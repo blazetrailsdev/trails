@@ -56,10 +56,16 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("marshal dump", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires Marshal serialization
   });
 
   it.skip("should property quote string primary keys", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires DB quoting
   });
 
@@ -111,6 +117,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("adding type mismatch", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires AssociationTypeMismatch
   });
 
@@ -127,6 +136,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("adding from the project fixed timestamp", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires timestamp freezing
   });
 
@@ -474,6 +486,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("associations with conditions", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires scoped HABTM with conditions
   });
 
@@ -508,6 +523,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("include checks if record exists if target not loaded", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires DB-backed include? when not loaded
   });
 
@@ -527,18 +545,30 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("find with merged options", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires merged find options
   });
 
   it.skip("dynamic find should respect association order", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires dynamic finder with order
   });
 
   it.skip("find should append to association order", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires order chaining
   });
 
   it.skip("dynamic find all should respect readonly access", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires readonly on HABTM
   });
 
@@ -558,10 +588,16 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("find in association with options", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires find with merged options
   });
 
   it.skip("association with extend option", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires extend module on association
   });
 
@@ -680,6 +716,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("habtm respects select", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires select option
   });
 
@@ -700,30 +739,51 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("habtm respects select query method", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires .select() chaining
   });
 
   it.skip("join middle table alias", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires join alias in query
   });
 
   it.skip("join table alias", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires join table aliasing
   });
 
   it.skip("join with group", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires GROUP BY on joined query
   });
 
   it.skip("find grouped", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires grouped find
   });
 
   it.skip("find scoped grouped", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires scoped + grouped
   });
 
   it.skip("find scoped grouped having", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires HAVING clause
   });
 
@@ -765,26 +825,44 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("get ids for unloaded associations does not load them", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires *_ids without loading
   });
 
   it.skip("assign ids", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires *_ids= writer
   });
 
   it.skip("assign ids ignoring blanks", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires blank filtering in *_ids=
   });
 
   it.skip("singular ids are reloaded after collection concat", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires cache invalidation after <<
   });
 
   it.skip("scoped find on through association doesnt return read only records", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires scoped through find
   });
 
   it.skip("has many through polymorphic has manys works", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires polymorphic through
   });
 
@@ -802,6 +880,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("dynamic find should respect association include", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires dynamic finder + includes
   });
 
@@ -821,18 +902,30 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("association proxy transaction method starts transaction in association class", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires CollectionProxy#transaction
   });
 
   it.skip("attributes are being set when initialized from habtm association with where clause", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires where-scoped build
   });
 
   it.skip("attributes are being set when initialized from habtm association with multiple where clauses", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires multiple where-scoped build
   });
 
   it.skip("include method in has and belongs to many association should return true for instance added with build", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires include? after build
   });
 
@@ -861,10 +954,16 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("association with validate false does not run associated validation callbacks on create", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires validate: false option
   });
 
   it.skip("association with validate false does not run associated validation callbacks on update", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires validate: false on update
   });
 
@@ -908,38 +1007,65 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("has and belongs to many in a namespaced model pointing to a namespaced model", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires module namespacing
   });
 
   it.skip("has and belongs to many in a namespaced model pointing to a non namespaced model", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires cross-namespace HABTM
   });
 
   it.skip("redefine habtm", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires association redefinition
   });
 
   it.skip("habtm with reflection using class name and fixtures", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires class_name option + fixtures
   });
 
   it.skip("with symbol class name", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires symbol class_name
   });
 
   it.skip("alternate database", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires multi-database support
   });
 
   it.skip("habtm scope can unscope", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires unscope support
   });
 
   it.skip("preloaded associations size", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires preload size optimization
   });
 
   it.skip("has and belongs to many is usable with belongs to required by default", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires belongs_to required by default config
   });
 
@@ -981,6 +1107,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("has and belongs to many while partial inserts false", () => {
+    // BLOCKED: associations — habtm feature gap
+    // ROOT-CAUSE: associations/has-and-belongs-to-many-associations.ts or preloader.ts missing habtm semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-and-belongs-to-many-associations.test.ts
     // Requires partial_inserts: false
   });
 

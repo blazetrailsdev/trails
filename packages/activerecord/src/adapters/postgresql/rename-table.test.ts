@@ -50,10 +50,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows.map((r) => r.name)).toEqual(["alice", "bob"]);
     });
 
-    it.skip("renaming a table with uuid primary key and uuid_generate_v4() default also renames the primary key index", async () => {});
-    it.skip("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {});
+    it.skip("renaming a table with uuid primary key and uuid_generate_v4() default also renames the primary key index", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
+      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    });
+    it.skip("renaming a table with uuid primary key and gen_random_uuid() default also renames the primary key index", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
+      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    });
 
-    it.skip("renaming a table also renames the primary key sequence", () => {});
-    it.skip("renaming a table also renames the primary key index", () => {});
+    it.skip("renaming a table also renames the primary key sequence", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
+      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    });
+    it.skip("renaming a table also renames the primary key index", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in rename-table
+      // ROOT-CAUSE: connection-adapters/postgresql/rename-table.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/rename-table.ts; affects ~10–47 tests in rename-table.test.ts
+    });
   });
 });

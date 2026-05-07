@@ -84,11 +84,31 @@ describe("EagerAssociationTest", () => {
       expect(comments).toHaveLength(1);
     }
   });
-  it.skip("loading polymorphic association with mixed table conditions", () => {});
-  it.skip("loading association with string joins", () => {});
-  it.skip("loading with scope including joins", () => {});
-  it.skip("loading association with same table joins", () => {});
-  it.skip("loading association with intersection joins", () => {});
+  it.skip("loading polymorphic association with mixed table conditions", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading association with string joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading with scope including joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading association with same table joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading association with intersection joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
 
   it("loading associations dont leak instance state", async () => {
     class EagerPost extends Base {
@@ -305,10 +325,26 @@ describe("EagerAssociationTest", () => {
     const children = (parents[0] as any)._preloadedAssociations.get("eagerHmNoPkChildren");
     expect(children).toHaveLength(1);
   });
-  it.skip("type cast in where references association name", () => {});
-  it.skip("attribute alias in where references association name", () => {});
-  it.skip("calculate with string in from and eager loading", () => {});
-  it.skip("with two tables in from without getting double quoted", () => {});
+  it.skip("type cast in where references association name", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("attribute alias in where references association name", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("calculate with string in from and eager loading", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("with two tables in from without getting double quoted", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("duplicate middle objects", async () => {
     class EagerDupParent extends Base {
       static {
@@ -1429,7 +1465,11 @@ describe("EagerAssociationTest", () => {
     const children = (parents[0] as any)._preloadedAssociations.get("eagerStrChildren");
     expect(children).toHaveLength(1);
   });
-  it.skip("string id column joins", () => {});
+  it.skip("string id column joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("eager load has many through with string keys", async () => {
     class EagerStrThrOwner extends Base {
       static {
@@ -1792,7 +1832,11 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("does it hurt");
   });
-  it.skip("preloading with has one through an sti with after initialize", () => {});
+  it.skip("preloading with has one through an sti with after initialize", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preloading has many through with implicit source", async () => {
     class EagerImpOwner extends Base {
       static {
@@ -1843,7 +1887,11 @@ describe("EagerAssociationTest", () => {
     });
     expect(items).toHaveLength(1);
   });
-  it.skip("eager with has many through an sti join model with conditions on both", () => {});
+  it.skip("eager with has many through an sti join model with conditions on both", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("eager with has many through join model with conditions", async () => {
     class EagerHmtCondAuthor extends Base {
       static {
@@ -2393,12 +2441,36 @@ describe("EagerAssociationTest", () => {
     const posts = await EagerNoResPost.all().includes("eagerNoResComments").toArray();
     expect(posts).toHaveLength(0);
   });
-  it.skip("eager count performed on a has many association with multi table conditional", () => {});
-  it.skip("eager count performed on a has many through association with multi table conditional", () => {});
-  it.skip("eager with has and belongs to many and limit", () => {});
-  it.skip("has and belongs to many should not instantiate same records multiple times", () => {});
-  it.skip("eager with has many and limit and conditions on the eagers", () => {});
-  it.skip("eager with has many and limit and scoped conditions on the eagers", () => {});
+  it.skip("eager count performed on a has many association with multi table conditional", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager count performed on a has many through association with multi table conditional", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager with has and belongs to many and limit", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("has and belongs to many should not instantiate same records multiple times", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager with has many and limit and conditions on the eagers", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager with has many and limit and scoped conditions on the eagers", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("eager association loading with habtm", async () => {
     class HabtmEagerPost extends Base {
       static {
@@ -2595,7 +2667,11 @@ describe("EagerAssociationTest", () => {
     const cats = (posts[0] as any)._preloadedAssociations.get("habtmInhSpecialCategories");
     expect(cats).toHaveLength(1);
   });
-  it.skip("eager with multi table conditional properly counts the records when using size", () => {});
+  it.skip("eager with multi table conditional properly counts the records when using size", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
 
   it("eager with invalid association reference", async () => {
     class EagerWidget extends Base {
@@ -2613,6 +2689,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it.skip("exceptions have suggestions for fix", async () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
     class ExSugAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -3254,7 +3333,11 @@ describe("EagerAssociationTest", () => {
     const preloaded = (results[0] as any)._preloadedAssociations.get("eagerPreHoChild");
     expect(preloaded?.value).toBe("V");
   });
-  it.skip("eager association with scope with joins", () => {});
+  it.skip("eager association with scope with joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preconfigured includes with habtm", async () => {
     class PciAuthor extends Base {
       static {
@@ -3395,8 +3478,16 @@ describe("EagerAssociationTest", () => {
     expect(count).toBe(2);
   });
 
-  it.skip("association loading notification", () => {});
-  it.skip("base messages", () => {});
+  it.skip("association loading notification", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("base messages", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("load with sti sharing association", async () => {
     class StiShareComment extends Base {
       static {
@@ -3428,15 +3519,51 @@ describe("EagerAssociationTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded.title).toBe("T");
   });
-  it.skip("conditions on join table with include and limit", () => {});
-  it.skip("dont create temporary active record instances", () => {});
-  it.skip("order on join table with include and limit", () => {});
-  it.skip("eager loading with order on joined table preloads", () => {});
-  it.skip("eager loading with conditions on joined table preloads", () => {});
-  it.skip("preload has many with association condition and default scope", () => {});
-  it.skip("eager loading with conditions on string joined table preloads", () => {});
-  it.skip("eager loading with select on joined table preloads", () => {});
-  it.skip("eager loading with conditions on join model preloads", () => {});
+  it.skip("conditions on join table with include and limit", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("dont create temporary active record instances", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("order on join table with include and limit", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading with order on joined table preloads", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading with conditions on joined table preloads", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preload has many with association condition and default scope", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading with conditions on string joined table preloads", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading with select on joined table preloads", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading with conditions on join model preloads", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preload has many using primary key", async () => {
     class EagerPkAuthor extends Base {
       static {
@@ -3623,8 +3750,16 @@ describe("EagerAssociationTest", () => {
     const parents = await EagerReordParent.all().includes("eagerReordChild").toArray();
     expect((parents[0] as any)._preloadedAssociations.get("eagerReordChild")?.value).toBe("V");
   });
-  it.skip("preloading polymorphic with custom foreign type", () => {});
-  it.skip("joins with includes should preload via joins", () => {});
+  it.skip("preloading polymorphic with custom foreign type", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("joins with includes should preload via joins", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("join eager with empty order should generate valid sql", async () => {
     class JeeoPost extends Base {
       static {
@@ -3678,7 +3813,11 @@ describe("EagerAssociationTest", () => {
     expect(result).toHaveLength(1);
     expect(result[0]._preloadedAssociations.get("jeeoComments")).toHaveLength(1);
   });
-  it.skip("deep including through habtm", () => {});
+  it.skip("deep including through habtm", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("eager load multiple associations with references", async () => {
     class ElmarMentor extends Base {
       static {
@@ -3843,9 +3982,17 @@ describe("EagerAssociationTest", () => {
     expect(devs.length).toBe(1);
     expect(devs[0].name).toBe("David");
   });
-  it.skip("scoping with a circular preload", () => {});
+  it.skip("scoping with a circular preload", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
 
-  it.skip("circular preload does not modify unscoped", () => {});
+  it.skip("circular preload does not modify unscoped", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
 
   it("belongs_to association ignores the scoping", async () => {
     class BtScopeAuthor extends Base {
@@ -3911,7 +4058,11 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {});
+  it.skip("preloading does not cache has many association subset when preloaded with a through association", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preloading a through association twice does not reset it", async () => {
     class EagerTwiceOwner extends Base {
       static {
@@ -3971,16 +4122,56 @@ describe("EagerAssociationTest", () => {
     });
     expect(targets2).toHaveLength(1);
   });
-  it.skip("works in combination with order(:symbol) and reorder(:symbol)", () => {});
-  it.skip("preloading with a polymorphic association and using the existential predicate but also using a select", () => {});
-  it.skip("preloading with a polymorphic association and using the existential predicate", () => {});
-  it.skip("preloading associations with string joins and order references", () => {});
-  it.skip("including associations with where.not adds implicit references", () => {});
-  it.skip("including association based on sql condition and no database column", () => {});
-  it.skip("preloading of instance dependent associations is supported", () => {});
-  it.skip("eager loading of instance dependent associations is not supported", () => {});
-  it.skip("preloading of optional instance dependent associations is supported", () => {});
-  it.skip("eager loading of optional instance dependent associations is not supported", () => {});
+  it.skip("works in combination with order(:symbol) and reorder(:symbol)", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading with a polymorphic association and using the existential predicate but also using a select", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading with a polymorphic association and using the existential predicate", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading associations with string joins and order references", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("including associations with where.not adds implicit references", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("including association based on sql condition and no database column", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading of instance dependent associations is supported", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading of instance dependent associations is not supported", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading of optional instance dependent associations is supported", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading of optional instance dependent associations is not supported", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preload with invalid argument", async () => {
     class PiaWidget extends Base {
       static {
@@ -3994,8 +4185,16 @@ describe("EagerAssociationTest", () => {
     const widgets = await PiaWidget.all().preload("nonExistent").toArray();
     expect(widgets).toHaveLength(1);
   });
-  it.skip("associations with extensions are not instance dependent", () => {});
-  it.skip("including associations with extensions and an instance dependent scope is supported", () => {});
+  it.skip("associations with extensions are not instance dependent", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("including associations with extensions and an instance dependent scope is supported", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preloading readonly association", async () => {
     class PraAuthor extends Base {
       static {
@@ -4077,9 +4276,21 @@ describe("EagerAssociationTest", () => {
     const posts = (authors[0] as any)._preloadedAssociations?.get("elraPosts") ?? [];
     expect(posts).toHaveLength(1);
   });
-  it.skip("preloading a polymorphic association with references to the associated table", () => {});
-  it.skip("eager-loading a polymorphic association with references to the associated table", () => {});
-  it.skip("eager-loading with a polymorphic association won't work consistently", () => {});
+  it.skip("preloading a polymorphic association with references to the associated table", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager-loading a polymorphic association with references to the associated table", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager-loading with a polymorphic association won't work consistently", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preloading has_many_through association avoids calling association.reader", async () => {
     class PhmtAuthor extends Base {
       static {
@@ -4123,15 +4334,50 @@ describe("EagerAssociationTest", () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].body).toBe("C");
   });
-  it.skip("preloading through a polymorphic association doesn't require the association to exist", () => {});
-  it.skip("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", () => {});
-  it.skip("preloading a regular association with a typo through a polymorphic association still raises", () => {});
-  it.skip("preloading belongs_to association associated by a composite query_constraints", () => {});
-  it.skip("preloading belongs_to association SQL", () => {});
-  it.skip("preloading has_many association associated by a composite query_constraints", () => {});
-  it.skip("preloading has_many through association associated by a composite query_constraints", () => {});
-  it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {});
+  it.skip("preloading through a polymorphic association doesn't require the association to exist", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading a regular association with a typo through a polymorphic association still raises", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading belongs_to association associated by a composite query_constraints", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading belongs_to association SQL", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading has_many association associated by a composite query_constraints", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading has_many through association associated by a composite query_constraints", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preloading belongs_to CPK model with one of the keys being shared between models", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it.skip("preloading belongs_to with cpk", async () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
     class CpkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -4167,6 +4413,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it.skip("preloading has_many with cpk", async () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
     class CpkHmOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -4202,6 +4451,9 @@ describe("EagerAssociationTest", () => {
   });
 
   it.skip("preloading has_one with cpk", async () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
     class CpkHoOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -4236,11 +4488,31 @@ describe("EagerAssociationTest", () => {
     expect(receipt.number).toBe("R001");
   });
 
-  it.skip("preloading too many ids", () => {});
-  it.skip("eager loading too many ids", () => {});
-  it.skip("eager with has one through join model with conditions on the through", () => {});
-  it.skip("loading with one association with non preload", () => {});
-  it.skip("loading with multiple associations", () => {});
+  it.skip("preloading too many ids", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading too many ids", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager with has one through join model with conditions on the through", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading with one association with non preload", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("loading with multiple associations", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("including duplicate objects from has many", async () => {
     // Rails: car_post belongs to 2 categories via habtm; includes({ posts: :comments })
     // on categories should yield the SAME comment object for each category's posts[0].
@@ -4413,7 +4685,11 @@ describe("EagerAssociationTest", () => {
       expect((posts[0] as any)._preloadedAssociations.has("alarComments")).toBe(true);
     }
   });
-  it.skip("loading from an association that has a hash of conditions", () => {});
+  it.skip("loading from an association that has a hash of conditions", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("loading with no associations", async () => {
     // Rails: Post.includes(:author).find(authorless post).author is nil
     class LnaPost extends Base {
@@ -4478,13 +4754,41 @@ describe("EagerAssociationTest", () => {
     expect(titles).toContain("Welcome");
     expect(titles).toContain("Other");
   });
-  it.skip("eager with has one dependent does not destroy dependent", () => {});
-  it.skip("preconfigured includes with belongs to", () => {});
-  it.skip("preconfigured includes with has many", () => {});
-  it.skip("preload belongs to uses exclusive scope", () => {});
-  it.skip("preload has many uses exclusive scope", () => {});
-  it.skip("preload has one using primary key", () => {});
-  it.skip("include has one using primary key", () => {});
+  it.skip("eager with has one dependent does not destroy dependent", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preconfigured includes with belongs to", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preconfigured includes with has many", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preload belongs to uses exclusive scope", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preload has many uses exclusive scope", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("preload has one using primary key", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("include has one using primary key", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
   it("preloading empty belongs to", async () => {
     // Rails: Client.create!(client_of: beyond_max_id) then preload(:firm) → nil firm
     class PebClient extends Base {
@@ -4644,8 +4948,16 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  it.skip("preloading too many ids", () => {});
-  it.skip("eager loading too many ids", () => {});
+  it.skip("preloading too many ids", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
+  it.skip("eager loading too many ids", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  });
 });
 
 // ==========================================================================

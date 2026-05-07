@@ -139,7 +139,11 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     expect(ids).toContain(p2.id);
   });
 
-  it.skip("ids on loaded association with custom primary key", () => {});
+  it.skip("ids on loaded association with custom primary key", () => {
+    // BLOCKED: associations — has-many feature gap
+    // ROOT-CAUSE: associations/has-many-associations.ts or preloader.ts missing has-many semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-associations.test.ts
+  });
 
   it("blank custom primary key on new record should not run queries", async () => {
     const adapter = freshAdapter();

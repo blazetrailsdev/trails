@@ -122,24 +122,45 @@ describe("ReadonlyTest", () => {
   });
 
   it.skip("cant touch readonly column", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* fixture-dependent */
   });
   it.skip("has many find readonly", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
   it.skip("has many with through is not implicitly marked readonly", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
   it.skip("has many with through is not implicitly marked readonly while finding by id", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
   it.skip("has many with through is not implicitly marked readonly while finding first", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
   it.skip("has many with through is not implicitly marked readonly while finding last", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
   it.skip("association collection method missing scoping not readonly", () => {
+    // BLOCKED: relation — Relation API gap in readonly
+    // ROOT-CAUSE: relation/readonly.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in readonly.test.ts
     /* needs associations */
   });
 });

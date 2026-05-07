@@ -14,10 +14,30 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("AdapterPreventWritesTest", () => {
-    it.skip("errors when a replace query is called while preventing writes", () => {});
-    it.skip("doesnt error when a describe query is called while preventing writes", () => {});
-    it.skip("doesnt error when a desc query is called while preventing writes", () => {});
-    it.skip("doesnt error when a use query is called while preventing writes", () => {});
-    it.skip("doesnt error when a kill query is called while preventing writes", () => {});
+    it.skip("errors when a replace query is called while preventing writes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in adapter-prevent-writes
+      // ROOT-CAUSE: adapters/mysql2/adapter-prevent-writes.ts or abstract-mysql-adapter/adapter-prevent-writes.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/adapter-prevent-writes.ts; affects ~10–26 tests in adapter-prevent-writes.test.ts
+    });
+    it.skip("doesnt error when a describe query is called while preventing writes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in adapter-prevent-writes
+      // ROOT-CAUSE: adapters/mysql2/adapter-prevent-writes.ts or abstract-mysql-adapter/adapter-prevent-writes.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/adapter-prevent-writes.ts; affects ~10–26 tests in adapter-prevent-writes.test.ts
+    });
+    it.skip("doesnt error when a desc query is called while preventing writes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in adapter-prevent-writes
+      // ROOT-CAUSE: adapters/mysql2/adapter-prevent-writes.ts or abstract-mysql-adapter/adapter-prevent-writes.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/adapter-prevent-writes.ts; affects ~10–26 tests in adapter-prevent-writes.test.ts
+    });
+    it.skip("doesnt error when a use query is called while preventing writes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in adapter-prevent-writes
+      // ROOT-CAUSE: adapters/mysql2/adapter-prevent-writes.ts or abstract-mysql-adapter/adapter-prevent-writes.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/adapter-prevent-writes.ts; affects ~10–26 tests in adapter-prevent-writes.test.ts
+    });
+    it.skip("doesnt error when a kill query is called while preventing writes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in adapter-prevent-writes
+      // ROOT-CAUSE: adapters/mysql2/adapter-prevent-writes.ts or abstract-mysql-adapter/adapter-prevent-writes.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/adapter-prevent-writes.ts; affects ~10–26 tests in adapter-prevent-writes.test.ts
+    });
   });
 });

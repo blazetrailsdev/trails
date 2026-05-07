@@ -3,10 +3,26 @@ import { UrlConfig } from "./url-config.js";
 
 describe("DatabaseConfigurations", () => {
   describe("UrlConfigTest", () => {
-    it.skip("schema dump parsing", () => {});
-    it.skip("query cache parsing", () => {});
-    it.skip("replica parsing", () => {});
-    it.skip("database tasks parsing", () => {});
+    it.skip("schema dump parsing", () => {
+      // BLOCKED: connection-pool — database configuration parsing gap in url-config
+      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
+      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
+    });
+    it.skip("query cache parsing", () => {
+      // BLOCKED: connection-pool — database configuration parsing gap in url-config
+      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
+      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
+    });
+    it.skip("replica parsing", () => {
+      // BLOCKED: connection-pool — database configuration parsing gap in url-config
+      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
+      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
+    });
+    it.skip("database tasks parsing", () => {
+      // BLOCKED: connection-pool — database configuration parsing gap in url-config
+      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
+      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in url-config.test.ts
+    });
 
     // Mirrors Rails' UrlConfig#database — when the configuration hash
     // doesn't carry an explicit `database`, fall back to the URL path.

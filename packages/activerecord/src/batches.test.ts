@@ -564,13 +564,41 @@ describe("EachTest", () => {
     expect(batchRels.length).toBeGreaterThan(0);
   });
 
-  it.skip("find in batches should quote batch order", () => {});
-  it.skip("find in batches should ignore the order default scope", () => {});
-  it.skip("find in batches should error on ignore the order", () => {});
-  it.skip("find in batches should not error if config overridden", () => {});
-  it.skip("find in batches should error on config specified to error", () => {});
-  it.skip("find in batches should not error by default", () => {});
-  it.skip("find in batches should use any column as primary key when start is not specified", () => {});
+  it.skip("find in batches should quote batch order", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should ignore the order default scope", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should error on ignore the order", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should not error if config overridden", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should error on config specified to error", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should not error by default", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("find in batches should use any column as primary key when start is not specified", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
 
   it("in batches update all returns zero when no batches", async () => {
     const adp = freshAdapter();
@@ -591,6 +619,9 @@ describe("EachTest", () => {
   });
 
   it.skip("in batches touch all returns rows affected", async () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
     const adp = freshAdapter();
     class Post extends Base {
       static {
@@ -663,11 +694,31 @@ describe("EachTest", () => {
     expect(total).toBe(0);
   });
 
-  it.skip("in batches should use any column as primary key when start is not specified", () => {});
-  it.skip("in_batches should return no records if the limit is 0 and load is ", () => {});
-  it.skip(".find_each respects table alias", () => {});
-  it.skip(".in_batches should start from the start option when using composite primary key", () => {});
-  it.skip(".in_batches should end at the finish option when using composite primary key", () => {});
+  it.skip("in batches should use any column as primary key when start is not specified", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip("in_batches should return no records if the limit is 0 and load is ", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip(".find_each respects table alias", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip(".in_batches should start from the start option when using composite primary key", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
+  it.skip(".in_batches should end at the finish option when using composite primary key", () => {
+    // BLOCKED: relation — batch enumeration gap (inBatchesOf / findEach cursor)
+    // ROOT-CAUSE: relation/batches.ts#inBatchesOf or findEachWithOrder missing composite-PK support
+    // SCOPE: ~50 LOC in relation/batches.ts; affects ~13 tests in batches.test.ts
+  });
 });
 
 // ==========================================================================

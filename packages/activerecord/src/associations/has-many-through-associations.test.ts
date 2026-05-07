@@ -25,7 +25,11 @@ describe("HasManyThroughAssociationsTest", () => {
     adapter = freshAdapter();
   });
 
-  it.skip("marshal dump", () => {});
+  it.skip("marshal dump", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-associations.test.ts
+  });
 
   it("through association with joins", async () => {
     class TajAuthor extends Base {
@@ -5614,6 +5618,9 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it.skip("save returns falsy when join record has errors", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-associations.test.ts
     // Rails: c = Category.new(name: "Fishing", authors: [Author.first]); assert_not c.save
     // Requires autosave-through support: saving a new record with pre-set through
     // associations must attempt join record creation and propagate failures to the

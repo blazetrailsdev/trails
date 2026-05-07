@@ -14,10 +14,30 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("UnsignedTypeTest", () => {
-    it.skip("unsigned int max value is in range", () => {});
-    it.skip("minus value is out of range", () => {});
-    it.skip("schema definition can use unsigned as the type", () => {});
-    it.skip("deprecate unsigned_float and unsigned_decimal", () => {});
-    it.skip("schema dump includes unsigned option", () => {});
+    it.skip("unsigned int max value is in range", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in unsigned-type
+      // ROOT-CAUSE: adapters/mysql2/unsigned-type.ts or abstract-mysql-adapter/unsigned-type.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/unsigned-type.ts; affects ~10–26 tests in unsigned-type.test.ts
+    });
+    it.skip("minus value is out of range", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in unsigned-type
+      // ROOT-CAUSE: adapters/mysql2/unsigned-type.ts or abstract-mysql-adapter/unsigned-type.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/unsigned-type.ts; affects ~10–26 tests in unsigned-type.test.ts
+    });
+    it.skip("schema definition can use unsigned as the type", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in unsigned-type
+      // ROOT-CAUSE: adapters/mysql2/unsigned-type.ts or abstract-mysql-adapter/unsigned-type.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/unsigned-type.ts; affects ~10–26 tests in unsigned-type.test.ts
+    });
+    it.skip("deprecate unsigned_float and unsigned_decimal", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in unsigned-type
+      // ROOT-CAUSE: adapters/mysql2/unsigned-type.ts or abstract-mysql-adapter/unsigned-type.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/unsigned-type.ts; affects ~10–26 tests in unsigned-type.test.ts
+    });
+    it.skip("schema dump includes unsigned option", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in unsigned-type
+      // ROOT-CAUSE: adapters/mysql2/unsigned-type.ts or abstract-mysql-adapter/unsigned-type.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/unsigned-type.ts; affects ~10–26 tests in unsigned-type.test.ts
+    });
   });
 });

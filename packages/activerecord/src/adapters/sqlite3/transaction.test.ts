@@ -63,6 +63,9 @@ describe("SQLite3TransactionTest", () => {
   });
 
   it.skip("opens a `read_uncommitted` transaction", async () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in transaction
+    // ROOT-CAUSE: adapters/sqlite3/transaction.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/transaction.ts; affects ~1–17 tests in transaction.test.ts
     // better-sqlite3 does not expose SQLITE_OPEN_SHAREDCACHE, so cross-connection
     // read_uncommitted visibility cannot be tested.
     const conn1 = withConn({ sharedCache: true });

@@ -79,6 +79,9 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it.skip("schema define with table name prefix", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in active-record-schema
+    // ROOT-CAUSE: active-record-schema.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in active-record-schema.test.ts
     /* table name prefixes not supported */
   });
 
@@ -179,6 +182,9 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it.skip("timestamps with implicit default on change table with bulk", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in active-record-schema
+    // ROOT-CAUSE: active-record-schema.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in active-record-schema.test.ts
     /* bulk mode not supported */
   });
 

@@ -151,18 +151,33 @@ describe("InverseBelongsToTests", () => {
   });
 
   it.skip("with has many inversing should have single record when setting record through attribute in build method", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs has_many inversing push */
   });
   it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs callback tracking */
   });
   it.skip("with has many inversing does not add duplicate associated objects", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs has_many inversing */
   });
   it.skip("with has many inversing does not add unsaved duplicate records when collection is loaded", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs collection tracking */
   });
   it.skip("with has many inversing does not add saved duplicate records when collection is loaded", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs collection tracking */
   });
 
@@ -197,12 +212,21 @@ describe("InverseBelongsToTests", () => {
   });
 
   it.skip("recursive inverse on recursive model has many inversing", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs deep recursive inverse */
   });
   it.skip("unscope does not set inverse when incorrect", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs unscope support */
   });
   it.skip("or does not set inverse when incorrect", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs or-query inverse checking */
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
@@ -345,6 +369,9 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("parent instance should be shared with every child on find for sti", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs STI support */
   });
 
@@ -389,10 +416,16 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("parent instance should be shared within create block of new child", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs block-style create */
   });
 
   it.skip("parent instance should be shared within build block of new child", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs block-style build */
   });
 
@@ -463,6 +496,9 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("find on child instance with id should not load all child records", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs query counting */
   });
 
@@ -581,9 +617,15 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("inverse instance should be set before find callbacks are run", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs callback integration */
   });
   it.skip("inverse instance should be set before initialize callbacks are run", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs callback integration */
   });
 
@@ -618,6 +660,9 @@ describe("InverseHasManyTests", () => {
   });
 
   it.skip("changing the association id makes the inversed association target stale", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs stale detection */
   });
 });
@@ -715,6 +760,9 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it.skip("has many and belongs to should find inverse automatically for model in module", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs module/namespace support */
   });
 
@@ -757,9 +805,15 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it.skip("has many and belongs to should find inverse automatically for extension block", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs extension blocks */
   });
   it.skip("has many and belongs to should find inverse automatically for sti", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs STI */
   });
   it("has one and belongs to with non default foreign key should not find inverse automatically", () => {
@@ -1083,12 +1137,18 @@ describe("AutomaticInverseFindingTests", () => {
   });
 
   it.skip("has many inverse of derived automatically despite of composite foreign key", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* Composite FK associations use queryConstraints (not options.foreignKey scalar).
        canFindInverseOfAutomatically currently checks options.foreignKey only, so composite
        FK associations passed via queryConstraints may still auto-detect. Needs validation
        that the right path is exercised and inverse detection works correctly for composite FKs. */
   });
   it.skip("belongs to inverse of derived automatically despite of composite foreign key", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* Same as above — verify canFindInverseOfAutomatically behavior for queryConstraints vs
        scalar foreignKey, and that automatic detection works for composite FK associations. */
   });
@@ -1182,12 +1242,21 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
   });
   it.skip("inversed instance should not be reloaded after stale state changed", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs stale state tracking */
   });
   it.skip("inversed instance should not be reloaded after stale state changed with validation", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs stale state tracking */
   });
   it.skip("inversed instance should load after autosave if it is not already loaded", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs autosave */
   });
 
@@ -1204,9 +1273,15 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("with has many inversing should try to set inverse instances when the inverse is a has many", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs has_many inversing */
   });
   it.skip("with has many inversing does not trigger association callbacks on set when the inverse is a has many", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs callback tracking */
   });
 
@@ -1223,9 +1298,15 @@ describe("InversePolymorphicBelongsToTests", () => {
   });
 
   it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs inverse validation on polymorphic */
   });
   it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => {
+    // BLOCKED: associations — inverse-of feature gap
+    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs inverse validation on polymorphic */
   });
 });

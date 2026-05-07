@@ -505,31 +505,114 @@ describe("AggregationsTest", () => {
   // Rails: test_immutable_value_objects
   // Rails: test_reloaded_instance_refreshes_aggregations
   // Rails: test_inferred_mapping
-  it.skip("gps latitude", () => {});
-  it.skip("gps longitude", () => {});
-  it.skip("responds to constructor", () => {});
-  it.skip("hash should be the same for objects with the same values", () => {});
-  it.skip("hash should be different for objects with different values", () => {});
-  it.skip("mapping with custom constructor and target object that does not respond to to a", () => {});
-  it.skip("attributes after initialize", () => {});
-  it.skip("name mapping", () => {});
-  it.skip("ensure_custom_mapping", () => {});
-  it.skip("composite value", () => {});
+  it.skip("gps latitude", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("gps longitude", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("responds to constructor", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("hash should be the same for objects with the same values", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("hash should be different for objects with different values", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("mapping with custom constructor and target object that does not respond to to a", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("attributes after initialize", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("name mapping", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("ensure_custom_mapping", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("composite value", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
 
-  it.skip("find single value object", () => {});
-  it.skip("allow nil gps is nil", () => {});
-  it.skip("allow nil gps set to nil", () => {});
-  it.skip("allow nil set address attributes to nil", () => {});
-  it.skip("nil raises error when allow nil is false", () => {});
-  it.skip("nil return from converter is respected when allow nil is true", () => {});
-  it.skip("nil return from converter results in failure when allow nil is false", () => {});
-  it.skip("do not run the converter when nil was set", () => {});
-  it.skip("assigning hash to custom converter", () => {});
-  it.skip("assigning hash without custom converter", () => {});
+  it.skip("find single value object", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("allow nil gps is nil", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("allow nil gps set to nil", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("allow nil set address attributes to nil", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("nil raises error when allow nil is false", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("nil return from converter is respected when allow nil is true", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("nil return from converter results in failure when allow nil is false", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("do not run the converter when nil was set", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("assigning hash to custom converter", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
+  it.skip("assigning hash without custom converter", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
+  });
 });
 
 describe("OverridingAggregationsTest", () => {
   it.skip("composed of aggregation redefinition reflections should differ and not inherited", () => {
+    // BLOCKED: relation — calculation / aggregation gap
+    // ROOT-CAUSE: relation/calculations.ts#calculate or Relation#sum/avg/min/max missing Rails parity
+    // SCOPE: ~50 LOC in relation/calculations.ts; affects ~21 tests in calculations/aggregations.test.ts
     /* fixture-dependent */
   });
 });

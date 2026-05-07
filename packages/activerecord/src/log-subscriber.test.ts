@@ -129,7 +129,11 @@ describe("LogSubscriberTest", () => {
     expect(subscriber.debugs[0]).toMatch(/ruby {3}rails/);
   });
 
-  it.skip("basic query logging", () => {});
+  it.skip("basic query logging", () => {
+    // BLOCKED: relation — log-subscriber feature gap
+    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for log_subscriber
+    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in log-subscriber.test.ts
+  });
 
   it("basic query logging coloration", () => {
     subscriber.colorizeLogging = true;
@@ -275,7 +279,11 @@ describe("LogSubscriberTest", () => {
     );
   });
 
-  it.skip("exists query logging", () => {});
+  it.skip("exists query logging", () => {
+    // BLOCKED: relation — log-subscriber feature gap
+    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for log_subscriber
+    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in log-subscriber.test.ts
+  });
 
   it("verbose query logs", () => {
     setVerboseQueryLogs(true);

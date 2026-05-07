@@ -91,10 +91,26 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("Mysql2AdapterTest", () => {
-    it.skip("mysql2 default prepared statements", () => {});
-    it.skip("exec query with prepared statements", () => {});
-    it.skip("exec query nothing raises with no result queries", () => {});
-    it.skip("database exists returns false if database does not exist", () => {});
+    it.skip("mysql2 default prepared statements", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("exec query with prepared statements", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("exec query nothing raises with no result queries", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("database exists returns false if database does not exist", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
 
     // FK type-mismatch fixture tables — created/dropped around each test so
     // the FK tests are self-contained. beforeEach/afterEach live directly in
@@ -259,10 +275,30 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(error.cause).toBeInstanceOf(Error);
     });
 
-    it.skip("read timeout exception", () => {});
-    it.skip("statement timeout error codes", () => {});
-    it.skip("database timezone changes synced to connection", () => {});
-    it.skip("warnings do not change returned value of exec update", () => {});
-    it.skip("warnings do not change returned value of exec delete", () => {});
+    it.skip("read timeout exception", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("statement timeout error codes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("database timezone changes synced to connection", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("warnings do not change returned value of exec update", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
+    it.skip("warnings do not change returned value of exec delete", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
+      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    });
   });
 });

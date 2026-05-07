@@ -18,6 +18,10 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("MySQL2CheckConstraintQuotingTest", () => {
-    it.skip("check constraint no duplicate expression quoting", () => {});
+    it.skip("check constraint no duplicate expression quoting", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in check-constraint-quoting
+      // ROOT-CAUSE: adapters/mysql2/check-constraint-quoting.ts or abstract-mysql-adapter/check-constraint-quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/check-constraint-quoting.ts; affects ~10–26 tests in check-constraint-quoting.test.ts
+    });
   });
 });

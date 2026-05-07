@@ -14,19 +14,75 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("ActiveSchemaTest", () => {
-    it.skip("add index", () => {});
-    it.skip("index in create", () => {});
-    it.skip("index in bulk change", () => {});
-    it.skip("drop table", () => {});
-    it.skip("drop tables", () => {});
-    it.skip("create mysql database with encoding", () => {});
-    it.skip("recreate mysql database with encoding", () => {});
-    it.skip("add column", () => {});
-    it.skip("add column with limit", () => {});
-    it.skip("drop table with specific database", () => {});
-    it.skip("drop tables with specific database", () => {});
-    it.skip("add timestamps", () => {});
-    it.skip("remove timestamps", () => {});
-    it.skip("indexes in create", () => {});
+    it.skip("add index", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("index in create", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("index in bulk change", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("drop table", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("drop tables", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("create mysql database with encoding", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("recreate mysql database with encoding", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("add column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("add column with limit", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("drop table with specific database", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("drop tables with specific database", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("add timestamps", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("remove timestamps", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
+    it.skip("indexes in create", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in active-schema
+      // ROOT-CAUSE: adapters/mysql2/active-schema.ts or abstract-mysql-adapter/active-schema.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/active-schema.ts; affects ~10–26 tests in active-schema.test.ts
+    });
   });
 });

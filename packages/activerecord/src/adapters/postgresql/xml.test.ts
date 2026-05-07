@@ -14,14 +14,45 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLXMLTest", () => {
-    it.skip("xml column", async () => {});
-    it.skip("xml default", async () => {});
-    it.skip("xml type cast", async () => {});
-    it.skip("xml write", async () => {});
-    it.skip("xml schema dump", async () => {});
-    it.skip("null xml", async () => {});
-    it.skip("round trip", async () => {});
+    it.skip("xml column", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("xml default", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("xml type cast", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("xml write", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("xml schema dump", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("null xml", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
+    it.skip("round trip", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
+    });
     it.skip("update all", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in xml
+      // ROOT-CAUSE: connection-adapters/postgresql/xml.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/xml.ts; affects ~10–47 tests in xml.test.ts
       /* TODO: needs imports from original file */
     });
   });

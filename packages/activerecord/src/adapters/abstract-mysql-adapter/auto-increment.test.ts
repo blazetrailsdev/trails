@@ -14,9 +14,25 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("AutoIncrementTest", () => {
-    it.skip("auto increment without primary key", () => {});
-    it.skip("auto increment with composite primary key", () => {});
-    it.skip("auto increment false with custom primary key", () => {});
-    it.skip("auto increment false with create table", () => {});
+    it.skip("auto increment without primary key", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
+      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+    });
+    it.skip("auto increment with composite primary key", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
+      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+    });
+    it.skip("auto increment false with custom primary key", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
+      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+    });
+    it.skip("auto increment false with create table", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in auto-increment
+      // ROOT-CAUSE: adapters/mysql2/auto-increment.ts or abstract-mysql-adapter/auto-increment.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/auto-increment.ts; affects ~10–26 tests in auto-increment.test.ts
+    });
   });
 });

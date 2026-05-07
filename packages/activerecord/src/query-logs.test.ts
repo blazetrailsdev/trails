@@ -102,9 +102,15 @@ describe("QueryLogsTest", () => {
   });
 
   it.skip("connection is passed to tagging proc", () => {
+    // BLOCKED: relation — query-logs feature gap
+    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for query_logs
+    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in query-logs.test.ts
     /* needs connection context */
   });
   it.skip("connection does not override already existing connection in context", () => {
+    // BLOCKED: relation — query-logs feature gap
+    // ROOT-CAUSE: relation.ts or abstract-adapter.ts missing Rails parity for query_logs
+    // SCOPE: ~20–50 LOC fix in relation.ts or abstract-adapter.ts; affects ~1–2 tests in query-logs.test.ts
     /* needs connection context */
   });
 

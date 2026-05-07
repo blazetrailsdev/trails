@@ -261,6 +261,9 @@ describe("WithTest", () => {
   });
 
   it.skip("raises when using block", () => {
+    // BLOCKED: relation — Relation API gap in with
+    // ROOT-CAUSE: relation/with.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in with.test.ts
     // Rails tests that passing a block to with() raises ArgumentError.
     // TypeScript has no block/proc syntax; this constraint is not applicable.
   });
@@ -284,6 +287,9 @@ describe("WithTest", () => {
   });
 
   it.skip("common table expressions are unsupported", () => {
+    // BLOCKED: relation — Relation API gap in with
+    // ROOT-CAUSE: relation/with.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in with.test.ts
     // The in-memory test adapter (SQLite) supports CTEs. This branch only
     // runs on adapters that don't, which aren't exercised in the test suite.
   });

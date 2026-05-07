@@ -1116,7 +1116,11 @@ describe("NestedThroughAssociationsTest", () => {
     expect(loadedPost!.title).toBe("BC");
   });
 
-  it.skip("joins and includes from through models not included in association", () => {});
+  it.skip("joins and includes from through models not included in association", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("has one through has one through with belongs to source reflection preload", async () => {
     // Tag has_one :tagging -> Tagging belongs_to :post
@@ -1198,11 +1202,23 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags.every((t: any) => t.name === "general")).toBe(true);
   });
 
-  it.skip("distinct has many through a has many through association on through reflection", () => {});
+  it.skip("distinct has many through a has many through association on through reflection", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
-  it.skip("nested has many through with a table referenced multiple times", () => {});
+  it.skip("nested has many through with a table referenced multiple times", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
-  it.skip("nested has many through with scope on polymorphic reflection", () => {});
+  it.skip("nested has many through with scope on polymorphic reflection", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("has many through with foreign key option on through reflection", async () => {
     class FkThrAuthor extends Base {
@@ -1372,7 +1388,11 @@ describe("NestedThroughAssociationsTest", () => {
     expect(members[0].name).toBe("Alice");
   });
 
-  it.skip("has many through with sti on nested through reflection", () => {});
+  it.skip("has many through with sti on nested through reflection", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("nested has many through writers should raise error", async () => {
     const { CollectionProxy } = await import("./collection-proxy.js");
@@ -1587,7 +1607,11 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags[0].name).toBe("blue");
   });
 
-  it.skip("nested has many through with conditions on through associations preload via joins", () => {});
+  it.skip("nested has many through with conditions on through associations preload via joins", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("nested has many through with conditions on source associations", async () => {
     // Same as above but conditions are on source (tag) side
@@ -1656,9 +1680,17 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedTags[0].name).toBe("blue");
   });
 
-  it.skip("through association preload doesnt reset source association if already preloaded", () => {});
+  it.skip("through association preload doesnt reset source association if already preloaded", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
-  it.skip("nested has many through with conditions on source associations preload via joins", () => {});
+  it.skip("nested has many through with conditions on source associations preload via joins", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("nested has many through with foreign key option on the source reflection through reflection", async () => {
     // Organization -> Authors (custom FK) -> Essays -> Categories
@@ -1729,7 +1761,11 @@ describe("NestedThroughAssociationsTest", () => {
     expect(preloadedCats[0].name).toBe("general");
   });
 
-  it.skip("nested has many through should not be autosaved", () => {});
+  it.skip("nested has many through should not be autosaved", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
   it("polymorphic has many through when through association has not loaded", async () => {
     // Hotel -> departments -> chefs -> cake_designers (polymorphic)
@@ -1868,11 +1904,23 @@ describe("NestedThroughAssociationsTest", () => {
     expect(chefs).toHaveLength(1);
   });
 
-  it.skip("polymorphic has many through joined different table twice", () => {});
+  it.skip("polymorphic has many through joined different table twice", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
-  it.skip("has many through polymorphic with scope", () => {});
+  it.skip("has many through polymorphic with scope", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 
-  it.skip("has many through reset source reflection after loading is complete", () => {});
+  it.skip("has many through reset source reflection after loading is complete", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+  });
 });
 
 // ==========================================================================

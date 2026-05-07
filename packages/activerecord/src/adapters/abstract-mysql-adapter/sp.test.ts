@@ -14,8 +14,20 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("StoredProcedureTest", () => {
-    it.skip("multi results", () => {});
-    it.skip("multi results from select one", () => {});
-    it.skip("multi results from find by sql", () => {});
+    it.skip("multi results", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
+      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+    });
+    it.skip("multi results from select one", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
+      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+    });
+    it.skip("multi results from find by sql", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in sp
+      // ROOT-CAUSE: adapters/mysql2/sp.ts or abstract-mysql-adapter/sp.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/sp.ts; affects ~10–26 tests in sp.test.ts
+    });
   });
 });

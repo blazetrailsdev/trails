@@ -14,12 +14,40 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("CaseSensitivityTest", () => {
-    it.skip("columns include collation different from table", () => {});
-    it.skip("case sensitive", () => {});
-    it.skip("case insensitive comparison for ci column", () => {});
-    it.skip("case insensitive comparison for cs column", () => {});
-    it.skip("case sensitive comparison for ci column", () => {});
-    it.skip("case sensitive comparison for cs column", () => {});
-    it.skip("case sensitive comparison for binary column", () => {});
+    it.skip("columns include collation different from table", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case sensitive", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case insensitive comparison for ci column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case insensitive comparison for cs column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case sensitive comparison for ci column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case sensitive comparison for cs column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
+    it.skip("case sensitive comparison for binary column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in case-sensitivity
+      // ROOT-CAUSE: adapters/mysql2/case-sensitivity.ts or abstract-mysql-adapter/case-sensitivity.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/case-sensitivity.ts; affects ~10–26 tests in case-sensitivity.test.ts
+    });
   });
 });

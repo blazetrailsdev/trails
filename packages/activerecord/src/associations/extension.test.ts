@@ -257,15 +257,27 @@ describe("AssociationsExtensionsTest", () => {
     expect((await proxy.findLeastRecent())!.name).toBe("First");
   });
   it.skip("extension with dirty target", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
     /* dirty tracking on proxy not implemented */
   });
   it.skip("marshalling extensions", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
     /* marshalling not implemented */
   });
   it.skip("marshalling named extensions", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
     /* marshalling not implemented */
   });
   it.skip("extension name", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/extension.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in extension.test.ts
     /* extension naming not implemented */
   });
 });

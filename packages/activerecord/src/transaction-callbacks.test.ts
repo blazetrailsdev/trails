@@ -15,6 +15,9 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("TransactionCallbacksTest", () => {
   it.skip("before commit exception should pop transaction stack", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
 
@@ -168,6 +171,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after commit on create after transaction commits for new record if create succeeds creating through association", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
   it("no after commit on destroy after transaction commits for destroyed new record", async () => {
@@ -212,9 +218,15 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after commit on update after transaction commits for existing record on touch", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
   it.skip("only call after commit on top level transactions", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
 
@@ -262,6 +274,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("only call after rollback on update after transaction rollsback for existing record on touch", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
 
@@ -309,12 +324,21 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("call after rollback when commit fails", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
   it.skip("only call after rollback on records rolled back to a savepoint", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
   it.skip("only call after rollback on records rolled back to a savepoint when release savepoint fails", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
 
@@ -401,6 +425,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("after rollback callback when raise should restore state", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
   it("after rollback callbacks should validate on condition", () => {
@@ -451,6 +478,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* fixture-dependent */
   });
 
@@ -538,6 +568,9 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it.skip("save in after create commit wont invoke extra after create commit", () => {
+    // BLOCKED: transactions — transaction / savepoint / isolation gap
+    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
     /* needs transactional callback deduplication */
   });
 
@@ -694,10 +727,16 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("before commit actions", () => {
+      // BLOCKED: transactions — transaction / savepoint / isolation gap
+      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
       /* fixture-dependent */
     });
 
     it.skip("before commit update in same transaction", () => {
+      // BLOCKED: transactions — transaction / savepoint / isolation gap
+      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
       /* fixture-dependent */
     });
   }); // CallbacksOnMultipleActionsTest
@@ -976,6 +1015,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("updated callback called on first to save when followed in transaction by destroy from separate instance with old configuration", () => {
+      // BLOCKED: transactions — transaction / savepoint / isolation gap
+      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
       /* fixture-dependent */
     });
 
@@ -1005,6 +1047,9 @@ describe("TransactionCallbacksTest", () => {
     });
 
     it.skip("destroyed callbacks called on first saved instance in transaction with old configuration", () => {
+      // BLOCKED: transactions — transaction / savepoint / isolation gap
+      // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
+      // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transaction-callbacks.test.ts
       /* fixture-dependent */
     });
   }); // CallbacksOnMultipleInstancesInATransactionTest

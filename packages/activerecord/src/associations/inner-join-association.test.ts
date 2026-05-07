@@ -108,6 +108,9 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it.skip("eager load with arel joins", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
     /* needs eager loading with arel nodes */
   });
 
@@ -373,7 +376,11 @@ describe("InnerJoinAssociationTest", () => {
     expect(sql).toContain("comments");
   });
 
-  it.skip("eager load with string joins", () => {});
+  it.skip("eager load with string joins", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/inner-join-association.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inner-join-association.test.ts
+  });
 
   it("joins a has_and_belongs_to_many association", async () => {
     class HabtmPost extends Base {

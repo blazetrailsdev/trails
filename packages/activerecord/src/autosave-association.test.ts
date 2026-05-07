@@ -123,6 +123,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   it.skip("should rollback destructions if an exception occurred while saving a child", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires transaction rollback */
   });
 
@@ -191,6 +194,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   it.skip("should rollback destructions if an exception occurred while saving a parent", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires transaction rollback */
   });
 
@@ -264,6 +270,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   it.skip("should rollback destructions if an exception occurred while saving has many", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires transaction rollback */
   });
 
@@ -414,6 +423,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(saved).toBe(true);
   });
   it.skip("should rollback destructions if an exception occurred while saving habtm", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs transaction rollback support */
   });
 });
@@ -570,12 +582,21 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(ids).toEqual([c1.id, c2.id].sort());
   });
   it.skip("assign ids with belongs to cpk model", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* cpk not fully supported */
   });
   it.skip("assign ids with cpk for two models", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* cpk not fully supported */
   });
   it.skip("has one cpk has one autosave with id", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* cpk not fully supported */
   });
   it("assign ids for through a belongs to", async () => {
@@ -1012,9 +1033,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(child.isNewRecord()).toBe(false);
   });
   it.skip("callbacks on child when parent autosaves child twice", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs more callback infrastructure */
   });
   it.skip("callbacks on child when parent autosaves polymorphic child with inverse of", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* polymorphic not implemented */
   });
   it("callbacks on child when child autosaves parent", async () => {
@@ -1050,9 +1077,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(owner.isNewRecord()).toBe(false);
   });
   it.skip("callbacks on child when child autosaves parent twice", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs more callback infrastructure */
   });
   it.skip("callbacks on child when polymorphic child with inverse of autosaves parent", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* polymorphic not implemented */
   });
 
@@ -1134,6 +1167,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it.skip("should automatically save bang the associated model if it sets the inverse record", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* inverse not fully implemented */
   });
 
@@ -1158,6 +1194,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it.skip("should not ignore different error messages on the same attribute", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* error merging details */
   });
 
@@ -1180,9 +1219,15 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it.skip("should allow to bypass validations on associated models at any depth", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* deep nesting not tested */
   });
   it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* save! not fully implemented */
   });
   it("should not save and return false if a callback cancelled saving", async () => {
@@ -1237,6 +1282,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it.skip("recognises inverse polymorphic association changes with same foreign key", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* polymorphic not implemented */
   });
 });
@@ -1346,12 +1394,21 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it.skip("store association in two relations with one save", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave FK sync on cached belongs_to */
   });
   it.skip("store association in two relations with one save in existing object", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave FK sync */
   });
   it.skip("store association in two relations with one save in existing object with values", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave FK sync */
   });
 
@@ -1409,6 +1466,9 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it.skip("composite primary key autosave", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* cpk not fully supported */
   });
 
@@ -1522,6 +1582,9 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* save! not fully implemented */
   });
   it("should not save and return false if a callback cancelled saving", async () => {
@@ -1653,21 +1716,39 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   });
 
   it.skip("errors should be indexed when global flag is set", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires global indexed errors config */
   });
   it.skip("errors details should be indexed when passed as array", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires indexed error details */
   });
   it.skip("errors details with error on base should be indexed when passed as array", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires base error indexing */
   });
   it.skip("indexed errors should be properly translated", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires i18n */
   });
   it.skip("indexed errors on base attribute should be properly translated", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires i18n */
   });
   it.skip("errors details should be indexed when global flag is set", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires global indexed errors config */
   });
 });
@@ -1710,6 +1791,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it.skip("autosave does not pass through non custom validation contexts", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs custom validation contexts on autosave */
   });
 
@@ -1825,18 +1909,33 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   });
 
   it.skip("should not add the same callbacks multiple times for has one", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for belongs to", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for has many", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("should not add the same callbacks multiple times for has and belongs to many", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs reflectOnAllAssociations to inspect callback count */
   });
   it.skip("cyclic autosaves do not add multiple validations", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs cyclic association detection */
   });
 });
@@ -1938,6 +2037,9 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   });
 
   it.skip("when extra records exist for associations, validate should not load them up", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires lazy-loading tracking */
   });
 });
@@ -2194,6 +2296,9 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   });
 
   it.skip("when extra records exist for associations, validate should not load them up", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* requires lazy-loading tracking */
   });
 });
@@ -2333,6 +2438,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   });
 
   it.skip("autosave new record with after create callback and habtm association", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs HABTM autosave integration */
   });
 });
@@ -2352,9 +2460,15 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     expect(valid).toBe(false);
   });
   it.skip("rollbacks whole transaction and raises ActiveRecord::RecordInvalid when associations fail to #save! due to uniqueness validation failure", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave association integration */
   });
   it.skip("rollbacks whole transaction when associations fail to #save due to uniqueness validation failure", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave association integration */
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
@@ -2591,6 +2705,9 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
   it.skip("after save callback with autosave", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave association integration */
   });
 });
@@ -2670,6 +2787,9 @@ describe("TestAutosaveAssociationWithTouch", () => {
 
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
   it.skip("should update children when association redefined in subclass", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs autosave association integration */
   });
 });
@@ -3173,6 +3293,9 @@ describe("should update children when autosave is true and parent is new but chi
   });
 
   it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
+    // BLOCKED: associations — autosave feature gap
+    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* TODO: needs RecordInvalid import */
   });
 });

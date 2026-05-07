@@ -14,13 +14,45 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("QuotingTest", () => {
-    it.skip("cast bound integer", () => {});
-    it.skip("cast bound big decimal", () => {});
-    it.skip("cast bound rational", () => {});
-    it.skip("cast bound true", () => {});
-    it.skip("cast bound false", () => {});
-    it.skip("quote string", () => {});
-    it.skip("quote column name", () => {});
-    it.skip("quote table name", () => {});
+    it.skip("cast bound integer", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("cast bound big decimal", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("cast bound rational", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("cast bound true", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("cast bound false", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("quote string", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("quote column name", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
+    it.skip("quote table name", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
+      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    });
   });
 });

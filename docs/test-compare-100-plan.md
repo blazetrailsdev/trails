@@ -390,3 +390,86 @@ These should be added to a `scripts/test-compare/skip-list.ts` so test:compare c
 ### Symbols
 
 - Cases where the assertion distinguishes `Symbol` from `String`
+
+---
+
+## Workflow for unskipping tests
+
+Test-unskip agents will hit implementation gaps that exceed the 300-LOC ceiling if bundled with un-skips. The triage rule is: **don't file 50 follow-up issues for 50 tests blocked by 5 root causes.** Annotate each blocked skip with a structured comment so a later consolidation pass groups them by root cause and unblocks dozens at a time.
+
+### Per-test-file PR loop
+
+For each `it.skip(...)` (or `xit(...)`, `test.skip(...)`, `describe.skip(...)`) in the file:
+
+1. Attempt to un-skip the test and run it.
+2. **Passing** → un-skip, commit.
+3. **Failing with surgical fix (≤20 LOC, in-scope)** → fix, un-skip, commit.
+4. **Failing with deep gap** → leave skipped; upgrade the annotation to the format below.
+
+LOC budget per PR: ≤300 total diff. If 30 PASSING + a few SURGICAL pushes over, split into `<file>-pass` (un-skips only) + `<file>-fixes` (surgical fixes only). If a single bug fix would be >30 LOC, defer the fix entirely — don't try to land a subsystem repair inside a test-unskip PR.
+
+### Skip annotation format
+
+Replace bare `it.skip("name", () => {})` with:
+
+```ts
+it.skip("rails-test-name", () => {
+  // BLOCKED: STI — User.find(manager_id) returns User, expected Manager
+  // ROOT-CAUSE: inheritance.ts#findSubclass not reading inheritanceColumn for cross-class find
+  // SCOPE: ~50 LOC fix in inheritance.ts; affects ~12 tests across associations/, base.test.ts
+  // ...test body if any...
+});
+```
+
+Three required lines, in this order:
+
+- `BLOCKED: <category>` — controlled vocabulary, see below. The grep contract.
+- `ROOT-CAUSE:` — one-sentence specific cause naming the file/symbol involved.
+- `SCOPE:` — rough fix size + how many _other_ tests likely share this cause.
+
+**Note:** The initial normalization pass (PR #1294) applied annotations at file-path granularity, not per-test. Annotations on tests in multi-theme files (e.g. `base.test.ts`) may use the file's dominant-theme category even for outlier tests. When running a consolidation pass, treat `BLOCKED:` as a starting point for triage — verify the category applies to the specific test before acting on it.
+
+### Controlled vocabulary
+
+| Category                   | Meaning                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `BLOCKED: STI`             | Single-table inheritance routing                                                 |
+| `BLOCKED: associations`    | Specific association feature (specify which: habtm / inverse / through / ...)    |
+| `BLOCKED: encryption`      | Encryption subsystem gap                                                         |
+| `BLOCKED: schema`          | Schema introspection / dumper / definition gap                                   |
+| `BLOCKED: transactions`    | Transaction / savepoint / isolation gap                                          |
+| `BLOCKED: query-cache`     | Query cache behavior                                                             |
+| `BLOCKED: load-async`      | Async query / future result                                                      |
+| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent, candidate for `skip-list.ts`               |
+| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent, candidate for `skip-list.ts`  |
+| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent, candidate for `skip-list.ts`      |
+| `BLOCKED: fixture`         | Fixture loader feature (whole subsystem already in `skip-list.ts`)               |
+| `BLOCKED: migration`       | Migration runner feature                                                         |
+| `BLOCKED: connection-pool` | Connection pool / handler / pool config gap                                      |
+| `BLOCKED: relation`        | Relation API gap (specify which: where / scope / batches / ...)                  |
+| `BLOCKED: i18n`            | I18n message / translation gap                                                   |
+| `BLOCKED: validation`      | Validator behavior gap (specify which: uniqueness / length / numericality / ...) |
+| `BLOCKED: type`            | Type cast / serialize / deserialize gap (specify which Type)                     |
+| `BLOCKED: adapter-pg`      | PostgreSQL-specific adapter gap                                                  |
+| `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                       |
+| `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                      |
+| `BLOCKED: unknown`         | Could not categorize from context; needs human triage                            |
+
+Adding a new category: pick a slug, document it in the table above in the same PR.
+
+### Cross-file consolidation pass
+
+After several test-unskip PRs land, an audit pass:
+
+```bash
+grep -rn "BLOCKED:" packages/activerecord/src --include='*.test.ts' \
+  | sed 's/.*BLOCKED: //' | cut -d' ' -f1 | sort | uniq -c | sort -rn
+```
+
+Output ranks subsystems by blocked-test count. The biggest groups become focused subsystem-fix PRs. After a fix lands, un-skipping the affected tests is mechanical: run the previously-blocked file under `BLOCKED: <category>` and remove the annotation from any test that now passes.
+
+### Why this is better than per-test issues
+
+- Agents don't file 50 issues for 50 tests blocked by 5 root causes.
+- Annotation lives next to the failing test; no issue-tracker round-trip needed.
+- The grep is rerunnable; priorities update as state shifts.

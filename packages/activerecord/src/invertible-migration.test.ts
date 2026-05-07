@@ -166,6 +166,9 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate revert change column default", async () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     // ALTER COLUMN SET DEFAULT not supported in SQLite/MemoryAdapter
     class CreateHorses extends Migration {
       async change() {
@@ -195,12 +198,21 @@ describe("InvertibleMigrationTest", () => {
     expect(tableExists("horses")).toBe(true);
   });
   it.skip("migrate revert change column comment", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* comments not supported */
   });
   it.skip("migrate revert change table comment", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* comments not supported */
   });
   it.skip("migrate enable and disable extension", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* extensions not supported */
   });
 
@@ -295,6 +307,9 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate down with table name prefix", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* table name prefixes not supported */
   });
 
@@ -338,6 +353,9 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate revert add index without name on expression", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* expression indexes not supported */
   });
 
@@ -362,16 +380,29 @@ describe("InvertibleMigrationTest", () => {
   });
 
   it.skip("migrate revert add unique constraint with invalid option", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* unique constraints API not implemented */
   });
   it.skip("migrate revert add foreign key with invalid option", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* foreign key reversal not supported */
   });
   it.skip("migrate revert add check constraint with invalid option", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
     /* check constraints not implemented */
   });
 
-  it.skip("migrate revert change table", () => {});
+  it.skip("migrate revert change table", () => {
+    // BLOCKED: migration — migration runner gap in invertible-migration
+    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
+    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
+  });
 });
 
 describe("Reversible Migrations", () => {

@@ -45,5 +45,9 @@ describe("DateTest", () => {
     expect(val.year).toBe(2024);
   });
 
-  it.skip("assign valid dates", () => {});
+  it.skip("assign valid dates", () => {
+    // BLOCKED: type — date/time precision type gap in date
+    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
+    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in date.test.ts
+  });
 });

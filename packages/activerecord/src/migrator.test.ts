@@ -78,6 +78,9 @@ describe("MigratorTest", () => {
   });
 
   it.skip("finds migrations in subdirectories", () => {
+    // BLOCKED: migration — Migrator feature gap
+    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
+    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
     /* needs filesystem discovery */
   });
 
@@ -89,10 +92,16 @@ describe("MigratorTest", () => {
   });
 
   it.skip("finds migrations in numbered directory", () => {
+    // BLOCKED: migration — Migrator feature gap
+    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
+    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
     /* needs filesystem discovery */
   });
 
   it.skip("relative migrations", () => {
+    // BLOCKED: migration — Migrator feature gap
+    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
+    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
     /* needs filesystem discovery */
   });
 
@@ -148,10 +157,16 @@ describe("MigratorTest", () => {
   });
 
   it.skip("migrations status in subdirectories", () => {
+    // BLOCKED: migration — Migrator feature gap
+    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
+    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
     /* needs filesystem discovery */
   });
 
   it.skip("migrations status with schema define in subdirectories", () => {
+    // BLOCKED: migration — Migrator feature gap
+    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
+    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
     /* needs filesystem discovery */
   });
 

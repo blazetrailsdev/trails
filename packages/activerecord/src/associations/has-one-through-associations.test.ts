@@ -92,6 +92,9 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through executes limited query", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires query count assertions
   });
 
@@ -140,10 +143,16 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("building multiple associations builds through record", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires multiple has_one :through on same model
   });
 
   it.skip("building works with has one through belongs to", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires belongs_to :through configuration
   });
 
@@ -343,26 +352,44 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through with conditions eager loading", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires eager loading with conditions
   });
 
   it.skip("has one through polymorphic with source type", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires polymorphic with source type
   });
 
   it.skip("eager has one through polymorphic with source type", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires eager polymorphic with source type
   });
 
   it.skip("has one through nonpreload eagerloading", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires non-preload eager loading
   });
 
   it.skip("has one through nonpreload eager loading through polymorphic", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires non-preload eager loading through polymorphic
   });
 
   it.skip("has one through nonpreload eager loading through polymorphic with more than one through record", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires multi-record non-preload through polymorphic eager loading
   });
 
@@ -401,14 +428,23 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires proxy method visibility
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires proxy method visibility via send
   });
 
   it.skip("assigning to has one through preserves decorated join record", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires decorated join record preservation
   });
 
@@ -487,26 +523,44 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("value is properly quoted", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires SQL quoting
   });
 
   it.skip("has one through polymorphic with primary key option", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires polymorphic with primary key option
   });
 
   it.skip("has one through with primary key option", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires primary key option on through
   });
 
   it.skip("has one through with default scope on join model", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires default scope on join model
   });
 
   it.skip("has one through many raises exception", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires exception on has-one through has-many
   });
 
   it.skip("has one through polymorphic association", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires polymorphic through association
   });
 
@@ -557,18 +611,30 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("assigning has one through belongs to with new record owner", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires assignment with new record owner
   });
 
   it.skip("has one through with custom select on join model default scope", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires custom select on join model
   });
 
   it.skip("has one through relationship cannot have a counter cache", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires counter cache restriction
   });
 
   it.skip("has one through do not cache association reader if the though method has default scopes", () => {
+    // BLOCKED: associations — has-one-through feature gap
+    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
     // Requires cache invalidation with scoped through
   });
 

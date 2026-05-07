@@ -301,6 +301,9 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it.skip("reconnecting after materialized transaction starts new event", () => {
+    // BLOCKED: transactions — transaction instrumentation / notification not fully wired
+    // ROOT-CAUSE: transactions.ts#instrumentTransaction or Notifications event not published on commit/rollback
+    // SCOPE: ~20 LOC fix in transactions.ts; affects ~2 tests in transaction-instrumentation.test.ts
     // Requires reconnect!(restore_transactions: true) — not yet supported.
   });
 
@@ -368,6 +371,9 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it.skip("transaction instrumentation on failed rollback", () => {
+    // BLOCKED: transactions — transaction instrumentation / notification not fully wired
+    // ROOT-CAUSE: transactions.ts#instrumentTransaction or Notifications event not published on commit/rollback
+    // SCOPE: ~20 LOC fix in transactions.ts; affects ~2 tests in transaction-instrumentation.test.ts
     // Rails guards this with `unless in_memory_db?`. Our test adapter
     // uses an in-memory SQLite database so this scenario does not apply.
   });

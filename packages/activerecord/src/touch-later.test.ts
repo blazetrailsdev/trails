@@ -94,6 +94,9 @@ describe("TouchLaterTest", () => {
   });
 
   it.skip("touch later an association dont autosave parent", () => {
+    // BLOCKED: associations — touch: true / touch_later not implemented
+    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
+    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
     /* needs association autosave */
   });
 
@@ -122,12 +125,21 @@ describe("TouchLaterTest", () => {
     expect(inv.changed).toBe(false);
   });
   it.skip("touching three deep", () => {
+    // BLOCKED: associations — touch: true / touch_later not implemented
+    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
+    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
     /* needs multi-level association touch */
   });
   it.skip("touching through nested attributes without before committed on all records", () => {
+    // BLOCKED: associations — touch: true / touch_later not implemented
+    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
+    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
     /* needs nested attributes + touch */
   });
   it.skip("touching through nested attributes with before committed on all records", () => {
+    // BLOCKED: associations — touch: true / touch_later not implemented
+    // ROOT-CAUSE: associations/belongs-to.ts#touchRecord or TouchLater not implemented
+    // SCOPE: ~30 LOC fix in associations/belongs-to.ts; affects ~4 tests in touch-later.test.ts
     /* needs nested attributes + touch */
   });
 });

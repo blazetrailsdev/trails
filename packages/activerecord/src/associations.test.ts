@@ -2006,6 +2006,9 @@ describe("AssociationsTest", () => {
     expect(countAfter).toBe(countBefore);
   });
   it.skip("subselect", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs author_favorites association */
   });
   it("loading the association target should keep child records marked for destruction", async () => {
@@ -2222,9 +2225,15 @@ describe("AssociationsTest", () => {
     expect(reloaded.length).toBe(1);
   });
   it.skip("using limitable reflections helper", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs limitable_reflections helper */
   });
   it.skip("association with references", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs references/includes support */
   });
   it("belongs to a model with composite foreign key finds associated record", async () => {
@@ -2341,9 +2350,15 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 5]);
   });
   it.skip("querying by whole associated records using query constraints", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it.skip("querying by single associated record works using query constraints", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it("querying by relation with composite key", async () => {
@@ -2405,9 +2420,15 @@ describe("AssociationsTest", () => {
     expect(posts.map((p) => p.title).sort()).toEqual(["Post1", "Post2"]);
   });
   it.skip("has many association from a model with query constraints different from the association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it("model with composite query constraints has many association sql", async () => {
@@ -2444,12 +2465,21 @@ describe("AssociationsTest", () => {
     expect(posts).toHaveLength(1);
   });
   it.skip("belongs to association does not use parent query constraints if not configured to", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs single FK to CPK parent resolution */
   });
   it.skip("polymorphic belongs to uses parent query constraints", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it.skip("preloads model with query constraints by explicitly configured fk and pk", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it("append composite foreign key has many association", async () => {
@@ -2682,9 +2712,15 @@ describe("AssociationsTest", () => {
   });
 
   it.skip("query constraints that dont include the primary key raise with a single column", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it.skip("query constraints that dont include the primary key raise with multiple columns", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
   it("assign belongs to cpk model by id attribute", async () => {
@@ -2723,18 +2759,33 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([2, 7]);
   });
   it.skip("append composite foreign key has many association with autosave", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* fixture-dependent */
   });
   it.skip("assign composite foreign key belongs to association with autosave", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* fixture-dependent */
   });
   it.skip("append composite has many through association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* fixture-dependent */
   });
   it.skip("append composite has many through association with autosave", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* fixture-dependent */
   });
   it.skip("nullify composite has many through association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* fixture-dependent */
   });
   it("belongs to with explicit composite foreign key", async () => {
@@ -6545,6 +6596,9 @@ describe("AssociationProxyTest", () => {
     expect(proxy.loaded).toBe(false);
   });
   it.skip("push has many through does not load target", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: david.categories << category; assert_not david.categories.loaded? — needs has_many_through push-without-load */
   });
   it("push followed by save does not load target", async () => {
@@ -6566,12 +6620,21 @@ describe("AssociationProxyTest", () => {
     expect(proxy.loaded).toBe(false);
   });
   it.skip("inspect does not reload a not yet loaded target", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: assert_match on andreas.audit_logs.inspect — needs inspect() on CollectionProxy */
   });
   it.skip("pretty print does not reload a not yet loaded target", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: pretty_print(PP.new) on proxy — no equivalent in JS */
   });
   it.skip("save on parent saves children", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* requires autosave */
   });
   it("reload returns association", async () => {
@@ -6597,9 +6660,15 @@ describe("AssociationProxyTest", () => {
     expect(results[0].body).toBe("scoped");
   });
   it.skip("proxy object can be stubbed", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: Mocha stub test — no JS equivalent for this Ruby testing infrastructure check */
   });
   it.skip("inverses get set of subsets of the association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: sets inverse_of on loaded records — needs inverse_of population on collection load */
   });
   it("pluck uses loaded target", async () => {
@@ -6858,27 +6927,51 @@ describe("PreloaderTest", () => {
     expect(cats[0].name).toBe("Special");
   });
   it.skip("preload groups queries with same scope", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs scope tracking */
   });
   it.skip("preload grouped queries with already loaded records", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs loaded-record merging */
   });
   it.skip("preload grouped queries of middle records", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs middle-record grouping */
   });
   it.skip("preload grouped queries of through records", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs through-record grouping */
   });
   it.skip("preload through records with already loaded middle record", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs loaded-record merging */
   });
   it.skip("preload with instance dependent scope", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs instance-dependent scopes */
   });
   it.skip("preload with instance dependent through scope", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs instance-dependent scopes */
   });
   it.skip("preload with through instance dependent scope", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs instance-dependent scopes */
   });
 
@@ -6968,27 +7061,51 @@ describe("PreloaderTest", () => {
   });
 
   it.skip("preload groups queries with same scope at second level", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs multi-level scope grouping */
   });
   it.skip("preload groups queries with same sql at second level", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs multi-level scope grouping */
   });
   it.skip("preload with grouping sets inverse association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs inverse association setting */
   });
   it.skip("preload can group separate levels", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs multi-level grouping */
   });
   it.skip("preload can group multi level ping pong through", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs multi-level through */
   });
   it.skip("preload does not group same class different scope", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs scope comparison */
   });
   it.skip("preload does not group same scope different key name", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs key name comparison */
   });
   it.skip("multi database polymorphic preload with same table name", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs multi-database */
   });
 
@@ -7025,6 +7142,9 @@ describe("PreloaderTest", () => {
   });
 
   it.skip("preload with available records sti", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs STI */
   });
 
@@ -7099,9 +7219,15 @@ describe("PreloaderTest", () => {
   });
 
   it.skip("preload with available records with through association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs through preload with available records */
   });
   it.skip("preload with only some records available with through associations", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs through preload */
   });
 
@@ -7151,12 +7277,21 @@ describe("PreloaderTest", () => {
   });
 
   it.skip("preload with available records queries when scoped", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs scoped preloading */
   });
   it.skip("preload with available records queries when collection", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs collection preloading */
   });
   it.skip("preload with available records queries when incomplete", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs incomplete record detection */
   });
 
@@ -7227,15 +7362,27 @@ describe("PreloaderTest", () => {
   });
 
   it.skip("preload has many association with composite foreign key", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite keys */
   });
   it.skip("preload belongs to association with composite foreign key", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite keys */
   });
   it.skip("preload loaded belongs to association with composite foreign key", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite keys */
   });
   it.skip("preload has many through association with composite query constraints", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite keys */
   });
   it("preloads has many on model with a composite primary key through id attribute", async () => {

@@ -57,6 +57,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("invalid symbol config", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for MergeAndResolveDefaultUrlConfigTest
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Ruby-specific: symbol values like :bar aren't valid in TS configs
   });
 
@@ -146,6 +149,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("resolver with database uri containing only database name", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Rails treats bare "foo" as database name; our URL parser requires a scheme
   });
 
@@ -175,6 +181,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("url with hyphenated scheme", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Requires ConnectionAdapters.register which maps custom schemes; skip for now
   });
 
@@ -333,6 +342,9 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("separate database env vars", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Requires PRIMARY_DATABASE_URL / ANIMALS_DATABASE_URL per-name env var logic
   });
 
@@ -380,14 +392,23 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it.skip("protocol adapter mapping is used and can be updated", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
   });
 
   it.skip("protocol adapter mapping translates underscores to dashes", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
   });
 
   it.skip("protocol adapter mapping handles sqlite3 file urls", () => {
+    // BLOCKED: connection-pool — connection pool / handler gap in merge-and-resolve-default-url-config
+    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
+    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in merge-and-resolve-default-url-config.test.ts
     // Requires mutable ActiveRecord.protocol_adapters — not yet implemented
   });
 });

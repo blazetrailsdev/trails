@@ -3,15 +3,51 @@ import { HashLookupTypeMap } from "./hash-lookup-type-map.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 describe("TypeMapTest", () => {
-  it.skip("registering types", () => {});
-  it.skip("overriding registered types", () => {});
-  it.skip("aliasing types", () => {});
-  it.skip("changing type changes aliases", () => {});
-  it.skip("aliases keep metadata", () => {});
-  it.skip("fuzzy lookup", () => {});
-  it.skip("register proc", () => {});
-  it.skip("parent fallback", () => {});
-  it.skip("parent fallback for default type", () => {});
+  it.skip("registering types", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("overriding registered types", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("aliasing types", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("changing type changes aliases", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("aliases keep metadata", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("fuzzy lookup", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("register proc", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("parent fallback", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
+  it.skip("parent fallback for default type", () => {
+    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
+    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
+    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  });
 });
 
 describe("HashLookupTypeMapTest", () => {

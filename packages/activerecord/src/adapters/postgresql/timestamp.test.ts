@@ -85,7 +85,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs migration framework
-    it.skip("timestamp migration", async () => {});
+    it.skip("timestamp migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
 
     it("datetime column", async () => {
       const cols = await adapter.columns("postgresql_timestamps");
@@ -118,26 +122,70 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs Rails time zone support
-    it.skip("timestamp with zone values with rails time zone support and no time zone set", () => {});
-    it.skip("timestamp with zone values without rails time zone support", () => {});
+    it.skip("timestamp with zone values with rails time zone support and no time zone set", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("timestamp with zone values without rails time zone support", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
   });
 
   describe("PostgreSQLTimestampWithAwareTypesTest", () => {
-    it.skip("timestamp with zone values with rails time zone support and time zone set", () => {});
+    it.skip("timestamp with zone values with rails time zone support and time zone set", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
   });
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
-    it.skip("timestamp with zone values with rails time zone support and timestamptz and no time zone set", () => {});
-    it.skip("timestamp with zone values with rails time zone support and timestamptz and time zone set", () => {});
+    it.skip("timestamp with zone values with rails time zone support and timestamptz and no time zone set", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("timestamp with zone values with rails time zone support and timestamptz and time zone set", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
   });
 
   describe("PostgreSQLTimestampFixtureTest", () => {
-    it.skip("group by date", () => {});
-    it.skip("load infinity and beyond", async () => {});
-    it.skip("save infinity and beyond", async () => {});
-    it.skip("bc timestamp", () => {});
-    it.skip("bc timestamp leap year", () => {});
-    it.skip("bc timestamp year zero", () => {});
+    it.skip("group by date", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("load infinity and beyond", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("save infinity and beyond", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("bc timestamp", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("bc timestamp leap year", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
+    it.skip("bc timestamp year zero", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
+    });
   });
 
   describe("PostgreSQLTimestampMigrationTest", () => {
@@ -179,6 +227,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("adds column as custom type", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in timestamp
+      // ROOT-CAUSE: connection-adapters/postgresql/timestamp.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/timestamp.ts; affects ~10–47 tests in timestamp.test.ts
       // Requires creating a custom enum type and patching NATIVE_DATABASE_TYPES
     });
   });

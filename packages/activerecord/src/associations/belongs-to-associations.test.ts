@@ -3839,6 +3839,9 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it.skip("cant save readonly association", () => {
+    // BLOCKED: associations — belongs-to feature gap
+    // ROOT-CAUSE: associations/belongs-to-associations.ts or preloader.ts missing belongs-to semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in belongs-to-associations.test.ts
     // Requires readonly association
   });
 });

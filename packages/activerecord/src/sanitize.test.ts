@@ -123,9 +123,15 @@ describe("SanitizeTest", () => {
   });
 
   it.skip("disallow raw sql with unknown attribute string", () => {
+    // BLOCKED: relation — SQL sanitization gap
+    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
+    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
     /* fixture-dependent */
   });
   it.skip("disallow raw sql with unknown attribute sql literal", () => {
+    // BLOCKED: relation — SQL sanitization gap
+    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
+    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
     /* fixture-dependent */
   });
 
@@ -215,6 +221,9 @@ describe("SanitizeTest", () => {
   });
 
   it.skip("named bind with postgresql type casts", () => {
+    // BLOCKED: relation — SQL sanitization gap
+    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
+    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
     /* fixture-dependent */
   });
 
@@ -254,6 +263,9 @@ describe("SanitizeTest", () => {
   });
 
   it.skip("sanitize sql array handles relations", () => {
+    // BLOCKED: relation — SQL sanitization gap
+    // ROOT-CAUSE: relation.ts#sanitizeSql or Sanitization module not fully implementing Rails parity
+    // SCOPE: ~30 LOC fix in relation.ts; affects ~4 tests in sanitize.test.ts
     /* needs Relation#toSql integration with sanitize */
   });
 });

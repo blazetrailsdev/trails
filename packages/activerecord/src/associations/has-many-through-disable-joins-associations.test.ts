@@ -206,7 +206,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(normalCount).toBe(2);
   });
 
-  it.skip("counting on disable joins through using custom foreign key", () => {});
+  it.skip("counting on disable joins through using custom foreign key", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("pluck on disable joins through", async () => {
     const { author } = await setupData();
@@ -219,7 +223,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(noJoinsIds).toEqual(normalIds);
   });
 
-  it.skip("pluck on disable joins through using custom foreign key", () => {});
+  it.skip("pluck on disable joins through using custom foreign key", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("fetching on disable joins through", async () => {
     const { author } = await setupData();
@@ -229,7 +237,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(noJoinsFirst!.id).toBe(normalFirst!.id);
   });
 
-  it.skip("fetching on disable joins through using custom foreign key", () => {});
+  it.skip("fetching on disable joins through using custom foreign key", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("to a on disable joins through", async () => {
     const { author } = await setupData();
@@ -248,7 +260,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(after).toBe(before + 1);
   });
 
-  it.skip("appending on disable joins through using custom foreign key", () => {});
+  it.skip("appending on disable joins through using custom foreign key", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("empty on disable joins through", async () => {
     const emptyAuthor = await DjAuthor.create({ name: "Bob" });
@@ -261,7 +277,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(noJoinsComments).toEqual([]);
   });
 
-  it.skip("empty on disable joins through using custom foreign key", () => {});
+  it.skip("empty on disable joins through using custom foreign key", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("pluck on disable joins through a through", async () => {
     const { author, rating1, rating2 } = await setupData();
@@ -283,9 +303,21 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(normalCount).toBe(2);
   });
 
-  it.skip("count on disable joins using relation with scope", () => {});
-  it.skip("to a on disable joins with multiple scopes", () => {});
-  it.skip("preloading has many through disable joins", () => {});
+  it.skip("count on disable joins using relation with scope", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("to a on disable joins with multiple scopes", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("preloading has many through disable joins", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 
   it("polymophic disable joins through counting", async () => {
     const { author } = await setupData();
@@ -320,15 +352,59 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(await association(author, "djRatings").exists([-1, -2])).toBe(false);
   });
 
-  it.skip("polymophic disable joins through ordering", () => {});
-  it.skip("polymorphic disable joins through reordering", () => {});
-  it.skip("polymorphic disable joins through ordered scopes", () => {});
-  it.skip("polymorphic disable joins through ordered chained scopes", () => {});
-  it.skip("polymorphic disable joins through ordered scope limits", () => {});
-  it.skip("polymorphic disable joins through ordered scope first", () => {});
-  it.skip("order applied in double join", () => {});
-  it.skip("first and scope applied in double join", () => {});
-  it.skip("first and scope in double join applies order in memory", () => {});
-  it.skip("limit and scope applied in double join", () => {});
-  it.skip("limit and scope in double join applies limit in memory", () => {});
+  it.skip("polymophic disable joins through ordering", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("polymorphic disable joins through reordering", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("polymorphic disable joins through ordered scopes", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("polymorphic disable joins through ordered chained scopes", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("polymorphic disable joins through ordered scope limits", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("polymorphic disable joins through ordered scope first", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("order applied in double join", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("first and scope applied in double join", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("first and scope in double join applies order in memory", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("limit and scope applied in double join", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
+  it.skip("limit and scope in double join applies limit in memory", () => {
+    // BLOCKED: associations — has-many-through feature gap
+    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  });
 });

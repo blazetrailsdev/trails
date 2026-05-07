@@ -208,6 +208,9 @@ describe("SelectTest", () => {
   });
 
   it.skip("reselect with default scope select", () => {
+    // BLOCKED: relation — Relation API gap in select
+    // ROOT-CAUSE: relation/select.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in select.test.ts
     /* needs default_scope with select */
   });
 
@@ -219,6 +222,9 @@ describe("SelectTest", () => {
   });
 
   it.skip("select with block without any arguments", () => {
+    // BLOCKED: relation — Relation API gap in select
+    // ROOT-CAUSE: relation/select.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in select.test.ts
     /* needs select with block form */
   });
 });

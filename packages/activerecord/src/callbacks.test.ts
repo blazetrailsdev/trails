@@ -337,9 +337,15 @@ describe("CallbacksTest", () => {
   });
 
   it.skip("after_commit_on_create_in_transaction", () => {
+    // BLOCKED: unknown — callbacks feature gap; needs human triage
+    // ROOT-CAUSE: callbacks.ts missing Rails parity; exact symbol unclear without running the test
+    // SCOPE: ~30–100 LOC fix in callbacks.ts; affects ~1–10 tests in callbacks.test.ts
     /* needs transaction + afterCommit on create */
   });
   it.skip("after_commit callback doesnt fire for readonly", () => {
+    // BLOCKED: unknown — callbacks feature gap; needs human triage
+    // ROOT-CAUSE: callbacks.ts missing Rails parity; exact symbol unclear without running the test
+    // SCOPE: ~30–100 LOC fix in callbacks.ts; affects ~1–10 tests in callbacks.test.ts
     /* needs readonly check in commit callbacks */
   });
 

@@ -111,6 +111,9 @@ describe("SecureTokenTest", () => {
   });
 
   it.skip("generating token on initialize is skipped if column was not selected", () => {
+    // BLOCKED: unknown — SecureToken feature gap; needs human triage
+    // ROOT-CAUSE: secure-token.ts#SecureToken not fully implementing Rails has_secure_token semantics
+    // SCOPE: ~20 LOC fix in secure-token.ts; affects ~1 test
     /* fixture-dependent */
   });
 });

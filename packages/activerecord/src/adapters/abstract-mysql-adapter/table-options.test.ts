@@ -14,17 +14,53 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("TableOptionsTest", () => {
-    it.skip("table options with ENGINE", () => {});
-    it.skip("table options with ROW_FORMAT", () => {});
-    it.skip("table options with CHARSET", () => {});
-    it.skip("table options with COLLATE", () => {});
-    it.skip("charset and collation options", () => {});
-    it.skip("charset and partitioned table options", () => {});
-    it.skip("schema dump works with NO_TABLE_OPTIONS sql mode", () => {});
+    it.skip("table options with ENGINE", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("table options with ROW_FORMAT", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("table options with CHARSET", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("table options with COLLATE", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("charset and collation options", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("charset and partitioned table options", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("schema dump works with NO_TABLE_OPTIONS sql mode", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
   });
 
   describe("DefaultEngineOptionTest", () => {
-    it.skip("new migrations do not contain default ENGINE=InnoDB option", () => {});
-    it.skip("legacy migrations contain default ENGINE=InnoDB option", () => {});
+    it.skip("new migrations do not contain default ENGINE=InnoDB option", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
+    it.skip("legacy migrations contain default ENGINE=InnoDB option", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in table-options
+      // ROOT-CAUSE: adapters/mysql2/table-options.ts or abstract-mysql-adapter/table-options.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/table-options.ts; affects ~10–26 tests in table-options.test.ts
+    });
   });
 });

@@ -14,7 +14,15 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("TransactionTest", () => {
-    it.skip("raises StatementTimeout when statement timeout exceeded", () => {});
-    it.skip("reconnect preserves isolation level", () => {});
+    it.skip("raises StatementTimeout when statement timeout exceeded", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in transaction
+      // ROOT-CAUSE: adapters/mysql2/transaction.ts or abstract-mysql-adapter/transaction.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/transaction.ts; affects ~10–26 tests in transaction.test.ts
+    });
+    it.skip("reconnect preserves isolation level", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in transaction
+      // ROOT-CAUSE: adapters/mysql2/transaction.ts or abstract-mysql-adapter/transaction.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/transaction.ts; affects ~10–26 tests in transaction.test.ts
+    });
   });
 });

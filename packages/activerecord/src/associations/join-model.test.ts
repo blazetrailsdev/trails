@@ -265,42 +265,72 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("polymorphic has many going through join model with find", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires scoped find through polymorphic
   });
 
   it.skip("polymorphic has many going through join model with include on source reflection", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires eager loading
   });
 
   it.skip("polymorphic has many going through join model with include on source reflection with find", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires eager load + find
   });
 
   it.skip("polymorphic has many going through join model with custom select and joins", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires custom select + joins
   });
 
   it.skip("polymorphic has many going through join model with custom foreign key", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires custom foreign_key
   });
 
   it.skip("polymorphic has many create model with inheritance and custom base class", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires STI + custom base
   });
 
   it.skip("polymorphic has many going through join model with inheritance", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires STI through
   });
 
   it.skip("polymorphic has many going through join model with inheritance with custom class name", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires STI + class_name
   });
 
   it.skip("polymorphic has many create model with inheritance", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires STI create
   });
 
   it.skip("polymorphic has one create model with inheritance", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires STI has_one create
   });
 
@@ -641,10 +671,16 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("has many with piggyback", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires select piggyback columns
   });
 
   it.skip("create through has many with piggyback", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires through create with extra columns
   });
 
@@ -721,10 +757,16 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("include polymorphic has one defined in abstract parent", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires abstract parent eager loading
   });
 
   it.skip("include polymorphic has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires eager polymorphic through
   });
 
@@ -890,18 +932,30 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("has many going through polymorphic join model with custom primary key", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires polymorphic through + custom PK
   });
 
   it.skip("has many through with custom primary key on belongs to source", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires custom PK on belongs_to source
   });
 
   it.skip("has many through with custom primary key on has many source", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires custom PK on has_many source
   });
 
   it.skip("belongs to polymorphic with counter cache", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires counter_cache on polymorphic
   });
 
@@ -925,6 +979,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("exceptions have suggestions for fix", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires error message suggestions
   });
 
@@ -1052,6 +1109,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("has many polymorphic associations merges through scope", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires scope merging
   });
 
@@ -1448,10 +1508,16 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("eager load has many through has many with conditions", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires eager load + conditions
   });
 
   it.skip("eager belongs to and has one not singularized", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires eager load pluralization fix
   });
 
@@ -1500,6 +1566,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("add to self referential has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires << on self-referential through
   });
 
@@ -1583,6 +1652,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("associating unsaved records with has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires unsaved record through association
   });
 
@@ -1639,26 +1711,44 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("add to join table with no id", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires join table without PK
   });
 
   it.skip("has many through collection size doesnt load target if not loaded", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires size without loading
   });
 
   it.skip("has many through collection size uses counter cache if it exists", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires counter_cache on through
   });
 
   it.skip("adding junk to has many through should raise type mismatch", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires type check on <<
   });
 
   it.skip("adding to has many through should return self", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires << return value
   });
 
   it.skip("delete associate when deleting from has many through with nonstandard id", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires non-standard id delete
   });
 
@@ -1768,26 +1858,44 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("deleting junk from has many through should raise type mismatch", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires type check on delete
   });
 
   it.skip("deleting by integer id from has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires delete by integer id
   });
 
   it.skip("deleting by string id from has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires delete by string id
   });
 
   it.skip("has many through sum uses calculations", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires sum() on through
   });
 
   it.skip("calculations on has many through should disambiguate fields", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires disambiguated field calculations
   });
 
   it.skip("calculations on has many through should not disambiguate fields unless necessary", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires smart disambiguation
   });
 
@@ -1939,6 +2047,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("preload polymorphic has many through", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires preload polymorphic through
   });
 
@@ -2055,6 +2166,9 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("has many through include checks if record exists if target not loaded", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires DB check when not loaded
   });
 
@@ -2147,14 +2261,23 @@ describe("AssociationsJoinModelTest", () => {
   });
 
   it.skip("has many with pluralize table names false", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires pluralize_table_names: false
   });
 
   it.skip("proper error message for eager load and includes association errors", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires error message on includes failure
   });
 
   it.skip("eager association with scope with string joins", () => {
+    // BLOCKED: associations — join-model feature gap
+    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
     // Requires string joins in scope
   });
   it("has many inherited", async () => {

@@ -14,7 +14,15 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("VirtualColumnTest", () => {
-    it.skip("virtual column", () => {});
-    it.skip("schema dumping", () => {});
+    it.skip("virtual column", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in virtual-column
+      // ROOT-CAUSE: adapters/mysql2/virtual-column.ts or abstract-mysql-adapter/virtual-column.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/virtual-column.ts; affects ~10–26 tests in virtual-column.test.ts
+    });
+    it.skip("schema dumping", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in virtual-column
+      // ROOT-CAUSE: adapters/mysql2/virtual-column.ts or abstract-mysql-adapter/virtual-column.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/virtual-column.ts; affects ~10–26 tests in virtual-column.test.ts
+    });
   });
 });

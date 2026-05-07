@@ -88,12 +88,21 @@ describe("RequiredAssociationsTest", () => {
   });
 
   it.skip("belongs_to associations can be required by default", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/required.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
     /* global config not implemented */
   });
   it.skip("required has_one associations have presence validated", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/required.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
     /* has_one required option not implemented */
   });
   it.skip("required has_one associations have a correct error message", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/required.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
     /* has_one required option not implemented */
   });
 

@@ -124,6 +124,9 @@ describe("StoreTest", () => {
   });
 
   it.skip("overriding a read accessor using super", () => {
+    // BLOCKED: type — store accessor / serialized column type gap
+    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
+    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
     /* needs Ruby-style super in JS property accessor */
   });
 
@@ -292,6 +295,9 @@ describe("StoreTest", () => {
   });
 
   it.skip("overriding a write accessor using super", () => {
+    // BLOCKED: type — store accessor / serialized column type gap
+    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
+    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
     /* needs Ruby-style super */
   });
 
@@ -321,6 +327,9 @@ describe("StoreTest", () => {
   });
 
   it.skip("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", () => {
+    // BLOCKED: type — store accessor / serialized column type gap
+    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
+    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
     /* Ruby-specific YAML behavior */
   });
 
@@ -560,6 +569,9 @@ describe("StoreTest", () => {
   });
 
   it.skip("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
+    // BLOCKED: type — store accessor / serialized column type gap
+    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
+    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
     /* needs type checking */
   });
 

@@ -21,9 +21,21 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it.skip("explain with options as symbol", () => {});
-    it.skip("explain with options as strings", () => {});
-    it.skip("explain options with eager loading", () => {});
+    it.skip("explain with options as symbol", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
+      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
+    });
+    it.skip("explain with options as strings", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
+      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
+    });
+    it.skip("explain options with eager loading", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-explain
+      // ROOT-CAUSE: adapters/mysql2/mysql-explain.ts or abstract-mysql-adapter/mysql-explain.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-explain.ts; affects ~10–26 tests in mysql-explain.test.ts
+    });
 
     it("buildExplainClause renders FORMAT=JSON without parens for { format: 'json' }", () => {
       const clause = adapter.buildExplainClause([{ format: "json" }]);

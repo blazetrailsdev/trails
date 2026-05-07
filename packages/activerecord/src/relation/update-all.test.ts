@@ -280,6 +280,9 @@ describe("UpdateAllTest", () => {
   });
 
   it.skip("touch all with custom timestamp", () => {
+    // BLOCKED: relation — Relation API gap in update-all
+    // ROOT-CAUSE: relation/update-all.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in update-all.test.ts
     /* needs custom timestamp column name support in touchAll */
   });
 

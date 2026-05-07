@@ -129,6 +129,9 @@ describe("DirtyTest", () => {
   });
 
   it.skip("aliased attribute changes", () => {
+    // BLOCKED: type — dirty type/attribute gap
+    // ROOT-CAUSE: dirty.ts or attribute-methods/dirty.ts missing Rails parity
+    // SCOPE: ~20 LOC fix; affects ~1 test in dirty.test.ts
     /* needs aliasAttribute to propagate dirty tracking */
   });
 

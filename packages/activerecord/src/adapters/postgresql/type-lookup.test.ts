@@ -14,11 +14,35 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlTypeLookupTest", () => {
-    it.skip("type lookup", async () => {});
-    it.skip("type lookup array", async () => {});
-    it.skip("type lookup custom", async () => {});
-    it.skip("array delimiters are looked up correctly", () => {});
-    it.skip("array types correctly respect registration of subtypes", () => {});
-    it.skip("range types correctly respect registration of subtypes", () => {});
+    it.skip("type lookup", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
+    it.skip("type lookup array", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
+    it.skip("type lookup custom", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
+    it.skip("array delimiters are looked up correctly", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
+    it.skip("array types correctly respect registration of subtypes", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
+    it.skip("range types correctly respect registration of subtypes", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in type-lookup
+      // ROOT-CAUSE: connection-adapters/postgresql/type-lookup.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/type-lookup.ts; affects ~10–47 tests in type-lookup.test.ts
+    });
   });
 });

@@ -688,9 +688,21 @@ describe("StrictLoadingTest", () => {
       }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("strict loading with includes prevents lazy loading", () => {});
-  it.skip("strict loading with eager load prevents lazy loading", () => {});
-  it.skip("strict loading with preload prevents lazy loading", () => {});
+  it.skip("strict loading with includes prevents lazy loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with eager load prevents lazy loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with preload prevents lazy loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
   it("strict loading by default can be toggled", () => {
     class Author extends Base {
       static {
@@ -704,7 +716,11 @@ describe("StrictLoadingTest", () => {
     Author.strictLoadingByDefault = false;
     expect(Author.strictLoadingByDefault).toBe(false);
   });
-  it.skip("strict loading logging by default", () => {});
+  it.skip("strict loading logging by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
   it("strict loading violation raises StrictLoadingViolationError by default", async () => {
     class Author extends Base {
       static {
@@ -733,9 +749,15 @@ describe("StrictLoadingTest", () => {
   });
 
   it.skip("strict loading violation logs when mode is :log", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
     /* needs actionOnStrictLoadingViolation = "log" support */
   });
   it.skip("strict loading logging mode can be set per model", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
     /* needs per-model strict loading mode configuration */
   });
   it("strict loading all prevents lazy loading", async () => {
@@ -764,11 +786,31 @@ describe("StrictLoadingTest", () => {
       loadHasMany(author, "sl_all_books", { className: "SlAllBook", foreignKey: "author_id" }),
     ).rejects.toThrow(StrictLoadingViolationError);
   });
-  it.skip("preload does not trigger strict loading", () => {});
-  it.skip("strict loading with select on relation", () => {});
-  it.skip("strict loading n_plus_one_only prevents n plus one", () => {});
-  it.skip("strict loading n_plus_one_only allows first level", () => {});
-  it.skip("strict loading n_plus_one_only does not prevent scoped loading", () => {});
+  it.skip("preload does not trigger strict loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with select on relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading n_plus_one_only prevents n plus one", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading n_plus_one_only allows first level", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading n_plus_one_only does not prevent scoped loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
   it("strict loading with count does not raise", async () => {
     class SlcAuthor extends Base {
       static {
@@ -928,8 +970,16 @@ describe("StrictLoadingTest", () => {
     author.strictLoadingBang();
     expect(author.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading n plus one only mode with has many", () => {});
-  it.skip("strict loading n plus one only mode with belongs to", () => {});
+  it.skip("strict loading n plus one only mode with has many", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading n plus one only mode with belongs to", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
   it("default mode can be changed globally", async () => {
     class GmAuthor extends Base {
       static {
@@ -990,9 +1040,15 @@ describe("StrictLoadingTest", () => {
     ).rejects.toThrow(StrictLoadingViolationError);
   });
   it.skip("strict loading is ignored in validation context", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
     /* needs validation integration with strict loading bypass */
   });
   it.skip("strict loading with reflection is ignored in validation context", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
     /* needs validation integration with strict loading bypass */
   });
 
@@ -1106,35 +1162,138 @@ describe("StrictLoadingTest", () => {
     await proxy.concat(book);
     expect(author.isStrictLoading()).toBe(true);
   });
-  it.skip("strict loading with new record on build is ignored", () => {});
-  it.skip("strict loading with new record on writer is ignored", () => {});
-  it.skip("strict loading has one reload", () => {});
-  it.skip("strict loading with has many", () => {});
-  it.skip("strict loading with has many singular association and reload", () => {});
-  it.skip("strict loading with has many through cascade down to middle records", () => {});
-  it.skip("strict loading with has one through does not prevent creation of association", () => {});
-  it.skip("preload audit logs are strict loading because parent is strict loading", () => {});
-  it.skip("preload audit logs are strict loading because it is strict loading by default", () => {});
-  it.skip("eager load audit logs are strict loading because parent is strict loading in hm relation", () => {});
-  it.skip("eager load audit logs are strict loading because parent is strict loading", () => {});
-  it.skip("eager load audit logs are strict loading because it is strict loading by default", () => {});
-  it.skip("raises on unloaded relation methods if strict loading", () => {});
-  it.skip("raises on unloaded relation methods if strict loading by default", () => {});
-  it.skip("strict loading can be turned off on an association in a model with strict loading on", () => {});
-  it.skip("does not raise on eager loading a strict loading belongs to relation", () => {});
-  it.skip("does not raise on eager loading a strict loading has one relation", () => {});
-  it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {});
-  it.skip("does not raise on eager loading a has many relation if strict loading by default", () => {});
-  it.skip("raises on lazy loading a strict loading habtm relation", () => {});
-  it.skip("raises on lazy loading a habtm relation if strict loading by default", () => {});
-  it.skip("does not raise on eager loading a strict loading habtm relation", () => {});
-  it.skip("does not raise on eager loading a habtm relation if strict loading by default", () => {});
-  it.skip("strict loading violation can log instead of raise", () => {});
-  it.skip("strict loading violation logs on polymorphic relation", () => {});
+  it.skip("strict loading with new record on build is ignored", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with new record on writer is ignored", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading has one reload", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with has many", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with has many singular association and reload", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with has many through cascade down to middle records", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading with has one through does not prevent creation of association", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("preload audit logs are strict loading because parent is strict loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("preload audit logs are strict loading because it is strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("eager load audit logs are strict loading because parent is strict loading in hm relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("eager load audit logs are strict loading because parent is strict loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("eager load audit logs are strict loading because it is strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("raises on unloaded relation methods if strict loading", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("raises on unloaded relation methods if strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading can be turned off on an association in a model with strict loading on", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a strict loading belongs to relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a strict loading has one relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a has one relation if strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a has many relation if strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("raises on lazy loading a strict loading habtm relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("raises on lazy loading a habtm relation if strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a strict loading habtm relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("does not raise on eager loading a habtm relation if strict loading by default", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading violation can log instead of raise", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
+  it.skip("strict loading violation logs on polymorphic relation", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
+  });
 });
 
 describe("StrictLoadingFixturesTest", () => {
   it.skip("strict loading violations are ignored on fixtures", () => {
+    // BLOCKED: relation — StrictLoadingViolation not wired into association loading
+    // ROOT-CAUSE: strict-loading.ts#checkStrictLoading not called from association loading path
+    // SCOPE: ~30 LOC in strict-loading.ts + associations/association.ts; affects ~41 tests in strict-loading.test.ts
     /* fixture-dependent */
   });
 });

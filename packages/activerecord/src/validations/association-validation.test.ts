@@ -236,6 +236,9 @@ describe("AssociationValidationTest", () => {
     expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
   });
   it.skip("validates associated with create context", () => {
+    // BLOCKED: validation — validator behavior gap in association-validation
+    // ROOT-CAUSE: validations/associated.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in validations/associated.ts; affects ~4–11 tests in association-validation.test.ts
     /* needs update! and replies.create — complex persistence operations */
   });
 });

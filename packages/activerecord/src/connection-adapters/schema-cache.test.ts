@@ -31,7 +31,11 @@ describe("SchemaCacheTest", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it.skip("cached?", () => {});
+  it.skip("cached?", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
 
   it("yaml dump and load", () => {
     const cache = new SchemaCache();
@@ -74,9 +78,21 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("posts")).toBe(true);
   });
 
-  it.skip("yaml dump and load with gzip", () => {});
-  it.skip("yaml loads 5 1 dump", () => {});
-  it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {});
+  it.skip("yaml dump and load with gzip", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
+  it.skip("yaml loads 5 1 dump", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
+  it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
 
   it("primary key for existent table", async () => {
     const cache = new SchemaCache();
@@ -195,9 +211,21 @@ describe("SchemaCacheTest", () => {
     expect(hash!["title"].sqlType).toBe("text");
   });
 
-  it.skip("marshal dump and load with ignored tables", () => {});
-  it.skip("marshal dump and load with gzip", () => {});
-  it.skip("gzip dumps identical", () => {});
+  it.skip("marshal dump and load with ignored tables", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
+  it.skip("marshal dump and load with gzip", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
+  it.skip("gzip dumps identical", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
 
   it("data source exist", () => {
     const cache = new SchemaCache();
@@ -234,8 +262,16 @@ describe("SchemaCacheTest", () => {
     expect(cache.isColumnsHashCached(null, "users")).toBe(false);
   });
 
-  it.skip("when lazily load schema cache is set cache is lazily populated when est connection", () => {});
-  it.skip("#init_with skips deduplication if told to", () => {});
+  it.skip("when lazily load schema cache is set cache is lazily populated when est connection", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
+  it.skip("#init_with skips deduplication if told to", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
+    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  });
 
   it("#encode_with sorts members", () => {
     const cache = new SchemaCache();

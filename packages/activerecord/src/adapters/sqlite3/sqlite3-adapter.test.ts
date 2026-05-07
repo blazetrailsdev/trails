@@ -510,6 +510,9 @@ describe("SQLite3AdapterTest", () => {
   });
 
   it.skip("supports extensions", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
     // better-sqlite3 does not support loadExtension by default
   });
 
@@ -580,14 +583,23 @@ describe("SQLite3AdapterTest", () => {
   // when enabled or set true in database.yml, loose matches raise. Trails' adapter
   // does not yet implement this config knob.
   it.skip("strict strings by default", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
     // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
   });
 
   it.skip("strict strings by default and true in database yml", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
     // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
   });
 
   it.skip("strict strings by default and false in database yml", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
     // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
   });
 
@@ -639,7 +651,15 @@ describe("SQLite3AdapterTest", () => {
     const pkCols = cols.filter((c: any) => c.pk > 0);
     expect(pkCols).toHaveLength(2);
   });
-  it.skip("tables logs name", async () => {});
+  it.skip("tables logs name", async () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
+  });
 
-  it.skip("table exists logs name", async () => {});
+  it.skip("table exists logs name", async () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
+    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
+  });
 });

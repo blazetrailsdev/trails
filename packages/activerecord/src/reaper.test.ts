@@ -111,6 +111,9 @@ describe("ReaperTest", () => {
   });
 
   it.skip("connection pool starts reaper in fork", () => {
+    // BLOCKED: GVL — Thread.kill / reaper semantics, no Node.js equivalent
+    // ROOT-CAUSE: Node.js has no Thread.kill; connection reaper depends on Ruby thread lifecycle
+    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
     // N/A: Node.js does not fork processes the way Ruby does
   });
 

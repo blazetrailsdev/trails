@@ -556,6 +556,9 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* composite keys not implemented */
   });
 
@@ -811,6 +814,9 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
   });
 
   it.skip("should modify an existing record if there is a matching composite id", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* composite keys not implemented */
   });
 
@@ -1173,9 +1179,15 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it.skip("reuse already built new record", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* needs association building support */
   });
   it.skip("do not allow assigning foreign key when reusing existing new record", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* needs association building support */
   });
 
@@ -1230,6 +1242,9 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it.skip("first and array index zero methods return the same value when nested attributes are set to update existing record", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* needs collection first() */
   });
   it("allows class to override setter and call super", async () => {
@@ -1314,9 +1329,15 @@ describe("TestNestedAttributesInGeneral", () => {
     expect(birds.length).toBe(1);
   });
   it.skip("should not create duplicates with create with", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* needs createWith support */
   });
   it.skip("updating models with cpk provided as strings", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* composite keys not implemented */
   });
 
@@ -1487,9 +1508,15 @@ describe("TestNestedAttributesInGeneral", () => {
 
 describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
   it.skip("should update existing records with non standard primary key", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* test adapter auto-assigns 'id' not custom PK */
   });
   it.skip("attr accessor of child should be value provided during update", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* test adapter auto-assigns 'id' not custom PK */
   });
 });
@@ -1952,18 +1979,27 @@ describe("should not load association when updating existing records", () => {
 
 describe("should not overwrite unsaved updates when loading association", () => {
   it.skip("should not overwrite unsaved updates when loading association", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
 
 describe("should not remove scheduled destroys when loading association", () => {
   it.skip("should not remove scheduled destroys when loading association", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
 
 describe("should preserve order when not overwriting unsaved updates", () => {
   it.skip("should preserve order when not overwriting unsaved updates", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
@@ -2065,6 +2101,9 @@ describe("should raise an argument error if something else than a hash is passed
 
 describe("should refresh saved records when not overwriting unsaved updates", () => {
   it.skip("should refresh saved records when not overwriting unsaved updates", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
@@ -2179,6 +2218,9 @@ describe("should take a hash and assign the attributes to the associated models"
 
 describe("should take a hash with composite id keys and assign the attributes to the associated models", () => {
   it.skip("should take a hash with composite id keys and assign the attributes to the associated models", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
@@ -2253,6 +2295,9 @@ describe("should work with update as well", () => {
 
 describe("validate presence of parent works with inverse of", () => {
   it.skip("validate presence of parent works with inverse of", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* fixture-dependent */
   });
 });
@@ -2822,9 +2867,16 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     return { Pirate, Ship, Part };
   }
 
-  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {});
+  it.skip("if association is not loaded and association record is saved and then in memory record attributes should be saved", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
+  });
 
   it.skip("if association is not loaded and child doesn't change and I am saving a grandchild then in memory record should be used", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
     /* requires lazy-loading tracking */
   });
 
@@ -2981,7 +3033,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     expect(tags[0].name).toBe("new-grandchild");
   });
 
-  it.skip("circular references do not perform unnecessary queries", () => {});
+  it.skip("circular references do not perform unnecessary queries", () => {
+    // BLOCKED: associations — nested-attributes feature gap
+    // ROOT-CAUSE: associations/nested-attributes.ts or preloader.ts missing nested-attributes semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-attributes.test.ts
+  });
 
   it("nested singular associations are validated", async () => {
     const { Pirate, Ship, Part } = makeModels();

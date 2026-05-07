@@ -41,6 +41,9 @@ describe("BidirectionalDestroyDependenciesTest", () => {
   }
 
   it.skip("bidirectional dependence when destroying item with belongs to association", () => {
+    // BLOCKED: associations — collection/singular feature gap
+    // ROOT-CAUSE: associations/bidirectional-destroy-dependencies.ts or preloader.ts missing collection/singular semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in bidirectional-destroy-dependencies.test.ts
     /* needs dependent: destroy on belongs_to to cascade to parent */
   });
 

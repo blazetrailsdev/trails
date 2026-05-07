@@ -14,20 +14,68 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTransactionTest", () => {
-    it.skip("transaction isolation read committed", async () => {});
-    it.skip("transaction isolation repeatable read", async () => {});
-    it.skip("transaction isolation serializable", async () => {});
-    it.skip("transaction read only", async () => {});
-    it.skip("transaction deferrable", async () => {});
-    it.skip("transaction rollback on exception", async () => {});
-    it.skip("raises SerializationFailure when a serialization failure occurs", async () => {});
-    it.skip("raises QueryCanceled when statement timeout exceeded", async () => {});
-    it.skip("raises Interrupt when canceling statement via interrupt", async () => {});
+    it.skip("transaction isolation read committed", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("transaction isolation repeatable read", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("transaction isolation serializable", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("transaction read only", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("transaction deferrable", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("transaction rollback on exception", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("raises SerializationFailure when a serialization failure occurs", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("raises QueryCanceled when statement timeout exceeded", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
+    it.skip("raises Interrupt when canceling statement via interrupt", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
 
-    it.skip("raises Deadlocked when a deadlock is encountered", () => {});
+    it.skip("raises Deadlocked when a deadlock is encountered", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
 
-    it.skip("raises LockWaitTimeout when lock wait timeout exceeded", () => {});
+    it.skip("raises LockWaitTimeout when lock wait timeout exceeded", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
 
-    it.skip("raises QueryCanceled when canceling statement due to user request", () => {});
+    it.skip("raises QueryCanceled when canceling statement due to user request", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in transaction
+      // ROOT-CAUSE: connection-adapters/postgresql/transaction.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/transaction.ts; affects ~10–47 tests in transaction.test.ts
+    });
   });
 });

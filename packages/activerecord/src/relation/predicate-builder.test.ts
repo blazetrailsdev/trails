@@ -7,12 +7,36 @@ import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
 
 describe("PredicateBuilderTest", () => {
-  it.skip("registering new handlers", () => {});
-  it.skip("registering new handlers for association", () => {});
-  it.skip("registering new handlers for joins", () => {});
-  it.skip("references with schema", () => {});
-  it.skip("build from hash with schema", () => {});
-  it.skip("does not mutate", () => {});
+  it.skip("registering new handlers", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
+  it.skip("registering new handlers for association", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
+  it.skip("registering new handlers for joins", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
+  it.skip("references with schema", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
+  it.skip("build from hash with schema", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
+  it.skip("does not mutate", () => {
+    // BLOCKED: relation — Relation API gap in predicate-builder
+    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  });
 
   describe("buildFromHash", () => {
     const table = new Table("posts");

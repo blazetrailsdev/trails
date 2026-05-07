@@ -117,14 +117,28 @@ describe("FieldOrderedValuesTest", () => {
   });
 
   it.skip("in order of with associations", () => {
+    // BLOCKED: relation — Relation API gap in field-ordered-values
+    // ROOT-CAUSE: relation/field-ordered-values.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in field-ordered-values.test.ts
     /* fixture-dependent */
   });
   it.skip("in order of with filter false", () => {
+    // BLOCKED: relation — Relation API gap in field-ordered-values
+    // ROOT-CAUSE: relation/field-ordered-values.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in field-ordered-values.test.ts
     /* fixture-dependent */
   });
 
-  it.skip("in order of", () => {});
-  it.skip("in order of expression", () => {});
+  it.skip("in order of", () => {
+    // BLOCKED: relation — Relation API gap in field-ordered-values
+    // ROOT-CAUSE: relation/field-ordered-values.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in field-ordered-values.test.ts
+  });
+  it.skip("in order of expression", () => {
+    // BLOCKED: relation — Relation API gap in field-ordered-values
+    // ROOT-CAUSE: relation/field-ordered-values.ts or relation.ts missing Rails parity for this query feature
+    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in field-ordered-values.test.ts
+  });
 });
 
 describe("inOrderOf()", () => {

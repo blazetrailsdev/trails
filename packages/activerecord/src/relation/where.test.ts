@@ -151,6 +151,9 @@ describe("WhereTest", () => {
     expect(sql).toContain("title");
   });
   it.skip("where with table name and target table joined", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs JOIN across tables */
   });
   it("where with string and bound variable", () => {
@@ -286,18 +289,33 @@ describe("WhereTest", () => {
     expect(sql).toContain("IN");
   });
   it.skip("belongs to association where with non primary key", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("where with association conditions", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where association with default scope", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where with strong parameters", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs ActionController::Parameters integration in this test setup or ActiveRecord.where support for coercing Parameters to a plain hash */
   });
   it.skip("where with conditions on both tables", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs JOIN across tables */
   });
   it("where with blank condition", () => {
@@ -351,18 +369,33 @@ describe("WhereTest", () => {
     expect(result).toHaveLength(2);
   });
   it.skip("where on association with custom primary key", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where with association polymorphic", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("where with unsupported association raises", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association infrastructure for error path */
   });
   it.skip("where with arel star", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* Arel.star as hash key raises ArgumentError in Rails; behavior not yet validated */
   });
   it.skip("where on association with relation", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped subquery */
   });
   it("where with numeric comparison", () => {
@@ -813,48 +846,93 @@ describe("WhereTest", () => {
   });
 
   it.skip("where with nil cpk association", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to with composite primary key — association infrastructure gap */
   });
   it.skip("belongs to shallow where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("belongs to nested relation where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("belongs to nested where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("belongs to nested where with relation", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("polymorphic shallow where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("where not polymorphic id and type as nand", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("where not association as nand", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic nested array where not", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic array where multiple types", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic nested relation where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic sti shallow where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic nested where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("polymorphic sti nested where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it.skip("decorated polymorphic where", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it("where with empty hash and no foreign key", () => {
@@ -889,9 +967,15 @@ describe("WhereTest", () => {
     expect(sql).toContain("123.456");
   });
   it.skip("where with rational for string column", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* Rational is a Ruby type with no JS equivalent */
   });
   it.skip("where with duration for string column", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* ActiveSupport::Duration exists, but where predicate building/type-casting for Duration values is not implemented yet */
   });
   it("where with integer for binary column", () => {
@@ -915,27 +999,51 @@ describe("WhereTest", () => {
     expect(sql).toContain("hello");
   });
   it.skip("where on association with custom primary key with relation", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped subquery */
   });
   it.skip("where on association with relation performs subselect not two queries", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped subquery */
   });
   it.skip("where on association with custom primary key with array of base", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped subquery */
   });
   it.skip("where on association with custom primary key with array of ids", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped subquery */
   });
   it.skip("where with relation on has many association", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where with relation on has one association", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where on association with select relation", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs association-scoped WHERE with automatic JOIN */
   });
   it.skip("where on association with collection polymorphic relation", () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association setup */
   });
   it("where with unsupported arguments", () => {
@@ -1702,14 +1810,23 @@ describe("WhereTest", () => {
   });
 
   it.skip("type casting nested joins", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs join fixture setup */
   });
 
   it.skip("where with through association", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs has_many :through */
   });
 
   it.skip("polymorphic nested array where", async () => {
+    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
+    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
+    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs polymorphic association fixture */
   });
 });

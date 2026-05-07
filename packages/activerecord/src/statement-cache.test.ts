@@ -194,9 +194,21 @@ describe("StatementCacheTest", () => {
     expect(sql).not.toContain("?");
   });
 
-  it.skip("find by does not use statement cache if table name is changed", () => {});
-  it.skip("find does not use statement cache if table name is changed", () => {});
-  it.skip("find association does not use statement cache if table name is changed", () => {});
+  it.skip("find by does not use statement cache if table name is changed", () => {
+    // BLOCKED: relation — prepared statement cache not implemented
+    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
+    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+  });
+  it.skip("find does not use statement cache if table name is changed", () => {
+    // BLOCKED: relation — prepared statement cache not implemented
+    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
+    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+  });
+  it.skip("find association does not use statement cache if table name is changed", () => {
+    // BLOCKED: relation — prepared statement cache not implemented
+    // ROOT-CAUSE: statement-cache.ts#StatementCache#execute or prepared statement infrastructure missing
+    // SCOPE: ~50 LOC fix in statement-cache.ts; affects ~3 tests in statement-cache.test.ts
+  });
 
   it("StatementCache.create unprepared path uses PartialQuery with Substitute slots", async () => {
     await import("./relation.js");

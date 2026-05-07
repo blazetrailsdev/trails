@@ -3,8 +3,16 @@ import { Base } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 
 describe("ReadTest", () => {
-  it.skip("define attribute methods", () => {});
-  it.skip("attribute methods generated?", () => {});
+  it.skip("define attribute methods", () => {
+    // BLOCKED: type — read type/attribute gap
+    // ROOT-CAUSE: read.ts or attribute-methods/read.ts missing Rails parity
+    // SCOPE: ~20 LOC fix; affects ~1 test in read.test.ts
+  });
+  it.skip("attribute methods generated?", () => {
+    // BLOCKED: type — read type/attribute gap
+    // ROOT-CAUSE: read.ts or attribute-methods/read.ts missing Rails parity
+    // SCOPE: ~20 LOC fix; affects ~1 test in read.test.ts
+  });
 
   it("_read_attribute returns value for existing attribute", () => {
     createTestAdapter();

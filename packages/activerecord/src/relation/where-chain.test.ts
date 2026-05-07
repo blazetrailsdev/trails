@@ -39,41 +39,77 @@ describe("WhereChainTest", () => {
     expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
   });
   it.skip("associated merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs cross-model merge with automatic JOIN */
   });
 
   it.skip("associated unscoped merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs unscope support */
   });
   it.skip("associated unscoped merged joined with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs unscope support */
   });
   it.skip("associated unscoped merged joined extended early with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs extending support */
   });
   it.skip("associated unscoped merged joined extended late with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs extending support */
   });
 
   it.skip("associated ordered merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs cross-model merge with automatic JOIN */
   });
   it.skip("associated ordered merged joined with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs cross-model merge with automatic JOIN */
   });
   it.skip("associated with enum", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("associated with enum ordered", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("associated with enum unscoped", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("associated with enum extended early", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("associated with enum extended late", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it("associated with add joins before", async () => {
@@ -167,6 +203,9 @@ describe("WhereChainTest", () => {
   });
 
   it.skip("associated with composite primary key", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs proper composite primary key model setup */
   });
   it("missing with child association", () => {
@@ -211,50 +250,95 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("IS NULL");
   });
   it.skip("missing merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs cross-model merge with automatic JOIN */
   });
 
   it.skip("missing unscoped merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing unscoped merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing unscoped merged joined with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing ordered merged with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs cross-model merge with automatic JOIN */
   });
 
   it.skip("missing ordered merged joined with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing ordered merged joined with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing unscoped merged joined extended early with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing unscoped merged joined extended late with scope on association", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with enum", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with enum ordered", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with enum unscoped", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with enum extended early", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with enum extended late", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* fixture-dependent */
   });
   it.skip("missing with composite primary key", () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     /* needs proper composite primary key model setup */
   });
 
@@ -461,6 +545,9 @@ describe("WhereChainTest", () => {
   });
 
   it.skip("rewhere with polymorphic association", async () => {
+    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
+    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
+    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
     // requires polymorphic association
   });
 

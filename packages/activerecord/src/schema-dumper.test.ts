@@ -68,10 +68,16 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump uses force cascade on create table", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs force: :cascade option emitted in SchemaDumper output */
   });
 
   it.skip("schema dump excludes sqlite sequence", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs adapter-backed introspection to exercise sqlite_sequence filtering */
   });
 
@@ -84,9 +90,15 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("types no line up", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs column type alignment formatting */
   });
   it.skip("arguments no line up", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs argument alignment formatting */
   });
 
@@ -143,27 +155,51 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dumps partial indices", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs partial index WHERE clause tracking */
   });
   it.skip("schema dumps nulls not distinct", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs nulls not distinct tracking (PG 15+) */
   });
   it.skip("schema dumps index sort order", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs index sort order tracking */
   });
   it.skip("schema dumps index length", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs index length tracking (MySQL) */
   });
   it.skip("schema dumps check constraints", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs check constraint support */
   });
   it.skip("schema dumps exclusion constraints", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs exclusion constraint support (PG) */
   });
   it.skip("schema dumps unique constraints", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs unique constraint support (PG) */
   });
   it.skip("schema does not dump unique constraints as indexes", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs unique constraint support (PG) */
   });
 
@@ -220,24 +256,45 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump aliased types", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs type aliasing support */
   });
   it.skip("schema dump expression indices", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs expression index tracking */
   });
   it.skip("schema dump expression indices escaping", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs expression index tracking */
   });
   it.skip("schema dump includes length for mysql binary fields", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs MySQL-specific handling */
   });
   it.skip("schema dump includes length for mysql blob and text fields", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs MySQL-specific handling */
   });
   it.skip("schema does not include limit for emulated mysql boolean fields", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs MySQL-specific handling */
   });
   it.skip("schema dumps index type", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs index type tracking (btree/hash/gin/gist) */
   });
 
@@ -262,30 +319,57 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump includes limit on array type", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG array support */
   });
   it.skip("schema dump allows array of decimal defaults", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG array support */
   });
   it.skip("schema dump interval type", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG interval type */
   });
   it.skip("schema dump oid type", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG oid type */
   });
   it.skip("schema dump includes extensions", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG extension dumping */
   });
   it.skip("schema dump includes extensions in alphabetic order", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG extension dumping */
   });
   it.skip("schema dump include limit for float4 field", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG float4 specific handling */
   });
   it.skip("schema dump keeps enum intact if it contains comma", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG enum support */
   });
   it.skip("schema dump keeps large precision integer columns as decimal", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs decimal precision handling */
   });
 
@@ -299,27 +383,48 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump keeps id false when id is false and unique not null column added", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs unique constraint + id: false */
   });
 
   it.skip("foreign keys are dumped at the bottom to circumvent dependency issues", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs foreign key dumping in SchemaDumper */
   });
   it.skip("do not dump foreign keys for ignored tables", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs foreign key dumping in SchemaDumper */
   });
   it.skip("do not dump foreign keys when bypassed by config", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs foreign key dump config */
   });
 
   it.skip("schema dump with table name prefix and suffix", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs prefix/suffix stripping in SchemaDumper */
   });
 
   it.skip("schema dump with table name prefix and suffix regexp escape", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs prefix/suffix stripping in SchemaDumper */
   });
   it.skip("schema dump with table name prefix and ignoring tables", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs prefix/suffix stripping in SchemaDumper */
   });
 
@@ -335,18 +440,33 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump with timestamptz datetime format", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG timestamptz support */
   });
   it.skip("timestamps schema dump before rails 7", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs Rails version compat */
   });
   it.skip("timestamps schema dump before rails 7 with timestamptz setting", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs Rails version compat */
   });
   it.skip("schema dump when changing datetime type for an existing app", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs datetime type migration */
   });
   it.skip("schema dump with correct timestamp types via create table and t timestamptz", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG timestamptz support */
   });
 
@@ -361,9 +481,15 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skip("schema dump with correct timestamp types via add column before rails 7", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs Rails version compat */
   });
   it.skip("schema dump with correct timestamp types via add column before rails 7 with timestamptz setting", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs Rails version compat */
   });
 
@@ -408,6 +534,9 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 
   it.skip("schema dump with column infinity default", () => {
+    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
+    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs Infinity default handling */
   });
 });

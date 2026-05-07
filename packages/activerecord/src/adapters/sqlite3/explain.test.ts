@@ -25,5 +25,9 @@ describe("SQLite3ExplainTest", () => {
 
   // null-overridden: needs eager loading + explain integration
   // it.skip("explain with eager loading", () => {});
-  it.skip("explain with eager loading", () => {});
+  it.skip("explain with eager loading", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in explain
+    // ROOT-CAUSE: adapters/sqlite3/explain.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/explain.ts; affects ~1–17 tests in explain.test.ts
+  });
 });

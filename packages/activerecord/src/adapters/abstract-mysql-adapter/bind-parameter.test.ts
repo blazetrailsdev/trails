@@ -52,8 +52,16 @@ describeIfMysql("AbstractMySQLAdapter", () => {
       expect(rows[0].name).toBe("updated?name");
     });
 
-    it.skip("update null bytes", () => {});
-    it.skip("create null bytes", () => {});
+    it.skip("update null bytes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
+    it.skip("create null bytes", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
 
     it("where with string for string column using bind parameters", async () => {
       await adapter.executeMutation(
@@ -78,9 +86,25 @@ describeIfMysql("AbstractMySQLAdapter", () => {
       expect(rows).toHaveLength(1);
     });
 
-    it.skip("where with float for string column using bind parameters", () => {});
-    it.skip("where with boolean for string column using bind parameters", () => {});
-    it.skip("where with decimal for string column using bind parameters", () => {});
-    it.skip("where with rational for string column using bind parameters", () => {});
+    it.skip("where with float for string column using bind parameters", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
+    it.skip("where with boolean for string column using bind parameters", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
+    it.skip("where with decimal for string column using bind parameters", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
+    it.skip("where with rational for string column using bind parameters", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in bind-parameter
+      // ROOT-CAUSE: adapters/mysql2/bind-parameter.ts or abstract-mysql-adapter/bind-parameter.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/bind-parameter.ts; affects ~10–26 tests in bind-parameter.test.ts
+    });
   });
 });

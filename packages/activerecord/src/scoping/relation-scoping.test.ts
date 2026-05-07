@@ -31,10 +31,16 @@ describe("RelationScopingTest", () => {
   }
 
   it.skip("unscoped breaks caching", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs query cache integration */
   });
 
   it.skip("scope breaks caching on collections", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs query cache integration */
   });
 
@@ -50,22 +56,37 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("reverse order with arel attribute", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel attribute as hash", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel node as hash", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with multiple arel attributes", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs Arel node input support in order() */
   });
 
   it.skip("reverse order with arel attributes and strings", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs Arel node input support in order() */
   });
 
@@ -217,10 +238,16 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoped find select", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs scoping + select interaction */
   });
 
   it.skip("scope select concatenates", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* select overwrites instead of concatenating */
   });
 
@@ -271,10 +298,16 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("find with annotation unscope", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs unscope(:annotate) */
   });
 
   it.skip("scoped find include", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs includes() */
   });
 
@@ -358,10 +391,16 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("update all default scope filters on joins", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs joins + default_scope */
   });
 
   it.skip("delete all default scope filters on joins", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs joins + default_scope */
   });
 
@@ -416,6 +455,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoping respects sti constraint", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs STI + scoping interaction */
   });
 
@@ -443,10 +485,16 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("circular joins with scoping does not crash", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs joins() */
   });
 
   it.skip("circular left joins with scoping does not crash", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs left_joins() */
   });
 
@@ -478,6 +526,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoping applies to reload with all queries", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs reload() with scoping */
   });
 
@@ -500,15 +551,24 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("raises error if all queries is set to false while nested", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs all_queries option */
   });
 
   it.skip("default scope filters on joins", () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     /* needs joins + default_scope */
   });
 
   describe("HasManyScopingTest", () => {
     it.skip("should maintain default scope on associations", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + default_scope */
     });
   });
@@ -576,6 +636,9 @@ describe("NestedRelationScopingTest", () => {
   });
 
   it.skip("three level nested exclusive scoped find", async () => {
+    // BLOCKED: relation — relation scoping feature gap
+    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
     const { Post } = makeModel();
     await Post.create({ title: "A", author: "Alice" });
     await Post.create({ title: "B", author: "Bob" });
@@ -830,29 +893,50 @@ describe("Static shorthands (Rails-guided)", () => {
 
   describe("HasManyScopingTest", () => {
     it.skip("forwarding of static methods", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + scoping */
     });
 
     it.skip("nested scope finder", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + scoping */
     });
 
     it.skip("none scoping", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs none() relation */
     });
 
     it.skip("forwarding to scoped", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + scoping */
     });
 
     it.skip("should default scope on associations is overridden by association conditions", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + default_scope */
     });
 
     it.skip("should maintain default scope on eager loaded associations", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs eager loading + default_scope */
     });
     it.skip("scoping applies to all queries on has many when set", () => {
+      // BLOCKED: relation — relation scoping feature gap
+      // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
+      // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
       /* needs association + scoping */
     });
   }); // HasManyScopingTest

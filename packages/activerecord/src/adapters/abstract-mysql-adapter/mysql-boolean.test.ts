@@ -14,11 +14,35 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("MysqlBooleanTest", () => {
-    it.skip("column type with emulated booleans", () => {});
-    it.skip("column type without emulated booleans", () => {});
-    it.skip("type casting with emulated booleans", () => {});
-    it.skip("type casting without emulated booleans", () => {});
-    it.skip("with booleans stored as 1 and 0", () => {});
-    it.skip("with booleans stored as t", () => {});
+    it.skip("column type with emulated booleans", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
+    it.skip("column type without emulated booleans", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
+    it.skip("type casting with emulated booleans", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
+    it.skip("type casting without emulated booleans", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
+    it.skip("with booleans stored as 1 and 0", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
+    it.skip("with booleans stored as t", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-boolean
+      // ROOT-CAUSE: adapters/mysql2/mysql-boolean.ts or abstract-mysql-adapter/mysql-boolean.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-boolean.ts; affects ~10–26 tests in mysql-boolean.test.ts
+    });
   });
 });

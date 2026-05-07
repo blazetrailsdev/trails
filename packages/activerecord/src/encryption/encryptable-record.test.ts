@@ -293,6 +293,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it.skip("encryption schemes are resolved when used, not when declared", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
     // Global previous schemes (config.previous) are baked into the scheme at
     // encrypts() time. Supporting lazy re-evaluation after configure() requires
     // making globalPreviousSchemesFor run at serialize/deserialize time, not at
@@ -354,7 +357,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(reloaded.settings).toEqual(settings);
   });
 
-  it.skip("encrypts store attributes with accessors", () => {});
+  it.skip("encrypts store attributes with accessors", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
+  });
   it("encryption errors when saving records will raise the error and don't save anything", async () => {
     const Book = makeBookThatWillFailToEncryptName(freshAdapter());
     new Book();
@@ -460,6 +467,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it.skip("loading records with encrypted attributes defined on columns with default values", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
     // requires upsert/insert_on_duplicate_update support
   });
   it("can dump and load records that use encryption", async () => {
@@ -548,10 +558,25 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const overridingInstance = found!.becomes(OverridingBook);
     expect(overridingInstance.name).toBe("Dune-overridden");
   });
-  it.skip("binary data can be encrypted", () => {});
-  it.skip("binary data can be encrypted uncompressed", () => {});
-  it.skip("serialized binary data can be encrypted", () => {});
+  it.skip("binary data can be encrypted", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
+  });
+  it.skip("binary data can be encrypted uncompressed", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
+  });
+  it.skip("serialized binary data can be encrypted", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
+  });
   it.skip("deterministic ciphertexts remain constant", () => {
+    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
+    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
+    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
     // Requires exact Rails-compatible test key configuration to decrypt the
     // hardcoded ciphertext. Deferred until key derivation parity is confirmed.
   });

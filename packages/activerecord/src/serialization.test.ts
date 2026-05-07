@@ -90,6 +90,9 @@ describe("SerializationTest", () => {
   });
 
   it.skip("find records by serialized attributes through join", () => {
+    // BLOCKED: serialization — serialized attribute / YAML gap in serialization
+    // ROOT-CAUSE: serialized-attribute.ts#castForDatabase or YAMLCodec not fully implementing Rails parity
+    // SCOPE: ~30 LOC fix in serialized-attribute.ts; affects ~16 tests in serialization.test.ts
     /* needs associations + serialized columns */
   });
 

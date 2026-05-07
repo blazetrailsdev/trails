@@ -14,8 +14,20 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("SchemaMigrationsTest", () => {
-    it.skip("renaming index on foreign key", () => {});
-    it.skip("initializes schema migrations for encoding utf8mb4", () => {});
-    it.skip("initializes internal metadata for encoding utf8mb4", () => {});
+    it.skip("renaming index on foreign key", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in schema-migrations
+      // ROOT-CAUSE: adapters/mysql2/schema-migrations.ts or abstract-mysql-adapter/schema-migrations.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/schema-migrations.ts; affects ~10–26 tests in schema-migrations.test.ts
+    });
+    it.skip("initializes schema migrations for encoding utf8mb4", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in schema-migrations
+      // ROOT-CAUSE: adapters/mysql2/schema-migrations.ts or abstract-mysql-adapter/schema-migrations.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/schema-migrations.ts; affects ~10–26 tests in schema-migrations.test.ts
+    });
+    it.skip("initializes internal metadata for encoding utf8mb4", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in schema-migrations
+      // ROOT-CAUSE: adapters/mysql2/schema-migrations.ts or abstract-mysql-adapter/schema-migrations.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/schema-migrations.ts; affects ~10–26 tests in schema-migrations.test.ts
+    });
   });
 });

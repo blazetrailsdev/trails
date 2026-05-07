@@ -14,8 +14,20 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("SetTest", () => {
-    it.skip("should not be unsigned", () => {});
-    it.skip("should not be bigint", () => {});
-    it.skip("schema dumping", () => {});
+    it.skip("should not be unsigned", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in set
+      // ROOT-CAUSE: adapters/mysql2/set.ts or abstract-mysql-adapter/set.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/set.ts; affects ~10–26 tests in set.test.ts
+    });
+    it.skip("should not be bigint", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in set
+      // ROOT-CAUSE: adapters/mysql2/set.ts or abstract-mysql-adapter/set.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/set.ts; affects ~10–26 tests in set.test.ts
+    });
+    it.skip("schema dumping", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in set
+      // ROOT-CAUSE: adapters/mysql2/set.ts or abstract-mysql-adapter/set.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/set.ts; affects ~10–26 tests in set.test.ts
+    });
   });
 });

@@ -168,7 +168,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs ORM layer (pluck)
-    it.skip("enum pluck", async () => {});
+    it.skip("enum pluck", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("enum distinct", async () => {
       await adapter.executeMutation(
@@ -205,7 +209,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs migration framework
-    it.skip("enum migration", async () => {});
+    it.skip("enum migration", async () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("enum array", async () => {
       await adapter.exec(`ALTER TABLE "postgresql_enums" ADD COLUMN "past_moods" mood[]`);
@@ -234,10 +242,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs ORM layer (ActiveRecord enum DSL)
-    it.skip("invalid enum update", () => {});
+    it.skip("invalid enum update", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     // Needs ORM layer
-    it.skip("no oid warning", () => {});
+    it.skip("no oid warning", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("assigning enum to nil", async () => {
       await adapter.executeMutation(
@@ -248,13 +264,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs schema dumper with enum type output
-    it.skip("schema dump renamed enum", () => {});
-    it.skip("schema dump renamed enum with to option", () => {});
-    it.skip("schema dump added enum value", () => {});
-    it.skip("schema dump renamed enum value", () => {});
+    it.skip("schema dump renamed enum", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
+    it.skip("schema dump renamed enum with to option", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
+    it.skip("schema dump added enum value", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
+    it.skip("schema dump renamed enum value", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     // Needs ORM layer (ActiveRecord enum DSL)
-    it.skip("works with activerecord enum", () => {});
+    it.skip("works with activerecord enum", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
 
     it("enum type scoped to schemas", async () => {
       await adapter.beginTransaction();
@@ -291,7 +327,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     // Needs schema dumper with schema-scoped enum support
-    it.skip("schema dump scoped to schemas", () => {});
-    it.skip("schema load scoped to schemas", () => {});
+    it.skip("schema dump scoped to schemas", () => {
+      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
+      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
+      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    });
+    it.skip("schema load scoped to schemas", () => {
+      // BLOCKED: schema — schema loading / cache invalidation gap
+      // ROOT-CAUSE: schema-cache.ts#clear or connection-handler.ts#clearCache not fully wired
+      // SCOPE: ~20 LOC fix in schema-cache.ts; affects ~1 test
+    });
   });
 });

@@ -325,6 +325,9 @@ describe("TimestampsWithoutTransactionTest", () => {
     expect(p.created_at ?? undefined).toBeUndefined();
   });
   it.skip("index is created for both timestamps", () => {
+    // BLOCKED: type — timestamp type/attribute gap
+    // ROOT-CAUSE: timestamp.ts or attribute-methods/timestamp.ts missing Rails parity
+    // SCOPE: ~20 LOC fix; affects ~1 test in timestamp.test.ts
     /* fixture-dependent */
   });
 });

@@ -14,8 +14,20 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("MysqlEnumTest", () => {
-    it.skip("should not be unsigned", () => {});
-    it.skip("should not be bigint", () => {});
-    it.skip("enum with attribute", () => {});
+    it.skip("should not be unsigned", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-enum
+      // ROOT-CAUSE: adapters/mysql2/mysql-enum.ts or abstract-mysql-adapter/mysql-enum.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-enum.ts; affects ~10–26 tests in mysql-enum.test.ts
+    });
+    it.skip("should not be bigint", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-enum
+      // ROOT-CAUSE: adapters/mysql2/mysql-enum.ts or abstract-mysql-adapter/mysql-enum.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-enum.ts; affects ~10–26 tests in mysql-enum.test.ts
+    });
+    it.skip("enum with attribute", () => {
+      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql-enum
+      // ROOT-CAUSE: adapters/mysql2/mysql-enum.ts or abstract-mysql-adapter/mysql-enum.ts missing Rails parity
+      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql-enum.ts; affects ~10–26 tests in mysql-enum.test.ts
+    });
   });
 });

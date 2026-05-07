@@ -16,27 +16,51 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("CascadedEagerLoadingTest", () => {
   it.skip("eager association loading with cascaded two levels", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded two levels and one level", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with hmt does not table name collide when joining associations", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading grafts stashed associations to correct parent", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("cascaded eager association loading with join for count", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("cascaded eager association loading with duplicated includes", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("cascaded eager association loading with twice includes edge cases", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with join for count", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it("eager association loading with nil associations", async () => {
@@ -70,15 +94,27 @@ describe("CascadedEagerLoadingTest", () => {
     expect(children.length).toBe(0);
   });
   it.skip("eager association loading with cascaded two levels with two has many associations", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded two levels and self table reference", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded two levels with condition", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded three levels by ping pong", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it("eager association loading with has many sti", async () => {
@@ -199,6 +235,9 @@ describe("CascadedEagerLoadingTest", () => {
     expect(parentTopic.title).toBe("First");
   });
   it.skip("eager association loading with multiple stis and order", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it("eager association loading where first level returns nil", async () => {
@@ -296,12 +335,21 @@ describe("CascadedEagerLoadingTest", () => {
     expect(authors.filter((a: any) => a == null).length).toBe(1);
   });
   it.skip("eager association loading with recursive cascading four levels has many through", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with recursive cascading four levels has and belongs to many", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("eager association loading with cascaded interdependent one level and two levels", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it("preloaded records are not duplicated", async () => {
@@ -339,9 +387,15 @@ describe("CascadedEagerLoadingTest", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
   it.skip("preloading across has one constrains loaded records", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
   it.skip("preloading across has one through constrains loaded records", () => {
+    // BLOCKED: associations — eager-loading feature gap
+    // ROOT-CAUSE: associations/cascaded-eager-loading.ts or preloader.ts missing eager-loading semantics
+    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in cascaded-eager-loading.test.ts
     /* fixture-dependent */
   });
 });

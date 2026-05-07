@@ -19,7 +19,11 @@ describe("SQLite3StatementPoolTest", () => {
     }
   });
 
-  it.skip("cache is per pid", () => {});
+  it.skip("cache is per pid", () => {
+    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in statement-pool
+    // ROOT-CAUSE: adapters/sqlite3/statement-pool.ts missing Rails parity
+    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/statement-pool.ts; affects ~1–17 tests in statement-pool.test.ts
+  });
 
   it("reads statementLimit from the options hash", () => {
     const adapter = track(new SQLite3Adapter(":memory:", { statementLimit: 7 }));
