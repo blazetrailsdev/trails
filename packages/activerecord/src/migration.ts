@@ -38,7 +38,7 @@ export {
   type Compatibility,
 } from "./migration/compatibility.js";
 
-import { ActiveRecordError, NotImplementedError } from "./errors.js";
+import { ActiveRecordError } from "./errors.js";
 
 // Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
 function _crc32(str: string): number {
@@ -1567,7 +1567,7 @@ export class Migrator {
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
     this._strategy = options.strategy ?? new DefaultStrategy();
-    this._validateMigrations(migrations);
+    this.validate(migrations);
     const normalized = migrations.map((m) => ({
       ...m,
       version: String(BigInt(m.version)),
@@ -1979,7 +1979,8 @@ export class Migrator {
     });
   }
 
-  private _validateMigrations(migrations: MigrationProxy[]): void {
+  /** @internal */
+  private validate(migrations: MigrationProxy[]): void {
     const versions = new Set<string>();
     const names = new Set<string>();
 
@@ -2492,33 +2493,4 @@ export class CheckPending {
     // In TS migrations are registered programmatically, not watched.
     return null;
   }
-}
-
-/** @internal */
-function isAnySchemaNeedsUpdate(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migration#any_schema_needs_update? is not implemented",
-  );
-}
-
-/** @internal */
-function dbConfigsInCurrentEnv(): never {
-  throw new NotImplementedError(
-    "ActiveRecord::Migration#db_configs_in_current_env is not implemented",
-  );
-}
-
-/** @internal */
-function loadSchemaBang(): never {
-  throw new NotImplementedError("ActiveRecord::Migration#load_schema! is not implemented");
-}
-
-/** @internal */
-function target(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#target is not implemented");
-}
-
-/** @internal */
-function start(): never {
-  throw new NotImplementedError("ActiveRecord::Migrator#start is not implemented");
 }

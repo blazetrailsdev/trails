@@ -2,6 +2,11 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Rollback } from "../../errors.js";
 import {
+  buildFixtureSql,
+  buildFixtureStatements,
+  buildTruncateStatement,
+  buildTruncateStatements,
+  combineMultiStatements,
   toSql,
   toSqlAndBinds,
   cacheableQuery,
@@ -513,5 +518,139 @@ describe("returningColumnValues", () => {
   it("returns [undefined] for empty result", () => {
     const host: DatabaseStatementsHost = {};
     expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fixture / truncate builders
+// ---------------------------------------------------------------------------
+
+describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) / combineMultiStatements", () => {
+  type FixtureHost = DatabaseStatementsHost &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString">;
+
+  function makeHost(quoter: { q?: (n: string) => string } = {}): FixtureHost {
+    const q = quoter.q ?? ((n: string) => `"${n}"`);
+    return {
+      quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+      quoteTableName: q,
+      quoteColumnName: q,
+      quoteString: (s: string) => s.replace(/'/g, "''"),
+    };
+  }
+
+  describe("buildTruncateStatement", () => {
+    it("produces TRUNCATE TABLE with quoted name", () => {
+      expect(buildTruncateStatement.call(makeHost(), "users")).toBe(`TRUNCATE TABLE "users"`);
+    });
+
+    it("uses adapter quoteTableName (backtick for MySQL)", () => {
+      const host = makeHost({ q: (n) => `\`${n}\`` });
+      expect(buildTruncateStatement.call(host, "orders")).toBe("TRUNCATE TABLE `orders`");
+    });
+  });
+
+  describe("buildTruncateStatements", () => {
+    it("maps each table name through buildTruncateStatement", () => {
+      const result = buildTruncateStatements.call(makeHost(), ["users", "posts"]);
+      expect(result).toEqual([`TRUNCATE TABLE "users"`, `TRUNCATE TABLE "posts"`]);
+    });
+
+    it("returns empty array for empty input", () => {
+      expect(buildTruncateStatements.call(makeHost(), [])).toEqual([]);
+    });
+  });
+
+  describe("combineMultiStatements", () => {
+    it('joins statements with ";\\n"', () => {
+      expect(combineMultiStatements(["SELECT 1", "SELECT 2"])).toBe("SELECT 1;\nSELECT 2");
+    });
+
+    it("returns single statement as-is (no trailing separator)", () => {
+      expect(combineMultiStatements(["SELECT 1"])).toBe("SELECT 1");
+    });
+
+    it("returns empty string for empty array", () => {
+      expect(combineMultiStatements([])).toBe("");
+    });
+  });
+
+  describe("buildFixtureSql", () => {
+    it("returns empty-insert placeholder for an empty fixtures array", () => {
+      const sql = buildFixtureSql.call(makeHost(), [], "users");
+      expect(sql).toMatch(/INSERT INTO "users"/);
+      expect(sql).toMatch(/DEFAULT VALUES/);
+    });
+
+    it("single-row: includes only columns present in the fixture (no DEFAULT filler)", () => {
+      const sql = buildFixtureSql.call(makeHost(), [{ name: "Alice", age: 30 }], "users");
+      expect(sql).toContain('"name"');
+      expect(sql).toContain('"age"');
+      expect(sql).toContain("'Alice'");
+      expect(sql).toContain("30");
+      expect(sql).not.toContain("DEFAULT");
+    });
+
+    it("single-row: strips missing columns (DEFAULT-strip optimisation)", () => {
+      // Two-column union but only one fixture row — missing column must be omitted
+      const sql = buildFixtureSql.call(makeHost(), [{ name: "Alice" }], "users");
+      expect(sql).toContain('"name"');
+      expect(sql).not.toContain("DEFAULT");
+    });
+
+    it("multi-row: includes all union columns, using DEFAULT for missing entries", () => {
+      const fixtures = [{ name: "Alice" }, { name: "Bob", age: 25 }];
+      const sql = buildFixtureSql.call(makeHost(), fixtures, "users");
+      expect(sql).toContain('"name"');
+      expect(sql).toContain('"age"');
+      expect(sql).toContain("'Alice'");
+      expect(sql).toContain("'Bob'");
+      expect(sql).toContain("25");
+      expect(sql).toContain("DEFAULT");
+    });
+
+    it("uses adapter quoteTableName / quoteColumnName for identifier quoting", () => {
+      const host = makeHost({ q: (n) => `\`${n}\`` });
+      const sql = buildFixtureSql.call(host, [{ id: 1 }], "orders");
+      expect(sql).toContain("`orders`");
+      expect(sql).toContain("`id`");
+    });
+
+    it("uses adapter quote() for value escaping", () => {
+      const host: FixtureHost = {
+        quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
+        quoteTableName: (n) => `"${n}"`,
+        quoteColumnName: (n) => `"${n}"`,
+        quoteString: (s) => s,
+      };
+      const sql = buildFixtureSql.call(host, [{ val: "x" }], "t");
+      expect(sql).toContain("E'x'");
+    });
+  });
+
+  describe("buildFixtureStatements", () => {
+    it("returns one INSERT per non-empty table", () => {
+      const host = makeHost();
+      const result = buildFixtureStatements.call(host, {
+        users: [{ name: "Alice" }],
+        posts: [{ title: "Hi" }],
+      });
+      expect(result).toHaveLength(2);
+      expect(result[0]).toContain('"users"');
+      expect(result[1]).toContain('"posts"');
+    });
+
+    it("skips empty fixture arrays", () => {
+      const result = buildFixtureStatements.call(makeHost(), {
+        users: [{ name: "Alice" }],
+        posts: [],
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0]).toContain('"users"');
+    });
+
+    it("returns empty array when all fixture sets are empty", () => {
+      expect(buildFixtureStatements.call(makeHost(), { users: [] })).toEqual([]);
+    });
   });
 });
