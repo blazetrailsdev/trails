@@ -17,6 +17,7 @@ export class DefaultStrategy extends ExecutionStrategy {
     migration: MigrationLike,
     adapter: DatabaseAdapter,
   ): Promise<void> {
+    this.migration = migration;
     if (direction === "up") {
       await migration.up(adapter);
     } else {
