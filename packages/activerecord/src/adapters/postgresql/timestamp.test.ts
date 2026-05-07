@@ -199,11 +199,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         await Dev.loadSchema();
         const records = await (Dev as any).all();
-        const timestamps = records.map((r: any) => r.updatedAt);
+        const timestamps = records.map((r: any) => r.updated_at);
         expect(timestamps).toContain(DateInfinity);
         expect(timestamps).toContain(DateNegativeInfinity);
-        const negIdx = timestamps.indexOf(DateNegativeInfinity);
-        expect(negIdx).toBeGreaterThanOrEqual(0);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
       }
@@ -222,10 +220,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       try {
         await Dev.loadSchema();
-        const d1 = await (Dev as any).create({ name: "aaron", updatedAt: DateInfinity });
-        expect((d1 as any).updatedAt).toBe(DateInfinity);
-        const d2 = await (Dev as any).create({ name: "aaron2", updatedAt: DateNegativeInfinity });
-        expect((d2 as any).updatedAt).toBe(DateNegativeInfinity);
+        const d1 = await (Dev as any).create({ name: "aaron", updated_at: DateInfinity });
+        expect((d1 as any).updated_at).toBe(DateInfinity);
+        const d2 = await (Dev as any).create({ name: "aaron2", updated_at: DateNegativeInfinity });
+        expect((d2 as any).updated_at).toBe(DateNegativeInfinity);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev2`);
       }

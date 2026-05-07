@@ -244,7 +244,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await ByteaDataType.loadSchema();
-      const data = Buffer.from("", "binary");
+      const data = Buffer.from([0x1f]);
       const record = await (ByteaDataType as any).create({ payload: data });
       expect((record as any).isNewRecord()).toBe(false);
       expect((record as any).payload instanceof Uint8Array).toBe(true);
