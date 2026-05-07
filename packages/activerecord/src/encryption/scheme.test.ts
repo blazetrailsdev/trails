@@ -54,12 +54,15 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
 
   it("keyProvider resolves from deterministic: true via DeterministicKeyProvider when config.deterministicKey is set", () => {
     const originalKey = Configurable.config.deterministicKey;
+    const originalSalt = Configurable.config.keyDerivationSalt;
     Configurable.config.deterministicKey = "det-key";
+    Configurable.config.keyDerivationSalt = "test-salt";
     try {
       const scheme = new Scheme({ deterministic: true });
       expect(scheme.keyProvider).toBeInstanceOf(DeterministicKeyProvider);
     } finally {
       Configurable.config.deterministicKey = originalKey;
+      Configurable.config.keyDerivationSalt = originalSalt;
     }
   });
 

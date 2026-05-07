@@ -1,19 +1,18 @@
 /**
- * Deterministic key provider — uses a single key for deterministic encryption.
+ * Deterministic key provider — derives a single key from a password.
  *
  * Mirrors: ActiveRecord::Encryption::DeterministicKeyProvider
  */
 
-import { Key } from "./key.js";
 import { ConfigError } from "./errors.js";
-import { KeyProvider } from "./key-provider.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
-export class DeterministicKeyProvider extends KeyProvider {
-  constructor(keys: Key | Key[]) {
-    const keyList = Array.isArray(keys) ? keys : [keys];
-    if (keyList.length > 1) {
-      throw new ConfigError("A DeterministicKeyProvider only supports a single key");
+export class DeterministicKeyProvider extends DerivedSecretKeyProvider {
+  constructor(passwords: string | string[]) {
+    const passwordList = Array.isArray(passwords) ? passwords : [passwords];
+    if (passwordList.length > 1) {
+      throw new ConfigError("Deterministic encryption keys can't be rotated");
     }
-    super(keyList);
+    super(passwordList);
   }
 }

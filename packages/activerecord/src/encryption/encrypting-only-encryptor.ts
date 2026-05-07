@@ -5,23 +5,9 @@
  */
 
 import { Encryptor } from "./encryptor.js";
-import type { KeyProviderLike } from "./encryptor.js";
 
-export class EncryptingOnlyEncryptor {
-  private _encryptor: Encryptor;
-
-  constructor() {
-    this._encryptor = new Encryptor();
-  }
-
-  encrypt(
-    clearText: string,
-    options?: { keyProvider?: KeyProviderLike; key?: string; deterministic?: boolean },
-  ): string {
-    return this._encryptor.encrypt(clearText, options);
-  }
-
-  decrypt(encryptedText: string): string {
+export class EncryptingOnlyEncryptor extends Encryptor {
+  override decrypt(encryptedText: string, _options?: Parameters<Encryptor["decrypt"]>[1]): string {
     return encryptedText;
   }
 }

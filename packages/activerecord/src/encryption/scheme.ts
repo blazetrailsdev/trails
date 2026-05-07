@@ -11,7 +11,6 @@ import { Configurable } from "./configurable.js";
 import { withEncryptionContext } from "./context.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
-import { Key } from "./key.js";
 import {
   getOrCreateDefaultKeyProvider,
   clearDefaultKeyProviderCache,
@@ -155,9 +154,7 @@ export class Scheme {
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.deterministic) {
       const deterministicKey = Configurable.config.get("deterministicKey") as string;
-      this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(
-        new Key(deterministicKey),
-      );
+      this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
     }
     return undefined;
