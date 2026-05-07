@@ -85,7 +85,9 @@ import {
   isBuildCountSubquery as _isBuildCountSubquery,
   buildCountSubquery as _buildCountSubquery,
 } from "./relation/calculations.js";
+import * as _fm from "./relation/finder-methods.js";
 import { FinderMethods } from "./relation/finder-methods.js";
+import * as _sm from "./relation/spawn-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
@@ -4934,6 +4936,90 @@ export class Relation<T extends Base> {
   /** @internal */
   private async(): Relation<T> {
     return (this.spawn() as any).asyncBang();
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR 37d — finder privates (delegates to relation/finder-methods.ts + spawn-methods.ts)
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  private constructRelationForExists(conditions: unknown): any {
+    return _fm.constructRelationForExists(this as any, conditions);
+  }
+
+  /** @internal */
+  private applyJoinDependency(eagerLoading: boolean): any {
+    return _fm.applyJoinDependency(this as any, eagerLoading);
+  }
+
+  /** @internal */
+  private isUsingLimitableReflections(reflections: unknown[]): boolean {
+    return _fm.isUsingLimitableReflections(reflections);
+  }
+
+  /** @internal */
+  private async findWithIds(ids: unknown[]): Promise<any> {
+    return _fm.findWithIds(this as any, ids);
+  }
+
+  /** @internal */
+  private async findOne(id: unknown): Promise<any> {
+    return _fm.findOne(this as any, id);
+  }
+
+  /** @internal */
+  private async findSome(ids: unknown[]): Promise<any[]> {
+    return _fm.findSome(this as any, ids);
+  }
+
+  /** @internal */
+  private async findSomeOrdered(ids: unknown[]): Promise<any[]> {
+    return _fm.findSomeOrdered(this as any, ids);
+  }
+
+  /** @internal */
+  private async findTake(): Promise<any | null> {
+    return _fm.findTake(this as any);
+  }
+
+  /** @internal */
+  private async findTakeWithLimit(limit: number): Promise<any[]> {
+    return _fm.findTakeWithLimit(this as any, limit);
+  }
+
+  /** @internal */
+  private findNth(index: number): Promise<any | null> {
+    return _fm.findNth(this as any, index);
+  }
+
+  /** @internal */
+  private findNthWithLimit(index: number, limit: number): Promise<any[]> {
+    return _fm.findNthWithLimit.call(this as any, index, limit);
+  }
+
+  /** @internal */
+  private findNthFromLast(index: number): Promise<any | null> {
+    return _fm.findNthFromLast.call(this as any, index);
+  }
+
+  /** @internal */
+  private async findLast(limit?: number): Promise<any> {
+    return _fm.findLast(this as any, limit);
+  }
+
+  /** @internal */
+  private orderedRelation(): any {
+    return _fm.orderedRelation(this as any);
+  }
+
+  /** @internal */
+  private _orderColumns(): string[] {
+    return _fm._orderColumns(this as any);
+  }
+
+  /** @internal */
+  private relationWith(values: Partial<Relation<T>>): Relation<T> {
+    return _sm.relationWith(this as any, values as any);
   }
 }
 

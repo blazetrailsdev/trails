@@ -110,7 +110,7 @@ export const SpawnMethods = {
 } as const;
 
 /** @internal */
-function relationWith<T extends SpawnRelation<T>>(self: T, values: Partial<T>): T {
+export function relationWith<T extends SpawnRelation<T>>(self: T, values: Partial<T>): T {
   const result = self._clone();
   for (const [key, val] of Object.entries(values as Record<string, unknown>)) {
     (result as any)[key] = val;
