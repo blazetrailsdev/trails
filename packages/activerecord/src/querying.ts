@@ -691,11 +691,20 @@ export function references<T extends typeof Base>(
 }
 
 /** Mirrors: ActiveRecord::Querying#extending */
+export function extending<T extends typeof Base, M extends Record<string, Function>>(
+  this: T,
+  mod: M,
+): Relation<InstanceType<T>> & M;
 export function extending<T extends typeof Base>(
   this: T,
-  ...args: Parameters<Relation<InstanceType<T>>["extending"]>
+  fn: (rel: Relation<InstanceType<T>>) => void,
+): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
+export function extending<T extends typeof Base>(
+  this: T,
+  mod?: Record<string, Function> | ((rel: Relation<InstanceType<T>>) => void),
 ): Relation<InstanceType<T>> {
-  return this.all().extending(...(args as []));
+  return mod ? this.all().extending(mod as Record<string, Function>) : this.all().extending();
 }
 
 /** Mirrors: ActiveRecord::Querying#unscope */
@@ -739,6 +748,19 @@ export function regroup<T extends typeof Base>(
 }
 
 /** Mirrors: ActiveRecord::Querying#having */
+export function having<T extends typeof Base>(
+  this: T,
+  condition: string,
+  ...binds: unknown[]
+): Relation<InstanceType<T>>;
+export function having<T extends typeof Base>(
+  this: T,
+  condition: Record<string, unknown>,
+): Relation<InstanceType<T>>;
+export function having<T extends typeof Base>(
+  this: T,
+  condition: import("@blazetrails/arel").Nodes.Node,
+): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
   condition: string | Record<string, unknown> | import("@blazetrails/arel").Nodes.Node,

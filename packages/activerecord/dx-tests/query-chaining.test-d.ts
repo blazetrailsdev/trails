@@ -112,6 +112,25 @@ describe("query chaining DX", () => {
     >();
   });
 
+  it("Post.withCte / withRecursive return Relation<Post>", () => {
+    expectTypeOf(Post.withCte({ recent: "SELECT * FROM posts" })).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.withRecursive({ tree: "SELECT * FROM posts" })).toMatchTypeOf<
+      Relation<Post>
+    >();
+  });
+
+  it("Post.invertWhere / without / except / only / merge return Relation<Post>", () => {
+    expectTypeOf(Post.invertWhere()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.without()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.except()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.only("where")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.merge(Post.where({ published: true }))).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.asyncIds returns Promise<unknown[]>", () => {
+    expectTypeOf(Post.asyncIds()).toMatchTypeOf<Promise<unknown[]>>();
+  });
+
   it("this.scope(fn) infers `rel` as Relation<Self>; defaultScope same", () => {
     class Article extends Base {
       declare published: boolean;

@@ -43,8 +43,8 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(Post.extending()).toBeInstanceOf(Relation);
   });
 
-  it("unscope() returns a Relation", () => {
-    expect(Post.where({ status: "draft" }).unscope("where")).toBeInstanceOf(Relation);
+  it("unscope() static forwarder returns a Relation", () => {
+    expect(Post.unscope("where")).toBeInstanceOf(Relation);
   });
 
   it("reselect() returns a Relation", () => {
@@ -106,8 +106,8 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(sql).toContain("post_classes");
   });
 
-  it("invertWhere() returns a Relation", () => {
-    expect(Post.where({ status: "draft" }).invertWhere()).toBeInstanceOf(Relation);
+  it("invertWhere() static forwarder returns a Relation", () => {
+    expect(Post.invertWhere()).toBeInstanceOf(Relation);
   });
 
   it("without() returns a Relation", () => {
