@@ -3,6 +3,10 @@
  *
  * Mirrors: ActiveRecord.deprecator (deprecator.rb)
  * Also covers: gem_version.rb, version.rb, and MigrationProxy (migration.rb)
+ *
+ * NOTE: MigrationProxy uses node:module (createRequire) for synchronous file loading,
+ * matching Rails' synchronous load_migration. This makes deprecator.ts Node-only at
+ * import time — do not add this file to browser bundles.
  */
 import { createRequire } from "node:module";
 import { Deprecation, getPath } from "@blazetrails/activesupport";
@@ -83,6 +87,12 @@ export class MigrationProxy {
     delete req.cache[req.resolve(this.filename)];
     const mod = req(this.filename) as Record<string, new (name: string, version: string) => object>;
     const klass = mod[this.name] ?? mod.default;
+    if (typeof klass !== "function") {
+      throw new Error(
+        `Migration ${this.name} could not be loaded from ${this.filename}: ` +
+          `no export named "${this.name}" or "default" found`,
+      );
+    }
     return new (klass as new (name: string, version: string) => object)(this.name, this.version);
   }
 }

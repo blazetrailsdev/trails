@@ -326,6 +326,8 @@ export { Connection as TypeCasterConnection } from "./type-caster/connection.js"
 export { Map as TypeCasterMap } from "./type-caster/map.js";
 
 export { Trailtie } from "./trailtie.js";
+// deprecator.ts also exports MigrationProxy, but MigrationProxy uses node:module (createRequire)
+// for synchronous migration loading — Node-only; do not import in browser bundles.
 export { deprecator, gemVersion, version } from "./deprecator.js";
 export { JobRuntime } from "./railties/job-runtime.js";
 export { Resolver as DatabaseSelectorResolver } from "./middleware/database-selector/resolver.js";
