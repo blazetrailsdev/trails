@@ -529,7 +529,8 @@ export class AbstractAdapter implements Quoting {
    * resolve to the same object.
    * @internal
    */
-  get adapter(): import("./abstract/assert-schema-adapter.js").SchemaQuoter & DatabaseAdapter {
+  protected get adapter(): import("./abstract/assert-schema-adapter.js").SchemaQuoter &
+    DatabaseAdapter {
     return this as unknown as import("./abstract/assert-schema-adapter.js").SchemaQuoter &
       DatabaseAdapter;
   }
