@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { parseRange } from "./pg-range.js";
+import { parseRange, serializeRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
 
 const toInt = (s: string) => parseInt(s, 10);
@@ -512,59 +512,138 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs timezone infrastructure */
     });
-    it.skip("create numrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("create numrange", async () => {
+      // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))
+      const range = new Range(0.5, 1, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].num_range as string, toFloat)!;
+      expect(result.begin).toBeCloseTo(0.5);
+      expect(result.end).toBeCloseTo(1);
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update numrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("update numrange", async () => {
+      // Rails: assert_equal_round_trip => BigDecimal("0.5")...BigDecimal("1")
+      //        assert_nil_round_trip  => BigDecimal("0.5")...BigDecimal("0.5") (empty → nil)
+      const range = new Range(0.5, 1, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].num_range as string, toFloat)!;
+      expect(result.begin).toBeCloseTo(0.5);
+      expect(result.end).toBeCloseTo(1);
+
+      await adapter.execute(`DELETE FROM postgresql_ranges`);
+      const empty = new Range(0.5, 0.5, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(empty, String)}')`,
+      );
+      const rows2 = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
+      expect(parseRange(rows2[0].num_range as string, toFloat)).toBeNull();
     });
-    it.skip("create daterange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("create daterange", async () => {
+      // Rails: assert_equal_round_trip(@new_range, :date_range, Date.new(2012,1,1)...Date.new(2013,1,1))
+      const range = new Range("2012-01-01", "2013-01-01", true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(range)}')`,
+      );
+      const rows = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].date_range as string)!;
+      expect(result.begin).toBe("2012-01-01");
+      expect(result.end).toBe("2013-01-01");
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update daterange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("update daterange", async () => {
+      // Rails: assert_equal_round_trip => Date.new(2012,2,3)...Date.new(2012,2,10)
+      //        assert_nil_round_trip  => Date.new(2012,2,3)...Date.new(2012,2,3) (empty → nil)
+      const range = new Range("2012-02-03", "2012-02-10", true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(range)}')`,
+      );
+      const rows = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].date_range as string)!;
+      expect(result.begin).toBe("2012-02-03");
+      expect(result.end).toBe("2012-02-10");
+
+      await adapter.execute(`DELETE FROM postgresql_ranges`);
+      const empty = new Range("2012-02-03", "2012-02-03", true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(empty)}')`,
+      );
+      const rows2 = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
+      expect(parseRange(rows2[0].date_range as string)).toBeNull();
     });
-    it.skip("create int4range", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("create int4range", async () => {
+      // Rails: assert_equal_round_trip(@new_range, :int4_range, Range.new(3, 50, true))
+      const range = new Range(3, 50, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].int4_range as string, toInt)!;
+      expect(result.begin).toBe(3);
+      expect(result.end).toBe(50);
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update int4range", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("update int4range", async () => {
+      // Rails: assert_equal_round_trip => 6...10; assert_nil_round_trip => 3...3 (empty → nil)
+      const range = new Range(6, 10, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].int4_range as string, toInt)!;
+      expect(result.begin).toBe(6);
+      expect(result.end).toBe(10);
+
+      await adapter.execute(`DELETE FROM postgresql_ranges`);
+      const empty = new Range(3, 3, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(empty, String)}')`,
+      );
+      const rows2 = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
+      expect(parseRange(rows2[0].int4_range as string, toInt)).toBeNull();
     });
-    it.skip("create int8range", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("create int8range", async () => {
+      // Rails: assert_equal_round_trip(@new_range, :int8_range, Range.new(30, 50, true))
+      const range = new Range(30, 50, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].int8_range as string, toInt)!;
+      expect(result.begin).toBe(30);
+      expect(result.end).toBe(50);
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update int8range", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("update int8range", async () => {
+      // Rails: assert_equal_round_trip => 60000...10000000; assert_nil_round_trip => 39999...39999 (empty → nil)
+      const range = new Range(60000, 10000000, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(range, String)}')`,
+      );
+      const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
+      const result = parseRange(rows[0].int8_range as string, toInt)!;
+      expect(result.begin).toBe(60000);
+      expect(result.end).toBe(10000000);
+
+      await adapter.execute(`DELETE FROM postgresql_ranges`);
+      const empty = new Range(39999, 39999, true);
+      await adapter.execute(
+        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(empty, String)}')`,
+      );
+      const rows2 = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
+      expect(parseRange(rows2[0].int8_range as string, toInt)).toBeNull();
     });
-    it.skip("exclude beginning for subtypes without succ method is not supported", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model + error handling */
+    it("exclude beginning for subtypes without succ method is not supported", () => {
+      // Rails: assert_raises(ArgumentError) { PostgresqlRange.create!(num_range: "(0.1, 0.2]") }
+      // The parse-time throw covers the same invariant without needing the AR model.
+      expect(() => parseRange("(0.1,0.2]", toFloat)).toThrow();
+      expect(() => parseRange("(1,10]", toInt)).toThrow();
+      expect(() => parseRange("(2012-01-02,2012-01-04]")).toThrow();
     });
     it.skip("where by attribute with range", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
@@ -590,11 +669,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
       /* needs Base model */
     });
-    it.skip("ranges correctly unescape output", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it("ranges correctly unescape output", () => {
+      // Rails: inserts '["ca""t","do\\\\g")' via SQL, reads back as 'ca"t'...'do\\g'
+      // Tests unquoteRangeBound handles PG's "" and \\ escaping.
+      const r = parseRange('["ca""t","do\\\\g")')!;
+      expect(r.begin).toBe('ca"t');
+      expect(r.end).toBe("do\\g");
+      expect(r.excludeEnd).toBe(true);
     });
 
     it("infinity values", async () => {

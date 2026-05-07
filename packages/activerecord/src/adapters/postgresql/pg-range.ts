@@ -54,3 +54,28 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
 
   return new Range(castBegin, castEnd, excludeEnd);
 }
+
+export type SubtypeSerialize = (value: unknown) => string;
+
+/**
+ * Serialize a Range into a PG range literal like "[3,50)".
+ *
+ * Null bounds represent infinity (stored as empty string in the literal).
+ * Bounds containing special characters are double-quoted per the PG format.
+ */
+export function serializeRange(range: Range, subtype?: SubtypeSerialize): string {
+  const serializeBound = (v: unknown): string => {
+    if (v === null || v === undefined) return "";
+    const s = subtype ? subtype(v) : String(v);
+    return quoteRangeBound(s);
+  };
+  const endBracket = range.excludeEnd ? ")" : "]";
+  return `[${serializeBound(range.begin)},${serializeBound(range.end)}${endBracket}`;
+}
+
+function quoteRangeBound(value: string): string {
+  if (/[",\\\s[\]()]/.test(value)) {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '""')}"`;
+  }
+  return value;
+}
