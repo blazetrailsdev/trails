@@ -12,6 +12,7 @@
  * referenceNameForTable, columnNamesFromColumnNumbers)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   describeIfPg,
   PostgreSQLAdapter,
@@ -519,6 +520,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("extractSchemaQualifiedName splits schema-qualified name", () => {
       expect(adapter.extractSchemaQualifiedName("public.things")).toEqual(["public", "things"]);
       expect(adapter.extractSchemaQualifiedName("things")).toEqual([null, "things"]);
+    });
+
+    it("exclusionConstraintForBang raises ArgumentError for missing constraint", async () => {
+      const err = await adapter
+        .exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent WITH =")
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(ArgumentError);
+      expect(err.message).toMatch("has no exclusion constraint");
+    });
+
+    it("uniqueConstraintForBang raises ArgumentError for missing constraint", async () => {
+      const err = await adapter
+        .uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent_col")
+        .catch((e) => e);
+      expect(err).toBeInstanceOf(ArgumentError);
+      expect(err.message).toMatch("has no unique constraint");
     });
 
     it("exclusionConstraintName is deterministic and uses name option", () => {
