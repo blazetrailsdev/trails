@@ -609,3 +609,36 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).toContain("Schema version: 20240201000000");
   });
 });
+
+describe("SchemaDumper async header ordering", () => {
+  it("schemas → extensions → types appear in that order when all three are async", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const log: string[] = [];
+    class OrderedDumper extends TopLevelDumper {
+      protected override async schemas(lines: string[]): Promise<void> {
+        await Promise.resolve();
+        lines.push("SCHEMAS");
+        log.push("schemas");
+      }
+      protected override async extensions(lines: string[]): Promise<void> {
+        await Promise.resolve();
+        lines.push("EXTENSIONS");
+        log.push("extensions");
+      }
+      protected override async types(lines: string[]): Promise<void> {
+        await Promise.resolve();
+        lines.push("TYPES");
+        log.push("types");
+      }
+    }
+    const source = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (OrderedDumper as any)(source);
+    const result = await (dumper.dump() as Promise<string>);
+    expect(log).toEqual(["schemas", "extensions", "types"]);
+    const schemasIdx = result.indexOf("SCHEMAS");
+    const extensionsIdx = result.indexOf("EXTENSIONS");
+    const typesIdx = result.indexOf("TYPES");
+    expect(schemasIdx).toBeLessThan(extensionsIdx);
+    expect(extensionsIdx).toBeLessThan(typesIdx);
+  });
+});

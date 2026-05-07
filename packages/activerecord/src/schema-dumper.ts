@@ -469,14 +469,35 @@ export class SchemaDumper {
     const lines: string[] = [];
     this.header(lines);
     const schemasResult = this.schemas(lines);
+    // If any header section is async, run all three sequentially to preserve
+    // deterministic output order (schemas → extensions → types).
+    if (schemasResult instanceof Promise) {
+      return schemasResult
+        .then(() => this.extensions(lines))
+        .then(() => this.types(lines))
+        .then(async () => {
+          const result = this.dumpTables(lines);
+          if (result instanceof Promise) await result;
+          await this.virtualTables(lines);
+          this.trailer(lines);
+          return lines.join("\n");
+        });
+    }
     const extensionsResult = this.extensions(lines);
+    if (extensionsResult instanceof Promise) {
+      return extensionsResult
+        .then(() => this.types(lines))
+        .then(async () => {
+          const result = this.dumpTables(lines);
+          if (result instanceof Promise) await result;
+          await this.virtualTables(lines);
+          this.trailer(lines);
+          return lines.join("\n");
+        });
+    }
     const typesResult = this.types(lines);
-    const hasAsync =
-      schemasResult instanceof Promise ||
-      extensionsResult instanceof Promise ||
-      typesResult instanceof Promise;
-    if (hasAsync) {
-      return Promise.all([schemasResult, extensionsResult, typesResult]).then(async () => {
+    if (typesResult instanceof Promise) {
+      return typesResult.then(async () => {
         const result = this.dumpTables(lines);
         if (result instanceof Promise) await result;
         await this.virtualTables(lines);
