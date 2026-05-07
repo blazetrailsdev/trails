@@ -18,7 +18,7 @@ import {
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import type { Base } from "./base.js";
-import { applyPendingEncryptions } from "./encryption.js";
+import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
 
 type AnyClass = any;
@@ -96,7 +96,7 @@ export function defineAttribute(
   });
 
   amResetDefaultAttributes(this);
-  applyPendingEncryptions(this);
+  encryptionHooks.applyPendingEncryptions(this);
 
   // Install prototype accessor so the attribute is readable/writable by name,
   // matching what applyColumnsHash does for schema-reflected columns.

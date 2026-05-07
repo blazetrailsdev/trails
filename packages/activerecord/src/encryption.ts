@@ -18,6 +18,7 @@
  * two flows share a single wrapper implementation.
  */
 
+import { registerEncryptionHooks } from "./encryption-hooks.js";
 import { type Type } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
@@ -473,3 +474,15 @@ export function currentCustomContext(): EncryptionContext | null {
 export function resetDefaultContext(): void {
   Contexts.resetDefaultContext();
 }
+
+// Register real implementations into the hook registry so base.ts picks them
+// up without statically importing this module (which would drag zlib/crypto
+// into browser bundles via the configurable → config → zlib chain).
+registerEncryptionHooks({
+  encrypts,
+  applyPendingEncryptions,
+  encryptedAttributeQ,
+  ciphertextFor,
+  encryptRecord,
+  decryptRecord,
+});

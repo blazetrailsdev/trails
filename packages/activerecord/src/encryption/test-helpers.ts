@@ -18,6 +18,8 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { clearDefaultKeyProviderCache } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { DecryptionError, EncryptionError } from "./errors.js";
+// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
+import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 
 export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionError };

@@ -55,15 +55,8 @@ import {
   UniquenessValidator,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
-import {
-  encrypts as _encrypts,
-  applyPendingEncryptions,
-  encryptedAttributeQ as _encryptedAttributeQ,
-  ciphertextFor as _ciphertextFor,
-  encryptRecord as _encryptRecord,
-  decryptRecord as _decryptRecord,
-  type EncryptsOptions,
-} from "./encryption.js";
+import { encryptionHooks } from "./encryption-hooks.js";
+import type { EncryptsOptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
 import {
@@ -741,7 +734,7 @@ export class Base extends Model {
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
-    applyPendingEncryptions(this);
+    encryptionHooks.applyPendingEncryptions(this);
   }
 
   /**
@@ -1192,7 +1185,7 @@ export class Base extends Model {
     // the subclass and reintroduce the shadowing the STI-routing fix
     // is trying to eliminate.
     const target = isStiSubclass(this) ? (getStiBase(this) as typeof Base) : this;
-    _encrypts(target, ...args);
+    encryptionHooks.encrypts(target, ...args);
   }
 
   /**
@@ -1202,7 +1195,7 @@ export class Base extends Model {
    * @internal
    */
   encryptedAttribute(attributeName: string): boolean {
-    return _encryptedAttributeQ(this, attributeName);
+    return encryptionHooks.encryptedAttributeQ(this, attributeName);
   }
 
   /**
@@ -1212,7 +1205,7 @@ export class Base extends Model {
    * @internal
    */
   ciphertextFor(attributeName: string): unknown {
-    return _ciphertextFor(this, attributeName);
+    return encryptionHooks.ciphertextFor(this, attributeName);
   }
 
   /**
@@ -1222,7 +1215,7 @@ export class Base extends Model {
    * @internal
    */
   async encrypt(): Promise<void> {
-    return _encryptRecord(this);
+    return encryptionHooks.encryptRecord(this);
   }
 
   /**
@@ -1232,7 +1225,7 @@ export class Base extends Model {
    * @internal
    */
   async decrypt(): Promise<void> {
-    return _decryptRecord(this);
+    return encryptionHooks.decryptRecord(this);
   }
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {

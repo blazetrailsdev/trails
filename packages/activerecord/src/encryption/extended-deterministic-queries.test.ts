@@ -13,6 +13,8 @@ import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
+// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
+import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { createTestAdapter } from "../test-adapter.js";
