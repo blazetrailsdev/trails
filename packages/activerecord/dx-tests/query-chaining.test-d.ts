@@ -120,10 +120,9 @@ describe("query chaining DX", () => {
     expectTypeOf(Post["with"]({ recent: "SELECT * FROM posts" })).toMatchTypeOf<Relation<Post>>();
   });
 
-  it("Post.invertWhere / without / except / only / merge return Relation<Post>", () => {
+  it("Post.invertWhere / without / only / merge return Relation<Post>", () => {
     expectTypeOf(Post.invertWhere()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.without()).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.except()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.only("where")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.merge(Post.where({ published: true }))).toMatchTypeOf<Relation<Post>>();
   });

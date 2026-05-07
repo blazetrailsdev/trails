@@ -99,6 +99,10 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(Post.createWith({ status: "draft" })).toBeInstanceOf(Relation);
   });
 
+  it("createWith(null) resets create-with attrs and returns a Relation", () => {
+    expect(Post.createWith(null)).toBeInstanceOf(Relation);
+  });
+
   it("excluding() returns a Relation", () => {
     expect(Post.excluding()).toBeInstanceOf(Relation);
   });
@@ -132,10 +136,6 @@ describe("QueryingTest — static forwarders on Base", () => {
 
   it("without() returns a Relation", () => {
     expect(Post.without()).toBeInstanceOf(Relation);
-  });
-
-  it("except() returns a Relation", () => {
-    expect(Post.except()).toBeInstanceOf(Relation);
   });
 
   it("only() returns a Relation", () => {

@@ -855,7 +855,7 @@ export function strictLoading<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#create_with */
 export function createWith<T extends typeof Base>(
   this: T,
-  attrs: Record<string, unknown>,
+  attrs: Record<string, unknown> | null,
 ): Relation<InstanceType<T>> {
   return this.all().createWith(attrs);
 }
@@ -871,14 +871,6 @@ export function without<T extends typeof Base>(
   ...records: InstanceType<T>[]
 ): Relation<InstanceType<T>> {
   return this.all().without(...records);
-}
-
-/** Mirrors: ActiveRecord::Relation#except_ (SQL EXCEPT set-operation) */
-export function except<T extends typeof Base>(
-  this: T,
-  other?: Relation<InstanceType<T>>,
-): Relation<InstanceType<T>> {
-  return this.all().except(other);
 }
 
 /** Mirrors: ActiveRecord::SpawnMethods#only */
