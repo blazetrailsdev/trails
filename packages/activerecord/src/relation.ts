@@ -46,6 +46,7 @@ import {
   type UnscopeType,
   type AssociationSpec,
 } from "./relation/query-methods.js";
+import * as _qm from "./relation/query-methods.js";
 import {
   Batches,
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
@@ -4524,6 +4525,201 @@ export class Relation<T extends Base> {
 
   private skipQueryCacheIfNecessary<R>(block: () => R): R {
     return block();
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR 37c — build-helper privates (delegates to relation/query-methods.ts)
+  // Mirrors: ActiveRecord::QueryMethods private build helpers
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  private buildWhereClause(opts: unknown, rest: unknown[] = []): unknown {
+    return _qm.buildWhereClause.call(this as any, opts, rest);
+  }
+
+  /** @internal */
+  private buildNamedBoundSqlLiteral(statement: string, values: Record<string, unknown>): unknown {
+    return _qm.buildNamedBoundSqlLiteral.call(this as any, statement, values);
+  }
+
+  /** @internal */
+  private buildBoundSqlLiteral(statement: string, values: unknown[]): unknown {
+    return _qm.buildBoundSqlLiteral.call(this as any, statement, values);
+  }
+
+  /** @internal */
+  private buildSubquery(subqueryAlias: string, selectValue: unknown): unknown {
+    return _qm.buildSubquery.call(this as any, subqueryAlias, selectValue);
+  }
+
+  /** @internal */
+  private buildCastValue(name: string, value: unknown): unknown {
+    return _qm.buildCastValue(name, value);
+  }
+
+  /** @internal */
+  private flattenedArgs(args: unknown[]): unknown[] {
+    return _qm.flattenedArgs(args);
+  }
+
+  /** @internal */
+  private validateOrderArgs(args: unknown[]): void {
+    _qm.validateOrderArgs.call(this as any, args);
+  }
+
+  /** @internal */
+  private processWithArgs(args: unknown[]): Record<string, unknown>[] {
+    return _qm.processWithArgs.call(this as any, args);
+  }
+
+  /** @internal */
+  private isDoesNotSupportReverse(order: string): boolean {
+    return _qm.isDoesNotSupportReverse(order);
+  }
+
+  /** @internal */
+  private reverseSqlOrder(orderQuery: unknown[]): unknown[] {
+    return _qm.reverseSqlOrder.call(this as any, orderQuery);
+  }
+
+  /** @internal */
+  private extractTableNameFrom(orderTerm: string): string | null {
+    return _qm.extractTableNameFrom(orderTerm);
+  }
+
+  /** @internal */
+  private columnReferences(orderArgs: unknown[]): string[] {
+    return _qm.columnReferences(orderArgs);
+  }
+
+  /** @internal */
+  private sanitizeOrderArguments(orderArgs: unknown[]): unknown[] {
+    return _qm.sanitizeOrderArguments.call(this as any, orderArgs);
+  }
+
+  /** @internal */
+  private preprocessOrderArgs(orderArgs: unknown[]): void {
+    _qm.preprocessOrderArgs.call(this as any, orderArgs);
+  }
+
+  /** @internal */
+  private buildOrder(arel: unknown): void {
+    _qm.buildOrder.call(this as any, arel);
+  }
+
+  /** @internal */
+  private buildCaseForValuePosition(
+    column: unknown,
+    values: unknown[],
+    options?: { filter?: boolean },
+  ): unknown {
+    return _qm.buildCaseForValuePosition.call(this as any, column, values, options);
+  }
+
+  /** @internal */
+  private resolveArelAttributes(attrs: unknown[]): unknown[] {
+    return _qm.resolveArelAttributes.call(this as any, attrs);
+  }
+
+  /** @internal */
+  private orderColumn(field: string): unknown {
+    return _qm.orderColumn.call(this as any, field);
+  }
+
+  /** @internal */
+  private processSelectArgs(fields: unknown[]): unknown[] {
+    return _qm.processSelectArgs.call(this as any, fields);
+  }
+
+  /** @internal */
+  private arelColumnAliasesFromHash(fields: Record<string | symbol, unknown>): unknown[] {
+    return _qm.arelColumnAliasesFromHash.call(this as any, fields);
+  }
+
+  /** @internal */
+  private buildFrom(): unknown {
+    return _qm.buildFrom.call(this as any);
+  }
+
+  /** @internal */
+  private buildSelect(arel: unknown): void {
+    _qm.buildSelect.call(this as any, arel);
+  }
+
+  /** @internal */
+  private buildWithExpressionFromValue(value: unknown): unknown {
+    return _qm.buildWithExpressionFromValue.call(this as any, value);
+  }
+
+  /** @internal */
+  private buildWithValueFromHash(hash: Record<string, unknown>): unknown[] {
+    return _qm.buildWithValueFromHash.call(this as any, hash);
+  }
+
+  /** @internal */
+  private lookupTableKlassFromJoinDependencies(tableName: string): unknown {
+    return _qm.lookupTableKlassFromJoinDependencies.call(this as any, tableName);
+  }
+
+  /** @internal */
+  private eachJoinDependencies(
+    joinDependencies: unknown[] | undefined,
+    block: (join: unknown) => void,
+  ): void {
+    _qm.eachJoinDependencies.call(this as any, joinDependencies as any, block);
+  }
+
+  /** @internal */
+  private buildJoinDependencies(): unknown[] {
+    return _qm.buildJoinDependencies.call(this as any);
+  }
+
+  /** @internal */
+  private buildArel(connection?: unknown, aliases?: unknown): unknown {
+    return _qm.buildArel.call(this as any, connection, aliases);
+  }
+
+  /** @internal */
+  private selectNamedJoins(
+    joinNames: unknown[],
+    stashedJoins?: unknown[] | null,
+    block?: (join: unknown) => void,
+  ): unknown[] {
+    return _qm.selectNamedJoins.call(this as any, joinNames, stashedJoins ?? null, block);
+  }
+
+  /** @internal */
+  private selectAssociationList(
+    associations: unknown[],
+    stashedJoins?: unknown[] | null,
+    block?: (join: unknown) => void,
+  ): unknown[] {
+    return _qm.selectAssociationList.call(this as any, associations, stashedJoins ?? null, block);
+  }
+
+  /** @internal */
+  private buildJoinBuckets(): Record<string, unknown[]> {
+    return _qm.buildJoinBuckets.call(this as any);
+  }
+
+  /** @internal */
+  private buildJoins(arel: unknown): void {
+    _qm.buildJoins.call(this as any, arel);
+  }
+
+  /** @internal */
+  private buildWith(arel: unknown): void {
+    _qm.buildWith.call(this as any, arel);
+  }
+
+  /** @internal */
+  private buildWithJoinNode(name: string, kind?: unknown): unknown {
+    return _qm.buildWithJoinNode.call(this as any, name, kind as any);
+  }
+
+  /** @internal */
+  private structurallyIncompatibleValuesFor(other: unknown): string[] {
+    return _qm.structurallyIncompatibleValuesFor(this as any, other as any);
   }
 
   // ---------------------------------------------------------------------------

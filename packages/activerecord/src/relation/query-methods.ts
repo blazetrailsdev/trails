@@ -653,7 +653,7 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
 }
 
 /** @internal */
-function buildWhereClause(
+export function buildWhereClause(
   this: QueryMethodsHost,
   opts: unknown,
   rest: unknown[] = [],
@@ -836,7 +836,7 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
 ];
 
 /** @internal */
-function structurallyIncompatibleValuesFor(
+export function structurallyIncompatibleValuesFor(
   self: QueryMethodsHost,
   other: QueryMethodsHost,
 ): string[] {
@@ -1278,7 +1278,7 @@ export function checkIfMethodHasArgumentsBang(
 }
 
 /** @internal */
-function flattenedArgs(args: unknown[]): unknown[] {
+export function flattenedArgs(args: unknown[]): unknown[] {
   return args.flatMap((e) => {
     if (Array.isArray(e)) return flattenedArgs(e);
     // Only expand plain objects — leave class instances (Arel nodes, Dates, …) as-is.
@@ -1290,7 +1290,7 @@ function flattenedArgs(args: unknown[]): unknown[] {
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 
 /** @internal */
-function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
+export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
     if (!isPlainObject(arg)) continue;
     for (const [, value] of Object.entries(arg)) {
@@ -1304,7 +1304,10 @@ function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
 }
 
 /** @internal */
-function processWithArgs(this: QueryMethodsHost, args: unknown[]): Record<string, unknown>[] {
+export function processWithArgs(
+  this: QueryMethodsHost,
+  args: unknown[],
+): Record<string, unknown>[] {
   return args.flatMap((arg) => {
     if (!isPlainObject(arg)) {
       const desc =
@@ -1322,12 +1325,12 @@ function processWithArgs(this: QueryMethodsHost, args: unknown[]): Record<string
 }
 
 /** @internal */
-function buildCastValue(name: string, value: unknown): Attribute {
+export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, new ValueType());
 }
 
 /** @internal */
-function buildNamedBoundSqlLiteral(
+export function buildNamedBoundSqlLiteral(
   this: QueryMethodsHost,
   statement: string,
   values: Record<string, unknown>,
@@ -1348,7 +1351,7 @@ function buildNamedBoundSqlLiteral(
 }
 
 /** @internal */
-function buildBoundSqlLiteral(
+export function buildBoundSqlLiteral(
   this: QueryMethodsHost,
   statement: string,
   values: unknown[],
@@ -1367,7 +1370,7 @@ function buildBoundSqlLiteral(
 }
 
 /** @internal */
-function buildSubquery(
+export function buildSubquery(
   this: QueryMethodsHost,
   subqueryAlias: string,
   selectValue: unknown,
@@ -1391,7 +1394,7 @@ function buildSubquery(
 }
 
 /** @internal */
-function isDoesNotSupportReverse(order: string): boolean {
+export function isDoesNotSupportReverse(order: string): boolean {
   const plain = String(order);
   if (
     plain.includes(",") &&
@@ -1403,7 +1406,7 @@ function isDoesNotSupportReverse(order: string): boolean {
 }
 
 /** @internal */
-function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
+export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
     const pk = (this as any)._modelClass?.primaryKey;
     if (pk) {
@@ -1453,7 +1456,7 @@ function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown
 }
 
 /** @internal */
-function extractTableNameFrom(orderTerm: string): string | null {
+export function extractTableNameFrom(orderTerm: string): string | null {
   const match = orderTerm.match(/^\W?(\w+)\W?\./);
   return match ? match[1] : null;
 }
@@ -1467,7 +1470,7 @@ function symbolToName(s: symbol): string {
 }
 
 /** @internal */
-function columnReferences(orderArgs: unknown[]): string[] {
+export function columnReferences(orderArgs: unknown[]): string[] {
   const refs: string[] = [];
   for (const arg of orderArgs) {
     if (typeof arg === "string" || typeof arg === "symbol") {
@@ -1495,7 +1498,7 @@ function columnReferences(orderArgs: unknown[]): string[] {
 }
 
 /** @internal */
-function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
+export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
   return orderArgs.map((arg) => (this as any)._modelClass?.sanitizeSqlForOrder?.(arg) ?? arg);
 }
 
@@ -1519,7 +1522,7 @@ function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbo
 }
 
 /** @internal */
-function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
+export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   // disallowRawSqlBang skips symbols — resolve symbol names to strings first
   // so their descriptions are validated against the column-name matcher.
   const keysForCheck = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
@@ -1595,7 +1598,7 @@ function buildOrderNode(clause: unknown): unknown {
 }
 
 /** @internal */
-function buildOrder(this: QueryMethodsHost, arel: any): void {
+export function buildOrder(this: QueryMethodsHost, arel: any): void {
   const orders = ((this as any)._orderClauses ?? [])
     .filter((o: unknown) => o !== null && o !== undefined && o !== "")
     .map(buildOrderNode);
@@ -1603,7 +1606,7 @@ function buildOrder(this: QueryMethodsHost, arel: any): void {
 }
 
 /** @internal */
-function buildCaseForValuePosition(
+export function buildCaseForValuePosition(
   this: QueryMethodsHost,
   column: unknown,
   values: unknown[],
@@ -1619,7 +1622,7 @@ function buildCaseForValuePosition(
 }
 
 /** @internal */
-function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
+export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
   const builder = (this as any).predicateBuilder;
   return attrs.flatMap((attr) => {
     if (attr !== null && typeof attr === "object" && typeof (attr as any).eq === "function") {
@@ -1816,7 +1819,7 @@ export function arelColumnsFromHash(
 }
 
 /** @internal */
-function orderColumn(this: QueryMethodsHost, field: string): unknown {
+export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   const modelClass: any = (this as any)._modelClass;
   const table: any = modelClass?.arelTable;
   return arelColumn.call(this, field, (attrName: string) => {
@@ -1829,7 +1832,7 @@ function orderColumn(this: QueryMethodsHost, field: string): unknown {
 }
 
 /** @internal */
-function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
+export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
   return fields.flatMap((field) => {
     if (isPlainObject(field))
       return arelColumnAliasesFromHash.call(this, field as Record<string, unknown>);
@@ -1844,7 +1847,7 @@ function nodeAs(attr: unknown, quotedAlias: string): unknown {
 }
 
 /** @internal */
-function arelColumnAliasesFromHash(
+export function arelColumnAliasesFromHash(
   this: QueryMethodsHost,
   fields: Record<string | symbol, unknown>,
 ): unknown[] {
@@ -1874,7 +1877,7 @@ function arelColumnAliasesFromHash(
 }
 
 /** @internal */
-function buildFrom(this: QueryMethodsHost): unknown {
+export function buildFrom(this: QueryMethodsHost): unknown {
   const fromClause = (this as any)._fromClause;
   const opts = fromClause?.value;
   let name = fromClause?.name;
@@ -1890,7 +1893,7 @@ function buildFrom(this: QueryMethodsHost): unknown {
 }
 
 /** @internal */
-function buildSelect(this: QueryMethodsHost, arel: any): void {
+export function buildSelect(this: QueryMethodsHost, arel: any): void {
   const selectCols = (this as any)._selectColumns;
   if (selectCols && selectCols.length > 0) {
     arel.project(...arelColumns.call(this, selectCols));
@@ -1912,7 +1915,7 @@ function buildSelect(this: QueryMethodsHost, arel: any): void {
 }
 
 /** @internal */
-function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): unknown {
+export function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value as any);
   // Always return the AST node so Cte.relation receives a Node, not a SelectManager.
   if (value instanceof SelectManager) return value.ast;
@@ -1932,7 +1935,10 @@ function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): u
 }
 
 /** @internal */
-function buildWithValueFromHash(this: QueryMethodsHost, hash: Record<string, unknown>): unknown[] {
+export function buildWithValueFromHash(
+  this: QueryMethodsHost,
+  hash: Record<string, unknown>,
+): unknown[] {
   return Reflect.ownKeys(hash).map((key) => {
     const name = typeof key === "symbol" ? symbolToName(key) : key;
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
@@ -1951,7 +1957,10 @@ function buildWithValueFromHash(this: QueryMethodsHost, hash: Record<string, unk
 // callback. These helpers exist for private-API parity; they are not yet wired
 // through the current buildArel() → buildJoins() path.
 /** @internal */
-function lookupTableKlassFromJoinDependencies(this: QueryMethodsHost, tableName: string): unknown {
+export function lookupTableKlassFromJoinDependencies(
+  this: QueryMethodsHost,
+  tableName: string,
+): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(this, undefined, (join: any) => {
     if (tableName === join.tableName) found = join.modelClass;
@@ -1960,7 +1969,7 @@ function lookupTableKlassFromJoinDependencies(this: QueryMethodsHost, tableName:
 }
 
 /** @internal */
-function eachJoinDependencies(
+export function eachJoinDependencies(
   this: QueryMethodsHost,
   joinDependencies: JoinDependency[] | undefined,
   block: (join: any) => void,
@@ -1972,7 +1981,7 @@ function eachJoinDependencies(
 }
 
 /** @internal */
-function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
+export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   // Mirror Rails build_join_dependencies (query_methods.rb:1735-1745):
   // joins | left_outer_joins | eager_load | includes association specs.
   // _joinClauses store pre-resolved SQL (table name + ON string), not association
@@ -2003,7 +2012,7 @@ function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
 }
 
 /** @internal */
-function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unknown): any {
+export function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unknown): any {
   const mc = (this as any)._modelClass;
   const table: any = mc?.arelTable;
   const arel = new SelectManager(table);
@@ -2041,7 +2050,7 @@ function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unk
 }
 
 /** @internal */
-function selectNamedJoins(
+export function selectNamedJoins(
   this: QueryMethodsHost,
   joinNames: unknown[],
   stashedJoins: unknown[] | null,
@@ -2069,7 +2078,7 @@ function selectNamedJoins(
 }
 
 /** @internal */
-function selectAssociationList(
+export function selectAssociationList(
   this: QueryMethodsHost,
   associations: unknown[],
   stashedJoins: unknown[] | null,
@@ -2094,7 +2103,7 @@ function selectAssociationList(
 }
 
 /** @internal */
-function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
+export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
   const buckets: Record<string, unknown[]> = {
     leading_join: [],
     join_node: [],
@@ -2169,7 +2178,7 @@ function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown[]> {
 }
 
 /** @internal */
-function buildJoins(this: QueryMethodsHost, arel: any): void {
+export function buildJoins(this: QueryMethodsHost, arel: any): void {
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 || this._leftOuterJoinsValues.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
@@ -2213,7 +2222,7 @@ function buildJoins(this: QueryMethodsHost, arel: any): void {
 }
 
 /** @internal */
-function buildWith(this: QueryMethodsHost, arel: any): void {
+export function buildWith(this: QueryMethodsHost, arel: any): void {
   if (!this._ctes || this._ctes.length === 0) return;
 
   const hasRecursive = this._ctes.some((c) => c.recursive);
@@ -2227,7 +2236,7 @@ function buildWith(this: QueryMethodsHost, arel: any): void {
 }
 
 /** @internal */
-function buildWithJoinNode(
+export function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
