@@ -438,7 +438,11 @@ export abstract class Migration {
       this._recorder.record("dropTable", [name]);
       return;
     }
-    await this.schema.dropTable(name, options);
+    if (options) {
+      await this.schema.dropTable(name, options);
+    } else {
+      await this.schema.dropTable(name);
+    }
   }
 
   async addColumn(
@@ -466,7 +470,7 @@ export abstract class Migration {
       this._recorder.record("removeColumn", [tableName, columnName, type, opts]);
       return;
     }
-    await this.schema.removeColumn(tableName, columnName, opts);
+    await this.schema.removeColumn(tableName, columnName, type, opts);
   }
 
   async renameColumn(tableName: string, oldName: string, newName: string): Promise<void> {

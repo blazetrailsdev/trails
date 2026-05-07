@@ -1308,6 +1308,7 @@ export interface SchemaStatementsLike {
   removeColumn(
     tableName: string,
     columnName: string,
+    type?: string,
     options?: { ifExists?: boolean },
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;

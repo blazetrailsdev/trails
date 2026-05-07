@@ -451,8 +451,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     void newName;
   }
 
-  async dropTable(..._args: unknown[]): Promise<void> {}
-
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     void tableName;
     void oldName;
