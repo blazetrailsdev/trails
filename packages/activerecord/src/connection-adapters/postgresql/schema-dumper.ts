@@ -117,7 +117,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  async exclusionConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  protected async exclusionConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.exclusionConstraints) return;
     const constraints: ExclusionConstraintDefinition[] =
@@ -137,7 +137,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  async uniqueConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  protected async uniqueConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.uniqueConstraints) return;
     const constraints: UniqueConstraintDefinition[] = await adapter.uniqueConstraints(tableName);

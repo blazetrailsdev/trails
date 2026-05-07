@@ -939,11 +939,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("uniqueConstraints returns deferrable for deferred constraints", async () => {
       await adapter.addUniqueConstraint("uniq_test", "username", {
         name: "uniq_deferred",
-        deferrable: "immediate",
+        deferrable: "deferred",
       });
       const constraints = await adapter.uniqueConstraints("uniq_test");
       const uc = constraints.find((c) => c.name === "uniq_deferred")!;
-      expect(uc.deferrable).toBe("immediate");
+      expect(uc.deferrable).toBe("deferred");
     });
   });
 
