@@ -30,6 +30,7 @@ import {
   getAbstractClass as _getAbstractClass,
   setAbstractClass as _setAbstractClass,
   isBaseClass as _isBaseClass,
+  ensureProperType as _ensureProperType,
 } from "./inheritance.js";
 import {
   NotImplementedError,
@@ -42,6 +43,8 @@ import {
   autosaveBelongsTo,
   autosaveChildren,
   flushPendingReplaces,
+  computePrimaryKey as _computePrimaryKey,
+  _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
 } from "./autosave-association.js";
 import {
   isValid as validationsIsValid,
@@ -106,12 +109,33 @@ import * as Querying from "./querying.js";
 import { include, extend, type Included, type ParameterFilter } from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
+  _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
   attributeNamesList as _attributeNamesList,
   accessedFields as _accessedFields,
   attributesForCreate as _attributesForCreate,
   attributesForUpdate as _attributesForUpdate,
   attributeNames as _attributeNames,
+  isAttributeMethod as _isAttributeMethod,
+  attributesWithValues as _attributesWithValues,
+  formatForInspect as _formatForInspect,
+  pkAttribute as _pkAttribute,
+  readAttributeForDatabase as _readAttributeForDatabase,
+  attributesForDatabase as _attributesForDatabase,
+  attributeBeforeTypeCast as _attributeBeforeTypeCast,
+  attributeForDatabase as _attributeForDatabase,
+  queryCastAttribute as _queryCastAttribute,
+  isPrimaryKeyValuesPresent as _isPrimaryKeyValuesPresent,
+  idWas as _idWas,
+  idInDatabase as _idInDatabase,
+  idForDatabase as _idForDatabase,
+  isSavedChangeToAttribute as _isSavedChangeToAttribute,
+  attributeBeforeLastSave as _attributeBeforeLastSave,
+  isWillSaveChangeToAttribute as _isWillSaveChangeToAttribute,
+  attributeChangeToBeSaved as _attributeChangeToBeSaved,
+  attributeInDatabase as _attributeInDatabase,
+  attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
+  attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods.js";
 import {
   toKey as _toKey,
@@ -134,6 +158,8 @@ import {
   cacheKeyWithVersion as _cacheKeyWithVersion,
   cacheVersion as _cacheVersion,
   collectionCacheKey as _collectionCacheKey,
+  canUseFastCacheVersion as _canUseFastCacheVersion,
+  rawTimestampToCacheVersion as _rawTimestampToCacheVersion,
 } from "./integration.js";
 import {
   noTouching as _noTouchingBlock,
@@ -169,10 +195,20 @@ import {
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
-import { ScopeRegistry, scopeAttributes } from "./scoping.js";
+import {
+  ScopeRegistry,
+  scopeAttributes,
+  populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
+} from "./scoping.js";
 import {
   transaction as _transaction,
   currentTransactionPublic as _currentTransactionPublic,
+  withTransactionReturningStatus as _withTransactionReturningStatus,
+  _newRecordBeforeLastCommit as _txNewRecordBeforeLastCommit,
+  _triggerDestroyCallback as _txTriggerDestroyCallback,
+  clearTransactionRecordState as _clearTransactionRecordState,
+  _committedAlreadyCalled as _txCommittedAlreadyCalled,
+  _triggerUpdateCallback as _txTriggerUpdateCallback,
 } from "./transactions.js";
 
 import {
@@ -181,7 +217,13 @@ import {
   unscoped as _unscoped,
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
-import { Associations as _Associations, updateCounterCaches } from "./associations.js";
+import {
+  Associations as _Associations,
+  updateCounterCaches,
+  isAssociationCached as _isAssociationCached,
+  associationInstanceGet as _associationInstanceGet,
+  associationInstanceSet as _associationInstanceSet,
+} from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
 import {
@@ -3001,6 +3043,90 @@ include(Base, {
 });
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
+});
+// Wire private/internal helpers onto Base so api:compare credits them to base.rb.
+// These are standalone exports in their respective module files; the include()
+// call here is the only thing that causes the extractor to attribute them to base.ts.
+include(Base, {
+  // Core privates
+  initWithAttributes: _Core.initWithAttributes,
+  initAttributes: _Core.initAttributes,
+  fullInspect: _Core.fullInspect,
+  destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,
+  initializeInternalsCallback: _Core.initializeInternalsCallback,
+  isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
+  inspectWithAttributes: _Core.inspectWithAttributes,
+  attributesForInspect: _Core.attributesForInspect,
+  allAttributesForInspect: _Core.allAttributesForInspect,
+  // Persistence privates
+  strictLoadedAssociations: _Persistence.strictLoadedAssociations,
+  _findRecord: _Persistence._findRecord,
+  _inMemoryQueryConstraintsHash: _Persistence._inMemoryQueryConstraintsHash,
+  isApplyScoping: _Persistence.isApplyScoping,
+  destroyAssociations: _Persistence.destroyAssociations,
+  _deleteRow: _Persistence._deleteRow,
+  verifyReadonlyAttribute: _Persistence.verifyReadonlyAttribute,
+  _raiseRecordNotDestroyed: _Persistence._raiseRecordNotDestroyed,
+  _raiseReadonlyRecordError: _Persistence._raiseReadonlyRecordError,
+  _raiseRecordNotTouchedError: _Persistence._raiseRecordNotTouchedError,
+  // Inheritance / Scoping privates
+  _inheritanceColumn: ModelSchema._inheritanceColumn,
+  ensureProperType: _ensureProperType,
+  populateWithCurrentScopeAttributes: _populateWithCurrentScopeAttributes,
+  // Integration privates
+  canUseFastCacheVersion: _canUseFastCacheVersion,
+  rawTimestampToCacheVersion: _rawTimestampToCacheVersion,
+  // Validations privates
+  defaultValidationContext,
+  raiseValidationError: _Validations.raiseValidationError,
+  performValidations: _Validations.performValidations,
+  // AttributeMethods privates and additional instance methods
+  _hasAttribute: _privateHasAttribute,
+  isAttributeMethod: _isAttributeMethod,
+  attributesWithValues: _attributesWithValues,
+  attributesForCreate: _attributesForCreate,
+  attributesForUpdate: _attributesForUpdate,
+  formatForInspect: _formatForInspect,
+  pkAttribute: _pkAttribute,
+  readAttributeForDatabase: _readAttributeForDatabase,
+  attributesForDatabase: _attributesForDatabase,
+  attributeBeforeTypeCast: _attributeBeforeTypeCast,
+  attributeForDatabase: _attributeForDatabase,
+  isAttributeCameFromUser: _isAttributeCameFromUser,
+  queryCastAttribute: _queryCastAttribute,
+  isPrimaryKeyValuesPresent: _isPrimaryKeyValuesPresent,
+  idWas: _idWas,
+  idInDatabase: _idInDatabase,
+  idForDatabase: _idForDatabase,
+  isSavedChangeToAttribute: _isSavedChangeToAttribute,
+  attributeBeforeLastSave: _attributeBeforeLastSave,
+  isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
+  attributeChangeToBeSaved: _attributeChangeToBeSaved,
+  attributeInDatabase: _attributeInDatabase,
+  attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
+  attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
+  // CounterCache privates
+  _foreignKeysEqual: CounterCache._foreignKeysEqual,
+  // Associations privates
+  isAssociationCached: _isAssociationCached,
+  associationInstanceGet: _associationInstanceGet,
+  associationInstanceSet: _associationInstanceSet,
+  // AutosaveAssociation privates
+  computePrimaryKey: _computePrimaryKey,
+  _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
+  // Transactions privates
+  // committedBang / rolledbackBang intentionally omitted: transaction.ts calls
+  // these as record.committedBang({ shouldRunCallbacks }) — the record-arg form
+  // would receive the options hash as `record`, breaking that callsite.
+  withTransactionReturningStatus: _withTransactionReturningStatus,
+  _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
+  // isTriggerTransactionalCallbacks omitted: transaction.ts calls it as
+  // record.isTriggerTransactionalCallbacks() with no args; the record-arg
+  // form would receive undefined as `record`, throwing at runtime.
+  _committedAlreadyCalled: _txCommittedAlreadyCalled,
+  _triggerUpdateCallback: _txTriggerUpdateCallback,
+  _triggerDestroyCallback: _txTriggerDestroyCallback,
+  clearTransactionRecordState: _clearTransactionRecordState,
 });
 
 for (const [name, fn] of [

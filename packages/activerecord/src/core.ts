@@ -584,17 +584,19 @@ function initInternals(
 }
 
 /** @internal */
-function initializeInternalsCallback(this: unknown): void {
+export function initializeInternalsCallback(this: unknown): void {
   // hook for subclasses — overridden by inheritance.ts
 }
 
 /** @internal */
-function isCustomInspectMethodDefined(this: { constructor: { prototype: object } }): boolean {
+export function isCustomInspectMethodDefined(this: {
+  constructor: { prototype: object };
+}): boolean {
   return Object.prototype.hasOwnProperty.call(this.constructor.prototype, "inspect");
 }
 
 /** @internal */
-function inspectWithAttributes(
+export function inspectWithAttributes(
   this: CoreRecord & { _attributes: any },
   attributesToList: string[],
 ): string {
@@ -612,7 +614,7 @@ function inspectWithAttributes(
 }
 
 /** @internal */
-function attributesForInspect(this: CoreRecord): string[] {
+export function attributesForInspect(this: CoreRecord): string[] {
   const klass = this.constructor as any;
   const forInspect = klass.attributesForInspect;
   if (forInspect === "all" || forInspect == null) return allAttributesForInspect.call(this);
@@ -620,7 +622,7 @@ function attributesForInspect(this: CoreRecord): string[] {
 }
 
 /** @internal */
-function allAttributesForInspect(this: CoreRecord): string[] {
+export function allAttributesForInspect(this: CoreRecord): string[] {
   if (!this._attributes) return [];
   return Array.from(this._attributes).map(([k]) => k);
 }

@@ -350,7 +350,7 @@ export function formatForInspect(this: any, attr: string, value: unknown): strin
 }
 
 /** @internal */
-function pkAttribute(this: any, name: string): boolean {
+export function pkAttribute(this: any, name: string): boolean {
   const pk = (this.constructor as any)?.primaryKey ?? this._primaryKey;
   return Array.isArray(pk) ? pk.includes(name) : name === pk;
 }

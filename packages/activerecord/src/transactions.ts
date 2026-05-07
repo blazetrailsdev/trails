@@ -465,19 +465,19 @@ function restoreTransactionRecordState(record: Base, snapshot: TransactionRecord
  * Mirrors: ActiveRecord::Transactions#with_transaction_returning_status
  */
 export async function withTransactionReturningStatus<T>(
-  record: Base,
+  this: Base,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const modelClass = record.constructor as typeof Base;
+  const modelClass = this.constructor as typeof Base;
 
   // Mirrors: remember_transaction_record_state — snapshot before transaction
-  const snapshot = rememberTransactionRecordState(record);
+  const snapshot = rememberTransactionRecordState(this);
 
   // Reset transaction tracking flags (the block will set them if the
   // operation succeeds).
-  const r = record as any;
+  const r = this as any;
   r._transactionAction = undefined;
-  r._newRecordBeforeLastCommit = r._newRecord ?? record.isNewRecord?.() ?? false;
+  r._newRecordBeforeLastCommit = r._newRecord ?? this.isNewRecord?.() ?? false;
   r._triggerUpdateCallback = false;
   r._triggerDestroyCallback = false;
 
@@ -489,7 +489,7 @@ export async function withTransactionReturningStatus<T>(
     // Actual committedBang/rolledbackBang callbacks are scheduled after
     // the transaction returns, on the outer transaction or fired immediately.
     tx.afterRollback(async () => {
-      restoreTransactionRecordState(record, snapshot);
+      restoreTransactionRecordState(this, snapshot);
     });
 
     status = await fn();
@@ -507,20 +507,20 @@ export async function withTransactionReturningStatus<T>(
   if (!rolledBack) {
     const outerTx = currentTransaction();
     if (outerTx) {
-      outerTx.afterCommit(async () => await committedBang(record));
+      outerTx.afterCommit(async () => await committedBang(this));
       outerTx.afterRollback(async () => {
         // Fire callbacks before restoring state — rolledbackBang needs
         // isPersisted()/isDestroyed() to reflect what happened during the
         // transaction, not the pre-transaction state. Matches Rails where
         // rolledback! fires during rollback, restore runs in ensure.
-        await rolledbackBang(record);
-        restoreTransactionRecordState(record, snapshot);
+        await rolledbackBang(this);
+        restoreTransactionRecordState(this, snapshot);
       });
     } else {
-      await committedBang(record);
+      await committedBang(this);
     }
   } else {
-    await rolledbackBang(record);
+    await rolledbackBang(this);
   }
 
   return status!;
@@ -529,8 +529,8 @@ export async function withTransactionReturningStatus<T>(
 /**
  * Mirrors: ActiveRecord::Transactions#_new_record_before_last_commit (attr_accessor)
  */
-export function _newRecordBeforeLastCommit(record: Base): boolean {
-  return (record as any)._newRecordBeforeLastCommit ?? false;
+export function _newRecordBeforeLastCommit(this: Base): boolean {
+  return (this as any)._newRecordBeforeLastCommit ?? false;
 }
 
 /**
@@ -551,25 +551,25 @@ export function isTriggerTransactionalCallbacks(record: Base): boolean {
 
 // ---------------------------------------------------------------------------
 // Private instance helpers — mirrors ActiveRecord::Transactions private block.
-// Non-exported so the extractor marks them internal: true.
+// Exported so base.ts can wire them into include(Base, {...}) for api:compare.
 // ---------------------------------------------------------------------------
 
 // Mirrors: attr_reader :_committed_already_called
 /** @internal */
-function _committedAlreadyCalled(record: Base): boolean | null {
-  return (record as any)._committedAlreadyCalled ?? null;
+export function _committedAlreadyCalled(this: Base): boolean | null {
+  return (this as any)._committedAlreadyCalled ?? null;
 }
 
 // Mirrors: attr_reader :_trigger_update_callback
 /** @internal */
-function _triggerUpdateCallback(record: Base): boolean | null {
-  return (record as any)._triggerUpdateCallback ?? null;
+export function _triggerUpdateCallback(this: Base): boolean | null {
+  return (this as any)._triggerUpdateCallback ?? null;
 }
 
 // Mirrors: attr_reader :_trigger_destroy_callback
 /** @internal */
-function _triggerDestroyCallback(record: Base): boolean | null {
-  return (record as any)._triggerDestroyCallback ?? null;
+export function _triggerDestroyCallback(this: Base): boolean | null {
+  return (this as any)._triggerDestroyCallback ?? null;
 }
 
 // Mirrors: ActiveRecord::Transactions#init_internals
@@ -583,8 +583,8 @@ function initInternals(record: Base): void {
 
 // Mirrors: ActiveRecord::Transactions#clear_transaction_record_state
 /** @internal */
-function clearTransactionRecordState(record: Base): void {
-  const r = record as any;
+export function clearTransactionRecordState(this: Base): void {
+  const r = this as any;
   if (!r._startTransactionState) return;
   r._startTransactionState.level -= 1;
   if (r._startTransactionState.level < 1) r._startTransactionState = null;

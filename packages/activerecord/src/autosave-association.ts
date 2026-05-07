@@ -715,9 +715,9 @@ export async function saveBelongsToAssociation(this: any, reflection: any): Prom
 }
 
 /** @internal */
-function computePrimaryKey(reflection: any, record: any): string | string[] {
+export function computePrimaryKey(this: any, reflection: any): string | string[] {
   if (reflection.options?.primaryKey) return reflection.options.primaryKey;
-  const ctor = record?.constructor as any;
+  const ctor = this?.constructor as any;
   if (Array.isArray(ctor?.primaryKey)) {
     const pk: string[] = ctor.primaryKey;
     return pk.includes("id") ? "id" : pk;
@@ -726,7 +726,7 @@ function computePrimaryKey(reflection: any, record: any): string | string[] {
 }
 
 /** @internal */
-function _ensureNoDuplicateErrors(this: any): void {
+export function _ensureNoDuplicateErrors(this: any): void {
   if (typeof this.errors?.uniqBang === "function") this.errors.uniqBang();
 }
 

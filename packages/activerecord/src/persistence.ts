@@ -610,7 +610,9 @@ export async function save<T extends SaveRecord>(
 
   // Mirrors: ActiveRecord::Transactions#save
   try {
-    return await withTransactionReturningStatus(self, () => self.createOrUpdate());
+    return (await withTransactionReturningStatus.call(self, () =>
+      self.createOrUpdate(),
+    )) as boolean;
   } finally {
     self._skipTouch = false;
   }
@@ -640,7 +642,7 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T | fal
 
   // Mirrors: ActiveRecord::Transactions#destroy
   const self = this as any;
-  const result = await withTransactionReturningStatus(self, () => self._destroyRow());
+  const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
   return result ? this : false;
 }
 
@@ -1108,7 +1110,7 @@ function initInternals(this: PersistencePrivateHost): void {
 }
 
 /** @internal */
-function strictLoadedAssociations(this: any): string[] {
+export function strictLoadedAssociations(this: any): string[] {
   const cache: Map<string, any> = this._associationInstances;
   if (!cache) return [];
   const result: string[] = [];
@@ -1122,7 +1124,7 @@ function strictLoadedAssociations(this: any): string[] {
 }
 
 /** @internal */
-function _findRecord(
+export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string },
 ): Promise<unknown> {
@@ -1137,7 +1139,9 @@ function _findRecord(
 }
 
 /** @internal */
-function _inMemoryQueryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
+export function _inMemoryQueryConstraintsHash(
+  this: PersistencePrivateHost,
+): Record<string, unknown> {
   const constraintsList = queryConstraintsList.call(this.constructor as any);
   if (!constraintsList) {
     const pk = this.constructor.primaryKey as string;
@@ -1147,7 +1151,10 @@ function _inMemoryQueryConstraintsHash(this: PersistencePrivateHost): Record<str
 }
 
 /** @internal */
-function isApplyScoping(this: PersistencePrivateHost, options?: { unscoped?: boolean }): boolean {
+export function isApplyScoping(
+  this: PersistencePrivateHost,
+  options?: { unscoped?: boolean },
+): boolean {
   if (options?.unscoped) return false;
   const ctor = this.constructor as any;
   const hasDefaultScope = !!ctor._defaultScope;
@@ -1171,7 +1178,7 @@ function _queryConstraintsHash(this: any): Record<string, unknown> {
 }
 
 /** @internal */
-function destroyAssociations(this: PersistencePrivateHost): void {}
+export function destroyAssociations(this: PersistencePrivateHost): void {}
 
 /** @internal */
 export function destroyRow(this: PersistencePrivateHost): Promise<number> {
@@ -1179,7 +1186,7 @@ export function destroyRow(this: PersistencePrivateHost): Promise<number> {
 }
 
 /** @internal */
-function _deleteRow(this: PersistencePrivateHost): Promise<number> {
+export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
   return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
 }
 
@@ -1278,14 +1285,14 @@ async function _createRecord(this: any): Promise<unknown> {
 }
 
 /** @internal */
-function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
+export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
   if ((this.constructor as any).readonlyAttributeQ?.(name)) {
     throw new ReadonlyAttributeError(name);
   }
 }
 
 /** @internal */
-function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
+export function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
   const key = this.constructor.primaryKey;
   const keyStr = Array.isArray(key) ? key.join(", ") : key;
   // If an association destroy raised an exception, propagate that instead.
@@ -1301,12 +1308,12 @@ function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
 }
 
 /** @internal */
-function _raiseReadonlyRecordError(this: { constructor: { name: string } }): never {
+export function _raiseReadonlyRecordError(this: { constructor: { name: string } }): never {
   throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
 }
 
 /** @internal */
-function _raiseRecordNotTouchedError(): never {
+export function _raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
     "Cannot touch on a new or destroyed record object. Consider using persisted?, new_record?, or destroyed? before touching.",
   );
