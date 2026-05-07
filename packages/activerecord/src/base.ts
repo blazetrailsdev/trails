@@ -204,8 +204,6 @@ import {
 import {
   transaction as _transaction,
   currentTransactionPublic as _currentTransactionPublic,
-  committedBang as _committedBang,
-  rolledbackBang as _rolledbackBang,
   withTransactionReturningStatus as _withTransactionReturningStatus,
   _newRecordBeforeLastCommit as _txNewRecordBeforeLastCommit,
   isTriggerTransactionalCallbacks as _isTriggerTransactionalCallbacks,
@@ -3118,8 +3116,9 @@ include(Base, {
   computePrimaryKey: _computePrimaryKey,
   _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
   // Transactions privates
-  committedBang: _committedBang,
-  rolledbackBang: _rolledbackBang,
+  // committedBang / rolledbackBang intentionally omitted: transaction.ts calls
+  // these as record.committedBang({ shouldRunCallbacks }) — the record-arg form
+  // would receive the options hash as `record`, breaking that callsite.
   withTransactionReturningStatus: _withTransactionReturningStatus,
   _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
   isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
