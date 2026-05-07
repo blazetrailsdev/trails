@@ -1835,6 +1835,28 @@ export class Base extends Model {
   declare static findEach: typeof Querying.findEach;
   declare static findInBatches: typeof Querying.findInBatches;
   declare static inBatches: typeof Querying.inBatches;
+  declare static includes: typeof Querying.includes;
+  declare static preload: typeof Querying.preload;
+  declare static eagerLoad: typeof Querying.eagerLoad;
+  declare static references: typeof Querying.references;
+  declare static extending: typeof Querying.extending;
+  declare static unscope: typeof Querying.unscope;
+  declare static reselect: typeof Querying.reselect;
+  declare static reorder: typeof Querying.reorder;
+  declare static rewhere: typeof Querying.rewhere;
+  declare static regroup: typeof Querying.regroup;
+  declare static having: typeof Querying.having;
+  declare static lock: typeof Querying.lock;
+  declare static readonly: typeof Querying.readonly;
+  declare static withCte: typeof Querying.withCte;
+  declare static withRecursive: typeof Querying.withRecursive;
+  declare static annotate: typeof Querying.annotate;
+  declare static excluding: typeof Querying.excluding;
+  declare static or: typeof Querying.or;
+  declare static and: typeof Querying.and;
+  declare static inOrderOf: typeof Querying.inOrderOf;
+  declare static strictLoading: typeof Querying.strictLoading;
+  declare static createWith: typeof Querying.createWith;
 
   /**
    * Increment counter columns for a record by primary key.
