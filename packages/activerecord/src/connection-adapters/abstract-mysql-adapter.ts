@@ -13,6 +13,7 @@ import type { AdapterName, ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
+  DatabaseVersionError,
   InvalidForeignKey,
   MismatchedForeignKey,
   NotNullViolation,
@@ -265,9 +266,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this._mariadb;
   }
 
-  getDatabaseVersion(): Version {
-    if (this._databaseVersion) return this._databaseVersion;
-    return new Version("0.0.0");
+  /**
+   * Sync accessor for the cached database version. Mirrors the PostgreSQLAdapter
+   * pattern: throws a clear error when called before `getDatabaseVersion()` has
+   * been awaited. Overrides AbstractAdapter#databaseVersion which throws whenever
+   * it sees a Promise return from getDatabaseVersion().
+   */
+  override get databaseVersion(): Version {
+    if (!this._databaseVersion) {
+      throw new Error(
+        "databaseVersion is not available yet — await getDatabaseVersion() after connecting",
+      );
+    }
+    return this._databaseVersion;
   }
 
   supportsBulkAlter(): boolean {
@@ -615,9 +626,27 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return {};
   }
 
+  /**
+   * Query a MySQL session variable by name.
+   * Mirrors: AbstractMysqlAdapter#show_variable — `SELECT @@name` with logging name
+   * "SCHEMA". Returns null for unknown variables (Rails rescues StatementInvalid).
+   * The identifier is validated against MySQL variable-name characters before interpolation.
+   */
   async showVariable(name: string): Promise<string | null> {
-    void name;
-    return null;
+    if (!/^\w+$/.test(name)) return null;
+    try {
+      const rows = await this.schemaQuery(`SELECT @@${name}`);
+      if (rows.length === 0) return null;
+      const row = rows[0];
+      const val = row[Object.keys(row)[0]];
+      return val == null ? null : String(val);
+    } catch (e) {
+      // Mirrors Rails: rescue ActiveRecord::StatementInvalid — unknown variables
+      // throw a SQL error which we translate to StatementInvalid. Re-raise
+      // anything else (connection failures, protocol errors) so callers see outages.
+      if (e instanceof StatementInvalid) return null;
+      throw e;
+    }
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
@@ -1027,11 +1056,50 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this._databaseVersion?.gte("8.0.3") === true;
   }
 
+  /**
+   * Fetch the raw version string from the MySQL server (e.g. "8.0.28-ubuntu").
+   * Concrete adapters (Mysql2Adapter, TrilogyAdapter) override this to query
+   * the live connection. Base implementation throws — callers must call
+   * `getDatabaseVersion()` only after a subclass has wired this.
+   * @internal
+   */
+  async getFullVersion(): Promise<string> {
+    throw new Error(`${this.constructor.name} must implement getFullVersion()`);
+  }
+
+  /**
+   * Parse the server version from the full version string and return it.
+   * Caches the result in `_databaseVersion` so the sync `databaseVersion` getter
+   * works after this method has been awaited once.
+   *
+   * Mirrors: AbstractMysqlAdapter#get_database_version — calls get_full_version,
+   * strips MariaDB prefix via version_string, returns Version.
+   */
+  override async getDatabaseVersion(): Promise<Version> {
+    if (this._databaseVersion) return this._databaseVersion;
+    const fullVersion = await this.getFullVersion();
+    // getFullVersion() may have set _databaseVersion as a side effect
+    // (e.g. Mysql2Adapter#getFullVersion populates it while fetching); re-check
+    // to avoid double-parsing the version string in those subclasses.
+    if (this._databaseVersion) return this._databaseVersion;
+    const version = new Version(this.versionString(fullVersion));
+    this._databaseVersion = version;
+    return version;
+  }
+
   /** @internal */
-  protected versionString(fullVersionString: string): string {
+  protected versionString(fullVersionString: string | null | undefined): string {
+    if (fullVersionString == null) {
+      throw new DatabaseVersionError("Unable to parse MySQL version from nil");
+    }
+    if (fullVersionString.length === 0) {
+      throw new DatabaseVersionError(`Unable to parse MySQL version from ""`);
+    }
     const matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/);
     if (matches) return matches[1];
-    throw new Error(`Unable to parse MySQL version from ${JSON.stringify(fullVersionString)}`);
+    throw new DatabaseVersionError(
+      `Unable to parse MySQL version from ${JSON.stringify(fullVersionString)}`,
+    );
   }
 
   /** @internal */

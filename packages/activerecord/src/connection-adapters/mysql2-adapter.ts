@@ -79,6 +79,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private _driverPool: mysql.Pool | null;
+  private _endingPool: Promise<void> | null = null;
   private _conn: mysql.PoolConnection | null = null;
   private _inTransaction = false;
   // Per-mysql.PoolConnection StatementPool. Mirrors the PG adapter's
@@ -939,6 +940,34 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * Sever the connection immediately (synchronous contract from AbstractAdapter).
+   * Releases advisory-lock and transaction connections, nulls `_driverPool` so
+   * `active` returns false right away, then schedules pool.end() asynchronously.
+   * Mirrors Rails' Mysql2Adapter#disconnect! (super + raw_connection.close + nil).
+   */
+  override disconnectBang(): void {
+    super.disconnectBang();
+    if (this._advisoryLockConn) {
+      this._advisoryLockConn.release();
+      this._advisoryLockConn = null;
+    }
+    if (this._conn) {
+      this._statementPools.get(this._conn)?.detach();
+      this._conn.release();
+      this._conn = null;
+    }
+    this._inTransaction = false;
+    this._statementPools = new WeakMap<mysql.PoolConnection, Mysql2StatementPool>();
+    const pool = this._driverPool;
+    this._driverPool = null;
+    if (pool) {
+      this._endingPool = pool.end().catch(() => {
+        // swallow — pool already torn down or connection already gone
+      });
+    }
+  }
+
+  /**
    * Close the connection pool.
    */
   async close(): Promise<void> {
@@ -959,6 +988,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._driverPool) {
       await this._driverPool.end();
       this._driverPool = null;
+    }
+    // If disconnectBang() was called before close(), await the in-flight
+    // pool.end() so callers (e.g. afterEach) can be sure sockets are drained.
+    if (this._endingPool) {
+      await this._endingPool;
+      this._endingPool = null;
     }
   }
 

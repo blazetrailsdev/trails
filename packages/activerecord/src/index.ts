@@ -210,6 +210,7 @@ export {
   PreparedStatementInvalid,
   PreparedStatementCacheExpired,
   NoDatabaseError,
+  DatabaseVersionError,
   DatabaseAlreadyExists,
   AttributeAssignmentError,
   TransactionIsolationError,
