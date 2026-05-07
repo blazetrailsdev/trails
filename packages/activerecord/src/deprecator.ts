@@ -5,6 +5,7 @@
  * Also covers: gem_version.rb, version.rb, and MigrationProxy (migration.rb)
  */
 import { createRequire } from "node:module";
+import { basename } from "node:path";
 import { Deprecation } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
@@ -52,7 +53,23 @@ export class MigrationProxy {
   }
 
   basename(): string {
-    return this.filename.split("/").pop() ?? this.filename;
+    return basename(this.filename);
+  }
+
+  migrate(direction: "up" | "down"): Promise<void> {
+    return (this.migration() as { migrate(d: "up" | "down"): Promise<void> }).migrate(direction);
+  }
+
+  announce(message: string): void {
+    (this.migration() as { announce(msg: string): void }).announce(message);
+  }
+
+  write(text = ""): void {
+    (this.migration() as { write(t: string): void }).write(text);
+  }
+
+  get disableDdlTransaction(): boolean {
+    return !!(this.migration() as { disableDdlTransaction?: boolean }).disableDdlTransaction;
   }
 
   /** @internal */
@@ -64,6 +81,7 @@ export class MigrationProxy {
   /** @internal */
   loadMigration(): object {
     const req = createRequire(import.meta.url);
+    delete req.cache[req.resolve(this.filename)];
     const mod = req(this.filename) as Record<string, new (name: string, version: string) => object>;
     const klass = mod[this.name] ?? mod.default;
     return new (klass as new (name: string, version: string) => object)(this.name, this.version);
