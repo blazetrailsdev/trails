@@ -15,22 +15,23 @@ describe("DecimalWithoutScale", () => {
 
   it("casts integer strings", () => {
     const type = new DecimalWithoutScale();
-    expect(type.cast("42")).toBe(42n);
-    expect(type.cast("-7")).toBe(-7n);
+    expect(type.cast("42")).toBe(42);
+    expect(type.cast("-7")).toBe(-7);
     expect(type.cast("")).toBeNull();
   });
 
   it("casts numbers by truncating", () => {
     const type = new DecimalWithoutScale();
-    expect(type.cast(3.9)).toBe(3n);
-    expect(type.cast(-3.9)).toBe(-3n);
+    expect(type.cast(3.9)).toBe(3);
+    expect(type.cast(-3.9)).toBe(-3);
   });
 
   it("accepts large values beyond 32-bit range without truncation", () => {
     const type = new DecimalWithoutScale();
-    // Values above 2^31-1 that would be silently truncated by 4-byte IntegerType
-    expect(type.cast("2147483648")).toBe(2147483648n);
-    expect(type.cast("9999999999")).toBe(9999999999n);
+    // Values above 2^31-1 that would be silently truncated by 4-byte IntegerType.
+    // JS number precision is exact up to 2^53; values beyond that lose precision.
+    expect(type.cast("2147483648")).toBe(2147483648);
+    expect(type.cast("9999999999")).toBe(9999999999);
   });
 
   it("typeCastForSchema quotes the value as a string", () => {

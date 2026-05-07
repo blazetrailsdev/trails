@@ -10,6 +10,19 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 export class DecimalWithoutScale extends BigIntegerType {
   override readonly name: string = "decimal";
 
+  // BigIntegerType.castValue returns bigint; DecimalWithoutScale must return
+  // plain number (Ruby to_i semantics) because NUMERIC-without-scale columns
+  // are consumed as numbers by the rest of the stack.
+  protected override castValue(value: unknown): number | null {
+    if (typeof value === "number") {
+      if (isNaN(value)) return null;
+      return Math.trunc(value);
+    }
+    if (typeof value === "bigint") return Number(value);
+    const parsed = parseInt(String(value), 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+
   override type(): string {
     return "decimal";
   }
