@@ -9,7 +9,7 @@ import {
   type Type,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
-import { applyPendingEncryptions } from "./encryption.js";
+import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 
 /**
@@ -773,7 +773,7 @@ function applyColumnsHash(
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
 
-  applyPendingEncryptions(host);
+  encryptionHooks.applyPendingEncryptions(host);
 
   // STI: if the subclass previously forked _attributeDefinitions (via
   // attribute()/decorateAttributes()/encrypts()), carry its entries
@@ -801,7 +801,7 @@ function applyColumnsHash(
       }
     }
     originatingHost._attributeDefinitions = baseDefs;
-    applyPendingEncryptions(originatingHost);
+    encryptionHooks.applyPendingEncryptions(originatingHost);
   }
 }
 

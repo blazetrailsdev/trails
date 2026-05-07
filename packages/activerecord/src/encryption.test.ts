@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
+import "./encryption.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Decryption as DecryptionError } from "./encryption/errors.js";

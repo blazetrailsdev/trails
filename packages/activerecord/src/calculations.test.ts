@@ -3,6 +3,8 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+// Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
+import "./encryption.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Base,
