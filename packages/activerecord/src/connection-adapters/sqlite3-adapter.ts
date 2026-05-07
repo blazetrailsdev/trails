@@ -2098,7 +2098,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  private static initializeTypeMap(m: TypeMap): void {
+  static override initializeTypeMap(m: TypeMap): void {
     const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
     m.registerType("string", new StringType());
     m.registerType("text", new TextType());
