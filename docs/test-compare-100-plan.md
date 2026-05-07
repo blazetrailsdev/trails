@@ -360,7 +360,7 @@ Delta: 7970 → 7930 Ruby tests (−40), 2085 → 2048 skipped (−37).
 - `test/cases/marshal_serialization_test.rb` — Marshal.dump/load (**already excluded** before this PR)
 - `test/cases/coders/yaml_column_test.rb` — Psych YAMLColumn (**already excluded** before this PR)
 - `test/cases/message_pack_test.rb` — MessagePack Ruby bridge (**already excluded** before this PR)
-- `test/cases/serialized_attribute_test.rb` — 17 YAML/class-serializer cases (**per-test excluded**)
+- `test/cases/serialized_attribute_test.rb` — 19 YAML/class-serializer cases excluded (17 unique names; 2 names appear in both the base class and a subclass within the file)
 - `test/cases/base_test.rb` — 7 Marshal cases (**per-test excluded**)
 
 ### Ruby concurrency / thread / GVL ✓ partially excluded
