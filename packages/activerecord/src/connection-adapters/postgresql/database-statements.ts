@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements
  */
 
-import pg from "pg";
+import type pg from "pg";
 import { PreparedStatementCacheExpired } from "../../errors.js";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";

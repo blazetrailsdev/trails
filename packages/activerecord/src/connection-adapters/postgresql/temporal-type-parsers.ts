@@ -11,6 +11,7 @@
  * etc. Per-connection tables, not global mutation.
  */
 
+// Reachable only via the postgresql-adapter subpath; safe to import pg at runtime here.
 import pg from "pg";
 import {
   parsePostgresInstant,

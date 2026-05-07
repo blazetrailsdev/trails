@@ -52,6 +52,11 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/activemodel": "workspace:*"
   },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.6.2",
+    "mysql2": "^3.18.2",
+    "pg": "^8.19.0"
+  },
   "peerDependencies": {
     "typescript": ">=5.0.0"
   },
