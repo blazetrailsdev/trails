@@ -19,7 +19,7 @@
  * a process-wide registry shared with other mysql2 users in the process.
  */
 
-import mysql from "mysql2/promise";
+import type mysql from "mysql2/promise";
 import {
   parseMysqlInstant,
   parseMysqlDatetimeAsInstant,

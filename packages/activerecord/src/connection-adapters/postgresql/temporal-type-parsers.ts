@@ -11,6 +11,7 @@
  * etc. Per-connection tables, not global mutation.
  */
 
+// Not imported by the top-level activerecord barrel; only pulled in when the PostgreSQL adapter is loaded.
 import pg from "pg";
 import {
   parsePostgresInstant,
