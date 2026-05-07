@@ -9,7 +9,6 @@ import type { DatabaseAdapter, ExplainOption } from "../adapter.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
-  NotImplementedError,
   ActiveRecordError,
   StatementInvalid,
   ConnectionNotEstablished,
@@ -83,6 +82,21 @@ import type {
   ColumnOptions,
 } from "./abstract/schema-definitions.js";
 import type { Column } from "./column.js";
+import { TypeMap } from "../type/type-map.js";
+import {
+  StringType,
+  IntegerType,
+  FloatType,
+  BooleanType,
+  BinaryType,
+  DecimalType,
+} from "@blazetrails/activemodel";
+import { Text as TextType } from "../type/text.js";
+import { Date as DateType } from "../type/date.js";
+import { Time as TimeType } from "../type/time.js";
+import { DateTime as DateTimeType } from "../type/date-time.js";
+import { Json as JsonType } from "../type/json.js";
+import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter::Version
@@ -1214,9 +1228,89 @@ export class AbstractAdapter implements Quoting {
 
   static dbconsole(_config?: unknown): void {}
 
-  // --- Type registration ---
+  // --- Type registration (Rails: class << self private) ---
 
-  static registerClassWithPrecision(_typeMap: unknown, _name: string, _klass: unknown): void {}
+  /** @internal */
+  static initializeTypeMap(this: typeof AbstractAdapter, m: TypeMap): void {
+    this.registerClassWithLimit(m, /boolean/i, BooleanType);
+    this.registerClassWithLimit(m, /char/i, StringType);
+    this.registerClassWithLimit(m, /binary/i, BinaryType);
+    this.registerClassWithLimit(m, /text/i, TextType);
+    this.registerClassWithPrecision(m, /date/i, DateType);
+    this.registerClassWithPrecision(m, /time/i, TimeType);
+    this.registerClassWithPrecision(m, /datetime/i, DateTimeType);
+    this.registerClassWithLimit(m, /float/i, FloatType);
+    this.registerClassWithLimit(m, /int/i, IntegerType);
+
+    const aliasTo = (targetKey: string) => (sqlType: string) => {
+      const meta = /\(.*\)/.exec(sqlType)?.[0] ?? "";
+      return m.lookup(`${targetKey}${meta}`);
+    };
+    m.registerType(/blob/i, undefined, aliasTo("binary"));
+    m.registerType(/clob/i, undefined, aliasTo("text"));
+    m.registerType(/timestamp/i, undefined, aliasTo("datetime"));
+    m.registerType(/numeric/i, undefined, aliasTo("decimal"));
+    m.registerType(/number/i, undefined, aliasTo("decimal"));
+    m.registerType(/double/i, undefined, aliasTo("float"));
+
+    m.registerType(/^json/i, new JsonType());
+
+    m.registerType(/decimal/i, undefined, (sqlType: string) => {
+      const scale = this.extractScale(sqlType);
+      const precision = this.extractPrecision(sqlType);
+      if (scale === 0) return new DecimalWithoutScale({ precision });
+      return new DecimalType({ precision, scale });
+    });
+  }
+
+  /** @internal */
+  static registerClassWithLimit(
+    this: typeof AbstractAdapter,
+    mapping: TypeMap,
+    key: string | RegExp,
+    klass: new (options?: { limit?: number }) => object,
+  ): void {
+    mapping.registerType(key, undefined, (sqlType: string) => {
+      return new klass({ limit: this.extractLimit(sqlType) }) as ReturnType<typeof mapping.lookup>;
+    });
+  }
+
+  /** @internal */
+  static registerClassWithPrecision(
+    this: typeof AbstractAdapter,
+    mapping: TypeMap,
+    key: string | RegExp,
+    klass: new (options?: { precision?: number }) => object,
+    extraOptions: Record<string, unknown> = {},
+  ): void {
+    mapping.registerType(key, undefined, (sqlType: string) => {
+      return new klass({
+        precision: this.extractPrecision(sqlType),
+        ...extraOptions,
+      }) as ReturnType<typeof mapping.lookup>;
+    });
+  }
+
+  /** @internal */
+  static extractScale(sqlType: string): number | undefined {
+    if (/\(\d+\)/.test(sqlType)) return 0;
+    const match = /\(\d+,(\d+)\)/.exec(sqlType);
+    return match ? Number.parseInt(match[1], 10) : undefined;
+  }
+
+  /** @internal */
+  static extractPrecision(sqlType: string): number | undefined {
+    const match = /\((\d+)(,\d+)?\)/.exec(sqlType);
+    return match ? Number.parseInt(match[1], 10) : undefined;
+  }
+
+  /** @internal */
+  static extractLimit(sqlType: string): number | undefined {
+    const match = /\((.*)\)/.exec(sqlType);
+    if (!match) return undefined;
+    const n = Number.parseInt(match[1], 10);
+    return Number.isNaN(n) ? 0 : n;
+  }
 
   private _extendedTypeMap?: Map<string, unknown>;
   get extendedTypeMap(): Map<string, unknown> {
@@ -1545,48 +1639,3 @@ include(AbstractAdapter, {
   indexNameLength,
   bindParamsLength,
 });
-
-// Wire abstract private stubs so api:compare credits them to AbstractAdapter.
-const AbstractAdapterPrivates = {
-  initializeTypeMap,
-  registerClassWithLimit,
-  extractScale,
-  extractPrecision,
-  extractLimit,
-};
-include(AbstractAdapter, AbstractAdapterPrivates);
-
-/** @internal */
-function initializeTypeMap(m: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#initialize_type_map is not implemented",
-  );
-}
-
-/** @internal */
-function registerClassWithLimit(mapping: any, key: any, klass: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#register_class_with_limit is not implemented",
-  );
-}
-
-/** @internal */
-function extractScale(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_scale is not implemented",
-  );
-}
-
-/** @internal */
-function extractPrecision(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_precision is not implemented",
-  );
-}
-
-/** @internal */
-function extractLimit(sqlType: any): never {
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::AbstractAdapter#extract_limit is not implemented",
-  );
-}

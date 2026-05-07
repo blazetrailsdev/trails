@@ -1035,7 +1035,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  protected static initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
+  static override initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
     // Base types (mirrors AbstractAdapter#initialize_type_map via super)
     m.registerType(/^boolean/i, undefined, () => new BooleanType());
     m.registerType(/^char/i, undefined, () => new StringType());
