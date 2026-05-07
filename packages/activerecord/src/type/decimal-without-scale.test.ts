@@ -26,6 +26,13 @@ describe("DecimalWithoutScale", () => {
     expect(type.cast(-3.9)).toBe(-3);
   });
 
+  it("returns null for non-finite numbers", () => {
+    const type = new DecimalWithoutScale();
+    expect(type.cast(Infinity)).toBeNull();
+    expect(type.cast(-Infinity)).toBeNull();
+    expect(type.cast(NaN)).toBeNull();
+  });
+
   it("accepts large values beyond 32-bit range without truncation", () => {
     const type = new DecimalWithoutScale();
     // Values above 2^31-1 would throw ActiveModelRangeError under 4-byte IntegerType.

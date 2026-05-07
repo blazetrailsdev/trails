@@ -15,7 +15,7 @@ export class DecimalWithoutScale extends BigIntegerType {
   // are consumed as numbers by the rest of the stack.
   protected override castValue(value: unknown): number | null {
     if (typeof value === "number") {
-      if (isNaN(value)) return null;
+      if (isNaN(value) || !isFinite(value)) return null;
       return Math.trunc(value);
     }
     if (typeof value === "bigint") return Number(value);
