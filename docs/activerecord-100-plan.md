@@ -208,6 +208,30 @@ TS paths use `$TS/` = `packages/activerecord/src/`.
 
 **PR 25 — `abstract_adapter.rb` core privates** ✅ #1235 (first split, 13/27)
 
+**Track 2 wiring (PRs #1137 #1139 #1292)** ✅ 374/465 (80%)
+
+**Triage of 91 remaining gaps** (see PR body for full 15-row table):
+
+Root cause: `compare.ts`'s `moduleFqnByShort` resolves short names like `"Quoting"`,
+`"DatabaseStatements"`, `"SchemaStatements"` to **all** adapter variants (PG, MySQL, SQLite)
+rather than just the abstract base. This inflates AbstractAdapter's expected set by ~83 false
+positives — methods from `PostgreSQL::Quoting`, `MySQL::SchemaStatements`, etc. that
+AbstractAdapter never actually includes.
+
+- **Category A (~83/91, 91%)**: False positives from multi-resolution. Methods exist in
+  their own adapter files (at 100%) but compare incorrectly expects them in abstract-adapter.ts.
+  Fix: improve `compare.ts` to resolve short module names to the base variant when flattening
+  an abstract class's includes. Tracked as extractor issue (do not fix in this PR).
+- **Category B (~6/91, 7%)**: `insert`, `update`, `delete`, `raw_execute`, `internal_execute`,
+  `execute_batch` — exist as standalone exports in `abstract/database-statements.ts` but are
+  **not** included in the `DatabaseStatements` const object, so
+  `include(AbstractAdapter, DatabaseStatements)` misses them. Wiring PR deferred — low
+  priority since Category A dominates.
+- **Category C (~0/91, 0%)**: No genuinely unimplemented methods in the residual.
+
+Next step for abstract_adapter.rb: fix the multi-resolution in compare.ts, which should
+collapse 374/465 → ~450+/465 (≥96%) without any TS changes.
+
 ---
 
 ### Wave 7 — Core AR model files
