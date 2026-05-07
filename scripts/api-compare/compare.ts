@@ -315,6 +315,45 @@ export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolea
 }
 
 /**
+ * Resolve a bare include name (e.g. `"Quoting"`) to the best-matching FQN(s)
+ * from the perspective of `contextFqn` (the including class or module).
+ *
+ * Ruby's constant lookup walks enclosing namespaces outward. Given
+ * `ActiveRecord::ConnectionAdapters::AbstractAdapter` including `"Quoting"`,
+ * Ruby resolves to `ActiveRecord::ConnectionAdapters::Quoting` — NOT to
+ * `ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting` even though both
+ * have the same short name. This scoped resolution avoids the false-positive
+ * where PostgreSQL-specific methods inflate AbstractAdapter's missing count.
+ *
+ * If the name already contains `::` it is returned as-is. If only one FQN
+ * matches the short name, that single candidate is returned regardless of
+ * context. When multiple candidates exist, namespace-prefix walking picks the
+ * nearest enclosing match; if none of the candidates share a namespace prefix
+ * with the context the full candidate list is returned (original behavior,
+ * safe fallback).
+ */
+export function resolveModuleName(
+  incName: string,
+  contextFqn: string,
+  moduleFqnByShort: Map<string, string[]>,
+): string[] {
+  if (incName.includes("::")) return [incName];
+  const candidates = moduleFqnByShort.get(incName);
+  if (!candidates || candidates.length === 0) return [incName];
+  if (candidates.length === 1) return candidates;
+
+  // Walk namespace prefixes from longest to shortest, pick first match.
+  const parts = contextFqn.split("::");
+  for (let i = parts.length; i > 0; i--) {
+    const candidate = `${parts.slice(0, i).join("::")}::${incName}`;
+    if (candidates.includes(candidate)) return [candidate];
+  }
+
+  // No prefix match — fall back to all candidates (original behavior).
+  return candidates;
+}
+
+/**
  * Flatten `include`/`extend`-reachable methods onto a host entity.
  *
  * Ruby's `include Mod` flattens Mod's instance methods onto the including
@@ -338,9 +377,14 @@ export function tsShouldIncludeInIndex(m: MethodInfo, mode: CompareMode): boolea
  *
  * Cycles are guarded by `visited`. Modules outside the package are
  * silently skipped — stdlib like `Comparable`/`Enumerable` falls through.
+ *
+ * `entityFqn` drives namespace-scoped include resolution (see
+ * `resolveModuleName`): `AbstractAdapter` including `"Quoting"` resolves
+ * only to `ConnectionAdapters::Quoting`, not to adapter-specific siblings.
  */
 export function flattenIncludedMethodInfos(
   entity: ClassInfo,
+  entityFqn: string,
   rubyPkg: PackageInfo,
   moduleFqnByShort: Map<string, string[]>,
 ): { instance: MethodInfo[]; klass: MethodInfo[] } {
@@ -348,8 +392,8 @@ export function flattenIncludedMethodInfos(
   const klass: MethodInfo[] = [...entity.classMethods];
   const visited = new Set<string>();
 
-  const walk = (incName: string, asClassMethods: boolean): void => {
-    const fqns = moduleFqnByShort.get(incName) ?? [incName];
+  const walk = (incName: string, asClassMethods: boolean, contextFqn: string): void => {
+    const fqns = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     for (const fqn of fqns) {
       if (visited.has(fqn)) continue;
       visited.add(fqn);
@@ -357,12 +401,12 @@ export function flattenIncludedMethodInfos(
       if (!mod) continue;
       const sink = asClassMethods ? klass : instance;
       for (const m of mod.instanceMethods) sink.push(m);
-      for (const inc of mod.includes ?? []) walk(inc, asClassMethods);
+      for (const inc of mod.includes ?? []) walk(inc, asClassMethods, fqn);
     }
   };
 
-  for (const inc of entity.includes ?? []) walk(inc, false);
-  for (const ext of entity.extends ?? []) walk(ext, true);
+  for (const inc of entity.includes ?? []) walk(inc, false, entityFqn);
+  for (const ext of entity.extends ?? []) walk(ext, true, entityFqn);
   return { instance, klass };
 }
 
@@ -815,7 +859,7 @@ function main() {
       // `invert`). Count once.
       const seen = new Map<string, { rubyName: string; rubyModule: string }>();
       for (const item of items) {
-        const f = flattenIncludedMethodInfos(item.info, rubyPkg, moduleFqnByShort);
+        const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort);
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
           if (!methodMatchesMode(rm)) continue;

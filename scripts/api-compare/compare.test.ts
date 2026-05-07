@@ -6,6 +6,7 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  resolveModuleName,
   dedupeRubyMethodInto,
   selectMisplacedFile,
   MISPLACED_MIN_HITS,
@@ -287,7 +288,7 @@ describe("flattenIncludedMethodInfos", () => {
       ["Predications", ["Arel::Predications"]],
       ["Math", ["Arel::Math"]],
     ]);
-    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    const f = flattenIncludedMethodInfos(host, "Arel::Nodes::NodeExpression", pkg, byShort);
     expect(f.instance.map((m) => m.name).sort()).toEqual(
       ["add", "eq", "gt", "hash", "lt", "subtract"].sort(),
     );
@@ -309,7 +310,7 @@ describe("flattenIncludedMethodInfos", () => {
       modules: { Enum: enums },
     };
     const byShort = new Map([["Enum", ["Enum"]]]);
-    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    const f = flattenIncludedMethodInfos(host, "Base", pkg, byShort);
     expect(f.instance.map((m) => m.name)).toEqual([]);
     expect(f.klass.map((m) => m.name).sort()).toEqual(["inherited", "lookup", "values"]);
   });
@@ -334,7 +335,7 @@ describe("flattenIncludedMethodInfos", () => {
       ["Predications", ["Arel::Predications"]],
       ["Constants", ["Arel::Constants"]],
     ]);
-    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    const f = flattenIncludedMethodInfos(host, "Arel::Attribute", pkg, byShort);
     expect(f.instance.map((m) => m.name).sort()).toEqual(["eq", "null", "true_value"]);
   });
 
@@ -363,7 +364,7 @@ describe("flattenIncludedMethodInfos", () => {
       ["Concern", ["Concern"]],
       ["MyConcern", ["MyConcern"]],
     ]);
-    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    const f = flattenIncludedMethodInfos(host, "Host", pkg, byShort);
     expect(f.instance.map((m) => m.name).sort()).toEqual(["instance_helper"]);
     expect(f.klass).toEqual([]);
   });
@@ -379,7 +380,7 @@ describe("flattenIncludedMethodInfos", () => {
       classMethods: [],
     };
     const pkg: PackageInfo = { classes: {}, modules: {} };
-    const f = flattenIncludedMethodInfos(host, pkg, new Map());
+    const f = flattenIncludedMethodInfos(host, "Range", pkg, new Map());
     expect(f.instance.map((m) => m.name)).toEqual(["first"]);
   });
 
@@ -399,8 +400,132 @@ describe("flattenIncludedMethodInfos", () => {
       ["A", ["A"]],
       ["B", ["B"]],
     ]);
-    const f = flattenIncludedMethodInfos(host, pkg, byShort);
+    const f = flattenIncludedMethodInfos(host, "Host", pkg, byShort);
     expect(f.instance.map((m) => m.name).sort()).toEqual(["a1", "b1", "h1"]);
+  });
+
+  it("scopes include resolution to host namespace — base Quoting, not adapter siblings", () => {
+    // AbstractAdapter includes "Quoting". Ruby resolves to the base
+    // ConnectionAdapters::Quoting, NOT to PostgreSQL::Quoting or MySQL::Quoting.
+    const baseQuoting = mod("Quoting", ["quote", "quoteColumnName"]);
+    const pgQuoting = mod("PostgreSQL::Quoting", ["escapeBytea", "quoteSchemaName"]);
+    const mysqlQuoting = mod("MySQL::Quoting", ["unquotedBool"]);
+    const host: ClassInfo = {
+      name: "AbstractAdapter",
+      file: "connection_adapters/abstract_adapter.rb",
+      includes: ["Quoting"],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: {
+        "ActiveRecord::ConnectionAdapters::Quoting": baseQuoting,
+        "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting": pgQuoting,
+        "ActiveRecord::ConnectionAdapters::MySQL::Quoting": mysqlQuoting,
+      },
+    };
+    const byShort = new Map([
+      [
+        "Quoting",
+        [
+          "ActiveRecord::ConnectionAdapters::Quoting",
+          "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting",
+          "ActiveRecord::ConnectionAdapters::MySQL::Quoting",
+        ],
+      ],
+    ]);
+    const f = flattenIncludedMethodInfos(
+      host,
+      "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+      pkg,
+      byShort,
+    );
+    // Should only get base Quoting methods, NOT PG or MySQL specifics
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["quote", "quoteColumnName"]);
+  });
+
+  it("scopes include resolution to adapter namespace — adapter-specific Quoting", () => {
+    // PostgreSQLAdapter includes "Quoting". Ruby resolves to PostgreSQL::Quoting.
+    const baseQuoting = mod("Quoting", ["quote", "quoteColumnName"]);
+    const pgQuoting = mod("PostgreSQL::Quoting", ["escapeBytea", "quoteSchemaName"]);
+    const host: ClassInfo = {
+      name: "PostgreSQLAdapter",
+      file: "connection_adapters/postgresql_adapter.rb",
+      includes: ["Quoting"],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [],
+    };
+    const pkg: PackageInfo = {
+      classes: {},
+      modules: {
+        "ActiveRecord::ConnectionAdapters::Quoting": baseQuoting,
+        "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting": pgQuoting,
+      },
+    };
+    const byShort = new Map([
+      [
+        "Quoting",
+        [
+          "ActiveRecord::ConnectionAdapters::Quoting",
+          "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting",
+        ],
+      ],
+    ]);
+    const f = flattenIncludedMethodInfos(
+      host,
+      "ActiveRecord::ConnectionAdapters::PostgreSQL::PostgreSQLAdapter",
+      pkg,
+      byShort,
+    );
+    // Should resolve to PostgreSQL::Quoting, not the base abstract Quoting
+    expect(f.instance.map((m) => m.name).sort()).toEqual(["escapeBytea", "quoteSchemaName"]);
+  });
+});
+
+describe("resolveModuleName", () => {
+  it("returns the single candidate unchanged", () => {
+    const byShort = new Map([["Quoting", ["AR::ConnectionAdapters::Quoting"]]]);
+    expect(
+      resolveModuleName("Quoting", "AR::ConnectionAdapters::AbstractAdapter", byShort),
+    ).toEqual(["AR::ConnectionAdapters::Quoting"]);
+  });
+
+  it("passes through already-qualified names", () => {
+    const byShort = new Map([["Foo::Bar", ["Foo::Bar"]]]);
+    expect(resolveModuleName("Foo::Bar", "Baz::Qux", byShort)).toEqual(["Foo::Bar"]);
+  });
+
+  it("returns all candidates when context has no prefix match", () => {
+    const byShort = new Map([["Foo", ["X::Foo", "Y::Foo"]]]);
+    expect(resolveModuleName("Foo", "Z::Bar", byShort)).toEqual(["X::Foo", "Y::Foo"]);
+  });
+
+  it("prefers nearest namespace prefix — abstract base wins over sibling adapter", () => {
+    const candidates = [
+      "AR::ConnectionAdapters::Quoting",
+      "AR::ConnectionAdapters::PostgreSQL::Quoting",
+      "AR::ConnectionAdapters::MySQL::Quoting",
+    ];
+    const byShort = new Map([["Quoting", candidates]]);
+    const result = resolveModuleName("Quoting", "AR::ConnectionAdapters::AbstractAdapter", byShort);
+    expect(result).toEqual(["AR::ConnectionAdapters::Quoting"]);
+  });
+
+  it("prefers adapter-specific namespace when including class is in that namespace", () => {
+    const candidates = [
+      "AR::ConnectionAdapters::Quoting",
+      "AR::ConnectionAdapters::PostgreSQL::Quoting",
+    ];
+    const byShort = new Map([["Quoting", candidates]]);
+    const result = resolveModuleName(
+      "Quoting",
+      "AR::ConnectionAdapters::PostgreSQL::PostgreSQLAdapter",
+      byShort,
+    );
+    expect(result).toEqual(["AR::ConnectionAdapters::PostgreSQL::Quoting"]);
   });
 });
 
