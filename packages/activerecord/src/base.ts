@@ -1998,11 +1998,14 @@ export class Base extends Model {
     rows: Record<string, unknown>[],
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T>[] {
-    return Querying._loadFromSql.call(
-      this as typeof Base,
-      rows,
-      block as never,
-    ) as InstanceType<T>[];
+    // Cast the imported function to the concrete generic instantiation so call()
+    // propagates the type without needing `block as never` or return-value casts.
+    const fn = Querying._loadFromSql as (
+      this: T,
+      rows: Record<string, unknown>[],
+      block?: (record: InstanceType<T>) => void,
+    ) => InstanceType<T>[];
+    return fn.call(this, rows, block);
   }
 
   /**
