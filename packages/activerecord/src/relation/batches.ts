@@ -1,5 +1,3 @@
-import { Nodes } from "@blazetrails/arel";
-
 /**
  * Batch processing methods: findEach, findInBatches, inBatches.
  *
@@ -13,7 +11,7 @@ export class Batches {
 }
 
 /** @internal */
-function ensureValidOptionsForBatchingBang(
+export function ensureValidOptionsForBatchingBang(
   cursor: string | string[],
   start: unknown,
   finish: unknown,
@@ -41,7 +39,7 @@ function ensureValidOptionsForBatchingBang(
 }
 
 /** @internal */
-function applyLimits(
+export function applyLimits(
   relation: any,
   cursor: string | string[],
   start: unknown,
@@ -58,7 +56,7 @@ function applyLimits(
 }
 
 /** @internal */
-function applyStartLimit(
+export function applyStartLimit(
   relation: any,
   cursor: string | string[],
   start: unknown,
@@ -69,7 +67,7 @@ function applyStartLimit(
 }
 
 /** @internal */
-function applyFinishLimit(
+export function applyFinishLimit(
   relation: any,
   cursor: string | string[],
   finish: unknown,
@@ -80,7 +78,7 @@ function applyFinishLimit(
 }
 
 /** @internal */
-function batchCondition(
+export function batchCondition(
   relation: any,
   cursor: string | string[],
   values: unknown,
@@ -89,18 +87,27 @@ function batchCondition(
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   const valArr = Array.isArray(values) ? values : [values];
   const table = relation._modelClass.arelTable;
-  const conditions = cursorArr.map((col, i) => {
-    const attr = table.get(col);
-    const val = valArr[i];
-    const op = operators[i];
-    return (attr as any)[op](val);
-  });
-  if (conditions.length === 1) return relation.where(conditions[0]);
-  return relation.where(new Nodes.Grouping(new Nodes.And(conditions)));
+
+  // Build lexicographic WHERE matching Rails' cursor_positions.reverse_each logic:
+  // Single column: col OP val
+  // Multi-column: (col1 STRICT_OP val1) OR (col1 = val1 AND <rest>)
+  // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
+  const positions = cursorArr.map((col, i) => [col, valArr[i], operators[i]] as const);
+  const [firstCol, firstVal, firstOp] = positions[positions.length - 1];
+  let clause: any = (table.get(firstCol) as any)[firstOp](firstVal);
+
+  for (let i = positions.length - 2; i >= 0; i--) {
+    const [col, val, op] = positions[i];
+    const attr = table.get(col) as any;
+    const strictOp = op === "lteq" ? "lt" : op === "gteq" ? "gt" : op;
+    clause = attr[strictOp](val).or(attr.eq(val).and(clause));
+  }
+
+  return relation.where(clause);
 }
 
 /** @internal */
-function buildBatchOrders(
+export function buildBatchOrders(
   cursor: string | string[],
   order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
 ): [string, "asc" | "desc"][] {
@@ -110,14 +117,14 @@ function buildBatchOrders(
 }
 
 /** @internal */
-function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
+export function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
   if (errorOnIgnore) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
   }
 }
 
 /** @internal */
-function batchOnLoadedRelation(opts: {
+export function batchOnLoadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
@@ -145,13 +152,13 @@ function batchOnLoadedRelation(opts: {
 }
 
 /** @internal */
-function recordCursorValues(record: any, cursor: string | string[]): unknown[] {
+export function recordCursorValues(record: any, cursor: string | string[]): unknown[] {
   const cols = Array.isArray(cursor) ? cursor : [cursor];
   return cols.map((c) => record.readAttribute?.(c) ?? record[c]);
 }
 
 /** @internal */
-function compareValuesForOrder(
+export function compareValuesForOrder(
   values1: unknown[],
   values2: unknown[],
   order: ("asc" | "desc")[],
@@ -167,7 +174,7 @@ function compareValuesForOrder(
 }
 
 /** @internal */
-async function batchOnUnloadedRelation(opts: {
+export async function batchOnUnloadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;

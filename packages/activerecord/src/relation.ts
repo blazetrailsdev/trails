@@ -46,13 +46,44 @@ import {
   type UnscopeType,
   type AssociationSpec,
 } from "./relation/query-methods.js";
-import { Batches } from "./relation/batches.js";
+import {
+  Batches,
+  ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
+  applyLimits as _applyLimits,
+  applyStartLimit as _applyStartLimit,
+  applyFinishLimit as _applyFinishLimit,
+  batchCondition as _batchCondition,
+  buildBatchOrders as _buildBatchOrders,
+  actOnIgnoredOrder as _actOnIgnoredOrder,
+  batchOnLoadedRelation as _batchOnLoadedRelation,
+  recordCursorValues as _recordCursorValues,
+  compareValuesForOrder as _compareValuesForOrder,
+  batchOnUnloadedRelation as _batchOnUnloadedRelation,
+} from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
 import { InsertAll } from "./insert-all.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { Calculations, groupColumnToArel } from "./relation/calculations.js";
+import {
+  Calculations,
+  groupColumnToArel,
+  aggregateColumn as _aggregateColumn,
+  isAllAttributes as _isAllAttributes,
+  hasInclude as _hasInclude,
+  performCalculation as _performCalculation,
+  isDistinctSelect as _isDistinctSelect,
+  operationOverAggregateColumn as _operationOverAggregateColumn,
+  executeSimpleCalculation as _executeSimpleCalculation,
+  executeGroupedCalculation as _executeGroupedCalculation,
+  typeFor as _typeFor,
+  lookupCastTypeFromJoinDependencies as _lookupCastTypeFromJoinDependencies,
+  typeCastPluckValues as _typeCastPluckValues,
+  typeCastCalculatedValue as _typeCastCalculatedValue,
+  selectForCount as _selectForCount,
+  isBuildCountSubquery as _isBuildCountSubquery,
+  buildCountSubquery as _buildCountSubquery,
+} from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
@@ -64,6 +95,10 @@ import {
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { touchAttributesWithTime } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
+import {
+  renderBind as _renderBind,
+  collectingQueriesForExplain as _collectingQueriesForExplain,
+} from "./explain.js";
 import { inspectExplainOption } from "./adapter.js";
 import type { DatabaseAdapter, ExplainOption } from "./adapter.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
@@ -2194,7 +2229,7 @@ export class Relation<T extends Base> {
   async explain(...options: ExplainOption[]): Promise<string> {
     validateExplainOptions(options);
     const { queries } = await ExplainRegistry.collectingQueries(() => this.toArray());
-    return this._execExplain(queries, options);
+    return this.execExplain(queries, options);
   }
 
   /**
@@ -2206,7 +2241,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#exec_explain
    * @internal
    */
-  async _execExplain(
+  async execExplain(
     queries: [string, unknown[]][],
     options: ExplainOption[] = [],
   ): Promise<string> {
@@ -2220,7 +2255,7 @@ export class Relation<T extends Base> {
     // string. Matches Rails' behavior of always producing output even
     // for degenerate cases.
     const effective: [string, unknown[]][] = queries.length > 0 ? queries : [[this._toSql(), []]];
-    const clause = this._buildExplainClause(adapter, options);
+    const clause = this.buildExplainClause(adapter, options);
     const parts: string[] = [];
     for (const [sql, binds] of effective) {
       let msg = `${clause} ${sql}`;
@@ -2365,7 +2400,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
    */
-  private _buildExplainClause(adapter: DatabaseAdapter, options: ExplainOption[]): string {
+  private buildExplainClause(adapter: DatabaseAdapter, options: ExplainOption[]): string {
     if (typeof adapter.buildExplainClause === "function") {
       return adapter.buildExplainClause(options);
     }
@@ -4489,6 +4524,220 @@ export class Relation<T extends Base> {
 
   private skipQueryCacheIfNecessary<R>(block: () => R): R {
     return block();
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR 37b — calculation privates (delegates to relation/calculations.ts)
+  // Mirrors: ActiveRecord::Calculations private helpers
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  private aggregateColumn(columnName: string): unknown {
+    return _aggregateColumn(this as any, columnName);
+  }
+
+  /** @internal */
+  private isAllAttributes(columnNames: string[]): boolean {
+    return _isAllAttributes(this as any, columnNames);
+  }
+
+  /** @internal */
+  private hasInclude(columnName: string | null): boolean {
+    return _hasInclude(this as any, columnName);
+  }
+
+  /** @internal */
+  private performCalculation(operation: string, columnName: string): Promise<unknown> {
+    return _performCalculation(this as any, operation, columnName);
+  }
+
+  /** @internal */
+  private isDistinctSelect(columnName: string): boolean {
+    return _isDistinctSelect(this as any, columnName);
+  }
+
+  /** @internal */
+  private operationOverAggregateColumn(
+    column: unknown,
+    operation: string,
+    distinct: boolean,
+  ): unknown {
+    return _operationOverAggregateColumn(column, operation, distinct);
+  }
+
+  /** @internal */
+  private async executeSimpleCalculation(
+    operation: string,
+    columnName: string,
+    distinct: boolean,
+  ): Promise<unknown> {
+    return _executeSimpleCalculation(this as any, operation, columnName, distinct);
+  }
+
+  /** @internal */
+  private async executeGroupedCalculation(
+    operation: string,
+    columnName: string,
+    distinct: boolean,
+  ): Promise<Record<string, unknown>> {
+    return _executeGroupedCalculation(this as any, operation, columnName, distinct);
+  }
+
+  /** @internal */
+  private typeFor(field: string): unknown {
+    return _typeFor(this as any, field);
+  }
+
+  /** @internal */
+  private lookupCastTypeFromJoinDependencies(name: string): unknown {
+    return _lookupCastTypeFromJoinDependencies(this as any, name);
+  }
+
+  /** @internal */
+  private typeCastPluckValues(result: unknown[][], columns: string[]): unknown[][] {
+    return _typeCastPluckValues(result, columns, this as any);
+  }
+
+  /** @internal */
+  private typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
+    return _typeCastCalculatedValue(value, operation, type);
+  }
+
+  /** @internal */
+  private selectForCount(): string {
+    return _selectForCount(this as any);
+  }
+
+  /** @internal */
+  private isBuildCountSubquery(operation: string, columnName: string, distinct: boolean): boolean {
+    return _isBuildCountSubquery(operation, columnName, distinct);
+  }
+
+  /** @internal */
+  private buildCountSubquery(columnName: string, distinct: boolean): string {
+    return _buildCountSubquery(this as any, columnName, distinct);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR 37b — batch privates (delegates to relation/batches.ts)
+  // Mirrors: ActiveRecord::Batches private helpers
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  private ensureValidOptionsForBatchingBang(
+    cursor: string | string[],
+    start: unknown,
+    finish: unknown,
+    order: "asc" | "desc" | ("asc" | "desc")[],
+  ): void {
+    _ensureValidOptionsForBatchingBang(cursor, start, finish, order);
+  }
+
+  /** @internal */
+  private applyLimits(
+    cursor: string | string[],
+    start: unknown,
+    finish: unknown,
+    batchOrders: [string, "asc" | "desc"][],
+  ): this {
+    return _applyLimits(this, cursor, start, finish, batchOrders) as this;
+  }
+
+  /** @internal */
+  private applyStartLimit(
+    cursor: string | string[],
+    start: unknown,
+    batchOrders: [string, "asc" | "desc"][],
+  ): this {
+    return _applyStartLimit(this, cursor, start, batchOrders) as this;
+  }
+
+  /** @internal */
+  private applyFinishLimit(
+    cursor: string | string[],
+    finish: unknown,
+    batchOrders: [string, "asc" | "desc"][],
+  ): this {
+    return _applyFinishLimit(this, cursor, finish, batchOrders) as this;
+  }
+
+  /** @internal */
+  private batchCondition(cursor: string | string[], values: unknown, operators: string[]): this {
+    return _batchCondition(this, cursor, values, operators) as this;
+  }
+
+  /** @internal */
+  private buildBatchOrders(
+    cursor: string | string[],
+    order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
+  ): [string, "asc" | "desc"][] {
+    return _buildBatchOrders(cursor, order);
+  }
+
+  /** @internal */
+  private actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
+    _actOnIgnoredOrder(errorOnIgnore);
+  }
+
+  /** @internal */
+  private batchOnLoadedRelation(opts: {
+    start: unknown;
+    finish: unknown;
+    cursor: string | string[];
+    order: "asc" | "desc" | ("asc" | "desc")[];
+    batchLimit: number;
+  }): T[][] {
+    return _batchOnLoadedRelation({ relation: this, ...opts });
+  }
+
+  /** @internal */
+  private recordCursorValues(record: T, cursor: string | string[]): unknown[] {
+    return _recordCursorValues(record, cursor);
+  }
+
+  /** @internal */
+  private compareValuesForOrder(
+    values1: unknown[],
+    values2: unknown[],
+    order: ("asc" | "desc")[],
+  ): number {
+    return _compareValuesForOrder(values1, values2, order);
+  }
+
+  /** @internal */
+  private async batchOnUnloadedRelation(opts: {
+    start: unknown;
+    finish: unknown;
+    load: boolean;
+    cursor: string | string[];
+    order: "asc" | "desc" | ("asc" | "desc")[];
+    useRanges: boolean | undefined;
+    remaining: number;
+    batchLimit: number;
+  }): Promise<T[][]> {
+    return _batchOnUnloadedRelation({ relation: this, ...opts });
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR 37b — explain / async privates
+  // Mirrors: ActiveRecord::Explain + ActiveRecord::QueryMethods#async
+  // ---------------------------------------------------------------------------
+
+  /** @internal */
+  private async collectingQueriesForExplain<R>(
+    fn: () => Promise<R>,
+  ): Promise<{ value: R; queries: [string, unknown[]][] }> {
+    return _collectingQueriesForExplain(fn);
+  }
+
+  /** @internal */
+  private renderBind(connection: unknown, attr: unknown): [string | null, unknown] {
+    return _renderBind(connection, attr);
+  }
+
+  /** @internal */
+  private async(): Relation<T> {
+    return (this.spawn() as any).asyncBang();
   }
 }
 

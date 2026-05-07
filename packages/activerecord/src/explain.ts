@@ -35,10 +35,10 @@ export async function execExplain(
   queries: [string, unknown[]][],
   options: ExplainOption[] = [],
 ): Promise<string> {
-  // Delegate to Relation#_execExplain which handles typeCast, binary binds,
+  // Delegate to Relation#execExplain which handles typeCast, binary binds,
   // and adapter-specific buildExplainClause — reusing that logic avoids
   // duplicating the JSON.stringify / typeCast edge cases.
-  return (modelClass as any).all()._execExplain(queries, options);
+  return (modelClass as any).all().execExplain(queries, options);
 }
 
 function byteSize(value: unknown): number {
