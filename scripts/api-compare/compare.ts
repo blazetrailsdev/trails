@@ -32,7 +32,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
-import { OUTPUT_DIR, packageSrcDir } from "./config.js";
+import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { isExcluded } from "./excluded-files.js";
 
@@ -481,6 +481,57 @@ export function selectMisplacedFile(
   return bestFile;
 }
 
+/**
+ * Build a name → ClassInfo[] map for `pkg`, unioning in entities from every
+ * @blazetrails/* dependency so the inheritance walker can cross package
+ * boundaries (e.g. AR Base extends AM Model).
+ */
+export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, ClassInfo[]> {
+  const map = new Map<string, ClassInfo[]>();
+
+  const isFixture = (e: ClassInfo) =>
+    (e.file ?? "").includes("__fixtures__") || (e.file ?? "").startsWith("tsc-wrapper/");
+
+  const addPkg = (pkgKey: string) => {
+    const p = ts.packages[pkgKey];
+    if (!p) return;
+    for (const entity of [...Object.values(p.classes), ...Object.values(p.modules)]) {
+      if (isFixture(entity)) continue;
+      const list = map.get(entity.name) ?? [];
+      list.push(entity);
+      map.set(entity.name, list);
+    }
+  };
+
+  // Always include the current package first so same-package candidates beat
+  // cross-package ones in the proximity tie-breaker.
+  addPkg(pkg);
+
+  // Read @blazetrails/* deps from package.json to discover sibling packages.
+  const pkgJsonPath = path.join(ROOT_DIR, "packages", pkg, "package.json");
+  if (fs.existsSync(pkgJsonPath)) {
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8")) as Record<
+        string,
+        Record<string, string>
+      >;
+      const allDeps = {
+        ...((pkgJson["dependencies"] as Record<string, string>) ?? {}),
+        ...((pkgJson["peerDependencies"] as Record<string, string>) ?? {}),
+      };
+      for (const dep of Object.keys(allDeps)) {
+        if (!dep.startsWith("@blazetrails/")) continue;
+        const depKey = dep.replace("@blazetrails/", "");
+        if (depKey !== pkg) addPkg(depKey);
+      }
+    } catch {
+      // Non-fatal: if we can't read deps, fall back to same-package only.
+    }
+  }
+
+  return map;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const pkgIndex = args.indexOf("--package");
@@ -579,13 +630,9 @@ function main() {
     // and interface/module `extends` chains.
     if (tsPkg) {
       // Key by short name → entity for superclass/extends resolution.
-      // Multiple entities can share a name; store all and resolve by context.
-      const entitiesByName = new Map<string, ClassInfo[]>();
-      for (const entity of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
-        const list = entitiesByName.get(entity.name) || [];
-        list.push(entity);
-        entitiesByName.set(entity.name, list);
-      }
+      // Includes dep-package entities so walks can cross package boundaries
+      // (e.g. AR Base extends AM Model).
+      const entitiesByName = buildEntitiesByName(pkg, ts);
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
