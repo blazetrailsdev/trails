@@ -468,9 +468,28 @@ export class SchemaDumper {
   dump(): string | Promise<string> {
     const lines: string[] = [];
     this.header(lines);
-    this.schemas(lines);
-    this.extensions(lines);
-    this.types(lines);
+    const schemasResult = this.schemas(lines);
+    // Run header sections sequentially to preserve deterministic output order
+    // (schemas → extensions → types). If any section is async, chain the rest.
+    if (schemasResult instanceof Promise) {
+      return schemasResult
+        .then(() => this.extensions(lines))
+        .then(() => this.types(lines))
+        .then(() => this._finalizeDump(lines));
+    }
+    const extensionsResult = this.extensions(lines);
+    if (extensionsResult instanceof Promise) {
+      return extensionsResult.then(() => this.types(lines)).then(() => this._finalizeDump(lines));
+    }
+    const typesResult = this.types(lines);
+    if (typesResult instanceof Promise) {
+      return typesResult.then(() => this._finalizeDump(lines));
+    }
+    return this._finalizeDump(lines);
+  }
+
+  /** @internal */
+  private _finalizeDump(lines: string[]): string | Promise<string> {
     const result = this.dumpTables(lines);
     if (result instanceof Promise) {
       return result.then(async () => {
@@ -491,13 +510,13 @@ export class SchemaDumper {
   }
 
   /** @internal */
-  protected extensions(_lines: string[]): void {}
+  protected extensions(_lines: string[]): void | Promise<void> {}
 
   /** @internal */
-  protected types(_lines: string[]): void {}
+  protected types(_lines: string[]): void | Promise<void> {}
 
   /** @internal */
-  protected schemas(_lines: string[]): void {}
+  protected schemas(_lines: string[]): void | Promise<void> {}
 
   /** @internal */
   protected virtualTables(lines: string[]): void | Promise<void> {

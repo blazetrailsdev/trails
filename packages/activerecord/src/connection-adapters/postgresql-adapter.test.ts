@@ -849,6 +849,32 @@ describeIfPg("PostgreSQLAdapter", () => {
         /expression.*name/,
       );
     });
+
+    it("exclusionConstraints returns expression, using, where, and name", async () => {
+      await adapter.addExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_introspect",
+        using: "gist",
+        where: "during IS NOT NULL",
+      });
+      const constraints = await adapter.exclusionConstraints("excl_test");
+      expect(constraints).toHaveLength(1);
+      const ec = constraints[0];
+      expect(ec.expression).toContain("WITH &&");
+      expect(ec.using).toBe("gist");
+      expect(ec.where).toContain("during IS NOT NULL");
+      expect(ec.name).toBe("excl_introspect");
+    });
+
+    it("exclusionConstraints returns deferrable for deferred constraints", async () => {
+      await adapter.addExclusionConstraint("excl_test", `"during" WITH &&`, {
+        name: "excl_deferred",
+        using: "gist",
+        deferrable: "deferred",
+      });
+      const constraints = await adapter.exclusionConstraints("excl_test");
+      const ec = constraints.find((c) => c.name === "excl_deferred")!;
+      expect(ec.deferrable).toBe("deferred");
+    });
   });
 
   describe("addUniqueConstraint / removeUniqueConstraint", () => {
@@ -895,6 +921,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.addUniqueConstraint("uniq_test", null)).rejects.toThrow(
         /columnName.*usingIndex/,
       );
+    });
+
+    it("uniqueConstraints returns column, name, and nullsNotDistinct", async () => {
+      await adapter.addUniqueConstraint("uniq_test", "email", {
+        name: "uniq_introspect",
+        nullsNotDistinct: true,
+      });
+      const constraints = await adapter.uniqueConstraints("uniq_test");
+      expect(constraints).toHaveLength(1);
+      const uc = constraints[0];
+      expect(uc.column).toEqual(["email"]);
+      expect(uc.name).toBe("uniq_introspect");
+      expect(uc.nullsNotDistinct).toBe(true);
+    });
+
+    it("uniqueConstraints returns deferrable for deferred constraints", async () => {
+      await adapter.addUniqueConstraint("uniq_test", "username", {
+        name: "uniq_deferred",
+        deferrable: "deferred",
+      });
+      const constraints = await adapter.uniqueConstraints("uniq_test");
+      const uc = constraints.find((c) => c.name === "uniq_deferred")!;
+      expect(uc.deferrable).toBe("deferred");
     });
   });
 

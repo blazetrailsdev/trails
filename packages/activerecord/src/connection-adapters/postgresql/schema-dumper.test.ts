@@ -214,4 +214,121 @@ describe("PostgreSQL::SchemaDumper", () => {
       );
     });
   });
+
+  describe("extensions", () => {
+    it("emits enable_extension lines sorted with header and trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        extensions: async () => ["plpgsql", "hstore"],
+      };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.extensions(lines);
+      expect(lines[0]).toContain("extensions that must be enabled");
+      expect(lines[1]).toBe(`  enable_extension "hstore"`);
+      expect(lines[2]).toBe(`  enable_extension "plpgsql"`);
+      expect(lines[3]).toBe("");
+    });
+
+    it("emits nothing when extensions list is empty", async () => {
+      const adapter = { ...emptySource, extensions: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.extensions(lines);
+      expect(lines).toHaveLength(0);
+    });
+  });
+
+  describe("types", () => {
+    it("emits create_enum lines sorted with header and trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        enumTypes: async () =>
+          [
+            ["status", ["active", "inactive"]],
+            ["mood", ["happy", "sad"]],
+          ] as [string, string[]][],
+      };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.types(lines);
+      expect(lines[0]).toBe("  # Custom types defined in this database.");
+      expect(lines[2]).toBe(`  create_enum "mood", ["happy","sad"]`);
+      expect(lines[3]).toBe(`  create_enum "status", ["active","inactive"]`);
+      expect(lines[4]).toBe("");
+    });
+
+    it("emits nothing when enum types list is empty", async () => {
+      const adapter = { ...emptySource, enumTypes: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.types(lines);
+      expect(lines).toHaveLength(0);
+    });
+  });
+
+  describe("schemas", () => {
+    it("emits create_schema lines sorted, excluding public, with trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        schemaNames: async () => ["public", "myschema", "analytics"],
+      };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.schemas(lines);
+      expect(lines).toEqual([`  create_schema "analytics"`, `  create_schema "myschema"`, ""]);
+    });
+  });
+
+  describe("exclusionConstraintsInCreate", () => {
+    it("emits sorted ctx.addExclusionConstraint lines with options", async () => {
+      const { ExclusionConstraintDefinition } = await import("./schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        exclusionConstraints: async () => [
+          new ExclusionConstraintDefinition("rooms", "price WITH =", {
+            using: "gist",
+            where: "(price > 0)",
+            name: "excl_rooms_price",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.exclusionConstraintsInCreate("rooms", lines);
+      expect(lines[0]).toContain(`await ctx.addExclusionConstraint("rooms", "price WITH ="`);
+      expect(lines[0]).toContain(`where: "(price > 0)"`);
+      expect(lines[0]).toContain(`using: "gist"`);
+      expect(lines[0]).toContain(`name: "excl_rooms_price"`);
+    });
+  });
+
+  describe("uniqueConstraintsInCreate", () => {
+    it("emits sorted ctx.addUniqueConstraint lines with options", async () => {
+      const { UniqueConstraintDefinition } = await import("./schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        uniqueConstraints: async () => [
+          new UniqueConstraintDefinition("users", ["email"], {
+            nullsNotDistinct: true,
+            name: "uniq_users_email",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.uniqueConstraintsInCreate("users", lines);
+      expect(lines[0]).toContain(`await ctx.addUniqueConstraint("users", ["email"]`);
+      expect(lines[0]).toContain(`nullsNotDistinct: true`);
+      expect(lines[0]).toContain(`name: "uniq_users_email"`);
+    });
+
+    it("emits nothing when no unique constraints", async () => {
+      const adapter = { ...emptySource, uniqueConstraints: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter) as any;
+      const lines: string[] = [];
+      await dumper.uniqueConstraintsInCreate("users", lines);
+      expect(lines).toHaveLength(0);
+    });
+  });
 });

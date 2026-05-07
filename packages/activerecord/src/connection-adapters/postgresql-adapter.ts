@@ -4051,6 +4051,81 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return quotedColumns;
   }
 
+  async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(`
+      SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef, c.condeferrable, c.condeferred
+      FROM pg_constraint c
+      JOIN pg_class t ON c.conrelid = t.oid
+      JOIN pg_namespace n ON n.oid = c.connamespace
+      WHERE c.contype = 'x'
+        AND t.relname = ${scope.name}
+        AND n.nspname = ${scope.schema}
+    `);
+    return rows.map((row) => {
+      const r = row as Record<string, unknown>;
+      const constraintdef = r.constraintdef as string;
+      const whereIdx = constraintdef.search(/ WHERE /i);
+      let predicate: string | undefined;
+      let excludePart = constraintdef;
+      if (whereIdx !== -1) {
+        predicate = constraintdef.slice(whereIdx + 7);
+        excludePart = constraintdef.slice(0, whereIdx);
+        predicate = predicate.replace(/ DEFERRABLE(?: INITIALLY (?:IMMEDIATE|DEFERRED))?/i, "");
+        // strip outer parentheses added by pg_get_constraintdef
+        if (predicate.startsWith("((") && predicate.endsWith("))")) {
+          predicate = predicate.slice(1, -1);
+        }
+      }
+      const parts = excludePart.match(/EXCLUDE(?:\s+USING\s+(\S+))?\s+\((.+)\)/s);
+      const using = parts?.[1];
+      const expression = parts?.[2] ?? "";
+      const deferrable = this.extractConstraintDeferrable(
+        r.condeferrable as boolean,
+        r.condeferred as boolean,
+      );
+      return new ExclusionConstraintDefinition(tableName, expression, {
+        name: r.conname as string,
+        using: using as string | undefined,
+        where: predicate,
+        deferrable: deferrable || undefined,
+      });
+    });
+  }
+
+  async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
+    const scope = this.quotedScope(tableName);
+    const rows = await this.schemaQuery(`
+      SELECT c.conname, c.conrelid, c.conkey, c.condeferrable, c.condeferred,
+             pg_get_constraintdef(c.oid) AS constraintdef
+      FROM pg_constraint c
+      JOIN pg_class t ON c.conrelid = t.oid
+      JOIN pg_namespace n ON n.oid = c.connamespace
+      WHERE c.contype = 'u'
+        AND t.relname = ${scope.name}
+        AND n.nspname = ${scope.schema}
+    `);
+    return Promise.all(
+      rows.map(async (row) => {
+        const r = row as Record<string, unknown>;
+        const conkey = String(r.conkey).replace(/[{}]/g, "").split(",").map(Number);
+        const columns = await this.columnNamesFromColumnNumbers(Number(r.conrelid), conkey);
+        const nullsNotDistinct = (r.constraintdef as string).startsWith(
+          "UNIQUE NULLS NOT DISTINCT",
+        );
+        const deferrable = this.extractConstraintDeferrable(
+          r.condeferrable as boolean,
+          r.condeferred as boolean,
+        );
+        return new UniqueConstraintDefinition(tableName, columns, {
+          name: r.conname as string,
+          nullsNotDistinct: nullsNotDistinct || undefined,
+          deferrable: deferrable || undefined,
+        });
+      }),
+    );
+  }
+
   /** @internal */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
