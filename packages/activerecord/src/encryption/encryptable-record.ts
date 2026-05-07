@@ -213,7 +213,7 @@ export class EncryptableRecord {
 
   /** @internal */
   static preserveOriginalEncrypted(modelClass: any, name: string): void {
-    const originalName = `original_${name}`;
+    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
     this.encrypts(modelClass, originalName);
     this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
   }
