@@ -1122,7 +1122,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#create_with
    */
-  createWith(attrs: Record<string, unknown>): Relation<T> {
+  createWith(attrs: Record<string, unknown> | null): Relation<T> {
     return this._clone().createWithBang(attrs);
   }
 

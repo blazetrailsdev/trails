@@ -67,6 +67,70 @@ describe("query chaining DX", () => {
     expectTypeOf(rows).toEqualTypeOf<Post[]>();
   });
 
+  it("Post.includes returns Relation<Post> and chains", () => {
+    expectTypeOf(Post.includes("author")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.includes("author").where({ published: true })).toMatchTypeOf<
+      Relation<Post>
+    >();
+  });
+
+  it("Post.preload / eagerLoad / references return Relation<Post>", () => {
+    expectTypeOf(Post.preload("comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.eagerLoad("author")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.references("authors")).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.having / lock / readonly / strictLoading return Relation<Post>", () => {
+    expectTypeOf(Post.having("COUNT(*) > 1")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.lock()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.readonly()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.strictLoading()).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.reselect / reorder / rewhere / regroup return Relation<Post>", () => {
+    expectTypeOf(Post.reselect("title")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.reorder("title ASC")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.rewhere({ title: "x" })).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.regroup("title")).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.annotate / extending / unscope / createWith return Relation<Post>", () => {
+    expectTypeOf(Post.annotate("hint")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.extending()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.unscope("where")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.createWith({ title: "x" })).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.inOrderOf / excluding / or / and return Relation<Post>", () => {
+    expectTypeOf(Post.inOrderOf("title", ["a", "b"])).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.excluding()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(
+      Post.where({ published: true }).or(Post.where({ published: false })),
+    ).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.where({ published: true }).and(Post.where({ title: "x" }))).toMatchTypeOf<
+      Relation<Post>
+    >();
+  });
+
+  it("Post.withCte / withRecursive / with return Relation<Post>", () => {
+    expectTypeOf(Post.withCte({ recent: "SELECT * FROM posts" })).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.withRecursive({ tree: "SELECT * FROM posts" })).toMatchTypeOf<
+      Relation<Post>
+    >();
+    expectTypeOf(Post["with"]({ recent: "SELECT * FROM posts" })).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.invertWhere / without / only / merge return Relation<Post>", () => {
+    expectTypeOf(Post.invertWhere()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.without()).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.only("where")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.merge(Post.where({ published: true }))).toMatchTypeOf<Relation<Post>>();
+  });
+
+  it("Post.asyncIds returns Promise<unknown[]>", () => {
+    expectTypeOf(Post.asyncIds()).toMatchTypeOf<Promise<unknown[]>>();
+  });
+
   it("this.scope(fn) infers `rel` as Relation<Self>; defaultScope same", () => {
     class Article extends Base {
       declare published: boolean;
