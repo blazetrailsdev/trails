@@ -831,16 +831,16 @@ describe("BasicsTest", () => {
   });
 
   it.skip("model classes with matching names", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: unknown — Ruby module namespace / constant lookup semantics not translatable
+    // ROOT-CAUSE: Node.js has no Ruby Module namespace for matching class names by constant path
+    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
     /* needs module/namespace support */
   });
 
   it.skip("copy table with id", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: schema — SQLite copy_table DDL not implemented
+    // ROOT-CAUSE: connection-adapters/sqlite3/schema-statements.ts#copyTable not implemented
+    // SCOPE: ~20 LOC fix in sqlite3/schema-statements.ts; affects ~1 test
     /* needs SQLite copy_table support */
   });
 
@@ -1379,9 +1379,9 @@ describe("BasicsTest", () => {
     expect(u.name).toBe("alice");
   });
   it.skip("implicit readonly on left joins", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: relation — implicit readonly on left joins not implemented
+    // ROOT-CAUSE: relation.ts#buildFromJoin or Relation#readonly missing Rails auto-readonly-on-left-join semantics
+    // SCOPE: ~20 LOC fix in relation.ts; affects ~1 test
     /* not in Rails test suite — left_outer_joins does not mark records readonly in Rails */
   });
   it("to param with id", async () => {
@@ -1523,9 +1523,9 @@ describe("BasicsTest", () => {
     expect(unscopedSql).not.toContain("alice");
   });
   it.skip("find applies includes with default scope", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: associations — eager loading / includes with scoping gap
+    // ROOT-CAUSE: preloader.ts#preloadAssociations or Relation#includes not applying default scope on eager load
+    // SCOPE: ~30 LOC fix in preloader.ts; affects ~2 tests
   });
   it("find applies scope conditions", () => {
     class User extends Base {
@@ -1773,15 +1773,15 @@ describe("BasicsTest", () => {
     expect(sql).toContain("INNER JOIN");
   });
   it.skip("includes eager loads associations", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: associations — eager loading / includes with scoping gap
+    // ROOT-CAUSE: preloader.ts#preloadAssociations or Relation#includes not applying default scope on eager load
+    // SCOPE: ~30 LOC fix in preloader.ts; affects ~2 tests
     /* not in Rails base_test.rb — covered by eager_test.rb tests */
   });
   it.skip("incomplete schema loading", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: schema — schema loading / cache invalidation gap
+    // ROOT-CAUSE: schema-cache.ts#clear or connection-handler.ts#clearCache not fully wired
+    // SCOPE: ~20 LOC fix in schema-cache.ts; affects ~1 test
     /* Rails: stubs schema_cache to raise — relies on internal connection-pool stub infrastructure */
   });
   it("primary key with no id", () => {

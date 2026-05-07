@@ -79,6 +79,55 @@ function testNameOverride(testName: string, relPath: string): Annotation | null 
     };
   }
 
+  // Schema / DDL: copy_table
+  if (/\bcopy.?table\b/.test(n)) {
+    return {
+      blocked: "schema — SQLite copy_table DDL not implemented",
+      rootCause: "connection-adapters/sqlite3/schema-statements.ts#copyTable not implemented",
+      scope: "~20 LOC fix in sqlite3/schema-statements.ts; affects ~1 test",
+    };
+  }
+
+  // Relation: implicit readonly on joins
+  if (/\b(implicit.*readonly|readonly.*join|left.?join.*readonly)/.test(n)) {
+    return {
+      blocked: "relation — implicit readonly on left joins not implemented",
+      rootCause:
+        "relation.ts#buildFromJoin or Relation#readonly missing Rails auto-readonly-on-left-join semantics",
+      scope: "~20 LOC fix in relation.ts; affects ~1 test",
+    };
+  }
+
+  // Eager loading / includes with scope
+  if (
+    /\b(includes.*scope|scope.*includes|eager.*load.*assoc|includes.*eager|find.*includes)/.test(n)
+  ) {
+    return {
+      blocked: "associations — eager loading / includes with scoping gap",
+      rootCause:
+        "preloader.ts#preloadAssociations or Relation#includes not applying default scope on eager load",
+      scope: "~30 LOC fix in preloader.ts; affects ~2 tests",
+    };
+  }
+
+  // Ruby module namespace (not STI — Ruby constant lookup semantics)
+  if (/\bmodel.*classes.*matching\b/.test(n)) {
+    return {
+      blocked: "unknown — Ruby module namespace / constant lookup semantics not translatable",
+      rootCause: "Node.js has no Ruby Module namespace for matching class names by constant path",
+      scope: "~0 LOC fix; likely permanent skip-list.ts candidate",
+    };
+  }
+
+  // Schema loading / cache
+  if (/\b(incomplete.*schema|schema.*load)\b/.test(n)) {
+    return {
+      blocked: "schema — schema loading / cache invalidation gap",
+      rootCause: "schema-cache.ts#clear or connection-handler.ts#clearCache not fully wired",
+      scope: "~20 LOC fix in schema-cache.ts; affects ~1 test",
+    };
+  }
+
   return null;
 }
 
