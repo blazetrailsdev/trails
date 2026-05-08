@@ -27,7 +27,8 @@ export async function withTimezoneConfig(
   const oldDefault = getDefaultTimezone();
   const base = Base as any;
 
-  // Snapshot: track whether each property existed before, and its prior value.
+  // Snapshot existence + value so restore is symmetric: if the property wasn't
+  // present before we set it, we delete it on restore rather than leaving it.
   const hadAwareAttributes = "timeZoneAwareAttributes" in base;
   const oldAwareAttributes = base.timeZoneAwareAttributes;
   const hadAwareTypes = "timeZoneAwareTypes" in base;
@@ -35,16 +36,23 @@ export async function withTimezoneConfig(
 
   try {
     if (cfg.default !== undefined) setDefaultTimezone(cfg.default);
-    if (cfg.awareAttributes !== undefined && hadAwareAttributes) {
-      base.timeZoneAwareAttributes = cfg.awareAttributes;
-    }
-    if (cfg.awareTypes !== undefined && hadAwareTypes) {
-      base.timeZoneAwareTypes = cfg.awareTypes;
-    }
+    // Apply unconditionally — mirrors Rails' Base.time_zone_aware_attributes = cfg[:aware_attributes].
+    // If Base doesn't define the property yet the assignment still takes effect (JS class property),
+    // making the helper forward-compatible when the wiring lands.
+    if (cfg.awareAttributes !== undefined) base.timeZoneAwareAttributes = cfg.awareAttributes;
+    if (cfg.awareTypes !== undefined) base.timeZoneAwareTypes = cfg.awareTypes;
     await fn();
   } finally {
     setDefaultTimezone(oldDefault);
-    if (hadAwareAttributes) base.timeZoneAwareAttributes = oldAwareAttributes;
-    if (hadAwareTypes) base.timeZoneAwareTypes = oldAwareTypes;
+    if (hadAwareAttributes) {
+      base.timeZoneAwareAttributes = oldAwareAttributes;
+    } else {
+      delete base.timeZoneAwareAttributes;
+    }
+    if (hadAwareTypes) {
+      base.timeZoneAwareTypes = oldAwareTypes;
+    } else {
+      delete base.timeZoneAwareTypes;
+    }
   }
 }
