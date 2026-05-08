@@ -229,6 +229,7 @@ export interface ColumnOptions {
   comment?: string;
   ifExists?: boolean;
   ifNotExists?: boolean;
+  autoIncrement?: boolean;
 }
 
 export interface AddIndexOptions {

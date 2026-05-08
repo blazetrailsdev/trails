@@ -226,6 +226,9 @@ export class SchemaCreation {
     if (options.null === false) {
       sql += " NOT NULL";
     }
+    if (options.autoIncrement) {
+      sql += " AUTO_INCREMENT";
+    }
     if (options.primaryKey) {
       sql += " PRIMARY KEY";
     }
