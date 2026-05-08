@@ -61,6 +61,7 @@ export function quote(value: unknown): string {
     throw new TypeError(
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
+  if (value instanceof Uint8Array) return quotedBinary(value);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
