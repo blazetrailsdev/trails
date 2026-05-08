@@ -87,7 +87,8 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
 
 // Non-PG adapters (SQLite, MySQL/MariaDB) store temporal and binary types as
 // TEXT, matching test-adapter.ts's sqlType() mapping. Using the typed column
-// names causes MariaDB to reject ISO 8601 Z-suffix strings.
+// names causes MariaDB to reject ISO 8601 Z-suffix strings when the base
+// DateTimeType.serialize is used (e.g. via attribute() declarations).
 /** @internal */
 const COLUMN_TYPE_MAP_OTHER: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,

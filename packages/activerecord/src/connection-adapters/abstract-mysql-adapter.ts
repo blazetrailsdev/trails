@@ -59,7 +59,7 @@ import {
 } from "@blazetrails/activemodel";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Date as DateType } from "../type/date.js";
-import { DateTime as DateTimeType } from "../type/date-time.js";
+import { DateTime as MysqlDateTimeType } from "./mysql/date-time.js";
 import { Time as TimeType } from "../type/time.js";
 import { Text as TextType } from "../type/text.js";
 import { Json as JsonType } from "../type/json.js";
@@ -1114,7 +1114,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(/^varbinary/i, undefined, () => new BinaryType());
     m.registerType(/^date$/i, new DateType());
     m.registerType(/^time\b/i, undefined, () => new TimeType());
-    m.registerType(/^datetime/i, undefined, () => new DateTimeType());
+    m.registerType(/^datetime/i, undefined, () => new MysqlDateTimeType());
     m.registerType(/decimal/i, undefined, () => new DecimalType());
     m.registerType(/numeric/i, undefined, () => new DecimalType());
     m.registerType("json", new JsonType());
@@ -1137,7 +1137,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
     m.registerType(/^year/i, undefined, () => new IntegerType());
     m.registerType(/^bit/i, undefined, () => new BinaryType());
-    m.registerType(/^timestamp/i, undefined, () => new DateTimeType());
+    m.registerType(/^timestamp/i, undefined, () => new MysqlDateTimeType());
   }
 
   /** @internal */

@@ -6,6 +6,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
+import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -221,28 +222,41 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~5 LOC in postgresql-adapter.ts:lookupCastTypeFromColumn; unblocks save
       // infinity, BC timestamp tests, and bytea round-trip tests.
     });
-    it.skip("bc timestamp", () => {
-      // BLOCKED: adapter-pg — BC date serialize path not wired for PG BC format
-      // ROOT-CAUSE: base DateTimeType.serialize calls Temporal.Instant.toString() which
-      // outputs ISO 8601 with negative year (e.g. "-0043-01-01T00:00:00Z"). PostgreSQL's
-      // timestamp parser does NOT accept ISO 8601 negative years natively; it expects the
-      // "YYYY-MM-DD BC" proleptic Gregorian format. A custom serialize override in
-      // OID::DateTime is needed to convert negative Temporal years to the PG BC suffix format.
-      // SCOPE: ~20 LOC in connection-adapters/postgresql/oid/date-time.ts serialize override;
-      // unblocks all 3 bc timestamp tests.
+    it("bc timestamp", async () => {
+      // Rails: Time.new(0) - 1.week = Dec 25, ISO year -1 (2 BC)
+      const oidType = new OidDateTime();
+      const instant = oidType.castValue("0002-12-25 00:00:00 BC") as Temporal.Instant;
+      expect(instant.toZonedDateTimeISO("UTC").year).toBe(-1);
+      const serialized = oidType.serialize(instant) as string;
+      expect(serialized).toBe("0002-12-25 00:00:00.000000 BC");
+      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
+      const roundTripped = rows[0].val as Temporal.Instant;
+      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
+      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
     });
-    it.skip("bc timestamp leap year", () => {
-      // BLOCKED: adapter-pg — same BC date serialize gap as "bc timestamp".
-      // ROOT-CAUSE: Temporal.Instant.toString() → ISO negative year not accepted by PG;
-      // needs serialize override in OID::DateTime to emit "YYYY-MM-DD BC" format.
-      // SCOPE: Same fix as "bc timestamp".
+    it("bc timestamp leap year", async () => {
+      // Rails: Time.utc(-4, 2, 29) = Feb 29, ISO year -4 (5 BC)
+      const oidType = new OidDateTime();
+      const instant = oidType.castValue("0005-02-29 00:00:00 BC") as Temporal.Instant;
+      expect(instant.toZonedDateTimeISO("UTC").year).toBe(-4);
+      const serialized = oidType.serialize(instant) as string;
+      expect(serialized).toBe("0005-02-29 00:00:00.000000 BC");
+      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
+      const roundTripped = rows[0].val as Temporal.Instant;
+      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
+      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
     });
-    it.skip("bc timestamp year zero", () => {
-      // BLOCKED: adapter-pg — same BC date serialize gap as "bc timestamp".
-      // ROOT-CAUSE: Year 0 in ISO 8601 = 1 BCE in PG proleptic Gregorian; same serialize
-      // mismatch applies. After the serialize fix, also verify that PG "0001 BC" round-trips
-      // correctly through parseBcTimestampAsInstant (bcYearToIso converts 1 → 0).
-      // SCOPE: Same fix as "bc timestamp"; add year-zero edge case to the serialize helper.
+    it("bc timestamp year zero", async () => {
+      // Rails: Time.utc(0, 4, 7) = Apr 7, ISO year 0 (1 BC)
+      const oidType = new OidDateTime();
+      const instant = oidType.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
+      expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
+      const serialized = oidType.serialize(instant) as string;
+      expect(serialized).toBe("0001-04-07 00:00:00.000000 BC");
+      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
+      const roundTripped = rows[0].val as Temporal.Instant;
+      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
+      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
     });
   });
 

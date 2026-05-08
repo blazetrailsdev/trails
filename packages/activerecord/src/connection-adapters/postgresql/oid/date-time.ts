@@ -62,7 +62,20 @@ export class DateTime extends DateTimeType {
   override serialize(value: unknown): string | null {
     if (value === DateInfinity) return "infinity";
     if (value === DateNegativeInfinity) return "-infinity";
-    return super.serialize(value);
+    const result = super.serialize(value);
+    if (result === null) return null;
+    // PostgreSQL does not accept ISO 8601 negative-year timestamps. Convert
+    // astronomical year Y ≤ 0 to "YYYY-MM-DD HH:MM:SS[.ffffff] BC" format.
+    // ISO year -43 → 44 BC; ISO year 0 → 1 BC.
+    const m = /^(-?\d+)-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?)Z?$/.exec(result);
+    if (m) {
+      const isoYear = parseInt(m[1], 10);
+      if (isoYear <= 0) {
+        const bcYear = String(-isoYear + 1).padStart(4, "0");
+        return `${bcYear}-${m[2]}-${m[3]} ${m[4]} BC`;
+      }
+    }
+    return result;
   }
 
   override typeCastForSchema(value: unknown): string {
