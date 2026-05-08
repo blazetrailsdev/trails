@@ -3569,6 +3569,18 @@ describe("quoteSqlValue", () => {
     expect(() => quoteSqlValue(v)).not.toThrow();
     expect(quoteSqlValue(v)).toBe("NULL");
   });
+
+  it("serializes object containing bigint values without crashing", () => {
+    expect(() => quoteSqlValue({ a: 1n })).not.toThrow();
+    expect(quoteSqlValue({ a: 1n })).toBe('\'{"a":"1"}\'');
+  });
+
+  it("emits NULL for circular object (no crash)", () => {
+    const circ: Record<string, unknown> = {};
+    circ.self = circ;
+    expect(() => quoteSqlValue(circ)).not.toThrow();
+    expect(quoteSqlValue(circ)).toBe("NULL");
+  });
 });
 
 // ==========================================================================
