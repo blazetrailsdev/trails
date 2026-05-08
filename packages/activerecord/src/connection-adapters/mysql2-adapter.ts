@@ -230,7 +230,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch {
         // malformed URI — leave _database undefined
       }
-      this._poolConfig = { uri, waitTimeout };
+      // Mirrors Rails Mysql2Adapter#initialize: always ensure FOUND_ROWS is set.
+      this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
       this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
       return;
     }
@@ -257,8 +258,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           return undefined;
         }
       })();
-    // Mirrors Rails Mysql2Adapter#initialize: ensure FOUND_ROWS is always set so UPDATE/DELETE
-    // return the number of rows actually changed (not matched). Rails does:
+    // Mirrors Rails Mysql2Adapter#initialize: ensure FOUND_ROWS is always set so MySQL reports
+    // matched rows (not just changed rows) for UPDATE/DELETE. Rails does:
     //   @config[:flags] ||= 0
     //   if @config[:flags].kind_of?(Array) then flags.push "FOUND_ROWS" else flags |= FOUND_ROWS
     const inputFlags = mysqlConfig.flags as Array<string> | undefined;

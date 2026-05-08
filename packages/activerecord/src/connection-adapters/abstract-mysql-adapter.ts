@@ -1183,7 +1183,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (rows.length === 0) throw new Error(`Column not found: ${columnName} in ${tableName}`);
     const row = rows[0];
     const colDef = new ColumnDefinition(newColumnName, row["Type"] as string, {
-      default: row["Default"] as string | null | undefined,
+      // SHOW COLUMNS returns NULL for Default both when there is no default and when DEFAULT NULL.
+      // Treat null as "no explicit default" (undefined) to avoid emitting DEFAULT NULL on
+      // NOT NULL columns. Mirrors Rails column_for + new_column_definition behaviour.
+      default: row["Default"] !== null ? (row["Default"] as string) : undefined,
       null: (row["Null"] as string) === "YES",
     });
     const cd = new ChangeColumnDefinition(colDef, columnName);

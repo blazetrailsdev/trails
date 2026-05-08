@@ -171,18 +171,22 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
     it("passing arbitrary flags to adapter", async () => {
+      // mirrors Rails: flags.push "FOUND_ROWS" appended when not already present
       const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: ["COMPRESS"] });
       try {
-        // mirrors Rails: flags.push "FOUND_ROWS" so adapter always reports changed rows
         expect(testAdapter._testOnlyPoolFlags()).toEqual(["COMPRESS", "FOUND_ROWS"]);
       } finally {
         await testAdapter.close();
       }
     });
     it("passing flags by array to adapter", async () => {
-      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: ["COMPRESS"] });
+      // mirrors Rails: FOUND_ROWS not duplicated when already present in the array
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        flags: ["FOUND_ROWS", "COMPRESS"],
+      });
       try {
-        expect(testAdapter._testOnlyPoolFlags()).toEqual(["COMPRESS", "FOUND_ROWS"]);
+        expect(testAdapter._testOnlyPoolFlags()).toEqual(["FOUND_ROWS", "COMPRESS"]);
       } finally {
         await testAdapter.close();
       }
