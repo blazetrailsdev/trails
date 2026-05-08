@@ -1554,7 +1554,8 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   protected quote(value: unknown): string {
     if (value === null || value === undefined) return "NULL";
     if (typeof value === "number") return String(value);
-    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "boolean")
+      return value ? this.connection.quotedTrue() : this.connection.quotedFalse();
     if (typeof value === "bigint") return value.toString();
     // Normalise all typed-array views (ArrayBuffer, SharedArrayBuffer) to
     // Uint8Array before handing off so adapters' quotedBinary can rely on a
