@@ -30,30 +30,12 @@ export class DefaultStrategy extends ExecutionStrategy {
 
   /** @internal */
   connection(): DatabaseAdapter {
-    // Mirrors Rails: DefaultStrategy#connection → migration.connection →
-    //   @connection || DatabaseTasks.migration_connection.
-    // migration.connection is the per-migration override; _adapter is the
-    // global migration connection passed to exec(). Per-migration wins,
-    // then global exec() connection, then DatabaseTasks.migrationConnection().
-    const conn =
-      (this.migration as MigrationLike | null)?.connection ??
-      this._adapter ??
-      this._migrationConnectionFallback();
-    if (!conn) throw new Error("DefaultStrategy: no adapter available");
+    // Mirrors Rails: DefaultStrategy#connection → migration.connection.
+    // Migration#connection in Rails returns @connection || DatabaseTasks.migration_connection,
+    // so the global fallback lives on the migration, not here.
+    const conn = (this.migration as MigrationLike | null)?.connection ?? this._adapter;
+    if (!conn)
+      throw new Error("DefaultStrategy: no adapter available (exec() has not been called)");
     return conn;
-  }
-
-  private _migrationConnectionFallback(): DatabaseAdapter | null {
-    // Lazy import to avoid a circular dep: database-tasks.ts → migration.ts →
-    // default-strategy.ts → database-tasks.ts.
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { DatabaseTasks } = require("../tasks/database-tasks.js") as {
-        DatabaseTasks: { migrationConnection(): DatabaseAdapter | null };
-      };
-      return DatabaseTasks.migrationConnection();
-    } catch {
-      return null;
-    }
   }
 }

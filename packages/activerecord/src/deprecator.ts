@@ -102,12 +102,8 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * ESM-capable loader. The sync `loadMigration()` / `migration()` path is
-   * retained for backward compatibility; wiring this into Migrator would
-   * require making `MigrationProxy.migration()` async, cascading to the
-   * `MigrationProxy` interface in migration.ts. In practice, the trailties
-   * migration-loader already uses `import(pathToFileURL(...))` so ESM
-   * migrations are handled before they reach this class.
+   * ESM-capable loader. Falls through to `require()` for CJS migrations and
+   * uses `import(pathToFileURL(...))` for ESM files (ERR_REQUIRE_ESM).
    */
   async loadMigrationAsync(): Promise<object> {
     try {
