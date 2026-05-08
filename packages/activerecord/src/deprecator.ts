@@ -47,6 +47,7 @@ export class MigrationProxy {
   scope: string;
 
   private _migration: object | null = null;
+  private _migrationPromise: Promise<object> | null = null;
 
   constructor(name: string, version: string, filename: string, scope: string) {
     this.name = name;
@@ -59,26 +60,30 @@ export class MigrationProxy {
     return getPath().basename(this.filename);
   }
 
-  migrate(direction: "up" | "down"): Promise<void> {
-    return (this.migration() as { migrate(d: "up" | "down"): Promise<void> }).migrate(direction);
+  async migrate(direction: "up" | "down"): Promise<void> {
+    return ((await this.migration()) as { migrate(d: "up" | "down"): Promise<void> }).migrate(
+      direction,
+    );
   }
 
-  announce(message: string): void {
-    (this.migration() as { announce(msg: string): void }).announce(message);
+  async announce(message: string): Promise<void> {
+    ((await this.migration()) as { announce(msg: string): void }).announce(message);
   }
 
-  write(text = ""): void {
-    (this.migration() as { write(t: string): void }).write(text);
+  async write(text = ""): Promise<void> {
+    ((await this.migration()) as { write(t: string): void }).write(text);
   }
 
   get disableDdlTransaction(): boolean {
-    return !!(this.migration() as { disableDdlTransaction?: boolean }).disableDdlTransaction;
+    if (!this._migration)
+      throw new Error("MigrationProxy: await migration() before reading disableDdlTransaction");
+    return !!(this._migration as { disableDdlTransaction?: boolean }).disableDdlTransaction;
   }
 
   /** @internal */
-  migration(): object {
-    this._migration ??= this.loadMigration();
-    return this._migration;
+  migration(): Promise<object> {
+    this._migrationPromise ??= this.loadMigrationAsync().then((m) => (this._migration = m));
+    return this._migrationPromise;
   }
 
   /** @internal */
@@ -98,12 +103,8 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * ESM-capable loader. The sync `loadMigration()` / `migration()` path is
-   * retained for backward compatibility; wiring this into Migrator would
-   * require making `MigrationProxy.migration()` async, cascading to the
-   * `MigrationProxy` interface in migration.ts. In practice, the trailties
-   * migration-loader already uses `import(pathToFileURL(...))` so ESM
-   * migrations are handled before they reach this class.
+   * ESM-capable loader. Falls through to `require()` for CJS migrations and
+   * uses `import(pathToFileURL(...))` for ESM files (ERR_REQUIRE_ESM).
    */
   async loadMigrationAsync(): Promise<object> {
     try {

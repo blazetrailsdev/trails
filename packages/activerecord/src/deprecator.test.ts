@@ -25,13 +25,13 @@ describe("MigrationProxy", () => {
     expect(proxy.basename()).toBe("20240101000000_create_users.ts");
   });
 
-  it("migration() caches the result of loadMigration()", () => {
+  it("migration() caches the result of loadMigration()", async () => {
     const proxy = new MigrationProxy("CreateUsers", "1", "/fake/path.ts", "");
     const sentinel = {};
-    const spy = vi.spyOn(proxy, "loadMigration").mockReturnValue(sentinel);
+    const spy = vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(sentinel);
 
-    const first = proxy.migration();
-    const second = proxy.migration();
+    const first = await proxy.migration();
+    const second = await proxy.migration();
 
     expect(first).toBe(sentinel);
     expect(second).toBe(sentinel);
