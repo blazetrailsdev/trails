@@ -217,6 +217,7 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   ["ValueType", "Type"],
   ["LockingType", "ValueType"],
   ["Serialized", "ValueType"],
+  ["TimeZoneConverter", "ValueType"],
   // `ActiveRecord::Base` has no Ruby super; TS `Base` extends `Model`
   // so the ActiveModel mixin surface is type-visible on subclasses.
   ["Base", "Model"],

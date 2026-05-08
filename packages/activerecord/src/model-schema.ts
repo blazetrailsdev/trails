@@ -364,6 +364,7 @@ interface SchemaHost {
   adapter: any;
   prototype: any;
   superclass?: SchemaHost;
+  hookAttributeType?(name: string, type: Type): Type;
 }
 
 export function deriveJoinTableName(this: SchemaHost, otherTableName: string): string {
@@ -695,6 +696,8 @@ function applyColumnsHash(
         ? adapter.lookupCastTypeFromColumn(column)
         : null;
     let type = (castType as Type | null) ?? typeRegistry.lookup("value");
+
+    type = host.hookAttributeType?.(name, type) ?? type;
 
     // Preserve encryption wrappers across schema reflection. Both
     // EncryptedAttributeType variants implement `WrappedType`; any

@@ -39,8 +39,10 @@ export function lockingEnabled(modelClass: typeof Base): boolean {
 }
 
 /**
- * Type wrapper for the lock_version column that ensures values are
- * always coerced to integers on serialize and deserialize.
+ * Type wrapper for the lock_version column that ensures nil → 0 on
+ * serialize/deserialize so passing nil doesn't trigger StaleObjectError.
+ * cast() delegates unchanged to the subtype (no nil → 0 coercion), preserving
+ * null for new records that explicitly pass nil — matching Rails' LockingType.
  *
  * Mirrors: ActiveRecord::Locking::LockingType
  */
@@ -54,15 +56,15 @@ export class LockingType extends ValueType<number> {
     this.name = subtype.name;
   }
 
-  cast(value: unknown): number {
-    return toInt(this._subtype.cast(value));
+  override cast(value: unknown): number | null {
+    return this._subtype.cast(value) as number | null;
   }
 
-  deserialize(value: unknown): number {
+  override deserialize(value: unknown): number {
     return toInt(this._subtype.deserialize(value));
   }
 
-  serialize(value: unknown): number {
+  override serialize(value: unknown): number {
     return toInt(this._subtype.serialize(value));
   }
 }
