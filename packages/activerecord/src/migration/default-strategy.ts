@@ -27,6 +27,6 @@ export class DefaultStrategy extends ExecutionStrategy {
 
   /** @internal */
   connection(): DatabaseAdapter {
-    return (this.migration as { connection: DatabaseAdapter }).connection;
+    return (this.migration as MigrationLike).connection!;
   }
 }
