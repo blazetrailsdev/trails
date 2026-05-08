@@ -405,53 +405,108 @@ describeIfPg("PostgreSQLAdapter", () => {
       // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges/tstz_ranges array columns in setup
       // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
-    it.skip("create tstzrange", async () => {
-      // BLOCKED: range — create tstzrange round-trip untested
-      // ROOT-CAUSE: no infra gap expected; RangeType(TimestampWithTimeZone) IS registered by loadAdditionalTypes();
-      //   DateTime.serialize + parsePostgresInstant should handle Temporal.Instant bounds end-to-end
-      // SCOPE: ~12 LOC test body; try in CI with Temporal.Instant.from("2010-01-01T13:30:00Z")...bounds
+    it("create tstzrange", async () => {
+      // Rails: Time.parse("2010-01-01 14:30:00 +0100")...Time.parse("2011-02-02 14:30:00 CDT") → UTC-normalised
+      const begin = Temporal.Instant.from("2010-01-01T13:30:00Z");
+      const end = Temporal.Instant.from("2011-02-02T19:30:00Z");
+      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
+      await r.reload();
+      const result = r.tstz_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(begin.epochMilliseconds);
+      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update tstzrange", async () => {
-      // BLOCKED: range — update tstzrange round-trip untested (follow-on to create tstzrange)
-      // ROOT-CAUSE: no infra gap expected; needs assert_equal_round_trip + assert_nil_round_trip bodies
-      //   (nil trip: [same_utc, same_utc) is empty in tstzrange → null on reload)
-      // SCOPE: ~14 LOC; run after "create tstzrange" is confirmed passing in CI
+    it("update tstzrange", async () => {
+      // Rails: assert_equal_round_trip + assert_nil_round_trip (same UTC instant → empty → null)
+      const begin = Temporal.Instant.from("2010-01-01T19:30:00Z");
+      const end = Temporal.Instant.from("2011-02-02T13:30:00Z");
+      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
+      await r.reload();
+      expect((r.tstz_range as Range).begin).toBeDefined();
+      const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00Z");
+      r.tstz_range = new Range(sameInstant, sameInstant, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.tstz_range).toBeNull();
     });
-    it.skip("escaped tstzrange", () => {
-      // BLOCKED: range — BC-era tstzrange round-trip test body not written
-      // ROOT-CAUSE: no infra gap; parsePostgresInstant handles BC via extractBcSuffix (temporal-wire.ts);
-      //   DateTime.serialize emits "YYYY-MM-DD HH:MM:SS BC" for year<=0; full round-trip untested
-      // SCOPE: ~10 LOC test body; run after "create tstzrange" is confirmed passing
+    it("escaped tstzrange", async () => {
+      // Rails: Time.parse("-1000-01-01 14:30:00 CDT")...Time.parse("2020-02-02 14:30:00 CET"); BC round-trip
+      const bcBegin = Temporal.ZonedDateTime.from(
+        { year: -1000, month: 1, day: 1, hour: 19, minute: 30, second: 0, timeZone: "UTC" },
+        { overflow: "reject" },
+      ).toInstant();
+      const end = Temporal.Instant.from("2020-02-02T13:30:00Z");
+      const r = await PostgresqlRanges.create({ tstz_range: new Range(bcBegin, end, true) });
+      await r.reload();
+      const result = r.tstz_range as Range;
+      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(bcBegin.epochMilliseconds);
+      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
     });
-    it.skip("unbounded tstzrange", async () => {
-      // BLOCKED: range — unbounded (endless/beginless) tstzrange round-trip untested
-      // ROOT-CAUSE: null bounds serialize as empty string (no infra gap); test body not yet written;
-      //   needs verification that null begin/end survives RangeType serialize → deserialize cycle
-      // SCOPE: ~12 LOC test body; run after "create tstzrange" is confirmed passing
+    it("unbounded tstzrange", async () => {
+      // Rails: endless (begin...nil) and beginless (nil..end) round-trips
+      const t = Temporal.Instant.from("2010-01-01T19:30:00Z");
+      const r1 = await PostgresqlRanges.create({ tstz_range: new Range(t, null, true) });
+      await r1.reload();
+      const res1 = r1.tstz_range as Range;
+      expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect(res1.end).toBeNull();
+      const r2 = await PostgresqlRanges.create({ tstz_range: new Range(null, t, false) });
+      await r2.reload();
+      const res2 = r2.tstz_range as Range;
+      expect(res2.begin).toBeNull();
+      expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
     });
-    it.skip("create tsrange", async () => {
-      // BLOCKED: range — create tsrange round-trip untested
-      // ROOT-CAUSE: no infra gap expected; RangeType(Timestamp) IS registered by loadAdditionalTypes();
-      //   DateTime.serialize + parsePostgresTimestampAsInstant should handle Temporal.Instant bounds
-      // SCOPE: ~11 LOC test body; try in CI with Temporal.Instant UTC bounds
+    it("create tsrange", async () => {
+      // Rails: Time.utc(2010,1,1,14,30,0)...Time.utc(2011,2,2,14,30,0) (default_timezone = :utc)
+      const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
+      const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
+      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
+      await r.reload();
+      const result = r.ts_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(begin.epochMilliseconds);
+      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect(result.excludeEnd).toBe(true);
     });
-    it.skip("update tsrange", async () => {
-      // BLOCKED: range — update tsrange round-trip untested (follow-on to create tsrange)
-      // ROOT-CAUSE: no infra gap expected; needs assert_equal_round_trip + assert_nil_round_trip bodies
-      //   (nil trip: [same, same) is empty in tsrange → null on reload)
-      // SCOPE: ~12 LOC; run after "create tsrange" is confirmed passing in CI
+    it("update tsrange", async () => {
+      // Rails: assert_equal_round_trip + assert_nil_round_trip (same instant → empty → null)
+      const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
+      const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
+      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
+      await r.reload();
+      expect((r.ts_range as Range).begin).toBeDefined();
+      r.ts_range = new Range(begin, begin, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.ts_range).toBeNull();
     });
-    it.skip("escaped tsrange", () => {
-      // BLOCKED: range — BC-era tsrange round-trip test body not written
-      // ROOT-CAUSE: no infra gap; parsePostgresTimestampAsInstant handles BC via extractBcSuffix (temporal-wire.ts);
-      //   DateTime.serialize emits "YYYY-MM-DD HH:MM:SS BC" for year<=0; full round-trip untested
-      // SCOPE: ~10 LOC test body; run after "create tsrange" is confirmed passing
+    it("escaped tsrange", async () => {
+      // Rails: Time.utc(-1000,1,1,14,30,0)...Time.utc(2020,2,2,14,30,0); BC round-trip
+      const bcBegin = Temporal.ZonedDateTime.from(
+        { year: -1000, month: 1, day: 1, hour: 14, minute: 30, second: 0, timeZone: "UTC" },
+        { overflow: "reject" },
+      ).toInstant();
+      const end = Temporal.Instant.from("2020-02-02T14:30:00Z");
+      const r = await PostgresqlRanges.create({ ts_range: new Range(bcBegin, end, true) });
+      await r.reload();
+      const result = r.ts_range as Range;
+      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(bcBegin.epochMilliseconds);
+      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
     });
-    it.skip("unbounded tsrange", async () => {
-      // BLOCKED: range — unbounded (endless/beginless) tsrange round-trip untested
-      // ROOT-CAUSE: null bounds serialize as empty string (no infra gap); test body not yet written;
-      //   needs verification that null begin/end survives RangeType serialize → deserialize cycle
-      // SCOPE: ~12 LOC test body; run after "create tsrange" is confirmed passing
+    it("unbounded tsrange", async () => {
+      // Rails: endless (begin...nil) and beginless (nil..end) round-trips
+      const t = Temporal.Instant.from("2010-01-01T14:30:00Z");
+      const r1 = await PostgresqlRanges.create({ ts_range: new Range(t, null, true) });
+      await r1.reload();
+      const res1 = r1.ts_range as Range;
+      expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect(res1.end).toBeNull();
+      const r2 = await PostgresqlRanges.create({ ts_range: new Range(null, t, false) });
+      await r2.reload();
+      const res2 = r2.ts_range as Range;
+      expect(res2.begin).toBeNull();
+      expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
     });
     it.skip("timezone awareness tsrange", () => {
       // BLOCKED: range — time_zone_aware_types infrastructure not implemented
@@ -470,23 +525,50 @@ describeIfPg("PostgreSQLAdapter", () => {
       // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges array column in setup
       // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
-    it.skip("create tstzrange preserve usec", async () => {
-      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to create tstzrange)
-      // ROOT-CAUSE: test body not yet written; formatInstantForSql preserves nanosecond precision
-      //   so no infra gap expected — bounds with µs should survive the same serialize/deserialize path
-      // SCOPE: ~10 LOC test body; run after "create tstzrange" is confirmed passing
+    it("create tstzrange preserve usec", async () => {
+      // Rails: Time.parse("2010-01-01 14:30:00.670277 +0100")...Time.parse("2011-02-02 14:30:00.745125 CDT")
+      const begin = Temporal.Instant.from("2010-01-01T13:30:00.670277Z");
+      const end = Temporal.Instant.from("2011-02-02T19:30:00.745125Z");
+      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
+      await r.reload();
+      const result = r.tstz_range as Range;
+      expect((result.begin as Temporal.Instant).toString()).toBe(begin.toString());
+      expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
     });
-    it.skip("update tstzrange preserve usec", async () => {
-      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to update tstzrange)
-      // SCOPE: ~12 LOC test body; run after "update tstzrange" is confirmed passing
+    it("update tstzrange preserve usec", async () => {
+      // Rails: assert_equal_round_trip + assert_nil_round_trip with µs precision
+      const begin = Temporal.Instant.from("2010-01-01T19:30:00.245124Z");
+      const end = Temporal.Instant.from("2011-02-02T13:30:00.451274Z");
+      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
+      await r.reload();
+      expect((r.tstz_range as Range).begin).toBeDefined();
+      const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00.245124Z");
+      r.tstz_range = new Range(sameInstant, sameInstant, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.tstz_range).toBeNull();
     });
-    it.skip("create tsrange preserve usec", async () => {
-      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to create tsrange)
-      // SCOPE: ~10 LOC test body; run after "create tsrange" is confirmed passing
+    it("create tsrange preserve usec", async () => {
+      // Rails: Time.utc(2010,1,1,14,30,0,125435)...Time.utc(2011,2,2,14,30,0,225435)
+      const begin = Temporal.Instant.from("2010-01-01T14:30:00.125435Z");
+      const end = Temporal.Instant.from("2011-02-02T14:30:00.225435Z");
+      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
+      await r.reload();
+      const result = r.ts_range as Range;
+      expect((result.begin as Temporal.Instant).toString()).toBe(begin.toString());
+      expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
     });
-    it.skip("update tsrange preserve usec", async () => {
-      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to update tsrange)
-      // SCOPE: ~12 LOC test body; run after "update tsrange" is confirmed passing
+    it("update tsrange preserve usec", async () => {
+      // Rails: assert_equal_round_trip + assert_nil_round_trip with µs precision
+      const begin = Temporal.Instant.from("2010-01-01T14:30:00.142432Z");
+      const end = Temporal.Instant.from("2011-02-02T14:30:00.224242Z");
+      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
+      await r.reload();
+      expect((r.ts_range as Range).begin).toBeDefined();
+      r.ts_range = new Range(begin, begin, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.ts_range).toBeNull();
     });
     it.skip("timezone awareness tsrange preserve usec", () => {
       // BLOCKED: range — time_zone_aware_types infrastructure not implemented
