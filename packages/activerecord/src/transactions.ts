@@ -412,6 +412,12 @@ export async function rolledbackBang(
     _restoreTransactionRecordState.call(this, forceRestoreState);
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
+      // Unconditionally null _startTransactionState on full outer rollback.
+      // Inner savepoint commits don't call committedBang (records are moved
+      // to parent instead), so level can be > 1 when we reach here. Without
+      // this, clearTransactionRecordState only decrements level and leaves
+      // a stale snapshot that corrupts the next transaction's level tracking.
+      (this as any)._startTransactionState = null;
       (this as any)._triggerUpdateCallback = false;
       (this as any)._triggerDestroyCallback = false;
     }

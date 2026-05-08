@@ -451,7 +451,14 @@ export function withRoleAndShard<T>(
   // so Promise.resolve(relation) would unwrap it to records instead of calling .load().
   if (isRelationLike(result)) {
     // Sync Relation returned: .load() is async, cleanup fires via withCleanup's .finally().
-    const loaded = (result as any).load();
+    // Guard against a sync throw from .load() (mirrors Rails' ensure semantics).
+    let loaded: unknown;
+    try {
+      loaded = (result as any).load();
+    } catch (error) {
+      removeStackEntry(entry);
+      throw error;
+    }
     return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
   }
 
