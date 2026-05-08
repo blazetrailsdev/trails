@@ -24,7 +24,14 @@ export const MutableModule = {
   },
 
   isChangedInPlace(this: Type, rawOldValue: unknown, newValue: unknown): boolean {
-    return rawOldValue !== this.serialize(newValue);
+    // Fast path: rawOldValue is already serialized (Rails' invariant, normal case).
+    // Slow path: pre-parsed object (pg driver parses jsonb before we see it) —
+    // normalize via serialize so both sides compare as serialized strings.
+    const normalizedOld =
+      rawOldValue == null || typeof rawOldValue === "string"
+        ? rawOldValue
+        : this.serialize(rawOldValue);
+    return normalizedOld !== this.serialize(newValue);
   },
 
   isMutable(this: Type): boolean {

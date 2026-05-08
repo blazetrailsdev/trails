@@ -64,4 +64,12 @@ describe("MutableModule", () => {
     const newValue = { x: 42 };
     expect(t.isChangedInPlace(rawOld, newValue)).toBe(false);
   });
+
+  it("isChangedInPlace handles pre-parsed object rawOldValue (driver-parsed case)", () => {
+    const t = new FakeJsonType();
+    // Simulate pg driver pre-parsing jsonb: rawOldValue is an object, not a string
+    const rawOld = { a: 1 };
+    expect(t.isChangedInPlace(rawOld, { a: 1 })).toBe(false);
+    expect(t.isChangedInPlace(rawOld, { a: 2 })).toBe(true);
+  });
 });

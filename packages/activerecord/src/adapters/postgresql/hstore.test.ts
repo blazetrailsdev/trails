@@ -419,24 +419,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   call type.isChangedInPlace() for mutable types.
       // SCOPE: ~50 LOC store_accessor + ~5 LOC attribute.ts changedInPlace delegation.
     });
-    it.skip("changes in place", () => {
-      // BLOCKED: dirty-tracking — Attribute.changedInPlace() does not delegate to type.isChangedInPlace()
-      // ROOT-CAUSE: activemodel/src/attribute.ts FromDatabase.changedInPlace() returns false
-      //   unconditionally; Rails calls type.changed_in_place?(original_value_for_database, value).
-      //   Hstore.isChangedInPlace() is implemented but never called by the Attribute layer.
-      // SCOPE: ~5 LOC in activemodel/src/attribute.ts FromDatabase subclass.
+    it.skip("changes in place", async () => {
+      // BLOCKED: save path does not consult Attribute.changedInPlace() for in-place mutations.
+      // ROOT-CAUSE: _performUpdate (base.ts) short-circuits on empty this.changes before checking
+      //   changedInPlace(); the DirtyTracker only records explicit writeAttribute() calls, not
+      //   direct object mutations. Wiring changedInPlace() into the update path is separate work.
+      // SCOPE: ~10–20 LOC in base.ts _performUpdate; unblocks all mutable-type save-on-mutate tests.
     });
-    it.skip("dirty from user equal", () => {
-      // BLOCKED: dirty-tracking — same Attribute.changedInPlace() gap as "changes in place"
-      // ROOT-CAUSE: After reassigning an attribute with a deep-equal hash, the dirty tracker
-      //   must call type.isChangedInPlace() to detect equality; currently it compares by identity.
-      // SCOPE: ~5 LOC in activemodel/src/attribute.ts FromDatabase.changedInPlace().
+    it("dirty from user equal", async () => {
+      const settings = { alongkey: "anything", key: "value" };
+      const hstore = await HstoreModel.createBang({ settings });
+      (hstore as any).settings = { key: "value", alongkey: "anything" };
+      expect((hstore as any).settings).toEqual(settings);
+      expect((hstore as any).changed).toBe(false);
     });
-    it.skip("hstore dirty from database equal", () => {
-      // BLOCKED: dirty-tracking — same Attribute.changedInPlace() gap as "changes in place"
-      // ROOT-CAUSE: After reload + reassign with same hash, dirty must be false; requires
-      //   Attribute.changedInPlace() → type.isChangedInPlace() delegation to detect equality.
-      // SCOPE: ~5 LOC in activemodel/src/attribute.ts FromDatabase.changedInPlace().
+    it("hstore dirty from database equal", async () => {
+      const settings = { alongkey: "anything", key: "value" };
+      const hstore = await HstoreModel.createBang({ settings });
+      await (hstore as any).reload();
+      expect((hstore as any).settings).toEqual(settings);
+      (hstore as any).settings = settings;
+      expect((hstore as any).changed).toBe(false);
     });
 
     it("spaces", () => {

@@ -488,4 +488,65 @@ describe("AttributeTest", () => {
       expect(updated.isChanged()).toBe(false);
     });
   });
+
+  describe("Attribute#changedInPlace delegates to type.isChangedInPlace", () => {
+    it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
+      const stringType = typeRegistry.lookup("string");
+      const attr = Attribute.fromDatabase("name", "hello", stringType);
+      void attr.value; // materialize so hasBeenRead() is true
+      // Simulate mutation by overriding the cast value while raw stays "hello"
+      attr.overrideCastValue("world");
+      expect(attr.changedInPlace()).toBe(true);
+    });
+
+    it("returns false before value is read (hasBeenRead guard)", () => {
+      const stringType = typeRegistry.lookup("string");
+      const attr = Attribute.fromDatabase("name", "hello", stringType);
+      // Don't access attr.value — hasBeenRead() is false
+      expect(attr.changedInPlace()).toBe(false);
+    });
+
+    it("returns false for immutable type even after value is read", () => {
+      const intType = typeRegistry.lookup("integer");
+      const attr = Attribute.fromDatabase("count", 5, intType);
+      void attr.value; // materialize
+      expect(attr.changedInPlace()).toBe(false);
+    });
+  });
+
+  describe("valueForDatabase cache invalidation uses type.isChangedInPlace", () => {
+    it("stays memoized when isChangedInPlace returns false (immutable type)", () => {
+      const stringType = typeRegistry.lookup("string");
+      let serializeCount = 0;
+      const spyType = Object.create(stringType);
+      spyType.serialize = (v: unknown) => {
+        serializeCount++;
+        return stringType.serialize(v);
+      };
+      const attr = Attribute.fromDatabase("name", "hello", spyType);
+      void attr.valueForDatabase;
+      void attr.valueForDatabase;
+      expect(serializeCount).toBe(1);
+    });
+
+    it("recomputes when in-place object mutation is detected via isChangedInPlace", () => {
+      // Custom mutable type: deserializes JSON strings, detects in-place mutations
+      const Types = typeRegistry;
+      const baseType = Types.lookup("value");
+      const mutableType = Object.create(baseType);
+      mutableType.deserialize = (v: unknown) =>
+        typeof v === "string" ? JSON.parse(v) : (v ?? null);
+      mutableType.serialize = (v: unknown) => (v == null ? null : JSON.stringify(v));
+      mutableType.isChangedInPlace = (rawOld: unknown, newVal: unknown) =>
+        JSON.stringify(typeof rawOld === "string" ? JSON.parse(rawOld) : rawOld) !==
+        JSON.stringify(newVal);
+
+      const attr = Attribute.fromDatabase("data", '{"x":1}', mutableType);
+      void attr.valueForDatabase; // prime cache — _hasValueForDatabase=true
+      // Mutate the memoized value object in place (no setter, _hasValueForDatabase stays true)
+      (attr.value as Record<string, number>).x = 99;
+      // isChangedInPlace('{"x":1}', {x:99}) → true → recompute
+      expect(attr.valueForDatabase).toBe('{"x":99}');
+    });
+  });
 });
