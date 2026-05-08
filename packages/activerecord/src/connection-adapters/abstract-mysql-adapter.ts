@@ -1186,6 +1186,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const cols = await this.columnDefinitions(tableName);
     const col = cols.find((c) => (c["Field"] as string) === columnName);
     if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
+    // Guard against silently dropping Extra attributes (AUTO_INCREMENT, ON UPDATE, generated
+    // columns) that ColumnOptions cannot express. Rails preserves these via column_for's
+    // auto_increment?/comment; our ColumnDefinition lacks that field. Throw explicitly so
+    // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
+    const extra = ((col["Extra"] as string | undefined) ?? "").trim().toLowerCase();
+    if (extra) {
+      throw new Error(
+        `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
+          `— Extra="${col["Extra"]}" is not preserved by this path. ` +
+          `Upgrade to MySQL ≥8.0.3 or MariaDB ≥10.5.2 to use RENAME COLUMN instead.`,
+      );
+    }
     const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, {
       // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
       // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
@@ -1194,8 +1206,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       null: (col["Null"] as string) === "YES",
       collation: (col["Collation"] as string | undefined) || undefined,
       comment: (col["Comment"] as string | undefined) || undefined,
-      // Note: auto_increment (from Extra) is not in ColumnOptions yet — a separate infra
-      // gap tracked outside this PR.
     });
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);
