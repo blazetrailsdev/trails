@@ -57,64 +57,34 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("exceptional middleware clears and disables cache on error", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs middleware integration */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query cache is applied to all connections", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs multi-connection support */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("cache is not applied when config is false", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs config-based cache setup */
+    // BLOCKED: connection-pool — db_config integration
   });
   it.skip("cache is applied when config is string", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs config-based cache setup */
+    // BLOCKED: connection-pool — db_config integration
   });
   it.skip("cache is applied when config is integer", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs config-based cache setup */
+    // BLOCKED: connection-pool — db_config integration
   });
   it.skip("cache is applied when config is nil", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs config-based cache setup */
+    // BLOCKED: connection-pool — db_config integration
   });
   it.skip("query cache with forked processes", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs process forking support */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
   it.skip("query cache across threads", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs thread-safety testing */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
   it.skip("middleware delegates", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs middleware integration */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("middleware caches", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs middleware integration */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
 
   it("cache enabled during call", async () => {
@@ -375,16 +345,10 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("cache is available when connection is connected", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs connection pool */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("cache is available when using a not connected connection", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs connection pool */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
 
   it("query cache executes new queries within block", async () => {
@@ -412,52 +376,28 @@ describe("QueryCacheTest", () => {
   });
 
   it.skip("query cached even when types are reset", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs type map reset */
+    // BLOCKED: query-cache — resetColumnInformation not implemented
   });
   it.skip("query cache does not establish connection if unconnected", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs connection pool */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query cache is enabled on connections established after middleware runs", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs middleware */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query caching is local to the current thread", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs thread isolation */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
   it.skip("query cache is enabled on all connection pools", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs multi-pool support */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("clear query cache is called on all connections", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs multi-connection support */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query cache is enabled in threads with shared connection", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs shared connection */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
   it.skip("query cache is cleared for all thread when a connection is shared", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs shared connection */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
 
   it("query cache uncached dirties", async () => {
@@ -584,10 +524,7 @@ describe("QuerySerializedParamTest", () => {
 
 describe("QueryCacheExpiryTest", () => {
   it.skip("cache gets cleared after migration", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs migration integration */
+    // BLOCKED: query-cache — changeColumn migration cache clear missing
   });
 
   it("enable disable", async () => {
@@ -600,28 +537,16 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it.skip("insert all bang", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs insertAll API */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("upsert all", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs upsertAll API */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("cache is expired by habtm update", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs HABTM update */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("cache is expired by habtm delete", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs HABTM delete */
+    // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
 
   it("query cache lru eviction", async () => {
@@ -637,25 +562,16 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it.skip("threads use the same connection", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs thread-safety */
+    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
   });
 });
 
 describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
   it.skip("payload without open transaction", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs notification payload */
+    // BLOCKED: query-cache — transaction key missing from cacheNotificationInfo payload
   });
   it.skip("payload with open transaction", () => {
-    // BLOCKED: query-cache — query cache not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/query-cache.ts#cacheQuery not fully wired
-    // SCOPE: ~50 LOC in abstract/query-cache.ts; affects ~28 tests in query-cache.test.ts
-    /* needs notification payload */
+    // BLOCKED: query-cache — transaction key missing from cacheNotificationInfo payload
   });
 });
 
