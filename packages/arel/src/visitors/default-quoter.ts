@@ -1,10 +1,19 @@
-import type { ArelQuoter } from "./to-sql.js";
+import type { ArelConnection } from "./to-sql.js";
+
+function quoteScalar(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  // Only escape single quotes here; backslash escaping is dialect-specific
+  // and handled by quoteString (MySQL/PG adapters override quote() as needed).
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
 
 /**
  * MySQL default quoter: backtick-quoted identifiers, same escaping as the abstract adapter.
  * Used when `new MySQL()` is constructed without a connection quoter (test / debug use).
  */
-export const mysqlDefaultQuoter: ArelQuoter = {
+export const mysqlDefaultQuoter: ArelConnection = {
   quoteTableName(name: string): string {
     return String(name)
       .split(".")
@@ -20,24 +29,37 @@ export const mysqlDefaultQuoter: ArelQuoter = {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
   },
 
-  quote(value: unknown): string {
-    if (value === null || value === undefined) return "NULL";
-    if (typeof value === "number" || typeof value === "bigint") return String(value);
-    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    return `'${String(value).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`;
+  quote: quoteScalar,
+
+  quotedBinary(value: unknown): string {
+    const bytes =
+      value instanceof Uint8Array
+        ? value
+        : new Uint8Array(
+            String(value)
+              .split("")
+              .map((c) => c.charCodeAt(0)),
+          );
+    return `x'${Buffer.from(bytes).toString("hex")}'`;
+  },
+
+  quotedTrue(): string {
+    return "TRUE";
+  },
+  quotedFalse(): string {
+    return "FALSE";
   },
 };
 
 /**
- * Default quoter used when no connection quoter is passed to a visitor.
+ * Default connection used when no adapter is passed to a visitor.
  * Emits ANSI double-quoted identifiers and single-quoted strings —
- * matches the Rails abstract-adapter defaults and the ToSql defaults
- * that existed here before the quoter was extracted.
+ * matches the Rails abstract-adapter defaults.
  *
  * `Node#toSql()` (no connection in scope) uses this; treat its output
  * as a debug aid, not production SQL — same as Rails.
  */
-export const defaultQuoter: ArelQuoter = {
+export const defaultQuoter: ArelConnection = {
   quoteTableName(name: string): string {
     return String(name)
       .split(".")
@@ -53,10 +75,24 @@ export const defaultQuoter: ArelQuoter = {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
   },
 
-  quote(value: unknown): string {
-    if (value === null || value === undefined) return "NULL";
-    if (typeof value === "number" || typeof value === "bigint") return String(value);
-    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-    return `'${String(value).replace(/\\/g, "\\\\").replace(/'/g, "''")}'`;
+  quote: quoteScalar,
+
+  quotedBinary(value: unknown): string {
+    const bytes =
+      value instanceof Uint8Array
+        ? value
+        : new Uint8Array(
+            String(value)
+              .split("")
+              .map((c) => c.charCodeAt(0)),
+          );
+    return `'${Buffer.from(bytes).toString("hex")}'`;
+  },
+
+  quotedTrue(): string {
+    return "TRUE";
+  },
+  quotedFalse(): string {
+    return "FALSE";
   },
 };

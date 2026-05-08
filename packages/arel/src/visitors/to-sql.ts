@@ -16,14 +16,30 @@ export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
 
 /**
- * Structural duck-type for identifier and value quoting.
- * activerecord's full `Quoting` interface is a superset; both satisfy this.
+ * Connection-quoting surface exposed to the Arel visitor.
  *
- * Mirrors: Arel::Visitors::ToSql constructor `connection` param (Rails passes
- * the full connection; we accept only the quoting subset so arel stays
- * dependency-free from activerecord).
+ * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
+ * Rails dispatches every quoting decision through the connection so adapters
+ * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
+ * etc.).  We accept this subset so `arel` stays dependency-free from
+ * `activerecord`; `AbstractAdapter` is a structural superset and always
+ * satisfies this interface.
+ *
+ * @deprecated Use `ArelConnection` — this alias will be removed in a future release.
  */
-export interface ArelQuoter {
+export type ArelQuoter = ArelConnection;
+
+/**
+ * Connection-quoting surface exposed to the Arel visitor.
+ *
+ * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
+ * Rails dispatches every quoting decision through the connection so adapters
+ * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
+ * etc.).  We accept this subset so `arel` stays dependency-free from
+ * `activerecord`; `AbstractAdapter` is a structural superset and always
+ * satisfies this interface.
+ */
+export interface ArelConnection {
   /** @internal */
   quoteTableName(name: string): string;
   /** @internal */
@@ -32,6 +48,12 @@ export interface ArelQuoter {
   quoteString(s: string): string;
   /** @internal */
   quote(value: unknown): string;
+  /** @internal */
+  quotedBinary(value: unknown): string;
+  /** @internal */
+  quotedTrue(): string;
+  /** @internal */
+  quotedFalse(): string;
 }
 
 /**
@@ -56,13 +78,13 @@ const DEFAULT_BIND_BLOCK: (index: number) => string = () => "?";
  * Mirrors: Arel::Visitors::ToSql
  */
 export class ToSql extends Visitor implements NodeVisitor<SQLString> {
-  protected readonly quoter: ArelQuoter;
+  protected readonly connection: ArelConnection;
   protected collector!: SQLString;
   protected _extractBinds = false;
 
-  constructor(quoter: ArelQuoter = defaultQuoter) {
+  constructor(connection: ArelConnection = defaultQuoter) {
     super();
-    this.quoter = quoter;
+    this.connection = connection;
   }
 
   compile(node: Node): string {
@@ -1534,7 +1556,16 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     if (typeof value === "bigint") return value.toString();
-    if (value instanceof Uint8Array) return this.quoter.quote(value);
+    // Normalise all typed-array views (ArrayBuffer, SharedArrayBuffer) to
+    // Uint8Array before handing off so adapters' quotedBinary can rely on a
+    // consistent shape. Uint8Array itself passes through unchanged.
+    if (ArrayBuffer.isView(value)) {
+      const bytes =
+        value instanceof Uint8Array
+          ? value
+          : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      return this.connection.quotedBinary(bytes);
+    }
     if (
       typeof value === "object" &&
       value !== null &&
@@ -1554,12 +1585,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
             return `'${json.replace(/'/g, "''")}'`;
           }
         } catch {
-          // circular references, BigInt, etc. — fall through to String()
+          // circular references, BigInt, etc. — fall through
         }
       }
     }
-    const escaped = String(value).replace(/'/g, "''");
-    return `'${escaped}'`;
+    // Unknown object types (custom classes, Temporal types without toISOString,
+    // etc.) — delegate to the connection, which knows the adapter-specific rules.
+    return this.connection.quote(value);
   }
 
   private sanitizeHint(hint: string): string {
@@ -1640,13 +1672,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.quoter.quoteTableName(String(name));
+    return this.connection.quoteTableName(String(name));
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.quoter.quoteColumnName(String(name));
+    return this.connection.quoteColumnName(String(name));
   }
 
   /**
