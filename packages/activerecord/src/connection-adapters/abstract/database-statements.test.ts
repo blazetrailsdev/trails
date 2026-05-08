@@ -32,6 +32,7 @@ import {
   performQuery,
   preprocessQuery,
   select,
+  execInsert,
   sqlForInsert,
   arelFromRelation,
   extractTableRefFromInsertSql,
@@ -431,6 +432,42 @@ describe("select", () => {
     };
     const result = await select.call(host, "SELECT 1");
     expect(result).toBeInstanceOf(Result);
+  });
+});
+
+describe("execInsert", () => {
+  function makeInsertHost(supportsReturning: boolean) {
+    let capturedSql = "";
+    const host: DatabaseStatementsHost = {
+      supportsInsertReturning: () => supportsReturning,
+      quoteColumnName: (c) => `"${c}"`,
+      internalExecute: async (sql: string) => {
+        capturedSql = sql;
+        return new Result([], []);
+      },
+    };
+    return { host, getCapturedSql: () => capturedSql };
+  }
+
+  it("appends RETURNING via sqlForInsert when adapter supports it", async () => {
+    const { host, getCapturedSql } = makeInsertHost(true);
+    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
+    expect(getCapturedSql()).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "id"`);
+  });
+
+  it("passes sql unchanged when adapter does not support RETURNING", async () => {
+    const { host, getCapturedSql } = makeInsertHost(false);
+    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], "id");
+    expect(getCapturedSql()).toBe("INSERT INTO t (x) VALUES (1)");
+  });
+
+  it("uses explicit returning list when provided", async () => {
+    const { host, getCapturedSql } = makeInsertHost(true);
+    await execInsert.call(host, "INSERT INTO t (x) VALUES (1)", null, [], null, null, [
+      "id",
+      "created_at",
+    ]);
+    expect(getCapturedSql()).toContain('RETURNING "id", "created_at"');
   });
 });
 

@@ -64,12 +64,94 @@ packages/activerecord/src/connection-adapters/sqlite3/**/*.ts
 packages/activerecord/src/connection-adapters/sqlite3-adapter.ts
 ```
 
-### PR 3 — Sprinkle async/await (upcoming)
+### PR 3 — Async-aware adapter (#1264)
 
-- Make `BetterSqlite3Driver` methods return `Promise<T>` (via
-  `Promise.resolve`).
-- Add `async`/`await` at every `this.driver.*` call site in `sqlite3-adapter.ts`
-  and the `sqlite3/` cluster.
-- The `blazetrails/sqlite-driver-await` lint guard ensures any new helper
-  that passes a `driver` parameter and calls methods on it without `await`
-  is caught at CI time, not at runtime.
+Sprinkled `async`/`await` through every `this.driver.*` call site in
+`sqlite3-adapter.ts`. Removed the local sync sub-type aliases that bound
+the adapter to `SyncSqliteConnection` / `SyncSqliteStatement`; the adapter
+now binds to the full async-tolerant types. `BetterSqlite3Driver` methods
+return raw values; the `T | Promise<T>` interface accepts them.
+
+Two scoped exceptions kept sync (with comments):
+
+- `disconnectBang()` — supertype is `void`-returning; can't easily go async
+- `getDatabaseVersion()` — lazy-init, sync caller path
+
+Both flagged for follow-up; both work fine for in-process-sync drivers.
+
+### PR 4 — Consolidate transactions onto generic path (#1256)
+
+Audit + tests confirming `Sqlite3Adapter` uses only explicit
+`BEGIN`/`COMMIT`/`ROLLBACK`/`SAVEPOINT` SQL via `driver.exec()`. No reliance
+on `db.transaction(fn)` (which is better-sqlite3-specific). Adapter is
+portable to async drivers (node:sqlite, wa-sqlite, expo-sqlite) by
+construction.
+
+### PR M — Move driver abstraction to activesupport (#1247)
+
+Moved `SqliteDriver` / `SqliteStatement` / `SqliteConnection` interfaces +
+registry to `packages/activesupport/src/sqlite-adapter.ts`. Driver
+implementations live under `packages/activesupport/src/sqlite-drivers/`.
+The activerecord adapter consumes them via `getSqlite(name)`.
+
+Key interface additions:
+
+- `SqliteDriverCapabilities`: `inProcessSync`, `streaming`, `loadExtension`,
+  `concurrentStatements`, `foreignKeysOnByDefault`, `immediateTransactions`.
+- `SyncSqliteConnection` / `SyncSqliteStatement` sub-types for inProcessSync
+  drivers (better-sqlite3 + node:sqlite via openSync).
+- `globalThis`-stashed registry to survive module duplication.
+
+### PR 5 — node:sqlite driver (#1271)
+
+Added `packages/activesupport/src/sqlite-drivers/node-sqlite.ts` wrapping
+Node 22.5+'s built-in `node:sqlite`. Soft-loads via `createRequire` so
+older Node doesn't crash on import; exposes `isNodeSqliteAvailable` for
+test gating. Capabilities: `inProcessSync: true`, `streaming: false`,
+`loadExtension: false`, `concurrentStatements: false`,
+`foreignKeysOnByDefault: false`, `immediateTransactions: true`.
+
+### PR 7 — expo-sqlite driver (planned)
+
+Adds `packages/activesupport/src/sqlite-drivers/expo-sqlite.ts` wrapping
+Expo's modern async API (`openDatabaseAsync`, `runAsync`, `getAllAsync`,
+`getEachAsync`, `closeAsync`). Same shape as node-sqlite (soft-load,
+self-register, expose `isExpoSqliteAvailable` for test gating).
+
+Capabilities:
+
+| Capability               | Value | Why                                                  |
+| ------------------------ | ----- | ---------------------------------------------------- |
+| `inProcessSync`          | false | expo-sqlite's modern API is async-only               |
+| `streaming`              | true  | `getEachAsync` yields rows                           |
+| `loadExtension`          | false | No FTS / spatial extensions on RN                    |
+| `concurrentStatements`   | false | Single-connection-per-DB model; serialize statements |
+| `foreignKeysOnByDefault` | false | Must `PRAGMA foreign_keys = ON` post-open            |
+| `immediateTransactions`  | true  | `BEGIN IMMEDIATE` supported                          |
+
+**Async-only:** no `openSync` hook on the driver. Implements
+`open(): Promise<SqliteConnection>` only. PR 3 (#1264) made async drivers
+first-class; that work is the prerequisite this driver depends on.
+
+**Web fallback:** Expo SDK 51+ auto-forks to wa-sqlite under the hood when
+running on web. The driver itself is platform-agnostic — Expo handles
+native iOS/Android vs web internally.
+
+**`expo-sqlite` peer dep:** added to `optionalDependencies` in
+`activesupport/package.json` so Trails consumers don't need Expo unless
+they're using this driver.
+
+**Reference impl:** `packages/activesupport/src/sqlite-drivers/node-sqlite.ts`
+is the closest in shape (soft-load, capabilities object, single-driver
+self-registration). Cherry-pick its structure.
+
+**Out of scope (defer to PR 6):** CI matrix integration, parity tests
+across all three drivers (better-sqlite3 / node:sqlite / expo-sqlite),
+docs in the website. PR 6 is still the planned follow-up that wires
+all drivers into a CI matrix.
+
+### PR 6 — CI matrix + parity tests + docs (blocked on driver landing)
+
+Originally planned to land after PR 5; still pending. After PR 7
+(expo-sqlite) lands, this PR wires all three drivers into a CI matrix
+and adds parity tests asserting identical behavior across them.

@@ -534,3 +534,43 @@ Folds former PRs 58 + 59 plus the remaining unassigned 1-missers from the PR 52 
 - `packages/activerecord/src/base.ts`
 
 ---
+
+## Known Rails-fidelity gaps (tracked, not blocking)
+
+Findings flagged during PR review that were correctly deferred from their source PR. Each is small enough to ship as a follow-up; none currently break behavior or block the PR they were found in. Pull from this list when sequencing the next batch of small fixes.
+
+### From PR #1298 (PR 37c — relation.rb build helpers)
+
+- **`buildFrom` missing `eager_loading?` → `apply_join_dependency` branch.** Rails: when `from` is unset and the relation needs eager loading, `build_from` consults the join dependency to derive the `from` clause. Currently a real gap; low frequency (most queries set `from` explicitly or don't need eager-load-derived from). File: `relation.ts#buildFrom`. Source: Rails `relation.rb` `build_from` method.
+- **`buildArel` passing `limit` as raw number.** Rails wraps in `build_cast_value("LIMIT", sanitize_limit(limit))` so the value goes through type-cast / sanitization. TS passes the raw number. Low risk — JS numbers don't need the same coercion, and `sanitizeLimit` is already called upstream. File: `relation.ts#buildArel`. Tracking only because Rails source disagrees.
+- **`buildArel` not calling `arel.distinct(false)` when distinct is off.** Rails explicitly clears the distinct flag on a fresh `SelectManager`; TS relies on the default-false from constructing a new SelectManager each time. Negligible — same effective output. File: `relation.ts#buildArel`.
+
+### From PR #1292 (Track 2 — abstract_adapter wiring)
+
+- **5 throw-stubs wired into `AbstractAdapter`** via `AbstractAdapterPrivates`: `initializeTypeMap`, `registerClassWithLimit`, `extractScale`, `extractPrecision`, `extractLimit`. Pure decoration for api:compare attribution; subclasses override or use module-level copies. Worth porting the Rails implementations to AbstractAdapter so callers inherit functioning defaults instead of overriding errors. **In flight on a follow-up agent (pane %50).**
+
+### From PR #1294 (skip-annotation normalization)
+
+- **`testNameOverride()` keyword groups too narrow.** Currently catches STI / Marshal / GVL via specific keywords. base.test.ts has ~10 file-templated annotations that would benefit from broader keyword coverage (`namespace`, `copy_table`, `readonly`, `includes`, `default scope`, etc.). Re-running the script after extending keywords is mechanical (script is idempotent).
+
+### From PR #1276 (PR 51b — mysql2 ER_BAD_DB_ERROR)
+
+- **`_isMissingDatabaseError` smears SQLSTATE/errno knowledge** into `database-tasks.ts` instead of the adapter layer. As more callers need NoDatabaseError detection, the per-adapter knowledge should live on the adapter so it's translated at the connection level.
+
+### MariaDB DATETIME serialization
+
+- mysql2 inserts ISO 8601 `Z`-suffix strings into `DATETIME` columns; MariaDB rejects. Worked around in `defineSchema` by mapping `datetime` → `TEXT` on non-PG. Real fix lives in `connection-adapters/mysql2/quoting.ts` / `typecast.ts` — emit `YYYY-MM-DD HH:MM:SS` (no `T`, no `Z`). Once fixed, revert the defineSchema datetime→TEXT downgrade.
+
+### EncryptableRecord `encrypt` / `decrypt` ergonomics (S1 from ENC-4 review)
+
+- Both are static methods (`EncryptableRecord.encrypt(record)`); Rails has them as instance methods (`record.encrypt`). No api:compare impact (already counted) but ergonomic Rails parity. Wire onto Base.prototype via the include() mechanism.
+
+### Signature-parity-only parameters
+
+- `relation/calculations.ts` keeps `_distinct` (and possibly other) parameters in method signatures for Rails parity, but the simplified TS implementation doesn't yet use them. Suppressed via underscore prefix to silence unused-param lints. Real behavior gap: callers passing `distinct: true` get parity in the API surface but not in the SQL output. Sweep `relation/calculations.ts` for `_`-prefixed unused params; same pattern may exist elsewhere — grep `(_[a-z]\w*:` across `packages/activerecord/src/`.
+
+### Future infra (deferred)
+
+- **ESLint rule for `_`-prefixed params on Rails-mirroring methods.** Catches the signature-parity-only gap above at PR time.
+- **`lint:deps` activesupport rule → blocking** once the 37 missing migrations land.
+- **api:compare param-name set comparison** (alongside the current method-name set check).

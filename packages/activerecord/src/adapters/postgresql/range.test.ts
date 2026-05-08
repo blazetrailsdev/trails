@@ -9,6 +9,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
+const toBigInt = (s: string) => BigInt(s);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -112,14 +113,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("int8range column", async () => {
       await adapter.execute(`INSERT INTO postgresql_ranges (int8_range) VALUES ('[10,100]')`);
       const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
-      const range = parseRange(rows[0].int8_range as string, toInt)!;
-      expect(range.begin).toBe(10);
+      const range = parseRange(rows[0].int8_range as string, toBigInt)!;
+      expect(range.begin).toBe(10n);
     });
 
     it("int8range type cast", async () => {
-      const range = parseRange("[10,100)", toInt)!;
-      expect(range.begin).toBe(10);
-      expect(range.end).toBe(100);
+      const range = parseRange("[10,100)", toBigInt)!;
+      expect(range.begin).toBe(10n);
+      expect(range.end).toBe(100n);
     });
 
     it("int8range write", async () => {
@@ -351,9 +352,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("int8range values", () => {
-      const r = parseRange("[10,100)", toInt)!;
-      expect(r.begin).toBe(10);
-      expect(r.end).toBe(100);
+      const r = parseRange("[10,100)", toBigInt)!;
+      expect(r.begin).toBe(10n);
+      expect(r.end).toBe(100n);
     });
 
     it("daterange values", () => {

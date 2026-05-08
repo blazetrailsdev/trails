@@ -299,6 +299,41 @@ describe("findSome — expected_size respects limit and offset", () => {
 });
 
 // ---------------------------------------------------------------------------
+// findSome — select_values narrowing on ordered path (Story I-followup-2)
+// ---------------------------------------------------------------------------
+
+describe("findSome — narrows to pk column when select_values non-empty (ordered path)", () => {
+  it("calls .select(pk) when the relation has select values", async () => {
+    let selectedCol: string | undefined;
+    const rel: any = {
+      _modelClass: {
+        primaryKey: "id",
+        name: "Post",
+        typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+        arelTable: { get: (col: string) => col },
+      },
+      _limitValue: null,
+      _offsetValue: null,
+      _orderClauses: ["id ASC"],
+      _rawOrderClauses: [],
+      selectValues: ["title"],
+      where(_cond: any) {
+        const inner: any = {
+          toArray: async () => [{ id: 1 }],
+          select(col: string) {
+            selectedCol = col;
+            return inner;
+          },
+        };
+        return inner;
+      },
+    };
+    await findSome(rel, [1]);
+    expect(selectedCol).toBe("id");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // findSome → findSomeOrdered dispatch (Story I-followup gap 1)
 // ---------------------------------------------------------------------------
 

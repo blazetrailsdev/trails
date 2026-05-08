@@ -689,7 +689,12 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
   if (!hasOrder(rel)) return findSomeOrdered(rel, ids);
 
   const pk = (rel as any)._modelClass.primaryKey as string;
-  const records = await (rel as any).where({ [pk]: ids }).toArray();
+  let relation = (rel as any).where({ [pk]: ids });
+  // Rails: `relation = relation.select(table[primary_key]) unless select_values.empty?`
+  if ((rel as any).selectValues.length > 0) {
+    relation = relation.select((rel as any)._modelClass.arelTable.get(pk));
+  }
+  const records = await relation.toArray();
 
   // Rails: expected_size = ids.size, then clamp down for limit/offset.
   // "11 ids with limit 3, offset 9 should give 2 results."

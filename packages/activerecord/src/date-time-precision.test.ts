@@ -130,7 +130,9 @@ describe("DateTimePrecisionTest", () => {
   });
 
   it("formatting datetime according to precision when time zone aware", () => {
-    // BLOCKED: needs with_timezone_config(aware_attributes: true) — TimeZoneAware not yet ported
+    // BLOCKED: type — withTimezoneConfig helper exists (test-helper.ts) but
+    // Base.timeZoneAwareAttributes is not yet wired; TimeZoneConverter.serialize
+    // not implemented (no TZ shift on datetime write).
   });
 
   it("formatting datetime according to precision using timestamptz", () => {

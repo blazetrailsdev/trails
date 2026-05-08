@@ -264,6 +264,39 @@ class ApiExtractor
       process_method_add_arg(node)
     when :sclass
       process_sclass(node)
+    when :assign
+      # Handle `CONST = Struct.new(...) do ... end` — methods defined in the
+      # block belong to the struct, not to the enclosing module.
+      lhs, rhs = node[1], node[2]
+      # Only enter the struct-class path when:
+      #   lhs = [:var_field, [:@const, "Name", ...]]
+      #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
+      #         where the receiver constant resolves to "Struct"
+      struct_call = rhs.is_a?(Array) && rhs[0] == :method_add_block && rhs[1]
+      struct_receiver = struct_call && struct_call.is_a?(Array) &&
+                        struct_call[0] == :method_add_arg && const_name(struct_call[1])
+      is_struct_new = struct_receiver == "Struct"
+      if lhs.is_a?(Array) && lhs[0] == :var_field &&
+         lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
+         is_struct_new
+        const_name_str = lhs[1][1]
+        block = rhs[2]
+        body = block.is_a?(Array) && (block[0] == :do_block || block[0] == :brace_block) ? block[2] : nil
+        if body
+          @namespace_stack.push(const_name_str)
+          @visibility_stack.push(:public)
+          fqn = current_fqn
+          @classes[fqn] ||= new_class_info(const_name_str, fqn)
+          @classes[fqn][:superclass] = "Struct"
+          walk_body(body)
+          @visibility_stack.pop
+          @namespace_stack.pop
+        else
+          node.each { |child| walk(child) if child.is_a?(Array) }
+        end
+      else
+        node.each { |child| walk(child) if child.is_a?(Array) }
+      end
     when :program, :bodystmt, :body_stmt, :stmts_add, :stmts_new,
          :begin, :else, :elsif, :if, :if_mod, :unless, :unless_mod,
          :rescue, :ensure, :while, :until, :case, :when
