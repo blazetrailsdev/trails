@@ -702,28 +702,37 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(() => parseRange("(1,10]", toInt)).toThrow();
       expect(() => parseRange("(2012-01-02,2012-01-04]")).toThrow();
     });
-    it.skip("where by attribute with range", () => {
-      // BLOCKED: range — PredicateBuilder routes Range through RangeHandler (interval semantics) not range-column equality
-      // ROOT-CAUSE: predicate-builder.ts dispatches Range values to RangeHandler which builds BETWEEN/>=/<
-      //   predicates; for range-typed columns Rails builds attribute.eq(type.serialize(range)) instead;
-      //   needs a RangeType column guard before the RangeHandler path to emit an Arel equality node
-      // SCOPE: ~60 LOC — RangeType column guard in predicate-builder.ts + serialize-to-literal path; affects 4 where/updateAll tests
+    it("where by attribute with range", async () => {
+      const range = new Range(1, 100, false);
+      const record = await PostgresqlRanges.create({ int4_range: range });
+      const found = await PostgresqlRanges.where({ int4_range: range }).take();
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(record.id);
     });
-    it.skip("where by attribute with range in array", () => {
-      // BLOCKED: range — PredicateBuilder doesn't serialize Range for range-typed columns
-      // SCOPE: ~60 LOC shared with "where by attribute with range" fix; affects 4 where/updateAll tests
+    it("where by attribute with range in array", async () => {
+      const range = new Range(1, 100, false);
+      const record = await PostgresqlRanges.create({ int4_range: range });
+      const found = await PostgresqlRanges.where({ int4_range: [range] }).take();
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(record.id);
     });
-    it.skip("update all with ranges", () => {
-      // BLOCKED: range — updateAll doesn't serialize Range through column's RangeType
-      // ROOT-CAUSE: Relation#updateAll passes Range values to the Arel SET clause without calling
-      //   type.serialize; the range literal is not generated (no quoteRangeBound in the SET path)
-      // SCOPE: ~60 LOC shared with "where by attribute with range" fix; affects 4 where/updateAll tests
+    it("update all with ranges", async () => {
+      await PostgresqlRanges.create({});
+      await PostgresqlRanges.updateAll({ int8_range: new Range(1, 100, false) });
+      const first = await PostgresqlRanges.first();
+      expect(first!.int8_range).toBeInstanceOf(Range);
+      expect((first!.int8_range as Range).begin).toBe(BigInt(1));
+      // PG normalises [1,100] → [1,101) for discrete int8range (Rails: 1...101)
+      expect((first!.int8_range as Range).end).toBe(BigInt(101));
+      expect((first!.int8_range as Range).excludeEnd).toBe(true);
     });
-    it.skip("ranges correctly escape input", () => {
-      // BLOCKED: range — updateAll Range serialization (same as "update all with ranges")
-      // ROOT-CAUSE: same gap as "update all with ranges"; test also verifies quoteRangeBound
-      //   prevents SQL injection — only testable once Range values flow through updateAll
-      // SCOPE: ~60 LOC shared with "update all with ranges" fix; affects 4 where/updateAll tests
+    it("ranges correctly escape input", async () => {
+      const range = new Range("-1,2]'\"; DROP TABLE postgresql_ranges; --", "a", false);
+      await PostgresqlRanges.create({});
+      // SQL injection is prevented — the update either succeeds (value stored) or
+      // raises a type error, but the table must still exist afterwards.
+      await PostgresqlRanges.updateAll({ int8_range: range }).catch(() => {});
+      await expect(PostgresqlRanges.first()).resolves.not.toBeNull();
     });
     it("ranges correctly unescape output", () => {
       // Rails: inserts '["ca""t","do\\\\g")' via SQL, reads back as 'ca"t'...'do\\g'

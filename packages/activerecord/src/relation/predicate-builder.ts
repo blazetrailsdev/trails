@@ -227,6 +227,8 @@ export class PredicateBuilder {
       return customHandler.call(attribute, value);
     }
     if (value instanceof Range) {
+      const rangeNode = this._buildRangeEqualityOrNull(attribute, value);
+      if (rangeNode !== null) return rangeNode;
       return this.rangeHandler.call(attribute, value);
     }
     if (Array.isArray(value)) {
@@ -239,6 +241,8 @@ export class PredicateBuilder {
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
+    const rangeNode = this._buildRangeEqualityOrNull(attribute, range);
+    if (rangeNode !== null) return rangeNode;
     return this.rangeHandler.call(attribute, range);
   }
 
@@ -382,6 +386,38 @@ export class PredicateBuilder {
   /** Set context without cloning — use only when constructing a fresh builder. */
   setTableContext(context: any): void {
     this._tableContext = context;
+  }
+
+  /** @internal */
+  private _buildRangeEqualityOrNull(attribute: Nodes.Attribute, value: Range): Nodes.Node | null {
+    type TypeLike =
+      | { isForceEquality?(v: unknown): boolean; encodeLiteral?(v: unknown): string }
+      | null
+      | undefined;
+    const lookups = [
+      () => {
+        const rel = (attribute as unknown as { relation?: unknown }).relation;
+        return (rel as { typeForAttribute?(n: string): TypeLike } | undefined)?.typeForAttribute?.(
+          attribute.name,
+        ) as TypeLike;
+      },
+      () =>
+        (
+          this._tableContext as { typeForAttribute?(n: string): TypeLike } | null
+        )?.typeForAttribute?.(attribute.name) as TypeLike,
+      () => this.table.typeForAttribute(attribute.name) as TypeLike,
+    ];
+    for (const lookup of lookups) {
+      const t = lookup();
+      if (t?.isForceEquality?.(value)) {
+        // Only emit equality when the type can produce a safe inline literal.
+        // A type without encodeLiteral would fall through to the BindParam path
+        // which fails under manager.toSql()'s defaultQuoter for non-scalar
+        // objects — so we skip the equality shortcut and let the handler run.
+        if (t.encodeLiteral) return attribute.eq(new Nodes.Quoted(t.encodeLiteral(value)));
+      }
+    }
+    return null;
   }
 
   static references(conditions: Record<string, unknown>): Nodes.SqlLiteral[] {

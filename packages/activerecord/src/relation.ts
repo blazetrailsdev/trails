@@ -2731,6 +2731,12 @@ export class Relation<T extends Base> {
         const def = this._modelClass._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
         if (isArray) return [table.get(key), def!.type!.serialize(val)];
+        const isRangeCol =
+          val instanceof Range &&
+          (def?.type as { isForceEquality?(v: unknown): boolean } | undefined)?.isForceEquality?.(
+            val,
+          );
+        if (isRangeCol) return [table.get(key), def!.type!.serialize(val)];
         return [table.get(key), val];
       },
     );
