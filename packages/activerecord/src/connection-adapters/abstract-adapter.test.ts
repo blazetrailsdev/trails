@@ -26,6 +26,18 @@ class TestAdapter extends AbstractAdapter {
   }
 }
 
+describe("AbstractAdapter#returnValueAfterInsert", () => {
+  it("returns true when column isAutoPopulated", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.returnValueAfterInsert({ isAutoPopulated: () => true })).toBe(true);
+  });
+
+  it("returns false when column is not auto-populated", () => {
+    const adapter = new TestAdapter();
+    expect(adapter.returnValueAfterInsert({ isAutoPopulated: () => false })).toBe(false);
+  });
+});
+
 describe("AbstractAdapter.extractLimit", () => {
   it("parses limit from sql type with parens", () => {
     expect(TestAdapter.extractLimit("varchar(255)")).toBe(255);
