@@ -14,6 +14,8 @@ export interface MigrationLike {
   down(adapter: DatabaseAdapter): Promise<void>;
   /** When true, Migrator skips DDL transaction wrapping for this migration. */
   disableDdlTransaction?: boolean;
+  /** Adapter for this migration; mirrors Rails' Migration#connection (@connection field). */
+  connection?: DatabaseAdapter;
 }
 
 export abstract class ExecutionStrategy {

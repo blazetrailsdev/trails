@@ -88,8 +88,8 @@ export interface SchemaStatements {
   validateConstraint(tableName: string, constraintName: string): Promise<void>;
   validateCheckConstraint(tableName: string, name: string): Promise<void>;
   validateForeignKey(tableName: string, name: string): Promise<void>;
-  exclusionConstraints(tableName: string): Promise<unknown[]>;
-  uniqueConstraints(tableName: string): Promise<unknown[]>;
+  exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]>;
+  uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]>;
   commentOnColumn(tableName: string, columnName: string, comment: string | null): Promise<void>;
   commentOnTable(tableName: string, comment: string | null): Promise<void>;
   addColumn(

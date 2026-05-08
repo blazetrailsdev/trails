@@ -95,4 +95,41 @@ export class MigrationProxy {
     }
     return new (klass as new (name: string, version: string) => object)(this.name, this.version);
   }
+
+  /**
+   * @internal
+   * ESM-capable loader. The sync `loadMigration()` / `migration()` path is
+   * retained for backward compatibility; wiring this into Migrator would
+   * require making `MigrationProxy.migration()` async, cascading to the
+   * `MigrationProxy` interface in migration.ts. In practice, the trailties
+   * migration-loader already uses `import(pathToFileURL(...))` so ESM
+   * migrations are handled before they reach this class.
+   */
+  async loadMigrationAsync(): Promise<object> {
+    try {
+      // require() works for CJS migrations; falls through to import() for ESM.
+      return this.loadMigration();
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ERR_REQUIRE_ESM") throw err;
+      // ESM migration file — use dynamic import() via file URL.
+      // Note: unlike the require() path above, import() is module-cached by the
+      // Node.js ESM loader and will not reload the file if it changes during the
+      // same process. Cache-busting (e.g. appending ?t=Date.now()) is unstable
+      // across runtimes; in practice, ESM migrations run once per process.
+      const { pathToFileURL } = await import("node:url");
+      const mod = (await import(/* @vite-ignore */ pathToFileURL(this.filename).href)) as Record<
+        string,
+        new (name: string, version: string) => object
+      >;
+      const klass = mod[this.name] ?? mod.default;
+      if (typeof klass !== "function") {
+        throw new Error(
+          `Migration ${this.name} could not be loaded from ${this.filename}: ` +
+            `no export named "${this.name}" or "default" found`,
+          { cause: err },
+        );
+      }
+      return new (klass as new (name: string, version: string) => object)(this.name, this.version);
+    }
+  }
 }

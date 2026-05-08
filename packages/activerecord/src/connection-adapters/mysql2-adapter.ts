@@ -261,6 +261,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
   }
 
+  /** Returns true for raw mysql2 errors that indicate the database doesn't exist (ER_BAD_DB_ERROR). */
+  isNoDatabaseError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+    const e = error as { code?: unknown; errno?: unknown };
+    return e.code === "ER_BAD_DB_ERROR" || e.errno === 1049;
+  }
+
   /** Checkout a fresh connection from the pool, translating ER_BAD_DB_ERROR. */
   private async _checkoutConn(): Promise<mysql.PoolConnection> {
     // Lazy reconnect after disconnectBang() — mirrors Rails' reconnect on next
@@ -274,8 +281,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     try {
       return await this._driverPool.getConnection();
     } catch (error) {
-      const e = error as { code?: unknown; errno?: unknown };
-      if (e.code === "ER_BAD_DB_ERROR" || e.errno === 1049) {
+      if (this.isNoDatabaseError(error)) {
         throw NoDatabaseError.dbError(this._database ?? "unknown");
       }
       throw error;

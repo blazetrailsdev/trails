@@ -546,6 +546,10 @@ class SchemaAdapter implements DatabaseAdapter {
     return this.inner?.adapterName ?? "sqlite";
   }
 
+  isNoDatabaseError(error: unknown): boolean {
+    return this.inner?.isNoDatabaseError?.(error) ?? false;
+  }
+
   private inner: any;
 
   constructor(inner: any) {

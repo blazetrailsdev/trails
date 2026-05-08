@@ -1502,6 +1502,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this._useInsertReturning;
   }
 
+  /** Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000). */
+  isNoDatabaseError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false;
+    return (error as { code?: unknown }).code === "3D000";
+  }
+
   // Mirrors: PostgreSQLAdapter.new_client (postgresql_adapter.rb:57)
   // Connects a single pg.Client and translates connection errors into
   // the same ActiveRecord error hierarchy as Rails (ConnectionNotEstablished,
