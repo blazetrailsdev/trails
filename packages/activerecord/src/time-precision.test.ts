@@ -18,8 +18,8 @@ describe("TimePrecisionTest", () => {
     adapter = new SQLite3Adapter(":memory:");
     ctx = new MigrationContext(adapter);
   });
-  afterEach(() => {
-    adapter.close();
+  afterEach(async () => {
+    await adapter.close();
   });
 
   function makeFoo() {
