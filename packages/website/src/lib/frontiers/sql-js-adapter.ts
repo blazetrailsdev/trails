@@ -4,6 +4,10 @@ import type { Database } from "sql.js";
 export class SqlJsAdapter implements DatabaseAdapter {
   readonly adapterName = "SQLite";
 
+  isNoDatabaseError(_error: unknown): boolean {
+    return false;
+  }
+
   constructor(private db: Database) {}
 
   async execute(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {

@@ -44,6 +44,9 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   override get adapterName(): AdapterName {
     return "sqlite";
   }
+  isNoDatabaseError(_error: unknown): boolean {
+    return false;
+  }
   readonly inTransaction = false;
 
   async execute(

@@ -1542,6 +1542,30 @@ describe("initializeDatabase", () => {
     expect(result).toBe(true);
   });
 
+  it("calls DatabaseTasks.create when adapter.isNoDatabaseError returns true for a raw driver error", async () => {
+    let created = false;
+    const rawDriverError = Object.assign(new Error("ER_BAD_DB_ERROR"), {
+      code: "ER_BAD_DB_ERROR",
+      errno: 1049,
+    });
+    vi.spyOn(DatabaseTasks as any, "_connectFor").mockResolvedValue({
+      execute: async () => {
+        throw rawDriverError;
+      },
+      close: async () => {},
+      isNoDatabaseError: (e: unknown) => (e as { code?: unknown }).code === "ER_BAD_DB_ERROR",
+    });
+    vi.spyOn(DatabaseTasks, "create").mockImplementation(async () => {
+      created = true;
+    });
+    // adapter is "mysql2" to match the MySQL-flavored raw error; _connectFor is
+    // mocked so no real connection is made — the test validates delegation only.
+    const config = new HashConfig("test", "primary", { adapter: "mysql2", database: "mydb" });
+    const result = await initializeDatabase(config);
+    expect(created).toBe(true);
+    expect(result).toBe(true);
+  });
+
   it("loads schema dump when DB is fresh and dump file exists", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-initdb-schema-"));
     const schemaFile = path.join(tmp, "schema.ts");

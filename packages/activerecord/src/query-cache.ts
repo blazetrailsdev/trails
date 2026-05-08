@@ -121,6 +121,10 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.adapterName;
   }
 
+  isNoDatabaseError(error: unknown): boolean {
+    return this.inner.isNoDatabaseError(error);
+  }
+
   readonly inner: DatabaseAdapter;
   readonly cache: QueryCacheStore;
   private _queryCount = 0;

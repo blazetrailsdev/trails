@@ -172,6 +172,14 @@ export interface DatabaseAdapter {
   readonly adapterName: AdapterName;
 
   /**
+   * Returns true when `error` is a raw driver error indicating the database
+   * does not exist (e.g. SQLSTATE 3D000 for pg, ER_BAD_DB_ERROR for mysql2,
+   * SQLITE_CANTOPEN for sqlite3). Used as a defensive fallback when pool
+   * proxies re-surface untranslated errors before NoDatabaseError is thrown.
+   */
+  isNoDatabaseError(error: unknown): boolean;
+
+  /**
    * Execute a SQL query and return rows.
    */
   execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;

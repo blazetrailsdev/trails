@@ -352,6 +352,15 @@ export class AbstractAdapter implements Quoting {
 
   _queryCache: Store | null = null;
 
+  /**
+   * Returns true when `error` is a raw driver error indicating the database
+   * does not exist. Concrete adapters override this with driver-specific checks.
+   * The base implementation always returns false (safe default for custom adapters).
+   */
+  isNoDatabaseError(_error: unknown): boolean {
+    return false;
+  }
+
   pool: unknown = null;
   logger: unknown = null;
   lock: unknown = null;

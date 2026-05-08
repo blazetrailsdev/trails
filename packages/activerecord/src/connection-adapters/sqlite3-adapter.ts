@@ -105,9 +105,24 @@ export class SQLiteDateTimeType extends ARDateTimeType {
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter
  */
+
+function _isSqliteMissingDbError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: unknown; message?: unknown };
+  return (
+    e.code === "SQLITE_CANTOPEN" ||
+    (typeof e.message === "string" && /unable to open database file/i.test(e.message))
+  );
+}
+
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override get adapterName(): AdapterName {
     return "sqlite";
+  }
+
+  /** Returns true for raw SQLite driver errors that indicate a missing or unopenable database file (SQLITE_CANTOPEN). */
+  isNoDatabaseError(error: unknown): boolean {
+    return _isSqliteMissingDbError(error);
   }
 
   static columnNameMatcher(): RegExp {
@@ -2245,7 +2260,7 @@ function translateException(
   if (msg.includes("String or BLOB exceeded size limit")) {
     return new ValueTooLong(message, { sql, binds, cause: exception });
   }
-  if (code === "SQLITE_CANTOPEN" || /unable to open database file/i.test(msg)) {
+  if (_isSqliteMissingDbError(exception)) {
     return new NoDatabaseError(message, { sql, binds, cause: exception });
   }
   if (/called on a closed database/i.test(msg)) {
