@@ -3,6 +3,7 @@
  */
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
+type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 export interface TimeZoneConversion {
   timeZoneAwareAttributes: boolean;
@@ -57,8 +58,11 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this._subtype.serializeCastValue(value as any);
   }
 
-  equals(other: unknown): boolean {
-    return other instanceof TimeZoneConverter && this._subtype === other._subtype;
+  override equals(other: Type): boolean {
+    return (
+      other instanceof TimeZoneConverter &&
+      (this._subtype as ValueTypeInstance).equals(other._subtype)
+    );
   }
 }
 
