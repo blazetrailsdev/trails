@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Model, type Type, typeRegistry } from "@blazetrails/activemodel";
+import { Model, type Type, typeRegistry, pushPendingDecorator } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
   Table,
@@ -786,11 +786,15 @@ export class Base extends Model {
     super.attribute(name, typeName, options);
     // Apply hookAttributeType decorators (TZ conversion, locking) to the
     // just-registered type so user-declared datetime attributes are wrapped.
+    // Patch _attributeDefinitions immediately (read path) and also push a
+    // PendingDecorator so _defaultAttributes() replay sees the hooked type
+    // after the PendingType for this attribute.
     const def = this._attributeDefinitions.get(name);
     if (def) {
       const hooked = this.hookAttributeType(name, def.type);
       if (hooked !== def.type) {
         this._attributeDefinitions.set(name, { ...def, type: hooked });
+        pushPendingDecorator(this, [name], (_n: string, _t: Type) => hooked);
       }
     }
     // If we just defined an "id" accessor on a subclass prototype, remove it

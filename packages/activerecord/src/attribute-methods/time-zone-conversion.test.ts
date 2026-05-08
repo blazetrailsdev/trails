@@ -68,4 +68,16 @@ describe("TimeZoneConversionTest", () => {
     const type = Post._attributeDefinitions.get("starts_at")?.type;
     expect(type).toBeInstanceOf(TimeZoneConverter);
   });
+
+  it("instance attribute type matches _attributeDefinitions after _defaultAttributes replay", () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.attribute("published_at", "datetime");
+      }
+    }
+    const defaults = Post._defaultAttributes();
+    const attr = defaults.getAttribute("published_at");
+    expect(attr?.type).toBeInstanceOf(TimeZoneConverter);
+  });
 });
