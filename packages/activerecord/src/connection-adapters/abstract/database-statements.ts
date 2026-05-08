@@ -1359,6 +1359,8 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
+    _pk?: string | null,
+    _sequenceName?: string | null,
   ): Promise<number> {
     return this.executeMutation(sql, binds, name ?? "SQL");
   },
@@ -1407,12 +1409,12 @@ export const DatabaseStatements = {
     name?: string | null,
     pk?: string | null,
     idValue?: unknown,
-    _sequenceName?: string | null,
+    sequenceName?: string | null,
     binds: unknown[] = [],
     opts?: { returning?: string[] | null },
   ): Promise<unknown> {
     const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
-    const result = await this.execInsert(sql, name, resolvedBinds, pk);
+    const result = await this.execInsert(sql, name, resolvedBinds, pk, sequenceName);
     if (opts?.returning != null) return returningColumnValues.call(this, result);
     if (idValue != null) return idValue;
     // execInsert may return a Result (PG/adapter with RETURNING support) or a
