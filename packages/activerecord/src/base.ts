@@ -2467,6 +2467,11 @@ export class Base extends Model {
     }
 
     const changedAttrs = { ...this.changes };
+    this._attributes.forEach((attr, name) => {
+      if (!(name in changedAttrs) && attr.changedInPlace()) {
+        changedAttrs[name] = [attr.originalValue, attr.value];
+      }
+    });
 
     if (Object.keys(changedAttrs).length === 0) return;
 

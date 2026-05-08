@@ -419,12 +419,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   call type.isChangedInPlace() for mutable types.
       // SCOPE: ~50 LOC store_accessor + ~5 LOC attribute.ts changedInPlace delegation.
     });
-    it.skip("changes in place", async () => {
-      // BLOCKED: save path does not consult Attribute.changedInPlace() for in-place mutations.
-      // ROOT-CAUSE: _performUpdate (base.ts) short-circuits on empty this.changes before checking
-      //   changedInPlace(); the DirtyTracker only records explicit writeAttribute() calls, not
-      //   direct object mutations. Wiring changedInPlace() into the update path is separate work.
-      // SCOPE: ~10–20 LOC in base.ts _performUpdate; unblocks all mutable-type save-on-mutate tests.
+    it("changes in place", async () => {
+      const hstore = await HstoreModel.createBang({ settings: { one: "two" } });
+      (hstore as any).settings["three"] = "four";
+      await (hstore as any).saveBang();
+      await (hstore as any).reload();
+
+      expect((hstore as any).settings["three"]).toBe("four");
+      expect((hstore as any).changed).toBe(false);
     });
     it("dirty from user equal", async () => {
       const settings = { alongkey: "anything", key: "value" };
