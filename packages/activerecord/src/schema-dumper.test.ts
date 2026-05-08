@@ -573,6 +573,15 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).toContain("index_comments_on_post_id");
   });
 
+  it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    await ctx.createTable("events", {}, (t) => {
+      (t as any).datetime("happened_at", { precision: null });
+    });
+    const result = await TopLevelDumper.dump(adapter);
+    expect(result).toMatch(/t\.datetime\("happened_at"[^)]*precision.*null/);
+  });
+
   it("skips internal tables when dumping from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
