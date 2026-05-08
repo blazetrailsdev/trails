@@ -19,8 +19,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
-    await adapter.exec(`DROP TYPE IF EXISTS floatrange`);
-    await adapter.exec(`DROP TYPE IF EXISTS stringrange`);
+    await adapter.dropRange("floatrange", { ifExists: true });
+    await adapter.dropRange("stringrange", { ifExists: true });
     await adapter.createRange("floatrange", { subtype: "float8", subtypeDiff: "float8mi" });
     await adapter.createRange("stringrange", { subtype: "varchar" });
     await adapter.exec(`
@@ -49,8 +49,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
-    await adapter.exec(`DROP TYPE IF EXISTS floatrange`);
-    await adapter.exec(`DROP TYPE IF EXISTS stringrange`);
+    await adapter.dropRange("floatrange", { ifExists: true });
+    await adapter.dropRange("stringrange", { ifExists: true });
     await adapter.close();
   });
 

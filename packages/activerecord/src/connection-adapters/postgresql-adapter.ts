@@ -3461,19 +3461,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const qualifiedName = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(rangeName)}`
       : this.quoteIdentifier(rangeName);
-    const quoteTypeName = (typeName: string, param: string) => {
-      if (/[\s()]/.test(typeName)) {
+    const quoteQualifiedIdentifier = (identifier: string, param: string) => {
+      if (/[\s()]/.test(identifier)) {
         throw new Error(
           `PostgreSQLAdapter#createRange: ${param} must be a simple or schema-qualified identifier ` +
-            `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${typeName}".`,
+            `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
         );
       }
-      const { schema: s, table: t } = this.parseSchemaQualifiedName(typeName);
+      const { schema: s, table: t } = this.parseSchemaQualifiedName(identifier);
       return s ? `${this.quoteIdentifier(s)}.${this.quoteIdentifier(t)}` : this.quoteIdentifier(t);
     };
-    const parts = [`SUBTYPE = ${quoteTypeName(options.subtype, "subtype")}`];
-    if (options.subtypeDiff)
-      parts.push(`SUBTYPE_DIFF = ${quoteTypeName(options.subtypeDiff, "subtypeDiff")}`);
+    const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
+    if (options.subtypeDiff) {
+      parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
+    }
     await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
   }
 
