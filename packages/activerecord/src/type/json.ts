@@ -53,6 +53,10 @@ export class Json extends ValueType<unknown> {
     return ActiveSupportJSON.encode(value);
   }
 
+  override isMutable(): boolean {
+    return true;
+  }
+
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     return this.serialize(this.deserialize(rawOldValue)) !== this.serialize(newValue);
   }
