@@ -85,22 +85,15 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   json: "json",
 };
 
-// SQLite stores temporal and binary types as TEXT; using typed column names
-// causes better-sqlite3 to return them as strings without conversion.
+// Non-PG adapters (SQLite, MySQL/MariaDB) store temporal and binary types as
+// TEXT, matching test-adapter.ts's sqlType() mapping. Using the typed column
+// names causes MariaDB to reject ISO 8601 Z-suffix strings when the base
+// DateTimeType.serialize is used (e.g. via attribute() declarations).
 /** @internal */
-const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
+const COLUMN_TYPE_MAP_OTHER: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   datetime: "string",
   date: "string",
-  binary: "string",
-  json: "string",
-};
-
-// MySQL/MariaDB supports native DATETIME; serialize now emits "YYYY-MM-DD HH:MM:SS"
-// (no T, no Z) so MariaDB accepts the value in strict SQL mode.
-/** @internal */
-const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
-  ...COLUMN_TYPE_MAP_PG,
   binary: "string",
   json: "string",
 };
@@ -112,12 +105,7 @@ export async function defineSchema(
 ): Promise<void> {
   const ss = new SchemaStatements(adapter);
   const order = resolveReferences(schema);
-  const typeMap =
-    adapter.adapterName === "postgres"
-      ? COLUMN_TYPE_MAP_PG
-      : adapter.adapterName === "mysql"
-        ? COLUMN_TYPE_MAP_MYSQL
-        : COLUMN_TYPE_MAP_SQLITE;
+  const typeMap = adapter.adapterName === "postgres" ? COLUMN_TYPE_MAP_PG : COLUMN_TYPE_MAP_OTHER;
 
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
