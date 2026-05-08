@@ -423,7 +423,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T13:30:00Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
       await r.reload();
-      expect((r.tstz_range as Range).begin).toBeDefined();
+      expect(((r.tstz_range as Range).begin as Temporal.Instant).epochMilliseconds).toBe(
+        begin.epochMilliseconds,
+      );
+      expect(((r.tstz_range as Range).end as Temporal.Instant).epochMilliseconds).toBe(
+        end.epochMilliseconds,
+      );
       const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00Z");
       r.tstz_range = new Range(sameInstant, sameInstant, true);
       await r.saveBang();
@@ -451,11 +456,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const res1 = r1.tstz_range as Range;
       expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
       expect(res1.end).toBeNull();
+      expect(res1.excludeEnd).toBe(true);
       const r2 = await PostgresqlRanges.create({ tstz_range: new Range(null, t, false) });
       await r2.reload();
       const res2 = r2.tstz_range as Range;
       expect(res2.begin).toBeNull();
       expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect(res2.excludeEnd).toBe(false);
     });
     it("create tsrange", async () => {
       // Rails: Time.utc(2010,1,1,14,30,0)...Time.utc(2011,2,2,14,30,0) (default_timezone = :utc)
@@ -475,7 +482,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
       await r.reload();
-      expect((r.ts_range as Range).begin).toBeDefined();
+      expect(((r.ts_range as Range).begin as Temporal.Instant).epochMilliseconds).toBe(
+        begin.epochMilliseconds,
+      );
+      expect(((r.ts_range as Range).end as Temporal.Instant).epochMilliseconds).toBe(
+        end.epochMilliseconds,
+      );
       r.ts_range = new Range(begin, begin, true);
       await r.saveBang();
       await r.reload();
@@ -502,11 +514,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const res1 = r1.ts_range as Range;
       expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
       expect(res1.end).toBeNull();
+      expect(res1.excludeEnd).toBe(true);
       const r2 = await PostgresqlRanges.create({ ts_range: new Range(null, t, false) });
       await r2.reload();
       const res2 = r2.ts_range as Range;
       expect(res2.begin).toBeNull();
       expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect(res2.excludeEnd).toBe(false);
     });
     it.skip("timezone awareness tsrange", () => {
       // BLOCKED: range — time_zone_aware_types infrastructure not implemented
@@ -541,7 +555,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T13:30:00.451274Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
       await r.reload();
-      expect((r.tstz_range as Range).begin).toBeDefined();
+      expect(((r.tstz_range as Range).begin as Temporal.Instant).toString()).toBe(begin.toString());
+      expect(((r.tstz_range as Range).end as Temporal.Instant).toString()).toBe(end.toString());
       const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00.245124Z");
       r.tstz_range = new Range(sameInstant, sameInstant, true);
       await r.saveBang();
@@ -564,7 +579,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T14:30:00.224242Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
       await r.reload();
-      expect((r.ts_range as Range).begin).toBeDefined();
+      expect(((r.ts_range as Range).begin as Temporal.Instant).toString()).toBe(begin.toString());
+      expect(((r.ts_range as Range).end as Temporal.Instant).toString()).toBe(end.toString());
       r.ts_range = new Range(begin, begin, true);
       await r.saveBang();
       await r.reload();
