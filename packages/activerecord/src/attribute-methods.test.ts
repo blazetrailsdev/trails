@@ -389,6 +389,12 @@ describe("AttributeMethodsTest", () => {
     const out = formatForInspect.call(new M(), "x", new Date(NaN));
     expect(out).toBe('"Invalid Date"');
   });
+
+  it("formatForInspect does not crash for array containing an object with bigint values", () => {
+    class M extends Base {}
+    expect(() => formatForInspect.call(new M(), "x", [{ a: 1n }])).not.toThrow();
+    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a":"1"}]');
+  });
   it("attribute_for_inspect with a long array", async () => {
     const { Post } = makeModel();
     const p = await Post.create({ title: "inspect_arr" });
