@@ -52,6 +52,21 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
 }
 
 /**
+ * MySQL2-specific adapter options that extend the shared base.
+ * Kept separate so PG/SQLite3 destructuring of `TrailsAdapterOptions`
+ * never receives — and leaks — these keys into their driver configs.
+ */
+export interface MysqlAdapterOptions extends TrailsAdapterOptions {
+  // Mirrors: database.yml `strict:` — controls sql_mode STRICT_ALL_TABLES wiring.
+  // true/undefined → add STRICT_ALL_TABLES; false → remove strict flags; "default" → leave global value.
+  strict?: boolean | "default";
+  // Mirrors: database.yml `wait_timeout:` — SET SESSION wait_timeout = N on each connection.
+  waitTimeout?: number | string;
+  // Mirrors: database.yml `variables:` — SET SESSION key = value on each new connection.
+  variables?: Record<string, string | number | boolean | null | ":default" | "default">;
+}
+
+/**
  * PostgreSQL-specific adapter options that extend the shared base.
  * Kept separate so MySQL2/SQLite3 destructuring of `TrailsAdapterOptions`
  * never receives — and leaks — these keys into their driver configs.

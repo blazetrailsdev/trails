@@ -57,12 +57,25 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.active).toBe(false);
     });
 
-    it.skip("wait timeout as string", () => {
-      // BLOCKED: wait_timeout not wired into pool.on('connection') setup in mysql2-adapter.ts.
-      // SCOPE: parse wait_timeout from config; emit `SET SESSION wait_timeout = N` alongside SET time_zone.
+    it("wait timeout as string", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
+      try {
+        const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
+        expect(parseInt(rows[0].v as string, 10)).toBe(60);
+      } finally {
+        await testAdapter.close();
+      }
     });
-    it.skip("wait timeout as url", () => {
-      // BLOCKED: same as "wait timeout as string" — URL query param not parsed.
+    it("wait timeout as url", async () => {
+      const url = new URL(MYSQL_TEST_URL);
+      url.searchParams.set("wait_timeout", "60");
+      const testAdapter = new Mysql2Adapter(url.toString());
+      try {
+        const rows = await testAdapter.execute("SELECT @@SESSION.wait_timeout AS v");
+        expect(parseInt(rows[0].v as string, 10)).toBe(60);
+      } finally {
+        await testAdapter.close();
+      }
     });
 
     it("character set connection is configured", async () => {
@@ -76,19 +89,40 @@ describeIfMysql("Mysql2Adapter", () => {
       // showVariable() now implemented; only the second-adapter assertion is missing.
       // SCOPE: add MYSQL_TEST_URL2 + second adapter to test-helper.ts.
     });
-    it.skip("mysql default in strict mode", () => {
-      // BLOCKED: configureConnection() doesn't set sql_mode/STRICT_ALL_TABLES in mysql2-adapter.ts.
-      // SCOPE: implement configureConnection() to emit SET SESSION sql_mode = '...,STRICT_ALL_TABLES'.
+    it("mysql default in strict mode", async () => {
+      const rows = await adapter.execute("SELECT @@SESSION.sql_mode AS v");
+      expect(String(rows[0].v)).toMatch(/STRICT_ALL_TABLES/);
     });
-    it.skip("mysql strict mode disabled", () => {
-      // BLOCKED: strict: false config not wired — same gap as "mysql default in strict mode".
+    it("mysql strict mode disabled", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: false });
+      try {
+        const rows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
+        expect(String(rows[0].v)).not.toMatch(/STRICT_ALL_TABLES/);
+      } finally {
+        await testAdapter.close();
+      }
     });
-    it.skip("mysql strict mode specified default", () => {
-      // BLOCKED: strict: :default config not wired — same gap as "mysql default in strict mode".
+    it("mysql strict mode specified default", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: "default" });
+      try {
+        const globalRows = await testAdapter.execute("SELECT @@GLOBAL.sql_mode AS v");
+        const sessionRows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
+        expect(sessionRows[0].v).toBe(globalRows[0].v);
+      } finally {
+        await testAdapter.close();
+      }
     });
-    it.skip("mysql sql mode variable overrides strict mode", () => {
-      // BLOCKED: variables config hash not wired into pool.on('connection') in mysql2-adapter.ts.
-      // SCOPE: parse variables; emit SET SESSION for each key alongside SET time_zone.
+    it("mysql sql mode variable overrides strict mode", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { sql_mode: "ansi" },
+      });
+      try {
+        const rows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
+        expect(String(rows[0].v)).not.toMatch(/STRICT_ALL_TABLES/);
+      } finally {
+        await testAdapter.close();
+      }
     });
     it.skip("passing arbitrary flags to adapter", () => {
       // BLOCKED: pool model has no single raw_connection; flags on query_options not accessible.
@@ -97,11 +131,30 @@ describeIfMysql("Mysql2Adapter", () => {
     it.skip("passing flags by array to adapter", () => {
       // BLOCKED: same as "passing arbitrary flags to adapter".
     });
-    it.skip("mysql set session variable", () => {
-      // BLOCKED: variables config not wired — same gap as "mysql sql mode variable overrides".
+    it("mysql set session variable", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { default_week_format: 3 },
+      });
+      try {
+        const rows = await testAdapter.execute("SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v");
+        expect(parseInt(rows[0].v as string, 10)).toBe(3);
+      } finally {
+        await testAdapter.close();
+      }
     });
-    it.skip("mysql set session variable to default", () => {
-      // BLOCKED: same as "mysql set session variable".
+    it("mysql set session variable to default", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { default_week_format: "default" },
+      });
+      try {
+        const globalRows = await testAdapter.execute("SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v");
+        const sessionRows = await testAdapter.execute("SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v");
+        expect(sessionRows[0].v).toBe(globalRows[0].v);
+      } finally {
+        await testAdapter.close();
+      }
     });
 
     it("logs name show variable", async () => {
