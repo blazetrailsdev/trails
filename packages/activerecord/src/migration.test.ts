@@ -1171,9 +1171,13 @@ describe("MigrationTest", () => {
     expect(m.connection).toBe(baseAdapter);
     (m as any)._connectionOverride = override;
     expect(m.connection).toBe(override);
-    expect(m.connectionPool).toBe(override);
     delete (m as any)._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
+    const poolOverride = createTestAdapter();
+    (m as any)._poolOverride = poolOverride;
+    expect(m.connectionPool).toBe(poolOverride);
+    delete (m as any)._poolOverride;
+    expect(m.connectionPool).toBe(baseAdapter);
   });
 
   it("migration context with default schema migration", async () => {

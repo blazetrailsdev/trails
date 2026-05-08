@@ -187,6 +187,8 @@ export abstract class Migration {
   protected adapter!: DatabaseAdapter;
   /** @internal Per-migration connection override — mirrors Rails' @connection ivar. */
   protected _connectionOverride?: DatabaseAdapter;
+  /** @internal Per-migration pool override — mirrors Rails' @pool ivar. */
+  protected _poolOverride?: DatabaseAdapter;
   private _recording = false;
   private _recorder = new CommandRecorder();
   private _name?: string;
@@ -931,13 +933,13 @@ export abstract class Migration {
   }
 
   get connectionPool(): DatabaseAdapter {
-    return this._connectionOverride ?? this.adapter;
+    return this._poolOverride ?? this.adapter;
   }
 
   // --- Execution (Rails: Migration#exec_migration, #execution_strategy, etc.) ---
 
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
-    this.adapter = conn;
+    this._connectionOverride = conn;
     try {
       if (direction === "up") {
         await this.up();
@@ -1277,6 +1279,9 @@ export class MigrationContext {
       case "datetime":
       case "timestamp": {
         const base = an === "postgres" ? "TIMESTAMP" : "DATETIME";
+        // Rails only defaults precision=6 for "datetime", not "timestamp" — addColumn passes
+        // options through to the real adapter (which has its own precision defaults), while
+        // this fallback _mapType is only used when the adapter doesn't handle the type directly.
         // precision: undefined → Rails default of 6; precision: null → no precision suffix
         const p = options?.precision === undefined ? 6 : options.precision;
         if (p != null && !(p >= 0 && p <= 6))
