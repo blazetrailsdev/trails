@@ -16,7 +16,7 @@ export class DateTime extends ARDateTime {
     if (cast === null) return null;
     if (cast instanceof Temporal.Instant) return formatInstantForSqlMysql(cast);
     // Sentinels (DateInfinity/DateNegativeInfinity): MySQL has no infinity
-    // timestamp values, so return null (skipped on INSERT/UPDATE).
+    // timestamp values, so serialize to SQL NULL.
     return null;
   }
 }
