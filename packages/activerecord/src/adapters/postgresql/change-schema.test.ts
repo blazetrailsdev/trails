@@ -64,7 +64,7 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.type).toBe("timestamp without time zone");
+      expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
     it("change type with symbol", async () => {
@@ -73,7 +73,7 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.type).toBe("timestamp without time zone");
+      expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
     it("change type with symbol with timestamptz", async () => {
@@ -82,7 +82,7 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.type).toBe("timestamp with time zone");
+      expect(col!.sqlType).toBe("timestamp with time zone");
     });
 
     it("change type with symbol using datetime", async () => {
@@ -91,7 +91,7 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.type).toBe("timestamp without time zone");
+      expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
     it.skip("change type with symbol using timestamp with timestamptz as default", async () => {
@@ -117,7 +117,7 @@ describeIfPg("Migration", () => {
       });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "somedate");
-      expect(col!.type).toBe("timestamp without time zone[]");
+      expect(col!.sqlType).toBe("timestamp without time zone[]");
     });
   });
 });

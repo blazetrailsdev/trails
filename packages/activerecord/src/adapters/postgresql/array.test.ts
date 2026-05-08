@@ -31,16 +31,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       const columns = await adapter.columns("pg_arrays");
       const column = columns.find((c) => c.name === "tags")!;
       // Rails: assert_equal :string, @column.type (semantic type from OID cast)
-      expect((column as any).sqlTypeMetadata?.type).toBe("string");
+      expect(column.type).toBe("string");
       // Rails: assert_equal "character varying(255)", @column.sql_type (stripped, no [])
       expect(column.sqlType).toBe("character varying(255)");
       expect((column as any).isArray()).toBe(true);
       // Rails: assert_not_predicate @type, :binary? — OID::Array is not binary
-      expect((column as any).sqlTypeMetadata?.type).not.toBe("binary");
+      expect(column.type).not.toBe("binary");
 
       const ratingsColumn = columns.find((c) => c.name === "ratings")!;
       // Rails: assert_equal :integer, ratings_column.type
-      expect((ratingsColumn as any).sqlTypeMetadata?.type).toBe("integer");
+      expect(ratingsColumn.type).toBe("integer");
       expect((ratingsColumn as any).isArray()).toBe(true);
     });
     it.skip("not compatible with serialize array", async () => {
@@ -113,7 +113,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
-      expect((column as any).sqlTypeMetadata?.type).toBe("text");
+      expect(column.type).toBe("text");
       expect((column as any).default).toEqual([]);
       expect((column as any).isArray()).toBe(true);
     });
@@ -126,7 +126,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       const cols = await adapter.columns("pg_arrays");
       const column = cols.find((c) => c.name === "snippets")!;
-      expect((column as any).sqlTypeMetadata?.type).toBe("text");
+      expect(column.type).toBe("text");
       expect((column as any).default).toEqual([]);
       expect((column as any).isArray()).toBe(true);
     });

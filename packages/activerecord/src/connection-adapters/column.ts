@@ -45,7 +45,7 @@ export class Column {
   }
 
   get type(): string | null {
-    return this.sqlTypeMetadata?.sqlType ?? this.sqlTypeMetadata?.type ?? null;
+    return this.sqlTypeMetadata?.type ?? null;
   }
 
   get baseType(): string | null {
