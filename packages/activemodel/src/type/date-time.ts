@@ -19,10 +19,26 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   protected castValue(value: unknown): DateTimeCastResult | null {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
-    if (value instanceof Temporal.Instant) return value;
+    if (value instanceof Temporal.Instant) return this._applySecondsPrecision(value);
     const str = String(value).trim();
     if (str === "") return null;
     return this.parseString(str);
+  }
+
+  private _applySecondsPrecision(value: Temporal.Instant): Temporal.Instant {
+    if (
+      this.precision == null ||
+      !Number.isInteger(this.precision) ||
+      this.precision < 0 ||
+      this.precision > 9
+    )
+      return value;
+    const mod = 10n ** BigInt(9 - this.precision);
+    let subsec = value.epochNanoseconds % 1_000_000_000n;
+    if (subsec < 0n) subsec += 1_000_000_000n;
+    const roundedOff = subsec % mod;
+    if (roundedOff === 0n) return value;
+    return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds - roundedOff);
   }
 
   private parseString(str: string): DateTimeCastResult | null {

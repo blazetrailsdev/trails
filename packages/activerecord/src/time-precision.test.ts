@@ -1,44 +1,127 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "./index.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import { MigrationContext } from "./migration.js";
+import { SchemaDumper } from "./schema-dumper.js";
+
+function nsecTime(v: Temporal.PlainTime): number {
+  return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
+}
 
 describe("TimePrecisionTest", () => {
-  it.skip("time data type with precision", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+  let adapter: SQLite3Adapter;
+  let ctx: MigrationContext;
+
+  beforeEach(() => {
+    adapter = new SQLite3Adapter(":memory:");
+    ctx = new MigrationContext(adapter);
   });
-  it.skip("time precision is truncated on assignment", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+  afterEach(async () => {
+    await adapter.close();
   });
-  it.skip("no time precision isnt truncated on assignment", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  function makeFoo() {
+    class Foo extends Base {
+      static override tableName = "foos";
+    }
+    Foo.adapter = adapter;
+    return Foo;
+  }
+
+  it("time data type with precision", async () => {
+    await ctx.createTable("foos", { force: true }, () => {});
+    await ctx.addColumn("foos", "start", "time", { precision: 3 });
+    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    expect((Foo.columnsHash() as any)["start"].precision).toBe(3);
+    expect((Foo.columnsHash() as any)["finish"].precision).toBe(6);
   });
-  it.skip("passing precision to time does not set limit", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  it("time precision is truncated on assignment", async () => {
+    await ctx.createTable("foos", { force: true }, () => {});
+    await ctx.addColumn("foos", "start", "time", { precision: 0 });
+    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    const time = Temporal.PlainTime.from({
+      hour: 12,
+      minute: 0,
+      second: 0,
+      millisecond: 123,
+      microsecond: 456,
+      nanosecond: 789,
+    });
+    const foo = new Foo({ start: time, finish: time });
+    expect(nsecTime((foo as any).start)).toBe(0);
+    expect(nsecTime((foo as any).finish)).toBe(123456000);
+    await (foo as any).save();
+    await (foo as any).reload();
+    expect(nsecTime((foo as any).start)).toBe(0);
+    expect(nsecTime((foo as any).finish)).toBe(123456000);
   });
-  it.skip("invalid time precision raises error", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  it("no time precision isnt truncated on assignment", async () => {
+    await ctx.createTable("foos", { force: true }, () => {});
+    await ctx.addColumn("foos", "start", "time");
+    await ctx.addColumn("foos", "finish", "time", { precision: 6 });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    const time = Temporal.PlainTime.from({
+      hour: 12,
+      minute: 0,
+      second: 0,
+      millisecond: 0,
+      microsecond: 0,
+      nanosecond: 123,
+    });
+    const foo = new Foo({ start: time, finish: time });
+    expect(nsecTime((foo as any).start)).toBe(123);
+    expect(nsecTime((foo as any).finish)).toBe(0);
+    await (foo as any).save();
+    await (foo as any).reload();
+    expect(nsecTime((foo as any).start)).toBe(0);
+    expect(nsecTime((foo as any).finish)).toBe(0);
   });
-  it.skip("formatting time according to precision", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  it("passing precision to time does not set limit", async () => {
+    await ctx.createTable("foos", { force: true }, (t) => {
+      t.time("start", { precision: 3 });
+      t.time("finish", { precision: 6 });
+    });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    expect((Foo.columnsHash() as any)["start"].limit).toBeNull();
+    expect((Foo.columnsHash() as any)["finish"].limit).toBeNull();
   });
-  it.skip("schema dump includes time precision", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  it("invalid time precision raises error", async () => {
+    await expect(
+      ctx.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 7 });
+        t.time("finish", { precision: 7 });
+      }),
+    ).rejects.toThrow(ArgumentError);
   });
-  it.skip("time precision with zero should be dumped", () => {
-    // BLOCKED: type — date/time precision type gap in time-precision
-    // ROOT-CAUSE: type/date-time.ts or type/time.ts#precision not fully matching Rails cast/serialize behavior
-    // SCOPE: ~30 LOC fix in type/date-time.ts or type/time.ts; affects ~8–18 tests in time-precision.test.ts
+
+  it("formatting time according to precision", () => {
+    // BLOCKED: PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
+    // ROOT-CAUSE: ~20 LOC in connection-adapters/abstract/quoting.ts PlainTime quoting
+  });
+
+  it("schema dump includes time precision", async () => {
+    await ctx.createTable("foos", { force: true }, (t) => {
+      t.time("start", { precision: 4 });
+      t.time("finish", { precision: 6 });
+    });
+    const output = SchemaDumper.dump(ctx) as string;
+    expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
+    expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
+  });
+
+  it("time precision with zero should be dumped", () => {
+    // BLOCKED: postgres-only test (current_adapter?(:PostgreSQLAdapter))
   });
 });

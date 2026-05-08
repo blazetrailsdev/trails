@@ -182,6 +182,7 @@ const DSL_HELPER_METHODS = new Set([
   "date",
   "datetime",
   "timestamp",
+  "time",
   "binary",
   "json",
   "jsonb",
@@ -690,12 +691,20 @@ export class SchemaDumper {
       if (col.array && !colspec.array) colspec.array = true;
       if (col.limit !== undefined && col.limit !== null && extraOpts?.limit === undefined)
         colspec.limit = col.limit;
-      if (
-        col.precision !== undefined &&
-        col.precision !== null &&
-        extraOpts?.precision === undefined
-      )
-        colspec.precision = col.precision;
+      if (extraOpts?.precision === undefined) {
+        if (dslType === "datetime" || dslType === "timestamp") {
+          // precision: 6 is the default for datetime — omit it; precision: null → "nil"
+          if (col.precision === undefined) {
+            // not set — omit
+          } else if (col.precision === null) {
+            colspec.precision = null;
+          } else if (col.precision !== SchemaDumper.DEFAULT_DATETIME_PRECISION) {
+            colspec.precision = col.precision;
+          }
+        } else if (col.precision !== undefined && col.precision !== null) {
+          colspec.precision = col.precision;
+        }
+      }
       if (col.scale !== undefined && col.scale !== null && extraOpts?.scale === undefined)
         colspec.scale = col.scale;
       if (col.collation != null) colspec.collation = col.collation;

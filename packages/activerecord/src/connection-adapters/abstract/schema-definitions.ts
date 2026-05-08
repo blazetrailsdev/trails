@@ -9,6 +9,7 @@ import {
 } from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize, pluralize } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 /** @internal */
 function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
@@ -38,6 +39,7 @@ export type ColumnType =
   | "decimal"
   | "boolean"
   | "date"
+  | "time"
   | "datetime"
   | "timestamp"
   | "binary"
@@ -840,6 +842,10 @@ export class TableDefinition {
     return this.column(name, "date", options);
   }
 
+  time(name: string, options: ColumnOptions = {}): this {
+    return this.column(name, "time", options);
+  }
+
   datetime(name: string, options: ColumnOptions = {}): this {
     return this.column(name, "datetime", options);
   }
@@ -963,10 +969,26 @@ export class TableDefinition {
         case "date":
           parts.push("DATE");
           break;
-        case "datetime":
-        case "timestamp":
-          parts.push(this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME");
+        case "time": {
+          const tp = col.options.precision;
+          if (tp != null && !(tp >= 0 && tp <= 6))
+            throw new ArgumentError(
+              `No TIME type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
+            );
+          parts.push(tp != null ? `TIME(${tp})` : "TIME");
           break;
+        }
+        case "datetime":
+        case "timestamp": {
+          const base = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+          const tp = col.options.precision;
+          if (tp != null && !(tp >= 0 && tp <= 6))
+            throw new ArgumentError(
+              `No ${base} type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
+            );
+          parts.push(tp != null ? `${base}(${tp})` : base);
+          break;
+        }
         case "binary":
           parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
           break;

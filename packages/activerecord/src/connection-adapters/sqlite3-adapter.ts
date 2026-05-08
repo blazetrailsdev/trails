@@ -628,8 +628,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   lookupCastTypeFromColumn(column: {
     sqlType?: string | null;
+    precision?: number | null;
   }): import("@blazetrails/activemodel").Type {
-    return this.lookupCastType(column.sqlType ?? "");
+    const base = this.lookupCastType(column.sqlType ?? "");
+    if (column.precision != null) {
+      if (base instanceof SQLiteDateTimeType)
+        return new SQLiteDateTimeType({ precision: column.precision });
+      if (base instanceof TimeType) return new TimeType({ precision: column.precision });
+    }
+    return base;
   }
 
   get nativeTypeMap(): TypeMap {
@@ -1395,11 +1402,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     return rows.map((r) => {
       const sqlType = r.type || "";
+      const precMatch = /^(datetime|timestamp|time)\((\d+)\)$/i.exec(sqlType);
+      const precision = precMatch ? parseInt(precMatch[2], 10) : null;
+      const baseSqlType = precMatch ? sqlType.slice(0, sqlType.indexOf("(")) : sqlType;
       const meta = new SqlTypeMetadata({
-        sqlType,
-        type: sqlType.toLowerCase(),
+        sqlType: baseSqlType,
+        type: baseSqlType.toLowerCase(),
         limit: null,
-        precision: null,
+        precision,
         scale: null,
       });
       const defaultValue = sqliteExtractValueFromDefault(r.dflt_value);

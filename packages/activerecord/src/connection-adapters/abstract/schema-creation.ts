@@ -29,6 +29,7 @@ import {
   quoteTableName as mysqlQuoteTableName,
 } from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 /** @internal */
 function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
@@ -258,11 +259,24 @@ export class SchemaCreation {
       case "date":
         sql = "DATE";
         break;
+      case "time": {
+        const p = options.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No TIME type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        sql = p != null ? `TIME(${p})` : "TIME";
+        break;
+      }
       case "datetime":
       case "timestamp": {
         const base = this.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
         const p = options.precision;
-        sql = p != null && p >= 0 && p <= 6 ? `${base}(${p})` : base;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        sql = p != null ? `${base}(${p})` : base;
         break;
       }
       case "binary":

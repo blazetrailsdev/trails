@@ -6,11 +6,34 @@ import { ValueType } from "./value.js";
 export class TimeType extends ValueType<Temporal.PlainTime> {
   readonly name = "time";
 
+  private _applySecondsPrecision(value: Temporal.PlainTime): Temporal.PlainTime {
+    if (
+      this.precision == null ||
+      !Number.isInteger(this.precision) ||
+      this.precision < 0 ||
+      this.precision > 9
+    )
+      return value;
+    const nsec = value.millisecond * 1_000_000 + value.microsecond * 1_000 + value.nanosecond;
+    const mod = 10 ** (9 - this.precision);
+    const roundedOff = nsec % mod;
+    if (roundedOff === 0) return value;
+    // Rebuild from truncated sub-second components to avoid PlainTime.subtract()
+    // wrapping across the midnight boundary (00:00:00.000000001 - 1ns = 23:59:59...).
+    const truncated = nsec - roundedOff;
+    return value.with({
+      millisecond: Math.floor(truncated / 1_000_000),
+      microsecond: Math.floor((truncated % 1_000_000) / 1_000),
+      nanosecond: truncated % 1_000,
+    });
+  }
+
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): Temporal.PlainTime | null {
-    if (value instanceof Temporal.PlainTime) return value;
+    if (value instanceof Temporal.PlainTime) return this._applySecondsPrecision(value);
     // Accept PlainDateTime from multiparameter assignment — extract the time part.
-    if (value instanceof Temporal.PlainDateTime) return value.toPlainTime();
+    if (value instanceof Temporal.PlainDateTime)
+      return this._applySecondsPrecision(value.toPlainTime());
     const str = String(value).trim();
     if (str === "") return null;
     const parts = looseDateParse(str);

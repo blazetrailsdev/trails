@@ -1,4 +1,5 @@
 import { getFs, getPath, Logger, getEnv } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -1246,7 +1247,7 @@ export class MigrationContext {
     // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
   }
 
-  private _mapType(type: string): string {
+  private _mapType(type: string, options?: ColumnOptions): string {
     const an = this._adapterName;
     switch (type.toLowerCase()) {
       case "string":
@@ -1263,9 +1264,24 @@ export class MigrationContext {
         return "BOOLEAN";
       case "date":
         return "DATE";
+      case "time": {
+        const p = options?.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No TIME type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        return p != null ? `TIME(${p})` : "TIME";
+      }
       case "datetime":
-      case "timestamp":
-        return an === "postgres" ? "TIMESTAMP" : "DATETIME";
+      case "timestamp": {
+        const base = an === "postgres" ? "TIMESTAMP" : "DATETIME";
+        const p = options?.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        return p != null ? `${base}(${p})` : base;
+      }
       case "binary":
         return an === "postgres" ? "BYTEA" : "BLOB";
       case "primary_key":
@@ -1291,7 +1307,7 @@ export class MigrationContext {
       return;
     }
     await this.adapter.executeMutation(
-      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type)}`,
+      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type, _options)}`,
     );
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
