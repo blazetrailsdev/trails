@@ -1,6 +1,7 @@
 import { describe } from "vitest";
 import pg from "pg";
 import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
+import { pgDatetimeConfig } from "../../connection-adapters/postgresql/pg-datetime-config.js";
 
 export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
@@ -24,7 +25,7 @@ export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof de
 
 /** Mirrors Rails' with_postgresql_datetime_type — temporarily changes the adapter's datetimeType. */
 export async function withPostgresqlDatetimeType<T>(
-  type: "timestamp" | "timestamptz",
+  type: string,
   fn: () => T | Promise<T>,
 ): Promise<T> {
   const original = PostgreSQLAdapter.datetimeType;
@@ -33,6 +34,20 @@ export async function withPostgresqlDatetimeType<T>(
     return await fn();
   } finally {
     PostgreSQLAdapter.datetimeType = original;
+  }
+}
+
+/** Temporarily registers extra entries in nativeDatabaseTypes, then restores the originals. */
+export async function withNativeDatabaseTypeOverrides<T>(
+  overrides: Record<string, string | { name?: string; limit?: number }>,
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const saved = { ...pgDatetimeConfig.nativeDatabaseTypesOverrides };
+  Object.assign(pgDatetimeConfig.nativeDatabaseTypesOverrides, overrides);
+  try {
+    return await fn();
+  } finally {
+    pgDatetimeConfig.nativeDatabaseTypesOverrides = saved;
   }
 }
 
