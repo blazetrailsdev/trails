@@ -18,7 +18,14 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     const mod = 10 ** (9 - this.precision);
     const roundedOff = nsec % mod;
     if (roundedOff === 0) return value;
-    return value.subtract({ nanoseconds: roundedOff });
+    // Rebuild from truncated sub-second components to avoid PlainTime.subtract()
+    // wrapping across the midnight boundary (00:00:00.000000001 - 1ns = 23:59:59...).
+    const truncated = nsec - roundedOff;
+    return value.with({
+      millisecond: Math.floor(truncated / 1_000_000),
+      microsecond: Math.floor((truncated % 1_000_000) / 1_000),
+      nanosecond: truncated % 1_000,
+    });
   }
 
   /** @internal Rails-private helper. */
