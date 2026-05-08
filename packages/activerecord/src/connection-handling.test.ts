@@ -436,6 +436,9 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
         loadCalled = true;
         return Promise.resolve(this);
       },
+      toArray() {
+        return Promise.resolve([]);
+      },
     };
 
     const adapter = createTestAdapter();
@@ -477,6 +480,9 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
       load() {
         loadCalled = true;
         return Promise.resolve(this);
+      },
+      toArray() {
+        return Promise.resolve([]);
       },
     };
 

@@ -5,6 +5,7 @@ import {
   timestampAttributesForUpdateInModel,
   currentTimeFromProperTimezone,
 } from "./timestamp.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
@@ -108,7 +109,7 @@ export async function touch(this: Base, ...names: string[]): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
-    const deferredTime = self._touchTime as Date | null;
+    const deferredTime = self._touchTime as Temporal.Instant | null;
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;
@@ -160,7 +161,7 @@ export function surreptitiouslyTouch(this: Base, attrNames: string[]): void {
 export async function touchDeferredAttributes(this: Base): Promise<void> {
   const self = this as any;
   const deferredAttrs = (self._deferTouchAttrs as string[]) ?? [];
-  const time = (self._touchTime as Date | null) ?? currentTimeFromProperTimezone();
+  const time = (self._touchTime as Temporal.Instant | null) ?? currentTimeFromProperTimezone();
   self._deferTouchAttrs = null;
   self._touchTime = null;
   // Mirrors Rails: touch(time: @_touch_time). Passes the deferred timestamp

@@ -393,6 +393,16 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value != null && typeof (value as any).then === "function";
 }
 
+// Mirrors Rails' `is_a? ActiveRecord::Relation` check. Requires both .load and
+// .toArray to avoid false positives on unrelated objects that happen to have .load().
+function isRelationLike(value: unknown): boolean {
+  return (
+    value != null &&
+    typeof (value as any).load === "function" &&
+    typeof (value as any).toArray === "function"
+  );
+}
+
 function withCleanup<T>(result: T, cleanup: () => void): T {
   if (isThenable(result)) {
     return Promise.resolve(result).finally(cleanup) as T;
@@ -439,7 +449,7 @@ export function withRoleAndShard<T>(
   //
   // Check .load BEFORE isThenable: Relation is thenable (delegates .then to toArray),
   // so Promise.resolve(relation) would unwrap it to records instead of calling .load().
-  if (result != null && typeof (result as any).load === "function") {
+  if (isRelationLike(result)) {
     // Sync Relation returned: .load() is async, cleanup fires via withCleanup's .finally().
     const loaded = (result as any).load();
     return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
@@ -448,7 +458,7 @@ export function withRoleAndShard<T>(
   if (isThenable(result)) {
     // Async fn: resolve first, then check if the resolved value is a Relation.
     const loaded = Promise.resolve(result as unknown).then((v) =>
-      v != null && typeof (v as any).load === "function" ? (v as any).load() : v,
+      isRelationLike(v) ? (v as any).load() : v,
     );
     return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
   }
