@@ -562,17 +562,19 @@ export function typeFor(rel: CalculationRelation, field: string): unknown {
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
-  joinDependencies?: Iterable<{ each(cb: (node: any) => void): void }>,
+  joinDependencies?: Iterable<Iterable<{ modelClass?: { attributeTypes?: unknown } }>>,
 ): unknown {
   const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
   for (const jd of deps) {
-    for (const node of jd as any) {
-      const klass = (node as any).modelClass;
+    for (const node of jd) {
+      const klass = node.modelClass;
       if (!klass) continue;
-      const rawTypes =
-        typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
+      const attrTypes = klass.attributeTypes;
+      const rawTypes: unknown =
+        typeof attrTypes === "function" ? (attrTypes as () => unknown)() : attrTypes;
       if (!rawTypes) continue;
-      const type = rawTypes instanceof Map ? rawTypes.get(name) : rawTypes[name];
+      const type =
+        rawTypes instanceof Map ? rawTypes.get(name) : (rawTypes as Record<string, unknown>)[name];
       if (type) return type;
     }
   }
