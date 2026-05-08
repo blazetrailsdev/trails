@@ -36,7 +36,7 @@ export class DefaultStrategy extends ExecutionStrategy {
     // own connection field if set.
     return (
       this._adapter ??
-      (this.migration as MigrationLike).connection ??
+      (this.migration as MigrationLike | null)?.connection ??
       (() => {
         throw new Error("DefaultStrategy: no adapter available (exec() has not been called)");
       })()
