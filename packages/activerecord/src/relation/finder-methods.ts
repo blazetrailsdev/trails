@@ -11,6 +11,7 @@
 import { Nodes } from "@blazetrails/arel";
 import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
+import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
@@ -194,6 +195,7 @@ interface FinderRelation {
     name: string;
     primaryKey: string | string[];
     compositePrimaryKey: boolean;
+    implicitOrderColumn?: string | null;
     createBang(attrs: any): Promise<any>;
     transaction<R>(
       fn: (tx: any) => Promise<R>,
@@ -686,10 +688,18 @@ export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
 export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
   const pk = (rel as any)._modelClass.primaryKey as string;
   const records = await (rel as any).where({ [pk]: ids }).toArray();
-  if (records.length !== ids.length) {
+
+  // Rails: expected_size = ids.size, then clamp down for limit/offset.
+  // "11 ids with limit 3, offset 9 should give 2 results."
+  let expectedSize = ids.length;
+  const limitValue: number | null = (rel as any)._limitValue ?? null;
+  const offsetValue: number | null = (rel as any)._offsetValue ?? null;
+  if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
+  if (offsetValue !== null && ids.length - offsetValue < expectedSize)
+    expectedSize = ids.length - offsetValue;
+
+  if (records.length !== expectedSize) {
     const foundIds = records.map((r: any) => r.readAttribute?.(pk) ?? r[pk]);
-    // Multiset subtraction: remove each found id once so duplicate requested ids
-    // are accounted for correctly (mirrors Rails' expected_size = ids.size comparison).
     const remaining = [...ids];
     for (const foundId of foundIds) {
       const idx = remaining.findIndex((id) => id === foundId);
@@ -715,12 +725,14 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 
 /** @internal */
 export async function findTake(rel: FinderRelation): Promise<any | null> {
+  if ((rel as any)._loaded) return (rel as any)._records[0] ?? null;
   const records = await (rel as any).limit(1).toArray();
   return records[0] ?? null;
 }
 
 /** @internal */
 export async function findTakeWithLimit(rel: FinderRelation, limit: number): Promise<any[]> {
+  if ((rel as any)._loaded) return (rel as any)._records.slice(0, limit);
   return (rel as any).limit(limit).toArray();
 }
 
@@ -736,15 +748,37 @@ export async function findLast(rel: FinderRelation, limit?: number): Promise<any
 
 /** @internal */
 export function orderedRelation(rel: FinderRelation): any {
-  if (!hasOrder(rel)) {
-    const pk = (rel as any)._modelClass?.primaryKey;
-    if (pk) return orderByPk(rel, "asc");
+  const mc = (rel as any)._modelClass;
+  const pk = mc?.primaryKey;
+  const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
+  const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
+  if (!hasOrder(rel) && (implicitOrder || constraintsList != null || pk)) {
+    const cols = _orderColumns(rel);
+    if (cols.length > 0) {
+      // Use hash-form { col: "asc" } so _orderClauses stores ["col", "asc"] tuples.
+      // Tuple form is what reverseOrderBang expects — Arel node form pre-renders to
+      // { raw: '"tbl"."col" ASC' } which the chained-replace in reverseOrderBang
+      // would undo (ASC→DESC→ASC). This matches Rails: table[column].asc nodes are
+      // rendered by the visitor at SQL-build time, not at order-storage time.
+      return (rel as any).order(...cols.map((col: string) => ({ [col]: "asc" as const })));
+    }
   }
   return rel;
 }
 
 /** @internal */
 export function _orderColumns(rel: FinderRelation): string[] {
-  const pk = (rel as any)._modelClass.primaryKey;
-  return Array.isArray(pk) ? pk : [pk];
+  const mc = (rel as any)._modelClass;
+  const pk = mc?.primaryKey;
+  const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
+  const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
+
+  const oc: string[] = [];
+  if (implicitOrder) oc.push(implicitOrder);
+  if (constraintsList) oc.push(...constraintsList);
+  if (pk && constraintsList == null) {
+    const pkCols = Array.isArray(pk) ? pk : [pk];
+    oc.push(...pkCols);
+  }
+  return [...new Set(oc.filter(Boolean))];
 }

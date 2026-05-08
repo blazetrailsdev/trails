@@ -1882,12 +1882,25 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   const opts = fromClause?.value;
   let name = fromClause?.name;
   if (opts && typeof (opts as any).toArel === "function") {
+    // When the from-value is a Relation that needs eager loading, derive the
+    // from clause via applyJoinDependency on a clone first (mirrors Rails
+    // build_from). Clone avoids mutating the caller's relation in-place since
+    // applyJoinDependency modifies _joinClauses.
+    let resolved: any = opts;
+    if (
+      typeof (opts as any)._eagerLoadingForSql === "function" &&
+      (opts as any)._eagerLoadingForSql()
+    ) {
+      resolved = (opts as any)._clone
+        ? (opts as any)._clone().applyJoinDependency(true)
+        : (opts as any).applyJoinDependency(true);
+    }
     name ??= "subquery";
     const alias = String(name);
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(alias)) {
       throw argumentError(`Invalid subquery alias "${alias}": must be a safe SQL identifier`);
     }
-    return (opts as any).toArel().as(alias);
+    return resolved.toArel().as(alias);
   }
   return opts;
 }
@@ -2033,7 +2046,7 @@ export function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliase
   buildSelect.call(this, arel);
 
   if (this._optimizerHints.length > 0) arel.optimizerHints?.(...this._optimizerHints);
-  if (this._isDistinct) arel.distinct();
+  arel.distinct(this._isDistinct);
 
   const from = buildFrom.call(this);
   if (from !== undefined && from !== null) arel.from(from as any);

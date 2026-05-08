@@ -7,8 +7,16 @@
  * flatten / composite arity / empty) is easier to pin here.
  */
 
-import { describe, it, expect } from "vitest";
-import { normalizeFindArgs, raiseNotFoundAll, raiseNotFoundSingle } from "./finder-methods.js";
+import { describe, it, expect, vi } from "vitest";
+import {
+  normalizeFindArgs,
+  raiseNotFoundAll,
+  raiseNotFoundSingle,
+  findSome,
+  findTake,
+  findTakeWithLimit,
+  _orderColumns,
+} from "./finder-methods.js";
 import { RecordNotFound } from "../errors.js";
 
 describe("normalizeFindArgs — simple primary key", () => {
@@ -229,5 +237,130 @@ describe("raiseNotFoundSingle", () => {
       expect(err.primaryKey).toBe("id");
       expect(err.id).toBe(42);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findSome — expected_size accounting (Gap 1)
+// ---------------------------------------------------------------------------
+
+function makeFindSomeRel(records: any[], opts: { limit?: number; offset?: number } = {}): any {
+  return {
+    _modelClass: { primaryKey: "id", name: "Post" },
+    _limitValue: opts.limit ?? null,
+    _offsetValue: opts.offset ?? null,
+    where(_cond: any) {
+      return { toArray: async () => records };
+    },
+  };
+}
+
+describe("findSome — expected_size respects limit and offset", () => {
+  it("succeeds when result count equals ids.length with no limit/offset", async () => {
+    const rel = makeFindSomeRel([{ id: 1 }, { id: 2 }]);
+    const result = await findSome(rel, [1, 2]);
+    expect(result).toHaveLength(2);
+  });
+
+  it("succeeds when limit clips expected_size and result matches limit", async () => {
+    // 5 ids, limit 3 → expected 3; DB returns 3 rows → no error
+    const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const rel = makeFindSomeRel(rows, { limit: 3 });
+    const result = await findSome(rel, [1, 2, 3, 4, 5]);
+    expect(result).toHaveLength(3);
+  });
+
+  it("succeeds when offset + limit produce expected_size=2 from 11 ids", async () => {
+    // 11 ids, limit 3, offset 9 → expected = min(3, 11-9) = 2
+    const rows = [{ id: 10 }, { id: 11 }];
+    const rel = makeFindSomeRel(rows, { limit: 3, offset: 9 });
+    const result = await findSome(rel, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result).toHaveLength(2);
+  });
+
+  it("throws when result count mismatches expected_size", async () => {
+    const rel = makeFindSomeRel([{ id: 1 }]);
+    await expect(findSome(rel, [1, 2])).rejects.toBeInstanceOf(RecordNotFound);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findTake / findTakeWithLimit — loaded? fast-path (Gap 3)
+// ---------------------------------------------------------------------------
+
+function makeLoadedRel(records: any[]): any {
+  return {
+    _loaded: true,
+    _records: records,
+    limit: (_n: number) => ({ toArray: async () => records.slice(0, _n) }),
+  };
+}
+
+describe("findTake — returns first record from loaded relation without querying", () => {
+  it("returns first record when loaded", async () => {
+    const rel = makeLoadedRel([{ id: 1 }, { id: 2 }]);
+    const spy = vi.spyOn(rel, "limit");
+    const result = await findTake(rel);
+    expect(result).toEqual({ id: 1 });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("returns null from empty loaded relation", async () => {
+    const rel = makeLoadedRel([]);
+    const result = await findTake(rel);
+    expect(result).toBeNull();
+  });
+});
+
+describe("findTakeWithLimit — slices loaded relation without querying", () => {
+  it("returns first N records when loaded", async () => {
+    const rel = makeLoadedRel([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    const spy = vi.spyOn(rel, "limit");
+    const result = await findTakeWithLimit(rel, 2);
+    expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _orderColumns — implicit_order_column + query_constraints_list (Gap 2)
+// ---------------------------------------------------------------------------
+
+function makeRelForOrder(mc: {
+  primaryKey?: string | string[];
+  implicitOrderColumn?: string | null;
+  _queryConstraintsList?: string[] | null;
+}): any {
+  return { _modelClass: mc };
+}
+
+describe("_orderColumns — Rails _order_columns precedence", () => {
+  it("returns [pk] when no implicit_order_column or query_constraints_list", () => {
+    const rel = makeRelForOrder({ primaryKey: "id" });
+    expect(_orderColumns(rel)).toEqual(["id"]);
+  });
+
+  it("puts implicit_order_column first, then pk", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", implicitOrderColumn: "created_at" });
+    expect(_orderColumns(rel)).toEqual(["created_at", "id"]);
+  });
+
+  it("deduplicates when implicit_order_column equals pk", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", implicitOrderColumn: "id" });
+    expect(_orderColumns(rel)).toEqual(["id"]);
+  });
+
+  it("uses _queryConstraintsList instead of pk when set", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", _queryConstraintsList: ["shop_id", "id"] });
+    expect(_orderColumns(rel)).toEqual(["shop_id", "id"]);
+  });
+
+  it("puts implicit_order_column before _queryConstraintsList", () => {
+    const rel = makeRelForOrder({
+      primaryKey: "id",
+      implicitOrderColumn: "created_at",
+      _queryConstraintsList: ["shop_id", "id"],
+    });
+    expect(_orderColumns(rel)).toEqual(["created_at", "shop_id", "id"]);
   });
 });
