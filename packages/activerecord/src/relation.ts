@@ -2731,15 +2731,7 @@ export class Relation<T extends Base> {
         const def = this._modelClass._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
         if (isArray) return [table.get(key), def!.type!.serialize(val)];
-        const dbVal =
-          val instanceof Temporal.Instant ||
-          val instanceof Temporal.PlainDateTime ||
-          val instanceof Temporal.PlainDate ||
-          val instanceof Temporal.PlainTime ||
-          val instanceof Temporal.ZonedDateTime
-            ? (def?.type?.serialize?.(val) ?? val)
-            : val;
-        return [table.get(key), dbVal];
+        return [table.get(key), val];
       },
     );
     const um = new UpdateManager().table(table).set(updateValues);

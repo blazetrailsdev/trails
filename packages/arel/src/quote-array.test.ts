@@ -48,4 +48,8 @@ describe("quoteArrayLiteral", () => {
     const obj = { toISOString: () => "2026-01-01T00:00:00Z" };
     expect(quoteArrayLiteral([obj])).toBe('{"2026-01-01T00:00:00Z"}');
   });
+
+  it("handles bigint values inside objects", () => {
+    expect(quoteArrayLiteral([{ id: 42n }])).toBe('{"{\\"id\\":\\"42\\"}"}');
+  });
 });

@@ -24,8 +24,10 @@ export function quoteArrayLiteral(arr: unknown[]): string {
     }
     let str: string;
     if (typeof v === "object" && v !== null) {
+      const replacer = (_k: string, val: unknown) =>
+        typeof val === "bigint" ? val.toString() : val;
       try {
-        str = JSON.stringify(v);
+        str = JSON.stringify(v, replacer) ?? String(v);
       } catch {
         str = String(v);
       }

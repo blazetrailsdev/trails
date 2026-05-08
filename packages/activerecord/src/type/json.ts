@@ -27,13 +27,6 @@ export class Json extends ValueType<unknown> {
 
   cast(value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return null;
-      }
-    }
     return this.deserialize(this.serialize(value));
   }
 

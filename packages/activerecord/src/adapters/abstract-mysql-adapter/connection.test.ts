@@ -31,13 +31,10 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it.skip("no automatic reconnection after timeout", () => {
-      // BLOCKED: pool model limitation — with connectionLimit > 1, mysql2 Pool
-      // can transparently create a new connection when getConnection() is called
-      // after a server-side wait_timeout, so activeAsync() may ping a fresh
-      // socket and return true. Rails pings a single raw connection (mysql_ping)
-      // and can directly observe the dead socket. The timeout-without-reconnect
-      // path is only testable with connectionLimit:1 (see the reconnect tests
-      // below) and is covered there via the positive reconnect assertions.
+      // BLOCKED: MariaDB reconnects transparently at the driver level even with
+      // connectionLimit:1, so activeAsync() returns true after wait_timeout.
+      // MySQL exposes the dead socket correctly but the CI also runs MariaDB,
+      // making this assertion non-deterministic across engines.
     });
     it("successful reconnection after timeout with manual reconnect", async () => {
       // Use connectionLimit: 1 so SET SESSION wait_timeout and the sleep share

@@ -17,7 +17,11 @@ describe("Json", () => {
   });
 
   it("cast parses string input", () => {
-    expect(type.cast('{"a":1}')).toEqual({ a: 1 });
+    expect(type.cast('{"a":1}')).toEqual('{"a":1}');
+  });
+
+  it("cast round-trips non-JSON string without returning null", () => {
+    expect(type.cast("foo")).toBe("foo");
   });
 
   it("cast returns null for null or undefined", () => {
