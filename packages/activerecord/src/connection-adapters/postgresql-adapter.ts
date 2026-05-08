@@ -79,7 +79,6 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
-import { Array as OidArray } from "./postgresql/oid/array.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -2528,7 +2527,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // literal default vs. default function (nextval, CURRENT_TIMESTAMP, etc.).
       const splitDefault = attgenerated ? null : splitPgDefault(rawDefault);
       const defaultFunction = attgenerated ? rawDefault : (splitDefault?.fn ?? null);
-      const literal = attgenerated ? null : (splitDefault?.literal ?? null);
+      const rawLiteral = attgenerated ? null : (splitDefault?.literal ?? null);
+      const literal = rawLiteral !== null ? castType.deserialize(rawLiteral) : null;
       const isSerial = typeof rawDefault === "string" && rawDefault.startsWith("nextval(");
 
       return new Column(
@@ -4060,10 +4060,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       string | null,
     ];
     const meta = await this.fetchTypeMetadata(col, type, Number(oid), Number(fmod));
+    const castType = this.lookupCastTypeFromColumn({
+      oid: Number(oid),
+      fmod: Number(fmod),
+      sqlType: type,
+    });
     const split = gen ? null : splitPgDefault(raw);
+    const rawLiteral = gen ? null : (split?.literal ?? null);
     return new Column(
       col,
-      gen ? null : (split?.literal ?? null),
+      rawLiteral !== null ? castType.deserialize(rawLiteral) : null,
       { sqlType: meta.sqlType, type: meta.type, oid: Number(oid), fmod: Number(fmod) },
       !notnull,
       {
@@ -4741,11 +4747,12 @@ function _pgAdvisoryLockSql(
 function splitPgDefault(raw: string | null): { literal: unknown; fn: string | null } {
   if (raw == null) return { literal: null, fn: null };
   // 'value'::type[] — array literal with a cast; {} is the PG empty-array literal.
+  // Return the raw PG array string so the call site can deserialize via the
+  // correct cast type (e.g. OID::Array<Integer> returns [4,4,2] not ["4","4","2"]).
   const arrayLiteral = /^'((?:[^']|'')*)'::[\w"\s.(,)]+\[\]$/.exec(raw);
   if (arrayLiteral) {
     const content = arrayLiteral[1].replace(/''/g, "'");
-    if (content === "{}") return { literal: [], fn: null };
-    return { literal: new OidArray(new ValueType()).deserialize(content), fn: null };
+    return { literal: `{${content}}`, fn: null };
   }
   // 'value'::type — quoted literal with an optional cast.
   const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
