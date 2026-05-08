@@ -360,17 +360,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private async _maybeConfigureConnection(client: pg.PoolClient): Promise<void> {
     if (this._configuredClients.has(client)) return;
-    // Mirrors Rails: postgresql_adapter.rb `unless ActiveRecord.db_warnings_action.nil?`.
-    // NOTE: Rails uses a single raw_connection (no pool) so there is no concurrent-accumulation race.
-    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction !== "ignore") {
-      client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
-        this._noticeReceiverSqlWarnings.push({
-          level: msg.severity,
-          message: msg.message,
-          code: msg.code,
-        });
-      });
-    }
     // Mark only after all queries succeed so a partial failure doesn't
     // leave the client flagged as configured on its next checkout.
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
@@ -388,6 +377,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     this._configuredClients.add(client);
+    // Attach after successful configuration — avoids duplicate listeners if a
+    // SET query fails and the client is re-checked-out before being discarded.
+    // Mirrors Rails: postgresql_adapter.rb `unless ActiveRecord.db_warnings_action.nil?`.
+    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction !== "ignore") {
+      client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
+        this._noticeReceiverSqlWarnings.push({
+          level: msg.severity,
+          message: msg.message,
+          code: msg.code,
+        });
+      });
+    }
   }
 
   /**
