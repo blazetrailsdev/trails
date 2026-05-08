@@ -967,3 +967,43 @@ describe("DirtyTest", () => {
     expect(inDb["age"]).toBe(30);
   });
 });
+
+// ==========================================================================
+// MutableAttributeAfterSave — targets json_shared_test_cases.rb
+// (test_changes_in_place) for the post-save forgettingAssignment reset
+// ==========================================================================
+describe("MutableAttributeAfterSave", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      json_models: { payload: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+    vi.unstubAllEnvs();
+  });
+
+  it("mutable attribute is not dirty after changesApplied resets baseline", async () => {
+    class JsonModel extends Base {
+      static tableName = "json_models";
+      static {
+        this.attribute("payload", "json");
+        this.adapter = adapter;
+      }
+    }
+    const record = await JsonModel.create({ payload: { one: "two" } });
+    // Mutate the attribute in-place, then save.
+    (record as any).payload.three = "four";
+    await (record as any).save();
+    // After save, changesApplied() must call forgettingAssignment() on each attribute
+    // so the FromDatabase baseline reflects the post-save serialized value.
+    // A second save should not fire any UPDATE (no spurious dirty detection).
+    const payloadAttr = (record as any)._attributes.getAttribute("payload");
+    expect(payloadAttr.changedInPlace()).toBe(false);
+  });
+});

@@ -34,7 +34,7 @@ export class Json extends ValueType<unknown> {
         return null;
       }
     }
-    return value;
+    return this.deserialize(this.serialize(value));
   }
 
   deserialize(value: unknown): unknown {

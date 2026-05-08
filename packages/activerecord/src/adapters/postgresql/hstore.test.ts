@@ -184,15 +184,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       // ROOT-CAUSE: Closest Rails match is test_duplication_with_store_accessors (store_accessor blocked).
       // SCOPE: Permanent skip-list candidate.
     });
-    it.skip("hstore mutate", async () => {
-      // BLOCKED: attribute chain not reset post-save — changesApplied() doesn't call
-      //   forgettingAssignment() on mutable attributes (unlike Rails changes_applied +
-      //   forget_attribute_assignments). FromUser attributes still reference a null-valued
-      //   originalAttribute after save, so changedInPlace() compares against null on next
-      //   save, causing spurious UPDATEs. Fix: reset mutable attrs to FromDatabase baseline
-      //   in changesApplied() / _updateRecord, then re-enable this test.
-      // SCOPE: ~10-20 LOC in dirty.ts changesApplied() or attribute-methods/dirty.ts
-      //   _updateRecord to call forgettingAssignment() on mutable attributes post-persist.
+    it("hstore mutate", async () => {
+      const hstore = await HstoreModel.createBang({ settings: { one: "two" } });
+      (hstore as any).settings.three = "four";
+      await (hstore as any).saveBang();
+      // Post-save baseline must be reset: changedInPlace() should be false
+      // without a reload, meaning a second save won't fire a spurious UPDATE.
+      expect((hstore as any)._attributes.getAttribute("settings").changedInPlace()).toBe(false);
+      await (hstore as any).reload();
+      expect((hstore as any).settings.three).toBe("four");
+      expect((hstore as any).changed).toBe(false);
     });
     it.skip("hstore nested", async () => {
       // BLOCKED: test-name mismatch — no Rails test named "hstore nested" in hstore_test.rb

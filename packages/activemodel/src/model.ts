@@ -1789,6 +1789,7 @@ export class Model {
 
   changesApplied(): void {
     this._dirty.changesApplied(this._attributes);
+    this._attributes.forgetAssignmentsBang();
   }
 
   /**
@@ -1840,6 +1841,7 @@ export class Model {
    * @internal
    */
   forgetAttributeAssignments(): void {
+    this._attributes.forgetAssignmentsBang();
     this._dirty.forgetAttributeAssignments(this._attributes);
   }
 
