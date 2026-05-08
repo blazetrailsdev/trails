@@ -18,7 +18,7 @@ async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean }>
   } catch {
     return { available: false, isMariaDb: false };
   } finally {
-    await conn?.end();
+    await conn?.end().catch(() => {});
   }
 }
 

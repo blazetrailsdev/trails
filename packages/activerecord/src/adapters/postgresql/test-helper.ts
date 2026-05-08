@@ -25,7 +25,7 @@ export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof de
 /** Mirrors Rails' with_postgresql_datetime_type — temporarily changes the adapter's datetimeType. */
 export async function withPostgresqlDatetimeType<T>(
   type: "timestamp" | "timestamptz",
-  fn: () => Promise<T>,
+  fn: () => T | Promise<T>,
 ): Promise<T> {
   const original = PostgreSQLAdapter.datetimeType;
   PostgreSQLAdapter.datetimeType = type;
