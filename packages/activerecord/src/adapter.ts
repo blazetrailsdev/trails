@@ -353,7 +353,13 @@ export interface DatabaseAdapter {
   selectValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   selectRows(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-  execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
+  execInsert(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    pk?: string | null,
+    sequenceName?: string | null,
+  ): Promise<number>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string): boolean;

@@ -78,11 +78,13 @@ export function asyncCountBySql(
 /**
  * Internal: execute a raw SQL query through the adapter.
  * Mirrors: ActiveRecord::Querying._query_by_sql
+ * @internal
  */
 export async function _queryBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
+  _opts: { preparable?: boolean | null; async?: boolean; allowRetry?: boolean } = {},
 ): Promise<Record<string, unknown>[]> {
   if (Array.isArray(sql)) {
     // Array form [sql, ...values] — interpolate into the string
@@ -96,6 +98,7 @@ export async function _queryBySql(
 /**
  * Internal: instantiate model objects from a result set.
  * Mirrors: ActiveRecord::Querying._load_from_sql
+ * @internal
  */
 export function _loadFromSql<T extends typeof Base>(
   this: T,
@@ -106,6 +109,10 @@ export function _loadFromSql<T extends typeof Base>(
 
   const payload = { record_count: rows.length, class_name: this.name };
   const records = Notifications.instrument("instantiation.active_record", payload, () =>
+    // Rails uses instantiate() when the result set includes the inheritance
+    // column (full STI dispatch) and instantiate_instance_of(self, …) otherwise
+    // (skip dispatch). _instantiate short-circuits the STI lookup when the
+    // column value is absent (undefined is falsy), covering both paths.
     rows.map((row) => this._instantiate(row)),
   );
   if (block) records.forEach(block);

@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, Relation } from "./index.js";
+import { registerModel } from "./associations.js";
+import { _queryBySql, _loadFromSql } from "./querying.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
@@ -144,5 +146,74 @@ describe("QueryingTest — static forwarders on Base", () => {
 
   it("merge() returns a Relation", () => {
     expect(Post.merge(Post.where({ status: "draft" }))).toBeInstanceOf(Relation);
+  });
+});
+
+describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
+  let Model: typeof Base;
+
+  afterEach(() => vi.restoreAllMocks());
+
+  beforeAll(() => {
+    const a = createTestAdapter();
+    class M extends Base {
+      static {
+        this.adapter = a;
+        this.attribute("id", "integer");
+      }
+    }
+    Model = M;
+  });
+
+  it("accepts preparable/async/allowRetry opts without error", async () => {
+    vi.spyOn(Model.adapter, "execute").mockResolvedValueOnce([]);
+    await expect(
+      _queryBySql.call(Model, "SELECT 1", [], { preparable: true, async: false, allowRetry: true }),
+    ).resolves.toEqual([]);
+  });
+
+  it("opts default to empty object — omitting opts still works", async () => {
+    vi.spyOn(Model.adapter, "execute").mockResolvedValueOnce([{ id: 1 }]);
+    const rows = await _queryBySql.call(Model, "SELECT 1");
+    expect(rows).toEqual([{ id: 1 }]);
+  });
+});
+
+describe("_loadFromSql — STI detection (Story J gap 2)", () => {
+  let Animal: typeof Base;
+  let Dog: typeof Base;
+
+  beforeAll(() => {
+    const a = createTestAdapter();
+    class AnimalClass extends Base {
+      static {
+        this.adapter = a;
+        this.inheritanceColumn = "type";
+        this.attribute("id", "integer");
+        this.attribute("type", "string");
+        this.attribute("name", "string");
+      }
+    }
+    class DogClass extends AnimalClass {}
+    Animal = AnimalClass;
+    Dog = DogClass;
+    registerModel(Animal);
+    registerModel(Dog);
+  });
+
+  it("dispatches to the correct STI subclass when inheritance column is present", () => {
+    const rows = [{ id: 1, type: Dog.name, name: "Rex" }];
+    const records = _loadFromSql.call(Animal, rows);
+    expect(records[0]).toBeInstanceOf(Dog);
+  });
+
+  it("instantiates as the base class when inheritance column is absent from result set", () => {
+    const rows = [{ id: 1, name: "Rex" }];
+    const records = _loadFromSql.call(Animal, rows);
+    expect(records[0]).toBeInstanceOf(Animal);
+  });
+
+  it("returns empty array for empty result set", () => {
+    expect(_loadFromSql.call(Animal, [])).toEqual([]);
   });
 });
