@@ -79,6 +79,7 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
+import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -172,9 +173,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     enum: {},
   };
 
-  // Mirrors: PostgreSQLAdapter.datetime_type class_attribute (postgresql_adapter.rb:123)
-  // Default :timestamp; can be changed to :timestamptz to store timezone info.
-  static datetimeType: "timestamp" | "timestamptz" = "timestamp";
+  // Mirrors: PostgreSQLAdapter.datetime_type class_attribute (postgresql_adapter.rb:123).
+  // Proxied through pgDatetimeConfig so OID::DateTime.realTypeUnlessAliased can read
+  // the current value without creating a circular import.
+  static get datetimeType(): "timestamp" | "timestamptz" {
+    return pgDatetimeConfig.datetimeType;
+  }
+  static set datetimeType(v: "timestamp" | "timestamptz") {
+    pgDatetimeConfig.datetimeType = v;
+  }
 
   // Mirrors: PostgreSQLAdapter.create_unlogged_tables class_attribute (postgresql_adapter.rb:105).
   // Pass this value as `unlogged` when constructing a PostgreSQL TableDefinition.

@@ -15,6 +15,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTimeType } from "@blazetrails/activemodel";
+import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -89,13 +90,12 @@ export class DateTime extends DateTimeType {
   }
 
   /**
-   * Rails' `real_type_unless_aliased` — Timestamp / TimestampWithTimeZone
-   * call this to return `:datetime` when the adapter's datetime_type
-   * matches `real_type`, else `real_type` itself. We don't yet have a
-   * per-adapter datetime_type setting so always return the real type,
-   * matching Rails' default when nothing is aliased.
+   * Mirrors: PostgreSQL::OID::DateTime#real_type_unless_aliased.
+   * Returns "datetime" when the adapter's datetime_type is aliased to
+   * real_type (i.e. real_type IS the storage type for datetime), else
+   * returns real_type unchanged.
    */
   protected realTypeUnlessAliased(realType: string): string {
-    return realType;
+    return pgDatetimeConfig.datetimeType === realType ? "datetime" : realType;
   }
 }
