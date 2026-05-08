@@ -68,6 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const col = cols.find((c) => c.name === "precise_at");
       expect(col).toBeDefined();
       expect(col!.type).toBe("datetime");
+      expect(col!.precision).toBe(3);
     });
 
     it("timestamp infinity", async () => {
@@ -120,6 +121,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "precise_at");
       expect(col).toBeDefined();
+      expect(col!.precision).toBe(3);
     });
 
     it("datetime schema dump", async () => {
