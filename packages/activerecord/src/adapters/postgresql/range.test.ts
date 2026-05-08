@@ -3,14 +3,17 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { parseRange, serializeRange } from "./pg-range.js";
+import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+  let PostgresqlRanges: any;
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
@@ -25,6 +28,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         int8_range int8range
       )
     `);
+    await adapter.loadAdditionalTypes();
+    const { Base } = await import("../../index.js");
+    class PostgresqlRangesCls extends Base {
+      static tableName = "postgresql_ranges";
+      static {
+        this.adapter = adapter;
+      }
+    }
+    await PostgresqlRangesCls.loadSchema();
+    PostgresqlRanges = PostgresqlRangesCls;
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
@@ -514,76 +527,64 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))
-      const range = new Range(0.5, 1, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].num_range as string, toFloat)!;
-      expect(result.begin).toBeCloseTo(0.5);
-      expect(result.end).toBeCloseTo(1);
+      // DecimalType.castValue returns string; bounds round-trip as "0.5"/"1".
+      const range = new Range("0.5", "1", true);
+      const r = await PostgresqlRanges.create({ num_range: range });
+      await r.reload();
+      const result = r.num_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect(result.begin).toBe("0.5");
+      expect(result.end).toBe("1");
       expect(result.excludeEnd).toBe(true);
     });
     it("update numrange", async () => {
       // Rails: assert_equal_round_trip => BigDecimal("0.5")...BigDecimal("1")
       //        assert_nil_round_trip  => BigDecimal("0.5")...BigDecimal("0.5") (empty → nil)
-      const range = new Range(0.5, 1, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].num_range as string, toFloat)!;
-      expect(result.begin).toBeCloseTo(0.5);
-      expect(result.end).toBeCloseTo(1);
-
-      await adapter.execute(`DELETE FROM postgresql_ranges`);
-      const empty = new Range(0.5, 0.5, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (num_range) VALUES ('${serializeRange(empty, String)}')`,
-      );
-      const rows2 = await adapter.execute(`SELECT num_range FROM postgresql_ranges`);
-      expect(parseRange(rows2[0].num_range as string, toFloat)).toBeNull();
+      const range = new Range("0.5", "1", true);
+      const r = await PostgresqlRanges.create({ num_range: range });
+      await r.reload();
+      expect((r.num_range as Range).begin).toBe("0.5");
+      expect((r.num_range as Range).end).toBe("1");
+      // [0.5,0.5) is empty in numrange → null on reload
+      r.num_range = new Range("0.5", "0.5", true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.num_range).toBeNull();
     });
     it("create daterange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :date_range, Date.new(2012,1,1)...Date.new(2013,1,1))
+      // OID::Date.deserialize returns Temporal.PlainDate; assert via toString().
       const range = new Range("2012-01-01", "2013-01-01", true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(range)}')`,
-      );
-      const rows = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].date_range as string)!;
-      expect(result.begin).toBe("2012-01-01");
-      expect(result.end).toBe("2013-01-01");
+      const r = await PostgresqlRanges.create({ date_range: range });
+      await r.reload();
+      const result = r.date_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect((result.begin as Temporal.PlainDate).toString()).toBe("2012-01-01");
+      expect((result.end as Temporal.PlainDate).toString()).toBe("2013-01-01");
       expect(result.excludeEnd).toBe(true);
     });
     it("update daterange", async () => {
       // Rails: assert_equal_round_trip => Date.new(2012,2,3)...Date.new(2012,2,10)
       //        assert_nil_round_trip  => Date.new(2012,2,3)...Date.new(2012,2,3) (empty → nil)
       const range = new Range("2012-02-03", "2012-02-10", true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(range)}')`,
-      );
-      const rows = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].date_range as string)!;
-      expect(result.begin).toBe("2012-02-03");
-      expect(result.end).toBe("2012-02-10");
-
-      await adapter.execute(`DELETE FROM postgresql_ranges`);
-      const empty = new Range("2012-02-03", "2012-02-03", true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (date_range) VALUES ('${serializeRange(empty)}')`,
-      );
-      const rows2 = await adapter.execute(`SELECT date_range FROM postgresql_ranges`);
-      expect(parseRange(rows2[0].date_range as string)).toBeNull();
+      const r = await PostgresqlRanges.create({ date_range: range });
+      await r.reload();
+      const result = r.date_range as Range;
+      expect((result.begin as Temporal.PlainDate).toString()).toBe("2012-02-03");
+      expect((result.end as Temporal.PlainDate).toString()).toBe("2012-02-10");
+      // [2012-02-03,2012-02-03) is empty → null on reload
+      r.date_range = new Range("2012-02-03", "2012-02-03", true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.date_range).toBeNull();
     });
     it("create int4range", async () => {
       // Rails: assert_equal_round_trip(@new_range, :int4_range, Range.new(3, 50, true))
       const range = new Range(3, 50, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].int4_range as string, toInt)!;
+      const r = await PostgresqlRanges.create({ int4_range: range });
+      await r.reload();
+      const result = r.int4_range as Range;
+      expect(result).toBeInstanceOf(Range);
       expect(result.begin).toBe(3);
       expect(result.end).toBe(50);
       expect(result.excludeEnd).toBe(true);
@@ -591,52 +592,41 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("update int4range", async () => {
       // Rails: assert_equal_round_trip => 6...10; assert_nil_round_trip => 3...3 (empty → nil)
       const range = new Range(6, 10, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].int4_range as string, toInt)!;
-      expect(result.begin).toBe(6);
-      expect(result.end).toBe(10);
-
-      await adapter.execute(`DELETE FROM postgresql_ranges`);
-      const empty = new Range(3, 3, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int4_range) VALUES ('${serializeRange(empty, String)}')`,
-      );
-      const rows2 = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      expect(parseRange(rows2[0].int4_range as string, toInt)).toBeNull();
+      const r = await PostgresqlRanges.create({ int4_range: range });
+      await r.reload();
+      expect((r.int4_range as Range).begin).toBe(6);
+      expect((r.int4_range as Range).end).toBe(10);
+      // [3,3) is empty in int4range → null on reload
+      r.int4_range = new Range(3, 3, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.int4_range).toBeNull();
     });
     it("create int8range", async () => {
       // Rails: assert_equal_round_trip(@new_range, :int8_range, Range.new(30, 50, true))
+      // BigIntegerType.castValue returns BigInt; bounds round-trip as 30n/50n.
       const range = new Range(30, 50, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].int8_range as string, toInt)!;
-      expect(result.begin).toBe(30);
-      expect(result.end).toBe(50);
+      const r = await PostgresqlRanges.create({ int8_range: range });
+      await r.reload();
+      const result = r.int8_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect(result.begin).toBe(30n);
+      expect(result.end).toBe(50n);
       expect(result.excludeEnd).toBe(true);
     });
     it("update int8range", async () => {
       // Rails: assert_equal_round_trip => 60000...10000000; assert_nil_round_trip => 39999...39999 (empty → nil)
+      // BigIntegerType.castValue returns BigInt; bounds round-trip as bigint values.
       const range = new Range(60000, 10000000, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(range, String)}')`,
-      );
-      const rows = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
-      const result = parseRange(rows[0].int8_range as string, toInt)!;
-      expect(result.begin).toBe(60000);
-      expect(result.end).toBe(10000000);
-
-      await adapter.execute(`DELETE FROM postgresql_ranges`);
-      const empty = new Range(39999, 39999, true);
-      await adapter.execute(
-        `INSERT INTO postgresql_ranges (int8_range) VALUES ('${serializeRange(empty, String)}')`,
-      );
-      const rows2 = await adapter.execute(`SELECT int8_range FROM postgresql_ranges`);
-      expect(parseRange(rows2[0].int8_range as string, toInt)).toBeNull();
+      const r = await PostgresqlRanges.create({ int8_range: range });
+      await r.reload();
+      expect((r.int8_range as Range).begin).toBe(60000n);
+      expect((r.int8_range as Range).end).toBe(10000000n);
+      // [39999,39999) is empty in int8range → null on reload
+      r.int8_range = new Range(39999, 39999, true);
+      await r.saveBang();
+      await r.reload();
+      expect(r.int8_range).toBeNull();
     });
     it("exclude beginning for subtypes without succ method is not supported", () => {
       // Rails: assert_raises(ArgumentError) { PostgresqlRange.create!(num_range: "(0.1, 0.2]") }
