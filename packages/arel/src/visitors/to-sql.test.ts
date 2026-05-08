@@ -1781,4 +1781,24 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
     const sql = new Visitors.ToSql(stubQuoter).compile(users.get("id").eq(1));
     expect(sql).toContain("<<users>>");
   });
+
+  it("Uint8Array in value position is routed through quoter.quote(), not String()", () => {
+    // Guards against the String(Uint8Array) → '1,31,139' corruption path.
+    // The quoter (e.g. PG adapter) receives the Uint8Array and emits the
+    // correct dialect binary literal.
+    const received: unknown[] = [];
+    const stubQuoter: Visitors.ArelQuoter = {
+      quoteTableName: (name) => `"${name}"`,
+      quoteColumnName: (name) => `"${name}"`,
+      quoteString: (s) => s.replace(/'/g, "''"),
+      quote: (v) => {
+        received.push(v);
+        return v instanceof Uint8Array ? `'\\x${Buffer.from(v).toString("hex")}'` : `'${v}'`;
+      },
+    };
+    const bytes = new Uint8Array([0x1f, 0x8b]);
+    const node = users.get("payload").eq(bytes);
+    new Visitors.ToSql(stubQuoter).compile(node);
+    expect(received).toContain(bytes);
+  });
 });
