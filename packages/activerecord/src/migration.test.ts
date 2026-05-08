@@ -1171,9 +1171,17 @@ describe("MigrationTest", () => {
     expect(m.connection).toBe(baseAdapter);
     (m as any)._connectionOverride = override;
     expect(m.connection).toBe(override);
-    expect(m.connectionPool).toBe(override);
+    // connectionPool is independent — _connectionOverride must not affect it
+    expect(m.connectionPool).toBe(baseAdapter);
     delete (m as any)._connectionOverride;
     expect(m.connection).toBe(baseAdapter);
+    const poolOverride = createTestAdapter();
+    (m as any)._poolOverride = poolOverride;
+    expect(m.connectionPool).toBe(poolOverride);
+    // connection is independent — _poolOverride must not affect it
+    expect(m.connection).toBe(baseAdapter);
+    delete (m as any)._poolOverride;
+    expect(m.connectionPool).toBe(baseAdapter);
   });
 
   it("migration context with default schema migration", async () => {

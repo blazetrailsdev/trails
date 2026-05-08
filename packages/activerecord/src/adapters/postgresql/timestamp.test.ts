@@ -9,6 +9,7 @@ import {
   PostgreSQLAdapter,
   PG_TEST_URL,
   withPostgresqlDatetimeType,
+  withNativeDatabaseTypeOverrides,
 } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
@@ -303,15 +304,31 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    it.skip("adds column as custom type", async () => {
-      // BLOCKED: adapter-pg — NATIVE_DATABASE_TYPES is not extensible at runtime
-      // ROOT-CAUSE: Rails patches NATIVE_DATABASE_TYPES[:datetimes_as_enum] to point at a
-      // custom enum type, then with_postgresql_datetime_type(:datetimes_as_enum) makes the
-      // adapter use it for datetime columns. Our adapter's nativeDatabaseTypes is a static
-      // object and datetimeType only accepts "timestamp" | "timestamptz" (a string literal
-      // union), not arbitrary custom type keys.
-      // SCOPE: ~30 LOC — widen datetimeType to string, allow nativeDatabaseTypes override;
-      // low priority since this is a niche extensibility path.
+    it("adds column as custom type", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+      await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
+      try {
+        await adapter.exec(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
+        await adapter.exec(`CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`);
+        await withNativeDatabaseTypeOverrides(
+          { datetimes_as_enum: { name: "custom_time_format" } },
+          () =>
+            withPostgresqlDatetimeType("datetimes_as_enum", () =>
+              adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime", {
+                precision: null,
+              }),
+            ),
+        );
+        const rows = await adapter.execute(
+          `SELECT data_type, udt_name FROM information_schema.columns
+           WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+        );
+        expect(rows[0]?.data_type).toBe("USER-DEFINED");
+        expect(rows[0]?.udt_name).toBe("custom_time_format");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+        await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
+      }
     });
   });
 });

@@ -176,10 +176,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: PostgreSQLAdapter.datetime_type class_attribute (postgresql_adapter.rb:123).
   // Proxied through pgDatetimeConfig so OID::DateTime.realTypeUnlessAliased can read
   // the current value without creating a circular import.
-  static get datetimeType(): "timestamp" | "timestamptz" {
+  static get datetimeType(): string {
     return pgDatetimeConfig.datetimeType;
   }
-  static set datetimeType(v: "timestamp" | "timestamptz") {
+  static set datetimeType(v: string) {
     pgDatetimeConfig.datetimeType = v;
   }
 
@@ -1439,7 +1439,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // The datetime entry is resolved dynamically from datetimeType, matching Rails'
   // `types[:datetime] = types[datetime_type]`.
   static nativeDatabaseTypes(): Record<string, string | { name?: string; limit?: number }> {
-    const types = { ...this.NATIVE_DATABASE_TYPES };
+    const types = {
+      ...this.NATIVE_DATABASE_TYPES,
+      ...pgDatetimeConfig.nativeDatabaseTypesOverrides,
+    };
     types["datetime"] = types[this.datetimeType] ?? { name: "timestamp" };
     return types;
   }
