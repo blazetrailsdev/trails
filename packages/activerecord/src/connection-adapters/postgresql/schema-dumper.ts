@@ -46,11 +46,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaType(column: Column): string {
     if (column.isSerial) return column.isBigint() ? "bigserial" : "serial";
-    // bigint: return directly — super reads column.type which includes "[]" for bigint arrays
     if (column.isBigint()) return "bigint";
-    // Use semantic type from sqlTypeMetadata (e.g. "string" for character varying) to
-    // match Rails' column.type which returns a semantic symbol (:string, :integer, etc.)
-    const semantic = (column as any).sqlTypeMetadata?.type as string | undefined;
+    const semantic = column.type ?? undefined;
     // BigIntegerType.name is "big_integer" — normalize to "bigint" for schema output
     if (semantic === "big_integer") return "bigint";
     return semantic ?? super.schemaType(column as any);

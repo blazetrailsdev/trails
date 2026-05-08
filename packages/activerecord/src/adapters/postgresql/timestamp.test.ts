@@ -33,7 +33,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "created_at");
       expect(col).toBeDefined();
-      expect(col!.type).toBe("timestamp without time zone");
+      expect(col!.type).toBe("timestamp");
+      expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
     it("timestamp default", async () => {

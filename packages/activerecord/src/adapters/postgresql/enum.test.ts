@@ -33,7 +33,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_enums");
       const col = cols.find((c) => c.name === "current_mood");
       expect(col).toBeDefined();
-      expect(col!.type).toContain("mood");
+      expect(col!.type).toBe("enum");
+      expect(col!.sqlType).toContain("mood");
     });
 
     it("enum default", async () => {

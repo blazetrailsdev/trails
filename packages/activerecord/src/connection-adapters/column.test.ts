@@ -70,6 +70,26 @@ describe("Column", () => {
     const col = new Column("name", null, makeMetadata());
     expect(col.isVirtual()).toBe(false);
   });
+
+  it("type returns semantic type, not raw sql type", () => {
+    const col = new Column(
+      "created_at",
+      null,
+      new SqlTypeMetadata({ sqlType: "timestamp without time zone", type: "datetime" }),
+    );
+    expect(col.type).toBe("datetime");
+    expect(col.sqlType).toBe("timestamp without time zone");
+  });
+
+  it("type falls back to sqlType when no semantic type is set", () => {
+    const col = new Column("body", null, new SqlTypeMetadata({ sqlType: "text" }));
+    expect(col.type).toBe("text");
+  });
+
+  it("type returns null when no sqlTypeMetadata", () => {
+    const col = new Column("name", null);
+    expect(col.type).toBeNull();
+  });
 });
 
 describe("NullColumn", () => {

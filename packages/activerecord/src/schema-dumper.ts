@@ -438,7 +438,8 @@ export class SchemaDumper {
   }
 
   static async dumpTableSchema(source: SchemaSource, tableName: string): Promise<string> {
-    const dumper = this.create(source);
+    const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
+    const dumper = this.create(wrappedSource);
     const lines: string[] = [];
     await dumper.dumpTable(lines, tableName);
     return lines.join("\n");
