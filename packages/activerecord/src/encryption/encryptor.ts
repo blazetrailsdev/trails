@@ -4,7 +4,6 @@
  * Mirrors: ActiveRecord::Encryption::Encryptor
  */
 
-import { Aes256Gcm } from "./cipher/aes256-gcm.js";
 import { Message } from "./message.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Configurable } from "./configurable.js";
@@ -99,9 +98,9 @@ export class Encryptor {
     }
 
     const message = this.deserializeMessage(encryptedText);
-    const compressed = message.headers.get("c") === true;
 
-    // Precedence mirrors encrypt(): keyProvider > key > default.
+    // Collect all candidate secrets then delegate key-rotation to Cipher#decrypt,
+    // mirroring Rails: cipher.decrypt(message, key: keys.collect(&:secret), **cipher_options)
     let keys: string[];
     if (options?.keyProvider) {
       keys = options.keyProvider.decryptionKeys(message).map((k) => k.secret);
@@ -112,27 +111,22 @@ export class Encryptor {
       if (!kp) throw new DecryptionError("No decryption key provided");
       keys = kp.decryptionKeys(message).map((k) => k.secret);
     }
+    if (keys.length === 0) throw new DecryptionError("No decryption key provided");
 
-    // Mirrors Rails: try_to_decrypt_with_each rescues only Errors::Decryption (wrong key /
-    // auth-tag mismatch) and re-raises on the last key. Non-Decryption errors (e.g.
-    // EncryptedContentIntegrity, ConfigError) propagate immediately. Inflate errors are
-    // message-level so they are wrapped as DecryptionError and thrown immediately.
-    for (const key of keys) {
-      let decryptedBuf: Buffer;
-      try {
-        decryptedBuf = new Aes256Gcm(key).decrypt(message);
-      } catch (e) {
-        if (e instanceof DecryptionError) continue; // wrong key — try next
-        throw e; // EncryptedContentIntegrity, ConfigError, etc.
-      }
-      try {
-        return this.uncompressIfNeeded(decryptedBuf, compressed);
-      } catch (e) {
-        if (e instanceof Base) throw e;
-        throw new DecryptionError(e instanceof Error ? e.message : String(e));
-      }
+    let decrypted: Buffer;
+    try {
+      decrypted = this.cipher().decrypt(message, { ...options?.cipherOptions, key: keys });
+    } catch (e) {
+      if (e instanceof Base) throw e;
+      throw new DecryptionError(e instanceof Error ? e.message : String(e));
     }
-    throw new DecryptionError("None of the provided keys could decrypt the data");
+
+    try {
+      return this.uncompressIfNeeded(decrypted, message.headers.get("c") === true);
+    } catch (e) {
+      if (e instanceof Base) throw e;
+      throw new DecryptionError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   isEncrypted(text: string): boolean {
@@ -218,7 +212,7 @@ export class Encryptor {
     if (key == null) throw new ConfigError("No encryption key provided");
 
     const [cipherInput, compressed] = this.compressIfWorthIt(clearText);
-    const message = new Aes256Gcm(key, cipherOptions).encrypt(cipherInput);
+    const message = this.cipher().encrypt(cipherInput, { key, ...cipherOptions });
     if (compressed) message.addHeader("c", true);
     if (encKeyObj.publicTags) {
       for (const [k, v] of Object.entries(encKeyObj.publicTags)) {
