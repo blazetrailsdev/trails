@@ -1087,7 +1087,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
       // Flush inside the instrumented callback so a raised SQLWarning is visible
       // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
-      this._flushWarnings(pgSql);
+      this._flushWarnings(payload.sql as string);
       return rc!;
     });
     return m;
