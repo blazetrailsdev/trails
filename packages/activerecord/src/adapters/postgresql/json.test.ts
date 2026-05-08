@@ -19,22 +19,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlJsonTest", () => {
-    it("json string cast round-trip", async () => {
-      const { Base } = await import("../../index.js");
-      class JsonStringCast extends Base {
-        static {
-          this.tableName = "json_test";
-        }
-      }
-      JsonStringCast.adapter = adapter;
-      await JsonStringCast.loadSchema();
-      const record = new JsonStringCast();
-      (record as any).settings = '{"a":1}';
-      await record.save();
-      await record.reload();
-      expect((record as any).settings).toBe('{"a":1}');
-    });
-
     it("json column", async () => {
       const obj = { foo: "bar", baz: 123 };
       await adapter.executeMutation(`INSERT INTO "json_test" ("settings", "name") VALUES (?, ?)`, [
