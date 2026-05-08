@@ -1020,6 +1020,43 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(def).toBeUndefined();
     });
   });
+
+  describe("addColumn datetime precision", () => {
+    beforeEach(async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "dt_prec_test" CASCADE');
+      await adapter.exec(`CREATE TABLE "dt_prec_test" ("id" SERIAL PRIMARY KEY)`);
+    });
+
+    afterEach(async () => {
+      await adapter.exec('DROP TABLE IF EXISTS "dt_prec_test" CASCADE');
+    });
+
+    async function columnSqlType(colName: string): Promise<string> {
+      const rows = await (adapter as any).schemaQuery(
+        `SELECT pg_catalog.format_type(a.atttypid, a.atttypmod) AS sql_type
+         FROM pg_attribute a
+         JOIN pg_class t ON t.oid = a.attrelid
+         WHERE t.relname = 'dt_prec_test' AND a.attname = $1 AND a.attnum > 0`,
+        [colName],
+      );
+      return rows[0]?.sql_type as string;
+    }
+
+    it("addColumn datetime defaults to TIMESTAMP(6)", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime");
+      expect(await columnSqlType("happened_at")).toBe("timestamp(6) without time zone");
+    });
+
+    it("addColumn datetime respects explicit precision", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime", { precision: 0 });
+      expect(await columnSqlType("happened_at")).toBe("timestamp(0) without time zone");
+    });
+
+    it("addColumn datetime null precision omits precision suffix", async () => {
+      await adapter.addColumn("dt_prec_test", "happened_at", "datetime", { precision: null });
+      expect(await columnSqlType("happened_at")).toBe("timestamp without time zone");
+    });
+  });
 });
 
 describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
@@ -1110,5 +1147,14 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
   it("indexAlgorithms returns concurrently", () => {
     const adapter = makeAdapter();
     expect(adapter.indexAlgorithms()).toEqual({ concurrently: "CONCURRENTLY" });
+  });
+
+  it("typeToSql emits TIMESTAMP(n) with explicit precision", () => {
+    const adapter = makeAdapter();
+    expect(adapter.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
+    expect(adapter.typeToSql("datetime", { precision: 0 })).toBe("timestamp(0)");
+    expect(adapter.typeToSql("datetime", { precision: 3 })).toBe("timestamp(3)");
+    // typeToSql itself has no default — addColumn supplies the default
+    expect(adapter.typeToSql("datetime")).toBe("timestamp");
   });
 });

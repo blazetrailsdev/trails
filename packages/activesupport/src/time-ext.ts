@@ -569,6 +569,21 @@ export function toTime(date: Date): Temporal.Instant {
 }
 
 /**
+ * instantToS — Rails `Time#to_s` for a UTC `Temporal.Instant`.
+ * Returns `"YYYY-MM-DD HH:MM:SS UTC"` — the default Ruby format for UTC times.
+ * @internal
+ */
+export function instantToS(instant: Temporal.Instant): string {
+  const zdt = instant.toZonedDateTimeISO("UTC");
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const year = String(zdt.year).padStart(4, "0");
+  return (
+    `${year}-${pad2(zdt.month)}-${pad2(zdt.day)} ` +
+    `${pad2(zdt.hour)}:${pad2(zdt.minute)}:${pad2(zdt.second)} UTC`
+  );
+}
+
+/**
  * formattedOffset — returns the UTC offset formatted as ±HH:MM.
  */
 export function formattedOffset(date: Date): string {
