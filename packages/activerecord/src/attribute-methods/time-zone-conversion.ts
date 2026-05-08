@@ -1,56 +1,60 @@
 /**
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
+import { Type, ValueType } from "@blazetrails/activemodel";
+
 export interface TimeZoneConversion {
   timeZoneAwareAttributes: boolean;
   skipTimeZoneConversionForAttributes: string[];
 }
 
-type Subtype = {
-  cast(value: unknown): unknown;
-  deserialize?(value: unknown): unknown;
-  map?(value: unknown): unknown;
-};
-
 /**
  * Time zone converter type — wraps a time type to apply zone conversion.
  *
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter
+ * Rails uses `DelegateClass(Type::Value)` to auto-delegate; we extend ValueType
+ * and forward all unoverridden methods to the wrapped subtype.
  */
-export class TimeZoneConverter {
-  private readonly subtype: Subtype;
+export class TimeZoneConverter extends ValueType<unknown> {
+  private readonly _subtype: Type;
+  override readonly name: string;
 
-  constructor(subtype: Subtype) {
-    this.subtype = subtype;
+  constructor(subtype: Type) {
+    super();
+    this._subtype = subtype;
+    this.name = subtype.name;
   }
 
   /** Idempotent factory — mirrors Rails' `self.new` guard. */
-  static wrap(subtype: Subtype): TimeZoneConverter {
+  static wrap(subtype: Type): TimeZoneConverter {
     return subtype instanceof TimeZoneConverter ? subtype : new TimeZoneConverter(subtype);
   }
 
-  cast(value: unknown): unknown {
+  override type(): string {
+    return this._subtype.type();
+  }
+
+  override cast(value: unknown): unknown {
     if (value == null) return null;
     if (Array.isArray(value)) {
       // mirrors: map(super) { |v| cast(v) }
-      const casted = this.subtype.cast(value);
+      const casted = this._subtype.cast(value);
       return Array.isArray(casted) ? casted.map((v) => this.cast(v)) : this.cast(casted);
     }
     // TODO: requires TimeWithZone — user_input_in_time_zone(value) for time-like values
-    return this.subtype.cast(value);
+    return this._subtype.cast(value);
   }
 
-  deserialize(value: unknown): unknown {
-    const raw = this.subtype.deserialize
-      ? this.subtype.deserialize(value)
-      : this.subtype.cast(value);
-    return convertTimeToTimeZone(raw);
+  override deserialize(value: unknown): unknown {
+    return convertTimeToTimeZone(this._subtype.deserialize(value));
+  }
+
+  override serialize(value: unknown): unknown {
+    return this._subtype.serialize(value);
   }
 
   equals(other: unknown): boolean {
-    return (
-      other instanceof TimeZoneConverter && this.subtype === (other as TimeZoneConverter).subtype
-    );
+    return other instanceof TimeZoneConverter && this._subtype === other._subtype;
   }
 }
 
@@ -88,10 +92,10 @@ interface TimeZoneConversionHost {
 export function hookAttributeType(
   this: TimeZoneConversionHost,
   name: string,
-  castType: { type?(): string },
-): unknown {
+  castType: Type,
+): Type {
   if (isCreateTimeZoneConversionAttribute.call(this, name, castType)) {
-    return TimeZoneConverter.wrap(castType as Subtype);
+    return TimeZoneConverter.wrap(castType);
   }
   return castType;
 }
@@ -100,12 +104,12 @@ export function hookAttributeType(
 function isCreateTimeZoneConversionAttribute(
   this: TimeZoneConversionHost,
   name: string,
-  castType: { type?(): string },
+  castType: Type,
 ): boolean {
   const enabledForColumn =
     this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name as any);
   return (
     enabledForColumn &&
-    (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type?.() ?? "")
+    (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type() ?? "")
   );
 }
