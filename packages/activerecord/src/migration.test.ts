@@ -1184,6 +1184,20 @@ describe("MigrationTest", () => {
     expect(m.connectionPool).toBe(baseAdapter);
   });
 
+  it("migration.schema uses connection (respects _connectionOverride)", () => {
+    class M extends Migration {
+      async up() {}
+      async down() {}
+    }
+    const m = new M();
+    const baseAdapter = createTestAdapter();
+    const override = createTestAdapter();
+    (m as any).adapter = baseAdapter;
+    expect((m.schema as any).adapter).toBe(baseAdapter);
+    (m as any)._connectionOverride = override;
+    expect((m.schema as any).adapter).toBe(override);
+  });
+
   it("migration context with default schema migration", async () => {
     const adapter = createTestAdapter();
     const migrations: MigrationProxy[] = [

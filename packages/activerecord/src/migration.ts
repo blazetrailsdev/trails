@@ -208,14 +208,10 @@ export abstract class Migration {
     return this.adapter.adapterName;
   }
 
-  private _schema?: SchemaStatements;
-
   get schema(): SchemaStatements {
-    if (!this._schema) {
-      assertSchemaAdapter(this.adapter);
-      this._schema = new SchemaStatements(this.adapter);
-    }
-    return this._schema;
+    const conn = this.connection;
+    assertSchemaAdapter(conn);
+    return new SchemaStatements(conn);
   }
 
   /**
@@ -947,7 +943,7 @@ export abstract class Migration {
         await this.down();
       }
     } finally {
-      this._schema = undefined;
+      this._connectionOverride = undefined;
     }
   }
 
