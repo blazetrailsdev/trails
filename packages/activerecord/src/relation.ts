@@ -2732,7 +2732,19 @@ export class Relation<T extends Base> {
       ([key, val]) => {
         const def = this._modelClass._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        return [table.get(key), isArray ? arelSql(quoteSqlValue(val, true)) : val];
+        if (isArray) return [table.get(key), arelSql(quoteSqlValue(val, true))];
+        // Pre-serialize Temporal values so the Arel visitor receives a string
+        // instead of a raw object — the generic quote() fallback would emit
+        // ISO Z format which MySQL/MariaDB DATETIME rejects in strict mode.
+        const dbVal =
+          val instanceof Temporal.Instant ||
+          val instanceof Temporal.PlainDateTime ||
+          val instanceof Temporal.PlainDate ||
+          val instanceof Temporal.PlainTime ||
+          val instanceof Temporal.ZonedDateTime
+            ? (def?.type?.serialize?.(val) ?? val)
+            : val;
+        return [table.get(key), dbVal];
       },
     );
     const um = new UpdateManager().table(table).set(updateValues);

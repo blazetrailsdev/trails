@@ -85,12 +85,20 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   json: "json",
 };
 
-// Non-PG adapters (SQLite, MySQL/MariaDB) store temporal and binary types as
-// TEXT, matching test-adapter.ts's sqlType() mapping. Using the typed column
-// names causes MariaDB to reject ISO 8601 Z-suffix strings when the base
-// DateTimeType.serialize is used (e.g. via attribute() declarations).
+// MySQL/MariaDB accepts native DATETIME columns with "YYYY-MM-DD HH:MM:SS" format
+// (no T/Z suffix). AR DateTime.serialize now emits this format, so datetime can
+// use the native column type. date/binary/json still use "string" (VARCHAR).
 /** @internal */
-const COLUMN_TYPE_MAP_OTHER: Record<PrimitiveColumnSpec, string> = {
+const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
+  ...COLUMN_TYPE_MAP_PG,
+  date: "string",
+  binary: "string",
+  json: "string",
+};
+
+// SQLite stores temporal and binary types as TEXT.
+/** @internal */
+const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   datetime: "string",
   date: "string",
@@ -105,7 +113,12 @@ export async function defineSchema(
 ): Promise<void> {
   const ss = new SchemaStatements(adapter);
   const order = resolveReferences(schema);
-  const typeMap = adapter.adapterName === "postgres" ? COLUMN_TYPE_MAP_PG : COLUMN_TYPE_MAP_OTHER;
+  const typeMap =
+    adapter.adapterName === "postgres"
+      ? COLUMN_TYPE_MAP_PG
+      : adapter.adapterName === "mysql"
+        ? COLUMN_TYPE_MAP_MYSQL
+        : COLUMN_TYPE_MAP_SQLITE;
 
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
@@ -125,6 +138,15 @@ export async function defineSchema(
           if (spec.null !== undefined) options["null"] = spec.null;
           if (spec.default !== undefined) options["default"] = spec.default;
           if (spec.primary) options["primaryKey"] = true;
+        }
+        // MySQL DATETIME without precision = DATETIME(0), which rejects fractional
+        // seconds. Default to DATETIME(6) so test schemas accept microseconds.
+        if (
+          adapter.adapterName === "mysql" &&
+          primitive === "datetime" &&
+          options["precision"] == null
+        ) {
+          options["precision"] = 6;
         }
         t.column(colName, arType, options);
       }

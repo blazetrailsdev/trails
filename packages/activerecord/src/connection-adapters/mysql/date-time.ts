@@ -3,10 +3,10 @@ import { formatInstantForSqlMysql } from "../abstract/quoting.js";
 import { DateTime as ARDateTime } from "../../type/date-time.js";
 
 /**
- * MySQL/MariaDB datetime type. Overrides serialize to emit
- * "YYYY-MM-DD HH:MM:SS[.ffffff]" (no T, no Z) so MariaDB DATETIME
- * columns accept the value. The base DateTimeType emits ISO 8601 with
- * T and Z which MariaDB rejects in strict SQL mode.
+ * MySQL/MariaDB datetime type. Overrides serialize to enforce the 6-digit
+ * fractional-second cap that MySQL/MariaDB DATETIME(6) enforces. The base
+ * AR DateTime emits up to 9 nanosecond digits; this override caps at
+ * microseconds (6 digits) so strict-mode MySQL never rejects the value.
  *
  * @internal
  */
