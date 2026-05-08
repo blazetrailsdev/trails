@@ -26,25 +26,25 @@ export async function withTimezoneConfig(
 ): Promise<void> {
   const oldDefault = getDefaultTimezone();
   const base = Base as any;
-  const oldAwareAttributes: boolean | undefined = base.timeZoneAwareAttributes;
-  const oldAwareTypes: string[] | undefined = base.timeZoneAwareTypes;
+
+  // Snapshot: track whether each property existed before, and its prior value.
+  const hadAwareAttributes = "timeZoneAwareAttributes" in base;
+  const oldAwareAttributes = base.timeZoneAwareAttributes;
+  const hadAwareTypes = "timeZoneAwareTypes" in base;
+  const oldAwareTypes = base.timeZoneAwareTypes;
 
   try {
     if (cfg.default !== undefined) setDefaultTimezone(cfg.default);
-    if (cfg.awareAttributes !== undefined && "timeZoneAwareAttributes" in base) {
+    if (cfg.awareAttributes !== undefined && hadAwareAttributes) {
       base.timeZoneAwareAttributes = cfg.awareAttributes;
     }
-    if (cfg.awareTypes !== undefined && "timeZoneAwareTypes" in base) {
+    if (cfg.awareTypes !== undefined && hadAwareTypes) {
       base.timeZoneAwareTypes = cfg.awareTypes;
     }
     await fn();
   } finally {
     setDefaultTimezone(oldDefault);
-    if ("timeZoneAwareAttributes" in base && oldAwareAttributes !== undefined) {
-      base.timeZoneAwareAttributes = oldAwareAttributes;
-    }
-    if ("timeZoneAwareTypes" in base && oldAwareTypes !== undefined) {
-      base.timeZoneAwareTypes = oldAwareTypes;
-    }
+    if (hadAwareAttributes) base.timeZoneAwareAttributes = oldAwareAttributes;
+    if (hadAwareTypes) base.timeZoneAwareTypes = oldAwareTypes;
   }
 }

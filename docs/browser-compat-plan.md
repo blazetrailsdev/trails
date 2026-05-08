@@ -195,11 +195,6 @@ failing the `Browser Bundle` job. Rely on esbuild's own exit code — don't
 pipe to grep (grep exits 1 on no matches, which would fail CI when the build
 is clean).
 
-A package barrel that resolves `node:fs` causes esbuild to exit non-zero,
-failing the `Browser Bundle` job. Rely on esbuild's own exit code — don't
-pipe to grep (grep exits 1 on no matches, which would fail CI when the build
-is clean).
-
 ## 6. Open questions
 
 - **Buffer / node: polyfills.** Do we offer a `Buffer` shim or similar on the
