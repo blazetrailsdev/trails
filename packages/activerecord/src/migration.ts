@@ -1552,7 +1552,7 @@ export interface MigrationProxy {
   version: string;
   name: string;
   filename?: string;
-  migration: () => MigrationLike;
+  migration: () => MigrationLike | Promise<MigrationLike>;
 }
 
 export class Migrator {
@@ -2103,7 +2103,7 @@ export class Migrator {
       Migration.logger.info(`== ${proxy.version} ${proxy.name}: ${action} ==`);
     }
 
-    const migration = proxy.migration();
+    const migration = await proxy.migration();
     // Rails wraps both the migration execution AND the version
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp

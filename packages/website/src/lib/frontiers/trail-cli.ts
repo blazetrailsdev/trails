@@ -72,7 +72,7 @@ function discoverMigrations(
                   `Migration ${match![1]} from ${file.path} did not register after execution`,
                 );
               }
-              await reg.migration().up(adapter);
+              await (await reg.migration()).up(adapter);
             },
             async down(adapter) {
               const content = vfs.read(file.path)?.content;
@@ -84,7 +84,7 @@ function discoverMigrations(
                   `Migration ${match![1]} from ${file.path} did not register after execution`,
                 );
               }
-              await reg.migration().down(adapter);
+              await (await reg.migration()).down(adapter);
             },
           }),
         },

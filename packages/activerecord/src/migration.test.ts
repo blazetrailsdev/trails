@@ -1190,6 +1190,20 @@ describe("MigrationTest", () => {
     expect(pendingAfter.length).toBe(3);
   });
 
+  it("migration context with async migration() proxy", async () => {
+    const adapter = createTestAdapter();
+    const migrations: MigrationProxy[] = [
+      {
+        version: "1",
+        name: "AsyncFirst",
+        migration: async () => ({ up: async () => {}, down: async () => {} }),
+      },
+    ];
+    const migrator = new Migrator(adapter, migrations);
+    await migrator.up();
+    expect(await migrator.currentVersion()).toBe(1);
+  });
+
   it("migrator versions", async () => {
     const adapter = createTestAdapter();
     const migrations: MigrationProxy[] = [
