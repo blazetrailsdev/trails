@@ -351,8 +351,17 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
     // 50 ids requested but limit 10 → only first 10 ids are queried
     const ids = Array.from({ length: 50 }, (_, i) => i + 1);
     const dbRows = ids.slice(0, 10).map((id) => ({ id }));
-    const rel = makeFindSomeOrderedRel(dbRows, { limit: 10 });
+    let queriedIds: unknown[] | undefined;
+    const rel = {
+      ...makeFindSomeOrderedRel(dbRows, { limit: 10 }),
+      where(cond: any) {
+        queriedIds = cond["id"];
+        const r: any = { toArray: async () => dbRows, select: () => r };
+        return r;
+      },
+    };
     const result = await findSomeOrdered(rel, ids);
+    expect(queriedIds).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
     expect(result).toHaveLength(10);
     expect(result[0].id).toBe(1);
   });
@@ -361,8 +370,17 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
     const ids = Array.from({ length: 11 }, (_, i) => i + 1);
     // ids.slice(9, 9+3) = [10, 11]
     const dbRows = [{ id: 11 }, { id: 10 }];
-    const rel = makeFindSomeOrderedRel(dbRows, { limit: 3, offset: 9 });
+    let queriedIds: unknown[] | undefined;
+    const rel = {
+      ...makeFindSomeOrderedRel(dbRows, { limit: 3, offset: 9 }),
+      where(cond: any) {
+        queriedIds = cond["id"];
+        const r: any = { toArray: async () => dbRows, select: () => r };
+        return r;
+      },
+    };
     const result = await findSomeOrdered(rel, ids);
+    expect(queriedIds).toEqual([10, 11]);
     expect(result.map((r: any) => r.id)).toEqual([10, 11]);
   });
 

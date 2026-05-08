@@ -733,8 +733,12 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 
   if (records.length !== ids.length) {
     const modelName = (rel as any)._modelClass.name as string;
-    const foundKeys = new Set(records.map((r: any) => castKey(r.readAttribute?.(pk) ?? r[pk])));
-    const remaining = ids.filter((id) => !foundKeys.has(castKey(id)));
+    const remaining = [...ids];
+    for (const r of records) {
+      const key = castKey(r.readAttribute?.(pk) ?? r[pk]);
+      const idx = remaining.findIndex((id) => castKey(id) === key);
+      if (idx >= 0) remaining.splice(idx, 1);
+    }
     throw new RecordNotFound(`Couldn't find all ${modelName}`, modelName, pk, remaining);
   }
   const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
