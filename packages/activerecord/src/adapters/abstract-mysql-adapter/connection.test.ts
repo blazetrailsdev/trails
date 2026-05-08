@@ -4,12 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import {
-  describeIfMysql,
-  describeIfMysqlOnly,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
+import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { NoDatabaseError, DatabaseVersionError } from "../../errors.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -35,8 +30,9 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
-    describeIfMysqlOnly("no automatic reconnection after timeout", () => {
-      it("no automatic reconnection after timeout", async () => {
+    it.skipIf(isMariaDb)(
+      "no automatic reconnection after timeout",
+      async () => {
         const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
         try {
           expect(await singleConn.activeAsync()).toBe(true);
@@ -46,8 +42,9 @@ describeIfMysql("Mysql2Adapter", () => {
         } finally {
           await singleConn.close();
         }
-      }, 10_000);
-    });
+      },
+      10_000,
+    );
     it("successful reconnection after timeout with manual reconnect", async () => {
       // Use connectionLimit: 1 so SET SESSION wait_timeout and the sleep share
       // the same physical connection — otherwise a second pool connection with

@@ -25,7 +25,6 @@ async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean }>
 ({ available: mysqlAvailable, isMariaDb: mariaDb } = await checkMysql());
 
 export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
-/** Gates a suite to MySQL only — skips when the server is MariaDB. */
-export const describeIfMysqlOnly =
-  mysqlAvailable && !mariaDb ? describe : (describe.skip as typeof describe);
+/** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
+export const isMariaDb = mariaDb;
 export { Mysql2Adapter };
