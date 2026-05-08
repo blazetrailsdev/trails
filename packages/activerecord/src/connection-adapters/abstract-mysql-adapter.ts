@@ -1167,18 +1167,22 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  renameColumnForAlter(tableName: string, columnName: string, newColumnName: string): string {
+  async renameColumnForAlter(
+    tableName: string,
+    columnName: string,
+    newColumnName: string,
+  ): Promise<string> {
     if (this.supportsRenameColumn()) {
       return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
     }
-    // TODO: implement CHANGE-column fallback for older MySQL/MariaDB
-    //   (matches abstract_mysql_adapter.rb:rename_column_for_alter when !supports_rename_column?).
-    //   Requires fetching the existing column type via columnDefinitions() and building a
-    //   ChangeColumnDefinition. Safe to skip for modern servers: MySQL ≥8.0.3 and
-    //   MariaDB ≥10.5.2 always hit the fast path above.
-    throw new Error(
-      "renameColumnForAlter fallback path (CHANGE clause for older MySQL/MariaDB) not yet implemented",
-    );
+    // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: fetch column definition via SHOW FULL FIELDS
+    // (fires "SCHEMA" sql.active_record notification) then emit a CHANGE clause.
+    const cols = await this.columnDefinitions(tableName);
+    const col = cols.find((c) => (c["Field"] as string) === columnName);
+    if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
+    const colDef = new ColumnDefinition(newColumnName, col["Type"] as string);
+    const cd = new ChangeColumnDefinition(colDef, columnName);
+    return new MysqlSchemaCreation().accept(cd);
   }
 
   /** @internal */

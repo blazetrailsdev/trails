@@ -5,6 +5,10 @@ import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 export const MYSQL_TEST_URL =
   process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
 
+// Second MySQL connection URL for tests requiring two simultaneous adapters (e.g. collation independence).
+// Set MYSQL_TEST_URL2 in the environment to enable these tests; they are skipped when unset.
+export const MYSQL_TEST_URL2 = process.env.MYSQL_TEST_URL2 ?? null;
+
 let mysqlAvailable = false;
 let mariaDb = false;
 

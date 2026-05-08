@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL, MYSQL_TEST_URL2 } from "./test-helper.js";
 import { NoDatabaseError, DatabaseVersionError } from "../../errors.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -124,10 +124,16 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(rows[0].Value).toBeDefined();
     });
 
-    it.skip("collation connection is configured", () => {
-      // BLOCKED: requires second adapter (ARUnit2Model pattern) — not in TS test infra.
-      // showVariable() now implemented; only the second-adapter assertion is missing.
-      // SCOPE: add MYSQL_TEST_URL2 + second adapter to test-helper.ts.
+    it.skipIf(!MYSQL_TEST_URL2)("collation connection is configured", async () => {
+      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL2!);
+      try {
+        const v1 = await adapter.showVariable("collation_connection");
+        const v2 = await adapter2.showVariable("collation_connection");
+        expect(v1).not.toBeNull();
+        expect(v2).not.toBeNull();
+      } finally {
+        await adapter2.close();
+      }
     });
     it("mysql default in strict mode", async () => {
       const rows = await adapter.execute("SELECT @@SESSION.sql_mode AS v");
@@ -164,12 +170,24 @@ describeIfMysql("Mysql2Adapter", () => {
         await testAdapter.close();
       }
     });
-    it.skip("passing arbitrary flags to adapter", () => {
-      // BLOCKED: pool model has no single raw_connection; flags on query_options not accessible.
-      // SCOPE: expose query_options via a test accessor or pool config read-back.
+    it("passing arbitrary flags to adapter", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: ["MULTI_RESULTS"] });
+      try {
+        expect(testAdapter._testOnlyPoolFlags()).toEqual(["MULTI_RESULTS"]);
+      } finally {
+        await testAdapter.close();
+      }
     });
-    it.skip("passing flags by array to adapter", () => {
-      // BLOCKED: same as "passing arbitrary flags to adapter".
+    it("passing flags by array to adapter", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        flags: ["MULTI_RESULTS", "LONG_FLAG"],
+      });
+      try {
+        expect(testAdapter._testOnlyPoolFlags()).toEqual(["MULTI_RESULTS", "LONG_FLAG"]);
+      } finally {
+        await testAdapter.close();
+      }
     });
     it("mysql set session variable", async () => {
       const testAdapter = new Mysql2Adapter({
@@ -211,10 +229,22 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
-    it.skip("logs name rename column for alter", () => {
-      // BLOCKED: renameColumnForAlter() returns a SQL fragment (for bulk ALTER) and doesn't
-      //   fire sql.active_record notifications; the SHOW CREATE TABLE path (old MySQL/MariaDB)
-      //   needs to call execute() with name "SCHEMA" — not yet implemented.
+    it("logs name rename column for alter", async () => {
+      await adapter.execute(
+        "CREATE TEMPORARY TABLE _test_rename_log (old_col INT NOT NULL DEFAULT 0)",
+      );
+      const names: string[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+        names.push(event.payload.name as string);
+      });
+      try {
+        vi.spyOn(adapter, "supportsRenameColumn").mockReturnValue(false);
+        await adapter.renameColumnForAlter("_test_rename_log", "old_col", "new_col");
+        expect(names).toContain("SCHEMA");
+      } finally {
+        Notifications.unsubscribe(sub);
+        await adapter.execute("DROP TEMPORARY TABLE IF EXISTS _test_rename_log");
+      }
     });
 
     it("version string", async () => {

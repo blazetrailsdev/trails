@@ -1090,6 +1090,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * @internal — test-only: returns the flags value from the pool config, mirroring
+   * Rails' `connection.raw_connection.query_options[:flags]` for flag-passing assertions.
+   */
+  _testOnlyPoolFlags(): Array<string> | undefined {
+    return this._poolConfig.flags as Array<string> | undefined;
+  }
+
+  /**
    * Get the underlying mysql2 Pool instance.
    * Escape hatch for advanced usage.
    */
