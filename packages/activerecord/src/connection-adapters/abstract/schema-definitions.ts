@@ -219,7 +219,7 @@ export interface ColumnOptions {
   null?: boolean;
   default?: unknown;
   limit?: number;
-  precision?: number;
+  precision?: number | null;
   scale?: number;
   index?: boolean;
   unique?: boolean;
@@ -828,7 +828,7 @@ export class TableDefinition {
   }
 
   decimal(name: string, options: ColumnOptions = {}): this {
-    if (options.scale !== undefined && options.precision === undefined) {
+    if (options.scale !== undefined && typeof options.precision !== "number") {
       throw new Error("Error adding decimal column: precision is required if scale is specified");
     }
     return this.column(name, "decimal", options);
@@ -981,7 +981,8 @@ export class TableDefinition {
         case "datetime":
         case "timestamp": {
           const base = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-          const tp = col.options.precision;
+          // precision: undefined → Rails default of 6; precision: null → no precision suffix
+          const tp = col.options.precision === undefined ? 6 : col.options.precision;
           if (tp != null && !(tp >= 0 && tp <= 6))
             throw new ArgumentError(
               `No ${base} type has precision of ${tp}. The allowed range of precision is from 0 to 6`,

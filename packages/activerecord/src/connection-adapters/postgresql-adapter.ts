@@ -2636,15 +2636,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       default?: unknown;
       null?: boolean;
       array?: boolean;
-      limit?: number;
-      precision?: number;
-      scale?: number;
+      limit?: number | null;
+      precision?: number | null;
+      scale?: number | null;
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteIdentifier(columnName);
-    const pgType = this.typeToSql(type, options);
+    const pgType = this.typeToSql(type, {
+      ...options,
+      precision: options.precision ?? undefined,
+      limit: options.limit ?? undefined,
+      scale: options.scale ?? undefined,
+    });
     let colSql = `${quotedCol} ${pgType}`;
     if (options.default !== undefined) {
       const defaultClause = pgQuoteDefaultExpression(

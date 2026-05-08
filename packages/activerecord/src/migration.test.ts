@@ -400,8 +400,8 @@ describe("Migrations", () => {
       td.timestamps();
 
       const sql = td.toSql();
-      expect(sql).toContain('"created_at" DATETIME NOT NULL');
-      expect(sql).toContain('"updated_at" DATETIME NOT NULL');
+      expect(sql).toContain('"created_at" DATETIME(6) NOT NULL');
+      expect(sql).toContain('"updated_at" DATETIME(6) NOT NULL');
     });
 
     it("supports references", () => {

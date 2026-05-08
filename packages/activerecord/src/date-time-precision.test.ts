@@ -58,10 +58,16 @@ describe("DateTimePrecisionTest", () => {
     expect(nsec((foo as any).updated_at)).toBe(123456000);
   });
 
-  it("no datetime precision isnt truncated on assignment", () => {
-    // BLOCKED: datetime without explicit precision should use native default precision 6
-    // ROOT-CAUSE: MigrationContext._mapType and SQLite3 type-map don't propagate native default
-    //   precision (6). Fix requires ~20 LOC in migration.ts + sqlite3-adapter.ts native types.
+  it("no datetime precision isnt truncated on assignment", async () => {
+    await ctx.createTable("foos", { force: true }, (t) => {
+      t.datetime("happened_at");
+    });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    expect((Foo.columnsHash() as any)["happened_at"].precision).toBe(6);
+    const time = Temporal.Instant.from("2000-01-01T12:00:00.123456789Z");
+    const foo = new Foo({ happened_at: time });
+    expect(nsec((foo as any).happened_at)).toBe(123456000);
   });
 
   it("timestamps helper with custom precision", async () => {
@@ -157,7 +163,7 @@ describe("DateTimePrecisionTest", () => {
 
   it("schema dump with without precision has precision as nil", async () => {
     await ctx.createTable("foos", { force: true }, (t) => {
-      (t as any).timestamps({ precision: null });
+      t.timestamps({ precision: null });
     });
     const output = SchemaDumper.dump(ctx) as string;
     expect(output).toMatch(/t\.datetime\("created_at".*precision.*null/);

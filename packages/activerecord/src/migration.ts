@@ -1134,9 +1134,9 @@ export class MigrationContext {
         primaryKey?: boolean;
         null?: boolean;
         default?: unknown;
-        limit?: number;
-        precision?: number;
-        scale?: number;
+        limit?: number | null;
+        precision?: number | null;
+        scale?: number | null;
       }
     >
   >();
@@ -1194,9 +1194,9 @@ export class MigrationContext {
         primaryKey?: boolean;
         null?: boolean;
         default?: unknown;
-        limit?: number;
-        precision?: number;
-        scale?: number;
+        limit?: number | null;
+        precision?: number | null;
+        scale?: number | null;
       }
     >();
     if (options?.id !== false) {
@@ -1275,7 +1275,8 @@ export class MigrationContext {
       case "datetime":
       case "timestamp": {
         const base = an === "postgres" ? "TIMESTAMP" : "DATETIME";
-        const p = options?.precision;
+        // precision: undefined → Rails default of 6; precision: null → no precision suffix
+        const p = options?.precision === undefined ? 6 : options.precision;
         if (p != null && !(p >= 0 && p <= 6))
           throw new ArgumentError(
             `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
@@ -1372,11 +1373,11 @@ export class MigrationContext {
   ): Promise<void> {
     if (this._adapterName === "mysql") {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type)}`,
+        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type, _options)}`,
       );
     } else {
       await this.adapter.executeMutation(
-        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type)}`,
+        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type, _options)}`,
       );
     }
     const meta = this._columnMeta.get(table);
@@ -1385,11 +1386,16 @@ export class MigrationContext {
       meta.set(column, {
         ...entry,
         type,
-        null: _options?.null ?? entry.null,
-        default: _options?.default ?? entry.default,
-        limit: _options?.limit ?? entry.limit,
-        precision: _options?.precision ?? entry.precision,
-        scale: _options?.scale ?? entry.scale,
+        null: _options?.null !== undefined ? _options.null : entry.null,
+        default: _options?.default !== undefined ? _options.default : entry.default,
+        limit: _options?.limit !== undefined ? _options.limit : entry.limit,
+        precision:
+          _options?.precision !== undefined
+            ? _options.precision
+            : type === "datetime" || type === "timestamp"
+              ? 6
+              : entry.precision,
+        scale: _options?.scale !== undefined ? _options.scale : entry.scale,
       });
     }
   }
@@ -1520,9 +1526,9 @@ export class MigrationContext {
     primaryKey?: boolean;
     null?: boolean;
     default?: unknown;
-    limit?: number;
-    precision?: number;
-    scale?: number;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
   }> {
     const meta = this._columnMeta.get(tableName);
     if (meta) {

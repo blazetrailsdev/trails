@@ -15,6 +15,22 @@ describe("looseDateParse", () => {
     expect(looseDateParse("7/4/2020")).toMatchObject({ year: 2020, month: 7, day: 4 });
   });
 
+  it("US slashes with 12-hour time MM/DD/YYYY H:MMam", () => {
+    expect(looseDateParse("8/17/2014 12:30pm")).toMatchObject({
+      year: 2014,
+      month: 8,
+      day: 17,
+      hour: 12,
+      minute: 30,
+    });
+    expect(looseDateParse("8/17/2014 3am")).toMatchObject({
+      year: 2014,
+      month: 8,
+      day: 17,
+      hour: 3,
+    });
+  });
+
   it("year-first slashes YYYY/MM/DD", () => {
     expect(looseDateParse("2020/07/04")).toMatchObject({ year: 2020, month: 7, day: 4 });
   });

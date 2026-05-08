@@ -75,8 +75,23 @@ export function looseDateParse(input: string): LooseDateParts | null {
 
   // Layer 4: regex set for common non-ISO formats
 
+  // US slashes with 12-hour time: MM/DD/YYYY H:MMam or MM/DD/YYYY H:MM am
+  let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(s);
+  if (m) {
+    const rawHour = int(m[4]);
+    const minute = m[5] !== undefined ? int(m[5]) : undefined;
+    if (rawHour >= 1 && rawHour <= 12 && (minute === undefined || minute <= 59)) {
+      const ampm = m[6].toLowerCase();
+      const hour =
+        ampm === "am" ? (rawHour === 12 ? 0 : rawHour) : rawHour === 12 ? 12 : rawHour + 12;
+      const parts: LooseDateParts = { year: int(m[3]), month: int(m[1]), day: int(m[2]), hour };
+      if (minute !== undefined) parts.minute = minute;
+      return parts;
+    }
+  }
+
   // US slashes: MM/DD/YYYY
-  let m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
   if (m) return { year: int(m[3]), month: int(m[1]), day: int(m[2]) };
 
   // Year-first slashes: YYYY/MM/DD
