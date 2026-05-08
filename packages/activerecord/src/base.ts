@@ -95,6 +95,7 @@ const loadSignedId = async () => {
 };
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
+import { hookAttributeType as tzHookAttributeType } from "./attribute-methods/time-zone-conversion.js";
 import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
 import * as Serialization from "./serialization.js";
@@ -580,6 +581,27 @@ export class Base extends Model {
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
+  /**
+   * When true, datetime/time attributes are wrapped in a TimeZoneConverter.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_attributes
+   */
+  static timeZoneAwareAttributes: boolean = false;
+
+  /**
+   * Attribute names exempt from time-zone conversion.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.skip_time_zone_conversion_for_attributes
+   */
+  static skipTimeZoneConversionForAttributes: string[] = [];
+
+  /**
+   * Column types eligible for time-zone conversion.
+   *
+   * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_types
+   */
+  static timeZoneAwareTypes: string[] = ["datetime", "time"];
+
   static get protectedEnvironments(): string[] {
     return ModelSchema.protectedEnvironments.call(this);
   }
@@ -762,12 +784,32 @@ export class Base extends Model {
       return;
     }
     super.attribute(name, typeName, options);
+    // Apply hookAttributeType decorators (TZ conversion, locking) to the
+    // just-registered type so user-declared datetime attributes are wrapped.
+    const def = this._attributeDefinitions.get(name);
+    if (def) {
+      const hooked = this.hookAttributeType(name, def.type);
+      if (hooked !== def.type) {
+        this._attributeDefinitions.set(name, { ...def, type: hooked });
+      }
+    }
     // If we just defined an "id" accessor on a subclass prototype, remove it
     // so Base.prototype.id (which handles CPK) is used instead.
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
     encryptionHooks.applyPendingEncryptions(this);
+  }
+
+  /**
+   * Chains time-zone-conversion and optimistic-locking type decoration.
+   *
+   * @internal Rails-private helper.
+   * Mirrors: ActiveRecord::Base#hook_attribute_type (composed via module includes)
+   */
+  static override hookAttributeType(name: string, type: Type): Type {
+    const tzType = tzHookAttributeType.call(this as any, name, type) as Type;
+    return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
   }
 
   /**

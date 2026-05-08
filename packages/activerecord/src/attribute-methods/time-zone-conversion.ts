@@ -56,11 +56,14 @@ interface TimeZoneConversionHost {
   _hookAttributeType?(name: string, castType: unknown): unknown;
 }
 
-/** @internal */
-function hookAttributeType(
+/**
+ * @internal
+ * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion::ClassMethods#hook_attribute_type
+ */
+export function hookAttributeType(
   this: TimeZoneConversionHost,
   name: string,
-  castType: { type?: string },
+  castType: { type?(): string },
 ): unknown {
   if (isCreateTimeZoneConversionAttribute.call(this, name, castType)) {
     return new TimeZoneConverter(castType as any);
@@ -72,12 +75,12 @@ function hookAttributeType(
 function isCreateTimeZoneConversionAttribute(
   this: TimeZoneConversionHost,
   name: string,
-  castType: { type?: string },
+  castType: { type?(): string },
 ): boolean {
   const enabledForColumn =
     this.timeZoneAwareAttributes && !this.skipTimeZoneConversionForAttributes.includes(name as any);
   return (
     enabledForColumn &&
-    (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type ?? "")
+    (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type?.() ?? "")
   );
 }
