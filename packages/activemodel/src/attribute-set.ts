@@ -278,6 +278,23 @@ export class AttributeSet {
     return new AttributeSet(newAttrs);
   }
 
+  /**
+   * Apply `forgettingAssignment()` to each attribute in place so that shared
+   * references (as in `becomes()`) see the updated baseline.
+   *
+   * Mirrors: ActiveModel::AttributeSet#map(&:forgetting_assignment) assigned
+   * back to `@attributes` in `forget_attribute_assignments`.
+   *
+   * @internal
+   */
+  forgetAssignmentsBang(): void {
+    this.assertNotFrozen();
+    for (const [name, attr] of this.attributes) {
+      const next = attr.forgettingAssignment();
+      if (next !== attr) this.attributes.set(name, next);
+    }
+  }
+
   reverseMergeBang(target: AttributeSet): this {
     this.assertNotFrozen();
     const cache = new Map<Attribute, Attribute>();

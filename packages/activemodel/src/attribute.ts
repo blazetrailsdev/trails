@@ -270,6 +270,17 @@ export class FromDatabase extends Attribute {
   protected override _originalValueForDatabase(): unknown {
     return this.valueBeforeTypeCast;
   }
+
+  override forgettingAssignment(): Attribute {
+    // Rails condition: `!defined?(@value_for_database) && !changed_in_place?`
+    // → fast-path creates a new FromDatabase using the existing value_before_type_cast.
+    // We simplify: if nothing changed in place, `this` is already a correct baseline
+    // (valueBeforeTypeCast is the serialized DB value), so return self.
+    // If changed in place, delegate to base which serializes the current value into
+    // a new FromDatabase, resetting the baseline to the post-mutation state.
+    if (!this.changedInPlace()) return this;
+    return super.forgettingAssignment();
+  }
 }
 
 export class FromUser extends Attribute {
