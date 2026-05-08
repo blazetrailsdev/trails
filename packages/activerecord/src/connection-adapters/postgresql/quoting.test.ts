@@ -122,6 +122,12 @@ describe("PostgreSQL quoting", () => {
     expect(quotedBinary("ab")).toBe("'\\x6162'");
   });
 
+  it("quote(Uint8Array) emits a bytea hex literal via quotedBinary", () => {
+    // byte 0x8b (> 0x7f) must not be corrupted to the UTF-8 replacement
+    // character sequence EF BF BD — regression for the String(buffer) path
+    expect(quote(new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
+  });
+
   it("checkIntInRange is the Rails name for checkIntegerRange", () => {
     expect(() => checkIntInRange(BigInt("9223372036854775808"))).toThrow(IntegerOutOf64BitRange);
     expect(() => checkIntInRange(BigInt("9223372036854775807"))).not.toThrow();

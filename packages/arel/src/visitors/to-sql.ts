@@ -1534,6 +1534,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     if (typeof value === "bigint") return value.toString();
+    if (value instanceof Uint8Array) return this.quoter.quote(value);
     if (
       typeof value === "object" &&
       value !== null &&

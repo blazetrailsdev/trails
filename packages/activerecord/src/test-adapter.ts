@@ -999,6 +999,14 @@ class SchemaAdapter implements DatabaseAdapter {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
   }
 
+  quotedBinary(value: unknown): string {
+    const inner = this.inner as { quotedBinary?: (v: unknown) => string };
+    if (typeof inner.quotedBinary === "function") return inner.quotedBinary(value);
+    throw new Error(
+      `SchemaAdapter.quotedBinary: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quotedBinary()`,
+    );
+  }
+
   get arelVisitor(): Visitors.ToSql | undefined {
     return undefined;
   }

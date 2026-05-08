@@ -187,6 +187,7 @@ export function quote(value: unknown): string {
     checkIntegerRange(value);
     return String(value);
   }
+  if (value instanceof Uint8Array) return quotedBinary(value);
   return abstractQuote(value);
 }
 

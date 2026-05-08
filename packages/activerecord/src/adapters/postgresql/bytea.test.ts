@@ -56,11 +56,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("type cast binary column", async () => {
-      // BLOCKED: adapter-pg — typeForAttribute("payload") returns BinaryType but not
-      // ROOT-CAUSE: Bytea OID class identity; Base.typeForAttribute returns generic BinaryType
-      // after loadSchema, not the Bytea subclass, because the type registry wires Bytea
-      // into the column lookup but typeForAttribute may not surface the OID subclass.
-      // SCOPE: ~20 LOC investigation in connection-adapters/postgresql/type-map-init.ts + base.ts
+      // BLOCKED: no test body — Rails checks column.type == :binary and
+      // typeForAttribute returns the Bytea OID subclass. columns() now
+      // batch-loads all OIDs via loadAdditionalTypes before building Column
+      // objects, so OID 17 is registered as Bytea in the type map and
+      // typeForAttribute("payload") returns Bytea after loadSchema().
+      // SCOPE: ~5 LOC to implement the test body; nothing blocking the impl.
     });
 
     it("type cast bytea", () => {
@@ -82,16 +83,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(type.deserialize(null)).toBeNull();
     });
 
-    it.skip("write and read", async () => {
-      // BLOCKED: adapter-pg — Buffer/Uint8Array not handled by Arel quote()
-      // ROOT-CAUSE: Arel's visitNodeOrValue falls through to this.quote(v) for
-      // Buffer/Uint8Array; quote() calls String(buffer) which does UTF-8 encoding
-      // and corrupts non-UTF-8 bytes (e.g. 0x8B → U+FFFD = 3 bytes EF BF BD).
-      // Fix needed: add Uint8Array branch in Arel's visitNodeOrValue (arel/src/visitors/to-sql.ts)
-      // to call adapter.quotedBinary(v), or detect binary type in base.ts:_performInsert
-      // and use arelSql(adapter.quotedBinary(values[i])) like array columns do.
-      // SCOPE: ~10 LOC in arel/src/visitors/to-sql.ts or base.ts:_performInsert + _performUpdate;
-      // unblocks write and read, write binary, and all binary round-trip tests.
+    it("write and read", async () => {
+      const { Base } = await import("../../index.js");
+      class ByteaDataType extends Base {
+        static tableName = "bytea_data_type";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await ByteaDataType.loadSchema();
+      const data = Buffer.from([0x1f, 0x8b]);
+      const record = await (ByteaDataType as any).create({ payload: data });
+      expect((record as any).isNewRecord()).toBe(false);
+      const reloaded = await ByteaDataType.find((record as any).id);
+      expect((reloaded as any).payload instanceof Uint8Array).toBe(true);
+      expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
+
+      // Also exercise the UPDATE path (binary quoting in _performUpdate)
+      const updated = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+      await (reloaded as any).update({ payload: updated });
+      const reloaded2 = await ByteaDataType.find((record as any).id);
+      expect(Buffer.from((reloaded2 as any).payload as Uint8Array)).toEqual(updated);
     });
 
     it.skip("write and read with url safe base64", async () => {
@@ -263,11 +275,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: Same as "via to sql" plus session config; no additional impl needed beyond that.
     });
 
-    it.skip("write binary", () => {
-      // BLOCKED: adapter-pg — same Arel quote() Buffer corruption as "write and read"
-      // ROOT-CAUSE: See "write and read" skip annotation above. Rails test_write_binary
-      // reads a binary file and round-trips it; our equivalent would corrupt any byte ≥0x80.
-      // SCOPE: Same fix as "write and read".
+    it("write binary", async () => {
+      const { Base } = await import("../../index.js");
+      class ByteaDataType extends Base {
+        static tableName = "bytea_data_type";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await ByteaDataType.loadSchema();
+      // Round-trip all byte values 0x00–0xFF — none should be corrupted.
+      const data = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
+      const record = await (ByteaDataType as any).create({ payload: data });
+      const reloaded = await ByteaDataType.find((record as any).id);
+      expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
     });
 
     it.skip("serialize", () => {

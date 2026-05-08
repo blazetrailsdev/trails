@@ -2434,11 +2434,13 @@ export class Base extends Model {
       const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {
         const def = ctor._attributeDefinitions.get(c);
         const isArray = def?.type?.name === "array";
-        const val = isArray ? arelSql(quoteSqlValue(values[i], true)) : values[i];
+        const raw = values[i];
+        const val = isArray ? arelSql(quoteSqlValue(raw, true)) : raw;
         return [table.get(c), val];
       });
       im.insert(insertValues);
-      sql = im.toSql();
+      const imVisitor = ctor.adapter.arelVisitor;
+      sql = imVisitor ? imVisitor.compile(im.ast) : im.toSql();
     }
     this._pendingOperation = ctor.adapter
       .execInsert(sql, `${ctor.name} Create`)
@@ -2515,8 +2517,9 @@ export class Base extends Model {
       }
     }
 
+    const umVisitor = ctor.adapter.arelVisitor;
     this._pendingOperation = ctor.adapter
-      .execUpdate(um.toSql(), `${ctor.name} Update`)
+      .execUpdate(umVisitor ? umVisitor.compile(um.ast) : um.toSql(), `${ctor.name} Update`)
       .then((affected) => {
         if (ctor.lockingEnabled && affected === 0) {
           throw new StaleObjectError(this, "update");

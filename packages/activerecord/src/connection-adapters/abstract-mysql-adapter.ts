@@ -580,8 +580,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlCastBoundValue(value);
   }
 
-  quotedBinary(value: Buffer | string): string {
-    return mysqlQuotedBinary(value);
+  quotedBinary(value: unknown): string {
+    return mysqlQuotedBinary(value as Buffer | Uint8Array | string);
   }
 
   unquoteIdentifier(identifier: string | null | undefined): string | null {

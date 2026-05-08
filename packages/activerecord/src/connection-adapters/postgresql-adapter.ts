@@ -485,6 +485,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // typeMap.has(oid)=true, skip loadAdditionalTypes, and never
     // resolve the real type. Return a fresh ValueType on miss and
     // leave miss-loading to getOidType / loadAdditionalTypes.
+    // columns() batch-loads missing OIDs via loadAdditionalTypes before
+    // building Column objects, so OIDs are registered by the time this is
+    // called for type-casting during attribute reads.
     return this.typeMap.fetch(oid, column.fmod ?? -1, column.sqlType ?? "", () => new ValueType());
   }
 
@@ -2484,14 +2487,31 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       binds,
     );
 
+    // Mirrors Rails' load_additional_types batch call: gather all OIDs not
+    // yet in the map and load them in a single pg_type query before building
+    // Column objects. This avoids N concurrent queries for wide tables.
+    const missingOids = [
+      ...new Set(rows.map((r) => r.oid as number).filter((oid) => !this.typeMap.has(oid))),
+    ];
+    if (missingOids.length > 0) {
+      await this.loadAdditionalTypes(missingOids);
+      // Mirrors Rails' get_oid_type fallback: register any OIDs still absent
+      // after the pg_type query so repeated columns() calls don't re-query.
+      for (const oid of missingOids) {
+        if (!this.typeMap.has(oid)) {
+          console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
+          this.typeMap.registerType(oid, new ValueType());
+        }
+      }
+    }
+
     return rows.map((r) => {
       const sqlType = r.type as string;
       const oid = r.oid as number;
       const fmod = r.fmod as number;
-      // Mirrors Rails' fetch_type_metadata: look up the cast type so that
-      // SqlTypeMetadata.type reflects the OID type's semantic name (e.g.
-      // "enum" for user-defined enums, "integer" for int4, etc.) rather
-      // than defaulting to the raw sqlType string.
+      // All OIDs are now registered (or warned as unknown) by the batch
+      // load above. lookupCastTypeFromColumn mirrors Rails' fetch_type_metadata
+      // after get_oid_type has pre-populated the map.
       const castType = this.lookupCastTypeFromColumn({ oid, fmod, sqlType });
       const rawDefault = (r.default as string | null) ?? null;
       const identity = (r.identity as string | null) || null;

@@ -374,6 +374,14 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
   }
 
+  quotedBinary(value: unknown): string {
+    const inner = this.inner as { quotedBinary?: (v: unknown) => string };
+    if (typeof inner.quotedBinary === "function") return inner.quotedBinary(value);
+    throw new Error(
+      `QueryCacheAdapter.quotedBinary: wrapped ${this.inner.adapterName} does not implement quotedBinary()`,
+    );
+  }
+
   quoteDefaultExpression(value: unknown): string {
     const inner = this.inner as { quoteDefaultExpression?: (v: unknown) => string };
     if (typeof inner.quoteDefaultExpression === "function")

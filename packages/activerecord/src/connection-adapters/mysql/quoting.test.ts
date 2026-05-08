@@ -58,6 +58,10 @@ describe("MySQL quoting — typeCast", () => {
     expect(quote(Buffer.from([0xca, 0xfe]))).toBe("x'cafe'");
   });
 
+  it("quotes Uint8Array values as hex literals via quotedBinary", () => {
+    expect(quote(new Uint8Array([0xca, 0xfe]))).toBe("x'cafe'");
+  });
+
   it("throws on Date — Date is no longer accepted", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
   });
@@ -70,6 +74,10 @@ describe("MySQL quoting — quotedBinary", () => {
 
   it("formats a binary string as hex literal", () => {
     expect(quotedBinary(Buffer.from("hello").toString("binary"))).toBe("x'68656c6c6f'");
+  });
+
+  it("formats a Uint8Array as hex literal", () => {
+    expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
   });
 });
 

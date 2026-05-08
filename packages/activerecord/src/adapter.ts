@@ -401,6 +401,15 @@ export interface DatabaseAdapter {
   quoteString(s: string): string;
 
   /**
+   * Mirrors: AbstractAdapter#quoted_binary. Returns a SQL literal for a
+   * binary value (e.g. PG hex `'\x1f8b'`, SQLite blob literal). Must be
+   * wrapped with `arelSql()` before use in an Arel value position.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quoted_binary
+   */
+  quotedBinary(value: unknown): string;
+
+  /**
    * Return a dialect-specific Arel visitor wired to this connection's
    * quoter. Used to compile Arel ASTs to SQL with correct identifier
    * quoting (e.g. backticks on MySQL). Optional — call sites fall back to

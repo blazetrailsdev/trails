@@ -95,10 +95,12 @@ export function quotedBinaryString(value: Buffer): string {
   return `x'${value.toString("hex")}'`;
 }
 
-export function quotedBinary(value: Buffer | string): string {
+export function quotedBinary(value: Buffer | Uint8Array | string): string {
   const hex = Buffer.isBuffer(value)
     ? value.toString("hex")
-    : Buffer.from(value, "binary").toString("hex");
+    : value instanceof Uint8Array
+      ? Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString("hex")
+      : Buffer.from(value, "binary").toString("hex");
   return `x'${hex}'`;
 }
 
@@ -182,7 +184,7 @@ export function quote(value: unknown): string {
     throw new TypeError(
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
-  if (value instanceof Buffer) return quotedBinary(value);
+  if (value instanceof Buffer || value instanceof Uint8Array) return quotedBinary(value);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
