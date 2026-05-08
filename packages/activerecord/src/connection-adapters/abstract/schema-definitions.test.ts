@@ -160,3 +160,28 @@ describe("Table#raise_on_if_exist_options", () => {
     await expect(t.string("name", { ifExists: true })).rejects.toThrow("if_exists");
   });
 });
+
+describe("Table#aliasedTypes", () => {
+  const fakeSchema2 = {
+    addColumn: async () => {},
+    removeColumn: async () => {},
+    changeColumn: async () => {},
+    renameColumn: async () => {},
+    addIndex: async () => {},
+    removeIndex: async () => {},
+    addReference: async () => {},
+    addTimestamps: async () => {},
+    renameIndex: async () => {},
+  };
+
+  it('maps "timestamp" to "datetime"', () => {
+    const t = new Table("users", fakeSchema2 as any);
+    expect(t.aliasedTypes("timestamp", "timestamp")).toBe("datetime");
+  });
+
+  it("returns fallback for unrecognised type names", () => {
+    const t = new Table("users", fakeSchema2 as any);
+    expect(t.aliasedTypes("string", "string")).toBe("string");
+    expect(t.aliasedTypes("datetime", "datetime")).toBe("datetime");
+  });
+});

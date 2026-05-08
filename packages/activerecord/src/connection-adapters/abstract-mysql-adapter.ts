@@ -359,8 +359,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return false;
   }
 
-  returnValueAfterInsert(_column: string): boolean {
-    return false;
+  returnValueAfterInsert(column: Column): boolean {
+    return this.supportsInsertReturning()
+      ? column.isAutoPopulated()
+      : column.isAutoIncrementedByDb();
   }
 
   supportsSavepoints(): boolean {
