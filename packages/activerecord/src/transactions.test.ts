@@ -2005,6 +2005,93 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     });
 
     expect((topic as any)._startTransactionState).toBeNull();
+    // In-TX user edit is preserved as dirty: title rolled back to "original" but
+    // "changed-during-tx" appears as the prior ("was") value. Mirrors Rails'
+    // per-attribute original_attribute chain that survives restore.
+    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+      title: ["changed-during-tx", "original"],
+    });
+  });
+});
+
+// ==========================================================================
+// Story K-followup regression tests
+// ==========================================================================
+describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
+  it("rollback preserves in-TX user edits as dirty", async () => {
+    const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "original" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+    (topic as any).writeAttribute("title", "tx-edit");
+
+    await rolledbackBang.call(topic as any, {
+      forceRestoreState: true,
+      shouldRunCallbacks: false,
+    });
+
+    // Attribute restored to pre-TX value
+    expect((topic as any).readAttribute("title")).toBe("original");
+    // In-TX edit preserved as dirty: was="tx-edit", now="original"
+    expect((topic as any)._dirty.attributeChanged("title")).toBe(true);
+    expect((topic as any)._dirty.attributeWas("title")).toBe("tx-edit");
+    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+      title: ["tx-edit", "original"],
+    });
+  });
+
+  it("rollback leaves clean attributes unchanged (no spurious dirty)", async () => {
+    const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "original" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+    // No attribute writes during TX
+
+    await rolledbackBang.call(topic as any, {
+      forceRestoreState: true,
+      shouldRunCallbacks: false,
+    });
+
+    expect((topic as any)._dirty.changed).toBe(false);
     expect((topic as any)._dirty.mutationsFromDatabase).toEqual({});
+  });
+});
+
+describe("inner savepoint committedBang (Story K-followup)", () => {
+  it("inner savepoint commit fires committedBang with shouldRunCallbacks=false", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+
+    let committedCallCount = 0;
+    const orig = (Topic.prototype as any).committedBang;
+    (Topic.prototype as any).committedBang = async function (
+      this: typeof Topic.prototype,
+      opts?: { shouldRunCallbacks?: boolean },
+    ) {
+      committedCallCount++;
+      return orig?.call(this, opts);
+    };
+
+    const topic = await Topic.create({ title: "outer" });
+    await Topic.transaction(async () => {
+      await (topic as any).update({ title: "inner-saved" });
+      try {
+        await Topic.transaction(
+          async () => {
+            await (topic as any).update({ title: "savepoint" });
+          },
+          { requiresNew: true },
+        );
+      } catch {}
+    });
+
+    // committedBang should have been called at least once (inner savepoint fires it)
+    expect(committedCallCount).toBeGreaterThan(0);
+
+    (Topic.prototype as any).committedBang = orig;
+    adapter.close();
   });
 });

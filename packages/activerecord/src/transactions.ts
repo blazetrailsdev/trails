@@ -412,12 +412,10 @@ export async function rolledbackBang(
     _restoreTransactionRecordState.call(this, forceRestoreState);
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
-      // Unconditionally null _startTransactionState on full outer rollback.
-      // Inner savepoint commits don't call committedBang (records are moved
-      // to parent instead), so level can be > 1 when we reach here. Without
-      // this, clearTransactionRecordState only decrements level and leaves
-      // a stale snapshot that corrupts the next transaction's level tracking.
-      (this as any)._startTransactionState = null;
+      // Reset ephemeral per-TX flags that survive across transactions when not
+      // cleared. _startTransactionState is already null (cleared by
+      // committedBang for inner savepoints, or by clearTransactionRecordState
+      // for direct rollbacks).
       (this as any)._triggerUpdateCallback = false;
       (this as any)._triggerDestroyCallback = false;
     }
@@ -532,12 +530,10 @@ function _restoreTransactionRecordState(this: Base, forceRestoreState = false): 
     r._destroyed = state.destroyed;
     r._previouslyNewRecord = state.previouslyNewRecord;
 
-    // Restore the full attribute set to pre-transaction state. Rails preserves
-    // in-transaction user edits as dirty on top of the pre-TX baseline via a
-    // per-attribute original_attribute mechanism (restore_state[:attributes].map).
-    // Our DirtyTracker is external and can't reconstruct that per-attribute
-    // original cheaply, so we take the clean restore: the record returns to the
-    // exact pre-transaction state (no pending changes).
+    // Capture post-TX attribute values before restoring the baseline so
+    // redetectChanges can surface any in-TX user edits as dirty.
+    const currentAttrs = r._attributes;
+
     r._attributes = state.attributes.deepDup();
 
     // Restore primary key if it shifted during the transaction.
@@ -556,12 +552,14 @@ function _restoreTransactionRecordState(this: Base, forceRestoreState = false): 
       r._attributes.freeze();
     }
 
-    // Clear mutation tracking caches AFTER all attribute mutations so the
-    // baseline reflects the fully-restored _attributes. Mirrors Rails:
-    //   @mutations_from_database = nil
-    //   @mutations_before_last_save = nil
+    // Set the pre-TX state as the clean baseline, then redetect any
+    // in-TX user edits that should survive as dirty. Mirrors Rails:
+    //   @mutations_from_database = nil (via snapshot)
+    //   @mutations_before_last_save = nil (via clearChangesInformation)
+    //   in-TX edits preserved via per-attribute original_attribute (via redetectChanges)
     r._dirty.snapshot(r._attributes);
     r._dirty.clearChangesInformation();
+    r._dirty.redetectChanges(currentAttrs);
   }
 }
 

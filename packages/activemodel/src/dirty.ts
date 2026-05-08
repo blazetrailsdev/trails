@@ -225,6 +225,36 @@ export class DirtyTracker {
     this._previousChanges.clear();
   }
 
+  /**
+   * After a transaction rollback restores the attribute set to its pre-TX
+   * baseline, re-populate `_changedAttributes` for any attribute whose
+   * post-TX value differs from the restored (pre-TX) baseline. This preserves
+   * in-transaction user edits as dirty — mirroring Rails' per-attribute
+   * `original_attribute` chain in `restore_state[:attributes].map`.
+   *
+   * Call this after `snapshot(restoredAttributes)` so `_originalAttributes`
+   * already holds the pre-TX baseline values.
+   *
+   * @internal
+   */
+  redetectChanges(currentAttributes: AttributeSet): void {
+    for (const [name] of currentAttributes) {
+      const attr = currentAttributes.getAttribute(name);
+      const preRollbackValue = attr.value;
+      if (!this._originalHas.has(name)) {
+        // Attribute added during the transaction — mark as reverted to absent
+        this._changedAttributes.set(name, [preRollbackValue, undefined]);
+      } else {
+        const restoredValue = resolveValue(this._originalAttributes.get(name));
+        // isChanged: compare restored (pre-TX) vs pre-rollback (post-TX) value.
+        // Entry is [was=preRollback, now=restored] matching Rails' original_attribute semantics.
+        if (attr.type.isChanged(restoredValue, preRollbackValue, preRollbackValue)) {
+          this._changedAttributes.set(name, [preRollbackValue, restoredValue]);
+        }
+      }
+    }
+  }
+
   clearAttributeChanges(attributes: string[]): void {
     for (const attr of attributes) {
       this._deleteChange(attr);

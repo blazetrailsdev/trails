@@ -505,6 +505,9 @@ export class Transaction {
         }
       } else {
         for (const record of ite) {
+          if (typeof (record as any).committedBang === "function") {
+            await (record as any).committedBang({ shouldRunCallbacks: false });
+          }
           this._connection.addTransactionRecord?.(record);
         }
       }

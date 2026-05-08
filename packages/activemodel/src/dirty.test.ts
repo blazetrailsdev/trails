@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
+import { Model, DirtyTracker, AttributeSet } from "./index.js";
 
 describe("DirtyTest", () => {
   it("changes accessible through both strings and symbols", () => {
@@ -845,5 +845,54 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changedAttributes).toContain("ratio");
     m.writeAttribute("ratio", "NaN");
     expect(m.changedAttributes).not.toContain("ratio");
+  });
+});
+
+describe("DirtyTracker#redetectChanges", () => {
+  class Subject extends Model {
+    static {
+      this.attribute("title", "string");
+      this.attribute("score", "integer");
+    }
+  }
+
+  it("marks attributes as dirty where the post-rollback value differs from the restored baseline", () => {
+    const m = new Subject({ title: "original", score: 0 });
+    m.changesApplied(); // simulate post-save clean state
+
+    // Simulate in-TX user edit
+    const postTxAttrs = (m as any)._attributes.deepDup();
+    (postTxAttrs as AttributeSet).writeFromUser("title", "tx-edit");
+
+    // Simulate restore to pre-TX state (baseline is already "original" from snapshot)
+    const restored = (m as any)._attributes;
+    const dirty: DirtyTracker = (m as any)._dirty;
+    dirty.snapshot(restored);
+    dirty.clearChangesInformation();
+    dirty.redetectChanges(postTxAttrs);
+
+    // title differed → dirty, with [was=tx-edit, now=original]
+    expect(dirty.attributeChanged("title")).toBe(true);
+    expect(dirty.attributeWas("title")).toBe("tx-edit");
+    expect(dirty.changes).toEqual({ title: ["tx-edit", "original"] });
+
+    // score unchanged → not dirty
+    expect(dirty.attributeChanged("score")).toBe(false);
+  });
+
+  it("leaves no dirty state when post-rollback values match the restored baseline", () => {
+    const m = new Subject({ title: "same", score: 1 });
+    m.changesApplied();
+
+    const postTxAttrs = (m as any)._attributes.deepDup(); // no edits during TX
+
+    const restored = (m as any)._attributes;
+    const dirty: DirtyTracker = (m as any)._dirty;
+    dirty.snapshot(restored);
+    dirty.clearChangesInformation();
+    dirty.redetectChanges(postTxAttrs);
+
+    expect(dirty.changed).toBe(false);
+    expect(dirty.changes).toEqual({});
   });
 });
