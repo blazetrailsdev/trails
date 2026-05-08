@@ -1167,18 +1167,48 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  renameColumnForAlter(tableName: string, columnName: string, newColumnName: string): string {
+  async renameColumnForAlter(
+    tableName: string,
+    columnName: string,
+    newColumnName: string,
+  ): Promise<string> {
+    // Ensure version is cached before branching — supportsRenameColumn() returns false when
+    // _databaseVersion is unset, so we'd always fall through to the CHANGE path on uninitialized
+    // connections. getDatabaseVersion() memoizes after the first DB round-trip.
+    await this.getDatabaseVersion();
     if (this.supportsRenameColumn()) {
       return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
     }
-    // TODO: implement CHANGE-column fallback for older MySQL/MariaDB
-    //   (matches abstract_mysql_adapter.rb:rename_column_for_alter when !supports_rename_column?).
-    //   Requires fetching the existing column type via columnDefinitions() and building a
-    //   ChangeColumnDefinition. Safe to skip for modern servers: MySQL ≥8.0.3 and
-    //   MariaDB ≥10.5.2 always hit the fast path above.
-    throw new Error(
-      "renameColumnForAlter fallback path (CHANGE clause for older MySQL/MariaDB) not yet implemented",
-    );
+    // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter fallback.
+    // columnDefinitions (SHOW FULL FIELDS) fires a "SCHEMA" notification and returns the full
+    // column definition including Collation, Extra (auto_increment), and Comment — more complete
+    // than SHOW COLUMNS which omits those fields.
+    const cols = await this.columnDefinitions(tableName);
+    const col = cols.find((c) => (c["Field"] as string) === columnName);
+    if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
+    // Guard against silently dropping Extra attributes (AUTO_INCREMENT, ON UPDATE, generated
+    // columns) that ColumnOptions cannot express. Rails preserves these via column_for's
+    // auto_increment?/comment; our ColumnDefinition lacks that field. Throw explicitly so
+    // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
+    const extra = ((col["Extra"] as string | undefined) ?? "").trim().toLowerCase();
+    if (extra) {
+      throw new Error(
+        `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
+          `— Extra="${col["Extra"]}" is not preserved by this path. ` +
+          `Upgrade to MySQL ≥8.0.3 or MariaDB ≥10.5.2 to use RENAME COLUMN instead.`,
+      );
+    }
+    const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, {
+      // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
+      // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
+      // DEFAULT NULL on NOT NULL columns — mirrors Rails column_for + new_column_definition.
+      default: col["Default"] !== null ? col["Default"] : undefined,
+      null: (col["Null"] as string) === "YES",
+      collation: (col["Collation"] as string | undefined) || undefined,
+      comment: (col["Comment"] as string | undefined) || undefined,
+    });
+    const cd = new ChangeColumnDefinition(colDef, columnName);
+    return new MysqlSchemaCreation().accept(cd);
   }
 
   /** @internal */
