@@ -746,6 +746,11 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
+  /** @internal */
+  returnValueAfterInsert(column: Column): boolean {
+    return column.isAutoPopulated();
+  }
+
   supportsInsertOnDuplicateSkip(): boolean {
     return false;
   }
