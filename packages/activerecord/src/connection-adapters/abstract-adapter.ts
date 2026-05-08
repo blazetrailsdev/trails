@@ -1179,8 +1179,8 @@ export class AbstractAdapter implements Quoting {
 
   // --- Comparison helpers ---
 
-  defaultUniquenessComparison(_attribute: unknown, _value: unknown): unknown {
-    return null;
+  defaultUniquenessComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+    return attribute.eq(value);
   }
 
   caseSensitiveComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {

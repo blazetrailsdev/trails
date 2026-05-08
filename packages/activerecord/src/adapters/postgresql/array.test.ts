@@ -55,14 +55,38 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   lifecycle around the OID::Array serialize/deserialize chain is not implemented.
       // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle
     });
-    it.skip("default", async () => {
-      /* BLOCKED: addColumn integer-array default DDL; same root as "default strings" (~20 LOC) */
+    it("default", async () => {
+      await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
+      expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
+      // Rails: assert_equal([4, 4, 2], PgArray.new.score)
+      expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
     });
-    it.skip("default strings", async () => {
-      // BLOCKED: adapter-pg — addColumn array default DDL gap
-      // ROOT-CAUSE: postgresql/schema-statements.ts addColumn does not serialize array defaults
-      //   (e.g. ["foo","bar"]) into PG literal form (e.g. ARRAY['foo','bar']) for the DEFAULT clause.
-      // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts
+    it("default strings", async () => {
+      await adapter.addColumn("pg_arrays", "names", "string", {
+        array: true,
+        default: ["foo", "bar"],
+      });
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await PgArrays.loadSchema();
+      // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
+      expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
+      // Rails: assert_equal(["foo", "bar"], PgArray.new.names)
+      expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
     });
     it("schema dump with shorthand", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "pg_arrays");
@@ -427,13 +451,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].tags).toEqual(tags);
     });
 
-    it.skip("uniqueness validation", async () => {
-      // BLOCKED: adapter-pg — validates_uniqueness_of array serialization gap
-      // ROOT-CAUSE: uniqueness validator builds a WHERE clause by serializing the attribute value;
-      //   OID::Array#serialize returns a Data object whose toString() is the PG literal, but the
-      //   WHERE-clause quoting path in quoting.ts does not handle ArrayData in the bind-param
-      //   position for uniqueness checks (separate from the INSERT path).
-      // SCOPE: ~10 LOC — verify quoting.ts bindToSql handles ArrayData for WHERE params
+    it("uniqueness validation", async () => {
+      const { Base } = await import("../../index.js");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.adapter = adapter;
+          this.validatesUniqueness("tags");
+        }
+      }
+      await PgArrays.loadSchema();
+
+      const tags = ["black", "blue"];
+      // Rails: e1 = klass.create("tags" => ["black", "blue"]); assert_predicate e1, :persisted?
+      const e1 = await (PgArrays as any).create({ tags });
+      expect((e1 as any).isPersisted()).toBe(true);
+
+      // Rails: e2 = klass.create("tags" => ["black", "blue"]); assert_not e2.persisted?
+      const e2 = await (PgArrays as any).create({ tags });
+      expect((e2 as any).isPersisted()).toBe(false);
+      // Rails: assert_equal ["has already been taken"], e2.errors[:tags]
+      expect((e2 as any).errors.where("tags").map((e: any) => e.message)).toEqual([
+        "has already been taken",
+      ]);
     });
 
     it("encoding arrays of utf8 strings", async () => {

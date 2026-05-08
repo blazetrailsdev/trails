@@ -79,6 +79,7 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
+import { Array as OidArray } from "./postgresql/oid/array.js";
 
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
@@ -4732,7 +4733,8 @@ function splitPgDefault(raw: string | null): { literal: unknown; fn: string | nu
   const arrayLiteral = /^'((?:[^']|'')*)'::[\w"\s.(,)]+\[\]$/.exec(raw);
   if (arrayLiteral) {
     const content = arrayLiteral[1].replace(/''/g, "'");
-    return { literal: content === "{}" ? [] : content, fn: null };
+    if (content === "{}") return { literal: [], fn: null };
+    return { literal: new OidArray(new ValueType()).deserialize(content), fn: null };
   }
   // 'value'::type — quoted literal with an optional cast.
   const quoted = /^'((?:[^']|'')*)'::[\w"\s.]+$/.exec(raw);
