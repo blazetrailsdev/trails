@@ -7,16 +7,14 @@ import {
   Visitors,
   UpdateManager,
   DeleteManager,
-  sql as arelSql,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { _setRelationCtor, _setScopeProxyWrapper, quoteSqlValue } from "./base.js";
+import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
 import { RecordNotSaved, RecordNotUnique } from "./errors.js";
 import { disallowRawSqlBang } from "./sanitization.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
   defaultSqlTimezone,
-  formatInstantForSql,
 } from "./connection-adapters/abstract/sql-formatting.js";
 import { modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
@@ -2732,7 +2730,7 @@ export class Relation<T extends Base> {
       ([key, val]) => {
         const def = this._modelClass._attributeDefinitions.get(key);
         const isArray = def?.type?.name === "array";
-        if (isArray) return [table.get(key), arelSql(quoteSqlValue(val, true))];
+        if (isArray) return [table.get(key), def!.type!.serialize(val)];
         // Pre-serialize Temporal values so the Arel visitor receives a string
         // instead of a raw object — the generic quote() fallback would emit
         // ISO Z format which MySQL/MariaDB DATETIME rejects in strict mode.
@@ -2748,8 +2746,8 @@ export class Relation<T extends Base> {
       },
     );
     const um = new UpdateManager().table(table).set(updateValues);
-    for (const cond of this._buildWhereStrings(table)) {
-      um.where(arelSql(cond));
+    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+      um.where(node);
     }
 
     const count = await this._modelClass.adapter.execUpdate(
@@ -2784,8 +2782,8 @@ export class Relation<T extends Base> {
 
     const table = this._modelClass.arelTable;
     const dm = new DeleteManager().from(table);
-    for (const cond of this._buildWhereStrings(table)) {
-      dm.where(arelSql(cond));
+    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+      dm.where(node);
     }
 
     const count = await this._modelClass.adapter.execDelete(
@@ -2805,26 +2803,25 @@ export class Relation<T extends Base> {
     if (this._isNone) return 0;
 
     const now = Temporal.Now.instant();
-    const nowSql = `'${formatInstantForSql(now)}'`;
     const updates: Record<string, unknown> = {};
 
     // Always touch updated_at if defined on the model
     if (this._modelClass._attributeDefinitions.has("updated_at")) {
-      updates.updated_at = nowSql;
+      updates.updated_at = now;
     }
     for (const name of names) {
-      updates[name] = nowSql;
+      updates[name] = now;
     }
 
     if (Object.keys(updates).length === 0) return 0;
 
     const table = this._modelClass.arelTable;
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
-      ([key, val]) => [table.get(key), arelSql(val as string)],
+      ([key, val]) => [table.get(key), val],
     );
     const um = new UpdateManager().table(table).set(updateValues);
-    for (const cond of this._buildWhereStrings(table)) {
-      um.where(arelSql(cond));
+    for (const node of predicatesWithWrappedSqlLiterals(this._whereClause.predicates)) {
+      um.where(node);
     }
 
     return this._modelClass.adapter.executeMutation(um.toSql());
@@ -3711,11 +3708,6 @@ export class Relation<T extends Base> {
     if (firstDot === -1) return { tbl: table.name, col: key };
     if (key.indexOf(".", firstDot + 1) !== -1) return { tbl: table.name, col: key };
     return { tbl: key.slice(0, firstDot), col: key.slice(firstDot + 1) };
-  }
-
-  private _buildWhereStrings(_table: Table): string[] {
-    const normalized = predicatesWithWrappedSqlLiterals(this._whereClause.predicates);
-    return normalized.map((node) => `(${this._compileArelNode(node)})`);
   }
 
   private async _preloadAssociationsForRecords(
