@@ -5,7 +5,7 @@ import {
   timestampAttributesForUpdateInModel,
   currentTimeFromProperTimezone,
 } from "./timestamp.js";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
