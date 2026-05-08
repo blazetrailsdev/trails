@@ -230,7 +230,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch {
         // malformed URI — leave _database undefined
       }
-      this._poolConfig = { uri, waitTimeout };
+      // Mirrors Rails Mysql2Adapter#initialize: always ensure FOUND_ROWS is set.
+      this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
       this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
       return;
     }
@@ -257,7 +258,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           return undefined;
         }
       })();
-    this._poolConfig = { ...mysqlConfig, strict, waitTimeout, variables };
+    // Mirrors Rails Mysql2Adapter#initialize: ensure FOUND_ROWS is always set so MySQL reports
+    // matched rows (not just changed rows) for UPDATE/DELETE. Rails also handles numeric bitmask
+    // flags (flags |= Mysql2::Client::FOUND_ROWS), but mysql2's TypeScript type only accepts
+    // Array<string>, so we handle the array form exclusively here.
+    const inputFlags = mysqlConfig.flags;
+    const resolvedFlags: string[] = Array.isArray(inputFlags)
+      ? inputFlags.includes("FOUND_ROWS")
+        ? inputFlags
+        : [...inputFlags, "FOUND_ROWS"]
+      : ["FOUND_ROWS"];
+    this._poolConfig = {
+      ...mysqlConfig,
+      flags: resolvedFlags,
+      strict,
+      waitTimeout,
+      variables,
+    };
     this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
   }
 
@@ -1087,6 +1104,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   override emptyInsertStatementValue(): string {
     return "VALUES ()";
+  }
+
+  /**
+   * @internal — test-only: returns the flags value from the pool config, mirroring
+   * Rails' `connection.raw_connection.query_options[:flags]` for flag-passing assertions.
+   */
+  _testOnlyPoolFlags(): string[] | undefined {
+    return this._poolConfig.flags;
   }
 
   /**
