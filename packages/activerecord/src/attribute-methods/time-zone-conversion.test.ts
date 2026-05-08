@@ -4,8 +4,10 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversionTest
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { typeRegistry } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { loadSchemaFromAdapter } from "../model-schema.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
 describe("TimeZoneConversionTest", () => {
@@ -79,5 +81,35 @@ describe("TimeZoneConversionTest", () => {
     const defaults = Post._defaultAttributes();
     const attr = defaults.getAttribute("published_at");
     expect(attr?.type).toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("wraps schema-reflected datetime column when timeZoneAwareAttributes is true", async () => {
+    const datetimeType = typeRegistry.lookup("datetime");
+    const stringType = typeRegistry.lookup("string");
+    const cols = {
+      published_at: { sqlType: "datetime" },
+      title: { sqlType: "string" },
+    } as Record<string, unknown>;
+    const adapter = {
+      schemaCache: {
+        dataSourceExists: async () => true,
+        columnsHash: async () => cols,
+        getCachedColumnsHash: () => cols,
+        isCached: () => true,
+      },
+      lookupCastTypeFromColumn(col: { sqlType: string }) {
+        return col.sqlType === "datetime" ? datetimeType : stringType;
+      },
+    };
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+      }
+      static override tableName = "posts";
+    }
+    (Post as unknown as { adapter: unknown }).adapter = adapter;
+    await loadSchemaFromAdapter.call(Post);
+    expect(Post._attributeDefinitions.get("published_at")?.type).toBeInstanceOf(TimeZoneConverter);
+    expect(Post._attributeDefinitions.get("title")?.type).not.toBeInstanceOf(TimeZoneConverter);
   });
 });

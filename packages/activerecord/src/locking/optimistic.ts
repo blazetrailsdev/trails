@@ -41,8 +41,8 @@ export function lockingEnabled(modelClass: typeof Base): boolean {
 /**
  * Type wrapper for the lock_version column that ensures nil → 0 on
  * serialize/deserialize so passing nil doesn't trigger StaleObjectError.
- * cast() is intentionally not overridden — Rails' LockingType delegates it
- * to the subtype unchanged, preserving null for new records.
+ * cast() delegates unchanged to the subtype (no nil → 0 coercion), preserving
+ * null for new records that explicitly pass nil — matching Rails' LockingType.
  *
  * Mirrors: ActiveRecord::Locking::LockingType
  */
