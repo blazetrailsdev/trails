@@ -287,8 +287,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("adds column as timestamptz if datetime type changed", async () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
-        await adapter.exec(`CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`);
         try {
+          await adapter.exec(
+            `CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`,
+          );
           await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
           const rows = await adapter.execute(
             `SELECT data_type FROM information_schema.columns
