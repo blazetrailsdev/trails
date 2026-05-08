@@ -43,6 +43,7 @@ import {
   RecordNotUnique,
   StatementInvalid,
   ValueTooLong,
+  SQLWarning,
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -95,6 +96,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   override get adapterName(): AdapterName {
     return "postgres";
   }
+
+  /** Mirrors: ActiveRecord.db_warnings_action */
+  static dbWarningsAction: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void) =
+    "ignore";
+
+  /** Mirrors: AbstractAdapter.db_warnings_ignore */
+  static dbWarningsIgnore: (string | RegExp)[] = [];
 
   static columnNameMatcher(): RegExp {
     return pgColumnNameMatcher();
@@ -218,6 +226,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // `beginTransaction`) drains those orphans. WeakSet so pg.Pool
   // reaping the client GCs the entry.
   private _clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+  // Accumulates PG NOTICE/WARNING messages fired during the current query.
+  // Cleared before each query; processed by _flushWarnings after.
+  private _noticeReceiverSqlWarnings: Array<{
+    level?: string;
+    message?: string;
+    code?: string;
+  }> = [];
   // Rails' `statement_limit` database.yml key — max prepared
   // statements cached per session before LRU eviction (default 1000).
   private _statementLimit = 1000;
@@ -362,6 +377,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     this._configuredClients.add(client);
+    // Attach after successful configuration — avoids duplicate listeners if a
+    // SET query fails and the client is re-checked-out before being discarded.
+    // Mirrors Rails: postgresql_adapter.rb `unless ActiveRecord.db_warnings_action.nil?`.
+    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction !== "ignore") {
+      client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
+        this._noticeReceiverSqlWarnings.push({
+          level: msg.severity,
+          message: msg.message,
+          code: msg.code,
+        });
+      });
+    }
   }
 
   /**
@@ -499,6 +526,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // writer which has no Temporal support.
     const bindArray = (binds ?? []).map((v) => temporalToBindString(v, "postgres"));
     const rewritten = this.rewriteBinds(sql, bindArray);
+    this._noticeReceiverSqlWarnings = [];
     const payload: Record<string, unknown> = {
       sql: rewritten,
       name: name ?? "SQL",
@@ -531,6 +559,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
 
     const fields = pgResult.fields ?? [];
+    // Flush before loadAdditionalTypes — nested execQuery calls reset the buffer.
+    this._flushWarnings(rewritten);
     if (fields.length === 0) return Result.fromRowHashes([]);
 
     // Batch-load any unknown dataTypeIDs in a single pg_type roundtrip.
@@ -869,6 +899,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#is_cached_plan_failure?
    * (postgresql_adapter.rb:901-906).
    */
+  /** @internal Mirrors: PostgreSQL::DatabaseStatements#handle_warnings */
+  private _flushWarnings(sql?: string): void {
+    const actionable = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
+    const ctor = this.constructor as typeof PostgreSQLAdapter;
+    const action = ctor.dbWarningsAction;
+    try {
+      if (!action || action === "ignore") return;
+      for (const w of this._noticeReceiverSqlWarnings) {
+        if (!actionable.has(w.level ?? "")) continue;
+        if (this.isWarningIgnored(w)) continue;
+        const sw = new SQLWarning(w.message, w.code ?? null, w.level ?? null);
+        if (sql) sw.sql = sql;
+        if (action === "raise") throw sw;
+        if (action === "log") {
+          const logger = this.logger as { warn?: (msg: string) => void } | null;
+          const codeSuffix = w.code ? ` (${w.code})` : "";
+          const msg = `[ActiveRecord::SQLWarning] ${sw.message}${codeSuffix}`;
+          if (logger?.warn) logger.warn(msg);
+          else console.warn(msg);
+        }
+        // TODO(report): Rails calls `Rails.error.report(warning, handled: true)`; deferred until wired.
+        if (typeof action === "function") action(sw);
+      }
+    } finally {
+      this._noticeReceiverSqlWarnings = [];
+    }
+  }
+
   private _isInvalidCachedPlan(e: unknown): boolean {
     const err = e as { code?: string; message?: string } | null;
     if (err?.code !== "0A000") return false;
@@ -904,11 +962,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       connection: this,
       row_count: 0,
     };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    this._noticeReceiverSqlWarnings = [];
+    // Flush inside the instrumented callback so a warning raise is captured by
+    // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
+    return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         return await this.withClient(async (client) => {
           const result = await this._runQuery(client, rewritten, binds);
           payload.row_count = result.rows.length;
+          this._flushWarnings(rewritten);
           return result.rows;
         });
       } catch (e: any) {
@@ -932,6 +994,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.materializeTransactions();
     binds = binds.map((v) => temporalToBindString(v, "postgres"));
     const pgSql = this.rewriteBinds(sql, binds);
+    this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
     // (and without re-appending RETURNING for bare INSERTs, which isn't
@@ -944,9 +1007,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       connection: this,
       row_count: 0,
     };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+    const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      let rc: number;
       try {
-        return await this.withClient(async (client) => {
+        rc = await this.withClient(async (client) => {
           this.dirtyCurrentTransaction();
           const upper = sql.trimStart().toUpperCase();
 
@@ -1021,7 +1085,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         payload.exception_object = translated;
         throw translated;
       }
+      // Flush inside the instrumented callback so a raised SQLWarning is visible
+      // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
+      this._flushWarnings(payload.sql as string);
+      return rc!;
     });
+    return m;
   }
 
   /**
