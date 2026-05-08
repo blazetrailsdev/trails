@@ -175,6 +175,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super();
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
+      let uri = config;
       try {
         const url = new URL(config);
         this._database =
@@ -183,11 +184,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         if (wt !== null) {
           const n = parseInt(wt, 10);
           if (Number.isInteger(n)) waitTimeout = n;
+          // Strip from URI so mysql2 doesn't warn about an unknown connection option.
+          url.searchParams.delete("wait_timeout");
+          uri = url.toString();
         }
       } catch {
         // malformed URI — leave _database undefined
       }
-      this._driverPool = Mysql2Adapter.newClient({ uri: config, waitTimeout });
+      this._driverPool = Mysql2Adapter.newClient({ uri, waitTimeout });
       return;
     }
     // See PostgreSQLAdapter#constructor: Rails' database.yml merges
@@ -1247,6 +1251,8 @@ function buildConfigureConnectionClauses(
     .map(([k, v]) => {
       if (DEFAULTS.has(String(v))) return `@@SESSION.${k} = DEFAULT`;
       if (typeof v === "number") return `@@SESSION.${k} = ${v}`;
+      // Mirrors Rails quote(true) → '1', quote(false) → '0'
+      if (typeof v === "boolean") return `@@SESSION.${k} = '${v ? 1 : 0}'`;
       return `@@SESSION.${k} = '${String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
     });
 
