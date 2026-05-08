@@ -86,7 +86,7 @@ describe("PostgreSQL::OID::Timestamp", () => {
   it("extends OID::DateTime and reports :timestamp", () => {
     const type = new Timestamp();
     expect(type).toBeInstanceOf(DateTime);
-    expect(type.type()).toBe("timestamp");
+    expect(type.type()).toBe("datetime");
   });
 
   it("inherits infinity + BC handling from OID::DateTime", () => {

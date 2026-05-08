@@ -33,7 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "created_at");
       expect(col).toBeDefined();
-      expect(col!.type).toBe("timestamp");
+      expect(col!.type).toBe("datetime");
       expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "precise_at");
       expect(col).toBeDefined();
-      expect(col!.type).toContain("timestamp");
+      expect(col!.type).toBe("datetime");
     });
 
     it("timestamp infinity", async () => {
@@ -102,7 +102,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const cols = await adapter.columns("postgresql_timestamps");
       const col = cols.find((c) => c.name === "created_at");
       expect(col).toBeDefined();
-      expect(col!.type).toContain("timestamp");
+      expect(col!.type).toBe("datetime");
     });
 
     it("datetime default", async () => {

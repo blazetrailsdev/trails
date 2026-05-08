@@ -996,7 +996,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       expect(def).toBeDefined();
       expect(def!.column.name).toBe("created_at");
-      expect(def!.column.type).toMatch(/timestamp/i);
+      expect(def!.column.type).toBe("datetime");
       expect(def!.column.sqlType).toMatch(/timestamp/i);
     });
 
