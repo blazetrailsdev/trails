@@ -21,4 +21,19 @@ async function checkPg(): Promise<boolean> {
 pgAvailable = await checkPg();
 
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);
+
+/** Mirrors Rails' with_postgresql_datetime_type — temporarily changes the adapter's datetimeType. */
+export async function withPostgresqlDatetimeType<T>(
+  type: "timestamp" | "timestamptz",
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const original = PostgreSQLAdapter.datetimeType;
+  PostgreSQLAdapter.datetimeType = type;
+  try {
+    return await fn();
+  } finally {
+    PostgreSQLAdapter.datetimeType = original;
+  }
+}
+
 export { PostgreSQLAdapter };

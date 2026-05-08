@@ -4,7 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import {
+  describeIfPg,
+  PostgreSQLAdapter,
+  PG_TEST_URL,
+  withPostgresqlDatetimeType,
+} from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 
@@ -161,15 +166,15 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
     it.skip("timestamp with zone values with rails time zone support and timestamptz and no time zone set", () => {
-      // BLOCKED: adapter-pg — with_postgresql_datetime_type(:timestamptz) not wired
-      // ROOT-CAUSE: Rails' with_postgresql_datetime_type helper temporarily changes the
-      // adapter-level datetime_type class attribute; our adapter has datetimeType static
-      // but no mechanism to change it per-connection for the duration of a block.
-      // SCOPE: ~30 LOC test helper + datetimeType scoping in postgresql-adapter.ts.
+      // BLOCKED: adapter-pg — aware_attributes / aware_types routing not implemented.
+      // withPostgresqlDatetimeType is now wired (see test-helper.ts); the remaining
+      // blocker is with_timezone_config(aware_attributes: true, aware_types: [...]),
+      // which routes timestamptz columns through TimeWithZone instead of Temporal.Instant.
+      // SCOPE: ~150 LOC — TimeWithZone class + OID::TimestampWithTimeZone routing.
     });
     it.skip("timestamp with zone values with rails time zone support and timestamptz and time zone set", () => {
-      // BLOCKED: adapter-pg — same as above; additionally requires TimeWithZone wrapping.
-      // ROOT-CAUSE: Same as the two prior timezone tests combined.
+      // BLOCKED: adapter-pg — same as above; additionally requires per-connection timezone
+      // config (zone: "Pacific Time (US & Canada)") and TimeWithZone wrapping.
       // SCOPE: Same as above.
     });
   });
@@ -280,25 +285,22 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("adds column as timestamptz if datetime type changed", async () => {
-      class TimestamptzAdapter extends PostgreSQLAdapter {
-        static override datetimeType: "timestamp" | "timestamptz" = "timestamptz";
-      }
-      const tzAdapter = new TimestamptzAdapter(PG_TEST_URL);
-      try {
-        await tzAdapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
-        await tzAdapter.exec(
-          `CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`,
-        );
-        await tzAdapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
-        const rows = await tzAdapter.execute(
-          `SELECT data_type FROM information_schema.columns
-           WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
-        );
-        expect(rows[0]?.data_type).toBe("timestamp with time zone");
-      } finally {
-        await tzAdapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
-        await tzAdapter.close();
-      }
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+        try {
+          await adapter.exec(
+            `CREATE TABLE postgresql_timestamp_with_zones (id serial primary key)`,
+          );
+          await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
+          const rows = await adapter.execute(
+            `SELECT data_type FROM information_schema.columns
+             WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+          );
+          expect(rows[0]?.data_type).toBe("timestamp with time zone");
+        } finally {
+          await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones CASCADE`);
+        }
+      });
     });
 
     it.skip("adds column as custom type", async () => {

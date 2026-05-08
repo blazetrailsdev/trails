@@ -16,6 +16,24 @@ afterEach(() => {
 });
 
 describe("SQLite3JSONTest", () => {
+  it("json string cast round-trip", async () => {
+    await adapter.exec(
+      `CREATE TABLE "json_string_cast" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "data" JSON)`,
+    );
+    class JsonStringCast extends Base {
+      static {
+        this.tableName = "json_string_cast";
+      }
+    }
+    JsonStringCast.adapter = adapter;
+    await JsonStringCast.loadSchema();
+    const record = new JsonStringCast();
+    (record as any).data = '{"a":1}';
+    await record.save();
+    await record.reload();
+    expect((record as any).data).toBe('{"a":1}');
+  });
+
   it("test_default", async () => {
     adapter.exec(`CREATE TABLE "json_data_type" (
       "id" INTEGER PRIMARY KEY AUTOINCREMENT,
