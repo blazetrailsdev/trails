@@ -412,6 +412,12 @@ export async function rolledbackBang(
     _restoreTransactionRecordState.call(this, forceRestoreState);
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
+      // Unconditionally null _startTransactionState on full outer rollback.
+      // Inner savepoint commits don't call committedBang (records are moved
+      // to parent instead), so level can be > 1 when we reach here. Without
+      // this, clearTransactionRecordState only decrements level and leaves
+      // a stale snapshot that corrupts the next transaction's level tracking.
+      (this as any)._startTransactionState = null;
       (this as any)._triggerUpdateCallback = false;
       (this as any)._triggerDestroyCallback = false;
     }
@@ -441,6 +447,34 @@ interface TransactionRecordSnapshot {
 /** @internal */
 export function rememberTransactionRecordState(this: Base): TransactionRecordSnapshot {
   const r = this as any;
+  // Initialize state once per outermost transaction, then increment level for
+  // each savepoint. Mirrors Rails' @_start_transaction_state ||= {...}; level += 1.
+  if (!r._startTransactionState) {
+    r._startTransactionState = {
+      newRecord: r._newRecord,
+      destroyed: r._destroyed,
+      frozen: r._attributes.isFrozen(),
+      id: this.id,
+      previouslyNewRecord: r._previouslyNewRecord,
+      attributes: r._attributes.deepDup(),
+      level: 0,
+    };
+  }
+  r._startTransactionState.level += 1;
+
+  // Mirrors Rails' _committed_already_called guard inside remember_transaction_record_state.
+  if (r._committedAlreadyCalled) {
+    r._newRecordBeforeLastCommit = false;
+  } else {
+    r._newRecordBeforeLastCommit = r._startTransactionState.newRecord;
+  }
+
+  // Return CURRENT identity state at this savepoint level — not the outermost
+  // _startTransactionState snapshot. The returned snapshot is captured by
+  // withTransactionReturningStatus's afterRollback hook and passed to
+  // restoreTransactionRecordState. For nested savepoints, the record may have
+  // already been modified (e.g. _newRecord flipped after an outer insert), so
+  // restoring to the outermost state would be wrong.
   return {
     newRecord: r._newRecord,
     destroyed: r._destroyed,
@@ -488,29 +522,46 @@ export function restoreTransactionRecordState(
   }
 }
 
-// this-typed form used by rolledbackBang ensure block — reads _startTransactionState
-// (populated by remember_transaction_record_state level-tracking; currently always
-// null since our fallback uses captured snapshots, so this is a no-op until the
-// level-tracking state is implemented).
 /** @internal */
-function _restoreTransactionRecordState(this: Base, _forceRestoreState = false): void {
+function _restoreTransactionRecordState(this: Base, forceRestoreState = false): void {
   const r = this as any;
   if (!r._startTransactionState) return;
   const state = r._startTransactionState;
-  if (_forceRestoreState || state.level <= 1) {
+  if (forceRestoreState || state.level <= 1) {
     r._newRecord = state.newRecord;
     r._destroyed = state.destroyed;
     r._previouslyNewRecord = state.previouslyNewRecord;
-    if (r._attributes.isFrozen()) {
-      r._attributes = r._attributes.deepDup();
-    }
+
+    // Restore the full attribute set to pre-transaction state. Rails preserves
+    // in-transaction user edits as dirty on top of the pre-TX baseline via a
+    // per-attribute original_attribute mechanism (restore_state[:attributes].map).
+    // Our DirtyTracker is external and can't reconstruct that per-attribute
+    // original cheaply, so we take the clean restore: the record returns to the
+    // exact pre-transaction state (no pending changes).
+    r._attributes = state.attributes.deepDup();
+
+    // Restore primary key if it shifted during the transaction.
     const ctor = this.constructor as typeof Base;
-    if (state.newRecord && !Array.isArray(this.id)) {
-      r._attributes.set(ctor.primaryKey as string, state.id);
+    if (Array.isArray(ctor.primaryKey)) {
+      const cols = ctor.primaryKey as string[];
+      const savedId = state.id as unknown[];
+      if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
+        cols.forEach((col, i) => r._attributes.writeFromUser(col, savedId[i]));
+      }
+    } else if (r._attributes.fetchValue(ctor.primaryKey as string) !== state.id) {
+      r._attributes.writeFromUser(ctor.primaryKey as string, state.id);
     }
+
     if (state.frozen && !r._attributes.isFrozen()) {
       r._attributes.freeze();
     }
+
+    // Clear mutation tracking caches AFTER all attribute mutations so the
+    // baseline reflects the fully-restored _attributes. Mirrors Rails:
+    //   @mutations_from_database = nil
+    //   @mutations_before_last_save = nil
+    r._dirty.snapshot(r._attributes);
+    r._dirty.clearChangesInformation();
   }
 }
 
@@ -528,15 +579,13 @@ export async function withTransactionReturningStatus<T>(
 ): Promise<T> {
   const modelClass = this.constructor as typeof Base;
 
-  // Mirrors: remember_transaction_record_state — snapshot before transaction
+  // rememberTransactionRecordState also sets _newRecordBeforeLastCommit.
   const snapshot = rememberTransactionRecordState.call(this);
 
-  // Mirrors: remember_transaction_record_state — set _newRecordBeforeLastCommit.
   // _triggerUpdateCallback/_triggerDestroyCallback are NOT reset here; Rails resets
   // those only in committed!/rolledback! ensure blocks.
   const r = this as any;
   r._transactionAction = undefined;
-  r._newRecordBeforeLastCommit = r._newRecord ?? this.isNewRecord?.() ?? false;
 
   let status: T;
   let rolledBack = false;

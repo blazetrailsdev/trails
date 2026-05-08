@@ -143,3 +143,58 @@ describe("TouchLaterTest", () => {
     /* needs nested attributes + touch */
   });
 });
+
+describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", () => {
+  it("uses _touchTime stored on the record rather than an explicit argument", async () => {
+    const { surreptitiouslyTouch } = await import("./touch-later.js");
+    class Invoice extends Base {
+      static {
+        this._tableName = "invoices";
+        this.attribute("amount", "integer");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const inv = await Invoice.create({ amount: 5 });
+    const touchTime = new Date(1_000_000);
+    (inv as any)._touchTime = touchTime;
+
+    const written: [string, unknown][] = [];
+    const origWrite = (inv as any).writeAttribute.bind(inv);
+    (inv as any).writeAttribute = (attr: string, val: unknown) => {
+      written.push([attr, val]);
+      return origWrite(attr, val);
+    };
+
+    surreptitiouslyTouch.call(inv as any, ["updated_at"]);
+
+    // writeAttribute was called with _touchTime (not an explicit param)
+    expect(written).toEqual([["updated_at", touchTime]]);
+    // No dirty tracking — surreptitiouslyTouch clears the change
+    expect((inv as any).attributeChanged("updated_at")).toBe(false);
+  });
+});
+
+describe("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
+  it("uses the stored _touchTime and clears deferred state", async () => {
+    const { touchDeferredAttributes } = await import("./touch-later.js");
+    class Invoice extends Base {
+      static {
+        this._tableName = "invoices";
+        this.attribute("amount", "integer");
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    const inv = await Invoice.create({ amount: 10 });
+
+    const fixedTime = new Date(2_000_000);
+    (inv as any)._deferTouchAttrs = ["updated_at"];
+    (inv as any)._touchTime = fixedTime;
+
+    await touchDeferredAttributes.call(inv as any);
+
+    expect((inv as any)._deferTouchAttrs).toBeNull();
+    expect((inv as any)._touchTime).toBeNull();
+  });
+});

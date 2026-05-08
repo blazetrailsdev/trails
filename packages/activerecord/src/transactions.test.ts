@@ -1971,3 +1971,40 @@ describe("TransactionTest", () => {
     });
   });
 });
+
+describe("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
+  it("rememberTransactionRecordState populates _startTransactionState with level and attributes", async () => {
+    const { rememberTransactionRecordState } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "before" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+
+    const state = (topic as any)._startTransactionState;
+    expect(state).not.toBeNull();
+    expect(state.level).toBe(1);
+    expect(state.attributes).toBeDefined();
+    // Second call increments level, does not overwrite attributes snapshot
+    rememberTransactionRecordState.call(topic as any);
+    expect((topic as any)._startTransactionState.level).toBe(2);
+  });
+
+  it("rolledbackBang restores identity and clears mutation tracking", async () => {
+    const { rolledbackBang, rememberTransactionRecordState } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "original" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+    (topic as any).writeAttribute("title", "changed-during-tx");
+
+    await rolledbackBang.call(topic as any, {
+      forceRestoreState: true,
+      shouldRunCallbacks: false,
+    });
+
+    expect((topic as any)._startTransactionState).toBeNull();
+    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({});
+  });
+});

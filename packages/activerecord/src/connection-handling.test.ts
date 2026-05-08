@@ -426,3 +426,81 @@ describe("ConnectionHandlingTest", () => {
     }
   });
 });
+
+describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {
+  it("calls .load() on a Relation returned from the block", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    let loadCalled = false;
+    const fakeRelation = {
+      load() {
+        loadCalled = true;
+        return Promise.resolve(this);
+      },
+      toArray() {
+        return Promise.resolve([]);
+      },
+    };
+
+    const adapter = createTestAdapter();
+    class FakeModel extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+
+    await withRoleAndShard.call(FakeModel as any, undefined, undefined, false, () => fakeRelation);
+
+    expect(loadCalled).toBe(true);
+  });
+
+  it("does not call .load() on non-Relation return values", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    const adapter = createTestAdapter();
+    class FakeModel extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+
+    const result = await withRoleAndShard.call(
+      FakeModel as any,
+      undefined,
+      undefined,
+      false,
+      () => 42,
+    );
+
+    expect(result).toBe(42);
+  });
+
+  it("calls .load() on a Relation returned from an async block", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    let loadCalled = false;
+    const fakeRelation = {
+      load() {
+        loadCalled = true;
+        return Promise.resolve(this);
+      },
+      toArray() {
+        return Promise.resolve([]);
+      },
+    };
+
+    const adapter = createTestAdapter();
+    class FakeModel extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+
+    await withRoleAndShard.call(
+      FakeModel as any,
+      undefined,
+      undefined,
+      false,
+      async () => fakeRelation,
+    );
+
+    expect(loadCalled).toBe(true);
+  });
+});

@@ -17,7 +17,11 @@ import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
  *
  * Mirrors: ActiveRecord::Timestamp#touch
  */
-export async function touch(this: Base, ...names: string[]): Promise<boolean> {
+export async function touch(
+  this: Base,
+  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
+  ...rest: string[]
+): Promise<boolean> {
   if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
@@ -26,7 +30,23 @@ export async function touch(this: Base, ...names: string[]): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
   if (isNoTouchingApplied(ctor)) return false;
 
-  const now = Temporal.Now.instant();
+  let time: Temporal.Instant;
+  let names: string[];
+  if (typeof optionsOrName === "string") {
+    time = Temporal.Now.instant();
+    names = [optionsOrName, ...rest];
+  } else if (optionsOrName?.time != null) {
+    const t = optionsOrName.time;
+    time =
+      t instanceof Temporal.Instant
+        ? t
+        : Temporal.Instant.fromEpochMilliseconds((t as Date).getTime()); // boundary: accepts JS Date from touch(time:) callers
+    names = rest;
+  } else {
+    time = Temporal.Now.instant();
+    names = rest;
+  }
+  const now = time;
   const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
   const touchColSet = new Set<string>();
   if (ctor._attributeDefinitions.has("updated_at")) touchColSet.add("updated_at");
