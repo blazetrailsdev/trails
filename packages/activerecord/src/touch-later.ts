@@ -165,7 +165,16 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   self._touchTime = null;
   // Mirrors Rails: touch(time: @_touch_time). Passes the deferred timestamp
   // through the canonical touch path (type casting, locking, after_touch).
-  await timestampTouch.call(this, { time }, ...deferredAttrs);
+  // On failure, restore deferred state so the touch can be retried —
+  // mirrors touch_later.rb where @_defer_touch_attrs/@_touch_time are cleared
+  // only after the super call succeeds.
+  try {
+    await timestampTouch.call(this, { time }, ...deferredAttrs);
+  } catch (error) {
+    self._deferTouchAttrs = deferredAttrs;
+    self._touchTime = time;
+    throw error;
+  }
 }
 
 export const InstanceMethods = {

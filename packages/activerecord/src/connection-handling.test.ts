@@ -469,4 +469,32 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
 
     expect(result).toBe(42);
   });
+
+  it("calls .load() on a Relation returned from an async block", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    let loadCalled = false;
+    const fakeRelation = {
+      load() {
+        loadCalled = true;
+        return Promise.resolve(this);
+      },
+    };
+
+    const adapter = createTestAdapter();
+    class FakeModel extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+
+    await withRoleAndShard.call(
+      FakeModel as any,
+      undefined,
+      undefined,
+      false,
+      async () => fakeRelation,
+    );
+
+    expect(loadCalled).toBe(true);
+  });
 });

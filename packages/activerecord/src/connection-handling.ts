@@ -435,11 +435,22 @@ export function withRoleAndShard<T>(
 
   // Force-load any Relation within the role/shard scope so lazy queries don't
   // escape to a different connection context.
-  // Mirrors: return_value.load if return_value.is_a? ActiveRecord::Relation
-  const toLoad =
-    result != null && typeof (result as any).load === "function" ? (result as any).load() : result;
+  // Mirrors: return_value.load if return_value.is_a? ActiveRecord::Relation (ensure pops stack)
+  if (isThenable(result)) {
+    // Async fn: resolve first, then check for Relation and call .load() inside scope.
+    const loaded = Promise.resolve(result as unknown).then((v) =>
+      v != null && typeof (v as any).load === "function" ? (v as any).load() : v,
+    );
+    return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
+  }
 
-  return withCleanup(toLoad as T, () => removeStackEntry(entry));
+  if (result != null && typeof (result as any).load === "function") {
+    // Sync Relation: .load() is async, so cleanup fires via withCleanup's .finally().
+    const loaded = (result as any).load();
+    return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
+  }
+
+  return withCleanup(result, () => removeStackEntry(entry));
 }
 
 /** @internal */
