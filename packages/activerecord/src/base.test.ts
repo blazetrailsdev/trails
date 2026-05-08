@@ -3563,6 +3563,12 @@ describe("quoteSqlValue", () => {
   it("emits NULL for an invalid Date (NaN)", () => {
     expect(quoteSqlValue(new Date(NaN))).toBe("NULL");
   });
+
+  it("emits NULL for object whose toJSON() returns undefined (no crash)", () => {
+    const v = { toJSON: () => undefined };
+    expect(() => quoteSqlValue(v)).not.toThrow();
+    expect(quoteSqlValue(v)).toBe("NULL");
+  });
 });
 
 // ==========================================================================

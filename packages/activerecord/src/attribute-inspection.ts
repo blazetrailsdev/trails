@@ -63,8 +63,21 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
   return this._inspectionFilter;
 }
 
+const bigintReplacer = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString() : v);
+
 function inspectArray(arr: unknown[]): string {
-  return `[${arr.map((v) => (v == null ? "nil" : globalThis.Array.isArray(v) ? inspectArray(v as unknown[]) : typeof v === "bigint" ? String(v) : (JSON.stringify(v) ?? String(v)))).join(", ")}]`;
+  return `[${arr
+    .map((v) => {
+      if (v == null) return "nil";
+      if (globalThis.Array.isArray(v)) return inspectArray(v as unknown[]);
+      if (typeof v === "bigint") return String(v);
+      try {
+        return JSON.stringify(v, bigintReplacer) ?? String(v);
+      } catch {
+        return String(v);
+      }
+    })
+    .join(", ")}]`;
 }
 
 /**

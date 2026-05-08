@@ -265,7 +265,12 @@ export function quoteSqlValue(v: unknown, asArray = false): string {
     const arrayLiteral = quoteArrayLiteral(v);
     return `'${arrayLiteral.replace(/'/g, "''")}'`;
   }
-  if (!asArray && typeof v === "object") return `'${JSON.stringify(v).replace(/'/g, "''")}'`;
+  if (!asArray && typeof v === "object") {
+    const json = JSON.stringify(v);
+    // toJSON() returning undefined makes JSON.stringify return undefined — treat as SQL NULL.
+    if (json === undefined) return "NULL";
+    return `'${json.replace(/'/g, "''")}'`;
+  }
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
