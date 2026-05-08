@@ -1163,6 +1163,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       typeCast: userTypeCast,
       ...poolOptions
     } = config;
+    // Build configure_connection SET clauses before createPool — mirrors AbstractMysqlAdapter#configure_connection.
+    // time_zone is included here so all session setup is sent as ONE query, queued
+    // synchronously in the 'connection' handler before mysql2 adds the connection to its
+    // free-connection list. A second chained rawConn.query() inside the callback of the
+    // first would race against the caller's query (mysql2 makes the connection available
+    // after emitting 'connection', before our callbacks fire).
+    // Computed before createPool so a validation throw (e.g. bad variable name) doesn't leak a live pool.
+    const sessionClauses = buildConfigureConnectionClauses(strict, waitTimeout, configVars);
+    const initSql = `SET time_zone = '+00:00', ${sessionClauses}`;
+
     const composedTypeCast =
       typeof userTypeCast === "function"
         ? (field: unknown, next: () => unknown) =>
@@ -1175,15 +1185,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...poolOptions,
       typeCast: composedTypeCast,
     });
-
-    // Build configure_connection SET clauses — mirrors AbstractMysqlAdapter#configure_connection.
-    // time_zone is included here so all session setup is sent as ONE query, queued
-    // synchronously in the 'connection' handler before mysql2 adds the connection to its
-    // free-connection list. A second chained rawConn.query() inside the callback of the
-    // first would race against the caller's query (mysql2 makes the connection available
-    // after emitting 'connection', before our callbacks fire).
-    const sessionClauses = buildConfigureConnectionClauses(strict, waitTimeout, configVars);
-    const initSql = `SET time_zone = '+00:00', ${sessionClauses}`;
 
     // mysql.Pool (promise wrapper) re-emits 'connection' from the underlying pool
     // via inheritEvents — this is the public typed API on mysql.Pool, no internal
