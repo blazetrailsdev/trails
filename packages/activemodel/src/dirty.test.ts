@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
+import { Model, DirtyTracker, AttributeSet } from "./index.js";
 
 describe("DirtyTest", () => {
   it("changes accessible through both strings and symbols", () => {
@@ -845,5 +845,75 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changedAttributes).toContain("ratio");
     m.writeAttribute("ratio", "NaN");
     expect(m.changedAttributes).not.toContain("ratio");
+  });
+});
+
+describe("DirtyTracker#redetectChanges", () => {
+  class Subject extends Model {
+    static {
+      this.attribute("title", "string");
+      this.attribute("score", "integer");
+    }
+  }
+
+  it("marks attributes as dirty where the post-rollback value differs from the restored baseline", () => {
+    const m = new Subject({ title: "original", score: 0 });
+    m.changesApplied(); // simulate post-save clean state
+
+    // Simulate in-TX user edit
+    const postTxAttrs = (m as any)._attributes.deepDup();
+    (postTxAttrs as AttributeSet).writeFromUser("title", "tx-edit");
+
+    // Simulate restore to pre-TX state (baseline is already "original" from snapshot)
+    const restored = (m as any)._attributes;
+    const dirty: DirtyTracker = (m as any)._dirty;
+    dirty.snapshot(restored);
+    dirty.clearChangesInformation();
+    dirty.redetectChanges(postTxAttrs);
+
+    // title differed → dirty, with [was=original (preTX baseline), now=tx-edit (postTX)]
+    expect(dirty.attributeChanged("title")).toBe(true);
+    expect(dirty.attributeWas("title")).toBe("original");
+    expect(dirty.changes).toEqual({ title: ["original", "tx-edit"] });
+
+    // score unchanged → not dirty
+    expect(dirty.attributeChanged("score")).toBe(false);
+  });
+
+  it("leaves no dirty state when post-rollback values match the restored baseline", () => {
+    const m = new Subject({ title: "same", score: 1 });
+    m.changesApplied();
+
+    const postTxAttrs = (m as any)._attributes.deepDup(); // no edits during TX
+
+    const restored = (m as any)._attributes;
+    const dirty: DirtyTracker = (m as any)._dirty;
+    dirty.snapshot(restored);
+    dirty.clearChangesInformation();
+    dirty.redetectChanges(postTxAttrs);
+
+    expect(dirty.changed).toBe(false);
+    expect(dirty.changes).toEqual({});
+  });
+
+  it("detects number_to_non_number? via valueBeforeTypeCast — score=1 written as `true` is dirty vs numeric baseline", () => {
+    // Numeric type isChanged: isNumberToNonNumber?(oldValue, newValueBeforeTypeCast) fires when
+    // the new raw value is not a number even if the cast value equals the old cast value.
+    const m = new Subject({ title: "t", score: 1 });
+    m.changesApplied(); // baseline: score=1 (cast), raw=1
+
+    // Simulate in-TX write of `true` to score (casts to 1, but raw is non-numeric)
+    const postTxAttrs = (m as any)._attributes.deepDup();
+    (postTxAttrs as AttributeSet).writeFromUser("score", true); // valueBeforeTypeCast=true, value=1
+
+    const restored = (m as any)._attributes; // baseline still score=1
+    const dirty: DirtyTracker = (m as any)._dirty;
+    dirty.snapshot(restored);
+    dirty.clearChangesInformation();
+    dirty.redetectChanges(postTxAttrs);
+
+    // Cast values are both 1, but raw `true` triggers isNumberToNonNumber? → dirty
+    expect(dirty.attributeChanged("score")).toBe(true);
+    expect(dirty.changes).toEqual({ score: [1, 1] });
   });
 });

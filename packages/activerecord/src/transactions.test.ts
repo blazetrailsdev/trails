@@ -2005,6 +2005,59 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
     });
 
     expect((topic as any)._startTransactionState).toBeNull();
+    // In-TX user edit preserved: "changed-during-tx" stays live in memory,
+    // "original" (pre-TX) is the dirty baseline. Mirrors Rails' attribute
+    // reconstruction via attr.with_value_from_user(current_value).
+    expect((topic as any).readAttribute("title")).toBe("changed-during-tx");
+    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+      title: ["original", "changed-during-tx"],
+    });
+  });
+});
+
+// ==========================================================================
+// Story K-followup regression tests
+// ==========================================================================
+describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
+  it("rollback preserves in-TX user edits as dirty", async () => {
+    const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "original" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+    (topic as any).writeAttribute("title", "tx-edit");
+
+    await rolledbackBang.call(topic as any, {
+      forceRestoreState: true,
+      shouldRunCallbacks: false,
+    });
+
+    // Post-TX value stays live in memory; pre-TX value becomes the dirty baseline.
+    // Mirrors Rails: attr.with_value_from_user keeps current value, pre-TX as original.
+    expect((topic as any).readAttribute("title")).toBe("tx-edit");
+    expect((topic as any)._dirty.attributeChanged("title")).toBe(true);
+    expect((topic as any)._dirty.attributeWas("title")).toBe("original");
+    expect((topic as any)._dirty.mutationsFromDatabase).toEqual({
+      title: ["original", "tx-edit"],
+    });
+  });
+
+  it("rollback leaves clean attributes unchanged (no spurious dirty)", async () => {
+    const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "original" });
+    (topic as any)._newRecord = false;
+
+    rememberTransactionRecordState.call(topic as any);
+    // No attribute writes during TX
+
+    await rolledbackBang.call(topic as any, {
+      forceRestoreState: true,
+      shouldRunCallbacks: false,
+    });
+
+    expect((topic as any)._dirty.changed).toBe(false);
     expect((topic as any)._dirty.mutationsFromDatabase).toEqual({});
   });
 });

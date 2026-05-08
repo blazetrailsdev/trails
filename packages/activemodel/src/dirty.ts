@@ -225,6 +225,40 @@ export class DirtyTracker {
     this._previousChanges.clear();
   }
 
+  /**
+   * Walk `currentAttributes` (post-TX) and populate `_changedAttributes` for
+   * any attribute whose current value differs from the pre-TX baseline already
+   * stored in `_originalAttributes` (set by a prior `snapshot(preTxAttrs)` call).
+   *
+   * Mirrors the Rails per-attribute `original_attribute` chain built by
+   * `restore_state[:attributes].map { attr.with_value_from_user(current_value) }`:
+   * the current (post-TX) value survives in memory as the "now" side, with the
+   * pre-TX value as the "was" baseline, so `mutationsFromDatabase` reflects
+   * `[preTx, postTx]` for each changed attribute.
+   *
+   * Call after `snapshot(preTxAttrs)` + `clearChangesInformation()`.
+   *
+   * @internal
+   */
+  redetectChanges(currentAttributes: AttributeSet): void {
+    for (const name of currentAttributes.keys()) {
+      const attr = currentAttributes.getAttribute(name);
+      const currentValue = attr.value;
+      if (!this._originalHas.has(name)) {
+        // Attribute added during the TX — mark as a new addition
+        this._changedAttributes.set(name, [undefined, currentValue]);
+      } else {
+        const savedValue = resolveValue(this._originalAttributes.get(name));
+        // Entry: [was=savedValue (pre-TX), now=currentValue (post-TX)] — matches [was, now] convention.
+        // Pass attr.valueBeforeTypeCast as the raw third arg so numeric types can
+        // detect number_to_non_number? changes (e.g. writing `true` to an integer field).
+        if (attr.type.isChanged(savedValue, currentValue, attr.valueBeforeTypeCast)) {
+          this._changedAttributes.set(name, [savedValue, currentValue]);
+        }
+      }
+    }
+  }
+
   clearAttributeChanges(attributes: string[]): void {
     for (const attr of attributes) {
       this._deleteChange(attr);
