@@ -220,70 +220,57 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("custom range column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs custom range type creation */
+      // BLOCKED: range — custom range type setup missing from beforeEach
+      // ROOT-CAUSE: beforeEach doesn't CREATE TYPE floatrange/stringrange AS RANGE or add float_range/string_range columns;
+      //   TypeMapInitializer already handles typtype='r' rows so no core OID gap exists
+      // SCOPE: ~25 LOC — extend beforeEach + write assertion body; affects 4 custom-range tests
     });
     it.skip("custom range type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs custom range type */
+      // BLOCKED: range — custom range type setup missing from beforeEach
+      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
     });
     it.skip("custom range write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs custom range type */
+      // BLOCKED: range — custom range type setup missing from beforeEach
+      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
     });
     it.skip("range schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs schema dumper */
+      // BLOCKED: range — range SQL types absent from SQL_TYPE_MAP / DSL_HELPER_METHODS
+      // ROOT-CAUSE: schema-dumper.ts SQL_TYPE_MAP has no entries for int4range, int8range, numrange,
+      //   daterange, tsrange, tstzrange; sqlTypeToDsl() hits the enum fallback → t.column(name,"int4range")
+      //   instead of the dedicated DSL helper; DSL_HELPER_METHODS also needs them to emit t.int4range(...)
+      // SCOPE: ~15 LOC in schema-dumper.ts (SQL_TYPE_MAP + DSL_HELPER_METHODS) + ~10 LOC test body; affects 1 test
     });
     it.skip("range migration", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs migration API */
+      // BLOCKED: range — test body not yet written; no core infra gap expected
+      // ROOT-CAUSE: per-column helpers (int4range(), tstzrange(), daterange(), etc.) exist in schema-definitions.ts;
+      //   test should exercise create_table with range columns; createRange() is only needed for custom range types
+      // SCOPE: ~15 LOC test body; createRange()/dropRange() (~30 LOC) is a separate gap (see custom-range tests)
     });
     it.skip("multirange int4", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // ROOT-CAUSE: TypeMapInitializer.queryConditionsForKnownTypeTypes() queries typtype IN ('r','e','d')
+      //   but not 'm'; no MultiRange class; Rails 7+ OID::Range handles multirange via multi_range flag
+      // SCOPE: ~80 LOC — add 'm' to typtype query + MultiRange class + 6 OID registrations; affects all 6 multirange tests
     });
     it.skip("multirange int8", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
     });
     it.skip("multirange num", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
     });
     it.skip("multirange ts", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
     });
     it.skip("multirange tstz", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
     });
     it.skip("multirange date", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs PG 14+ multirange support */
+      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
+      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
     });
 
     it("range intersection", async () => {
@@ -394,136 +381,117 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("custom range values", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs custom range type */
+      // BLOCKED: range — custom range type setup missing from beforeEach
+      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
     });
     it.skip("timezone awareness tzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — TimeZoneConversion not wired and predicate broken for range types
+      // ROOT-CAUSE: (1) time-zone-conversion.ts is never imported/used — not wired into Model;
+      //   (2) isCreateTimeZoneConversionAttribute checks castType.type (a property) but Type exposes
+      //   type() as a method — predicate always returns false even if wired; (3) timeZoneAwareTypes
+      //   defaults to ["datetime","time"] — tsrange/tstzrange would also need to be added
+      // SCOPE: ~100 LOC — wire module into Model + fix castType.type() call + add tsrange/tstzrange; separate story; affects 9 tests
     });
     it.skip("timezone awareness endless tzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it.skip("timezone awareness beginless tzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it.skip("timezone array awareness tzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges/tstz_ranges array columns in setup
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
-    it.skip("create tstzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("create tstzrange", async () => {
+      // BLOCKED: range — create tstzrange round-trip untested
+      // ROOT-CAUSE: no infra gap expected; RangeType(TimestampWithTimeZone) IS registered by loadAdditionalTypes();
+      //   DateTime.serialize + parsePostgresInstant should handle Temporal.Instant bounds end-to-end
+      // SCOPE: ~12 LOC test body; try in CI with Temporal.Instant.from("2010-01-01T13:30:00Z")...bounds
     });
-    it.skip("update tstzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("update tstzrange", async () => {
+      // BLOCKED: range — update tstzrange round-trip untested (follow-on to create tstzrange)
+      // ROOT-CAUSE: no infra gap expected; needs assert_equal_round_trip + assert_nil_round_trip bodies
+      //   (nil trip: [same_utc, same_utc) is empty in tstzrange → null on reload)
+      // SCOPE: ~14 LOC; run after "create tstzrange" is confirmed passing in CI
     });
     it.skip("escaped tstzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+      // BLOCKED: range — BC-era tstzrange round-trip test body not written
+      // ROOT-CAUSE: no infra gap; parsePostgresInstant handles BC via extractBcSuffix (temporal-wire.ts);
+      //   DateTime.serialize emits "YYYY-MM-DD HH:MM:SS BC" for year<=0; full round-trip untested
+      // SCOPE: ~10 LOC test body; run after "create tstzrange" is confirmed passing
     });
-    it.skip("unbounded tstzrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("unbounded tstzrange", async () => {
+      // BLOCKED: range — unbounded (endless/beginless) tstzrange round-trip untested
+      // ROOT-CAUSE: null bounds serialize as empty string (no infra gap); test body not yet written;
+      //   needs verification that null begin/end survives RangeType serialize → deserialize cycle
+      // SCOPE: ~12 LOC test body; run after "create tstzrange" is confirmed passing
     });
-    it.skip("create tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("create tsrange", async () => {
+      // BLOCKED: range — create tsrange round-trip untested
+      // ROOT-CAUSE: no infra gap expected; RangeType(Timestamp) IS registered by loadAdditionalTypes();
+      //   DateTime.serialize + parsePostgresTimestampAsInstant should handle Temporal.Instant bounds
+      // SCOPE: ~11 LOC test body; try in CI with Temporal.Instant UTC bounds
     });
-    it.skip("update tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("update tsrange", async () => {
+      // BLOCKED: range — update tsrange round-trip untested (follow-on to create tsrange)
+      // ROOT-CAUSE: no infra gap expected; needs assert_equal_round_trip + assert_nil_round_trip bodies
+      //   (nil trip: [same, same) is empty in tsrange → null on reload)
+      // SCOPE: ~12 LOC; run after "create tsrange" is confirmed passing in CI
     });
     it.skip("escaped tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+      // BLOCKED: range — BC-era tsrange round-trip test body not written
+      // ROOT-CAUSE: no infra gap; parsePostgresTimestampAsInstant handles BC via extractBcSuffix (temporal-wire.ts);
+      //   DateTime.serialize emits "YYYY-MM-DD HH:MM:SS BC" for year<=0; full round-trip untested
+      // SCOPE: ~10 LOC test body; run after "create tsrange" is confirmed passing
     });
-    it.skip("unbounded tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("unbounded tsrange", async () => {
+      // BLOCKED: range — unbounded (endless/beginless) tsrange round-trip untested
+      // ROOT-CAUSE: null bounds serialize as empty string (no infra gap); test body not yet written;
+      //   needs verification that null begin/end survives RangeType serialize → deserialize cycle
+      // SCOPE: ~12 LOC test body; run after "create tsrange" is confirmed passing
     });
     it.skip("timezone awareness tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it.skip("timezone awareness endless tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it.skip("timezone awareness beginless tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it.skip("timezone array awareness tsrange", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges array column in setup
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
-    it.skip("create tstzrange preserve usec", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("create tstzrange preserve usec", async () => {
+      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to create tstzrange)
+      // ROOT-CAUSE: test body not yet written; formatInstantForSql preserves nanosecond precision
+      //   so no infra gap expected — bounds with µs should survive the same serialize/deserialize path
+      // SCOPE: ~10 LOC test body; run after "create tstzrange" is confirmed passing
     });
-    it.skip("update tstzrange preserve usec", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("update tstzrange preserve usec", async () => {
+      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to update tstzrange)
+      // SCOPE: ~12 LOC test body; run after "update tstzrange" is confirmed passing
     });
-    it.skip("create tsrange preserve usec", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("create tsrange preserve usec", async () => {
+      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to create tsrange)
+      // SCOPE: ~10 LOC test body; run after "create tsrange" is confirmed passing
     });
-    it.skip("update tsrange preserve usec", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+    it.skip("update tsrange preserve usec", async () => {
+      // BLOCKED: range — preserve-usec ts*range round-trip untested (follow-on to update tsrange)
+      // SCOPE: ~12 LOC test body; run after "update tsrange" is confirmed passing
     });
     it.skip("timezone awareness tsrange preserve usec", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs timezone infrastructure */
+      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
+      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires µs-level time-zone conversion
+      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))
@@ -636,28 +604,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(() => parseRange("(2012-01-02,2012-01-04]")).toThrow();
     });
     it.skip("where by attribute with range", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model with range where */
+      // BLOCKED: range — PredicateBuilder routes Range through RangeHandler (interval semantics) not range-column equality
+      // ROOT-CAUSE: predicate-builder.ts dispatches Range values to RangeHandler which builds BETWEEN/>=/<
+      //   predicates; for range-typed columns Rails builds attribute.eq(type.serialize(range)) instead;
+      //   needs a RangeType column guard before the RangeHandler path to emit an Arel equality node
+      // SCOPE: ~60 LOC — RangeType column guard in predicate-builder.ts + serialize-to-literal path; affects 4 where/updateAll tests
     });
     it.skip("where by attribute with range in array", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model with range array where */
+      // BLOCKED: range — PredicateBuilder doesn't serialize Range for range-typed columns
+      // SCOPE: ~60 LOC shared with "where by attribute with range" fix; affects 4 where/updateAll tests
     });
     it.skip("update all with ranges", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs update_all with range */
+      // BLOCKED: range — updateAll doesn't serialize Range through column's RangeType
+      // ROOT-CAUSE: Relation#updateAll passes Range values to the Arel SET clause without calling
+      //   type.serialize; the range literal is not generated (no quoteRangeBound in the SET path)
+      // SCOPE: ~60 LOC shared with "where by attribute with range" fix; affects 4 where/updateAll tests
     });
     it.skip("ranges correctly escape input", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in range
-      // ROOT-CAUSE: connection-adapters/postgresql/range.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/range.ts; affects ~10–47 tests in range.test.ts
-      /* needs Base model */
+      // BLOCKED: range — updateAll Range serialization (same as "update all with ranges")
+      // ROOT-CAUSE: same gap as "update all with ranges"; test also verifies quoteRangeBound
+      //   prevents SQL injection — only testable once Range values flow through updateAll
+      // SCOPE: ~60 LOC shared with "update all with ranges" fix; affects 4 where/updateAll tests
     });
     it("ranges correctly unescape output", () => {
       // Rails: inserts '["ca""t","do\\\\g")' via SQL, reads back as 'ca"t'...'do\\g'
