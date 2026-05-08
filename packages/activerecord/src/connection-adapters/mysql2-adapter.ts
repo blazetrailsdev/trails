@@ -66,8 +66,42 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * Uses a connection pool internally for concurrent access.
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
+  // Cached liveness state — updated by activeAsync() pings and reset by
+  // disconnectBang()/reconnectBang(). The sync `active` getter can't issue a
+  // real network ping, so we track the last known result here.
+  private _activeState = true;
+
   override get active(): boolean {
-    return this._driverPool != null;
+    return this._driverPool != null && this._activeState;
+  }
+
+  /**
+   * Async liveness probe — checks socket health via a real `ping` call on a
+   * pool connection. Updates the cached `_activeState` so the sync `active`
+   * getter reflects the result. Mirrors Rails' `active?` which calls
+   * `mysql_ping` on the raw connection.
+   */
+  async activeAsync(): Promise<boolean> {
+    if (!this._driverPool) {
+      this._activeState = false;
+      return false;
+    }
+    let conn: mysql.PoolConnection | undefined;
+    try {
+      // Reuse the held transaction connection when available — probes the same
+      // session and avoids blocking on pool exhaustion (e.g. connectionLimit: 1
+      // with an active transaction holds the only slot).
+      conn = this._conn ?? (await this._driverPool.getConnection());
+      await conn.ping();
+      this._activeState = true;
+      return true;
+    } catch {
+      this._activeState = false;
+      return false;
+    } finally {
+      // Only release if we checked out a fresh connection, not the transaction one.
+      if (conn && conn !== this._conn) conn.release();
+    }
   }
 
   // Mirrors Rails' Mysql2Adapter#connected? — null raw connection means
@@ -80,6 +114,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   private _driverPool: mysql.Pool | null;
   private _endingPool: Promise<void> | null = null;
+  // Set by close() to distinguish permanent teardown from disconnectBang(),
+  // which is reconnectable. _checkoutConn() refuses to lazy-reconnect after close().
+  private _permanentlyClosed = false;
+  // Normalized config passed to newClient — stored for reconnect.
+  private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _conn: mysql.PoolConnection | null = null;
   private _inTransaction = false;
   // Per-mysql.PoolConnection StatementPool. Mirrors the PG adapter's
@@ -191,7 +230,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch {
         // malformed URI — leave _database undefined
       }
-      this._driverPool = Mysql2Adapter.newClient({ uri, waitTimeout });
+      this._poolConfig = { uri, waitTimeout };
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
       return;
     }
     // See PostgreSQLAdapter#constructor: Rails' database.yml merges
@@ -217,12 +257,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           return undefined;
         }
       })();
-    this._driverPool = Mysql2Adapter.newClient({ ...mysqlConfig, strict, waitTimeout, variables });
+    this._poolConfig = { ...mysqlConfig, strict, waitTimeout, variables };
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
   }
 
   /** Checkout a fresh connection from the pool, translating ER_BAD_DB_ERROR. */
   private async _checkoutConn(): Promise<mysql.PoolConnection> {
-    if (!this._driverPool) throw new Error("Mysql2Adapter: connection is closed");
+    // Lazy reconnect after disconnectBang() — mirrors Rails' reconnect on next
+    // execute after disconnect! (abstract_adapter.rb #with_raw_connection).
+    // close() sets _permanentlyClosed so we don't silently reopen after teardown.
+    if (!this._driverPool) {
+      if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+      this._activeState = true;
+    }
     try {
       return await this._driverPool.getConnection();
     } catch (error) {
@@ -951,12 +999,25 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Sever the connection immediately (synchronous contract from AbstractAdapter).
+   * Close and reopen the connection pool from the stored config.
+   * Mirrors Rails' Mysql2Adapter#reconnect! (disconnect! + connect).
+   * Pool creation via newClient is synchronous; fresh connections are
+   * established lazily on first use, so this method stays synchronous.
+   */
+  override reconnectBang(): void {
+    if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
+    this.disconnectBang();
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+    this._activeState = true;
+  }
+
+  /**
    * Releases advisory-lock and transaction connections, nulls `_driverPool` so
    * `active` returns false right away, then schedules pool.end() asynchronously.
    * Mirrors Rails' Mysql2Adapter#disconnect! (super + raw_connection.close + nil).
    */
   override disconnectBang(): void {
+    this._activeState = false;
     super.disconnectBang();
     if (this._advisoryLockConn) {
       this._advisoryLockConn.release();
@@ -972,16 +1033,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const pool = this._driverPool;
     this._driverPool = null;
     if (pool) {
-      this._endingPool = pool.end().catch(() => {
-        // swallow — pool already torn down or connection already gone
-      });
+      // Chain onto any in-flight teardown from a prior disconnect/reconnect so
+      // repeated reconnects don't lose earlier pool.end() promises.
+      const ending = pool.end().catch(() => {});
+      this._endingPool = this._endingPool ? this._endingPool.then(() => ending) : ending;
     }
   }
 
   /**
-   * Close the connection pool.
+   * Close the connection pool permanently. Unlike disconnectBang(), this is not
+   * reconnectable — subsequent execute() calls will throw.
    */
   async close(): Promise<void> {
+    this._permanentlyClosed = true;
     if (this._advisoryLockConn) {
       this._advisoryLockConn.release();
       this._advisoryLockConn = null;
@@ -1000,8 +1064,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       await this._driverPool.end();
       this._driverPool = null;
     }
-    // If disconnectBang() was called before close(), await the in-flight
-    // pool.end() so callers (e.g. afterEach) can be sure sockets are drained.
+    // Await any in-flight pool.end() from disconnectBang()/reconnectBang() so
+    // callers (e.g. afterEach) can be sure all sockets are drained.
     if (this._endingPool) {
       await this._endingPool;
       this._endingPool = null;
