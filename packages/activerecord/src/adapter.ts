@@ -409,6 +409,12 @@ export interface DatabaseAdapter {
    */
   quotedBinary(value: unknown): string;
 
+  /** @internal Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_true */
+  quotedTrue(): string;
+
+  /** @internal Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_false */
+  quotedFalse(): string;
+
   /**
    * Return a dialect-specific Arel visitor wired to this connection's
    * quoter. Used to compile Arel ASTs to SQL with correct identifier

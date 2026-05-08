@@ -96,8 +96,8 @@ describe("edge cases — rough edges in current DX", () => {
   });
 
   it("DatabaseAdapter is a structural superset of ArelQuoter", () => {
-    // The arel visitor accepts any ArelQuoter; the connection adapter satisfies
+    // The arel visitor accepts any ArelConnection; the connection adapter satisfies
     // it structurally so passing `connection` to `new ToSql(connection)` type-checks.
-    expectTypeOf<DatabaseAdapter>().toMatchTypeOf<Visitors.ArelQuoter>();
+    expectTypeOf<DatabaseAdapter>().toMatchTypeOf<Visitors.ArelConnection>();
   });
 });

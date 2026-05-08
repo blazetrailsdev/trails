@@ -1007,6 +1007,14 @@ class SchemaAdapter implements DatabaseAdapter {
     );
   }
 
+  quotedTrue(): string {
+    return this.inner.quotedTrue();
+  }
+
+  quotedFalse(): string {
+    return this.inner.quotedFalse();
+  }
+
   get arelVisitor(): Visitors.ToSql | undefined {
     return undefined;
   }

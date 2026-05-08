@@ -1777,24 +1777,30 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
       quoteColumnName: (name) => `<<${name}>>`,
       quoteString: (s) => s.replace(/'/g, "''"),
       quote: (v) => (v === null ? "NULL" : `'${v}'`),
+      quotedBinary: (v) => `'${v}'`,
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
     };
     const sql = new Visitors.ToSql(stubQuoter).compile(users.get("id").eq(1));
     expect(sql).toContain("<<users>>");
   });
 
   it("Uint8Array in value position is routed through quoter.quote(), not String()", () => {
-    // Guards against the String(Uint8Array) → '31,139' corruption path.
-    // The quoter (e.g. PG adapter) receives the Uint8Array and emits the
-    // correct dialect binary literal.
+    // Guards against the String(Uint8Array) → comma-joined decimals ('31,139')
+    // corruption path. The connection receives the Uint8Array via quotedBinary
+    // and emits the correct dialect binary literal.
     const received: unknown[] = [];
-    const stubQuoter: Visitors.ArelQuoter = {
+    const stubQuoter: Visitors.ArelConnection = {
       quoteTableName: (name) => `"${name}"`,
       quoteColumnName: (name) => `"${name}"`,
       quoteString: (s) => s.replace(/'/g, "''"),
-      quote: (v) => {
+      quote: (v) => `'${v}'`,
+      quotedBinary: (v) => {
         received.push(v);
         return v instanceof Uint8Array ? `'\\x${Buffer.from(v).toString("hex")}'` : `'${v}'`;
       },
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
     };
     const bytes = new Uint8Array([0x1f, 0x8b]);
     const node = users.get("payload").eq(bytes);

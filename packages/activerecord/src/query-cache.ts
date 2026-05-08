@@ -382,6 +382,14 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     );
   }
 
+  quotedTrue(): string {
+    return this.inner.quotedTrue();
+  }
+
+  quotedFalse(): string {
+    return this.inner.quotedFalse();
+  }
+
   quoteDefaultExpression(value: unknown): string {
     const inner = this.inner as { quoteDefaultExpression?: (v: unknown) => string };
     if (typeof inner.quoteDefaultExpression === "function")
