@@ -240,3 +240,28 @@ describe("SchemaStatements privates (PR 8)", () => {
     );
   });
 });
+
+describe("SchemaStatements#quotedColumnsForIndex", () => {
+  it("quotes column names without options", () => {
+    const ss = makeStatements();
+    expect(ss.quotedColumnsForIndex(["id", "name"])).toBe('"id", "name"');
+  });
+
+  it("appends sort order when adapter supports it and order option is given", () => {
+    const ss = makeStatements({
+      supportsIndexSortOrder: () => true,
+    });
+    expect(ss.quotedColumnsForIndex(["id", "name"], { order: { id: "desc", name: "asc" } })).toBe(
+      '"id" DESC, "name" ASC',
+    );
+  });
+
+  it("ignores sort order when adapter does not support it", () => {
+    const ss = makeStatements({
+      supportsIndexSortOrder: () => false,
+    });
+    expect(ss.quotedColumnsForIndex(["id", "name"], { order: { id: "desc" } })).toBe(
+      '"id", "name"',
+    );
+  });
+});

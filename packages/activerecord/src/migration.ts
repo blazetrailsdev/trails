@@ -689,12 +689,12 @@ export abstract class Migration {
     if (fn) await fn(table);
   }
 
-  async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
+  async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     if (this._recording) {
-      this._recorder.record("renameIndex", [_tableName, oldName, newName]);
+      this._recorder.record("renameIndex", [tableName, oldName, newName]);
       return;
     }
-    await this.schema.renameIndex(_tableName, oldName, newName);
+    await this.schema.renameIndex(tableName, oldName, newName);
   }
 
   indexName(tableName: string, options: { column?: string | string[] }): string {

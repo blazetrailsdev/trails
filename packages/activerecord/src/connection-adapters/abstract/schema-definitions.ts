@@ -1102,8 +1102,8 @@ export class Table {
   ) {}
 
   /** @internal */
-  aliasedTypes(_name: string, fallback: string): string {
-    return fallback;
+  aliasedTypes(name: string, fallback: string): string {
+    return name === "timestamp" ? "datetime" : fallback;
   }
 
   async string(name: string, options: ColumnOptions = {}): Promise<void> {
