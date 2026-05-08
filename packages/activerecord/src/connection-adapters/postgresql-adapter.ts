@@ -2546,6 +2546,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           type: castType.type(),
           oid,
           fmod,
+          limit: castType.limit ?? null,
+          precision: castType.precision ?? null,
+          scale: castType.scale ?? null,
         },
         !(r.notnull as boolean),
         {
@@ -4043,9 +4046,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       type: castType.type(),
       oid,
       fmod,
-      limit: (castType as { limit?: number | null }).limit ?? null,
-      precision: (castType as { precision?: number | null }).precision ?? null,
-      scale: (castType as { scale?: number | null }).scale ?? null,
+      limit: castType.limit ?? null,
+      precision: castType.precision ?? null,
+      scale: castType.scale ?? null,
     });
   }
 
@@ -4079,7 +4082,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return new Column(
       col,
       rawLiteral !== null ? castType.deserialize(rawLiteral) : null,
-      { sqlType: meta.sqlType, type: meta.type, oid: Number(oid), fmod: Number(fmod) },
+      {
+        sqlType: meta.sqlType,
+        type: meta.type,
+        oid: Number(oid),
+        fmod: Number(fmod),
+        limit: meta.limit,
+        precision: meta.precision,
+        scale: meta.scale,
+      },
       !notnull,
       {
         defaultFunction: (gen ? raw : split?.fn) ?? undefined,
