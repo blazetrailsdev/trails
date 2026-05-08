@@ -178,24 +178,23 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
 describe("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
   it("uses the stored _touchTime and clears deferred state", async () => {
     const { touchDeferredAttributes } = await import("./touch-later.js");
-    class Developer extends Base {
+    class Invoice extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "invoices";
+        this.attribute("amount", "integer");
         this.attribute("updated_at", "datetime");
         this.adapter = adapter;
       }
     }
-    const dev = new Developer({ name: "Alice" });
-    (dev as any)._newRecord = false;
-    (dev as any)._destroyed = false;
+    const inv = await Invoice.create({ amount: 10 });
 
     const fixedTime = new Date(2_000_000);
-    (dev as any)._deferTouchAttrs = ["updated_at"];
-    (dev as any)._touchTime = fixedTime;
+    (inv as any)._deferTouchAttrs = ["updated_at"];
+    (inv as any)._touchTime = fixedTime;
 
-    await touchDeferredAttributes.call(dev as any);
+    await touchDeferredAttributes.call(inv as any);
 
-    expect((dev as any)._deferTouchAttrs).toBeNull();
-    expect((dev as any)._touchTime).toBeNull();
+    expect((inv as any)._deferTouchAttrs).toBeNull();
+    expect((inv as any)._touchTime).toBeNull();
   });
 });
