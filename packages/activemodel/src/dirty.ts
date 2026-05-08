@@ -241,7 +241,7 @@ export class DirtyTracker {
    * @internal
    */
   redetectChanges(currentAttributes: AttributeSet): void {
-    for (const [name] of currentAttributes) {
+    for (const name of currentAttributes.keys()) {
       const attr = currentAttributes.getAttribute(name);
       const currentValue = attr.value;
       if (!this._originalHas.has(name)) {

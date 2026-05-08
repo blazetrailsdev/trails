@@ -413,11 +413,11 @@ export async function rolledbackBang(
     clearTransactionRecordState.call(this);
     if (forceRestoreState) {
       // Force-null _startTransactionState on full outer rollback. Inner
-      // savepoint commits move records to the parent without calling
-      // committedBang (matching Rails), so the level can be > 1 here.
+      // savepoint commits move records to the parent via add_transaction_record
+      // without calling committedBang — matching Rails' commit_records else branch
+      // which skips committed! in the happy path. Level can therefore be > 1 here.
       // clearTransactionRecordState only decrements and would leave a stale
-      // snapshot — null it unconditionally on forceRestore. Mirrors Rails'
-      // rolledback! ensure block which does not attempt to track level here.
+      // snapshot — null it unconditionally on forceRestore.
       (this as any)._startTransactionState = null;
       (this as any)._triggerUpdateCallback = false;
       (this as any)._triggerDestroyCallback = false;
