@@ -37,13 +37,13 @@ describe("PostgreSQL::OID::DateTime", () => {
     // 44 BC = ISO year -43; round-trip via castValue to create the Instant
     const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
-    expect(type.serialize(instant)).toBe("0044-01-01 00:00:00.000000 BC");
+    expect(type.serialize(instant)).toBe("0044-01-01 00:00:00 BC");
   });
 
   it("serialize converts ISO year 0 to 1 BC", () => {
     const instant = type.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
     expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
-    expect(type.serialize(instant)).toBe("0001-04-07 00:00:00.000000 BC");
+    expect(type.serialize(instant)).toBe("0001-04-07 00:00:00 BC");
   });
 
   it("serialize preserves microseconds in BC format", () => {
@@ -53,7 +53,7 @@ describe("PostgreSQL::OID::DateTime", () => {
 
   it("serialize leaves AD dates unchanged", () => {
     const instant = Temporal.Instant.from("2023-06-15T12:00:00Z");
-    expect(type.serialize(instant)).toBe("2023-06-15T12:00:00.000000Z");
+    expect(type.serialize(instant)).toBe("2023-06-15 12:00:00.000000");
   });
 
   it("serialize returns 'infinity' / '-infinity' for sentinels", () => {
