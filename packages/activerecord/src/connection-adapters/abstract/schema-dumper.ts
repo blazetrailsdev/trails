@@ -118,7 +118,6 @@ export class SchemaDumper extends BaseSchemaDumper {
     if (column.default == null) return this.schemaExpression(column);
     // Represent the default as its schema literal
     if (typeof column.default === "string") return JSON.stringify(column.default);
-    if (Array.isArray(column.default)) return JSON.stringify(column.default);
     return String(column.default);
   }
 
