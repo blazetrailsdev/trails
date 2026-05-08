@@ -164,6 +164,26 @@ describe("RelationMutationTest", () => {
     expect(sql).toContain("DISTINCT");
   });
 
+  it("uniq! deduplicates the named clause array", () => {
+    const { Post } = makeModel();
+    const rel = Post.group("title").group("title").group("author");
+    expect((rel as any)._groupColumns).toEqual(["title", "title", "author"]);
+    (rel as any).uniqBang("group");
+    expect((rel as any)._groupColumns).toEqual(["title", "author"]);
+  });
+
+  it("uniq! is a no-op for unknown clause names", () => {
+    const { Post } = makeModel();
+    const rel = Post.group("title");
+    expect(() => (rel as any).uniqBang("unknown_clause")).not.toThrow();
+  });
+
+  it("uniq! with no argument is a no-op", () => {
+    const { Post } = makeModel();
+    const rel = Post.group("title");
+    expect(() => (rel as any).uniqBang()).not.toThrow();
+  });
+
   it("order! with empty string does not emit ORDER BY", () => {
     const { Post } = makeModel();
     // Test the bang method directly — order() delegates to orderBang() on a clone.

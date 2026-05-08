@@ -16,6 +16,7 @@ import {
 import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
 import { sanitizeSqlArray, disallowRawSqlBang } from "../sanitization.js";
+import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { foreignKey } from "@blazetrails/activesupport";
@@ -1101,8 +1102,24 @@ function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {
   return this;
 }
 
-function uniqBang(this: QueryMethodsHost, _name?: string): any {
-  this._isDistinct = true;
+const UNIQ_BANG_FIELDS: Partial<Record<string, keyof QueryMethodsHost>> = {
+  group: "_groupColumns",
+  select: "_selectColumns",
+  order: "_orderClauses",
+  joins: "_joinValues",
+  annotate: "_annotations",
+  optimizer_hints: "_optimizerHints",
+  references: "_referencesValues",
+};
+
+function uniqBang(this: QueryMethodsHost, name?: string): any {
+  if (name === undefined) return this;
+  const field = UNIQ_BANG_FIELDS[name];
+  if (!field) return this;
+  const arr = this[field] as unknown[];
+  if (Array.isArray(arr) && arr.length > 0) {
+    (this as any)[field] = [...new Set(arr)];
+  }
   return this;
 }
 
@@ -2025,17 +2042,17 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
 }
 
 /** @internal */
-export function buildArel(this: QueryMethodsHost, _connection?: unknown, _aliases?: unknown): any {
+export function buildArel(this: QueryMethodsHost, _connection?: unknown, aliases?: unknown): any {
   const mc = (this as any)._modelClass;
   const table: any = mc?.arelTable;
   const arel = new SelectManager(table);
 
-  buildJoins.call(this, arel);
+  buildJoins.call(this, arel, aliases);
 
   if (!this._whereClause.isEmpty()) arel.where(this._whereClause.ast);
   if (!this._havingClause.isEmpty()) arel.having(this._havingClause.ast);
 
-  if (this._limitValue !== null) arel.take(this._limitValue);
+  if (this._limitValue !== null) arel.take(sanitizeLimit(this._limitValue));
   if (this._offsetValue !== null) arel.skip(this._offsetValue);
 
   if (this._groupColumns.length > 0)
@@ -2191,7 +2208,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
 }
 
 /** @internal */
-export function buildJoins(this: QueryMethodsHost, arel: any): void {
+export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: unknown): void {
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 || this._leftOuterJoinsValues.length > 0;
   if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
@@ -2221,13 +2238,13 @@ export function buildJoins(this: QueryMethodsHost, arel: any): void {
   // no explicit joins). Rails processes these as named_join → OuterJoin type.
   if (namedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, Nodes.OuterJoin);
-    const constraintNodes = jd.joinConstraints(stashedJoins);
+    const constraintNodes = jd.joinConstraints(stashedJoins, aliases);
     for (const node of constraintNodes) arel.source.right.push(node);
   } else if (stashedJoins.length > 0) {
     // Stashed join dependencies (eager_load or left_outer combined with explicit
     // joins) — generate join SQL via joinConstraints (mirrors build_joins:1896).
     const [primary, ...rest] = stashedJoins;
-    const constraintNodes = primary.joinConstraints(rest);
+    const constraintNodes = primary.joinConstraints(rest, aliases);
     for (const node of constraintNodes) arel.source.right.push(node);
   }
 
