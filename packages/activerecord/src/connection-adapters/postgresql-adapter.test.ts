@@ -1150,6 +1150,7 @@ describe("PostgreSQLAdapter supports_* predicates (unit)", () => {
     expect(adapter.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
     expect(adapter.typeToSql("datetime", { precision: 0 })).toBe("timestamp(0)");
     expect(adapter.typeToSql("datetime", { precision: 3 })).toBe("timestamp(3)");
+    // typeToSql itself has no default — addColumn supplies the default
     expect(adapter.typeToSql("datetime")).toBe("timestamp");
   });
 });

@@ -108,8 +108,12 @@ describe("DateTimePrecisionTest", () => {
 
     // 999999 microseconds = 999.999ms
     const date = Temporal.Instant.from("2014-08-17T12:30:00.999999Z");
-    const record = await (Foo as any).create({ created_at: date, updated_at: date });
-    const foo = await (Foo as any).find(record.id);
+    await (Foo as any).create({ created_at: date, updated_at: date });
+
+    // find_by uses the column type to truncate the query value, matching stored precision-0 value
+    const foo = await (Foo as any).findBy({ created_at: date });
+    expect(foo).not.toBeNull();
+    expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
 
     expect(foo.created_at.epochNanoseconds / 1_000_000_000n).toBe(
       date.epochNanoseconds / 1_000_000_000n,
