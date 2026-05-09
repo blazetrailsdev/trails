@@ -3,6 +3,8 @@
  */
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
+import { TimeWithZone, getZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 export interface TimeZoneConversion {
@@ -41,9 +43,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
   override cast(value: unknown): unknown {
     if (value == null) return null;
-    // TODO: requires TimeWithZone — in_time_zone branch via user_input_in_time_zone(value)
-    // Fallback mirrors: map(super) { |v| cast(v) } — delegate to subtype
-    return this._subtype.cast(value);
+    // Hash (multiparameter attributes): cast via subtype, then treat wall-clock
+    // components as local time in the current zone (set_time_zone_without_conversion).
+    if (isPlainObject(value)) {
+      return setTimeZoneWithoutConversion(this._subtype.cast(value));
+    }
+    // TimeWithZone or any value with in_time_zone: move to current zone.
+    if (value instanceof TimeWithZone) {
+      return convertTimeToTimeZone(value);
+    }
+    // String, Temporal.Instant, Date, etc.: cast via subtype then wrap in zone.
+    return convertTimeToTimeZone(this._subtype.cast(value));
   }
 
   override deserialize(value: unknown): unknown {
@@ -79,19 +89,38 @@ function convertTimeToTimeZone(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((v) => convertTimeToTimeZone(v));
   }
-  // TODO: requires TimeWithZone — value.in_time_zone for time-like values
+  const zone = getZone();
+  if (!zone) return value;
+  if (value instanceof TimeWithZone) {
+    return value.inTimeZone(zone);
+  }
+  if (value instanceof Temporal.Instant) {
+    return new TimeWithZone(value, zone);
+  }
   return value;
 }
 
 /** @internal */
 function setTimeZoneWithoutConversion(value: unknown): unknown {
-  if (value == null) return value;
-  // TODO: requires TimeWithZone — Time.zone.local_to_utc(value).try(:in_time_zone)
+  if (value == null) return null;
+  const zone = getZone();
+  if (!zone) return value;
+  if (value instanceof Temporal.Instant) {
+    // The subtype cast treats multiparameter hash components as UTC wall-clock
+    // values. Re-interpret those wall-clock components as local time in the
+    // current zone (mirrors Time.zone.local_to_utc(localTime).in_time_zone).
+    const dt = value.toZonedDateTimeISO("UTC").toPlainDateTime();
+    return zone.local(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond);
+  }
+  if (value instanceof TimeWithZone) {
+    return value.inTimeZone(zone);
+  }
   return value;
 }
 
-// Silence unused-variable warnings until TimeWithZone is implemented.
-void setTimeZoneWithoutConversion;
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype;
+}
 
 interface TimeZoneConversionHost {
   timeZoneAwareAttributes: boolean;
