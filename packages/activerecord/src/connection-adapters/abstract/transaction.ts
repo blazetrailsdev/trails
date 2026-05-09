@@ -673,6 +673,12 @@ export class RestartParentTransaction extends Transaction {
     this.state.commitBang();
   }
 
+  /** @internal */
+  override incompleteBang(): void {
+    // RestartParentTransaction has no own instrumentation lifecycle —
+    // materializeBang() delegates to parent, so _instrumenter is never started.
+  }
+
   override isFullRollback(): boolean {
     return false;
   }

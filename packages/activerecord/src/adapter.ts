@@ -237,6 +237,15 @@ export interface DatabaseAdapter {
   readonly inTransaction: boolean;
 
   /**
+   * Number of open transactions on this adapter's TransactionManager stack.
+   * Zero for adapters without a TransactionManager.
+   * Includes lazy (unmaterialized) transactions.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#open_transactions
+   */
+  readonly openTransactions?: number;
+
+  /**
    * Schema cache for this adapter's connection pool. Holds table/column
    * metadata so repeated introspection queries are avoided.
    *

@@ -344,7 +344,7 @@ let _ddlSpCounter = 0;
  * so we need savepoints to isolate DDL failures and allow rollback+retry.
  */
 async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
-  const useSp = isPg() && inner.inTransaction;
+  const useSp = isPg() && ((inner.openTransactions ?? 0) > 0 || inner.inTransaction);
   const sp = useSp ? `_ddl_sp_${++_ddlSpCounter}` : "";
   try {
     if (useSp) await inner.createSavepoint(sp);
@@ -660,7 +660,7 @@ class SchemaAdapter implements DatabaseAdapter {
       // In PG, errors inside a transaction abort it. Use a savepoint so we
       // can rollback the failed statement and retry after auto-creating the
       // missing table/column.
-      const useSp = isPg() && this.inTransaction;
+      const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
       const sp = useSp ? `_sr_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -705,7 +705,7 @@ class SchemaAdapter implements DatabaseAdapter {
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const useSp = isPg() && this.inTransaction;
+      const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
       const sp = useSp ? `_sr_m_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -900,6 +900,10 @@ class SchemaAdapter implements DatabaseAdapter {
   }
   get inTransaction(): boolean {
     return this.inner.inTransaction;
+  }
+
+  get openTransactions(): number {
+    return this.inner.openTransactions ?? 0;
   }
 
   emptyInsertStatementValue(pk?: string | null): string {
