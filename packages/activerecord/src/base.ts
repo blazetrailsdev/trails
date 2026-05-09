@@ -600,7 +600,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion.time_zone_aware_types
    */
-  static timeZoneAwareTypes: string[] = ["datetime", "time", "tsrange", "tstzrange"];
+  static timeZoneAwareTypes: string[] = ["datetime", "time"];
 
   static get protectedEnvironments(): string[] {
     return ModelSchema.protectedEnvironments.call(this);
