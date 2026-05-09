@@ -1107,39 +1107,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Begin a transaction. Acquires a dedicated client from the pool.
    */
   async beginTransaction(): Promise<void> {
-    // Routes through `_acquireFreshClient` so the drain runs on every
-    // checkout (a tagged client returned here gets `DEALLOCATE ALL`'d
-    // before BEGIN). Drain failures are released-with-error inside
-    // the helper, so a thrown drain doesn't leak `_client`.
+    await this._transactionManager.beginTransaction();
+  }
+
+  async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
       await this._client.query("BEGIN");
       this._inTransaction = true;
-      // Note: do NOT null `_lastReleasedTxnClient` here. After-rollback
-      // callbacks (rollback_records) run BEFORE TransactionManager's
-      // `after_failure_actions` hook fires; if such a callback opens a
-      // new transaction (this beginTransaction call), nulling the ref
-      // would lose the pointer to the just-failed client and the hook
-      // would clear the wrong pool. The ref is dropped instead inside
-      // `clearCacheBang` after `reset()` — bounded to the failure-hook
-      // window, while still WeakRef-held so pg.Pool can reap idles.
     } catch (error) {
-      // If BEGIN fails (e.g. network blip after connect), release the
-      // acquired client so it returns to the pool. Leaving `_client`
-      // set would leak a pool slot and eventually deadlock acquires.
-      // Pass the error to release() so node-postgres discards the
-      // (potentially damaged) client instead of returning a bad
-      // socket to the idle set.
       const client = this._client;
       this._client = null;
       this._inTransaction = false;
       client?.release(error instanceof Error ? error : undefined);
       throw error;
     }
-  }
-
-  async beginDbTransaction(): Promise<void> {
-    return this.beginTransaction();
   }
 
   async beginDeferredTransaction(): Promise<void> {
