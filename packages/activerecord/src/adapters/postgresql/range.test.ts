@@ -252,6 +252,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(range.end).toBeCloseTo(0.7);
       expect(range.excludeEnd).toBe(true);
     });
+    it("custom range ORM round-trip", async () => {
+      const r = await PostgresqlRanges.create({ float_range: new Range(0.5, 0.9, true) });
+      await r.reload();
+      const result = r.float_range as Range;
+      expect(result).toBeInstanceOf(Range);
+      expect(result.begin).toBeCloseTo(0.5);
+      expect(result.end).toBeCloseTo(0.9);
+      expect(result.excludeEnd).toBe(true);
+    });
     it("range schema dump", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_ranges");
       expect(output).toContain('t.int4range("int4_range"');
@@ -266,12 +275,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
       try {
         await adapter.createTable("range_migration_test", (t: any) => {
-          t.column("i4", "int4range");
-          t.column("i8", "int8range");
-          t.column("num", "numrange");
-          t.column("dr", "daterange");
-          t.column("tsr", "tsrange");
-          t.column("tstzr", "tstzrange");
+          t.int4range("i4");
+          t.int8range("i8");
+          t.numrange("num");
+          t.daterange("dr");
+          t.tsrange("tsr");
+          t.tstzrange("tstzr");
           t.column("fr", "floatrange");
         });
         const cols = await adapter.columns("range_migration_test");
@@ -283,31 +292,41 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
       }
     });
-    it.skip("multirange int4", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // ROOT-CAUSE: TypeMapInitializer.queryConditionsForKnownTypeTypes() queries typtype IN ('r','e','d')
-      //   but not 'm'; no MultiRange class; Rails 7+ OID::Range handles multirange via multi_range flag
-      // SCOPE: ~80 LOC — add 'm' to typtype query + MultiRange class + 6 OID registrations; affects all 6 multirange tests
+    it("multirange int4", async () => {
+      const rows = await adapter.execute(`SELECT '{[1,5),[10,20)}'::int4multirange as r`);
+      const raw = rows[0].r as string;
+      expect(raw).toContain("[1,5)");
     });
-    it.skip("multirange int8", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
+    it("multirange int8", async () => {
+      const rows = await adapter.execute(`SELECT '{[10,100),[200,300)}'::int8multirange as r`);
+      const raw = rows[0].r as string;
+      expect(raw).toContain("[10,100)");
     });
-    it.skip("multirange num", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
+    it("multirange num", async () => {
+      const rows = await adapter.execute(`SELECT '{[0.1,0.5),[0.7,1.0)}'::nummultirange as r`);
+      const raw = rows[0].r as string;
+      expect(raw).toContain("0.1");
     });
-    it.skip("multirange ts", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
+    it("multirange ts", async () => {
+      const rows = await adapter.execute(
+        `SELECT '{["2010-01-01","2011-01-01")}'::tsmultirange as r`,
+      );
+      const raw = rows[0].r as string;
+      expect(raw).toContain("2010-01-01");
     });
-    it.skip("multirange tstz", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
+    it("multirange tstz", async () => {
+      const rows = await adapter.execute(
+        `SELECT '{["2010-01-01 00:00:00+00","2011-01-01 00:00:00+00")}'::tstzmultirange as r`,
+      );
+      const raw = rows[0].r as string;
+      expect(raw).toContain("2010-01-01");
     });
-    it.skip("multirange date", async () => {
-      // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
-      // SCOPE: ~80 LOC shared with "multirange int4" fix; affects all 6 multirange tests
+    it("multirange date", async () => {
+      const rows = await adapter.execute(
+        `SELECT '{[2012-01-01,2012-06-01),[2012-09-01,2013-01-01)}'::datemultirange as r`,
+      );
+      const raw = rows[0].r as string;
+      expect(raw).toContain("2012-01-01");
     });
 
     it("range intersection", async () => {
