@@ -1,9 +1,14 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { TimeZoneConverter } from "./time-zone-conversion.js";
+import { DateTime } from "../type/date-time.js";
 
 describe("TimeZoneConverterTest", () => {
-  it.skip("comparison with date time type", () => {
-    // BLOCKED: type — time-zone-converter type/attribute gap
-    // ROOT-CAUSE: time-zone-converter.ts or attribute-methods/time-zone-converter.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in time-zone-converter.test.ts
+  it("comparison with date time type", () => {
+    const subtype = new DateTime();
+    const value = new TimeZoneConverter(subtype);
+    const valueCopy = new TimeZoneConverter(subtype);
+
+    expect(value.equals(valueCopy)).toBe(true);
+    expect(value.equals("foo" as any)).toBe(false);
   });
 });
