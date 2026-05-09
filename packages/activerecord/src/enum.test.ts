@@ -604,17 +604,39 @@ describe("EnumTest", () => {
     expect((p as any).isWritten()).toBe(true);
     expect((p as any).isDraft()).toBe(false);
   });
-  it.skip("reserved enum values", () => {
-    // BLOCKED: type — enum type feature gap
-    // ROOT-CAUSE: enum.ts#defineEnum or EnumType missing Rails parity for enum scopes / predicates
-    // SCOPE: ~50 LOC fix in enum.ts; affects ~10 tests in enum.test.ts
-    /* needs reserved name validation */
+  it("reserved enum values", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "status", { draft: 0, published: 1 });
+
+    // :valid → isValid conflicts with AR instance method
+    // :save  → saveBang conflicts with AR instance method
+    const conflicts = ["valid", "save"];
+    conflicts.forEach((value, i) => {
+      const enumName = `status_${i}`;
+      Post.attribute(enumName, "integer");
+      expect(() => defineEnum(Post, enumName, [value])).toThrow(ArgumentError);
+    });
   });
-  it.skip("reserved enum values for relation", () => {
-    // BLOCKED: type — enum type feature gap
-    // ROOT-CAUSE: enum.ts#defineEnum or EnumType missing Rails parity for enum scopes / predicates
-    // SCOPE: ~50 LOC fix in enum.ts; affects ~10 tests in enum.test.ts
-    /* needs reserved name validation */
+  it("reserved enum values for relation", () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("status", "integer");
+    Post.adapter = freshAdapter();
+
+    // Scope names that conflict with existing static model class methods
+    const conflicts = ["all", "where"];
+    conflicts.forEach((value, i) => {
+      const enumName = `category_${i}`;
+      Post.attribute(enumName, "integer");
+      expect(() => defineEnum(Post, enumName, [value])).toThrow(ArgumentError);
+    });
   });
 
   it("query state by predicate with custom prefix", () => {

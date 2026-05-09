@@ -97,19 +97,33 @@ export function defineEnum(
   // Camel-case a method name: "status_draft" -> "statusDraft"
   const toCamel = (s: string) => camelize(s, false);
 
-  // Define scopes for each enum value
-  for (const [name, value] of mapping) {
-    const scopeName = toCamel(methodName(name));
-    modelClass.scope(scopeName, (rel: any) => rel.where({ [attribute]: value }));
-  }
-
-  // Define instance methods on the prototype
+  // Define scopes and instance methods for each enum value
   for (const [name, value] of mapping) {
     const fullName = toCamel(methodName(name));
     const capitalizedFullName = camelize(methodName(name));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const scopeName = fullName;
+    const notScopeName = `not${capitalizedFullName}`;
+
+    // Conflict detection (mirrors Rails' detect_enum_conflict!)
+    if (predicateName in (modelClass.prototype as object)) {
+      raiseConflictError.call(modelClass, attribute, predicateName);
+    }
+    if (bangName in (modelClass.prototype as object)) {
+      raiseConflictError.call(modelClass, attribute, bangName);
+    }
+    if (scopeName in (modelClass as object)) {
+      raiseConflictError.call(modelClass, attribute, scopeName, { type: "class" });
+    }
+    if (notScopeName in (modelClass as object)) {
+      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
+    }
+
+    modelClass.scope(scopeName, (rel: any) => rel.where({ [attribute]: value }));
 
     // Predicate: record.isDraft() or record.isStatusDraft()
-    Object.defineProperty(modelClass.prototype, `is${capitalizedFullName}`, {
+    Object.defineProperty(modelClass.prototype, predicateName, {
       value: function (this: Base) {
         return this.readAttribute(attribute) === value;
       },
@@ -129,7 +143,6 @@ export function defineEnum(
     }
 
     // Bang setter: record.draftBang() or record.statusDraftBang()
-    const bangName = `${fullName}Bang`;
     Object.defineProperty(modelClass.prototype, bangName, {
       value: async function (this: any) {
         this.writeAttribute(attribute, value);
@@ -142,7 +155,6 @@ export function defineEnum(
     });
 
     // whereNot scope: Model.notDraft() or Model.notStatusDraft()
-    const notScopeName = `not${capitalizedFullName}`;
     modelClass.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
   }
 }
