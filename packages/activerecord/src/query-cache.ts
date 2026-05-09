@@ -101,6 +101,36 @@ function castBinds(binds: unknown[]): unknown[] {
 }
 
 /**
+ * Walk the adapter chain to find currentTransaction().userTransaction.
+ * Returns null when no real transaction is open (userTransaction.isOpen() === false,
+ * i.e. it is Transaction.NULL_TRANSACTION or a finalized transaction).
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache#cache_notification_info
+ * `transaction: current_transaction.user_transaction.presence`
+ */
+function getCurrentUserTransaction(adapter: unknown): unknown {
+  let a: unknown = adapter;
+  while (a !== null && a !== undefined && typeof a === "object") {
+    if (typeof (a as Record<string, unknown>).currentTransaction === "function") {
+      const tx: unknown = (a as { currentTransaction(): unknown }).currentTransaction();
+      const userTx = (tx as Record<string, unknown> | null | undefined)?.userTransaction ?? null;
+      // NULL_TRANSACTION.isOpen() === false; only return for real open transactions
+      if (
+        userTx !== null &&
+        typeof userTx === "object" &&
+        typeof (userTx as { isOpen?(): boolean }).isOpen === "function" &&
+        (userTx as { isOpen(): boolean }).isOpen()
+      ) {
+        return userTx;
+      }
+      return null;
+    }
+    a = (a as Record<string, unknown>).inner ?? null;
+  }
+  return null;
+}
+
+/**
  * Build a cache key from a SQL string and optional binds.
  */
 function cacheKey(sql: string, binds?: unknown[]): string {
@@ -248,6 +278,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
         connection: this,
         cached: true,
         row_count: cached.length,
+        transaction: getCurrentUserTransaction(this.inner),
       });
       return cached.map((row) => ({ ...row }));
     }
@@ -430,6 +461,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
           connection: this,
           cached: true,
           row_count: cached.length,
+          transaction: getCurrentUserTransaction(this.inner),
         });
         return Result.fromRowHashes(cached.map((row) => ({ ...row })));
       }
