@@ -415,8 +415,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async beginTransaction(): Promise<void> {
-    await this.driver.exec("BEGIN IMMEDIATE TRANSACTION");
-    this._inTransaction = true;
+    // Force materialization (_lazy: false) so _inTransaction is set immediately.
+    // The _transactionFallback path in transactions.ts checks adapter.inTransaction
+    // to decide savepoint-vs-begin; lazy BEGIN causes it to double-BEGIN.
+    await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
   /**
@@ -428,6 +430,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async commit(): Promise<void> {
+    if (this._transactionManager.openTransactions > 0) {
+      return this._transactionManager.commitTransaction();
+    }
     return this.commitDbTransaction();
   }
 
@@ -444,6 +449,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async rollback(): Promise<void> {
+    if (this._transactionManager.openTransactions > 0) {
+      return this._transactionManager.rollbackTransaction();
+    }
     return this.rollbackDbTransaction();
   }
 

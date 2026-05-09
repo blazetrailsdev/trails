@@ -573,7 +573,7 @@ describe("QueryCacheExpiryTest", () => {
 
   it("store checkVersion clears cache on version increment", async () => {
     const version = { value: 0 };
-    const store = new Store(10, version);
+    const store = new Store(version, 10);
     store.enabled = true;
     await store.computeIfAbsent("key1", async () => [{ val: 1 }]);
     expect(store.size).toBe(1);
@@ -586,7 +586,7 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it("query cache lru eviction", async () => {
-    const store = new Store(3);
+    const store = new Store(null, 3);
     store.enabled = true;
     for (let i = 0; i < 5; i++) {
       await store.computeIfAbsent(`query_${i}`, async () => [{ val: i }]);
@@ -624,10 +624,27 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
     expect(hit.payload.transaction).toBeNull();
   });
 
-  it.skip("payload with open transaction", () => {
-    // BLOCKED: query-cache — concrete adapters (SQLite3, PostgreSQL) bypass TransactionManager
-    // in beginTransaction(); currentTransaction().userTransaction is never open through the
-    // QueryCacheAdapter wrapper path. Re-enable when beginTransaction() wires TransactionManager.
+  it("payload with open transaction", async () => {
+    const { cached } = setup();
+    cached.enableQueryCache();
+    const sql = "SELECT 1 AS val";
+    const events: unknown[] = [];
+    const { Notifications } = await import("@blazetrails/activesupport");
+    const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
+    try {
+      await cached.beginTransaction();
+      await cached.execute(sql);
+      await cached.execute(sql); // cache hit
+      await cached.commit();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    const hit = (events as any[]).find(
+      (e) =>
+        e?.payload?.cached === true && e?.payload?.sql === sql && e?.payload?.connection === cached,
+    );
+    expect(hit).toBeDefined();
+    expect(hit.payload.transaction).not.toBeNull();
   });
 });
 

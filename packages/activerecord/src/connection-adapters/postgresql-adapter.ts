@@ -1107,29 +1107,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Begin a transaction. Acquires a dedicated client from the pool.
    */
   async beginTransaction(): Promise<void> {
-    // Routes through `_acquireFreshClient` so the drain runs on every
-    // checkout (a tagged client returned here gets `DEALLOCATE ALL`'d
-    // before BEGIN). Drain failures are released-with-error inside
-    // the helper, so a thrown drain doesn't leak `_client`.
+    // Force materialization (_lazy: false) so _client is acquired and
+    // _inTransaction is set immediately. createSavepoint() uses withClient()
+    // which falls back to a fresh pool connection when _client is null,
+    // causing "SAVEPOINT can only be used in transaction blocks".
+    await this._transactionManager.beginTransaction({ _lazy: false });
+  }
+
+  async beginDbTransaction(): Promise<void> {
     this._client = await this._acquireFreshClient();
     try {
       await this._client.query("BEGIN");
       this._inTransaction = true;
-      // Note: do NOT null `_lastReleasedTxnClient` here. After-rollback
-      // callbacks (rollback_records) run BEFORE TransactionManager's
-      // `after_failure_actions` hook fires; if such a callback opens a
-      // new transaction (this beginTransaction call), nulling the ref
-      // would lose the pointer to the just-failed client and the hook
-      // would clear the wrong pool. The ref is dropped instead inside
-      // `clearCacheBang` after `reset()` — bounded to the failure-hook
-      // window, while still WeakRef-held so pg.Pool can reap idles.
     } catch (error) {
-      // If BEGIN fails (e.g. network blip after connect), release the
-      // acquired client so it returns to the pool. Leaving `_client`
-      // set would leak a pool slot and eventually deadlock acquires.
-      // Pass the error to release() so node-postgres discards the
-      // (potentially damaged) client instead of returning a bad
-      // socket to the idle set.
       const client = this._client;
       this._client = null;
       this._inTransaction = false;
@@ -1138,18 +1128,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
-  async beginDbTransaction(): Promise<void> {
-    return this.beginTransaction();
-  }
-
   async beginDeferredTransaction(): Promise<void> {
-    return this.beginTransaction();
+    return this.beginDbTransaction();
   }
 
   /**
    * Commit the current transaction and release the client.
+   *
+   * Routes through TransactionManager when the TM has an open transaction
+   * (e.g. started by beginTransaction()) so the stack stays in sync.
+   * Falls through to the direct DB path when openTransactions == 0, which
+   * covers: (a) TM calling commitDbTransaction() after already popping the
+   * stack, and (b) beginDbTransaction() + commit() direct pairs in tests.
    */
   async commit(): Promise<void> {
+    if (this._transactionManager.openTransactions > 0) {
+      return this._transactionManager.commitTransaction();
+    }
     if (!this._client) throw new Error("No active transaction");
     await this._client.query("COMMIT");
     // Keep the per-client StatementPool attached through the pg.Pool
@@ -1170,8 +1165,48 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /**
    * Rollback the current transaction and release the client.
+   *
+   * Routes through TransactionManager when the TM has an open transaction.
+   * Falls through to the direct DB path when openTransactions == 0 (e.g.
+   * beginDbTransaction() + rollback() direct pairs). Does NOT call
+   * _cancelAnyRunningQuery() in the direct path — that cancel step is only
+   * safe in the TM path (via execRollbackDbTransaction()) where no
+   * fire-and-forget adapter work is in flight. Calling cancel when statement
+   * pool deallocs are in-flight causes "unexpected commandComplete" errors.
    */
   async rollback(): Promise<void> {
+    if (this._transactionManager.openTransactions > 0) {
+      return this._transactionManager.rollbackTransaction();
+    }
+    if (!this._client) throw new Error("No active transaction");
+    const releasedClient = this._client;
+    let rollbackError: unknown;
+    try {
+      await this._client.query("ROLLBACK");
+    } catch (e) {
+      rollbackError = e;
+    } finally {
+      this._client = null;
+      this._inTransaction = false;
+      releasedClient.release(
+        rollbackError === undefined
+          ? undefined
+          : rollbackError instanceof Error
+            ? rollbackError
+            : new Error(String(rollbackError)),
+      );
+      this._lastReleasedTxnClient = releasedClient;
+    }
+    if (rollbackError !== undefined) throw rollbackError;
+  }
+
+  async rollbackDbTransaction(): Promise<void> {
+    return this.execRollbackDbTransaction();
+  }
+
+  // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
+  async execRollbackDbTransaction(): Promise<void> {
+    this._cancelAnyRunningQuery();
     if (!this._client) throw new Error("No active transaction");
     const releasedClient = this._client;
     let rollbackError: unknown;
@@ -1181,7 +1216,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // If ROLLBACK itself throws (e.g. network drop mid-txn), we still
       // have to release the client or the pool leaks. Rethrow after
       // cleanup. Pass the error to release() so pg.Pool discards the
-      // client rather than returning it to the idle set.
+      // (potentially damaged) client instead of returning a bad
+      // socket to the idle set.
       rollbackError = e;
     } finally {
       // See commit() — ROLLBACK doesn't drop server-side prepared
@@ -1192,7 +1228,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // Normalize to Error before passing to release() — node-postgres
       // expects an Error to discard the client, and downstream code
       // (and our own rethrow path) may read `.message`. Matches the
-      // pattern in beginTransaction's catch.
+      // pattern in beginDbTransaction's catch.
       releasedClient.release(
         rollbackError === undefined
           ? undefined
@@ -1210,16 +1246,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._lastReleasedTxnClient = releasedClient;
     }
     if (rollbackError !== undefined) throw rollbackError;
-  }
-
-  async rollbackDbTransaction(): Promise<void> {
-    return this.execRollbackDbTransaction();
-  }
-
-  // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
-  async execRollbackDbTransaction(): Promise<void> {
-    this._cancelAnyRunningQuery();
-    return this.rollback();
   }
 
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
