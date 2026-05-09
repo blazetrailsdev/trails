@@ -138,8 +138,7 @@ describe("DirtyTest", () => {
     }
     const parrot = new Parrot();
     expect((parrot as any).titleChanged()).toBe(false);
-    // Rails returns nil; we return undefined (Map lookup miss — pre-existing gap in attributeChange)
-    expect((parrot as any).titleChange()).toBeUndefined();
+    expect((parrot as any).titleChange()).toBeNull();
 
     parrot.name = "Sam";
     expect((parrot as any).titleChanged()).toBe(true);

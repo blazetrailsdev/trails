@@ -1087,10 +1087,9 @@ describe("BasicsTest", () => {
       static tableName = "ghosts_that_do_not_exist";
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
+        this.adapter = { adapterName: "sqlite" } as DatabaseAdapter;
       }
     }
-    // The in-memory test adapter has no schemaCache, so tableExists falls back to true.
     const exists = await Ghost.tableExists();
     expect(exists).toBe(true);
   });
