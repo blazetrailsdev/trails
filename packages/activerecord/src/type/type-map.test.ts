@@ -1,52 +1,88 @@
 import { describe, it, expect } from "vitest";
 import { HashLookupTypeMap } from "./hash-lookup-type-map.js";
-import { ValueType } from "@blazetrails/activemodel";
+import {
+  BooleanType,
+  BinaryType,
+  StringType,
+  TimeType,
+  DateTimeType,
+  ValueType,
+} from "@blazetrails/activemodel";
+import { TypeMap } from "./type-map.js";
 
 describe("TypeMapTest", () => {
-  it.skip("registering types", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+  it("registering types", () => {
+    const boolean = new BooleanType();
+    const mapping = new TypeMap();
+    mapping.registerType(/boolean/i, boolean);
+    expect(mapping.lookup("boolean")).toBe(boolean);
   });
-  it.skip("overriding registered types", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("overriding registered types", () => {
+    const time = new TimeType();
+    const timestamp = new DateTimeType();
+    const mapping = new TypeMap();
+    mapping.registerType(/time/i, time);
+    mapping.registerType(/time/i, timestamp);
+    expect(mapping.lookup("time")).toBe(timestamp);
   });
-  it.skip("aliasing types", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("aliasing types", () => {
+    const string = new StringType();
+    const mapping = new TypeMap();
+    mapping.registerType(/string/i, string);
+    mapping.aliasType(/varchar/i, "string");
+    expect(mapping.lookup("varchar")).toBe(string);
   });
-  it.skip("changing type changes aliases", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("changing type changes aliases", () => {
+    const time = new TimeType();
+    const timestamp = new DateTimeType();
+    const mapping = new TypeMap();
+    mapping.registerType(/timestamp/i, time);
+    mapping.aliasType(/datetime/i, "timestamp");
+    mapping.registerType(/timestamp/i, timestamp);
+    expect(mapping.lookup("datetime")).toBe(timestamp);
   });
-  it.skip("aliases keep metadata", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("aliases keep metadata", () => {
+    const mapping = new TypeMap();
+    mapping.registerType(/decimal/i, undefined, (sqlType: string) => sqlType as any);
+    mapping.aliasType(/number/i, "decimal");
+    expect(mapping.lookup("number(20)")).toBe("decimal(20)");
+    expect(mapping.lookup("number")).toBe("decimal");
   });
-  it.skip("fuzzy lookup", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("fuzzy lookup", () => {
+    const string = new StringType();
+    const mapping = new TypeMap();
+    mapping.registerType(/varchar/i, string);
+    expect(mapping.lookup("varchar(20)")).toBe(string);
   });
-  it.skip("register proc", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("register proc", () => {
+    const string = new StringType();
+    const binary = new BinaryType();
+    const mapping = new TypeMap();
+    mapping.registerType(/varchar/i, undefined, (type: string) =>
+      type.includes("(") ? string : binary,
+    );
+    expect(mapping.lookup("varchar(20)")).toBe(string);
+    expect(mapping.lookup("varchar")).toBe(binary);
   });
-  it.skip("parent fallback", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("parent fallback", () => {
+    const boolean = new BooleanType();
+    const parent = new TypeMap();
+    parent.registerType(/boolean/i, boolean);
+    const mapping = new TypeMap(parent);
+    expect(mapping.lookup("boolean")).toBe(boolean);
   });
-  it.skip("parent fallback for default type", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in type-map
-    // ROOT-CAUSE: type/type-map.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in type-map.test.ts
+
+  it("parent fallback for default type", () => {
+    const parent = new TypeMap();
+    const mapping = new TypeMap(parent);
+    expect(mapping.lookup("undefined_key")).toBeInstanceOf(ValueType);
   });
 });
 

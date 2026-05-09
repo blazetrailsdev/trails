@@ -34,7 +34,7 @@ export class TypeMap {
     this._cache.clear();
   }
 
-  aliasType(key: string, targetKey: string): void {
+  aliasType(key: string | RegExp, targetKey: string): void {
     this.registerType(key, undefined, (sqlType: string) => {
       const metadata = sqlType.match(/\(.*\)/)?.[0] ?? "";
       return this.lookup(`${targetKey}${metadata}`);
