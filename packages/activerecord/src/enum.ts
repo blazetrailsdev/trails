@@ -10,7 +10,7 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 interface EnumDefinition {
   attribute: string;
-  mapping: Map<string, number>;
+  mapping: Map<string, number | string>;
   type: EnumType;
 }
 
@@ -47,10 +47,10 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
-  valuesInput: string[] | Record<string, number>,
+  valuesInput: string[] | Record<string, string | number>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
-  const mapping = new Map<string, number>();
+  const mapping = new Map<string, string | number>();
 
   if (Array.isArray(valuesInput)) {
     valuesInput.forEach((name, index) => {
@@ -63,9 +63,15 @@ export function defineEnum(
   }
 
   const defs = getEnumDefinitions(modelClass);
-  const enumType = new EnumType(attribute, mapping, "integer");
+  let subtype: string;
+  try {
+    const t = modelClass.typeForAttribute(attribute).type();
+    subtype = t === "value" || t === "big_integer" ? "integer" : t;
+  } catch {
+    subtype = "integer";
+  }
+  const enumType = new EnumType(attribute, mapping, subtype);
   const def: EnumDefinition = { attribute, mapping, type: enumType };
-  defs.set(attribute, def);
 
   // Compute prefix/suffix for method names
   const prefixStr =
@@ -88,22 +94,75 @@ export function defineEnum(
     return name;
   };
 
-  // Camel-case a method name: "status_draft" -> "statusDraft"
   const toCamel = (s: string) => camelize(s, false);
 
-  // Define scopes for each enum value
-  for (const [name, value] of mapping) {
-    const scopeName = toCamel(methodName(name));
-    modelClass.scope(scopeName, (rel: any) => rel.where({ [attribute]: value }));
+  for (const [name] of mapping) {
+    const fullName = toCamel(methodName(name));
+    const capitalizedFullName = camelize(methodName(name));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const notScopeName = `not${capitalizedFullName}`;
+    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
+
+    if (predicateName in (modelClass.prototype as object))
+      raiseConflictError.call(modelClass, attribute, predicateName);
+    if (bangName in (modelClass.prototype as object))
+      raiseConflictError.call(modelClass, attribute, bangName);
+    if (fullName in (modelClass as object))
+      raiseConflictError.call(modelClass, attribute, fullName, { type: "class" });
+    if (notScopeName in (modelClass as object))
+      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
+    if (friendlyName !== fullName) {
+      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      if (fp in (modelClass.prototype as object))
+        raiseConflictError.call(modelClass, attribute, fp);
+      if (`${friendlyName}Bang` in (modelClass.prototype as object))
+        raiseConflictError.call(modelClass, attribute, `${friendlyName}Bang`);
+      if (friendlyName in (modelClass as object))
+        raiseConflictError.call(modelClass, attribute, friendlyName, { type: "class" });
+      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      if (notFriendlyName in (modelClass as object))
+        raiseConflictError.call(modelClass, attribute, notFriendlyName, { type: "class" });
+    }
   }
 
-  // Define instance methods on the prototype
+  defs.set(attribute, def);
+
   for (const [name, value] of mapping) {
     const fullName = toCamel(methodName(name));
     const capitalizedFullName = camelize(methodName(name));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const notScopeName = `not${capitalizedFullName}`;
+    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    // Predicate: record.isDraft() or record.isStatusDraft()
-    Object.defineProperty(modelClass.prototype, `is${capitalizedFullName}`, {
+    modelClass.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
+
+    if (friendlyName !== fullName) {
+      modelClass.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
+      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      modelClass.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
+      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      Object.defineProperty(modelClass.prototype, fp, {
+        value: function (this: Base) {
+          return this.readAttribute(attribute) === value;
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(modelClass.prototype, `${friendlyName}Bang`, {
+        value: async function (this: any) {
+          this.writeAttribute(attribute, value);
+          if (this.isPersisted()) {
+            await this.updateColumn(attribute, value);
+          }
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    Object.defineProperty(modelClass.prototype, predicateName, {
       value: function (this: Base) {
         return this.readAttribute(attribute) === value;
       },
@@ -112,7 +171,7 @@ export function defineEnum(
     });
 
     // Setter: record.draft() or record.statusDraft() — sets the value in memory
-    if (!Object.hasOwn(modelClass.prototype, fullName)) {
+    if (!(fullName in (modelClass.prototype as object))) {
       Object.defineProperty(modelClass.prototype, fullName, {
         value: function (this: Base) {
           this.writeAttribute(attribute, value);
@@ -123,7 +182,6 @@ export function defineEnum(
     }
 
     // Bang setter: record.draftBang() or record.statusDraftBang()
-    const bangName = `${fullName}Bang`;
     Object.defineProperty(modelClass.prototype, bangName, {
       value: async function (this: any) {
         this.writeAttribute(attribute, value);
@@ -136,7 +194,6 @@ export function defineEnum(
     });
 
     // whereNot scope: Model.notDraft() or Model.notStatusDraft()
-    const notScopeName = `not${capitalizedFullName}`;
     modelClass.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
   }
 }
@@ -544,19 +601,19 @@ export function readEnumValue(record: Base, attribute: string): string | null {
 }
 
 /**
- * Cast an enum value (string name or number) to its integer storage value.
- * Delegates to EnumType.serialize for the mapping lookup.
+ * Cast an enum value (string name or number) to its storage value (integer or string,
+ * depending on the attribute subtype). Delegates to EnumType.serialize for the mapping lookup.
  */
 export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,
   value: unknown,
-): number | null {
+): number | string | null {
   const defs = getEnumDefinitions(modelClass);
   const def = defs.get(attribute);
   if (!def) return null;
 
-  return def.type.serialize(value) as number | null;
+  return def.type.serialize(value) as number | string | null;
 }
 
 /**
