@@ -974,8 +974,8 @@ function limitBang(this: QueryMethodsHost, value: number | null): any {
   return this;
 }
 
-function offsetBang(this: QueryMethodsHost, value: number): any {
-  this._offsetValue = value;
+function offsetBang(this: QueryMethodsHost, value: number | null): any {
+  this._offsetValue = value === null ? null : Math.trunc(value);
   return this;
 }
 

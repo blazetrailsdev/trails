@@ -92,4 +92,16 @@ describe("MySQL::SchemaCreation", () => {
     expect(sql).toContain("`my_idx`");
     expect(sql).toContain("`email`");
   });
+
+  it("addColumnOptionsBang emits AUTO_INCREMENT when autoIncrement: true", () => {
+    const col = new ColumnDefinition("id", "integer", { autoIncrement: true });
+    const result = (sc as any).addColumnOptionsBang("`id` int(11)", col.options);
+    expect(result).toContain("AUTO_INCREMENT");
+  });
+
+  it("addColumnOptionsBang does not emit AUTO_INCREMENT when not set", () => {
+    const col = new ColumnDefinition("id", "integer", {});
+    const result = (sc as any).addColumnOptionsBang("`id` int(11)", col.options);
+    expect(result).not.toContain("AUTO_INCREMENT");
+  });
 });

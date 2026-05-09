@@ -37,3 +37,38 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     expect(adapter.returnValueAfterInsert(makeColumn())).toBe(false);
   });
 });
+
+describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
+  async function makeAdapter(columnName: string, extra: string, supportsRename = false) {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as any;
+    adapter.supportsRenameColumn = () => supportsRename;
+    adapter.getDatabaseVersion = async () => {};
+    adapter.quoteIdentifier = (s: string) => `\`${s}\``;
+    adapter.columnDefinitions = async (_: string) => [
+      {
+        Field: columnName,
+        Type: "int(11)",
+        Null: "NO",
+        Default: null,
+        Extra: extra,
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    return adapter;
+  }
+
+  it("allows auto_increment Extra without throwing", async () => {
+    const adapter = await makeAdapter("id", "auto_increment");
+    const sql: string = await adapter.renameColumnForAlter("users", "id", "user_id");
+    expect(sql).toContain("AUTO_INCREMENT");
+  });
+
+  it("throws for unrecognised Extra values", async () => {
+    const adapter = await makeAdapter("updated_at", "on update current_timestamp()");
+    await expect(adapter.renameColumnForAlter("users", "updated_at", "ts")).rejects.toThrow(
+      "renameColumnForAlter fallback",
+    );
+  });
+});

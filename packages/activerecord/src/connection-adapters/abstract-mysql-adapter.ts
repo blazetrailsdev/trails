@@ -1191,7 +1191,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // auto_increment?/comment; our ColumnDefinition lacks that field. Throw explicitly so
     // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
     const extra = ((col["Extra"] as string | undefined) ?? "").trim().toLowerCase();
-    if (extra) {
+    if (extra && extra !== "auto_increment") {
       throw new Error(
         `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
           `— Extra="${col["Extra"]}" is not preserved by this path. ` +
@@ -1206,6 +1206,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       null: (col["Null"] as string) === "YES",
       collation: (col["Collation"] as string | undefined) || undefined,
       comment: (col["Comment"] as string | undefined) || undefined,
+      autoIncrement: extra === "auto_increment" || undefined,
     });
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);

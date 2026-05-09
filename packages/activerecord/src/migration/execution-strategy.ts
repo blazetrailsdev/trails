@@ -10,8 +10,8 @@
 import type { DatabaseAdapter } from "../adapter.js";
 
 export interface MigrationLike {
-  up(adapter: DatabaseAdapter): Promise<void>;
-  down(adapter: DatabaseAdapter): Promise<void>;
+  up(adapter?: DatabaseAdapter): Promise<void>;
+  down(adapter?: DatabaseAdapter): Promise<void>;
   /** When true, Migrator skips DDL transaction wrapping for this migration. */
   disableDdlTransaction?: boolean;
   /** Adapter for this migration; mirrors Rails' Migration#connection (@connection field). */

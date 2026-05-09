@@ -23,8 +23,8 @@ import type { DatabaseAdapter } from "./adapter.js";
 function makeMigration(
   version: string,
   name: string,
-  upFn?: (adapter: DatabaseAdapter) => Promise<void>,
-  downFn?: (adapter: DatabaseAdapter) => Promise<void>,
+  upFn?: (adapter?: DatabaseAdapter) => Promise<void>,
+  downFn?: (adapter?: DatabaseAdapter) => Promise<void>,
 ): MigrationProxy {
   return {
     version,
@@ -578,8 +578,8 @@ describe("MigratorTest", () => {
       async exec(
         direction: "up" | "down",
         migration: {
-          up(a: DatabaseAdapter): Promise<void>;
-          down(a: DatabaseAdapter): Promise<void>;
+          up(a?: DatabaseAdapter): Promise<void>;
+          down(a?: DatabaseAdapter): Promise<void>;
         },
         a: DatabaseAdapter,
       ): Promise<void> {

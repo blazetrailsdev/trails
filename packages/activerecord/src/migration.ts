@@ -209,11 +209,14 @@ export abstract class Migration {
   }
 
   private _schema?: SchemaStatements;
+  private _schemaConn?: DatabaseAdapter;
 
   get schema(): SchemaStatements {
-    if (!this._schema) {
-      assertSchemaAdapter(this.adapter);
-      this._schema = new SchemaStatements(this.adapter);
+    const conn = this.connection;
+    if (!this._schema || this._schemaConn !== conn) {
+      assertSchemaAdapter(conn);
+      this._schema = new SchemaStatements(conn);
+      this._schemaConn = conn;
     }
     return this._schema;
   }
@@ -947,7 +950,7 @@ export abstract class Migration {
         await this.down();
       }
     } finally {
-      this._schema = undefined;
+      this._connectionOverride = undefined;
     }
   }
 

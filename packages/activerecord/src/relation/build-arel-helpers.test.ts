@@ -182,3 +182,10 @@ describe("Relation private build-arel helpers", () => {
     });
   });
 });
+
+describe("Relation#offset float truncation", () => {
+  it("truncates float offset to integer via Math.trunc", () => {
+    const r = relation().offset(1.7);
+    expect((r as any)._offsetValue).toBe(1);
+  });
+});
