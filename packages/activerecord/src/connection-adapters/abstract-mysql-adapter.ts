@@ -1190,8 +1190,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // columns) that ColumnOptions cannot express. Rails preserves these via column_for's
     // auto_increment?/comment; our ColumnDefinition lacks that field. Throw explicitly so
     // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
-    const extra = ((col["Extra"] as string | undefined) ?? "").trim().toLowerCase();
-    if (extra && extra !== "auto_increment") {
+    const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
+    const extra = extraRaw.toLowerCase();
+    const onUpdateMatch = extraRaw.match(/^on update (.+)$/i);
+    if (extra && extra !== "auto_increment" && !onUpdateMatch) {
       throw new Error(
         `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
           `— Extra="${col["Extra"]}" is not preserved by this path. ` +
@@ -1207,6 +1209,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       collation: (col["Collation"] as string | undefined) || undefined,
       comment: (col["Comment"] as string | undefined) || undefined,
       autoIncrement: extra === "auto_increment" || undefined,
+      onUpdate: onUpdateMatch ? onUpdateMatch[1] : undefined,
     });
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);

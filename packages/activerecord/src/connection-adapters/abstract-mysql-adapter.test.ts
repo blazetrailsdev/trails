@@ -65,9 +65,16 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).toContain("AUTO_INCREMENT");
   });
 
+  it("preserves on update CURRENT_TIMESTAMP Extra without throwing", async () => {
+    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
+    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
+    expect(sql).toContain("ON UPDATE");
+    expect(sql).toContain("CURRENT_TIMESTAMP");
+  });
+
   it("throws for unrecognised Extra values", async () => {
-    const adapter = await makeAdapter("updated_at", "on update current_timestamp()");
-    await expect(adapter.renameColumnForAlter("users", "updated_at", "ts")).rejects.toThrow(
+    const adapter = await makeAdapter("gen_col", "VIRTUAL GENERATED");
+    await expect(adapter.renameColumnForAlter("users", "gen_col", "gen_col2")).rejects.toThrow(
       "renameColumnForAlter fallback",
     );
   });
