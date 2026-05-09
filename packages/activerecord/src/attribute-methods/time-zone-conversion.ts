@@ -2,7 +2,7 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
 import type { Type } from "@blazetrails/activemodel";
-import { ValueType } from "@blazetrails/activemodel";
+import { ValueType, configuredTimezone } from "@blazetrails/activemodel";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
@@ -52,7 +52,22 @@ export class TimeZoneConverter extends ValueType<unknown> {
     if (value instanceof TimeWithZone) {
       return convertTimeToTimeZone(value);
     }
-    // String, Temporal.Instant, etc.: cast via subtype then wrap in zone.
+    // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
+    // take the respond_to?(:in_time_zone) branch and are parsed as local to
+    // Time.zone (user_input_in_time_zone = value.in_time_zone = zone.parse(value)).
+    // Without this, subtype would interpret the string in default_timezone and
+    // convertTimeToTimeZone would only shift display — wrong underlying instant.
+    if (typeof value === "string") {
+      const zone = getZone();
+      if (zone) {
+        try {
+          return zone.parse(value);
+        } catch {
+          return null;
+        }
+      }
+    }
+    // Temporal.Instant, etc.: cast via subtype then wrap in zone.
     // For array-like results (e.g. Range types), recurse cast() on each element
     // to mirror Rails' `map(super) { |v| cast(v) }`.
     const casted = this._subtype.cast(value);
@@ -118,10 +133,12 @@ function setTimeZoneWithoutConversion(value: unknown): unknown {
   const zone = getZone();
   if (!zone) return value;
   if (value instanceof Temporal.Instant) {
-    // The subtype cast treats multiparameter hash components as UTC wall-clock
-    // values. Re-interpret those wall-clock components as local time in the
-    // current zone (mirrors Time.zone.local_to_utc(localTime).in_time_zone).
-    const dt = value.toZonedDateTimeISO("UTC").toPlainDateTime();
+    // AcceptsMultiparameterTime builds the instant by interpreting components
+    // in configuredTimezone() (UTC when default_timezone is :utc, host-local
+    // when :local). Extract wall-clock components using the SAME timezone so
+    // we get the original component values, then re-interpret them as local
+    // time in the current zone (mirrors Time.zone.local_to_utc(t).in_time_zone).
+    const dt = value.toZonedDateTimeISO(configuredTimezone()).toPlainDateTime();
     return zone.local(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.millisecond);
   }
   if (value instanceof TimeWithZone) {

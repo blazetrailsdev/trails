@@ -52,16 +52,32 @@ describe("TimeZoneConverterTest", () => {
     expect(twz.toI()).toBe(pacificTime.toI()); // same instant
   });
 
-  it("cast parses string via subtype then wraps in TimeWithZone", () => {
-    setZone("UTC");
+  it("cast parses offset-less string as local to current zone (not default_timezone)", () => {
+    setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
+    // "10:30:00" with no offset → should be 10:30 local Eastern, not 10:30 UTC
     const result = converter.cast("2024-06-15 10:30:00");
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
-    expect(twz.year).toBe(2024);
-    expect(twz.month).toBe(6);
-    expect(twz.day).toBe(15);
+    // Wall-clock in the zone must be 10:30 (not 06:30 as wrong UTC-then-display would give)
     expect(twz.hour).toBe(10);
+    expect(twz.min).toBe(30);
+    expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
+    // UTC instant should be 14:30 (10:30 EDT = UTC+4 in summer)
+    expect(twz.utc().epochMilliseconds).toBe(
+      Temporal.Instant.from("2024-06-15T14:30:00Z").epochMilliseconds,
+    );
+  });
+
+  it("cast parses string with offset as absolute instant then wraps in zone", () => {
+    setZone("UTC");
+    const converter = new TimeZoneConverter(new DateTime());
+    const result = converter.cast("2024-06-15T10:30:00-04:00");
+    expect(result).toBeInstanceOf(TimeWithZone);
+    const twz = result as TimeWithZone;
+    // 10:30 EDT = 14:30 UTC, displayed in UTC zone
+    expect(twz.hour).toBe(14);
+    expect(twz.min).toBe(30);
   });
 
   it("cast returns raw subtype result when no zone is configured", () => {
