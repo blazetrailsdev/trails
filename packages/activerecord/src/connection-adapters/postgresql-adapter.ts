@@ -1132,6 +1132,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Commit the current transaction and release the client.
    */
   async commit(): Promise<void> {
+    return this._transactionManager.commitTransaction();
+  }
+
+  async commitDbTransaction(): Promise<void> {
     if (!this._client) throw new Error("No active transaction");
     await this._client.query("COMMIT");
     // Keep the per-client StatementPool attached through the pg.Pool
@@ -1146,15 +1150,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._inTransaction = false;
   }
 
-  async commitDbTransaction(): Promise<void> {
-    return this.commit();
-  }
-
   /**
    * Rollback the current transaction and release the client.
    */
   async rollback(): Promise<void> {
-    if (!this._client) throw new Error("No active transaction");
+    return this._transactionManager.rollbackTransaction();
+  }
+
+  async rollbackDbTransaction(): Promise<void> {
+    return this.execRollbackDbTransaction();
+  }
+
+  // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
+  async execRollbackDbTransaction(): Promise<void> {
+    this._cancelAnyRunningQuery();
+    if (!this._client) return; // lazy transaction never materialized — nothing to roll back on the DB
     const releasedClient = this._client;
     let rollbackError: unknown;
     try {
@@ -1163,10 +1173,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // If ROLLBACK itself throws (e.g. network drop mid-txn), we still
       // have to release the client or the pool leaks. Rethrow after
       // cleanup. Pass the error to release() so pg.Pool discards the
-      // client rather than returning it to the idle set.
+      // (potentially damaged) client instead of returning it to the idle set.
       rollbackError = e;
     } finally {
-      // See commit() — ROLLBACK doesn't drop server-side prepared
+      // See commitDbTransaction() — ROLLBACK doesn't drop server-side prepared
       // statements, so we keep the pool attached to the pg.PoolClient
       // for the duration of the connection's life.
       this._client = null;
@@ -1174,7 +1184,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // Normalize to Error before passing to release() — node-postgres
       // expects an Error to discard the client, and downstream code
       // (and our own rethrow path) may read `.message`. Matches the
-      // pattern in beginTransaction's catch.
+      // pattern in beginDbTransaction's catch.
       releasedClient.release(
         rollbackError === undefined
           ? undefined
@@ -1192,16 +1202,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._lastReleasedTxnClient = releasedClient;
     }
     if (rollbackError !== undefined) throw rollbackError;
-  }
-
-  async rollbackDbTransaction(): Promise<void> {
-    return this.execRollbackDbTransaction();
-  }
-
-  // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
-  async execRollbackDbTransaction(): Promise<void> {
-    this._cancelAnyRunningQuery();
-    return this.rollback();
   }
 
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
