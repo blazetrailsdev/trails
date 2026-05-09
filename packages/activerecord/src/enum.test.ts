@@ -401,11 +401,23 @@ describe("EnumTest", () => {
     expect(readEnumValue(b, "status")).toBe("published");
   });
 
-  it.skip("enum with string column", () => {
-    // BLOCKED: type — enum type feature gap
-    // ROOT-CAUSE: enum.ts#defineEnum or EnumType missing Rails parity for enum scopes / predicates
-    // SCOPE: ~50 LOC fix in enum.ts; affects ~10 tests in enum.test.ts
-    /* needs string-based enum mapping support */
+  it("enum with string column", async () => {
+    class Post extends Base {
+      static _tableName = "posts";
+    }
+    Post.attribute("id", "integer");
+    Post.attribute("color", "string");
+    Post.adapter = freshAdapter();
+    defineEnum(Post, "color", { red: "red", green: "green", blue: "blue" });
+    const p = new Post({ color: "red" });
+    expect(readEnumValue(p, "color")).toBe("red");
+    expect((p as any).isRed()).toBe(true);
+    expect((p as any).isGreen()).toBe(false);
+    await Post.create({ color: "red" });
+    await Post.create({ color: "green" });
+    const reds = await (Post as any).red().toArray();
+    expect(reds.length).toBe(1);
+    expect(readEnumValue(reds[0], "color")).toBe("red");
   });
 
   it("enum without scope", async () => {

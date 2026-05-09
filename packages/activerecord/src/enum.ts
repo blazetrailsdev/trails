@@ -10,7 +10,7 @@ import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 interface EnumDefinition {
   attribute: string;
-  mapping: Map<string, number>;
+  mapping: Map<string, number | string>;
   type: EnumType;
 }
 
@@ -47,10 +47,10 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
 export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
-  valuesInput: string[] | Record<string, number>,
+  valuesInput: string[] | Record<string, string | number>,
   options?: { prefix?: boolean | string; suffix?: boolean | string },
 ): void {
-  const mapping = new Map<string, number>();
+  const mapping = new Map<string, string | number>();
 
   if (Array.isArray(valuesInput)) {
     valuesInput.forEach((name, index) => {
@@ -63,7 +63,13 @@ export function defineEnum(
   }
 
   const defs = getEnumDefinitions(modelClass);
-  const enumType = new EnumType(attribute, mapping, "integer");
+  let subtype = "integer";
+  try {
+    subtype = modelClass.typeForAttribute(attribute).type();
+  } catch {
+    // attribute not registered; default to integer
+  }
+  const enumType = new EnumType(attribute, mapping, subtype);
   const def: EnumDefinition = { attribute, mapping, type: enumType };
   defs.set(attribute, def);
 
@@ -551,12 +557,12 @@ export function castEnumValue(
   modelClass: typeof Base,
   attribute: string,
   value: unknown,
-): number | null {
+): number | string | null {
   const defs = getEnumDefinitions(modelClass);
   const def = defs.get(attribute);
   if (!def) return null;
 
-  return def.type.serialize(value) as number | null;
+  return def.type.serialize(value) as number | string | null;
 }
 
 /**
