@@ -128,11 +128,23 @@ describe("DirtyTest", () => {
     expect(typeof t.changed).toBe("boolean");
   });
 
-  it.skip("aliased attribute changes", () => {
-    // BLOCKED: type — dirty type/attribute gap
-    // ROOT-CAUSE: dirty.ts or attribute-methods/dirty.ts missing Rails parity
-    // SCOPE: ~20 LOC fix; affects ~1 test in dirty.test.ts
-    /* needs aliasAttribute to propagate dirty tracking */
+  it("aliased attribute changes", () => {
+    class Parrot extends Base {
+      static {
+        this.attribute("name", "string");
+        this.aliasAttribute("title", "name");
+        this.adapter = adapter;
+      }
+    }
+    const parrot = new Parrot();
+    expect((parrot as any).titleChanged()).toBe(false);
+    // Rails returns nil; we return undefined (Map lookup miss — pre-existing gap in attributeChange)
+    expect((parrot as any).titleChange()).toBeUndefined();
+
+    parrot.name = "Sam";
+    expect((parrot as any).titleChanged()).toBe(true);
+    expect((parrot as any).titleWas()).toBeNull();
+    expect((parrot as any).titleChange()).toEqual((parrot as any).nameChange());
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {

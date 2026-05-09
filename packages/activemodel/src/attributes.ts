@@ -5,6 +5,7 @@ import { AttributeSet } from "./attribute-set.js";
 import {
   AttrNames,
   attributeMissing,
+  defineDirtyAttributeMethods,
   isAttributeMethod as _isAttributeMethod,
   matchedAttributeMethod as _matchedAttributeMethod,
   missingAttribute as _missingAttribute,
@@ -133,65 +134,6 @@ export function attribute(
   }
 
   defineDirtyAttributeMethods(this.prototype, name);
-}
-
-/**
- * Generate per-attribute dirty methods on the prototype, mirroring the
- * method cascade Rails produces via `attribute_method_suffix` /
- * `attribute_method_affix` declarations in
- * activemodel/lib/active_model/dirty.rb.
- *
- * For an attribute `name` the generated methods are:
- *   nameChanged, nameChange, nameWas,
- *   nameInDatabase, nameBeforeLastSave,
- *   namePreviouslyChanged, namePreviousChange, namePreviouslyWas,
- *   savedChangeToName, willSaveChangeToName,
- *   restoreName
- *
- * Each forwards to the corresponding generic `attributeX(name, ...)` on
- * Model, so subclasses can override the generic and have the
- * per-attribute form pick up the change automatically. Skips any method
- * that already exists on the prototype (e.g. user-defined).
- */
-function defineDirtyAttributeMethods(prototype: object, attrName: string): void {
-  const cap = attrName.charAt(0).toUpperCase() + attrName.slice(1);
-  const binding: Array<[string, string]> = [
-    [`${attrName}Changed`, "attributeChanged"],
-    [`${attrName}Change`, "attributeChange"],
-    [`${attrName}Was`, "attributeWas"],
-    [`${attrName}InDatabase`, "attributeInDatabase"],
-    [`${attrName}BeforeLastSave`, "attributeBeforeLastSave"],
-    [`${attrName}PreviouslyChanged`, "attributePreviouslyChanged"],
-    [`${attrName}PreviousChange`, "attributePreviousChange"],
-    [`${attrName}PreviouslyWas`, "attributePreviouslyWas"],
-    [`savedChangeTo${cap}`, "savedChangeToAttribute"],
-    [`willSaveChangeTo${cap}`, "willSaveChangeToAttribute"],
-    [`restore${cap}`, "restoreAttribute"],
-  ];
-  for (const [methodName, target] of binding) {
-    if (Object.prototype.hasOwnProperty.call(prototype, methodName)) continue;
-    if (methodName in prototype) continue; // inherited; user/framework took it
-    Object.defineProperty(prototype, methodName, {
-      // Route through attribute_missing(match, ...) so subclasses can
-      // intercept the entire generated cascade by overriding a single
-      // method (Rails attribute_methods.rb:520-522). The match shape
-      // mirrors Rails' AttributeMethodMatch — proxyTarget names the
-      // generic handler; attrName is the bound attribute.
-      value: function (
-        this: {
-          attributeMissing(
-            match: { proxyTarget: string; attrName: string },
-            ...a: unknown[]
-          ): unknown;
-        },
-        ...args: unknown[]
-      ) {
-        return this.attributeMissing({ proxyTarget: target, attrName: attrName }, ...args);
-      },
-      writable: true,
-      configurable: true,
-    });
-  }
 }
 
 // ---------------------------------------------------------------------------
