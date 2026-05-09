@@ -17,6 +17,7 @@ describe("DateTimeTest", () => {
 
   afterAll(async () => {
     await dropAllTables(adapter);
+    vi.unstubAllEnvs();
   });
 
   it.skip("datetime seconds precision applied to timestamp", async () => {
