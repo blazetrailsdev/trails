@@ -1125,7 +1125,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async beginDeferredTransaction(): Promise<void> {
-    return this.beginTransaction();
+    return this.beginDbTransaction();
   }
 
   /**
