@@ -894,7 +894,7 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   get openTransactions(): number {
-    return (this.inner as any).openTransactions ?? 0;
+    return this.inner.openTransactions ?? 0;
   }
 
   emptyInsertStatementValue(pk?: string | null): string {

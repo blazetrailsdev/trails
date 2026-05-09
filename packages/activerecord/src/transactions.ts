@@ -179,9 +179,7 @@ async function _transactionFallback<T>(
   // Also check TM's openTransactions so lazy (unmaterialized) transactions are
   // detected even when adapter.inTransaction is still false.
   const nested =
-    currentTransaction() !== null ||
-    ((adapter as any).openTransactions ?? 0) > 0 ||
-    adapter.inTransaction;
+    currentTransaction() !== null || (adapter.openTransactions ?? 0) > 0 || adapter.inTransaction;
   let releaseLock = nested ? null : await acquireAdapterLock(adapter);
 
   let result: T;
