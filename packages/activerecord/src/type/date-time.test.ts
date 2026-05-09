@@ -31,7 +31,7 @@ describe("DateTimeTest", () => {
       }
     }
 
-    const starting = Temporal.Now.instant().round({ smallestUnit: "microsecond" });
+    const starting = Temporal.Instant.from("2001-02-03T04:05:06.789012Z");
     const p = await (Task as any).create({ starting });
     const reloaded = await (Task as any).find(p.id);
     expect((reloaded as any).starting.epochMicroseconds).toBe(
