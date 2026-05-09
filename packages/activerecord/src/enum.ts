@@ -98,82 +98,48 @@ export function defineEnum(
   // Camel-case a method name: "status_draft" -> "statusDraft"
   const toCamel = (s: string) => camelize(s, false);
 
-  // Collect method names upfront so all conflicts are validated before any
-  // method is defined — mirrors Rails: detect_enum_conflict! is called for
-  // every value before any method is registered, preventing partial state.
-  const valueEntries = [] as Array<{
-    name: string;
-    value: string | number;
-    fullName: string;
-    predicateName: string;
-    bangName: string;
-    scopeName: string;
-    notScopeName: string;
-    friendlyName: string;
-  }>;
+  // Pass 1: validate all conflicts before defining any method (mirrors Rails:
+  // detect_enum_conflict! is called for all values before registration).
+  for (const [name] of mapping) {
+    const fullName = toCamel(methodName(name));
+    const capitalizedFullName = camelize(methodName(name));
+    const predicateName = `is${capitalizedFullName}`;
+    const bangName = `${fullName}Bang`;
+    const notScopeName = `not${capitalizedFullName}`;
+    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
 
+    if (predicateName in (modelClass.prototype as object))
+      raiseConflictError.call(modelClass, attribute, predicateName);
+    if (bangName in (modelClass.prototype as object))
+      raiseConflictError.call(modelClass, attribute, bangName);
+    if (fullName in (modelClass as object))
+      raiseConflictError.call(modelClass, attribute, fullName, { type: "class" });
+    if (notScopeName in (modelClass as object))
+      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
+    if (friendlyName !== fullName) {
+      if (friendlyName in (modelClass as object))
+        raiseConflictError.call(modelClass, attribute, friendlyName, { type: "class" });
+      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+      if (notFriendlyName in (modelClass as object))
+        raiseConflictError.call(modelClass, attribute, notFriendlyName, { type: "class" });
+    }
+  }
+
+  // Register only after all conflicts are validated.
+  defs.set(attribute, def);
+
+  // Pass 2: define all methods.
   for (const [name, value] of mapping) {
     const fullName = toCamel(methodName(name));
     const capitalizedFullName = camelize(methodName(name));
     const predicateName = `is${capitalizedFullName}`;
     const bangName = `${fullName}Bang`;
-    const scopeName = fullName;
     const notScopeName = `not${capitalizedFullName}`;
-    // Method-friendly alias: replace non-word ASCII chars with _, then camelize.
-    // Mirrors Rails: label.gsub(/[\W&&[:ascii:]]+/, "_")
-    const friendlyName = toCamel(methodName(name).replace(/[^\w-￿]+/g, "_"));
+    const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    // Conflict detection (mirrors Rails' detect_enum_conflict!)
-    if (predicateName in (modelClass.prototype as object)) {
-      raiseConflictError.call(modelClass, attribute, predicateName);
-    }
-    if (bangName in (modelClass.prototype as object)) {
-      raiseConflictError.call(modelClass, attribute, bangName);
-    }
-    if (scopeName in (modelClass as object)) {
-      raiseConflictError.call(modelClass, attribute, scopeName, { type: "class" });
-    }
-    if (notScopeName in (modelClass as object)) {
-      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
-    }
-    if (friendlyName !== scopeName) {
-      if (friendlyName in (modelClass as object)) {
-        raiseConflictError.call(modelClass, attribute, friendlyName, { type: "class" });
-      }
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (notFriendlyName in (modelClass as object)) {
-        raiseConflictError.call(modelClass, attribute, notFriendlyName, { type: "class" });
-      }
-    }
+    modelClass.scope(fullName, (rel: any) => rel.where({ [attribute]: value }));
 
-    valueEntries.push({
-      name,
-      value,
-      fullName,
-      predicateName,
-      bangName,
-      scopeName,
-      notScopeName,
-      friendlyName,
-    });
-  }
-
-  // Register only after conflict validation succeeds — keeps enumRegistry atomic.
-  defs.set(attribute, def);
-
-  // Define all scopes and instance methods only after all conflicts are validated.
-  for (const {
-    value,
-    fullName,
-    predicateName,
-    bangName,
-    scopeName,
-    notScopeName,
-    friendlyName,
-  } of valueEntries) {
-    modelClass.scope(scopeName, (rel: any) => rel.where({ [attribute]: value }));
-
-    if (friendlyName !== scopeName) {
+    if (friendlyName !== fullName) {
       modelClass.scope(friendlyName, (rel: any) => rel.where({ [attribute]: value }));
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
       modelClass.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attribute]: value }));
