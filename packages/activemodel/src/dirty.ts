@@ -194,8 +194,8 @@ export class DirtyTracker {
   }
 
   /** @internal */
-  attributeChange(name: string): [unknown, unknown] | undefined {
-    return this._changedAttributes.get(name);
+  attributeChange(name: string): [unknown, unknown] | null {
+    return this._changedAttributes.get(name) ?? null;
   }
 
   changesApplied(

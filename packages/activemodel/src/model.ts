@@ -1638,7 +1638,7 @@ export class Model {
   }
 
   /** @internal */
-  attributeChange(name: string): [unknown, unknown] | undefined {
+  attributeChange(name: string): [unknown, unknown] | null {
     return this._dirty.attributeChange(resolveAliasName(this.constructor as typeof Model, name));
   }
 
@@ -1647,7 +1647,7 @@ export class Model {
    *
    * Mirrors: ActiveModel::Dirty#will_save_change_to_attribute
    */
-  willSaveChangeToAttributeValues(name: string): [unknown, unknown] | undefined {
+  willSaveChangeToAttributeValues(name: string): [unknown, unknown] | null {
     return this.attributeChange(name);
   }
 
