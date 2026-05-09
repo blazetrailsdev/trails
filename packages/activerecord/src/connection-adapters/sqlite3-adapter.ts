@@ -449,7 +449,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async rollback(): Promise<void> {
-    return this._transactionManager.rollbackTransaction();
+    if (this._transactionManager.openTransactions > 0) {
+      return this._transactionManager.rollbackTransaction();
+    }
+    return this.rollbackDbTransaction();
   }
 
   /**
