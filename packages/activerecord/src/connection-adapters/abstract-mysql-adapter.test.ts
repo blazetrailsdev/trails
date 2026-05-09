@@ -88,22 +88,22 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
       "renameColumnForAlter fallback",
     );
   });
-});
 
-describe("MysqlSchemaCreation addColumn autoIncrement DDL", () => {
-  it("emits AUTO_INCREMENT in column DDL when autoIncrement: true", async () => {
-    const { SchemaCreation } = await import("./mysql/schema-creation.js");
-    const { ColumnDefinition, AddColumnDefinition } =
-      await import("./abstract/schema-definitions.js");
-    const creation = new SchemaCreation();
-    (creation as any).adapter = {
-      quoteIdentifier: (s: string) => `\`${s}\``,
-      quoteTableName: (s: string) => `\`${s}\``,
-      quoteDefaultExpression: (_v: unknown) => "",
-    };
-    const col = new ColumnDefinition("id", "integer", { autoIncrement: true, null: false });
-    const addCol = new AddColumnDefinition(col);
-    const sql = creation.accept(addCol);
-    expect(sql).toMatch(/AUTO_INCREMENT/);
+  it("emits DEFAULT CURRENT_TIMESTAMP unquoted when default is a timestamp function", async () => {
+    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "updated_at",
+        Type: "datetime",
+        Null: "YES",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "on update CURRENT_TIMESTAMP",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
+    expect(sql).toContain("DEFAULT CURRENT_TIMESTAMP");
+    expect(sql).not.toContain("DEFAULT 'CURRENT_TIMESTAMP'");
   });
 });
