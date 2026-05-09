@@ -556,6 +556,14 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner = inner;
   }
 
+  get schemaCache() {
+    return this.inner?.schemaCache;
+  }
+
+  get pool() {
+    return this.inner?.pool ?? this.inner;
+  }
+
   /** Expose created tables for test introspection. */
   get tables(): Set<string> {
     return _createdTables;
