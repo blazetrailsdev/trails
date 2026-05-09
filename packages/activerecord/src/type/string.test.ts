@@ -1,9 +1,41 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { Base } from "../index.js";
+import { createTestAdapter } from "../test-adapter.js";
+import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("StringTypeTest", () => {
-  it.skip("string mutations are detected", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in string
-    // ROOT-CAUSE: type/string.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in string.test.ts
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, { authors: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
+  it("string mutations are detected", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const author = await Author.create({ name: "Sean" });
+    expect(author.changed).toBe(false);
+
+    (author.name as string) += " Griffin";
+    expect((author as any).nameChanged()).toBe(true);
+
+    await author.save();
+    await author.reload();
+
+    expect(author.name).toBe("Sean Griffin");
+    expect(author.changed).toBe(false);
   });
 });

@@ -1,14 +1,27 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { IntegerType } from "@blazetrails/activemodel";
+import { Base } from "../index.js";
+import { createTestAdapter } from "../test-adapter.js";
 
 describe("IntegerTest", () => {
-  it.skip("casting ActiveRecord models", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in integer
-    // ROOT-CAUSE: type/integer.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in integer.test.ts
+  it("casting ActiveRecord models", () => {
+    const type = new IntegerType();
+    const model = new Base();
+    expect(type.cast(model)).toBeNull();
   });
-  it.skip("values which are out of range can be re-assigned", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in integer
-    // ROOT-CAUSE: type/integer.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in integer.test.ts
+
+  it("values which are out of range can be re-assigned", () => {
+    const adapter = createTestAdapter();
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("foo", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const model = new Post();
+    model.foo = 2147483648;
+    model.foo = 1;
+    expect(model.foo).toBe(1);
   });
 });

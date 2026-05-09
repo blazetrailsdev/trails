@@ -3,9 +3,9 @@ import { Time } from "./time.js";
 
 describe("TimeTest", () => {
   it.skip("default year is correct", () => {
-    // BLOCKED: type — type cast/serialize/deserialize gap in time
-    // ROOT-CAUSE: type/time.ts or attribute-types.ts missing Rails parity
-    // SCOPE: ~20–100 LOC fix in type/; affects ~2–18 tests in time.test.ts
+    // BLOCKED: multiparameter hash-key assignment not implemented
+    // Rails: Topic.new(bonus_time: { 4 => 10, 5 => 30 }) uses numeric-keyed
+    // hash form from form helpers; our multiparameter assignment doesn't handle it.
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {
