@@ -11,18 +11,32 @@ const DEFAULT_MAX_SIZE = 100;
 export class Store {
   private _map = new Map<string, Record<string, unknown>[]>();
   private _maxSize: number;
+  private _version: { value: number } | null;
+  private _currentVersion: number;
   enabled = false;
   dirties = true;
 
-  constructor(maxSize: number = DEFAULT_MAX_SIZE) {
+  constructor(maxSize: number = DEFAULT_MAX_SIZE, version: { value: number } | null = null) {
     this._maxSize = maxSize;
+    this._version = version;
+    this._currentVersion = version?.value ?? 0;
+  }
+
+  /** @internal */
+  private checkVersion(): void {
+    if (this._version && this._version.value !== this._currentVersion) {
+      this._map.clear();
+      this._currentVersion = this._version.value;
+    }
   }
 
   get size(): number {
+    this.checkVersion();
     return this._map.size;
   }
 
   get empty(): boolean {
+    this.checkVersion();
     return this._map.size === 0;
   }
 
@@ -31,6 +45,7 @@ export class Store {
   }
 
   get(key: string): Record<string, unknown>[] | undefined {
+    this.checkVersion();
     if (!this.enabled) return undefined;
     const entry = this._map.get(key);
     if (entry) {
@@ -45,6 +60,7 @@ export class Store {
     key: string,
     compute: () => Promise<Record<string, unknown>[]>,
   ): Promise<Record<string, unknown>[]> {
+    this.checkVersion();
     if (!this.enabled) return compute();
 
     const cached = this.get(key);
@@ -123,6 +139,8 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
 export class ConnectionPoolConfiguration {
   private _threadQueryCaches = new QueryCacheRegistry();
   private _queryCacheMaxSize: number | null;
+  private _queryCacheVersion = { value: 0 };
+  private _pinnedConnection: QueryCacheHost | null = null;
 
   constructor(queryCacheConfig?: number | false | null) {
     if (queryCacheConfig === 0 || queryCacheConfig === false) {
@@ -192,12 +210,15 @@ export class ConnectionPoolConfiguration {
   }
 
   clearQueryCache(): void {
+    if (this._pinnedConnection) {
+      this._queryCacheVersion.value++;
+    }
     this.queryCache.clear();
   }
 
   get queryCache(): Store {
     return this._threadQueryCaches.computeIfAbsent("default", () => {
-      return new Store(this._queryCacheMaxSize ?? 0);
+      return new Store(this._queryCacheMaxSize ?? 0, this._queryCacheVersion);
     });
   }
 }
@@ -403,6 +424,9 @@ function cacheNotificationInfo(
   name: string | null | undefined,
   binds: unknown[],
 ): Record<string, unknown> {
+  const userTx = (this as any).currentTransaction?.()?.userTransaction ?? null;
+  const transaction =
+    userTx !== null && typeof userTx?.isOpen === "function" && userTx.isOpen() ? userTx : null;
   return {
     sql,
     binds,
@@ -410,6 +434,7 @@ function cacheNotificationInfo(
     name: name ?? "SQL",
     connection: this,
     cached: true,
+    transaction,
   };
 }
 
