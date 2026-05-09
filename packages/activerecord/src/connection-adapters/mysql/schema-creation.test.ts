@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
 import {
+  AddColumnDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
@@ -103,5 +104,11 @@ describe("MySQL::SchemaCreation", () => {
     const col = new ColumnDefinition("id", "integer", {});
     const result = (sc as any).addColumnOptionsBang("`id` int(11)", col.options);
     expect(result).not.toContain("AUTO_INCREMENT");
+  });
+
+  it("addColumn with autoIncrement: true emits AUTO_INCREMENT in DDL", () => {
+    const col = new ColumnDefinition("id", "integer", { autoIncrement: true, null: false });
+    const sql = sc.accept(new AddColumnDefinition(col));
+    expect(sql).toMatch(/ADD .+ AUTO_INCREMENT/);
   });
 });

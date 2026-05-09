@@ -162,7 +162,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
 
   constructor(inner: DatabaseAdapter, maxSize?: number) {
     this.inner = inner;
-    this.cache = new QueryCacheStore(maxSize);
+    this.cache = new QueryCacheStore(null, maxSize);
   }
 
   get queryCount(): number {

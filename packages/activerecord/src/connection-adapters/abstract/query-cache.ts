@@ -16,7 +16,7 @@ export class Store {
   enabled = false;
   dirties = true;
 
-  constructor(maxSize: number = DEFAULT_MAX_SIZE, version: { value: number } | null = null) {
+  constructor(version: { value: number } | null = null, maxSize: number = DEFAULT_MAX_SIZE) {
     this._maxSize = maxSize;
     this._version = version;
     this._currentVersion = version?.value ?? 0;
@@ -218,7 +218,7 @@ export class ConnectionPoolConfiguration {
 
   get queryCache(): Store {
     return this._threadQueryCaches.computeIfAbsent("default", () => {
-      return new Store(this._queryCacheMaxSize ?? 0, this._queryCacheVersion);
+      return new Store(this._queryCacheVersion, this._queryCacheMaxSize ?? 0);
     });
   }
 }
