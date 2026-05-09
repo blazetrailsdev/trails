@@ -84,6 +84,7 @@ export {
   isUtc as isUtcTimezone,
   defaultTimezone as getDefaultTimezone,
   setDefaultTimezone,
+  configuredTimezone,
 } from "./type/helpers/timezone.js";
 
 import { StringType } from "./type/string.js";

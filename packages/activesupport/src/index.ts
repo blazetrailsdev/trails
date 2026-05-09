@@ -310,6 +310,19 @@ export type { DurationParts } from "./duration.js";
 export { TimeZone, ZONES_MAP } from "./values/time-zone.js";
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
+export {
+  getZone,
+  setZone,
+  resetZone,
+  getZoneDefault,
+  setZoneDefault,
+  useZone,
+  findZone,
+  findZoneBang,
+  current,
+  dateInTimeZone,
+  ArgumentError,
+} from "./time-zone-config.js";
 
 export { Notifications } from "./notifications.js";
 export {

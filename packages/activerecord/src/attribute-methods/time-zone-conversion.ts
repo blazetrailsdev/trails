@@ -2,7 +2,9 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion
  */
 import type { Type } from "@blazetrails/activemodel";
-import { ValueType } from "@blazetrails/activemodel";
+import { ValueType, configuredTimezone } from "@blazetrails/activemodel";
+import { TimeWithZone, TimeZone, getZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 export interface TimeZoneConversion {
@@ -41,9 +43,41 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
   override cast(value: unknown): unknown {
     if (value == null) return null;
-    // TODO: requires TimeWithZone — in_time_zone branch via user_input_in_time_zone(value)
-    // Fallback mirrors: map(super) { |v| cast(v) } — delegate to subtype
-    return this._subtype.cast(value);
+    // Hash (multiparameter attributes): cast via subtype, then treat wall-clock
+    // components as local time in the current zone (set_time_zone_without_conversion).
+    if (isPlainObject(value)) {
+      return setTimeZoneWithoutConversion(this._subtype.cast(value));
+    }
+    // TimeWithZone: move to current zone.
+    if (value instanceof TimeWithZone) {
+      return convertTimeToTimeZone(value);
+    }
+    // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
+    // take the respond_to?(:in_time_zone) branch and are parsed as local to
+    // Time.zone (user_input_in_time_zone = value.in_time_zone = zone.parse(value)).
+    // Without this, subtype would interpret the string in default_timezone and
+    // convertTimeToTimeZone would only shift display — wrong underlying instant.
+    // Parse inline (not via zone.parse()) to preserve full nanosecond precision.
+    if (typeof value === "string") {
+      const zone = getZone();
+      if (zone) {
+        // Mirrors Rails' `super(user_input_in_time_zone(value)) || super`:
+        // parse in the current zone; fall back to subtype cast if the format
+        // isn't recognized (preserves support for formats parseStringInZone
+        // doesn't handle, e.g. non-standard strings the subtype accepts).
+        const parsed = parseStringInZone(value, zone);
+        if (parsed !== null) return parsed;
+        return convertTimeToTimeZone(this._subtype.cast(value));
+      }
+    }
+    // Temporal.Instant, etc.: cast via subtype then wrap in zone.
+    // For array-like results (e.g. Range types), recurse cast() on each element
+    // to mirror Rails' `map(super) { |v| cast(v) }`.
+    const casted = this._subtype.cast(value);
+    if (Array.isArray(casted)) {
+      return casted.map((v) => this.cast(v));
+    }
+    return convertTimeToTimeZone(casted);
   }
 
   override deserialize(value: unknown): unknown {
@@ -51,17 +85,23 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 
   override serialize(value: unknown): unknown {
-    return this._subtype.serialize(value);
+    // Rails' DelegateClass forwards serialize to the subtype, which calls
+    // cast_value on it. In Ruby, TimeWithZone acts_like?(:time) so AR's
+    // DateTime type can handle it. In TS, DateTime.castValue() can't parse
+    // a TimeWithZone — extract the UTC Temporal.Instant first.
+    const resolved = value instanceof TimeWithZone ? value.utc() : value;
+    return this._subtype.serialize(resolved);
   }
 
   override serializeCastValue(value: unknown): unknown {
+    const resolved = value instanceof TimeWithZone ? value.utc() : value;
     const sub = this._subtype as ValueTypeInstance;
     if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
       return sub.itselfIfSerializeCastValueCompatible()
-        ? sub.serializeCastValue(value as any)
-        : this._subtype.serialize(value);
+        ? sub.serializeCastValue(resolved as any)
+        : this._subtype.serialize(resolved);
     }
-    return this._subtype.serialize(value);
+    return this._subtype.serialize(resolved);
   }
 
   override equals(other: Type): boolean {
@@ -79,19 +119,99 @@ function convertTimeToTimeZone(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((v) => convertTimeToTimeZone(v));
   }
-  // TODO: requires TimeWithZone — value.in_time_zone for time-like values
+  const zone = getZone();
+  if (!zone) return value;
+  if (value instanceof TimeWithZone) {
+    return value.inTimeZone(zone);
+  }
+  if (value instanceof Temporal.Instant) {
+    return new TimeWithZone(value, zone);
+  }
   return value;
 }
 
 /** @internal */
 function setTimeZoneWithoutConversion(value: unknown): unknown {
-  if (value == null) return value;
-  // TODO: requires TimeWithZone — Time.zone.local_to_utc(value).try(:in_time_zone)
+  if (value == null) return null;
+  const zone = getZone();
+  if (!zone) return value;
+  if (value instanceof Temporal.Instant) {
+    // AcceptsMultiparameterTime builds the instant by interpreting components
+    // in configuredTimezone() (UTC when default_timezone is :utc, host-local
+    // when :local). Extract wall-clock components using the SAME timezone so
+    // we get the original component values, then re-interpret them as local
+    // time in the current zone (mirrors Time.zone.local_to_utc(t).in_time_zone).
+    const zoned = value.toZonedDateTimeISO(configuredTimezone());
+    const pdt = zoned.toPlainDateTime();
+    // zone.local() takes milliseconds; get the ms-level result with correct DST
+    // disambiguation, then add back sub-millisecond precision from the original.
+    const base = zone.local(
+      pdt.year,
+      pdt.month,
+      pdt.day,
+      pdt.hour,
+      pdt.minute,
+      pdt.second,
+      pdt.millisecond,
+    );
+    const subMs = zoned.microsecond * 1000 + zoned.nanosecond;
+    if (subMs === 0) return base;
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
+      zone,
+    );
+  }
+  if (value instanceof TimeWithZone) {
+    return value.inTimeZone(zone);
+  }
   return value;
 }
 
-// Silence unused-variable warnings until TimeWithZone is implemented.
-void setTimeZoneWithoutConversion;
+/** @internal */
+function parseStringInZone(value: string, zone: TimeZone): TimeWithZone | null {
+  try {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    // Normalize space separator → T first (e.g. "2024-06-15 10:30:00-04:00").
+    const withT = trimmed.replace(" ", "T");
+    // Detect offset: Z/z, ±HH:MM, ±HHMM, or short ±HH (without minutes).
+    if (/[Zz]$|[+-]\d{2}(?::?\d{2})?$/.test(withT)) {
+      // Normalize short offsets ±HH → ±HH:00 so Temporal.Instant.from() accepts them.
+      const normalized = withT.replace(/([-+]\d{2})$/, "$1:00");
+      return new TimeWithZone(Temporal.Instant.from(normalized), zone);
+    }
+    // No offset → wall-clock components local to the current zone.
+    // Date-only strings ("YYYY-MM-DD") → midnight, matching Rails' in_time_zone behavior.
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(withT);
+    const datetimeStr = isDateOnly ? `${withT}T00:00:00` : withT;
+    const pdt = Temporal.PlainDateTime.from(datetimeStr, { overflow: "reject" });
+    // zone.local() gives correct DST disambiguation at millisecond precision;
+    // add back sub-millisecond precision (microseconds + nanoseconds) separately.
+    const base = zone.local(
+      pdt.year,
+      pdt.month,
+      pdt.day,
+      pdt.hour,
+      pdt.minute,
+      pdt.second,
+      pdt.millisecond,
+    );
+    const subMs = pdt.microsecond * 1000 + pdt.nanosecond;
+    if (subMs === 0) return base;
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
+      zone,
+    );
+  } catch {
+    return null;
+  }
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+}
 
 interface TimeZoneConversionHost {
   timeZoneAwareAttributes: boolean;
