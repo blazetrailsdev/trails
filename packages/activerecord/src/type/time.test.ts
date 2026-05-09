@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Time } from "./time.js";
 
 describe("TimeTest", () => {
-  it.skip("default year is correct", () => {
-    // BLOCKED: multiparameter hash-key assignment not implemented
-    // Rails: Topic.new(bonus_time: { 4 => 10, 5 => 30 }) uses numeric-keyed
-    // hash form from form helpers; our multiparameter assignment doesn't handle it.
+  it("default year is correct", () => {
+    const type = new Time();
+    const result = type.cast({ 4: 10, 5: 30 }) as Temporal.PlainTime;
+    expect(result).toBeInstanceOf(Temporal.PlainTime);
+    expect(result.hour).toBe(10);
+    expect(result.minute).toBe(30);
+    expect(result.second).toBe(0);
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {

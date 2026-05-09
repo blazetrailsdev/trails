@@ -221,6 +221,6 @@ describe("NullMutationTracker", () => {
     expect(tracker.changes()).toEqual({});
     expect(tracker.isChanged("anything")).toBe(false);
     expect(tracker.originalValue("anything")).toBeUndefined();
-    expect(tracker.changeToAttribute("anything")).toBeUndefined();
+    expect(tracker.changeToAttribute("anything")).toBeNull();
   });
 });

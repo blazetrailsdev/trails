@@ -68,6 +68,11 @@ describe("DirtyTest", () => {
     expect(p.attributeChange("name")).toEqual(["Alice", "Bob"]);
   });
 
+  it("attributeChange returns null when attribute is unchanged", () => {
+    const p = new DirtyPerson({ name: "Alice" });
+    expect(p.attributeChange("name")).toBeNull();
+  });
+
   it("checking if an attribute has changed to a particular value", () => {
     const p = new DirtyPerson({ name: "Alice" });
     p.writeAttribute("name", "Bob");

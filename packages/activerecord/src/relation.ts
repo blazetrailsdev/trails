@@ -844,7 +844,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#offset
    */
-  offset(value: number): Relation<T> {
+  offset(value: number | null): Relation<T> {
     return this._clone().offsetBang(value);
   }
 

@@ -71,11 +71,11 @@ export class AttributeMutationTracker {
     return result;
   }
 
-  changeToAttribute(name: string): [unknown, unknown] | undefined {
+  changeToAttribute(name: string): [unknown, unknown] | null {
     if (this.isChanged(name)) {
       return [this.originalValue(name), this.fetchValue(name)];
     }
-    return undefined;
+    return null;
   }
 
   anyChanges(): boolean {
@@ -162,7 +162,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     return false;
   }
 
-  changeToAttribute(name: string): [unknown, unknown] | undefined {
+  changeToAttribute(name: string): [unknown, unknown] | null {
     if (
       this.finalizedChanges &&
       Object.prototype.hasOwnProperty.call(this.finalizedChanges, name)
@@ -217,8 +217,8 @@ export class NullMutationTracker {
     return {};
   }
 
-  changeToAttribute(_name: string): [unknown, unknown] | undefined {
-    return undefined;
+  changeToAttribute(_name: string): [unknown, unknown] | null {
+    return null;
   }
 
   anyChanges(): boolean {

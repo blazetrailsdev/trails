@@ -12,6 +12,13 @@ import { Type } from "../value.js";
  * into a single Temporal.PlainDateTime and delegates to the wrapped type,
  * which extracts what it needs (PlainDate, PlainTime, or PlainDateTime).
  */
+/** @internal */
+export function isNumericKeyHash(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const keys = Object.keys(value as Record<string, unknown>);
+  return keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+}
+
 export class AcceptsMultiparameterTime {
   readonly type: Type;
   /** @internal */
@@ -54,9 +61,7 @@ export class AcceptsMultiparameterTime {
   }
 
   private isMultiparameterHash(value: unknown): boolean {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-    const keys = Object.keys(value as Record<string, unknown>);
-    return keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+    return isNumericKeyHash(value);
   }
 
   private castFromMultiparameter(hash: Record<string, unknown>): unknown {
