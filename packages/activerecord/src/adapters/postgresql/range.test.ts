@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 const toInt = (s: string) => parseInt(s, 10);
@@ -18,6 +19,10 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.dropRange("floatrange", { ifExists: true });
+    await adapter.dropRange("stringrange", { ifExists: true });
+    await adapter.createRange("floatrange", { subtype: "float8", subtypeDiff: "float8mi" });
+    await adapter.createRange("stringrange", { subtype: "varchar" });
     await adapter.exec(`
       CREATE TABLE postgresql_ranges (
         id serial primary key,
@@ -26,7 +31,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         ts_range tsrange,
         tstz_range tstzrange,
         int4_range int4range,
-        int8_range int8range
+        int8_range int8range,
+        float_range floatrange,
+        string_range stringrange
       )
     `);
     await adapter.loadAdditionalTypes();
@@ -42,6 +49,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
+    await adapter.dropRange("floatrange", { ifExists: true });
+    await adapter.dropRange("stringrange", { ifExists: true });
     await adapter.close();
   });
 
@@ -220,32 +229,59 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].date_range).toBeDefined();
     });
 
-    it.skip("custom range column", async () => {
-      // BLOCKED: range — custom range type setup missing from beforeEach
-      // ROOT-CAUSE: beforeEach doesn't CREATE TYPE floatrange/stringrange AS RANGE or add float_range/string_range columns;
-      //   TypeMapInitializer already handles typtype='r' rows so no core OID gap exists
-      // SCOPE: ~25 LOC — extend beforeEach + write assertion body; affects 4 custom-range tests
+    it("custom range column", async () => {
+      await adapter.execute(`INSERT INTO postgresql_ranges (float_range) VALUES ('[0.5,0.7]')`);
+      const rows = await adapter.execute(`SELECT float_range FROM postgresql_ranges`);
+      const range = parseRange(rows[0].float_range as string, toFloat)!;
+      expect(range).toBeInstanceOf(Range);
+      expect(range.begin).toBeCloseTo(0.5);
+      expect(range.end).toBeCloseTo(0.7);
+      expect(range.excludeEnd).toBe(false);
     });
-    it.skip("custom range type cast", async () => {
-      // BLOCKED: range — custom range type setup missing from beforeEach
-      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
+    it("custom range type cast", () => {
+      const range = parseRange("[0.5,0.7)", toFloat)!;
+      expect(range.begin).toBeCloseTo(0.5);
+      expect(range.end).toBeCloseTo(0.7);
+      expect(range.excludeEnd).toBe(true);
     });
-    it.skip("custom range write", async () => {
-      // BLOCKED: range — custom range type setup missing from beforeEach
-      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
+    it("custom range write", async () => {
+      await adapter.execute(`INSERT INTO postgresql_ranges (float_range) VALUES ('[0.5,0.7)')`);
+      const rows = await adapter.execute(`SELECT float_range FROM postgresql_ranges`);
+      const range = parseRange(rows[0].float_range as string, toFloat)!;
+      expect(range.begin).toBeCloseTo(0.5);
+      expect(range.end).toBeCloseTo(0.7);
+      expect(range.excludeEnd).toBe(true);
     });
-    it.skip("range schema dump", async () => {
-      // BLOCKED: range — range SQL types absent from SQL_TYPE_MAP / DSL_HELPER_METHODS
-      // ROOT-CAUSE: schema-dumper.ts SQL_TYPE_MAP has no entries for int4range, int8range, numrange,
-      //   daterange, tsrange, tstzrange; sqlTypeToDsl() hits the enum fallback → t.column(name,"int4range")
-      //   instead of the dedicated DSL helper; DSL_HELPER_METHODS also needs them to emit t.int4range(...)
-      // SCOPE: ~15 LOC in schema-dumper.ts (SQL_TYPE_MAP + DSL_HELPER_METHODS) + ~10 LOC test body; affects 1 test
+    it("range schema dump", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_ranges");
+      expect(output).toContain('t.int4range("int4_range"');
+      expect(output).toContain('t.int8range("int8_range"');
+      expect(output).toContain('t.numrange("num_range"');
+      expect(output).toContain('t.daterange("date_range"');
+      expect(output).toContain('t.tsrange("ts_range"');
+      expect(output).toContain('t.tstzrange("tstz_range"');
+      expect(output).not.toContain('t.column("int4_range"');
     });
-    it.skip("range migration", async () => {
-      // BLOCKED: range — test body not yet written; no core infra gap expected
-      // ROOT-CAUSE: per-column helpers (int4range(), tstzrange(), daterange(), etc.) exist in schema-definitions.ts;
-      //   test should exercise create_table with range columns; createRange() is only needed for custom range types
-      // SCOPE: ~15 LOC test body; createRange()/dropRange() (~30 LOC) is a separate gap (see custom-range tests)
+    it("range migration", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
+      try {
+        await adapter.createTable("range_migration_test", (t: any) => {
+          t.column("i4", "int4range");
+          t.column("i8", "int8range");
+          t.column("num", "numrange");
+          t.column("dr", "daterange");
+          t.column("tsr", "tsrange");
+          t.column("tstzr", "tstzrange");
+          t.column("fr", "floatrange");
+        });
+        const cols = await adapter.columns("range_migration_test");
+        const names = cols.map((c: any) => c.name);
+        expect(names).toContain("i4");
+        expect(names).toContain("i8");
+        expect(names).toContain("fr");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);
+      }
     });
     it.skip("multirange int4", async () => {
       // BLOCKED: range — multirange types not registered (PG 14+ / Rails 7+)
@@ -381,9 +417,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.begin as string).toContain("2010-01-01");
     });
 
-    it.skip("custom range values", () => {
-      // BLOCKED: range — custom range type setup missing from beforeEach
-      // SCOPE: ~25 LOC shared with "custom range column" fix; affects 4 custom-range tests
+    it("custom range values", () => {
+      // Rails: 0.5..0.7, 0.5...0.7, 0.5...Infinity, -Infinity...Infinity, nil
+      expect(parseRange("[0.5,0.7]", toFloat)!.excludeEnd).toBe(false);
+      expect(parseRange("[0.5,0.7)", toFloat)!.excludeEnd).toBe(true);
+      const endless = parseRange("[0.5,)", toFloat)!;
+      expect(endless.begin).toBeCloseTo(0.5);
+      expect(endless.end).toBeNull();
+      const infinite = parseRange("[,]", toFloat)!;
+      expect(infinite.begin).toBeNull();
+      expect(infinite.end).toBeNull();
+      expect(parseRange("empty", toFloat)).toBeNull();
     });
     it.skip("timezone awareness tzrange", () => {
       // BLOCKED: range — TimeZoneConversion not wired and predicate broken for range types

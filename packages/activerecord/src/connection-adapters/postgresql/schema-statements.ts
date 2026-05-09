@@ -59,6 +59,8 @@ export interface SchemaStatements {
   inheritedTableNames(tableName: string): Promise<string[]>;
   createEnum(name: string, values: string[]): Promise<void>;
   dropEnum(name: string, options?: { ifExists?: boolean }): Promise<void>;
+  createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
+  dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
   renameEnum(name: string, newName: string): Promise<void>;
   addEnumValue(
     name: string,

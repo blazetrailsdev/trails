@@ -140,6 +140,12 @@ const SQL_TYPE_MAP: Record<string, DslMapping> = {
   citext: { dslType: "citext" },
   ltree: { dslType: "ltree" },
   oid: { dslType: "oid" },
+  int4range: { dslType: "int4range" },
+  int8range: { dslType: "int8range" },
+  numrange: { dslType: "numrange" },
+  daterange: { dslType: "daterange" },
+  tsrange: { dslType: "tsrange" },
+  tstzrange: { dslType: "tstzrange" },
   serial: { dslType: "serial" },
   bigserial: { dslType: "bigserial" },
   character: { dslType: "char" },
@@ -165,8 +171,10 @@ const KNOWN_DSL_TYPES = new Set([
 ]);
 
 /**
- * DSL methods that actually exist as helpers on TableDefinition
- * (connection-adapters/abstract/schema-definitions.ts). Types mapped
+ * DSL methods that actually exist as helpers on TableDefinition —
+ * either the abstract base (connection-adapters/abstract/schema-definitions.ts)
+ * or adapter-specific subclasses (e.g. PG range helpers in
+ * connection-adapters/postgresql/schema-definitions.ts). Types mapped
  * to names outside this set are emitted as `t.column(name, sqlType,
  * options)` so the dumped schema loads through MigrationContext
  * without a ReferenceError.
@@ -186,6 +194,12 @@ const DSL_HELPER_METHODS = new Set([
   "binary",
   "json",
   "jsonb",
+  "int4range",
+  "int8range",
+  "numrange",
+  "daterange",
+  "tsrange",
+  "tstzrange",
 ]);
 
 function sqlTypeToDsl(sqlType: string): DslMapping {

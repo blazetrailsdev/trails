@@ -1132,6 +1132,13 @@ export class AbstractAdapter implements Quoting {
 
   async dropEnum(_name: string): Promise<void> {}
 
+  async createRange(
+    _name: string,
+    _options: { subtype: string; subtypeDiff?: string },
+  ): Promise<void> {}
+
+  async dropRange(_name: string, _options?: { ifExists?: boolean }): Promise<void> {}
+
   async renameEnum(_oldName: string, _newName: string): Promise<void> {}
 
   async addEnumValue(_enumName: string, _value: string): Promise<void> {}

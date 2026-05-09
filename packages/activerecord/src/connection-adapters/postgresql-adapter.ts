@@ -3449,6 +3449,50 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
   }
 
+  // ---------------------------------------------------------------------------
+  // Range types
+  // ---------------------------------------------------------------------------
+
+  async createRange(
+    name: string,
+    options: { subtype: string; subtypeDiff?: string },
+  ): Promise<void> {
+    const { schema, table: rangeName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(rangeName)}`
+      : this.quoteIdentifier(rangeName);
+    const quoteQualifiedIdentifier = (identifier: string, param: string) => {
+      if (/[\s()]/.test(identifier)) {
+        throw new Error(
+          `PostgreSQLAdapter#createRange: ${param} must be a simple or schema-qualified identifier ` +
+            `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
+        );
+      }
+      const parts = splitQuotedIdentifier(identifier);
+      if (parts.length === 0 || parts.length > 2) {
+        throw new Error(
+          `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
+        );
+      }
+      const { schema: s, table: t } = this.parseSchemaQualifiedName(identifier);
+      return s ? `${this.quoteIdentifier(s)}.${this.quoteIdentifier(t)}` : this.quoteIdentifier(t);
+    };
+    const parts = [`SUBTYPE = ${quoteQualifiedIdentifier(options.subtype, "subtype")}`];
+    if (options.subtypeDiff) {
+      parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
+    }
+    await this.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
+  }
+
+  async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
+    const { schema, table: rangeName } = this.parseSchemaQualifiedName(name);
+    const qualifiedName = schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(rangeName)}`
+      : this.quoteIdentifier(rangeName);
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    await this.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+  }
+
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
     const newName = typeof newNameOrOptions === "string" ? newNameOrOptions : newNameOrOptions.to;
     const { schema: newSchema } = this.parseSchemaQualifiedName(newName);
