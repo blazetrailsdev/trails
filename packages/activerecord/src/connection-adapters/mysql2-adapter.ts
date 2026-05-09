@@ -559,7 +559,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async rollbackDbTransaction(): Promise<void> {
-    if (!this._conn) return; // no materialized transaction — nothing to roll back
+    if (!this._conn) throw new Error("No active transaction");
     await this._conn.query("ROLLBACK");
     this._conn.release();
     this._conn = null;

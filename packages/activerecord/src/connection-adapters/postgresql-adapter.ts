@@ -1186,7 +1186,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: DatabaseStatements#exec_rollback_db_transaction (database_statements.rb:78)
   async execRollbackDbTransaction(): Promise<void> {
     this._cancelAnyRunningQuery();
-    if (!this._client) return; // no materialized transaction — nothing to roll back on the DB
+    if (!this._client) throw new Error("No active transaction");
     const releasedClient = this._client;
     let rollbackError: unknown;
     try {
