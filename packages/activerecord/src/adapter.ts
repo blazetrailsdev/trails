@@ -246,6 +246,14 @@ export interface DatabaseAdapter {
   readonly openTransactions?: number;
 
   /**
+   * Materialize any unmaterialized (lazy) transactions on the stack.
+   * Only present on adapters with a full TransactionManager.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#materialize_transactions
+   */
+  materializeTransactions?(): Promise<void>;
+
+  /**
    * Schema cache for this adapter's connection pool. Holds table/column
    * metadata so repeated introspection queries are avoided.
    *
