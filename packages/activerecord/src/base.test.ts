@@ -20,9 +20,12 @@ import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
-import { Notifications, Logger } from "@blazetrails/activesupport";
+import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTimezoneConfig } from "./test-helper.js";
+import { adapterType } from "./test-adapter.js";
+import { IntegerType } from "@blazetrails/activemodel";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -1849,34 +1852,40 @@ describe("BasicsTest", () => {
     expect(() => User.limit("1, 7 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
   });
   it.skip("preserving time objects", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures — reads Topic.find(1).written_on / bonus_time with known usec values (223300, 9900, 129346) from topics.yml fixture data; no equivalent in our in-memory test adapter
   });
   it.skip("preserving time objects with local time conversion to default timezone utc", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures + with_env_tz — sets process-level TZ env var (eastern_time_zone) then creates Topic from fixture; Node.js has no equivalent of Ruby's with_env_tz (ENV["TZ"])
   });
   it.skip("preserving time objects with time with zone conversion to default timezone utc", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures + with_env_tz — same as above; uses Time.zone.local(2000) in CST then reloads and checks UTC offset
   });
   it.skip("preserving time objects with utc time conversion to default timezone local", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures + with_env_tz — reads back Time in "local" (EST) timezone via process-level TZ; no JS equivalent
   });
   it.skip("preserving time objects with time with zone conversion to default timezone local", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures + with_env_tz — same as above; Time.zone.local(2000) in CST then reload in EST local
   });
-  it.skip("time zone aware attribute with default timezone utc on utc can be created", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+  it("time zone aware attribute with default timezone utc on utc can be created", async () => {
+    await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
+      class Pet extends Base {
+        static {
+          this.tableName = "tz_pets";
+          this.attribute("name", "string");
+          this.attribute("created_at", "datetime");
+          this.attribute("updated_at", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      await defineSchema(adapter, {
+        tz_pets: { name: "string", created_at: "datetime", updated_at: "datetime" },
+      });
+      const pet = await Pet.create({ name: "Bidu" });
+      expect(pet.isPersisted()).toBe(true);
+      const savedPet = await Pet.find(pet.id);
+      expect(savedPet.readAttribute("created_at")).toBeInstanceOf(TimeWithZone);
+      expect(savedPet.readAttribute("updated_at")).toBeInstanceOf(TimeWithZone);
+    });
   });
   it("singular table name guesses with prefixes and suffixes", () => {
     class PrefixedModel extends Base {
@@ -1892,14 +1901,35 @@ describe("BasicsTest", () => {
     expect(Account.tableName).toBe("accounts");
   });
   it.skip("utc as time zone", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: fixtures + with_env_tz — reads Topic.find(1).bonus_time after assigning "5:42:00AM" string; requires process-level TZ env var and Topic fixture data
   });
-  it.skip("utc as time zone and new", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+  it("utc as time zone and new", async () => {
+    await withTimezoneConfig({ default: "utc" }, () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "topics_tz";
+          this.attribute("bonus_time", "time");
+          this.adapter = adapter;
+        }
+      }
+      const attributes = {
+        "bonus_time(1i)": "2000",
+        "bonus_time(2i)": "1",
+        "bonus_time(3i)": "1",
+        "bonus_time(4i)": "10",
+        "bonus_time(5i)": "35",
+        "bonus_time(6i)": "50",
+      };
+      const topic = new Topic(attributes);
+      const bonusTime = topic.readAttribute("bonus_time") as {
+        hour: number;
+        minute: number;
+        second: number;
+      };
+      expect(bonusTime.hour).toBe(10);
+      expect(bonusTime.minute).toBe(35);
+      expect(bonusTime.second).toBe(50);
+    });
   });
   it("out of range slugs", async () => {
     class Topic extends Base {
@@ -2143,10 +2173,7 @@ describe("BasicsTest", () => {
     await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
   });
   it.skip("respect internal encoding", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
-    /* Ruby-specific: tests Encoding.default_internal (EUC-JP) on column names — no JS equivalent */
+    // BLOCKED: Ruby-only — tests Encoding.default_internal (EUC-JP) on column names; JS has no string encoding model
   });
   it("non valid identifier column name", async () => {
     class Weird extends Base {
@@ -2160,16 +2187,10 @@ describe("BasicsTest", () => {
     expect(reloaded.readAttribute("a$b")).toBe("value");
   });
   it.skip("attributes on dummy time", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
-    /* needs time-string parsing ("5:42:00AM" -> dummy date 2000-01-01) with timezone config */
+    // BLOCKED: fixtures + with_env_tz — assigns "5:42:00AM" string to Topic.find(1).bonus_time; needs Topic fixture and process-level TZ change; then assert_equal using find_by, requiring DB
   });
   it.skip("attributes on dummy time with invalid time", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
-    /* needs time-string parsing — invalid time should return null */
+    // BLOCKED: fixtures — reads Topic.find(1) and assigns invalid time string; relies on Topic fixture data
   });
   it("previously persisted returns boolean", async () => {
     class User extends Base {
@@ -2246,39 +2267,25 @@ describe("BasicsTest", () => {
     expect(u.name).toBe("");
   });
   it.skip("default in local time", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: DB column defaults + with_env_tz — reads Default.new.fixed_time which is a DB-level default ('2004-01-01 00:00:00'); no column-default propagation in our test adapter
   });
   it.skip("default in utc", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: DB column defaults — reads Default.new.fixed_time from a DB-level column default; our test adapter creates columns without defaults
   });
   it.skip("default in utc with time zone", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: DB column defaults — same as "default in utc"; also uses Time.use_zone which doesn't affect DB-default reads
   });
   it.skip("switching default time zone", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: DB column defaults + with_env_tz — toggles default_timezone between :local and :utc while reading Default.new.fixed_time from DB default
   });
   it.skip("mutating time objects", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: DB column defaults + with_env_tz — reads Default.new.fixed_time, calls .utc, confirms original unchanged; requires DB-level column default
   });
   it.skip("connection in local time", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: establish_connection — requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config
   });
   it.skip("connection in utc time", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: establish_connection — same as "connection in local time"
   });
   it("column name properly quoted", () => {
     class User extends Base {
@@ -2494,15 +2501,13 @@ describe("BasicsTest", () => {
     class Concrete extends AbstractMiddle {}
     expect(Concrete.tableName).toBe("concretes");
   });
-  it.skip("column types on queries on postgresql", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+  it("column types on queries on postgresql", async () => {
+    if (adapterType !== "postgres") return;
+    const result = await (adapter as any).execQuery("SELECT 1 AS test");
+    expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
   it.skip("connection_handler can be overridden", () => {
-    // BLOCKED: type — time-zone aware attribute / timezone conversion gap (dominant theme in base.test.ts)
-    // ROOT-CAUSE: type/date-time.ts#castForDatabase or TimeZoneAwareAttribute not applying timezone on read/write; marshal round-trips are serialization gaps
-    // SCOPE: ~50–100 LOC in type/date-time.ts + connection-adapters/abstract/connection-handler.ts; affects ~36 tests in base.test.ts across time-zone, marshal, STI, and connection-handler clusters
+    // BLOCKED: GVL — uses Ruby Thread.new to override connection_handler in a child thread and verify isolation; Node.js has no threads with shared object model
   });
   it.skip("new threads get default the default connection handler", () => {
     // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
