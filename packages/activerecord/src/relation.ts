@@ -3414,7 +3414,7 @@ export class Relation<T extends Base> {
 
     const manager = this._buildEagerJoinManager(jd, basePk);
 
-    let sql = manager.toSql();
+    let sql = this._arelVisitor().compile(manager.ast);
     if (this._annotations.length > 0) {
       const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
       sql = `${sql} ${comments}`;
@@ -3459,7 +3459,7 @@ export class Relation<T extends Base> {
       manager.optimizerHints(...this._optimizerHints);
     }
 
-    let sql = manager.toSql();
+    let sql = this._arelVisitor().compile(manager.ast);
 
     // Replace FROM clause if from() was used
     if (!this._fromClause.isEmpty()) {
