@@ -352,6 +352,10 @@ export class JoinDependency {
       .filter(Boolean);
   }
 
+  /**
+   * @todo `_aliasTracker` is a stub — needs real `JoinDependency` alias-tracking
+   *   (Rails' `AliasTracker`) to deconflict table aliases in complex multi-join queries.
+   */
   joinConstraints(
     joinsToAdd: JoinDependency[],
     _aliasTracker?: any,
