@@ -186,6 +186,7 @@ async function _transactionFallback<T>(
   try {
     if (nested) {
       const spName = `active_record_${++_savepointCounter}`;
+      await (adapter as any).materializeTransactions?.();
       await adapter.createSavepoint(spName);
       try {
         result = await getTransactionStorage().run(tx, () => fn(tx));
