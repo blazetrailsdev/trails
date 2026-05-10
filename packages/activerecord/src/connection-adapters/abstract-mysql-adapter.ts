@@ -1186,27 +1186,39 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const cols = await this.columnDefinitions(tableName);
     const col = cols.find((c) => (c["Field"] as string) === columnName);
     if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
-    // Guard against silently dropping Extra attributes (AUTO_INCREMENT, ON UPDATE, generated
-    // columns) that ColumnOptions cannot express. Rails preserves these via column_for's
-    // auto_increment?/comment; our ColumnDefinition lacks that field. Throw explicitly so
-    // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
-    const extra = ((col["Extra"] as string | undefined) ?? "").trim().toLowerCase();
-    if (extra && extra !== "auto_increment") {
+    // Guard against silently dropping Extra attributes we cannot reconstruct (e.g. generated
+    // columns). AUTO_INCREMENT is preserved via ColumnOptions.autoIncrement; ON UPDATE <expr>
+    // (including MySQL 8 compound form "DEFAULT_GENERATED on update CURRENT_TIMESTAMP") is
+    // preserved via ColumnOptions.onUpdate. Anything else triggers an explicit throw so callers
+    // know to upgrade MySQL rather than receive a lossy CHANGE clause.
+    const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
+    const extra = extraRaw.toLowerCase();
+    const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
+    if (extra && extra !== "auto_increment" && !onUpdateMatch) {
       throw new Error(
         `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
           `— Extra="${col["Extra"]}" is not preserved by this path. ` +
           `Upgrade to MySQL ≥8.0.3 or MariaDB ≥10.5.2 to use RENAME COLUMN instead.`,
       );
     }
+    const rawDefault = col["Default"] !== null ? (col["Default"] as string) : undefined;
+    // SHOW FULL FIELDS returns function defaults as plain strings (e.g. "CURRENT_TIMESTAMP").
+    // Rails' column.default is nil for function defaults; pass as a lambda so
+    // quoteDefaultExpression emits it unquoted: DEFAULT CURRENT_TIMESTAMP, not DEFAULT 'CURRENT_TIMESTAMP'.
+    const colDefault =
+      typeof rawDefault === "string" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(rawDefault)
+        ? () => rawDefault
+        : rawDefault;
     const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, {
       // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
       // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
       // DEFAULT NULL on NOT NULL columns — mirrors Rails column_for + new_column_definition.
-      default: col["Default"] !== null ? col["Default"] : undefined,
+      default: colDefault,
       null: (col["Null"] as string) === "YES",
       collation: (col["Collation"] as string | undefined) || undefined,
       comment: (col["Comment"] as string | undefined) || undefined,
       autoIncrement: extra === "auto_increment" || undefined,
+      onUpdate: onUpdateMatch ? onUpdateMatch[1] : undefined,
     });
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);

@@ -230,6 +230,7 @@ export interface ColumnOptions {
   ifExists?: boolean;
   ifNotExists?: boolean;
   autoIncrement?: boolean;
+  onUpdate?: string;
 }
 
 export interface AddIndexOptions {
