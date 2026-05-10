@@ -2,154 +2,102 @@ import { describe, it } from "vitest";
 
 describe("MysqlDBCreateTest", () => {
   it.skip("establishes connection without database", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("creates database with no default options", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("creates database with given encoding", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("creates database with given collation", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("when database created successfully outputs info to stdout", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("create when database exists outputs info to stderr", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MysqlDBCreateWithInvalidPermissionsTest", () => {
   it.skip("raises error", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MySQLDBDropTest", () => {
   it.skip("establishes connection to mysql database", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("drops database", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("when database dropped successfully outputs info to stdout", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MySQLPurgeTest", () => {
   it.skip("establishes connection without database", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("recreates database with no default options", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("recreates database with the given options", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MysqlDBCharsetTest", () => {
   it.skip("db retrieves charset", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MysqlDBCollationTest", () => {
   it.skip("db retrieves collation", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MySQLStructureDumpTest", () => {
   it.skip("structure dump", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with extra flags", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with hash extra flags for a different driver", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with hash extra flags for the correct driver", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with ignore tables", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("warn when external structure dump command execution fails", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with port number", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure dump with ssl", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
 
 describe("MySQLStructureLoadTest", () => {
   it.skip("structure load", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure load with hash extra flags for a different driver", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
   it.skip("structure load with hash extra flags for the correct driver", () => {
-    // BLOCKED: rake — Rake/dbconsole shell-out cannot run in Node.js
-    // ROOT-CAUSE: mysql2-rake.ts#exec not translatable to Node.js
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — rake
   });
 });
