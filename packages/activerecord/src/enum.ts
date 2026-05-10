@@ -212,15 +212,17 @@ export function defineEnum(
     // Original-form predicate/bang for labels with special chars (spaces, hyphens).
     // Rails: define_method("American Bobtail?") accessible only via bracket notation.
     const originalName = methodName(name);
-    if (/[^\w\x80-￿]/.test(originalName)) {
-      Object.defineProperty(modelClass.prototype, `is${originalName}`, {
+    if (/[^\w\x80-\uffff]/.test(originalName)) {
+      const origPredicate = `is${originalName}`;
+      const origBang = `${originalName}Bang`;
+      Object.defineProperty(modelClass.prototype, origPredicate, {
         value: function (this: Base) {
           return this.readAttribute(attribute) === value;
         },
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(modelClass.prototype, `${originalName}Bang`, {
+      Object.defineProperty(modelClass.prototype, origBang, {
         value: async function (this: any) {
           this.writeAttribute(attribute, value);
           if (this.isPersisted()) {
