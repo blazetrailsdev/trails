@@ -188,4 +188,9 @@ describe("Relation#offset float truncation", () => {
     const r = relation().offset(1.7);
     expect((r as any)._offsetValue).toBe(1);
   });
+
+  it("emits OFFSET 1 in SQL when offset(1.7) is called", () => {
+    const sql = relation().offset(1.7).toSql();
+    expect(sql).toContain("OFFSET 1");
+  });
 });
