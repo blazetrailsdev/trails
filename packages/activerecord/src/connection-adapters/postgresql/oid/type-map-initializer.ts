@@ -6,7 +6,7 @@
 
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
-import { RangeType, type RangeSubtype } from "./range.js";
+import { RangeType, MultiRangeType, type RangeSubtype } from "./range.js";
 import { Vector } from "./vector.js";
 
 export interface TypeMap {
@@ -50,6 +50,7 @@ export class TypeMapInitializer {
     const nodes = records.filter((row) => !this.storeHas(toInt(row.oid)));
     const mapped = extract(nodes, (row) => this.storeHas(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
+    const multiranges = extract(nodes, (row) => row.typtype === "m");
     const enums = extract(nodes, (row) => row.typtype === "e");
     const domains = extract(nodes, (row) => row.typtype === "d");
     const arrays = extract(nodes, (row) => row.typinput === "array_in");
@@ -60,6 +61,7 @@ export class TypeMapInitializer {
     domains.forEach((row) => this.registerDomainType(row));
     arrays.forEach((row) => this.registerArrayType(row));
     ranges.forEach((row) => this.registerRangeType(row));
+    multiranges.forEach((row) => this.registerMultirangeType(row));
     composites.forEach((row) => this.registerCompositeType(row));
   }
 
@@ -76,7 +78,7 @@ export class TypeMapInitializer {
   }
 
   queryConditionsForKnownTypeTypes(): string {
-    return "WHERE\n  t.typtype IN ('r', 'e', 'd')\n";
+    return "WHERE\n  t.typtype IN ('r', 'e', 'd', 'm')\n";
   }
 
   queryConditionsForArrayTypes(): string {
@@ -102,6 +104,27 @@ export class TypeMapInitializer {
       // silently routing through cast.
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
+  }
+
+  private registerMultirangeType(row: PgTypeRow): void {
+    // For multirange types, typelem is the corresponding range type's OID.
+    // We look up that range type and extract its subtype for MultiRangeType.
+    if (!this.store.lookup) {
+      throw new Error(
+        `TypeMap store must implement lookup() to register subtype-based OID ${row.oid}`,
+      );
+    }
+    const rangeOid = toInt(row.typelem ?? 0);
+    if (this.storeHas(rangeOid)) {
+      this.register(row.oid, (_oid: number | string, ...args: unknown[]) => {
+        const rangeType = this.storeLookup(rangeOid, ...args);
+        const subtype =
+          rangeType instanceof RangeType
+            ? rangeType.subtype
+            : (rangeType as unknown as RangeSubtype);
+        return new MultiRangeType(subtype, row.typname);
+      });
+    }
   }
 
   private registerEnumType(row: PgTypeRow): void {

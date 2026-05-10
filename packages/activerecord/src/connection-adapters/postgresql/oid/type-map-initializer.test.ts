@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Array as OidArray } from "./array.js";
 import { Enum } from "./enum.js";
-import { RangeType } from "./range.js";
+import { RangeType, MultiRangeType } from "./range.js";
 import { TypeMapInitializer, type TypeMap } from "./type-map-initializer.js";
 import { Vector } from "./vector.js";
 
@@ -83,6 +83,28 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect((array.subtype as { metadata?: { scale?: number } }).metadata?.scale).toBe(2);
     expect(range).toBeInstanceOf(RangeType);
     expect((range.subtype as { metadata?: { scale?: number } }).metadata?.scale).toBe(4);
+  });
+
+  it("registers multirange types with the underlying range subtype", () => {
+    const store = new TestStore();
+    store.registerType(23, integerSubtype);
+    // int4range OID 3904, int4multirange OID 4451 (typelem → range OID)
+    new TypeMapInitializer(store).run([
+      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
+      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
+    ]);
+
+    expect(store.lookup(3904)).toBeInstanceOf(RangeType);
+    const multiRange = store.lookup(4451) as MultiRangeType;
+    expect(multiRange).toBeInstanceOf(MultiRangeType);
+    expect(multiRange.subtype).toBe((store.lookup(3904) as RangeType).subtype);
+    expect(multiRange.name).toBe("int4multirange");
+  });
+
+  it("queryConditionsForKnownTypeTypes includes multirange typtype m", () => {
+    const store = new TestStore();
+    const initializer = new TypeMapInitializer(store);
+    expect(initializer.queryConditionsForKnownTypeTypes()).toContain("'m'");
   });
 
   it("builds query condition fragments", () => {

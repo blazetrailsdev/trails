@@ -4708,6 +4708,30 @@ class SimpleTableBuilder {
     this._columns.push({ name, type: "integer" });
   }
 
+  int4range(name: string): void {
+    this._columns.push({ name, type: "int4range" });
+  }
+
+  int8range(name: string): void {
+    this._columns.push({ name, type: "int8range" });
+  }
+
+  numrange(name: string): void {
+    this._columns.push({ name, type: "numrange" });
+  }
+
+  daterange(name: string): void {
+    this._columns.push({ name, type: "daterange" });
+  }
+
+  tsrange(name: string): void {
+    this._columns.push({ name, type: "tsrange" });
+  }
+
+  tstzrange(name: string): void {
+    this._columns.push({ name, type: "tstzrange" });
+  }
+
   boolean(name: string, options: { default?: boolean } = {}): void {
     let type = "boolean";
     if (options.default !== undefined) type += ` DEFAULT ${options.default}`;

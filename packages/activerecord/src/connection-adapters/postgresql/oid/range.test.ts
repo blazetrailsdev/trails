@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Range, RangeType } from "./range.js";
+import { Range, RangeType, MultiRange, MultiRangeType } from "./range.js";
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),
@@ -124,5 +124,59 @@ describe("PostgreSQL::OID::Range", () => {
       expect(() => type.typeCastForSchema(new Date())).toThrow(TypeError);
       expect(() => type.typeCastForSchema(new Date())).toThrow(/Temporal/);
     });
+  });
+});
+
+describe("PostgreSQL::OID::MultiRange", () => {
+  const type = new MultiRangeType(integerSubtype, "int4multirange");
+
+  it("deserializes a two-element multirange literal", () => {
+    const result = type.deserialize("{[1,5),[10,20)}") as MultiRange;
+    expect(result).toBeInstanceOf(MultiRange);
+    expect(result.ranges).toHaveLength(2);
+    expect(result.ranges[0].begin).toBe(1);
+    expect(result.ranges[0].end).toBe(5);
+    expect(result.ranges[0].excludeEnd).toBe(true);
+    expect(result.ranges[1].begin).toBe(10);
+    expect(result.ranges[1].end).toBe(20);
+  });
+
+  it("returns empty MultiRange for empty literal {}", () => {
+    const result = type.deserialize("{}") as MultiRange;
+    expect(result).toBeInstanceOf(MultiRange);
+    expect(result.ranges).toHaveLength(0);
+  });
+
+  it("returns null for null", () => {
+    expect(type.deserialize(null)).toBeNull();
+  });
+
+  it("serializes a MultiRange back to PG literal", () => {
+    const mr = new MultiRange([new Range(1, 5, true), new Range(10, 20, false)]);
+    const result = type.serialize(mr) as string;
+    expect(result).toMatch(/^\{/);
+    expect(result).toContain("1");
+    expect(result).toContain("5");
+  });
+
+  it("serialize returns non-MultiRange values unchanged", () => {
+    expect(type.serialize("not a multirange")).toBe("not a multirange");
+  });
+
+  it("handles quoted bounds with ] inside", () => {
+    const stringSubtype = {
+      cast: (v: unknown) => String(v ?? ""),
+      serialize: (v: unknown) => String(v ?? ""),
+      deserialize: (v: unknown) => String(v ?? ""),
+    };
+    const strType = new MultiRangeType(stringSubtype, "stringmultirange");
+    // PG-style quoted bound: "[foo]bar" is a valid bound value for a string range.
+    // The quote-aware scanner must not stop at the ] inside the quoted bound.
+    const result = strType.deserialize('{["[foo]bar","baz")}') as MultiRange;
+    expect(result).toBeInstanceOf(MultiRange);
+    expect(result.ranges).toHaveLength(1);
+    expect(result.ranges[0].begin).toBe("[foo]bar");
+    expect(result.ranges[0].end).toBe("baz");
+    expect(result.ranges[0].excludeEnd).toBe(true);
   });
 });

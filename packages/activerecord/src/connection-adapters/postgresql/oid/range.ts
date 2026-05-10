@@ -230,6 +230,104 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Multirange.
+ *
+ * A multirange is an ordered collection of non-overlapping ranges.
+ * PG serializes them as `{[1,5),[10,20)}`.
+ */
+export class MultiRange {
+  readonly ranges: Range[];
+
+  constructor(ranges: Range[]) {
+    this.ranges = ranges;
+  }
+}
+
+export class MultiRangeType extends ValueType<MultiRange> {
+  readonly name: string;
+  readonly subtype: RangeSubtype;
+
+  constructor(subtype: RangeSubtype, typeName: string = "multirange") {
+    super();
+    this.subtype = subtype;
+    this.name = typeName;
+  }
+
+  override type(): string {
+    return this.name;
+  }
+
+  castValue(value: unknown): MultiRange | null {
+    if (value == null || value === "") return null;
+    if (value instanceof MultiRange) return value;
+    if (typeof value !== "string") return value as MultiRange | null;
+    const inner = value.slice(1, -1).trim();
+    if (!inner) return new MultiRange([]);
+    return new MultiRange(parseMultirangeLiteral(value, this.subtype));
+  }
+
+  cast(value: unknown): MultiRange | null {
+    return this.castValue(value);
+  }
+
+  override deserialize(value: unknown): MultiRange | null {
+    return this.castValue(value);
+  }
+
+  override serialize(value: unknown): unknown {
+    if (!(value instanceof MultiRange)) return value;
+    const rangeType = new RangeType(this.subtype, this.name);
+    const parts = value.ranges.map((r) => rangeType.encodeLiteral(r));
+    return `{${parts.join(",")}}`;
+  }
+}
+
+function parseMultirangeLiteral(value: string, subtype: RangeSubtype): Range[] {
+  // PG format: {[1,5),[10,20)} or {} for empty. Bounds may be double-quoted.
+  const inner = value.slice(1, -1).trim();
+  if (!inner) return [];
+  const ranges: Range[] = [];
+  const rangeType = new RangeType(subtype);
+  let i = 0;
+  while (i < inner.length) {
+    const openChar = inner[i];
+    if (openChar !== "[" && openChar !== "(") break;
+    // Scan forward to find the matching close bracket, respecting quoted bounds.
+    // PG quotes bound values with "" (doubled-quote escaping inside quotes).
+    let j = i + 1;
+    let inQuotes = false;
+    let closingIdx = -1;
+    while (j < inner.length) {
+      const ch = inner[j];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (inner[j + 1] === '"') {
+            j += 2; // escaped quote inside quoted bound
+            continue;
+          }
+          inQuotes = false;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === "]" || ch === ")") {
+          closingIdx = j;
+          break;
+        }
+      }
+      j++;
+    }
+    if (closingIdx === -1) break;
+    const literal = inner.slice(i, closingIdx + 1);
+    const r = rangeType.castValue(literal);
+    if (r) ranges.push(r);
+    i = closingIdx + 1;
+    if (i < inner.length && inner[i] === ",") i++;
+  }
+  return ranges;
+}
+
 /** @internal */
 function unquote(value: string): string {
   return unquoteRangeBound(value);
