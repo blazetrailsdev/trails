@@ -3,9 +3,11 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { withTimezoneConfig } from "./test-helper.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
@@ -342,46 +344,163 @@ describe("MultiParameterAttributeTest", () => {
     expect((topic as any).written_on).toBeNull();
   });
 
-  it.skip("multiparameter attributes on time with utc", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // UTC timezone handling requires global timezone configuration.
+  it("multiparameter attributes on time with utc", async () => {
+    await withTimezoneConfig({ default: "utc" }, () => {
+      class Topic extends Base {
+        static {
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      const topic = new Topic();
+      topic.assignAttributes({
+        "written_on(1i)": "2004",
+        "written_on(2i)": "6",
+        "written_on(3i)": "24",
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "00",
+      });
+      const instant = (topic as any).written_on as Temporal.Instant;
+      expect(instant).toBeInstanceOf(Temporal.Instant);
+      expect(instant.toZonedDateTimeISO("UTC").hour).toBe(16);
+      expect(instant.toZonedDateTimeISO("UTC").minute).toBe(24);
+    });
   });
 
-  it.skip("multiparameter attributes on time with time zone aware attributes", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // Requires time_zone_aware_attributes configuration.
+  it("multiparameter attributes on time with time zone aware attributes", async () => {
+    // zone: -28800 → Pacific Time; June is PDT (UTC-7) so local 16:24 → UTC 23:24.
+    await withTimezoneConfig(
+      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+      () => {
+        class Topic extends Base {
+          static {
+            this.attribute("written_on", "datetime");
+            this.adapter = adapter;
+          }
+        }
+        const topic = new Topic();
+        topic.assignAttributes({
+          "written_on(1i)": "2004",
+          "written_on(2i)": "6",
+          "written_on(3i)": "24",
+          "written_on(4i)": "16",
+          "written_on(5i)": "24",
+          "written_on(6i)": "00",
+        });
+        const twz = (topic as any).written_on as TimeWithZone;
+        expect(twz).toBeInstanceOf(TimeWithZone);
+        expect(twz.utc().toZonedDateTimeISO("UTC").hour).toBe(23); // PDT: local 16:24 → UTC 23:24
+        expect(twz.hour).toBe(16); // wall-clock in zone
+      },
+    );
   });
 
-  it.skip("multiparameter attributes on time with time zone aware attributes and invalid time params", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // Requires time_zone_aware_attributes configuration.
+  it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
+    await withTimezoneConfig({ awareAttributes: true }, () => {
+      class Topic extends Base {
+        static {
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      const topic = new Topic();
+      topic.assignAttributes({
+        "written_on(1i)": "2004",
+        "written_on(2i)": "",
+        "written_on(3i)": "",
+      });
+      expect((topic as any).written_on).toBeNull();
+    });
   });
 
-  it.skip("multiparameter attributes on time with time zone aware attributes false", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // Requires time_zone_aware_attributes configuration.
+  it("multiparameter attributes on time with time zone aware attributes false", async () => {
+    await withTimezoneConfig(
+      { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
+      () => {
+        class Topic extends Base {
+          static {
+            this.attribute("written_on", "datetime");
+            this.adapter = adapter;
+          }
+        }
+        const topic = new Topic();
+        topic.assignAttributes({
+          "written_on(1i)": "2004",
+          "written_on(2i)": "6",
+          "written_on(3i)": "24",
+          "written_on(4i)": "16",
+          "written_on(5i)": "24",
+          "written_on(6i)": "00",
+        });
+        const val = (topic as any).written_on;
+        expect(val).not.toBeInstanceOf(TimeWithZone); // assert_not_respond_to :time_zone
+        expect(val).toBeInstanceOf(Temporal.Instant);
+      },
+    );
   });
 
-  it.skip("multiparameter attributes on time with skip time zone conversion for attributes", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // Requires skip_time_zone_conversion_for_attributes configuration.
+  it("multiparameter attributes on time with skip time zone conversion for attributes", async () => {
+    await withTimezoneConfig(
+      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+      () => {
+        class Topic extends Base {
+          static {
+            this.skipTimeZoneConversionForAttributes = ["written_on"];
+            this.attribute("written_on", "datetime");
+            this.adapter = adapter;
+          }
+        }
+        const topic = new Topic();
+        topic.assignAttributes({
+          "written_on(1i)": "2004",
+          "written_on(2i)": "6",
+          "written_on(3i)": "24",
+          "written_on(4i)": "16",
+          "written_on(5i)": "24",
+          "written_on(6i)": "00",
+        });
+        const val = (topic as any).written_on;
+        expect(val).not.toBeInstanceOf(TimeWithZone);
+        expect(val).toBeInstanceOf(Temporal.Instant);
+        expect(val.toZonedDateTimeISO("UTC").hour).toBe(16);
+      },
+    );
   });
 
-  it.skip("multiparameter attributes on time only column with time zone aware attributes does not do time zone conversion", () => {
-    // BLOCKED: type — multiparameter attribute assignment gap
-    // ROOT-CAUSE: attribute-assignment.ts#assignMultiparameterAttributes not fully implementing all type edge cases
-    // SCOPE: ~30 LOC fix in attribute-assignment.ts; affects ~6 tests in multiparameter-attributes.test.ts
-    // Requires time_zone_aware_attributes configuration.
+  it("multiparameter attributes on time only column with time zone aware attributes does not do time zone conversion", async () => {
+    await withTimezoneConfig(
+      { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+      () => {
+        class Topic extends Base {
+          static {
+            this.attribute("bonus_time", "time");
+            this.attribute("written_on", "datetime");
+            this.adapter = adapter;
+          }
+        }
+        const topic = new Topic();
+        topic.assignAttributes({
+          "bonus_time(1i)": "2000",
+          "bonus_time(2i)": "1",
+          "bonus_time(3i)": "1",
+          "bonus_time(4i)": "16",
+          "bonus_time(5i)": "24",
+        });
+        const bt = (topic as any).bonus_time as TimeWithZone;
+        expect(bt).toBeInstanceOf(TimeWithZone);
+        expect(bt.hour).toBe(16);
+        // written_on with empty month/day → null
+        topic.assignAttributes({
+          "written_on(1i)": "2000",
+          "written_on(2i)": "",
+          "written_on(3i)": "",
+          "written_on(4i)": "",
+          "written_on(5i)": "",
+        });
+        expect((topic as any).written_on).toBeNull();
+      },
+    );
   });
 
   it("multiparameter attributes setting time attribute", () => {

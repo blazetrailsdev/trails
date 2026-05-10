@@ -4,11 +4,14 @@
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
+import { TimeWithZone, getZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTimezoneConfig } from "./test-helper.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -468,6 +471,7 @@ describe("DirtyTest", () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       posts: { title: "string" },
+      pirates: { catchphrase: "string", created_on: "datetime", parrot_id: "integer" },
     });
   });
 
@@ -475,17 +479,91 @@ describe("DirtyTest", () => {
     await dropAllTables(adapter);
   });
 
-  it("time attributes changes with time zone", () => {
-    expect(true).toBe(true);
+  it("time attributes changes with time zone", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      class Pirate extends Base {
+        static {
+          this.tableName = "pirates";
+          this.attribute("created_on", "datetime");
+          this.attribute("catchphrase", "string");
+          this.adapter = adapter;
+        }
+      }
+      const zone = getZone()!;
+      const pirate = new Pirate();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+      expect(pirate.attributeChange("created_on")).toBeNull();
+
+      pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 48 }), zone);
+      pirate.catchphrase = "arrrr, time zone!!";
+      await pirate.saveBang();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+
+      const oldCreatedOn = pirate.created_on as TimeWithZone;
+      pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 24 }), zone);
+      expect(pirate.attributeChanged("created_on")).toBe(true);
+      expect(pirate.attributeWas("created_on")).toBeInstanceOf(TimeWithZone);
+      expect((pirate.attributeWas("created_on") as TimeWithZone).utc().epochMilliseconds).toBe(
+        oldCreatedOn.utc().epochMilliseconds,
+      );
+      await pirate.reload();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+    });
   });
-  it("setting time attributes with time zone field to itself should not be marked as a change", () => {
-    expect(true).toBe(true);
+  it("setting time attributes with time zone field to itself should not be marked as a change", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      class Pirate extends Base {
+        static {
+          this.tableName = "pirates";
+          this.attribute("created_on", "datetime");
+          this.attribute("catchphrase", "string");
+          this.adapter = adapter;
+        }
+      }
+      const pirate = await Pirate.create({ catchphrase: "yo ho" });
+      const currentCreatedOn = pirate.created_on;
+      pirate.created_on = currentCreatedOn;
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+    });
   });
-  it("time attributes changes without time zone by skip", () => {
-    expect(true).toBe(true);
+  it("time attributes changes without time zone by skip", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      class Pirate extends Base {
+        static {
+          this.tableName = "pirates";
+          this.skipTimeZoneConversionForAttributes = ["created_on"];
+          this.attribute("created_on", "datetime");
+          this.attribute("catchphrase", "string");
+          this.adapter = adapter;
+        }
+      }
+      const pirate = new Pirate();
+      pirate.catchphrase = "arrrr, time zone!!";
+      await pirate.saveBang();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+      pirate.created_on = new Date().toISOString();
+      expect(pirate.attributeChanged("created_on")).toBe(true);
+      expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
+    });
   });
-  it("time attributes changes without time zone", () => {
-    expect(true).toBe(true);
+  it("time attributes changes without time zone", async () => {
+    await withTimezoneConfig({ awareAttributes: false }, async () => {
+      class Pirate extends Base {
+        static {
+          this.tableName = "pirates";
+          this.attribute("created_on", "datetime");
+          this.attribute("catchphrase", "string");
+          this.adapter = adapter;
+        }
+      }
+      const pirate = new Pirate();
+      pirate.catchphrase = "arrrr, time zone!!";
+      await pirate.saveBang();
+      expect(pirate.attributeChanged("created_on")).toBe(false);
+      pirate.created_on = new Date().toISOString();
+      expect(pirate.attributeChanged("created_on")).toBe(true);
+      expect(pirate.attributeWas("created_on")).not.toBeInstanceOf(TimeWithZone);
+    });
   });
   it("nullable decimal not marked as changed if new value is blank", () => {
     expect(true).toBe(true);

@@ -52,6 +52,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
     if (value instanceof TimeWithZone) {
       return convertTimeToTimeZone(value);
     }
+    // ZonedDateTime: extract instant, wrap in current zone.
+    if (value instanceof Temporal.ZonedDateTime) {
+      return convertTimeToTimeZone(value.toInstant());
+    }
+    // PlainDateTime: wall-clock components from multiparameter assembly (no timezone).
+    // Mirrors Rails' Hash branch: set_time_zone_without_conversion(super).
+    // Convert to instant via configuredTimezone() then re-interpret in current zone.
+    if (value instanceof Temporal.PlainDateTime) {
+      const instant = value.toZonedDateTime(configuredTimezone()).toInstant();
+      return setTimeZoneWithoutConversion(instant);
+    }
     // Strings: Rails gives String an in_time_zone method via CoreExt, so strings
     // take the respond_to?(:in_time_zone) branch and are parsed as local to
     // Time.zone (user_input_in_time_zone = value.in_time_zone = zone.parse(value)).

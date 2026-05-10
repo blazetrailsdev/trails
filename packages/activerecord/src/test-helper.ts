@@ -5,6 +5,7 @@
  */
 import { getDefaultTimezone, setDefaultTimezone } from "./type/internal/timezone.js";
 import { Base } from "./base.js";
+import { getZone, setZone, resetZone } from "@blazetrails/activesupport";
 
 interface TimezoneConfig {
   /** Mirrors Rails' `default_timezone` — "utc" or "local". */
@@ -13,6 +14,8 @@ interface TimezoneConfig {
   awareAttributes?: boolean;
   /** Mirrors Rails' `time_zone_aware_types`. */
   awareTypes?: string[];
+  /** Mirrors Rails' `zone:` — sets Time.zone for the duration of the block. */
+  zone?: string;
 }
 
 /**
@@ -33,6 +36,7 @@ export async function withTimezoneConfig(
   const oldAwareAttributes = base.timeZoneAwareAttributes;
   const hadAwareTypes = "timeZoneAwareTypes" in base;
   const oldAwareTypes = base.timeZoneAwareTypes;
+  const oldZone = getZone();
 
   try {
     if (cfg.default !== undefined) setDefaultTimezone(cfg.default);
@@ -41,6 +45,7 @@ export async function withTimezoneConfig(
     // making the helper forward-compatible when the wiring lands.
     if (cfg.awareAttributes !== undefined) base.timeZoneAwareAttributes = cfg.awareAttributes;
     if (cfg.awareTypes !== undefined) base.timeZoneAwareTypes = cfg.awareTypes;
+    if (cfg.zone !== undefined) setZone(cfg.zone);
     await fn();
   } finally {
     setDefaultTimezone(oldDefault);
@@ -53,6 +58,13 @@ export async function withTimezoneConfig(
       base.timeZoneAwareTypes = oldAwareTypes;
     } else {
       delete base.timeZoneAwareTypes;
+    }
+    if (oldZone !== getZone()) {
+      if (oldZone) {
+        setZone(oldZone);
+      } else {
+        resetZone();
+      }
     }
   }
 }
