@@ -130,7 +130,9 @@ export class TimeZoneConverter extends ValueType<unknown> {
           : null;
     if (oldInstant !== null && newInstant !== null) {
       // Compare at microsecond precision — serialization truncates to 6 decimal places.
-      return oldInstant.epochNanoseconds / 1000n !== newInstant.epochNanoseconds / 1000n;
+      // Use roundingMode:"trunc" to match Temporal.toString() truncation semantics.
+      const opts = { smallestUnit: "microsecond" as const, roundingMode: "trunc" as const };
+      return oldInstant.round(opts).epochNanoseconds !== newInstant.round(opts).epochNanoseconds;
     }
     return oldValue !== newValue;
   }

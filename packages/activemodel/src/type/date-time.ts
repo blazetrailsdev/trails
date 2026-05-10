@@ -75,7 +75,9 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
     if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
       // Compare at microsecond precision — serialization truncates to 6 decimal places.
-      return oldValue.epochNanoseconds / 1000n !== newValue.epochNanoseconds / 1000n;
+      // Use roundingMode:"trunc" to match Temporal.toString() truncation semantics.
+      const opts = { smallestUnit: "microsecond" as const, roundingMode: "trunc" as const };
+      return oldValue.round(opts).epochNanoseconds !== newValue.round(opts).epochNanoseconds;
     }
     return oldValue !== newValue;
   }
