@@ -6,7 +6,10 @@ import {
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { AcceptsMultiparameterTime } from "./helpers/accepts-multiparameter-time.js";
+import {
+  AcceptsMultiparameterTime,
+  isNumericKeyHash,
+} from "./helpers/accepts-multiparameter-time.js";
 import { configuredTimezone } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
 
@@ -20,6 +23,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (value === DateInfinity) return DateInfinity;
     if (value === DateNegativeInfinity) return DateNegativeInfinity;
     if (value instanceof Temporal.Instant) return this._applySecondsPrecision(value);
+    if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
     return this.parseString(str);
