@@ -65,10 +65,45 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).toContain("AUTO_INCREMENT");
   });
 
+  it("preserves on update CURRENT_TIMESTAMP Extra without throwing", async () => {
+    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
+    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
+    expect(sql).toContain("ON UPDATE");
+    expect(sql).toContain("CURRENT_TIMESTAMP");
+  });
+
+  it("preserves MySQL 8 compound DEFAULT_GENERATED on update Extra", async () => {
+    const adapter = await makeAdapter(
+      "updated_at",
+      "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)",
+    );
+    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
+    expect(sql).toContain("ON UPDATE");
+    expect(sql).toContain("CURRENT_TIMESTAMP(6)");
+  });
+
   it("throws for unrecognised Extra values", async () => {
-    const adapter = await makeAdapter("updated_at", "on update current_timestamp()");
-    await expect(adapter.renameColumnForAlter("users", "updated_at", "ts")).rejects.toThrow(
+    const adapter = await makeAdapter("gen_col", "VIRTUAL GENERATED");
+    await expect(adapter.renameColumnForAlter("users", "gen_col", "gen_col2")).rejects.toThrow(
       "renameColumnForAlter fallback",
     );
+  });
+
+  it("emits DEFAULT CURRENT_TIMESTAMP unquoted when default is a timestamp function", async () => {
+    const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "updated_at",
+        Type: "datetime",
+        Null: "YES",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "on update CURRENT_TIMESTAMP",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
+    expect(sql).toContain("DEFAULT CURRENT_TIMESTAMP");
+    expect(sql).not.toContain("DEFAULT 'CURRENT_TIMESTAMP'");
   });
 });
