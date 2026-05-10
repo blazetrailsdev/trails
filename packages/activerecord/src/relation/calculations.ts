@@ -562,6 +562,7 @@ export function typeFor(rel: CalculationRelation, field: string): unknown {
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
+  // @todo tighten to JoinDependency[] once test stubs migrate to real instances
   joinDependencies?: Iterable<Iterable<{ modelClass?: { attributeTypes?: unknown } }>>,
 ): unknown {
   const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
