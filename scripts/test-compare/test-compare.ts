@@ -263,7 +263,7 @@ function main() {
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
-        if (isTestCaseExcluded(file.file, tc.description)) continue;
+        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
         if (!seenPaths.has(np)) {
@@ -302,7 +302,7 @@ function main() {
       const matchedRuby = new Set<number>();
 
       const excludedCount = file.testCases.filter((tc) =>
-        isTestCaseExcluded(file.file, tc.description),
+        isTestCaseExcluded(file.file, tc.description, tc.ancestors[0]),
       ).length;
 
       let matched = 0;
@@ -316,7 +316,7 @@ function main() {
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description)) continue;
+        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
         if (tsIdx >= 0) {
@@ -339,7 +339,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description)) continue;
+        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
@@ -377,7 +377,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description)) continue;
+        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
