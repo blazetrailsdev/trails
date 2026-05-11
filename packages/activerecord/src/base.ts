@@ -2014,6 +2014,7 @@ export class Base extends Model {
   declare static leftJoins: typeof Querying.leftJoins;
   declare static leftOuterJoins: typeof Querying.leftOuterJoins;
   declare static none: typeof Querying.none;
+  declare static insert: typeof Querying.insert;
   declare static insertAll: typeof Querying.insertAll;
   declare static upsertAll: typeof Querying.upsertAll;
   declare static updateAll: typeof Querying.updateAll;

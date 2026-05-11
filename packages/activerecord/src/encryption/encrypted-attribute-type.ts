@@ -17,6 +17,21 @@ import {
   replaceUnencodable as _replaceUnencodable,
 } from "./encoding-helpers.js";
 
+// Injectable provider for global previous schemes — set by encryptable-record.ts
+// to avoid the circular import cycle (encryptable-record → encrypted-attribute-type → encryptable-record).
+let _globalPreviousSchemesFn: ((scheme: Scheme) => Scheme[]) | null = null;
+let _globalPreviousVersion = 0;
+
+/** @internal */
+export function setGlobalPreviousSchemesFn(fn: (scheme: Scheme) => Scheme[]): void {
+  _globalPreviousSchemesFn = fn;
+  _globalPreviousVersion++;
+}
+
+Configurable.onConfigure(() => {
+  _globalPreviousVersion++;
+});
+
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is
  * the central piece connecting the encryption system with `encrypts`
@@ -32,8 +47,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private _default?: unknown;
   private _encryptor: EncryptorLike;
   private _previousTypesMemo?: EncryptedAttributeType[];
-  private _previousTypesMemoKey?: boolean;
+  private _previousTypesMemoKey?: string;
+  private _effectivePrevMemo?: Scheme[];
+  private _effectivePrevVersion = -1;
   private _serializeWithOldestMemo?: boolean;
+  private _serializeWithOldestVersion = -1;
 
   constructor(options: {
     scheme: Scheme;
@@ -96,6 +114,12 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.serializeWithCurrent(value);
   }
 
+  // Encryption must always run through serialize, not the cast-value shortcut.
+  // insertAll prefers serializeCastValue; override so it always encrypts.
+  override serializeCastValue(value: unknown): unknown {
+    return this.serialize(value);
+  }
+
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldValue = rawOldValue === null ? null : this.deserialize(rawOldValue);
     return oldValue !== newValue;
@@ -104,6 +128,14 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   isEncrypted(value: unknown): boolean {
     if (typeof value !== "string") return false;
     return this.scheme.withContext(() => this._encryptor.isEncrypted(value));
+  }
+
+  // Delegate store accessor dispatch to the castType so store_accessor works
+  // with encrypted JSON/hstore columns without needing a separate store() call.
+  accessor(): unknown {
+    return typeof (this.castType as any).accessor === "function"
+      ? (this.castType as any).accessor()
+      : undefined;
   }
 
   get deterministic(): boolean {
@@ -119,10 +151,10 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   get previousTypes(): EncryptedAttributeType[] {
-    // Memoize on supportUnencryptedData so the clean-text scheme gets
-    // recomputed if the config toggles at runtime (Rails does the same
-    // via @previous_types[support_unencrypted_data?]).
-    const key = this.supportUnencryptedData;
+    // Key on both supportUnencryptedData and the global-previous version counter
+    // so the list is recomputed whenever config changes (e.g. configure() called
+    // after encrypts() is declared — the lazy-resolution contract).
+    const key = `${this.supportUnencryptedData}:${_globalPreviousVersion}`;
     if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
       this._previousTypesMemo = this.buildPreviousTypesFor(
         this.previousSchemesIncludingCleanText(),
@@ -141,15 +173,28 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   /** @internal */
+  private _effectivePreviousSchemes(): Scheme[] {
+    // Previous types are already derived from global+local schemes at the
+    // top-level — don't re-expand globals or we get infinite recursion.
+    if (this._previousType) return this.scheme.previousSchemes ?? [];
+    if (this._effectivePrevVersion !== _globalPreviousVersion) {
+      const global = _globalPreviousSchemesFn ? _globalPreviousSchemesFn(this.scheme) : [];
+      this._effectivePrevMemo = [...global, ...(this.scheme.previousSchemes ?? [])];
+      this._effectivePrevVersion = _globalPreviousVersion;
+    }
+    return this._effectivePrevMemo!;
+  }
+
+  /** @internal */
   private previousSchemesIncludingCleanText(): Scheme[] {
-    const schemes = [...(this.scheme.previousSchemes ?? [])];
+    const schemes = [...this._effectivePreviousSchemes()];
     if (this.supportUnencryptedData) schemes.push(this.cleanTextScheme());
     return schemes;
   }
 
   /** @internal */
   private previousTypesWithoutCleanText(): EncryptedAttributeType[] {
-    return this.buildPreviousTypesFor(this.scheme.previousSchemes ?? []);
+    return this.buildPreviousTypesFor(this._effectivePreviousSchemes());
   }
 
   /** @internal */
@@ -195,7 +240,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       });
     } catch (error) {
       if (!(error instanceof BaseEncryptionError)) throw error;
-      if (this.scheme.previousSchemes.length === 0)
+      if (this._effectivePreviousSchemes().length === 0)
         return this.handleDeserializeError(error, value);
       return this.tryToDeserializeWithPreviousEncryptedTypes(value);
     }
@@ -227,9 +272,12 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private isSerializeWithOldest(): boolean {
-    this._serializeWithOldestMemo ??=
-      this.scheme.isFixed() && this.scheme.previousSchemes.length > 0;
-    return this._serializeWithOldestMemo;
+    if (this._serializeWithOldestVersion !== _globalPreviousVersion) {
+      this._serializeWithOldestMemo =
+        this.scheme.isFixed() && this._effectivePreviousSchemes().length > 0;
+      this._serializeWithOldestVersion = _globalPreviousVersion;
+    }
+    return this._serializeWithOldestMemo!;
   }
 
   /** @internal */

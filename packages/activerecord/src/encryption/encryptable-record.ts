@@ -2,7 +2,7 @@ import { Scheme, type SchemeOptions } from "./scheme.js";
 import { getEncryptionContext, withoutEncryption as _withoutEncryption } from "./context.js";
 import { Configuration as ConfigurationError } from "./errors.js";
 import { LengthValidator } from "@blazetrails/activemodel";
-import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { EncryptedAttributeType, setGlobalPreviousSchemesFn } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -73,18 +73,23 @@ export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
 
 /**
  * Mirrors Rails' EncryptableRecord#scheme_for.
- * Builds the scheme with global previous schemes prepended to any
- * per-attribute previousSchemes declared in options.
+ * Builds the scheme with only locally-declared previousSchemes; global previous
+ * schemes are resolved lazily in EncryptedAttributeType at serialize/deserialize
+ * time so that configure() calls after encrypts() are picked up automatically.
  *
  * @internal
  */
 function schemeFor(options: SchemeOptions): Scheme {
   const { previousSchemes: localPrevious = [], ...rest } = options;
-  const base = new Scheme(rest);
-  const globalPrevious = globalPreviousSchemesFor(base);
-  const allPrevious = [...globalPrevious, ...localPrevious];
-  return allPrevious.length > 0 ? new Scheme({ ...rest, previousSchemes: allPrevious }) : base;
+  return localPrevious.length > 0
+    ? new Scheme({ ...rest, previousSchemes: localPrevious })
+    : new Scheme(rest);
 }
+
+// Register the global-previous-schemes provider into EncryptedAttributeType.
+// Called at module load time — always runs before any EncryptedAttributeType
+// accesses previousTypes because this module is loaded via encryption.ts first.
+setGlobalPreviousSchemesFn(globalPreviousSchemesFor);
 
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
