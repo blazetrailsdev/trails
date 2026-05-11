@@ -329,9 +329,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("only warn on first encounter of unrecognized oid", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        await adapter.execute(`select 'pg_catalog.pg_class'::regclass`);
-        await adapter.execute(`select 'pg_catalog.pg_class'::regclass`);
-        await adapter.execute(`select 'pg_catalog.pg_class'::regclass`);
+        // execQuery goes through getOidType which triggers the dedup logic.
+        // execute() bypasses OID resolution so it cannot trigger the warn.
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
         const oidWarns = warnSpy.mock.calls.filter(
           (c) => typeof c[0] === "string" && /unknown OID \d+/.test(c[0]),
         );
@@ -787,16 +789,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("only check for insensitive comparison capability once", async () => {
       await adapter.execute(`CREATE DOMAIN example_type AS integer`);
       try {
-        await adapter.exec(
-          `CREATE TABLE "ex_compare" ("id" SERIAL PRIMARY KEY, "number" example_type)`,
-        );
-        const table = new Arel.Table("ex_compare");
-        const attribute = table.get("number");
-        const executeSpy = vi.spyOn(adapter, "execute");
-        await adapter.caseInsensitiveComparison(attribute, "foo");
-        const callsAfterFirst = executeSpy.mock.calls.length;
-        await adapter.caseInsensitiveComparison(attribute, "foo");
-        expect(executeSpy.mock.calls.length).toBe(callsAfterFirst);
+        // canPerformCaseInsensitiveComparisonFor does the pg_proc lookup via schemaQuery.
+        // Spy on schemaQuery to verify the cache prevents a second DB round-trip.
+        const schemaQuerySpy = vi.spyOn(adapter, "schemaQuery");
+        const col = { sqlType: "example_type" };
+        await adapter.canPerformCaseInsensitiveComparisonFor(col);
+        const callsAfterFirst = schemaQuerySpy.mock.calls.length;
+        await adapter.canPerformCaseInsensitiveComparisonFor(col);
+        expect(schemaQuerySpy.mock.calls.length).toBe(callsAfterFirst);
+        schemaQuerySpy.mockRestore();
       } finally {
         await adapter.execute(`DROP DOMAIN example_type CASCADE`);
       }

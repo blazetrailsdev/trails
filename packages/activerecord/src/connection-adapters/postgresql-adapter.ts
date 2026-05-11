@@ -306,7 +306,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         types: {
           getTypeParser: (oid: number, format?: string) =>
             oid === 1082 && !PostgreSQLAdapter.decodeDates
-              ? pg.types.getTypeParser(oid, (format ?? "text") as "text" | "binary")
+              ? (v: unknown) => v
               : getTemporalTypeParser(oid, format),
         },
       };
@@ -374,10 +374,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // When decodeDates is false, skip the date parser (OID 1082) so
           // pg returns the raw string — mirrors Rails' decode_dates flag.
           if (oid === 1082 && !PostgreSQLAdapter.decodeDates) {
-            return (
-              userGetTypeParser?.(oid, format) ??
-              pg.types.getTypeParser(oid, (format ?? "text") as "text" | "binary")
-            );
+            return userGetTypeParser?.(oid, format) ?? ((v: unknown) => v);
           }
           // For all other OIDs, respect any user-supplied parser first, then
           // delegate to getTemporalTypeParser which falls back to pg built-ins.
@@ -535,6 +532,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors: PostgreSQLAdapter#case_insensitive_comparison (via AbstractAdapter).
+   * Async override: looks up the column type and checks pg_proc before emitting LOWER.
+   * @internal
+   */
+  override async caseInsensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Promise<Nodes.Node> {
+    const column = await this.columnForAttribute(attribute);
+    if (column && (await this.canPerformCaseInsensitiveComparisonFor(column))) {
+      return attribute.lower().eq((attribute.relation as any).lower(value));
+    }
+    return attribute.eq(value);
+  }
+
+  /**
    * Mirrors: PostgreSQLAdapter#can_perform_case_insensitive_comparison_for?(column).
    * Queries pg_proc once per sql_type and caches the result.
    * citext is pre-seeded as false — case-insensitive by definition, LOWER() unnecessary.
@@ -544,6 +557,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sqlType?: string | null;
   }): Promise<boolean> {
     const sqlType = column.sqlType ?? "";
+    if (!sqlType) {
+      this._caseInsensitiveCache.set(sqlType, false);
+      return false;
+    }
     if (this._caseInsensitiveCache.has(sqlType)) {
       return this._caseInsensitiveCache.get(sqlType)!;
     }
