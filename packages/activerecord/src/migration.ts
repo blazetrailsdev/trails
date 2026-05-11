@@ -52,7 +52,13 @@ function _extractNewCommentValue(
     if (!("to" in v) || (v as { to: unknown }).to === undefined) {
       throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
     }
-    return (v as { to: unknown }).to as string | null;
+    const to = (v as { to: unknown }).to;
+    if (to !== null && typeof to !== "string") {
+      throw new ArgumentError(
+        `change_column_comment / change_table_comment :to must be a string or null, got ${typeof to}`,
+      );
+    }
+    return to;
   }
   return v as string | null;
 }

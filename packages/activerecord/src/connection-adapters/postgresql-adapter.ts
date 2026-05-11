@@ -2872,8 +2872,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
     const fk = (fks as any[]).find((f) => {
       const { schema: fSchema, table: fTbl } = this.parseSchemaQualifiedName(String(f.toTable));
-      if (toSchema) return fSchema === toSchema && fTbl === toTbl;
-      return fTbl === toTbl;
+      if (fTbl !== toTbl) return false;
+      // When the FK record has no schema prefix (PostgreSQL omits "public." when it
+      // is on the search path), treat it as matching any schema lookup or "public".
+      if (!fSchema) return !toSchema || toSchema === "public";
+      return fSchema === toSchema;
     });
     if (!fk) throw new ArgumentError(`No foreign key found from ${fromTable} to ${toTable}`);
     await this.validateConstraint(fromTable, fk.name);
@@ -3506,7 +3509,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Enum types
   // ---------------------------------------------------------------------------
 
-  async createEnum(name: string, values: string[]): Promise<void> {
+  async createEnum(
+    name: string,
+    values: string[],
+    _options?: Record<string, unknown>,
+  ): Promise<void> {
     const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
