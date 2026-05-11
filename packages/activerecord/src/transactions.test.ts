@@ -658,10 +658,12 @@ describe("TransactionTest", () => {
   });
 
   it.skip("after_commit_returns_record_with_destroy", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    /* destroy doesn't trigger afterCommit callbacks */
+    // NOT IN RAILS — our addition covering afterCommit-record-passthrough on destroy.
+    // BLOCKED: transactions — afterCommit callback does not receive the destroyed record
+    // ROOT-CAUSE: committedBang fires for destroy (triggerDestroyCallback=true) and
+    //   the callback fn receives `this`, but the record may not yet be fully marked
+    //   destroyed at callback time. Needs test + verification against running behavior.
+    // SCOPE: ~10 LOC test body; investigate before un-skipping.
   });
 
   it("rollback triggers after_rollback", async () => {
@@ -700,10 +702,14 @@ describe("TransactionTest", () => {
     expect(history).toEqual(["commit_on_destroy"]);
   });
   it.skip("nested_transaction_with_savepoint_fires_callbacks", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    /* needs nested transaction / savepoint support */
+    // NOT IN RAILS — our addition; closest Rails test is
+    //   test_only_call_after_rollback_on_records_rolled_back_to_a_savepoint
+    //   (transaction_callbacks_test.rb). Verify those Rails tests first.
+    // BLOCKED: transactions — needs savepoint-scoped callback firing
+    // ROOT-CAUSE: afterCommit/afterRollback scoped to savepoint level requires
+    //   TransactionManager to track which savepoint enrolled each record and fire
+    //   callbacks at the right nesting level.
+    // SCOPE: ~20 LOC test body; unblocked once savepoint callback scoping is wired.
   });
   it("after_commit_not_called_on_rollback", async () => {
     const history: string[] = [];
@@ -726,10 +732,11 @@ describe("TransactionTest", () => {
     expect(history).toEqual(["rolled_back"]);
   });
   it.skip("after_commit callback doesnt fire for readonly", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    /* needs readonly check in commit callbacks */
+    // NOT IN RAILS — our addition; no matching Rails test found.
+    // BLOCKED: transactions — unverified behavior
+    // ROOT-CAUSE: undefined behavior for readonly records and commit callbacks;
+    //   Rails does not have a test for this. Needs investigation before implementing.
+    // SCOPE: ~10 LOC test body + implementation verification.
   });
   it("transaction within transaction", async () => {
     class TxPost extends Base {
@@ -844,11 +851,23 @@ describe("TransactionTest", () => {
     });
     expect(called).toBe(1);
   });
-  it.skip("rollback dirty changes then retry save on new record", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    /* needs real transaction rollback — memory adapter persists on save */
+  it("rollback dirty changes then retry save on new record", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const topic = new Topic({ title: "Jeff" });
+
+    await Topic.transaction(async () => {
+      expect(topic.isPersisted()).toBe(false);
+      await topic.saveBang();
+      expect(topic.isPersisted()).toBe(true);
+      throw new Rollback();
+    });
+
+    expect(topic.isPersisted()).toBe(false);
+    expect(topic.isNewRecord()).toBe(true);
+    expect(await Topic.count()).toBe(0);
+    await topic.saveBang();
+    expect(topic.isPersisted()).toBe(true);
+    expect(await Topic.count()).toBe(1);
   });
 
   it("break from transaction commits", async () => {
@@ -867,30 +886,52 @@ describe("TransactionTest", () => {
   });
 
   it.skip("throw from transaction commits", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
+    // PERMANENT-SKIP: Ruby-only — throw/catch semantics
     // Ruby's throw/catch is non-exceptional control flow that commits the
-    // transaction. JS throw is always exceptional (causes rollback). Skip.
+    // transaction. JS throw is always exceptional and always causes rollback.
+    // There is no JS equivalent that would let a transaction commit when the
+    // block exits via throw. The `break from transaction commits` test covers
+    // the JS equivalent (early return = commit).
   });
   it.skip("number of transactions in commit", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
+    // BLOCKED: transactions — needs openTransactions probe on adapter
+    // ROOT-CAUSE: Rails test monkey-patches commit_db_transaction to read
+    //   transaction_manager.open_transactions at commit time and assert it = 0.
+    //   Requires exposing openTransactions count on our TransactionManager
+    //   and a way to hook into commitDbTransaction without modifying src.
+    // SCOPE: ~15 LOC (openTransactions accessor + test body).
   });
 
-  it.skip("raising exception in callback rollbacks in save", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    /* needs real transaction wrapping around create — afterCreate fires
-       after INSERT so rollback requires DB-level transaction support */
+  it("raising exception in callback rollbacks in save", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+    );
+    let shouldRaise = false;
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+        this.afterSave(() => {
+          if (shouldRaise) throw new Error("Make the transaction rollback");
+        });
+      }
+    }
+    const first = await Topic.create({ title: "First", approved: false });
+    shouldRaise = true;
+    first.approved = true;
+    await expect(first.save()).rejects.toThrow("Make the transaction rollback");
+    const reloaded = await Topic.find(first.id);
+    expect(reloaded.approved).toBe(false);
   });
   it.skip("update should rollback on failure!", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    // Requires has_many associations and validation-triggered rollback.
+    // BLOCKED: transactions — needs has_many association + validation-triggered rollback
+    // ROOT-CAUSE: Rails test uses Topic with has_many :replies and a save! that fails
+    //   validation on the associated record, rolling back the outer transaction.
+    //   Requires has_many association wiring (Slot B fixture models).
+    // SCOPE: ~20 LOC test body; unblocked after Slot B (Topic+Reply model).
   });
   it("manually rolling back a transaction", async () => {
     class Topic extends Base {
@@ -979,35 +1020,39 @@ describe("TransactionTest", () => {
   });
 
   it.skip("restore frozen state after double destroy", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    // Requires dependent associations (topic.replies).
+    // BLOCKED: transactions — needs dependent associations (has_many :replies)
+    // ROOT-CAUSE: Rails test calls topic.destroy twice inside a transaction, relying
+    //   on :dependent => :destroy cascade. Requires Topic+Reply fixture models (Slot B).
+    // SCOPE: ~15 LOC test body; unblocked after Slot B.
   });
 
   it.skip("restore previously new record after double save", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    // Rails uses @_start_transaction_state tracked by nesting level so the
-    // pre-transaction snapshot is only captured once. Our implementation takes
-    // a fresh snapshot on every saveWithTransactions call, so the second save's
-    // snapshot (previouslyNewRecord=false) overwrites the first save's
-    // (previouslyNewRecord=true), making the restored state incorrect.
+    // BLOCKED: transactions — snapshot-overwrite on multiple saves
+    // ROOT-CAUSE: withTransactionReturningStatus registers a fresh tx.afterRollback
+    //   per save. With two saves, both register restore hooks on the same outer
+    //   transaction. Rollback fires hooks in registration order: the second save's
+    //   hook (previouslyNewRecord=false) runs last, overwriting the first save's
+    //   correct restore (previouslyNewRecord=true). Rails avoids this because
+    //   @_start_transaction_state is only captured once (||= idiom) at the outermost
+    //   save, and subsequent saves increment the level counter without taking a new
+    //   snapshot for rollback restoration.
+    // SCOPE: ~10 LOC fix in transactions.ts#withTransactionReturningStatus; deferred.
   });
 
   it.skip("restore composite id after rollback", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    // Requires composite primary key model setup.
+    // BLOCKED: transactions — needs Cpk::Book fixture model (composite PK)
+    // ROOT-CAUSE: Rails test uses Cpk::Book with id=[1,2], updates to [42,42],
+    //   rolls back, expects id restored to [1,2]. Requires composite-PK model
+    //   fixture wiring (Slot B).
+    // SCOPE: ~10 LOC test body; unblocked after Slot B.
   });
 
   it.skip("restore custom primary key after rollback", () => {
-    // BLOCKED: transactions — transaction / savepoint / isolation gap
-    // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
-    // SCOPE: ~50 LOC fix in transactions.ts; affects ~15 tests in transactions.test.ts
-    // Requires Movie model with custom primary key (movieid).
+    // BLOCKED: transactions — needs Movie fixture model (custom primary key)
+    // ROOT-CAUSE: Rails test uses Movie with primaryKey="movieid", updates PK
+    //   inside a transaction, rolls back, expects original PK restored.
+    //   Requires Movie model fixture wiring (Slot B).
+    // SCOPE: ~10 LOC test body; unblocked after Slot B.
   });
 
   it("assign id after rollback", async () => {
