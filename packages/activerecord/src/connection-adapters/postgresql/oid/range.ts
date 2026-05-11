@@ -30,6 +30,15 @@ export class Range {
     this.end = end;
     this.excludeEnd = excludeEnd;
   }
+
+  toString(): string {
+    const encode = (v: unknown): string => {
+      if (v === null || v === undefined || v === -Infinity || v === Infinity) return "";
+      const s = String(v);
+      return /[",\\\s[\]()]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"` : s;
+    };
+    return `[${encode(this.begin)},${encode(this.end)}${this.excludeEnd ? ")" : "]"}`;
+  }
 }
 
 export interface RangeSubtype {
@@ -114,12 +123,7 @@ export class RangeType extends ValueType<Range> {
   encodeLiteral(value: unknown): string {
     const serialized = this.serialize(value);
     if (!(serialized instanceof Range)) return String(value);
-    const encode = (v: unknown): string => {
-      if (v === null || v === undefined || v === -Infinity || v === Infinity) return "";
-      const s = String(v);
-      return /[",\\\s[\]()]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"` : s;
-    };
-    return `[${encode(serialized.begin)},${encode(serialized.end)}${serialized.excludeEnd ? ")" : "]"}`;
+    return serialized.toString();
   }
 
   private typeCastSingle(value: unknown): unknown {

@@ -8,6 +8,7 @@ import { Range } from "../../relation.js";
 import { MultiRange } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
@@ -16,6 +17,7 @@ const toBigInt = (s: string) => BigInt(s);
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let PostgresqlRanges: any;
+  let PostgresqlRangesTz: any;
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
@@ -48,6 +50,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
+
+    class PostgresqlRangesTzCls extends Base {
+      static tableName = "postgresql_ranges";
+      static timeZoneAwareAttributes = true;
+      static timeZoneAwareTypes = [...Base.timeZoneAwareTypes, "tsrange", "tstzrange"];
+      static {
+        this.adapter = adapter;
+      }
+    }
+    await PostgresqlRangesTzCls.loadSchema();
+    PostgresqlRangesTz = PostgresqlRangesTzCls;
+  });
+  afterEach(() => {
+    resetZone();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
@@ -465,26 +481,80 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(infinite.end).toBeNull();
       expect(parseRange("empty", toFloat)).toBeNull();
     });
-    it.skip("timezone awareness tzrange", () => {
-      // BLOCKED: range — TimeZoneConversion not wired and predicate broken for range types
-      // ROOT-CAUSE: (1) time-zone-conversion.ts is never imported/used — not wired into Model;
-      //   (2) isCreateTimeZoneConversionAttribute checks castType.type (a property) but Type exposes
-      //   type() as a method — predicate always returns false even if wired; (3) timeZoneAwareTypes
-      //   defaults to ["datetime","time"] — tsrange/tstzrange would also need to be added
-      // SCOPE: ~100 LOC — wire module into Model + fix castType.type() call + add tsrange/tstzrange; separate story; affects 9 tests
+    it("timezone awareness tzrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, timeString, false) });
+      const range1 = r.tstz_range as Range;
+      expect(range1.begin).toBeInstanceOf(TimeWithZone);
+      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.tstz_range as Range;
+      expect(range2.begin).toBeInstanceOf(TimeWithZone);
+      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
     });
-    it.skip("timezone awareness endless tzrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+    it("timezone awareness endless tzrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, null, true) });
+      const range1 = r.tstz_range as Range;
+      expect(range1.begin).toBeInstanceOf(TimeWithZone);
+      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect(range1.end).toBeNull();
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.tstz_range as Range;
+      expect(range2.begin).toBeInstanceOf(TimeWithZone);
+      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect(range2.end).toBeNull();
     });
-    it.skip("timezone awareness beginless tzrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+    it("timezone awareness beginless tzrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ tstz_range: new Range(null, timeString, false) });
+      const range1 = r.tstz_range as Range;
+      expect(range1.begin).toBeNull();
+      expect(range1.end).toBeInstanceOf(TimeWithZone);
+      expect((range1.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.tstz_range as Range;
+      expect(range2.begin).toBeNull();
+      expect(range2.end).toBeInstanceOf(TimeWithZone);
+      expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
     it.skip("timezone array awareness tzrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges/tstz_ranges array columns in setup
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+      // DEFERRED to follow-up PR: requires tstz_ranges tstzrange[] column in setup
     });
     it("create tstzrange", async () => {
       // Rails: Time.parse("2010-01-01 14:30:00 +0100")...Time.parse("2011-02-02 14:30:00 CDT") → UTC-normalised
@@ -603,22 +673,80 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
       expect(res2.excludeEnd).toBe(false);
     });
-    it.skip("timezone awareness tsrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+    it("timezone awareness tsrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
+      const range1 = r.ts_range as Range;
+      expect(range1.begin).toBeInstanceOf(TimeWithZone);
+      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.ts_range as Range;
+      expect(range2.begin).toBeInstanceOf(TimeWithZone);
+      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
     });
-    it.skip("timezone awareness endless tsrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+    it("timezone awareness endless tsrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, null, true) });
+      const range1 = r.ts_range as Range;
+      expect(range1.begin).toBeInstanceOf(TimeWithZone);
+      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect(range1.end).toBeNull();
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.ts_range as Range;
+      expect(range2.begin).toBeInstanceOf(TimeWithZone);
+      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        instant.epochMilliseconds,
+      );
+      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect(range2.end).toBeNull();
     });
-    it.skip("timezone awareness beginless tsrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+    it("timezone awareness beginless tsrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2020-06-15T10:00:00-07:00";
+      const instant = Temporal.Instant.from(timeString);
+
+      const r = new PostgresqlRangesTz({ ts_range: new Range(null, timeString, false) });
+      const range1 = r.ts_range as Range;
+      expect(range1.begin).toBeNull();
+      expect(range1.end).toBeInstanceOf(TimeWithZone);
+      expect((range1.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.ts_range as Range;
+      expect(range2.begin).toBeNull();
+      expect(range2.end).toBeInstanceOf(TimeWithZone);
+      expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
     it.skip("timezone array awareness tsrange", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires ts_ranges array column in setup
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+      // DEFERRED to follow-up PR: requires ts_ranges tsrange[] column in setup
     });
     it("create tstzrange preserve usec", async () => {
       // Rails: Time.parse("2010-01-01 14:30:00.670277 +0100")...Time.parse("2011-02-02 14:30:00.745125 CDT")
@@ -668,9 +796,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(r.ts_range).toBeNull();
     });
     it.skip("timezone awareness tsrange preserve usec", () => {
-      // BLOCKED: range — time_zone_aware_types infrastructure not implemented
-      // ROOT-CAUSE: same as "timezone awareness tzrange"; also requires µs-level time-zone conversion
-      // SCOPE: ~200+ LOC shared with "timezone awareness tzrange" fix; affects 9 tests
+      // DEFERRED to follow-up PR (LOC budget): same infrastructure as basic tests; µs precision
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))

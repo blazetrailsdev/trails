@@ -177,7 +177,7 @@ export function quote(value: unknown): string {
     return quoteString(value.toString());
   }
   if (value instanceof Range) {
-    return quoteString(encodeRange(value));
+    return quoteString(value.toString());
   }
   if (value instanceof MultiRange) {
     return quoteString(encodeMultirange(value));
@@ -237,7 +237,7 @@ export function typeCast(value: unknown): unknown {
     return value.toString();
   }
   if (value instanceof Range) {
-    return encodeRange(value);
+    return value.toString();
   }
   if (value instanceof MultiRange) {
     return encodeMultirange(value);
@@ -389,25 +389,8 @@ export function quotedDate(
 }
 
 /** @internal */
-function encodeRange(value: Range): string {
-  const lower = value.begin == null || value.begin === -Infinity ? "" : String(value.begin);
-  const upper = value.end == null || value.end === Infinity ? "" : String(value.end);
-  return `[${lower},${upper}${value.excludeEnd ? ")" : "]"}`;
-}
-
-/** @internal */
 function encodeMultirange(value: MultiRange): string {
-  return `{${value.ranges.map(encodeRangeLiteral).join(",")}}`;
-}
-
-/** @internal */
-function encodeRangeLiteral(value: Range): string {
-  const encode = (v: unknown): string => {
-    if (v === null || v === undefined || v === -Infinity || v === Infinity) return "";
-    const s = String(v);
-    return /[",\\\s[\]()]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"` : s;
-  };
-  return `[${encode(value.begin)},${encode(value.end)}${value.excludeEnd ? ")" : "]"}`;
+  return `{${value.ranges.map((r) => r.toString()).join(",")}}`;
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {

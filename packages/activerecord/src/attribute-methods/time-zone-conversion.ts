@@ -86,13 +86,33 @@ export class TimeZoneConverter extends ValueType<unknown> {
     // to mirror Rails' `map(super) { |v| cast(v) }`.
     const casted = this._subtype.cast(value);
     if (Array.isArray(casted)) {
-      return casted.map((v) => this.cast(v));
+      // Elements may themselves be Range-like (tsrange[] columns): apply TZ
+      // conversion to each bound. Bounds may be strings (when the user assigns
+      // Range objects with string bounds) or Instants (when cast by the subtype).
+      // Scalar elements (datetime[] columns) arrive here as Temporal.Instants
+      // after ArrayType pre-casts them through the DateTime subtype; this.cast(v)
+      // reaches convertTimeToTimeZone via the fallback path rather than through
+      // ArrayType.cast again (which would be a no-op second pass).
+      return casted.map((v) => (isRangeLike(v) ? mapRange(v, castBoundInZone) : this.cast(v)));
+    }
+    if (isRangeLike(casted)) {
+      // Range-typed columns (tsrange/tstzrange): cast each bound through the
+      // dedicated bound helper so string bounds are parsed in the current zone
+      // and Instants are zone-wrapped — without routing through _subtype.cast
+      // (which is RangeType and would misparse a timestamp string as a range literal).
+      return mapRange(casted, castBoundInZone);
     }
     return convertTimeToTimeZone(casted);
   }
 
   override deserialize(value: unknown): unknown {
-    return convertTimeToTimeZone(this._subtype.deserialize(value));
+    const d = this._subtype.deserialize(value);
+    if (Array.isArray(d))
+      return (d as unknown[]).map((v) =>
+        isRangeLike(v) ? mapRange(v, convertTimeToTimeZone) : convertTimeToTimeZone(v),
+      );
+    if (isRangeLike(d)) return mapRange(d, convertTimeToTimeZone);
+    return convertTimeToTimeZone(d);
   }
 
   override serialize(value: unknown): unknown {
@@ -100,12 +120,11 @@ export class TimeZoneConverter extends ValueType<unknown> {
     // cast_value on it. In Ruby, TimeWithZone acts_like?(:time) so AR's
     // DateTime type can handle it. In TS, DateTime.castValue() can't parse
     // a TimeWithZone — extract the UTC Temporal.Instant first.
-    const resolved = value instanceof TimeWithZone ? value.utc() : value;
-    return this._subtype.serialize(resolved);
+    return this._subtype.serialize(this._resolveForSerialize(value));
   }
 
   override serializeCastValue(value: unknown): unknown {
-    const resolved = value instanceof TimeWithZone ? value.utc() : value;
+    const resolved = this._resolveForSerialize(value);
     const sub = this._subtype as ValueTypeInstance;
     if (typeof sub.itselfIfSerializeCastValueCompatible === "function") {
       return sub.itselfIfSerializeCastValueCompatible()
@@ -147,6 +166,19 @@ export class TimeZoneConverter extends ValueType<unknown> {
     if (subsec < 0n) subsec += 1_000_000_000n;
     const roundedOff = subsec % mod;
     return ns - roundedOff;
+  }
+
+  // Strips TimeWithZone from any value before DB serialization. Extracts UTC
+  // Temporal.Instant from TimeWithZone bounds in Range/Array values so the
+  // subtype's serialize (which doesn't understand TimeWithZone) receives plain
+  // Instants or timestamps.
+  private _resolveForSerialize(value: unknown): unknown {
+    const extractUtc = (v: unknown): unknown => (v instanceof TimeWithZone ? v.utc() : v);
+    if (Array.isArray(value)) {
+      return value.map((v) => (isRangeLike(v) ? mapRange(v, extractUtc) : extractUtc(v)));
+    }
+    if (isRangeLike(value)) return mapRange(value, extractUtc);
+    return extractUtc(value);
   }
 
   override equals(other: Type): boolean {
@@ -256,6 +288,48 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
+}
+
+/** @internal */
+function castBoundInZone(value: unknown): unknown {
+  if (value == null) return null;
+  if (value instanceof TimeWithZone) return convertTimeToTimeZone(value);
+  if (value instanceof Temporal.Instant) return convertTimeToTimeZone(value);
+  if (value instanceof Temporal.ZonedDateTime) return convertTimeToTimeZone(value.toInstant());
+  if (value instanceof Temporal.PlainDateTime) {
+    const instant = value.toZonedDateTime(configuredTimezone()).toInstant();
+    return setTimeZoneWithoutConversion(instant);
+  }
+  if (typeof value === "string") {
+    const zone = getZone();
+    if (zone) {
+      const parsed = parseStringInZone(value, zone);
+      if (parsed !== null) return parsed;
+    }
+  }
+  return convertTimeToTimeZone(value);
+}
+
+interface RangeLike {
+  readonly begin: unknown;
+  readonly end: unknown;
+  readonly excludeEnd: boolean;
+  constructor: new (begin: unknown, end: unknown, excludeEnd: boolean) => RangeLike;
+}
+
+/** @internal */
+function isRangeLike(v: unknown): v is RangeLike {
+  if (v == null || typeof v !== "object" || Array.isArray(v) || isPlainObject(v)) return false;
+  return "begin" in v && "end" in v && "excludeEnd" in v;
+}
+
+/** @internal */
+function mapRange(range: RangeLike, fn: (v: unknown) => unknown): object {
+  return new (range.constructor as any)(
+    range.begin != null ? fn(range.begin) : null,
+    range.end != null ? fn(range.end) : null,
+    range.excludeEnd,
+  );
 }
 
 interface TimeZoneConversionHost {
