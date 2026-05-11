@@ -106,4 +106,50 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).toContain("DEFAULT CURRENT_TIMESTAMP");
     expect(sql).not.toContain("DEFAULT 'CURRENT_TIMESTAMP'");
   });
+
+  it.each([
+    ["NOW()", "(NOW())"],
+    ["CURRENT_DATE", "(CURRENT_DATE)"],
+    ["CURRENT_TIME", "(CURRENT_TIME)"],
+    ["uuid()", "(uuid())"],
+  ])(
+    "wraps DEFAULT_GENERATED default %s in parens (mirrors newColumnFromField)",
+    async (defaultVal, expectedFragment) => {
+      const adapter = await makeAdapter("col", "DEFAULT_GENERATED");
+      adapter.columnDefinitions = async () => [
+        {
+          Field: "col",
+          Type: "varchar(36)",
+          Null: "YES",
+          Default: defaultVal,
+          Extra: "DEFAULT_GENERATED",
+          Collation: null,
+          Comment: "",
+        },
+      ];
+      const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+      expect(sql).toContain(`DEFAULT ${expectedFragment}`);
+      expect(sql).not.toContain(`DEFAULT '`);
+    },
+  );
+
+  it("wraps arbitrary DEFAULT_GENERATED expression in parens, not as a quoted string", async () => {
+    // e.g. MySQL 8 expression defaults like `json_array()` that aren't in RENAME_FUNC_DEFAULT_RE.
+    // newColumnFromField wraps these in () and sets defaultFunction — we must match.
+    const adapter = await makeAdapter("col", "DEFAULT_GENERATED");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "col",
+        Type: "json",
+        Null: "YES",
+        Default: "json_array()",
+        Extra: "DEFAULT_GENERATED",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(sql).toContain("DEFAULT (json_array())");
+    expect(sql).not.toContain("DEFAULT 'json_array()'");
+  });
 });

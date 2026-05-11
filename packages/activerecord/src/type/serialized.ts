@@ -80,6 +80,11 @@ export class Serialized extends ValueType {
     return true;
   }
 
+  // Rails: Serialized uses DelegateClass so binary? delegates to subtype automatically.
+  override isBinary(): boolean {
+    return this.subtype.isBinary();
+  }
+
   private isDefaultValue(value: unknown): boolean {
     if (value === this._defaultValue) return true;
     if (value === null || value === undefined)

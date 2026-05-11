@@ -103,6 +103,11 @@ const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
 const ER_TABLE_EXISTS = 1050;
 
+// Function defaults emitted without DEFAULT_GENERATED in Extra (e.g. CURRENT_TIMESTAMP on
+// datetime columns). Used by renameColumnForAlter to emit them unquoted in the CHANGE clause.
+const RENAME_FUNC_DEFAULT_RE =
+  /^(CURRENT_TIMESTAMP(\([0-6]?\))?|NOW(\([0-6]?\))?|CURRENT_DATE|CURRENT_TIME(\([0-6]?\))?|UUID\(\))$/i;
+
 // Hot-path constants for the escape-only `quoteString` override below.
 // Match `MYSQL_ESCAPE_RE` / `MYSQL_ESCAPE_MAP` in `mysql/quoting.ts`
 // (those are module-private). Hoisted here so each call avoids
@@ -1190,14 +1195,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const col = cols.find((c) => (c["Field"] as string) === columnName);
     if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
     // Guard against silently dropping Extra attributes we cannot reconstruct (e.g. generated
-    // columns). AUTO_INCREMENT is preserved via ColumnOptions.autoIncrement; ON UPDATE <expr>
-    // (including MySQL 8 compound form "DEFAULT_GENERATED on update CURRENT_TIMESTAMP") is
-    // preserved via MysqlAddColumnOptions.onUpdate. Anything else triggers an explicit throw so
-    // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
+    // columns). Allowed values: AUTO_INCREMENT (via ColumnOptions.autoIncrement), ON UPDATE <expr>
+    // (via MysqlAddColumnOptions.onUpdate, including the MySQL 8 compound form
+    // "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"), and DEFAULT_GENERATED alone (function
+    // default — reconstructed via RENAME_FUNC_DEFAULT_RE / paren-wrap lambda in colDefault below).
+    // Anything else triggers an explicit throw so callers know to upgrade MySQL.
     const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
     const extra = extraRaw.toLowerCase();
     const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
-    if (extra && extra !== "auto_increment" && !onUpdateMatch) {
+    if (extra && extra !== "auto_increment" && extra !== "default_generated" && !onUpdateMatch) {
       throw new Error(
         `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
           `— Extra="${col["Extra"]}" is not preserved by this path. ` +
@@ -1205,13 +1211,30 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       );
     }
     const rawDefault = col["Default"] !== null ? (col["Default"] as string) : undefined;
-    // SHOW FULL FIELDS returns function defaults as plain strings (e.g. "CURRENT_TIMESTAMP").
+    // SHOW FULL FIELDS returns function defaults as plain strings (e.g. "CURRENT_TIMESTAMP", "NOW()").
     // Rails' column.default is nil for function defaults; pass as a lambda so
-    // quoteDefaultExpression emits it unquoted: DEFAULT CURRENT_TIMESTAMP, not DEFAULT 'CURRENT_TIMESTAMP'.
-    const colDefault =
-      typeof rawDefault === "string" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(rawDefault)
-        ? () => rawDefault
-        : rawDefault;
+    // quoteDefaultExpression emits it unquoted: DEFAULT NOW(), not DEFAULT 'NOW()'.
+    // Mirrors newColumnFromField: CURRENT_TIMESTAMP datetime cols and DEFAULT_GENERATED cols
+    // always go through the function-default path; everything else only when RENAME_FUNC_DEFAULT_RE matches.
+    // RENAME_FUNC_DEFAULT_RE only applies to the non-DEFAULT_GENERATED path (e.g. CURRENT_TIMESTAMP
+    // on datetime columns, which MySQL emits without DEFAULT_GENERATED in Extra).
+    let colDefault: (() => string) | string | undefined;
+    if (typeof rawDefault === "string") {
+      if (extra === "default_generated") {
+        // Mirrors newColumnFromField (mysql/schema-statements.ts): DEFAULT_GENERATED expressions
+        // must be wrapped in parens so MySQL accepts them in ALTER TABLE … CHANGE.
+        const expr = rawDefault.startsWith("(") ? rawDefault : `(${rawDefault})`;
+        colDefault = () => expr;
+      } else if (RENAME_FUNC_DEFAULT_RE.test(rawDefault)) {
+        // Well-known keyword defaults on non-DEFAULT_GENERATED columns (e.g. CURRENT_TIMESTAMP
+        // on datetime): emit as-is, no parens.
+        colDefault = () => rawDefault;
+      } else {
+        colDefault = rawDefault;
+      }
+    } else {
+      colDefault = rawDefault;
+    }
     const colOpts: MysqlAddColumnOptions = {
       // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
       // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
