@@ -1197,7 +1197,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
     const extra = extraRaw.toLowerCase();
     const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
-    if (extra && extra !== "auto_increment" && !onUpdateMatch) {
+    if (extra && extra !== "auto_increment" && extra !== "default_generated" && !onUpdateMatch) {
       throw new Error(
         `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
           `— Extra="${col["Extra"]}" is not preserved by this path. ` +

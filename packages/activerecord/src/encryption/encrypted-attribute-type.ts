@@ -1,4 +1,5 @@
 import { Type, ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
+import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { WrappedType } from "./wrapped-type.js";
@@ -325,9 +326,9 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
       // Rails: binary_cast_type = cast_type.serialized? ? cast_type.subtype : cast_type
       // For Serialized binary types, deserialize through the subtype only — the coder
       // (YAML/JSON) should not run on the raw binary ciphertext.
-      const binaryCastType =
-        (this.castType as any).isSerialized?.() && (this.castType as any).subtype
-          ? (this.castType as any).subtype
+      const binaryCastType: Type =
+        this.castType.isSerialized() && this.castType instanceof Serialized
+          ? this.castType.subtype
           : this.castType;
       const raw = binaryCastType.deserialize?.(value) ?? value;
       // Use Latin-1 (not UTF-8) so bytes 128–255 survive the round-trip. The
