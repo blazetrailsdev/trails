@@ -18,6 +18,7 @@ describe("SchemaDumperTest", () => {
   });
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
+    SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
   });
 
   it("dump schema information with empty versions", async () => {
@@ -408,43 +409,133 @@ describe("SchemaDumperTest", () => {
     /* needs unique constraint + id: false */
   });
 
-  it.skip("foreign keys are dumped at the bottom to circumvent dependency issues", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs foreign key dumping in SchemaDumper */
+  it("foreign keys are dumped at the bottom to circumvent dependency issues", async () => {
+    const source = {
+      tables: async () => ["authors", "books"],
+      columns: async (t: string) =>
+        t === "authors"
+          ? [{ name: "id", type: "integer", primaryKey: true }]
+          : [
+              { name: "id", type: "integer", primaryKey: true },
+              { name: "author_id", type: "integer" },
+            ],
+      indexes: async () => [],
+      foreignKeys: async (t: string) =>
+        t === "books"
+          ? [
+              {
+                fromTable: "books",
+                toTable: "authors",
+                column: "author_id",
+                primaryKey: "id",
+                name: "fk_books_author_id",
+              },
+            ]
+          : [],
+    };
+    const output = await SchemaDumper.dump(source as any);
+    const authorsIdx = output.indexOf('createTable("authors"');
+    const booksIdx = output.indexOf('createTable("books"');
+    const fkIdx = output.indexOf("addForeignKey");
+    expect(authorsIdx).toBeGreaterThan(-1);
+    expect(booksIdx).toBeGreaterThan(-1);
+    expect(fkIdx).toBeGreaterThan(Math.max(authorsIdx, booksIdx));
+    expect(output).toContain('addForeignKey("books", "authors"');
   });
-  it.skip("do not dump foreign keys for ignored tables", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs foreign key dumping in SchemaDumper */
+  it("do not dump foreign keys for ignored tables", async () => {
+    SchemaDumper.ignoreTables = ["books"];
+    const source = {
+      tables: async () => ["authors", "books"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+      foreignKeys: async (t: string) =>
+        t === "books"
+          ? [
+              {
+                fromTable: "books",
+                toTable: "authors",
+                column: "author_id",
+                primaryKey: "id",
+                name: "fk_books_author_id",
+              },
+            ]
+          : [],
+    };
+    const output = await SchemaDumper.dump(source as any);
+    expect(output).not.toContain("addForeignKey");
+    expect(output).not.toContain('"books"');
   });
-  it.skip("do not dump foreign keys when bypassed by config", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs foreign key dump config */
+  it("do not dump foreign keys when bypassed by config", async () => {
+    // Source has no foreignKeys hook — equivalent to a connection where FK dumping is unavailable.
+    const source = {
+      tables: async () => ["authors", "books"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+    };
+    const output = await SchemaDumper.dump(source as any);
+    expect(output).not.toContain("addForeignKey");
   });
 
-  it.skip("schema dump with table name prefix and suffix", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs prefix/suffix stripping in SchemaDumper */
+  it("fkIgnorePattern suppresses name for matching FK names, includes name for non-matching", async () => {
+    const mkSource = (fkName: string) => ({
+      tables: async () => ["books"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+      foreignKeys: async () => [
+        {
+          fromTable: "books",
+          toTable: "authors",
+          column: "author_id",
+          primaryKey: "id",
+          name: fkName,
+        },
+      ],
+    });
+    // auto-generated Rails name → name: omitted (export_name_on_schema_dump? == false)
+    const autoName = "fk_rails_abc123def4";
+    const autoOutput = await SchemaDumper.dump(mkSource(autoName) as any);
+    expect(autoOutput).toContain("addForeignKey");
+    expect(autoOutput).not.toContain(`"${autoName}"`);
+    // custom name → name: included
+    const customName = "fk_books_author_id";
+    const customOutput = await SchemaDumper.dump(mkSource(customName) as any);
+    expect(customOutput).toContain(`name: "${customName}"`);
   });
 
-  it.skip("schema dump with table name prefix and suffix regexp escape", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs prefix/suffix stripping in SchemaDumper */
+  it("schema dump with table name prefix and suffix", async () => {
+    await ctx.createTable("myapp_users_v1", {}, (t) => {
+      t.string("name");
+    });
+    const output = SchemaDumper.dump(ctx, {
+      tableNamePrefix: "myapp_",
+      tableNameSuffix: "_v1",
+    }) as string;
+    expect(output).toContain('"users"');
+    expect(output).not.toContain("myapp_users_v1");
   });
-  it.skip("schema dump with table name prefix and ignoring tables", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs prefix/suffix stripping in SchemaDumper */
+
+  it("schema dump with table name prefix and suffix regexp escape", async () => {
+    const source = {
+      tables: async () => ["app.prefix_users"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+    };
+    const output = await SchemaDumper.dump(source as any, { tableNamePrefix: "app.prefix_" });
+    expect(output).toContain('"users"');
+    expect(output).not.toContain("app.prefix_users");
+  });
+  it("schema dump with table name prefix and ignoring tables", async () => {
+    await ctx.createTable("myapp_users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.createTable("myapp_posts", {}, (t) => {
+      t.string("title");
+    });
+    SchemaDumper.ignoreTables = ["posts"];
+    const output = SchemaDumper.dump(ctx, { tableNamePrefix: "myapp_" }) as string;
+    expect(output).toContain('"users"');
+    expect(output).not.toContain('"posts"');
+    expect(output).not.toContain("myapp_");
   });
 
   it("schema dump with correct timestamp types via create table and t column", async () => {

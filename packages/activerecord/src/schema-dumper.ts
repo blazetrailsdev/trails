@@ -359,6 +359,8 @@ class AdapterSchemaSource implements SchemaSource {
 export class SchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;
   static ignoreTables: (string | RegExp)[] = [];
+  /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
+  static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
 
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
@@ -841,13 +843,20 @@ export class SchemaDumper {
       deferrable?: boolean | string;
       validate?: boolean;
     };
+    const rawFkPattern = (this.constructor as typeof SchemaDumper).fkIgnorePattern;
+    // Strip g/y flags to avoid mutating shared lastIndex state across iterations.
+    const fkIgnorePattern =
+      rawFkPattern.global || rawFkPattern.sticky
+        ? new RegExp(rawFkPattern.source, rawFkPattern.flags.replace(/[gy]/g, ""))
+        : rawFkPattern;
     for (const fk of fks as Fk[]) {
       const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
       const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
       const opts: string[] = [];
       if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
       if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      if (fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
+      // Mirrors Rails' export_name_on_schema_dump? — omit name when it matches the ignore pattern
+      if (fk.name && !fkIgnorePattern.test(fk.name)) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
       if (fk.deferrable !== undefined && fk.deferrable !== false)
