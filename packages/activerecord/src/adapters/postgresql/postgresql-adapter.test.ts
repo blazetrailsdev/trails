@@ -270,7 +270,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
         pid = (pidRows[0] as { pid: number }).pid;
-        const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`);
+        const sleepPromise = adapter.execute(`SELECT pg_sleep(2)`);
         // Give pg_sleep a moment to begin executing before we cancel it.
         await new Promise<void>((resolve) => setTimeout(resolve, 50));
         await withSecondAdapter(PG_TEST_URL, async (adapter2) => {

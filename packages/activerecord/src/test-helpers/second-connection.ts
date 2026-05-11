@@ -15,7 +15,7 @@ import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js"
  */
 export async function withSecondAdapter<T>(
   url: string,
-  fn: (adapter: PostgreSQLAdapter) => Promise<T>,
+  fn: (adapter: PostgreSQLAdapter) => T | Promise<T>,
 ): Promise<T> {
   const adapter = new PostgreSQLAdapter(url);
   try {
