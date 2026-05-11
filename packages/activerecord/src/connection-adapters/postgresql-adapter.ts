@@ -2537,7 +2537,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // yet in the map and load them in a single pg_type query before building
     // Column objects. This avoids N concurrent queries for wide tables.
     const missingOids = [
-      ...new Set(rows.map((r) => r.oid as number).filter((oid) => !this.typeMap.has(oid))),
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !this.typeMap.has(oid))),
     ];
     if (missingOids.length > 0) {
       await this.loadAdditionalTypes(missingOids);
@@ -2553,8 +2553,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
     return rows.map((r) => {
       const sqlType = r.type as string;
-      const oid = r.oid as number;
-      const fmod = r.fmod as number;
+      const oid = Number(r.oid);
+      const fmod = Number(r.fmod);
       // All OIDs are now registered (or warned as unknown) by the batch
       // load above. lookupCastTypeFromColumn mirrors Rails' fetch_type_metadata
       // after get_oid_type has pre-populated the map.
