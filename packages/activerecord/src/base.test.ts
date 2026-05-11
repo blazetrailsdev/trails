@@ -1851,20 +1851,121 @@ describe("BasicsTest", () => {
     }
     expect(() => User.limit("1, 7 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
   });
-  it.skip("preserving time objects", () => {
-    // BLOCKED: fixtures — reads Topic.find(1).written_on / bonus_time with known usec values (223300, 9900, 129346) from topics.yml fixture data; no equivalent in our in-memory test adapter
+  it("preserving time objects", async () => {
+    class Topic extends Base {
+      static {
+        this.tableName = "pres_tz_topics";
+        this.attribute("written_on", "datetime");
+        this.attribute("bonus_time", "time");
+        this.adapter = adapter;
+      }
+    }
+    await defineSchema(adapter, {
+      pres_tz_topics: { written_on: "datetime", bonus_time: "string" },
+    });
+    const t1 = await Topic.create({
+      written_on: Temporal.Instant.from("2003-07-16T14:28:11.223300Z"),
+      bonus_time: Temporal.PlainTime.from("11:30:00"),
+    });
+    const t2 = await Topic.create({
+      written_on: Temporal.Instant.from("2003-07-16T14:28:11.009900Z"),
+    });
+    const t3 = await Topic.create({
+      written_on: Temporal.Instant.from("2003-07-16T14:28:11.129346Z"),
+    });
+    const topic1 = await Topic.find(t1.id);
+    expect(topic1.readAttribute("bonus_time")).toBeInstanceOf(Temporal.PlainTime);
+    const wo1 = topic1.readAttribute("written_on") as Temporal.Instant;
+    expect(wo1).toBeInstanceOf(Temporal.Instant);
+    const zdt1 = wo1.toZonedDateTimeISO("UTC");
+    expect(zdt1.second).toBe(11);
+    expect(zdt1.millisecond * 1000 + zdt1.microsecond).toBe(223300);
+    const zdt2 = (
+      (await Topic.find(t2.id)).readAttribute("written_on") as Temporal.Instant
+    ).toZonedDateTimeISO("UTC");
+    expect(zdt2.millisecond * 1000 + zdt2.microsecond).toBe(9900);
+    const zdt3 = (
+      (await Topic.find(t3.id)).readAttribute("written_on") as Temporal.Instant
+    ).toZonedDateTimeISO("UTC");
+    expect(zdt3.millisecond * 1000 + zdt3.microsecond).toBe(129346);
   });
-  it.skip("preserving time objects with local time conversion to default timezone utc", () => {
-    // BLOCKED: fixtures + with_env_tz — sets process-level TZ env var (eastern_time_zone) then creates Topic from fixture; Node.js has no equivalent of Ruby's with_env_tz (ENV["TZ"])
+  it("preserving time objects with local time conversion to default timezone utc", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "pres_tz_topics";
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
+      // Rails: Time.local(2000) in EST process TZ = 2000-01-01 00:00:00 EST = 05:00 UTC
+      const estMidnight = Temporal.Instant.from("2000-01-01T05:00:00Z");
+      const topic = await Topic.create({ written_on: estMidnight });
+      const saved = await Topic.find(topic.id);
+      const savedTime = saved.readAttribute("written_on") as Temporal.Instant;
+      expect(savedTime.epochNanoseconds).toBe(estMidnight.epochNanoseconds);
+      expect(savedTime.toZonedDateTimeISO("UTC").hour).toBe(5);
+    });
   });
-  it.skip("preserving time objects with time with zone conversion to default timezone utc", () => {
-    // BLOCKED: fixtures + with_env_tz — same as above; uses Time.zone.local(2000) in CST then reloads and checks UTC offset
+  it("preserving time objects with time with zone conversion to default timezone utc", async () => {
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "pres_tz_topics";
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
+      // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00 CST (UTC-6) = 06:00 UTC
+      const cstMidnight = Temporal.Instant.from("2000-01-01T06:00:00Z");
+      const topic = await Topic.create({ written_on: cstMidnight });
+      const saved = await Topic.find(topic.id);
+      const savedTime = saved.readAttribute("written_on") as Temporal.Instant;
+      expect(savedTime.epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
+      expect(savedTime.toZonedDateTimeISO("UTC").hour).toBe(6);
+    });
   });
-  it.skip("preserving time objects with utc time conversion to default timezone local", () => {
-    // BLOCKED: fixtures + with_env_tz — reads back Time in "local" (EST) timezone via process-level TZ; no JS equivalent
+  it("preserving time objects with utc time conversion to default timezone local", async () => {
+    // Rails: with_env_tz(EST) + default: :local. We replace with_env_tz via setZone("America/New_York")
+    // and use timeZoneAwareAttributes to get back a zone-aware value in that timezone.
+    await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "pres_tz_topics";
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
+      const utcMidnight = Temporal.Instant.from("2000-01-01T00:00:00Z");
+      const topic = await Topic.create({ written_on: utcMidnight });
+      const saved = await Topic.find(topic.id);
+      const savedTime = saved.readAttribute("written_on") as TimeWithZone;
+      expect(savedTime.utc().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
+      expect(savedTime.hour).toBe(19); // midnight UTC = 19:00 EST (UTC-5)
+    });
   });
-  it.skip("preserving time objects with time with zone conversion to default timezone local", () => {
-    // BLOCKED: fixtures + with_env_tz — same as above; Time.zone.local(2000) in CST then reload in EST local
+  it("preserving time objects with time with zone conversion to default timezone local", async () => {
+    // Rails: with_env_tz(EST) + CST zone + default: :local. We replace with_env_tz via setZone("America/New_York").
+    await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
+      class Topic extends Base {
+        static {
+          this.tableName = "pres_tz_topics";
+          this.attribute("written_on", "datetime");
+          this.adapter = adapter;
+        }
+      }
+      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
+      // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00 CST (UTC-6) = 06:00 UTC = 01:00 EST
+      const cstMidnight = Temporal.Instant.from("2000-01-01T06:00:00Z");
+      const topic = await Topic.create({ written_on: cstMidnight });
+      const saved = await Topic.find(topic.id);
+      const savedTime = saved.readAttribute("written_on") as TimeWithZone;
+      expect(savedTime.utc().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
+      expect(savedTime.hour).toBe(1); // 06:00 UTC = 01:00 EST (UTC-5)
+    });
   });
   it("time zone aware attribute with default timezone utc on utc can be created", async () => {
     await withTimezoneConfig({ awareAttributes: true, default: "utc", zone: "UTC" }, async () => {
