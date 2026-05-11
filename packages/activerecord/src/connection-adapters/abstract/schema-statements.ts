@@ -158,9 +158,8 @@ export class SchemaStatements {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
     for (const name of tableNames) {
-      await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}${cascade}`);
+      await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}`);
     }
   }
 

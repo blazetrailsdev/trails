@@ -1186,7 +1186,17 @@ export class MigrationContext {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
     if (options?.force) {
-      await this.dropTable(name).catch(() => {});
+      if (options.force === "cascade" && typeof (this.adapter as any).dropTable === "function") {
+        await (this.adapter as any)
+          .dropTable(name, { ifExists: true, force: "cascade" })
+          .catch(() => {});
+        this._tables.delete(name);
+        this._columns.delete(name);
+        this._columnMeta.delete(name);
+        this._indexes.delete(name);
+      } else {
+        await this.dropTable(name).catch(() => {});
+      }
     }
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
