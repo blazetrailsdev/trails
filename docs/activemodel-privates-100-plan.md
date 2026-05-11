@@ -13,26 +13,22 @@ subagents, no `Co-Authored-By` lines.
 
 Rails reference: `scripts/api-compare/.rails-source/activemodel/`.
 
-## Current state
+## Current state (2026-05-11)
 
 ```
-pnpm api:compare --package activemodel                                        → 451/452 (99.8%)
-pnpm tsx scripts/api-compare/compare.ts --privates --package activemodel      → 578/625 (92.5%)
-pnpm test:compare --package activemodel                                       → 959/963 (99.6%)
+pnpm api:compare --package activemodel                                        → 447/452 (98.9%)
+pnpm api:compare --package activemodel --privates                             → 620/625 (99.2%)
+pnpm test:compare --package activemodel                                       → 957/961 (99.6%)
 ```
 
-> ⚠️ **Don't run `pnpm api:compare --privates …` for the privates view.**
-> The `api:compare` script chains four commands with `&&`, and pnpm
-> forwards arguments only to the LAST command in the chain (the
-> `build-rails-privates-manifest` step). `compare.ts` ends up running
-> with no flags (= public-only mode), and the printed numbers come
-> from the manifest builder, not from the comparison report. Always
-> invoke `compare.ts` directly when you need privates totals.
+Privates jumped from 92.5% → **99.2%** since this doc's last refresh — 5
+methods (across files: 1 file out of 64 still missing) plus 3 inheritance
+slots remain.
 
 **Live miss list** — before scoping any PR, run:
 
 ```
-pnpm tsx scripts/api-compare/compare.ts --privates --package activemodel --missing
+pnpm api:compare --package activemodel --privates --missing
 ```
 
 The per-file miss tables previously embedded in this doc are removed
@@ -114,15 +110,13 @@ checking before scoping.
 Re-run the live miss command before scoping each — counts shift as
 upstream PRs land.
 
-**Track B target:** activemodel privates 92.5% → ~99%. Final 1% is
-non-portable Ruby internals (lifecycle hooks, `method_missing`, etc.)
-that should stay in the api-compare skip list.
+**Track B target:** activemodel privates 92.5% → ~99% — **reached (99.2% as of 2026-05-11)**. Final ~0.8% (5 methods + 1 file) is non-portable Ruby internals (lifecycle hooks, `method_missing`, etc.) that should stay in the api-compare skip list.
 
 ---
 
 ## Track C — `test:compare` push to 100%
 
-Currently 959/963 (99.6%). Only 4 missing tests. C0 investigation done;
+Currently 957/961 (99.6%). Only 4 missing tests. C0 investigation done;
 2 of 4 are pure test ports (Date `returns correct year`, DateTime `hash
 to time`) — trails likely already supports the underlying behavior via
 existing multiparameter paths. The other 2 need real implementation:
@@ -153,7 +147,7 @@ Order: C1 first (cheap, banks 2/4). C2 before C3 (the
 `Time.zone_default` block in C3's test reuses the current-zone
 infra C2 introduces).
 
-**Track C target:** test:compare 959/963 → 963/963 (100%).
+**Track C target:** test:compare 957/961 → 961/961 (100%).
 
 ---
 
