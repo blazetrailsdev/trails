@@ -35,12 +35,18 @@ import type {
 } from "../adapter.js";
 import {
   ConnectionNotEstablished,
+  DatabaseAlreadyExists,
   DatabaseConnectionError,
+  Deadlocked,
   InvalidForeignKey,
+  LockWaitTimeout,
   NoDatabaseError,
   NotNullViolation,
   PreparedStatementCacheExpired,
+  QueryCanceled,
+  RangeError as ActiveRecordRangeError,
   RecordNotUnique,
+  SerializationFailure,
   StatementInvalid,
   ValueTooLong,
   SQLWarning,
@@ -3704,6 +3710,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         return new NotNullViolation(msg, { sql, binds, cause });
       case "22001": // string_data_right_truncation
         return new ValueTooLong(msg, { sql, binds, cause });
+      case "22003": // numeric_value_out_of_range
+        return new ActiveRecordRangeError(msg, { sql, binds, cause });
+      case "40001": // serialization_failure
+        return new SerializationFailure(msg, { sql, binds, cause });
+      case "40P01": // deadlock_detected
+        return new Deadlocked(msg, { sql, binds, cause });
+      case "42P04": // duplicate_database
+        return new DatabaseAlreadyExists(msg, { sql, binds, cause });
+      case "55P03": // lock_not_available
+        return new LockWaitTimeout(msg, { sql, binds, cause });
+      case "57014": // query_canceled
+        return new QueryCanceled(msg, { sql, binds, cause });
       default:
         // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
         // 5-char shape alone isn't enough — Node system errors like

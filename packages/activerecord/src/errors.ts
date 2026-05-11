@@ -287,6 +287,17 @@ export class LockWaitTimeout extends StatementInvalid {
   }
 }
 
+/** Mirrors `ActiveRecord::QueryCanceled`. */
+export class QueryCanceled extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "QueryCanceled";
+  }
+}
+
 export class WrappedDatabaseException extends StatementInvalid {
   constructor(
     message?: string,
@@ -491,6 +502,17 @@ export class DatabaseVersionError extends ActiveRecordError {
   constructor(message?: string) {
     super(message ?? "Unknown database version");
     this.name = "DatabaseVersionError";
+  }
+}
+
+/** Mirrors `ActiveRecord::RangeError`. */
+export class RangeError extends StatementInvalid {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "RangeError";
   }
 }
 

@@ -228,6 +228,8 @@ export {
   SerializationFailure,
   Deadlocked,
   LockWaitTimeout,
+  QueryCanceled,
+  RangeError,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

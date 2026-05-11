@@ -8,12 +8,18 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionNotEstablished,
+  Deadlocked,
   InvalidForeignKey,
+  LockWaitTimeout,
   NotNullViolation,
+  QueryCanceled,
+  RangeError as ActiveRecordRangeError,
   RecordNotUnique,
+  SerializationFailure,
   SQLWarning,
   ValueTooLong,
 } from "../../errors.js";
+import { withSecondAdapter } from "../../test-helpers/second-connection.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -195,18 +201,58 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toBeInstanceOf(ValueTooLong);
     });
 
-    it.skip("translate exception lock wait timeout", async () => {
-      // BLOCKED: Two concurrent connections required (lock_timeout, SQLSTATE 55P03).
+    it("translate exception lock wait timeout", async () => {
+      await adapter.exec(`CREATE TABLE "ex_lock" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_lock" ("val") VALUES (1)`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.execute(`SELECT * FROM "ex_lock" WHERE id = 1 FOR UPDATE`);
+        await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+          await adapter2.beginTransaction();
+          try {
+            await adapter2.execute(`SET LOCAL lock_timeout = '100ms'`);
+            await expect(
+              adapter2.execute(`SELECT * FROM "ex_lock" WHERE id = 1 FOR UPDATE`),
+            ).rejects.toBeInstanceOf(LockWaitTimeout);
+          } finally {
+            await adapter2.rollback();
+          }
+        });
+      } finally {
+        await adapter.rollback();
+      }
     });
-    it.skip("translate exception deadlock", async () => {
-      // BLOCKED: Two concurrent connections required (deadlock, SQLSTATE 40P01).
+    it("translate exception deadlock", async () => {
+      await adapter.exec(`CREATE TABLE "ex_dl" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_dl" ("val") VALUES (1)`);
+      await adapter.executeMutation(`INSERT INTO "ex_dl" ("val") VALUES (2)`);
+      // conn1 locks row 1, conn2 locks row 2, then each tries to lock the other's row
+      await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+        await adapter.beginTransaction();
+        await adapter2.beginTransaction();
+        try {
+          await adapter.execute(`SELECT * FROM "ex_dl" WHERE id = 1 FOR UPDATE`);
+          await adapter2.execute(`SELECT * FROM "ex_dl" WHERE id = 2 FOR UPDATE`);
+          const [result1, result2] = await Promise.allSettled([
+            adapter.execute(`SELECT * FROM "ex_dl" WHERE id = 2 FOR UPDATE`),
+            adapter2.execute(`SELECT * FROM "ex_dl" WHERE id = 1 FOR UPDATE`),
+          ]);
+          const errors = [result1, result2]
+            .filter((r) => r.status === "rejected")
+            .map((r) => (r as PromiseRejectedResult).reason);
+          expect(errors.some((e) => e instanceof Deadlocked)).toBe(true);
+        } finally {
+          await adapter.rollback().catch(() => {});
+          await adapter2.rollback().catch(() => {});
+        }
+      });
     });
 
     it("translate exception numeric value out of range", async () => {
       await adapter.exec(`CREATE TABLE "ex_num" ("id" SERIAL PRIMARY KEY, "val" SMALLINT)`);
       await expect(
         adapter.executeMutation(`INSERT INTO "ex_num" ("val") VALUES (99999)`),
-      ).rejects.toThrow(/out of range/i);
+      ).rejects.toBeInstanceOf(ActiveRecordRangeError);
     });
 
     it("translate exception invalid text representation", async () => {
@@ -216,11 +262,60 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toThrow(/invalid input|integer/i);
     });
 
-    it.skip("translate exception query cancelled", async () => {
-      // BLOCKED: Requires pg_cancel_backend from a second connection (SQLSTATE 57014).
+    it("translate exception query cancelled", async () => {
+      // Use a transaction so that pg_backend_pid() and pg_sleep() share the same
+      // pooled connection — otherwise two execute() calls get different PG backends.
+      await adapter.beginTransaction();
+      try {
+        const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
+        const pid = (pidRows[0] as { pid: number }).pid;
+        const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`);
+        // Attach a no-op handler synchronously so Node never flags this as an
+        // unhandled rejection during the gap before the expect() runs.
+        sleepPromise.catch(() => {});
+        // Poll pg_stat_activity until the pg_sleep query is observed as active on
+        // this backend, so the cancel always arrives after execution has started.
+        await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+          const deadline = Date.now() + 2000;
+          while (Date.now() < deadline) {
+            const rows = await adapter2.execute(
+              `SELECT 1 FROM pg_stat_activity WHERE pid = ${pid} AND query LIKE '%pg_sleep%' AND state = 'active'`,
+            );
+            if (rows.length > 0) break;
+            await new Promise<void>((r) => setTimeout(r, 10));
+          }
+          await adapter2.execute(`SELECT pg_cancel_backend(${pid})`);
+        });
+        await expect(sleepPromise).rejects.toBeInstanceOf(QueryCanceled);
+      } finally {
+        await adapter.rollback().catch(() => {});
+      }
     });
-    it.skip("translate exception serialization failure", async () => {
-      // BLOCKED: Requires two concurrent SERIALIZABLE transactions (SQLSTATE 40001).
+    it("translate exception serialization failure", async () => {
+      await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
+      await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);
+      await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+        // Both transactions get their snapshots before either commits.
+        await adapter.beginIsolatedDbTransaction("serializable");
+        await adapter2.beginIsolatedDbTransaction("serializable");
+        try {
+          // Both read the same row (establishes the SSI read-set).
+          await adapter.execute(`SELECT * FROM "ex_ser"`);
+          await adapter2.execute(`SELECT * FROM "ex_ser"`);
+          // Both write to that row.
+          await adapter.execute(`UPDATE "ex_ser" SET val = 1`);
+          // adapter commits first.
+          await adapter.commit();
+          // adapter2's write waits for adapter's lock, then writes.
+          await adapter2.execute(`UPDATE "ex_ser" SET val = 2`);
+          // PG SSI detects the rw-anti-dependency cycle; one transaction must abort.
+          await expect(adapter2.commit()).rejects.toBeInstanceOf(SerializationFailure);
+        } catch (e) {
+          await adapter.rollback().catch(() => {});
+          await adapter2.rollback().catch(() => {});
+          if (!(e instanceof SerializationFailure)) throw e;
+        }
+      });
     });
     it.skip("type map", async () => {
       // BLOCKED: typeMap is HashLookupTypeMap, not pg-driver PG::TypeMapByOid.
@@ -487,7 +582,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("reconnect after bad connection on check version", async () => {
-      // BLOCKED: No raw_connection handle; can't simulate server_version=0 on reconnect.
+      // BLOCKED: Rails stubs raw_connection.server_version=0 on the PG::Connection to
+      // simulate a bad version check during reconnect!. Our adapter uses a pg.Pool
+      // (accessible via _driverPoolForTest()) rather than a single PG::Connection, so
+      // there is no equivalent low-level server_version stub point.
     });
 
     it("primary key works tables containing capital letters", async () => {
@@ -661,7 +759,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.execute(null as any)).rejects.toBeInstanceOf(TypeError);
     });
     it.skip("translate no connection exception to not established", async () => {
-      // BLOCKED: pg_terminate_backend + raw PG::Connection#send_query needed; not exposed by pg driver.
+      // BLOCKED: Rails calls raw_connection.send_query("SELECT 1") directly on the
+      // PG::Connection to put it in CONNECTION_BAD state without waiting for the result.
+      // The pg npm driver doesn't expose send_query; _driverPoolForTest() gives the
+      // pg.Pool but no single-connection send_query equivalent exists.
     });
     it.skip("reload type map for newly defined types", async () => {
       // BLOCKED: TypeMapInitializer registers enum OIDs as generic types, not OID::Enum.
@@ -827,8 +928,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("reconnection error", () => {
-      // BLOCKED: Requires stubbing pg.Pool.connect() to throw PG::ConnectionBad.
-      // No public hook to inject a failing connection for this error path.
+      // BLOCKED: Rails creates a fake PG::Connection object with a reset() that
+      // throws PG::ConnectionBad, then stubs PG.connect to throw. The pg npm
+      // driver doesn't expose equivalent interception points.
     });
 
     it("database exists returns true when the database exists", async () => {
