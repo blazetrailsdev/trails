@@ -41,9 +41,21 @@ export interface PgTypeRow {
 
 export class TypeMapInitializer {
   private store: TypeMap;
+  /** Multirange rows whose range OID was not yet in the store during run(). */
+  readonly deferredMultirangeOids: number[] = [];
+  private deferredMultirangeRows: PgTypeRow[] = [];
 
   constructor(store: TypeMap) {
     this.store = store;
+  }
+
+  /** Re-attempt registration for any multirange rows deferred during run(). */
+  retryDeferredMultiranges(): void {
+    if (this.deferredMultirangeRows.length === 0) return;
+    const rows = this.deferredMultirangeRows;
+    this.deferredMultirangeRows = [];
+    this.deferredMultirangeOids.length = 0;
+    rows.forEach((row) => this.registerMultirangeType(row));
   }
 
   run(records: PgTypeRow[]): void {
@@ -107,15 +119,30 @@ export class TypeMapInitializer {
   }
 
   private registerMultirangeType(row: PgTypeRow): void {
-    // For multirange types, typelem is the corresponding range type's OID.
-    // We look up that range type and extract its subtype for MultiRangeType.
+    // Real PG 14+ has typelem=0 for multirange rows in pg_type — the range
+    // OID is not stored there. Synthetic test rows may supply a non-zero
+    // typelem for convenience, and that fast path still works. When typelem=0
+    // (the real-PG case), fall back to iterating the type map for a RangeType
+    // whose typname matches the naming convention ("int4multirange" → "int4range").
     if (!this.store.lookup) {
       throw new Error(
         `TypeMap store must implement lookup() to register subtype-based OID ${row.oid}`,
       );
     }
-    const rangeOid = toInt(row.typelem ?? 0);
-    if (this.storeHas(rangeOid)) {
+    let rangeOid = toInt(row.typelem ?? 0);
+    if (rangeOid === 0) {
+      const rangeName = row.typname.replace("multirange", "range");
+      for (const key of this.storeKeys()) {
+        if (typeof key === "number") {
+          const candidate = this.storeLookup(key);
+          if (candidate instanceof RangeType && candidate.name === rangeName) {
+            rangeOid = key;
+            break;
+          }
+        }
+      }
+    }
+    if (rangeOid !== 0 && this.storeHas(rangeOid)) {
       this.register(row.oid, (_oid: number | string, ...args: unknown[]) => {
         const rangeType = this.storeLookup(rangeOid, ...args);
         const subtype =
@@ -124,7 +151,13 @@ export class TypeMapInitializer {
             : (rangeType as unknown as RangeSubtype);
         return new MultiRangeType(subtype, row.typname);
       });
+    } else if (rangeOid !== 0) {
+      // Range OID found but not yet registered — defer so adapter can load it.
+      this.deferredMultirangeOids.push(rangeOid);
+      this.deferredMultirangeRows.push(row);
     }
+    // rangeOid still 0 means range type not in store yet; skip silently.
+    // The adapter's loadAdditionalTypes will retry via columns() batch-load.
   }
 
   private registerEnumType(row: PgTypeRow): void {

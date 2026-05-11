@@ -66,7 +66,7 @@ export function defineEnum(
   let subtype: string;
   try {
     const t = modelClass.typeForAttribute(attribute).type();
-    subtype = t === "value" || t === "big_integer" ? "integer" : t;
+    subtype = t === "value" || /integer/i.test(t) || t === "smallint" ? "integer" : t;
   } catch {
     subtype = "integer";
   }
@@ -95,6 +95,7 @@ export function defineEnum(
   };
 
   const toCamel = (s: string) => camelize(s, false);
+  const definedNames = new Set<string>();
 
   for (const [name] of mapping) {
     const fullName = toCamel(methodName(name));
@@ -103,6 +104,18 @@ export function defineEnum(
     const bangName = `${fullName}Bang`;
     const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(name).replace(/[^\w\x80-\uffff]+/g, "_"));
+
+    if (definedNames.has(predicateName))
+      raiseConflictError.call(modelClass, attribute, predicateName);
+    if (definedNames.has(bangName)) raiseConflictError.call(modelClass, attribute, bangName);
+    if (definedNames.has(fullName))
+      raiseConflictError.call(modelClass, attribute, fullName, { type: "class" });
+    if (definedNames.has(notScopeName))
+      raiseConflictError.call(modelClass, attribute, notScopeName, { type: "class" });
+    definedNames.add(predicateName);
+    definedNames.add(bangName);
+    definedNames.add(fullName);
+    definedNames.add(notScopeName);
 
     if (predicateName in (modelClass.prototype as object))
       raiseConflictError.call(modelClass, attribute, predicateName);
@@ -195,6 +208,31 @@ export function defineEnum(
 
     // whereNot scope: Model.notDraft() or Model.notStatusDraft()
     modelClass.scope(notScopeName, (rel: any) => rel.whereNot({ [attribute]: value }));
+
+    // Original-form predicate/bang for labels with special chars (spaces, hyphens).
+    // Rails: define_method("American Bobtail?") accessible only via bracket notation.
+    const originalName = methodName(name);
+    if (/[^\w\x80-\uffff]/.test(originalName)) {
+      const origPredicate = `is${originalName}`;
+      const origBang = `${originalName}Bang`;
+      Object.defineProperty(modelClass.prototype, origPredicate, {
+        value: function (this: Base) {
+          return this.readAttribute(attribute) === value;
+        },
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(modelClass.prototype, origBang, {
+        value: async function (this: any) {
+          this.writeAttribute(attribute, value);
+          if (this.isPersisted()) {
+            await this.updateColumn(attribute, value);
+          }
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
   }
 }
 

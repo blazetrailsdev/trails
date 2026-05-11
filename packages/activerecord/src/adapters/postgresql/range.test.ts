@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
+import { MultiRange } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -33,7 +34,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         int4_range int4range,
         int8_range int8range,
         float_range floatrange,
-        string_range stringrange
+        string_range stringrange,
+        int4_multirange int4multirange
       )
     `);
     await adapter.loadAdditionalTypes();
@@ -327,6 +329,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       const raw = rows[0].r as string;
       expect(raw).toContain("2012-01-01");
+    });
+
+    it("multirange ORM round-trip", async () => {
+      const mr = new MultiRange([new Range(1, 5, true), new Range(10, 20, true)]);
+      const r = await PostgresqlRanges.create({ int4_multirange: mr });
+      await r.reload();
+      const result = r.int4_multirange as MultiRange;
+      expect(result).toBeInstanceOf(MultiRange);
+      expect(result.ranges).toHaveLength(2);
+      expect(result.ranges[0].begin).toBe(1);
+      expect(result.ranges[0].end).toBe(5);
+      expect(result.ranges[0].excludeEnd).toBe(true);
+      expect(result.ranges[1].begin).toBe(10);
+      expect(result.ranges[1].end).toBe(20);
+      expect(result.ranges[1].excludeEnd).toBe(true);
     });
 
     it("range intersection", async () => {
