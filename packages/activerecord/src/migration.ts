@@ -877,11 +877,23 @@ export abstract class Migration {
     columnNameOrOptions?: string | string[] | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void> {
+    // Normalize: if second arg is a plain object it is the options hash (no column).
+    // Mirrors Rails extract_options! semantics for remove_unique_constraint(table, **opts).
+    const isOptsObj =
+      columnNameOrOptions !== null &&
+      typeof columnNameOrOptions === "object" &&
+      !Array.isArray(columnNameOrOptions);
+    const columnName = isOptsObj
+      ? undefined
+      : (columnNameOrOptions as string | string[] | undefined);
+    const opts = isOptsObj
+      ? (columnNameOrOptions as Record<string, unknown>)
+      : (options ?? undefined);
     if (this._recording) {
-      this._recorder.record("removeUniqueConstraint", [tableName, columnNameOrOptions, options]);
+      this._recorder.record("removeUniqueConstraint", [tableName, columnName, opts]);
       return;
     }
-    await (this.connection as any).removeUniqueConstraint(tableName, columnNameOrOptions, options);
+    await (this.connection as any).removeUniqueConstraint(tableName, columnName, opts);
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
