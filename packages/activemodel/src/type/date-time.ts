@@ -87,8 +87,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   // sub-precision nanosecond noise from Temporal.Now (when precision=null) doesn't
   // produce spurious dirty marks after serialize → cast round-trips.
   private _nsAtPrecision(ns: bigint): bigint {
-    const p = this.precision ?? 6;
-    if (!Number.isInteger(p) || p < 0 || p > 9) return ns;
+    const raw = this.precision ?? 6;
+    const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
     const mod = 10n ** BigInt(9 - p);
     let subsec = ns % 1_000_000_000n;
     if (subsec < 0n) subsec += 1_000_000_000n;

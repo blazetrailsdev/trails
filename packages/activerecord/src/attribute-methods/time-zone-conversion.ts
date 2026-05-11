@@ -140,8 +140,8 @@ export class TimeZoneConverter extends ValueType<unknown> {
   // Same floor-style truncation as DateTimeType._nsAtPrecision / _applySecondsPrecision.
   // Uses the wrapped subtype's precision so behavior matches the column's serialize output.
   private _nsAtPrecision(ns: bigint): bigint {
-    const p = this._subtype.precision ?? 6;
-    if (!Number.isInteger(p) || p < 0 || p > 9) return ns;
+    const raw = this._subtype.precision ?? 6;
+    const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
     const mod = 10n ** BigInt(9 - p);
     let subsec = ns % 1_000_000_000n;
     if (subsec < 0n) subsec += 1_000_000_000n;
