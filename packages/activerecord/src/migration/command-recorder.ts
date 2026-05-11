@@ -451,6 +451,21 @@ export class CommandRecorder {
   }
 
   /** @internal */
+  invertCreateEnum(args: unknown[]): [string, unknown[]] {
+    return ["dropEnum", args];
+  }
+
+  /** @internal */
+  invertEnableExtension(args: unknown[]): [string, unknown[]] {
+    return ["disableExtension", args];
+  }
+
+  /** @internal */
+  invertDisableExtension(args: unknown[]): [string, unknown[]] {
+    return ["enableExtension", args];
+  }
+
+  /** @internal */
   invertDropEnum(args: unknown[]): [string, unknown[]] {
     // Mirror Rails: extract_options! strips trailing hash, then check second positional arg
     const a = args.slice();

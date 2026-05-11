@@ -42,6 +42,27 @@ export {
 
 import { ActiveRecordError } from "./errors.js";
 
+// Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
+// For {from,to} hashes, returns `to` (which may be null to clear a comment).
+// `to: undefined` is rejected — a missing value cannot be forwarded to SQL.
+function _extractNewCommentValue(
+  v: string | null | { from?: unknown; to?: unknown },
+): string | null {
+  if (v !== null && typeof v === "object") {
+    if (!("to" in v) || (v as { to: unknown }).to === undefined) {
+      throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
+    }
+    const to = (v as { to: unknown }).to;
+    if (to !== null && typeof to !== "string") {
+      throw new ArgumentError(
+        `change_column_comment / change_table_comment :to must be a string or null, got ${typeof to}`,
+      );
+    }
+    return to;
+  }
+  return v as string | null;
+}
+
 // Mirrors Zlib.crc32 (ISO 3309 / ITU-T V.42 polynomial) operating on UTF-8 bytes.
 function _crc32(str: string): number {
   const bytes = new TextEncoder().encode(str);
@@ -417,6 +438,104 @@ export abstract class Migration {
         }
         break;
       }
+      case "changeColumnComment": {
+        const [ccTable, ccCol, ccOpts] = args as [string, string, { from?: unknown; to?: unknown }];
+        if (
+          !ccOpts ||
+          typeof ccOpts !== "object" ||
+          !("from" in ccOpts) ||
+          ccOpts.from === undefined ||
+          !("to" in ccOpts) ||
+          ccOpts.to === undefined
+        ) {
+          throw new IrreversibleMigration(
+            "change_column_comment is only reversible if given a :from and :to option.",
+          );
+        }
+        await this.changeColumnComment(ccTable, ccCol, { from: ccOpts.to, to: ccOpts.from });
+        break;
+      }
+      case "changeTableComment": {
+        const [ctTable, ctOpts] = args as [string, { from?: unknown; to?: unknown }];
+        if (
+          !ctOpts ||
+          typeof ctOpts !== "object" ||
+          !("from" in ctOpts) ||
+          ctOpts.from === undefined ||
+          !("to" in ctOpts) ||
+          ctOpts.to === undefined
+        ) {
+          throw new IrreversibleMigration(
+            "change_table_comment is only reversible if given a :from and :to option.",
+          );
+        }
+        await this.changeTableComment(ctTable, { from: ctOpts.to, to: ctOpts.from });
+        break;
+      }
+      case "enableExtension": {
+        const [extName, extOpts] = args as [string, Record<string, unknown>?];
+        await this.disableExtension(extName, extOpts);
+        break;
+      }
+      case "disableExtension": {
+        const [dextName, dextOpts] = args as [string, Record<string, unknown>?];
+        await this.enableExtension(dextName, dextOpts);
+        break;
+      }
+      case "createEnum": {
+        const [enumName, enumValues, enumOpts] = args as [
+          string,
+          string[],
+          Record<string, unknown>?,
+        ];
+        await this.dropEnum(enumName, enumValues, enumOpts);
+        break;
+      }
+      case "dropEnum": {
+        const [deEnumName, deValues, deOpts] = args as [
+          string,
+          string[] | undefined,
+          Record<string, unknown>?,
+        ];
+        if (!deValues) {
+          throw new IrreversibleMigration("Cannot reverse dropEnum without a list of enum values");
+        }
+        await this.createEnum(deEnumName, deValues, deOpts);
+        break;
+      }
+      case "renameEnumValue": {
+        const [revName, revOpts] = args as [string, { from: string; to: string }];
+        await this.renameEnumValue(revName, { from: revOpts.to, to: revOpts.from });
+        break;
+      }
+      case "addUniqueConstraint": {
+        const [ucTable, ucColumn, ucOpts] = args as [
+          string,
+          string | string[] | undefined,
+          Record<string, unknown>?,
+        ];
+        if (ucOpts?.["usingIndex"]) {
+          throw new IrreversibleMigration(
+            "add_unique_constraint is not reversible if given a using_index.",
+          );
+        }
+        await this.removeUniqueConstraint(ucTable, ucColumn, ucOpts);
+        break;
+      }
+      case "removeUniqueConstraint": {
+        const [rucTable, rucColumn, rucOpts] = args as [
+          string,
+          string | string[] | undefined,
+          Record<string, unknown>?,
+        ];
+        if (!rucColumn) {
+          throw new IrreversibleMigration(
+            "remove_unique_constraint is only reversible if given a column_name.",
+          );
+        }
+        await this.addUniqueConstraint(rucTable, rucColumn, rucOpts);
+        break;
+      }
       default:
         throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
     }
@@ -649,6 +768,142 @@ export abstract class Migration {
     }
     await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
   }
+  async validateCheckConstraint(
+    tableName: string,
+    nameOrOptions: string | { name: string },
+  ): Promise<void> {
+    await (this.connection as any).validateCheckConstraint(tableName, nameOrOptions);
+  }
+
+  async validateForeignKey(
+    fromTable: string,
+    toTableOrOptions?: string | { name?: string },
+    options?: { name?: string },
+  ): Promise<void> {
+    const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
+    const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : (options ?? undefined);
+    await (this.connection as any).validateForeignKey(fromTable, toTable, opts);
+  }
+
+  async changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: string | null | { from?: unknown; to?: unknown },
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("changeColumnComment", [tableName, columnName, commentOrChanges]);
+      return;
+    }
+    const resolved = _extractNewCommentValue(commentOrChanges);
+    await (this.connection as any).changeColumnComment(tableName, columnName, resolved);
+  }
+
+  async changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: unknown; to?: unknown },
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("changeTableComment", [tableName, commentOrChanges]);
+      return;
+    }
+    const resolved = _extractNewCommentValue(commentOrChanges);
+    await (this.connection as any).changeTableComment(tableName, resolved);
+  }
+
+  async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("enableExtension", [name, options]);
+      return;
+    }
+    await (this.connection as any).enableExtension(name, options);
+  }
+
+  async disableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("disableExtension", [name, options]);
+      return;
+    }
+    await (this.connection as any).disableExtension(name, options);
+  }
+
+  async createEnum(
+    name: string,
+    values: string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("createEnum", [name, values, options]);
+      return;
+    }
+    await (this.connection as any).createEnum(name, values, options);
+  }
+
+  async dropEnum(
+    name: string,
+    valuesOrOptions?: string[] | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    // Normalize: if second arg is a plain object it is the options hash (no values).
+    // Mirrors Rails drop_enum(name, values = nil, **options) which allows options-only calls.
+    const isOptsObj =
+      valuesOrOptions !== null &&
+      typeof valuesOrOptions === "object" &&
+      !Array.isArray(valuesOrOptions);
+    const values = isOptsObj ? undefined : (valuesOrOptions as string[] | undefined);
+    const opts = isOptsObj ? (valuesOrOptions as Record<string, unknown>) : (options ?? undefined);
+    if (this._recording) {
+      this._recorder.record("dropEnum", [name, values, opts]);
+      return;
+    }
+    // values is only captured for recording (so dropEnum can be inverted to createEnum);
+    // the adapter's dropEnum(name, options?) doesn't need values for SQL execution.
+    await (this.connection as any).dropEnum(name, opts ?? {});
+  }
+
+  async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("renameEnumValue", [name, options]);
+      return;
+    }
+    await (this.connection as any).renameEnumValue(name, options);
+  }
+
+  async addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("addUniqueConstraint", [tableName, columnName, options]);
+      return;
+    }
+    await (this.connection as any).addUniqueConstraint(tableName, columnName, options);
+  }
+
+  async removeUniqueConstraint(
+    tableName: string,
+    columnNameOrOptions?: string | string[] | Record<string, unknown>,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    // Normalize: if second arg is a plain object it is the options hash (no column).
+    // Mirrors Rails extract_options! semantics for remove_unique_constraint(table, **opts).
+    const isOptsObj =
+      columnNameOrOptions !== null &&
+      typeof columnNameOrOptions === "object" &&
+      !Array.isArray(columnNameOrOptions);
+    const columnName = isOptsObj
+      ? undefined
+      : (columnNameOrOptions as string | string[] | undefined);
+    const opts = isOptsObj
+      ? (columnNameOrOptions as Record<string, unknown>)
+      : (options ?? undefined);
+    if (this._recording) {
+      this._recorder.record("removeUniqueConstraint", [tableName, columnName, opts]);
+      return;
+    }
+    await (this.connection as any).removeUniqueConstraint(tableName, columnName, opts);
+  }
+
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     if (this._recording) {
       this._recorder.record("addTimestamps", [tableName, options]);
