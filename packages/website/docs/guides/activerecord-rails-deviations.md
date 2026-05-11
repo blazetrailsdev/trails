@@ -431,7 +431,7 @@ resolution, and connection-pool coordination would be a large surface
 for a feature Trails users would not adopt.
 
 Affected Rails files (skipped in `api:compare` / `test:compare` —
-see `scripts/api-compare/excluded-files.ts`):
+see `scripts/api-compare/unported-files.ts`):
 
 - `active_record/fixtures.rb`
 - `active_record/fixture_set/*` (file, table-rows, render-context, etc.)

@@ -9,11 +9,11 @@
 // Each entry must set at least one of:
 //   `pattern`  — substring match against the Ruby SOURCE file path
 //                (from extract-ruby-api.rb, e.g. "promise.rb").
-//                Consumed by isExcluded() → api:compare.
+//                Consumed by isSourceUnported() → api:compare.
 //                Omit for test-only entries where the source IS being ported.
 //   `testFile` — substring match against the Ruby TEST file path
 //                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
-//                Consumed by isTestExcluded() → test:compare.
+//                Consumed by isTestFileUnported() → test:compare.
 //                Omit when there is no corresponding Rails test file.
 //
 // Most entries set both (source and test excluded together).
@@ -21,7 +21,7 @@
 // `testFile` because their TS source counterparts either don't exist or
 // are being actively ported.
 
-export type ExcludedFile = { reason: string } & (
+export type UnportedFile = { reason: string } & (
   | { pattern: string; testFile?: string; tests?: never }
   | { pattern?: string; testFile: string; tests?: never }
   // Per-test exclusion: test-only — never affects api:compare.
@@ -31,7 +31,7 @@ export type ExcludedFile = { reason: string } & (
   | { pattern?: never; testFile: string; className?: string; tests: string[] }
 );
 
-export const EXCLUDED_FILES: ExcludedFile[] = [
+export const UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "migration/compatibility", // test excluded by extract-ruby-tests.rb SKIP_PATTERNS (/\/migration\//)
     reason: "Pre-1.0: legacy Rails version migration compatibility shims.",
@@ -44,9 +44,12 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
   },
   {
     pattern: "future_result.rb",
+    testFile: "relation/load_async_test.rb",
     reason:
       "Thread-pool scheduled query with mutex + EventBuffer bridging Ruby's threaded async. " +
-      "Marked :nodoc: in Rails. Collapses to the Promise returned by the adapter's async exec.",
+      "Marked :nodoc: in Rails. Collapses to the Promise returned by the adapter's async exec. " +
+      "Test file fully excluded — all live test classes exercise FutureResult/scheduled? semantics " +
+      "that don't port to single-threaded JS where `await relation.toArray()` is the async surface.",
   },
   {
     pattern: "asynchronous_queries_tracker.rb",
@@ -279,56 +282,22 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "Tests Marshal/YAML binary encoding of AR records. " +
       "Ruby binary serialization formats have no Node.js equivalent.",
   },
-  // --- Permanently not-portable: load_async thread-pool / GVL tests ---
-  {
-    testFile: "relation/load_async_test.rb",
-    tests: [
-      // LoadAsyncTest — uses Concurrent::CountDownLatch + GVL thread interleaving
-      "load async instrumentation is thread safe",
-    ],
-    reason:
-      "Ruby Concurrent::CountDownLatch / GVL thread-interleaving semantics. " +
-      "JS is single-threaded — GVL race tests have no equivalent.",
-  },
-  {
-    testFile: "relation/load_async_test.rb",
-    className: "LoadAsyncMultiThreadPoolExecutorTest",
-    tests: [
-      "async query executor and configuration",
-      "scheduled?",
-      "reset",
-      "simple query",
-      "load async from transaction",
-      "eager loading query",
-      "contradiction",
-      "pluck",
-      "size",
-      "empty?",
-    ],
-    reason: "Concurrent::ThreadPoolExecutor — GVL semantics; no Node.js equivalent.",
-  },
-  {
-    testFile: "relation/load_async_test.rb",
-    className: "LoadAsyncMixedThreadPoolExecutorTest",
-    tests: ["scheduled?", "simple query"],
-    reason: "Concurrent::ThreadPoolExecutor — GVL semantics; no Node.js equivalent.",
-  },
 ];
 
-export function isExcluded(file: string): boolean {
-  return EXCLUDED_FILES.some((e) => e.pattern && file.includes(e.pattern));
+export function isSourceUnported(file: string): boolean {
+  return UNPORTED_FILES.some((e) => e.pattern && file.includes(e.pattern));
 }
 
-export function isTestExcluded(testFile: string): boolean {
-  return EXCLUDED_FILES.some((e) => e.testFile && !e.tests && testFile.includes(e.testFile));
+export function isTestFileUnported(testFile: string): boolean {
+  return UNPORTED_FILES.some((e) => e.testFile && !e.tests && testFile.includes(e.testFile));
 }
 
-export function isTestCaseExcluded(
+export function isTestCaseUnported(
   testFile: string,
   testName: string,
   className?: string,
 ): boolean {
-  return EXCLUDED_FILES.some(
+  return UNPORTED_FILES.some(
     (e) =>
       e.testFile &&
       e.tests &&

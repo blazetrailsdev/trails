@@ -40,7 +40,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
-import { isExcluded } from "./excluded-files.js";
+import { isSourceUnported } from "./unported-files.js";
 
 const DETAIL_PACKAGES = new Set([
   "arel",
@@ -52,7 +52,7 @@ const DETAIL_PACKAGES = new Set([
   "actionview",
 ]);
 
-// Files intentionally excluded from comparison live in excluded-files.ts.
+// Files intentionally excluded from comparison live in unported-files.ts.
 
 // ---------------------------------------------------------------------------
 // Types
@@ -853,7 +853,7 @@ function main() {
     const excludedFiles = new Set<string>();
     for (const item of allRuby) {
       const file = item.info.file || "unknown.rb";
-      if (isExcluded(file)) {
+      if (isSourceUnported(file)) {
         excludedFiles.add(file);
         continue;
       }
@@ -1099,7 +1099,7 @@ function main() {
       };
 
       for (const { fqn, info } of allRuby) {
-        if (!info.file || isExcluded(info.file)) continue;
+        if (!info.file || isSourceUnported(info.file)) continue;
         if (primaryClassPerFile.get(info.file) !== fqn) continue;
         // `allRuby` mixes classes and modules; modules don't carry superclass.
         if (!(fqn in rubyPkg.classes)) continue;
@@ -1226,7 +1226,7 @@ function printReport(
 
     console.log(`\n${"=".repeat(100)}`);
     const excludedNote =
-      pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see excluded-files.ts)" : "";
+      pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files.ts)" : "";
     const inh = pkg.inheritance;
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
     const inhNote =

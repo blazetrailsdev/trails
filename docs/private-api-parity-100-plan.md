@@ -82,7 +82,7 @@ Subtotal: ~110 methods. ~6 PRs.
 - Files marked `✗` in the report (e.g. `dynamic_matchers.rb`,
   `serialization.rb`, `middleware/*`, `railties/*`,
   `destroy_association_async_job.rb`, `deprecator.rb`) — these are on
-  the existing skip list per `excluded-files.ts` / `compare.ts` and
+  the existing skip list per `unported-files.ts` / `compare.ts` and
   intentionally out of scope.
 
 ## 3. Sequencing
