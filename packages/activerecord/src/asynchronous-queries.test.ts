@@ -1,63 +1,47 @@
 import { describe, it } from "vitest";
 
+// The entire Rails test file (asynchronous_queries_test.rb) is permanently
+// excluded — see scripts/api-compare/excluded-files.ts, testFile entry for
+// "asynchronous_queries_test.rb". Per-thread async session barriers
+// (Concurrent::AtomicBoolean, ReadWriteLock) have no JS equivalent.
+// These stubs are kept as visible placeholders for the excluded test classes.
+
 describe("AsynchronousQueriesTest", () => {
   it.skip("async select all", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
 });
 
 describe("AsynchronousExecutorTypeTest", () => {
   it.skip("null configuration uses a single null executor by default", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
   it.skip("one global thread pool is used when set with default concurrency", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
   it.skip("concurrency can be set on global thread pool", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
   it.skip("concurrency cannot be set with null executor or multi thread pool", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
   it.skip("multi thread pool executor configuration", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
   it.skip("multi thread pool is used only by configurations that enable it", () => {
-    // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-    // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-    // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+    // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
   });
 });
 
 it.skip("async select failure", () => {
-  // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-  // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-  // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+  // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
 });
 it.skip("async query from transaction", () => {
-  // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-  // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-  // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+  // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
 });
 it.skip("async query cache", () => {
-  // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-  // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-  // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+  // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
 });
 it.skip("async query foreground fallback", () => {
-  // BLOCKED: load-async — FutureResult / async query infrastructure not implemented
-  // ROOT-CAUSE: future-result.ts#FutureResult not implemented; Relation#loadAsync missing
-  // SCOPE: ~150 LOC in future-result.ts + relation.ts; affects ~31 tests in load-async.test.ts
+  // PERMANENT: ruby-only — see scripts/api-compare/excluded-files.ts for asynchronous_queries_test.rb
 });

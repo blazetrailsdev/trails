@@ -276,6 +276,23 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "Tests Marshal/YAML binary encoding of AR records. " +
       "Ruby binary serialization formats have no Node.js equivalent.",
   },
+  // --- Permanently not-portable: load_async thread-pool / GVL tests ---
+  {
+    testFile: "relation/load_async_test.rb",
+    tests: [
+      // LoadAsyncTest — uses Concurrent::CountDownLatch + GVL thread interleaving
+      "load async instrumentation is thread safe",
+      // LoadAsyncMultiThreadPoolExecutorTest — Concurrent::ThreadPoolExecutor
+      // min_length/max_length/max_queue/fallback_policy config; unique name in file
+      "async query executor and configuration",
+    ],
+    reason:
+      "Ruby Concurrent::ThreadPoolExecutor / Concurrent::CountDownLatch / GVL semantics. " +
+      "JS is single-threaded — thread-pool configuration and GVL race tests have no equivalent. " +
+      "Note: LoadAsyncMultiThreadPoolExecutorTest and LoadAsyncMixedThreadPoolExecutorTest share " +
+      "test names with the implementable LoadAsyncTest/NullExecutorTest classes; those duplicates " +
+      "cannot be excluded here without dropping the implementable counterparts.",
+  },
 ];
 
 export function isExcluded(file: string): boolean {
