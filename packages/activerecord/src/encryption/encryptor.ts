@@ -5,7 +5,8 @@
  */
 
 import { Message } from "./message.js";
-import { MessageSerializer } from "./message-serializer.js";
+import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
+import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
 import {
   getOrCreateDefaultKeyProvider,
@@ -197,8 +198,8 @@ export class Encryptor {
   }
 
   /** @internal */
-  private serializer(): MessageSerializer {
-    return this._serializer;
+  private serializer(): MessageSerializerLike {
+    return getEncryptionContext().messageSerializer ?? this._serializer;
   }
 
   /** @internal */

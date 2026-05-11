@@ -11,7 +11,11 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("binary? returns false because this implementation uses JSON, not MessagePack binary", () => {
-    expect(new MessagePackMessageSerializer().isBinary()).toBe(false);
+    // isBinary() returns true: mirrors Rails' MessagePackMessageSerializer#binary?,
+    // which signals that the serialized form must be stored in a binary column.
+    // The wire format is JSON-based (not real MessagePack), but the binary-column
+    // constraint is the key behavioral contract.
+    expect(new MessagePackMessageSerializer().isBinary()).toBe(true);
   });
 
   it("serializes messages", () => {

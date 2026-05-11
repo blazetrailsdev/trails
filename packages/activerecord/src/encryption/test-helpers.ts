@@ -22,6 +22,7 @@ import { ValueType, BinaryData } from "@blazetrails/activemodel";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
+import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
 // JSON array type: cast/serialize produce a JSON string; deserialize parses it back.
 // Used as the castType for EncryptedBookWithSerialized*Binary factories.
@@ -324,6 +325,22 @@ export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAda
       this.decorateAttributes(["logo"], () => jsonArrayType);
       this.adapter = adapter;
       this.encrypts("logo");
+    }
+  } as any;
+}
+
+/**
+ * EncryptedBookWithBinaryMessagePackSerialized: logo is a binary attribute
+ * encrypted with a MessagePack message serializer. Mirrors the fixture class
+ * defined inline in encryptable_record_message_pack_serialized_test.rb.
+ */
+export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: DatabaseAdapter) {
+  return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("logo", "binary");
+      this.adapter = adapter;
+      this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
     }
   } as any;
 }

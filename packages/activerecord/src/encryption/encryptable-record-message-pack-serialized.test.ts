@@ -1,19 +1,56 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  freshAdapter,
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+  makeEncryptedBookWithBinaryMessagePackSerialized,
+  assertEncryptedAttribute,
+  Base,
+} from "./test-helpers.js";
+import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
+import { Encoding as EncodingError } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
-  it.skip("binary data can be serialized with message pack", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record-message-pack-serialized
-    // ROOT-CAUSE: encryption/encryptable-record-message-pack-serialized.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record-message-pack-serialized.ts; affects ~6–28 tests in encryptable-record-message-pack-serialized.test.ts
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
   });
-  it.skip("binary data can be encrypted uncompressed and serialized with message pack", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record-message-pack-serialized
-    // ROOT-CAUSE: encryption/encryptable-record-message-pack-serialized.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record-message-pack-serialized.ts; affects ~6–28 tests in encryptable-record-message-pack-serialized.test.ts
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
   });
-  it.skip("text columns cannot be serialized with message pack", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record-message-pack-serialized
-    // ROOT-CAUSE: encryption/encryptable-record-message-pack-serialized.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record-message-pack-serialized.ts; affects ~6–28 tests in encryptable-record-message-pack-serialized.test.ts
+
+  it("binary data can be serialized with message pack", async () => {
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(freshAdapter());
+    const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+    const book = await Book.create({ logo: allBytes });
+    await assertEncryptedAttribute(book, "logo", allBytes);
+  });
+
+  it("binary data can be encrypted uncompressed and serialized with message pack", async () => {
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(freshAdapter());
+    // Rails: both ranges are 128 bytes (< 140 threshold) so neither is compressed.
+    // TS note: highBytes (128–255) encoded as Latin-1 measures as 256 UTF-8 bytes so
+    // it may be compressed; the round-trip is correct either way.
+    const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
+    const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
+    await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
+    await assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
+  });
+
+  it("text columns cannot be serialized with message pack", async () => {
+    const adapter = freshAdapter();
+    const MsgPackTextBook = class extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
+      }
+    } as any;
+    await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(EncodingError);
   });
 });

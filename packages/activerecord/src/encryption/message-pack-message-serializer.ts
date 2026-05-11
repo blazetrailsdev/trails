@@ -7,8 +7,9 @@
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { DecryptionError, ForbiddenClass } from "./errors.js";
+import type { MessageSerializerLike } from "./message-serializer.js";
 
-export class MessagePackMessageSerializer {
+export class MessagePackMessageSerializer implements MessageSerializerLike {
   dump(message: Message): string {
     if (!(message instanceof Message)) {
       throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
@@ -30,7 +31,7 @@ export class MessagePackMessageSerializer {
   }
 
   isBinary(): boolean {
-    return false;
+    return true;
   }
 
   /** @internal */

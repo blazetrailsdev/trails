@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Encryption::Contexts
  */
 
+import type { MessageSerializerLike } from "./message-serializer.js";
+
 /**
  * Holds the encryption configuration for a single context frame:
  * key provider, key generator, cipher, message serializer, encryptor,
@@ -15,7 +17,7 @@ export class Context {
   private _keyProvider?: unknown;
   keyGenerator?: unknown;
   cipher?: unknown;
-  messageSerializer?: unknown;
+  messageSerializer?: MessageSerializerLike;
   encryptor?: unknown;
   frozenEncryption: boolean = false;
 
@@ -50,6 +52,7 @@ export interface EncryptionContext {
   protectedMode?: boolean;
   frozenEncryption?: boolean;
   keyProvider?: unknown;
+  messageSerializer?: MessageSerializerLike;
   [key: string]: unknown;
 }
 
