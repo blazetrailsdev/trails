@@ -45,6 +45,21 @@ describe("MigrationTest", () => {
     expect(ctx.columnExists("products", "name")).toBe(true);
   });
 
+  it("create table with force: cascade drops and recreates", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("things", {}, (t) => {
+      t.string("color");
+    });
+    expect(ctx.tableExists("things")).toBe(true);
+
+    await ctx.createTable("things", { force: "cascade" }, (t) => {
+      t.string("shape");
+    });
+    expect(ctx.tableExists("things")).toBe(true);
+    expect(ctx.columnExists("things", "shape")).toBe(true);
+    expect(ctx.columnExists("things", "color")).toBe(false);
+  });
+
   it("create table with force: true drops and recreates", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("things", {}, (t) => {

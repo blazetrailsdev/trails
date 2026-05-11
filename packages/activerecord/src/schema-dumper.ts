@@ -679,8 +679,8 @@ export class SchemaDumper {
 
     const tableOpts: Record<string, unknown> = {};
     if (!hasId) tableOpts.id = false;
-    const optStr =
-      Object.keys(tableOpts).length > 0 ? `{ ${this.formatOptions(tableOpts)} }` : "{}";
+    tableOpts.force = "cascade";
+    const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
     lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);
 

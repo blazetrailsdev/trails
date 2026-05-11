@@ -72,13 +72,13 @@ export class SchemaStatements {
   async createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean | "uuid"; force?: boolean; ifNotExists?: boolean }
+      | { id?: boolean | "uuid"; force?: boolean | "cascade"; ifNotExists?: boolean }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let options: {
       id?: boolean | "uuid";
-      force?: boolean;
+      force?: boolean | "cascade";
       ifNotExists?: boolean;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
@@ -100,7 +100,11 @@ export class SchemaStatements {
 
     if (options.force) {
       if (await this.tableExists(name)) {
-        await this.dropTable(name);
+        if (options.force === "cascade") {
+          await this.dropTable(name, { force: "cascade" });
+        } else {
+          await this.dropTable(name);
+        }
       }
     }
 
@@ -154,7 +158,10 @@ export class SchemaStatements {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    // Rails adds CASCADE only in the PG adapter override (pg/schema_statements.rb).
+    // We replicate that here: append CASCADE only when adapterName is "postgres".
+    const cascade =
+      options.force === "cascade" && this.adapterName === "postgres" ? " CASCADE" : "";
     for (const name of tableNames) {
       await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}${cascade}`);
     }
