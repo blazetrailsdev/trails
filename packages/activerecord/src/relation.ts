@@ -3474,13 +3474,10 @@ export class Relation<T extends Base> {
         // for names that would produce invalid SQL or risk injection.
         fromExpr = `(${subSql}) ${_safeAlias(name)}`;
       } else if (raw instanceof Nodes.Node) {
-        // Compile via the same visitor _compileSelectSql uses: adapter visitor
-        // when one is defined (real PG/SQLite/MySQL), registry otherwise, so
-        // identifier quoting stays dialect-consistent across the whole SELECT.
-        const adapterVisitor = (this._modelClass as any)._adapter?.arelVisitor as
-          | Visitors.ToSql
-          | undefined;
-        fromExpr = adapterVisitor ? adapterVisitor.compile(raw) : raw.toSql();
+        // Compile via the same visitor _compileSelectSql uses so identifier
+        // quoting stays dialect-consistent across the whole SELECT.
+        const sv = this._selectVisitor();
+        fromExpr = sv ? sv.compile(raw) : raw.toSql();
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
@@ -3532,18 +3529,26 @@ export class Relation<T extends Base> {
   }
 
   /**
+  /**
+   * Returns the adapter's SELECT visitor when one is defined, or null.
+   *
+   * Real adapters (PG, SQLite, MySQL) expose `arelVisitor` — use it to get
+   * dialect-correct quoting. SchemaAdapter (test wrapper) returns undefined,
+   * so callers fall back to manager.toSql() / node.toSql() (global registry
+   * visitor = ANSI double-quotes), which avoids MySQL backticks in toSql()
+   * output and DML execution in MariaDB's default non-ANSI mode.
+   */
+  private _selectVisitor(): Visitors.ToSql | null {
+    return ((this._modelClass as any)._adapter?.arelVisitor as Visitors.ToSql | undefined) ?? null;
+  }
+
+  /**
    * Compile a SelectManager's AST using the adapter-specific visitor when one
    * is defined (real PG/SQLite/MySQL adapter), or manager.toSql() otherwise.
-   *
-   * manager.toSql() uses the global registry visitor which for SchemaAdapter
-   * (test adapter) produces correct double-quoted ANSI SQL without delegating
-   * to the inner adapter's quoter (which would produce MySQL backticks that
-   * break toSql() assertions and fail in MariaDB's non-ANSI mode).
-   * Real adapters expose arelVisitor and get dialect-correct SQL from it.
    */
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
-    const visitor = (this._modelClass as any)._adapter?.arelVisitor as Visitors.ToSql | undefined;
-    return visitor ? visitor.compile(manager.ast) : manager.toSql();
+    const v = this._selectVisitor();
+    return v ? v.compile(manager.ast) : manager.toSql();
   }
 
   private _compileArelNode(node: Nodes.Node): string {

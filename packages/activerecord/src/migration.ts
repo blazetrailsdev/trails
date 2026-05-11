@@ -938,8 +938,12 @@ export abstract class Migration {
 
   get connectionPool(): ConnectionPool {
     // Mirrors Rails: @pool || DatabaseTasks.migration_connection_pool.
-    // _poolOverride is a real ConnectionPool when set by the migration
-    // runner; the adapter fallback covers test / direct-construction paths.
+    // _poolOverride is a real ConnectionPool when set by the migration runner.
+    // The adapter fallback is intentionally unsafe: DatabaseTasks.migrationConnectionPool
+    // is async (needs dynamic import to break the circular migration→base dependency),
+    // so we can't call it here synchronously. The cast is load-bearing until pool
+    // lookup is restructured — callers on the test/direct-construction path must not
+    // invoke pool-only methods (leaseConnection, withConnection, etc.).
     return (this._poolOverride ?? this.adapter) as unknown as ConnectionPool;
   }
 
