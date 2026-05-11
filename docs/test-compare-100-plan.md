@@ -1,343 +1,290 @@
 # activerecord test:compare → 100% Plan
 
-Snapshot 2026-04-30: `activerecord 5872/8177 (71.8%) | 334/334 files | 0 misplaced`.
-Total pending: **2305 tests** across skipped tests; zero missing files, zero misplaced.
+**Snapshot 2026-05-08:** `5999/7930 tests (75.6%) | 320/320 files | 0 misplaced`. **1929 skipped + 8 wrong-describe.**
 
-PR sizing follows the repo rule (≤20 methods/feature touchpoints unless trivial).
-For each PR the rails source path(s) and trails source/test paths are listed.
+The api:compare scoreboard is closed at 100% (4969/4969 methods). Remaining work is test:compare un-skips — getting Rails-mirrored test bodies to actually run and pass.
 
-## Completed
+**PR sizing target: ~250 LOC** (range 220–280 within the 300-LOC hard ceiling from CLAUDE.md). No small PRs (review-cycle overhead per PR is fixed; 50-LOC PRs aren't worth it). No huge PRs (anything ≥300 needs to split). If a slot is too small, **bundle adjacent gaps** until it hits ~250; if too big, **split** along a natural seam. The audit PR for each category produces a triage output that's pre-sized for ~250-LOC work slots.
 
-- **Phase 0** (all stub moves) — PR #855 moved 242 stubs; PRs #861/#869/#875/#880/#890/#893/#896 filled additional gaps
-- **PR 1.3** eager loading — PR #858
-- **PR 1.4** base_test connected_to guards — PR #866
-- **PR 1.12** unsafe raw SQL — PR #860
-- **PR 1.13** multiparameter attributes — PR #877
-- **PR 1.14** query cache — PR #883
-- **PR 1.15** relation/where + where_chain (partial) — PR #889
-- **PR 1.16** inverse_of associations — PR #894
-- **PR 1.17** integration cache_key/version — PR #878
-- **PR 1.20** collection cache key — PR #886
-- **PR 1.28** transaction instrumentation — PR #904
-- **PR 1.29** counter cache — PR #903
-- **PR 1.37** transactions residual — PR #907
-- **PR 1.37b** locking residual — PR #911
-- **PR 1.38** filter_attributes — PR #905
+Use the **test:compare prompt template** (`/home/dean/github/blazetrailsdev/test-compare-prompt-template.md`) when spawning un-skip agents.
 
 ---
 
-## Phase 1 — Big skip clusters (single-feature PRs)
+## Strategy
 
-### ~~PR 1.1 / 1.2 — Fixtures~~ (skipped — see "Doesn't translate" list)
+**Audit first, work second, integrated last.**
 
-### PR 1.5 — associations_test residual (50 skipped)
+For each `BLOCKED:` category, the plan has two phases:
 
-- Rails: `lib/active_record/associations.rb`,
-  `lib/active_record/associations/{association,collection_association,
-singular_association,builder/*}.rb`
-- Rails test: `test/cases/associations_test.rb`
-- Trails source: `src/associations.ts`, `src/associations/*.ts`
-- Trails test: `src/associations.test.ts`
-- Tests to implement:
-  - `subselect`
-  - `using limitable reflections helper`
-  - `association with references`
-  - `querying by whole associated records using query constraints`
-  - `querying by single associated record works using query constraints`
-  - `has many association from a model with query constraints different from the association`
-  - `query constraints over three without defining explicit foreign key query constraints raises`
-  - `belongs to association does not use parent query constraints if not configured to`
-  - `polymorphic belongs to uses parent query constraints`
-  - `preloads model with query constraints by explicitly configured fk and pk`
-  - `query constraints that dont include the primary key raise with a single column`
-  - `query constraints that dont include the primary key raise with multiple columns`
-  - `append composite foreign key has many association with autosave`
-  - `assign composite foreign key belongs to association with autosave`
-  - `append composite has many through association`
-  - `append composite has many through association with autosave`
-  - `nullify composite has many through association`
-  - `push has many through does not load target`
-  - `inspect does not reload a not yet loaded target`
-  - `pretty print does not reload a not yet loaded target`
-  - `save on parent saves children`
-  - `proxy object can be stubbed`
-  - `inverses get set of subsets of the association`
-  - `preload groups queries with same scope`
-  - `preload grouped queries with already loaded records`
-  - `preload grouped queries of middle records`
-  - `preload grouped queries of through records`
-  - `preload through records with already loaded middle record`
-  - `preload with instance dependent scope`
-  - `preload with instance dependent through scope`
-  - `preload with through instance dependent scope`
-  - `preload groups queries with same scope at second level`
-  - `preload groups queries with same sql at second level`
-  - `preload with grouping sets inverse association`
-  - `preload can group separate levels`
-  - `preload can group multi level ping pong through`
-  - `preload does not group same class different scope`
-  - `preload does not group same scope different key name`
-  - `multi database polymorphic preload with same table name`
-  - `preload with available records sti`
-  - `preload with available records with through association`
-  - `preload with only some records available with through associations`
-  - `preload with available records queries when scoped`
-  - `preload with available records queries when collection`
-  - `preload with available records queries when incomplete`
-  - `preload has many association with composite foreign key`
-  - `preload belongs to association with composite foreign key`
-  - `preload loaded belongs to association with composite foreign key`
-  - `preload has many through association with composite query constraints`
+1. **Audit PR.** Read Rails feature source + test file end-to-end; identify obvious impl gaps without writing un-skip code. Capture findings in PR body. Don't ship test un-skips in the audit PR.
+2. **Work PRs.** Triage from the audit produces a list of specific gaps. Each gap becomes a sized slot. Tests un-skip naturally as gaps close.
 
-### PR 1.6 — Schema dumper (43 tests)
+**Within categories, isolated → integrated:**
 
-- Rails: `lib/active_record/schema_dumper.rb`,
-  `lib/active_record/connection_adapters/abstract/schema_dumper.rb`,
-  `lib/active_record/connection_adapters/{postgresql,mysql2,sqlite3}/schema_dumper.rb`
-- Rails test: `test/cases/schema_dumper_test.rb`
-- Trails source: `src/schema-dumper.ts`, `src/connection-adapters/abstract/schema-dumper.ts`
-- Trails test: `src/schema-dumper.test.ts`
+- Tier 1 (do first): isolated behaviors with bounded code surface — `type`, `i18n`, `validation`, `query-cache`, `load-async`, `serialization`, `encryption`.
+- Tier 2: adapter-level — `adapter-pg`, `adapter-mysql`, `adapter-sqlite`, `schema`, `connection-pool`.
+- Tier 3: mid-layer features — `transactions`, `migration`.
+- Tier 4 (do last): highly-integrated — `relation`, `STI`, `associations`. These touch everything; closing them earlier means re-opening them every time a Tier 1–3 fix lands.
 
-### PR 1.7 — Insert/upsert all (43 tests)
-
-- Rails: `lib/active_record/insert_all.rb`
-- Rails test: `test/cases/insert_all_test.rb`
-- Trails source: `src/insert-all.ts`
-- Trails test: `src/insert-all.test.ts`
-
-### PR 1.8 — has_and_belongs_to_many (43 tests)
-
-- Rails test: `test/cases/associations/has_and_belongs_to_many_associations_test.rb`
-- Trails test: `src/associations/has-and-belongs-to-many-associations.test.ts`
-
-### PR 1.9 — Join model / habtm-via-has-many-through (41 tests)
-
-- Rails test: `test/cases/associations/join_model_test.rb`
-- Trails test: `src/associations/join-model.test.ts`
-
-### PR 1.10 — Autosave association residual (39 tests)
-
-- Rails: `lib/active_record/autosave_association.rb`
-- Rails test: `test/cases/autosave_association_test.rb`
-- Trails source: `src/autosave-association.ts`
-- Trails test: `src/autosave-association.test.ts`
-
-### PR 1.11 — has_many :through residual (38 tests)
-
-- Rails test: `test/cases/associations/has_many_through_associations_test.rb`
-- Trails test: `src/associations/has-many-through-associations.test.ts`
-
-### PR 1.18 — load_async + future_result (31 tests)
-
-- Rails: `lib/active_record/relation.rb` (`load_async`, `then`),
-  `lib/active_record/future_result.rb`
-- Rails test: `test/cases/relation/load_async_test.rb`
-- Trails source: `src/relation.ts`, `src/future-result.ts`
-- Trails test: `src/relation/load-async.test.ts`
-
-### PR 1.19 — Strict loading (30 tests)
-
-- Rails test: `test/cases/strict_loading_test.rb`
-- Trails test: `src/strict-loading.test.ts`
-
-### PR 1.21 — Encryption: encryptable_record (28 tests)
-
-- Rails test: `test/cases/encryption/encryptable_record_test.rb`
-- Trails test: `src/encryption/encryptable-record.test.ts`
-
-### PR 1.22 — has_one residual (28 tests)
-
-- Rails test: `test/cases/associations/has_one_associations_test.rb`
-- Trails test: `src/associations/has-one-associations.test.ts`
-
-### PR 1.23 — Migration core remainder (27 tests)
-
-- Rails test: `test/cases/migration_test.rb`
-- Trails test: `src/migration.test.ts`
-
-### PR 1.24 — Tasks::DatabaseTasks (26 tests)
-
-- Rails test: `test/cases/tasks/database_tasks_test.rb`
-- Trails test: `src/tasks/database-tasks.test.ts`
-
-### PR 1.25 — Connection pool / handler / pool config (24+13+13 tests)
-
-- Rails tests: `test/cases/connection_pool_test.rb`,
-  connection_handler, connection_handlers_multi_db, sharding
-- Three sub-PRs.
-
-### PR 1.26 — Reflection (22 tests)
-
-- Rails test: `test/cases/reflection_test.rb`
-- Trails test: `src/reflection.test.ts`
-
-### PR 1.27 — has_one :through (22 tests)
-
-- Rails test: `test/cases/associations/has_one_through_associations_test.rb`
-- Trails test: `src/associations/has-one-through-associations.test.ts`
-
-### PR 1.30 — has_many :through disable_joins (19 tests)
-
-- Rails test: `test/cases/associations/has_many_through_disable_joins_associations_test.rb`
-- Trails test: `src/associations/has-many-through-disable-joins-associations.test.ts`
-
-### PR 1.31 — Type::TypeMap + boundary type tests (18+8+10+2+2+1+3+2 tests)
-
-- Rails tests: `test/cases/type/{type_map,integer,date_time,string,time,unsigned_integer}_test.rb`
-- Two sub-PRs: (a) TypeMap + lookup, (b) primitive types.
-
-### PR 1.32 — date_time_precision + time_precision + date_time + dates (18+8+10+1+3 tests)
-
-- Rails tests: `test/cases/{date_time_precision,time_precision,date_time,date,date_test}_test.rb`
-
-### PR 1.33 — Cascaded eager loading + eager_singularization + eager_load_includes_full_sti_class (18+6+8 tests)
-
-- Rails tests: `test/cases/associations/{cascaded_eager_loading,eager_singularization,eager_load_includes_full_sti_class,eager_load_nested_include}_test.rb`
-
-### PR 1.34 — Comments on tables/columns (17 tests)
-
-- Rails test: `test/cases/comment_test.rb`
-- Trails test: `src/comment.test.ts`
-
-### PR 1.35 — Bind parameter (17 tests)
-
-- Rails test: `test/cases/bind_parameter_test.rb`
-- Trails test: `src/bind-parameter.test.ts`
-
-### PR 1.36 — yaml_serialization + serialization_test + serialized_attribute residual (16+1+16 tests)
-
-- Rails tests: `test/cases/{yaml_serialization,serialization,serialized_attribute}_test.rb`
-
-### PR 1.39 — Database selector / configurations (16+34+16+4 tests)
-
-- Rails tests: `test/cases/database_selector_test.rb`, `test/cases/database_configurations/*.rb`
-- Two sub-PRs: (a) configurations, (b) selector middleware.
-
-### PR 1.40 — Transaction callbacks residual (15 tests)
-
-- Rails test: `test/cases/transaction_callbacks_test.rb`
-- Trails test: `src/transaction-callbacks.test.ts`
-
-### PR 1.41 — Invertible migration + hot_compatibility (10+4 tests)
-
-- Rails tests: `test/cases/invertible_migration_test.rb`, `test/cases/hot_compatibility_test.rb`
-
-### PR 1.42 — Reserved word + multiple_db + connection_management + connection_handling (11+11+11+6 tests)
-
-- Rails tests: `test/cases/{reserved_word,multiple_db,connection_management,connection_handling}_test.rb`
-
-### PR 1.43 — Assertions::QueryAssertions (10 tests)
-
-- Rails test: `test/cases/assertions/query_assertions_test.rb`
-- Trails test: `src/assertions/query-assertions.test.ts`
-
-### PR 1.44 — Sharding (6+4 tests)
-
-- Rails tests: `test/cases/{shard_keys,shard_selector}_test.rb`
-
-### PR 1.45 — primary_class_test + multi_db_migrator + connection swapping (7+7+7+7 tests)
-
-- Rails tests: `test/cases/{primary_class,multi_db_migrator}_test.rb`, connection_adapters/connection_swapping
-
-### PR 1.46 — readonly + transaction_isolation + base_prevent_writes + adapter_prevent_writes (7+7+8+1 tests)
-
-- Rails tests: `test/cases/{readonly,transaction_isolation,base_prevent_writes,adapter_prevent_writes}_test.rb`
-
-### PR 1.47 — i18n validations (11+4+1 tests)
-
-- Rails tests: `test/cases/validations/{i18n_generate_message_validation,i18n_validation,uniqueness_validation,association_validation}_test.rb`
-
-### PR 1.48 — Encryption schemes + uniqueness + configurable + api + unencrypted + concurrency + msgpack (9+6+3+5+2+1+3 tests)
-
-- Rails tests: `test/cases/encryption/{encryption_schemes,uniqueness_validations,configurable,encryptable_record_api,unencrypted_attributes,concurrency,encryptable_record_message_pack_serialized,encryptor}_test.rb`
-
-### PR 1.49 — connection_adapters/schema_cache residual (9 tests)
-
-- Rails test: `test/cases/connection_adapters/schema_cache_test.rb`
-- Trails test: `src/connection-adapters/schema-cache.test.ts`
-
-### PR 1.50 — Statement cache + database_statements + statement_invalid + prepared_statement_status (3+2+2+1 tests)
-
-- Rails tests: `test/cases/{statement_cache,database_statements,statement_invalid,prepared_statement_status}_test.rb`
-
-### PR 1.51 — Disconnected/unconnected/invalid/pooled/reaper/reload_models/test_databases/schema_loading/persistence_reload_cache (12 small files)
-
-- One PR; all tiny.
+**Permanent / out-of-scope:** `rake`, `GVL`, partial `serialization` (Marshal/YAML) live in `scripts/api-compare/unported-files.ts`. The "Doesn't translate" section at the bottom is the canonical record.
 
 ---
 
-## Phase 2 — PostgreSQL adapter polish (~250 skipped tests)
+## Category status
 
-### PR 2.1 — pg/range (36 tests)
+| Tier | Category          | Skipped | Audit | Notes                                                       |
+| ---- | ----------------- | ------- | ----- | ----------------------------------------------------------- |
+| 1    | `type`            | 67      | open  | Type system; isolated. Most tests un-skip with cast fixes.  |
+| 1    | `i18n`            | 15      | open  | Translation / message generation                            |
+| 1    | `validation`      | 2       | open  | Trivial finisher                                            |
+| 1    | `query-cache`     | 28      | open  | Bounded subsystem                                           |
+| 1    | `load-async`      | 39      | open  | Narrow feature; `FutureResult`                              |
+| 1    | `serialization`   | 70      | open  | Most likely already in `unported-files.ts`; audit confirms  |
+| 1    | `encryption`      | 10      | open  | Encryption subsystem; small residual                        |
+| 2    | `adapter-pg`      | 442     | open  | Largest bucket; per-type files (range, hstore, array, etc.) |
+| 2    | `adapter-mysql`   | 122     | open  | Per-feature (connection, active-schema, warnings, ...)      |
+| 2    | `adapter-sqlite`  | 9       | open  | Almost free                                                 |
+| 2    | `schema`          | 211     | open  | Schema introspection + dumper                               |
+| 2    | `connection-pool` | 209     | open  | Pool / handler / pool config                                |
+| 3    | `transactions`    | 39      | open  | Transaction / savepoint / isolation                         |
+| 3    | `migration`       | 87      | open  | Migration runner                                            |
+| 4    | `relation`        | 272     | open  | Touches everything; do late                                 |
+| 4    | `STI`             | 6       | open  | Tangled with inheritance/relation                           |
+| 4    | `associations`    | 516     | open  | Largest; touches relation+STI+joins. Last.                  |
+| —    | `rake`            | 96      | n/a   | Permanent; mostly excluded. See "Doesn't translate".        |
+| —    | `GVL`             | 28      | n/a   | Permanent. See "Doesn't translate".                         |
+| —    | `unknown`         | 89      | open  | Triage PR — categorize each into the vocab above.           |
 
-### PR 2.2 — pg/hstore (24 tests)
+Re-run distribution any time:
 
-### PR 2.3 — pg/postgresql_adapter residual (23 tests)
-
-### PR 2.4 — pg/array (22 tests)
-
-### PR 2.5 — pg/uuid + pg/timestamp + pg/bytea (12+12+12 tests)
-
-### PR 2.6 — pg/connection + pg/schema (13+26 tests)
-
-### PR 2.7 — pg/serial + pg/composite + pg/virtual_column + pg/foreign_table + pg/infinity + pg/enum (12+3+6+9+9+9 tests)
-
-### PR 2.8 — pg/transaction + nested + schema_authorization + invertible + dbconsole + datatype + citext + quoting + xml + rename_table + money + ltree + interval (~50 tests)
-
-### PR 2.9 — pg/{referential_integrity,optimizer_hints,numbers,extension_migration,deferred_constraints,date,create_unlogged_tables,collation} (~35 tests)
-
-### PR 2.10 — pg/{statement_pool,prepared_statements_disabled,partitions,network,case_insensitive,explain,domain,geometric,type_lookup,full_text,cidr,change_schema,bit_string,postgresql_rake} (37 + smaller)
-
----
-
-## Phase 3 — MySQL/Trilogy adapter polish (~200 skipped tests)
-
-### PR 3.1 — trilogy adapter (51+26+3 tests)
-
-### PR 3.2 — mysql2 adapter + rake + dbconsole + check_constraint_quoting (15+26+4+1 tests)
-
-### PR 3.3 — abstract_mysql_adapter connection / active_schema (23+14 tests)
-
-### PR 3.4 — abstract_mysql warnings + table_options + quoting (9+9+8 tests)
-
-### PR 3.5 — abstract_mysql remainder (~50 small tests)
+```bash
+grep -rh '^\s*//\s*BLOCKED:' packages/activerecord/src/ \
+  | sed 's/.*BLOCKED: //' | awk '{print $1}' | sort | uniq -c | sort -rn
+```
 
 ---
 
-## Phase 4 — SQLite adapter polish (~30 tests)
+## Workflow per category
 
-### PR 4.1 — sqlite_rake + dbconsole (17+6 tests)
+### Audit PR (the first PR for any open category)
 
-### PR 4.2 — sqlite virtual_column + transaction + statement_pool + explain (1+1+1+1 tests)
+**Goal:** read the Rails feature + test surface end-to-end, identify obvious impl gaps in our codebase, file specific work slots.
+
+**Scope:**
+
+- Read every `def` in the relevant Rails source files (`scripts/api-compare/.rails-source/activerecord/lib/active_record/<feature>/`).
+- Read the corresponding Rails test files end-to-end.
+- For each Rails method/test, locate the TS counterpart. Note: missing impl, signature mismatch, behavioral divergence, or test-side fixture gap.
+- **Don't ship un-skips in the audit PR** — the goal is the inventory.
+- Output: a markdown audit document (committed to the branch under `docs/audits/<category>.md` or returned as PR-body content) listing each gap with:
+  - File / symbol
+  - Rails source reference
+  - Type: `missing` / `partial-impl` / `signature-drift` / `test-helper-gap` / `fixture-gap`
+  - Estimated LOC to close
+  - Test count it would unblock
+  - **Suggested bundling**: group small gaps (<100 LOC each) into ~250-LOC work slots so each downstream PR hits the sizing target. Avoid recommending standalone <100-LOC PRs.
+
+The audit's **triage output is itself pre-sized**: each suggested work-PR slot lists the gaps it covers, totalling ~220–280 LOC. Parent reviews and spawns slots from the suggested list.
+
+**LOC budget:** the audit doc itself is ≤300 LOC (it's all prose). No source changes.
+
+**Workflow:**
+
+1. Spawn agent with the prompt template from `/home/dean/github/blazetrailsdev/test-compare-prompt-template.md` adapted for audit (no un-skips, output is the inventory).
+2. Agent ships the audit doc as a draft PR.
+3. Parent reviews; triage the inventory into specific work slots.
+4. Each work slot becomes a separate PR using the standard test-compare-prompt-template flow.
+
+### Work PRs (after audit)
+
+**Goal:** un-skip tests for a specific gap (or cluster of related gaps) identified in the audit.
+
+Use the **standard test:compare prompt template** at `/home/dean/github/blazetrailsdev/test-compare-prompt-template.md`. Substitute `<TARGET FILE>`, `<RAILS REFERENCE>`, `<BUCKET>`, `<EXPECTED COUNT>`.
+
+The template enforces:
+
+- 1:1 Rails-port for test names + variables + function calls
+- Acceptable language deviations vs. Trails gaps
+- `BLOCKED:` / `ROOT-CAUSE:` / `SCOPE:` annotation format
+- "Workarounds = bugs" rule
+- Per-test loop: pass / surgical fix (≤20 LOC) / sharpen-and-skip
+- `/post-pr` reporting after merge
 
 ---
 
-## Phase 5 — Long tail residual skips
+## Tier 1 — Isolated behaviors
 
-### PR 5.1 — signed_id + enum + inheritance (9+8+2 tests)
+These have bounded code surface and minimal cross-cutting concerns. Audit each, then work through the resulting slots in parallel.
 
-### PR 5.2 — nested_attributes + nested_attributes_with_callbacks (19+8 tests)
+### `type` — 67 skipped
 
-### PR 5.3 — relations + batches + view + aggregations (16+13+5+7 tests)
+**Files:** `base.test.ts` (20), `date-time-precision.test.ts` (18), `enum.test.ts` (10), `date-time.test.ts` (10), `type/type-map.test.ts` (9). Plus residual in adapter-specific type files.
 
-### PR 5.4 — relation sub-tests: predicate_builder + select + update_all + field_ordered_values + scoping (6+2+1+4+28 tests)
+**Audit scope:**
 
-### PR 5.5 — where + where_chain remaining skips (association JOIN, polymorphic, composite PK associations)
+- Rails source: `lib/active_record/type/*.rb`, `lib/active_model/type/*.rb`.
+- Read each `Type` subclass: cast / serialize / deserialize / changedInPlace / typeForAttribute.
+- Identify gaps in TS Type implementations vs. Rails. Common shapes: `cast` returns wrong type, `serialize` doesn't handle edge cases, `precision`/`scale`/`limit` not propagated.
 
-- `src/relation/where.test.ts`, `src/relation/where-chain.test.ts`
-- Remaining skips require: association auto-JOIN, polymorphic associations, composite PK + associations, through associations, Rails-specific types (Rational, Duration)
+### `i18n` — 15 skipped
 
-### PR 5.6 — store + delegated_type + sanitize + dirty + column_definition + touch_later + timestamp (4+2+4+1+3+4+1 tests)
+**Files:** `validations/i18n-validation.test.ts`, `validations/i18n-generate-message-validation.test.ts`.
 
-### PR 5.7 — attribute_methods + modules + association long tail (2+1+5+3+many tests)
+**Audit scope:**
+
+- Rails source: `lib/active_record/translation.rb`, `lib/active_model/errors.rb`, `lib/active_model/validations.rb` (translation paths).
+- Read I18n integration: `humanAttributeName`, `errors.add` translation lookup, `errors.full_messages` formatting.
+- Likely surfaces gaps in our `@blazetrails/activesupport` I18n surface or in AR's translation hooks.
+
+### `validation` — 2 skipped
+
+Trivial finisher. Audit + close in one PR.
+
+### `query-cache` — 28 skipped
+
+**Files:** `query-cache.test.ts`.
+
+**Audit scope:**
+
+- Rails source: `lib/active_record/query_cache.rb`, `connection_adapters/abstract/query_cache.rb`.
+- Read cache wiring: middleware integration, connection-level enable/disable, statement-cache interaction.
+
+### `load-async` — 39 skipped
+
+**Files:** `relation/load-async.test.ts`, `future-result.test.ts`.
+
+**Audit scope:**
+
+- Rails source: `lib/active_record/future_result.rb`, `lib/active_record/relation.rb` async paths.
+- Some Rails async semantics rely on GVL release timing and won't translate (track separately under `GVL`).
+- Real subset: `loadAsync` returning a `FutureResult`-shaped wrapper, `then`/`schedule` semantics.
+
+### `serialization` — 70 skipped
+
+**Audit scope:**
+
+- Most likely already excluded via `unported-files.ts` (Marshal/YAML cases). Audit confirms which residual is real.
+- Real gaps likely in `serialize :col, coder:`, `IndifferentCoder`, custom coders.
+- Output: a delta PR moving anything Marshal/YAML-shaped into `unported-files.ts` if not already there, plus a list of real serialization-attribute gaps.
+
+### `encryption` — 10 skipped
+
+Small residual. Audit covers `EncryptableRecord`, `Encryptor`, `encryption/scheme.ts`. Likely 1–2 work PRs.
+
+---
+
+## Tier 2 — Adapter-level
+
+### `adapter-pg` — 442 skipped (largest bucket)
+
+**Top files:** `range.test.ts` (37 — L-2 in flight), `postgresql-adapter.test.ts` (33), `schema.test.ts` (24), `bytea.test.ts` (~14), `virtual-column.test.ts` (19), `infinity.test.ts` (18), `foreign-table.test.ts` (17), `datatype.test.ts` (15), `uuid.test.ts` (14), `interval.test.ts` (13), `connection.test.ts` (13), and per-type files (hstore, array, citext, money, ltree, network, geometric, etc.).
+
+**Audit scope:** per-type-file. The audit isn't one PR — it's one audit per pg-type cluster (range, hstore, array, uuid/timestamp/bytea, etc.). Several have already been audited inline by the work PRs that established their patterns (#1306, #1312, #1325, #1323).
+
+**Strategy:** audit + work in pairs per type. Already-merged audits inform the next:
+
+1. ✅ pg/range — #1306 + #1351 (L-1) shipped; L-2 in flight.
+2. ✅ pg/array — #1312, #1320, #1343 shipped.
+3. ✅ pg/hstore — #1325 shipped.
+4. ✅ pg/bytea + pg/timestamp — #1323 shipped (uuid annotations only).
+5. **pg/postgresql-adapter** (33) — #1331 partial; finish remaining via audit.
+6. **pg/schema** (24) — schema test integration.
+7. **pg/virtual-column** (19) — generated columns.
+8. **pg/infinity** (18) — `Float::INFINITY`, `Date::Infinity` quoting.
+9. **pg/foreign-table** (17).
+10. **pg/datatype** (15) — type composition tests.
+11. **pg/uuid** (14) — finish uuid round-trip beyond #1323's annotations.
+12. **pg/interval** (13).
+13. **pg/connection** (13).
+14. Long tail: citext, money, ltree, network, geometric, enum, composite, full_text, cidr, change_schema, bit_string, partitions, rename_table, deferred_constraints, optimizer_hints, prepared_statements_disabled, statement_pool, type_lookup, domain, extension_migration, collation, create_unlogged_tables, referential_integrity, numbers, date, case_insensitive, explain, transaction, nested transaction, schema_authorization, invertible.
+
+### `adapter-mysql` — 122 skipped
+
+**Top files:** `abstract-mysql-adapter/connection.test.ts` (14 after #1326), `active-schema.test.ts` (14), `mysql2/mysql2-adapter.test.ts` (9), `warnings.test.ts` (9), `table-options.test.ts` (9), `schema.test.ts` (8), `quoting.test.ts` (8), `charset-collation.test.ts` (7).
+
+**In flight:** Story H (mysql infra gaps), G-followup (timeout test).
+
+**Audit scope:** per-file. Several already audited inline by #1326 (connection). Remaining files audit fresh.
+
+### `adapter-sqlite` — 9 skipped
+
+**Files:** `sqlite3-adapter.test.ts` (6), `transaction.test.ts` (1), `statement-pool.test.ts` (1), `explain.test.ts` (1).
+
+Tiny — bundle audit + work into one PR.
+
+### `schema` — 211 skipped
+
+**Audit scope:**
+
+- Rails source: `connection_adapters/abstract/schema_*.rb`, `schema_dumper.rb`, `schema_migration.rb`.
+- Per-file: `schema.test.ts`, `schema-dumper.test.ts`, `change-schema.test.ts`, `migration.test.ts` schema-related slices.
+
+### `connection-pool` — 209 skipped
+
+**Audit scope:**
+
+- Rails source: `connection_adapters/abstract/connection_pool*.rb`, `connection_handler*.rb`.
+- Many cases already excluded as `GVL`. Real residual: pool-config / handler / role+shard semantics.
+
+---
+
+## Tier 3 — Mid-layer
+
+### `transactions` — 39 skipped
+
+**Audit scope:**
+
+- Rails source: `lib/active_record/transactions.rb`, `connection_adapters/abstract/transaction.rb`.
+- Story K (#1348) + K-followup (#1354) closed the savepoint-state work. K-followup-2 (in flight) closes the inner-savepoint commit.
+- Audit identifies remaining gaps after those land.
+
+### `migration` — 87 skipped
+
+**Audit scope:**
+
+- Rails source: `lib/active_record/migration.rb`, `migration/*.rb`, `command_recorder.rb`.
+- Per-file: `migration.test.ts`, `command-recorder.test.ts`, adapter-specific migration tests.
+- Already audited inline by #1317 (deprecator + default_strategy) + #1357 (Migrator async loader). Audit covers the remainder.
+
+---
+
+## Tier 4 — Highly integrated (do last)
+
+These touch everything; landing them earlier means re-opening them every time a Tier 1–3 fix surfaces a new edge case. Wait until Tier 1–3 audits + first-wave work PRs are mostly in.
+
+### `relation` — 272 skipped
+
+**Audit scope:**
+
+- Rails source: `lib/active_record/relation.rb` + `relation/*.rb` (already at 100% on api:compare). Behavioral fidelity is the open work.
+- Per-file: `relation.test.ts`, `relation/where.test.ts`, `relation/where-chain.test.ts`, `relation/predicate-builder.test.ts`, `relation/calculations.test.ts`, `relation/finder-methods.test.ts`, `relation/batches.test.ts`, `relation/spawn-methods.test.ts`, `relation/delegation.test.ts`.
+
+### `STI` — 6 skipped
+
+**Audit scope:** small but tangled. Audit reads `inheritance.ts` + `inheritance.test.ts` end-to-end against Rails `inheritance.rb`. Most gaps will surface as `findSubclass` / `discriminate_class_for_record` divergences.
+
+### `associations` — 516 skipped (largest)
+
+**Audit scope:**
+
+- Rails source: 30+ files in `lib/active_record/associations/`.
+- Per-feature-file: `associations.test.ts` (50), HABTM (43), join-model (41), autosave (39), `has_many :through` (38), `has_one` (28), reflection (22), `has_one :through` (22), `has_many :through disable_joins` (19).
+- Audit per association feature, then per-test work PRs.
+
+---
+
+## Triage `unknown` — 89 skipped
+
+Single audit PR — re-categorize each `BLOCKED: unknown` annotation under the controlled vocabulary above. Some will move to `unported-files.ts`; others get a real category. ~30–60 LOC of annotation edits.
 
 ---
 
 ## Tracking & cadence
 
-- Run `pnpm test:compare -- --package activerecord` after each merge.
+- Run `pnpm test:compare --package activerecord` after each merge.
 - Open all PRs as draft; run `/link <PR#>` after opening.
 - Per CLAUDE.md: do NOT rename Rails-derived test names.
+- After each work PR merges, run `/post-pr` with findings (out-of-scope gaps, fixture-model needs, infrastructure shortfalls).
 
 ---
 
@@ -347,94 +294,82 @@ Permanently not-portable tests are excluded via `UNPORTED_FILES` in
 `scripts/api-compare/unported-files.ts` (whole-file entries with `testFile`).
 This drops them from both the Ruby denominator and the skipped backlog.
 
-**PR that added whole-file exclusions: #1304** (chore(test-compare): exclude permanently-not-portable Rails tests).
-Delta: 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
-
-**PR that added per-test exclusion infra + mixed-file entries: #1305** (feat(test-compare): per-test exclusions for mixed GVL/serialization files).
-Delta: 7970 → 7930 Ruby tests (−40), 2085 → 2048 skipped (−37).
+**PR that added whole-file exclusions: #1304** — 8097 → 7970 Ruby tests (−127), 2211 → 2085 skipped (−126).
+**PR that added per-test exclusion infra: #1305** — 7970 → 7930 Ruby tests (−40), 2085 → 2048 skipped (−37).
 
 ### YAML / Marshal / Ruby object serialization ✓ excluded
 
-- `test/cases/yaml_serialization_test.rb` — YAML round-trip of arbitrary Ruby objects (**excluded**)
-- `test/cases/binary_test.rb` — Marshal/YAML binary encoding of AR records (**excluded**)
-- `test/cases/marshal_serialization_test.rb` — Marshal.dump/load (**already excluded** before this PR)
-- `test/cases/coders/yaml_column_test.rb` — Psych YAMLColumn (**already excluded** before this PR)
-- `test/cases/message_pack_test.rb` — MessagePack Ruby bridge (**already excluded** before this PR)
-- `test/cases/serialized_attribute_test.rb` — 19 YAML/class-serializer cases excluded (17 unique names; 2 names appear in both the base class and a subclass within the file)
-- `test/cases/base_test.rb` — 7 Marshal cases (**per-test excluded**)
+- `test/cases/yaml_serialization_test.rb` (**excluded**)
+- `test/cases/binary_test.rb` (**excluded**)
+- `test/cases/marshal_serialization_test.rb` (**already excluded**)
+- `test/cases/coders/yaml_column_test.rb` (**already excluded**)
+- `test/cases/message_pack_test.rb` (**already excluded**)
+- `test/cases/serialized_attribute_test.rb` — 19 YAML/class-serializer cases (per-test excluded)
+- `test/cases/base_test.rb` — 7 Marshal cases (per-test excluded)
 
 ### Ruby concurrency / thread / GVL ✓ partially excluded
 
-- `test/cases/transaction_isolation_test.rb` — all 7 cases GVL thread parallelism (**excluded**)
-- `test/cases/schema_loading_test.rb` — all 3 cases Zeitwerk/on_load from background threads (**excluded**)
-- `test/cases/reload_models_test.rb` — ActiveSupport::Dependencies class reloading (**excluded**)
-- `test/cases/connection_pool_test.rb` — 11 GVL thread cases (**per-test excluded**)
-- `test/cases/base_test.rb` — 2 GVL thread-handler cases (**per-test excluded**)
-- `test/cases/relation/load_async_test.rb` cases that assert GVL release while a query runs (mixed file)
-
-### Ruby autoload / `require` / class reloading ✓ excluded (see GVL above)
+- `test/cases/transaction_isolation_test.rb` — 7 cases (**excluded**)
+- `test/cases/schema_loading_test.rb` — 3 cases (**excluded**)
+- `test/cases/reload_models_test.rb` — `ActiveSupport::Dependencies` (**excluded**)
+- `test/cases/connection_pool_test.rb` — 11 GVL thread cases (per-test excluded)
+- `test/cases/base_test.rb` — 2 GVL thread-handler cases (per-test excluded)
+- `test/cases/relation/load_async_test.rb` cases that assert GVL release while a query runs (mixed file — fold into next exclusion touch)
 
 ### Process / Signal / fork
 
-- `connection_handler_test.rb` cases asserting `Process.fork` cleanup (mixed file)
-- `test/cases/reaper_test.rb` — 1 fork case (**per-test excluded**)
+- `connection_handler_test.rb` cases asserting `Process.fork` cleanup (mixed file — fold into next exclusion touch)
+- `test/cases/reaper_test.rb` — 1 fork case (per-test excluded)
 
 ### Rake / dbconsole shell-out ✓ excluded
 
 - `adapters/postgresql/postgresql_rake_test.rb` (37 cases) (**excluded**)
 - `adapters/mysql2/mysql2_rake_test.rb` (26 cases) (**excluded**)
 - `adapters/sqlite3/sqlite_rake_test.rb` (17 cases) (**excluded**)
-- `adapters/postgresql/dbconsole_test.rb` (6 cases) (**excluded**)
-- `adapters/mysql2/dbconsole_test.rb` (4 cases) (**excluded**)
-- `adapters/sqlite3/dbconsole_test.rb` (6 cases) (**excluded**)
+- `adapters/{postgresql,mysql2,sqlite3}/dbconsole_test.rb` (16 cases) (**excluded**)
 
-### Fixtures (entire suite) ✓ already excluded
+### Fixtures ✓ already excluded
 
-- `test/cases/fixtures_test.rb` (all 111 cases)
-- `test/cases/fixture_set/file_test.rb` (all 14 cases)
-- `test/cases/test_fixtures_test.rb` (all 4 cases)
+- `test/cases/fixtures_test.rb` (111), `fixture_set/file_test.rb` (14), `test_fixtures_test.rb` (4)
 
 ### Ruby exception classes / object model
 
-- Cases asserting on `NameError#missing_name?`, `Module#prepend` ordering, `singleton_class` semantics
-- `active_record_test.rb` cases asserting on `ActiveRecord::Base.singleton_class.ancestors`
+- `NameError#missing_name?`, `Module#prepend` ordering, `singleton_class` semantics
+- `active_record_test.rb` cases on `ActiveRecord::Base.singleton_class.ancestors`
 
 ### Encoding / String semantics ✓ excluded
 
-- `binary_test.rb` cases asserting `Encoding::ASCII_8BIT` vs `Encoding::UTF_8` (**excluded**)
-- `bytea_test.rb` cases asserting on Ruby `String#encoding`
+- `binary_test.rb` `Encoding::ASCII_8BIT` vs `Encoding::UTF_8` (**excluded**)
+- `bytea_test.rb` cases on Ruby `String#encoding`
 
 ### Symbols
 
-- Cases where the assertion distinguishes `Symbol` from `String`
+- Cases distinguishing `Symbol` from `String`
 
 ---
 
 ## Workflow for unskipping tests
 
-Test-unskip agents will hit implementation gaps that exceed the 300-LOC ceiling if bundled with un-skips. The triage rule is: **don't file 50 follow-up issues for 50 tests blocked by 5 root causes.** Annotate each blocked skip with a structured comment so a later consolidation pass groups them by root cause and unblocks dozens at a time.
+(Reference — the canonical workflow lives in `/home/dean/github/blazetrailsdev/test-compare-prompt-template.md`.)
 
-### Per-test-file PR loop
+### Per-test loop
 
-For each `it.skip(...)` (or `xit(...)`, `test.skip(...)`, `describe.skip(...)`) in the file:
+For each `it.skip(...)` (or `xit(...)`, `test.skip(...)`, `describe.skip(...)`):
 
-1. Attempt to un-skip the test and run it.
-2. **Passing** → un-skip, commit.
+1. Attempt to un-skip and run.
+2. **Pass** → un-skip, commit.
 3. **Failing with surgical fix (≤20 LOC, in-scope)** → fix, un-skip, commit.
 4. **Failing with deep gap** → leave skipped; upgrade the annotation to the format below.
 
-LOC budget per PR: ≤300 total diff. If 30 PASSING + a few SURGICAL pushes over, split into `<file>-pass` (un-skips only) + `<file>-fixes` (surgical fixes only). If a single bug fix would be >30 LOC, defer the fix entirely — don't try to land a subsystem repair inside a test-unskip PR.
+LOC budget per PR: ≤300 total diff.
 
 ### Skip annotation format
 
-Replace bare `it.skip("name", () => {})` with:
-
 ```ts
-it.skip("rails-test-name", () => {
-  // BLOCKED: STI — User.find(manager_id) returns User, expected Manager
-  // ROOT-CAUSE: inheritance.ts#findSubclass not reading inheritanceColumn for cross-class find
-  // SCOPE: ~50 LOC fix in inheritance.ts; affects ~12 tests across associations/, base.test.ts
-  // ...test body if any...
+it.skip("rails-test-name-verbatim", () => {
+  // BLOCKED: <category>
+  // ROOT-CAUSE: <file>#<symbol>: <one-sentence cause>
+  // SCOPE: ~<N> LOC <fix description>; affects ~<M> tests
 });
 ```
 
@@ -442,9 +377,7 @@ Three required lines, in this order:
 
 - `BLOCKED: <category>` — controlled vocabulary, see below. The grep contract.
 - `ROOT-CAUSE:` — one-sentence specific cause naming the file/symbol involved.
-- `SCOPE:` — rough fix size + how many _other_ tests likely share this cause.
-
-**Note:** The initial normalization pass (PR #1294) applied annotations at file-path granularity, not per-test. Annotations on tests in multi-theme files (e.g. `base.test.ts`) may use the file's dominant-theme category even for outlier tests. When running a consolidation pass, treat `BLOCKED:` as a starting point for triage — verify the category applies to the specific test before acting on it.
+- `SCOPE:` — rough fix size + how many other tests likely share this cause.
 
 ### Controlled vocabulary
 
@@ -457,10 +390,10 @@ Three required lines, in this order:
 | `BLOCKED: transactions`    | Transaction / savepoint / isolation gap                                          |
 | `BLOCKED: query-cache`     | Query cache behavior                                                             |
 | `BLOCKED: load-async`      | Async query / future result                                                      |
-| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent, candidate for `skip-list.ts`               |
-| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent, candidate for `skip-list.ts`  |
-| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent, candidate for `skip-list.ts`      |
-| `BLOCKED: fixture`         | Fixture loader feature (whole subsystem already in `skip-list.ts`)               |
+| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent → `unported-files.ts`                       |
+| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent → `unported-files.ts`          |
+| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent → `unported-files.ts`              |
+| `BLOCKED: fixture`         | Fixture loader feature (whole subsystem already in `unported-files.ts`)          |
 | `BLOCKED: migration`       | Migration runner feature                                                         |
 | `BLOCKED: connection-pool` | Connection pool / handler / pool config gap                                      |
 | `BLOCKED: relation`        | Relation API gap (specify which: where / scope / batches / ...)                  |
@@ -470,20 +403,19 @@ Three required lines, in this order:
 | `BLOCKED: adapter-pg`      | PostgreSQL-specific adapter gap                                                  |
 | `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                       |
 | `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                      |
+| `BLOCKED: range`           | pg/range type behavior                                                           |
 | `BLOCKED: unknown`         | Could not categorize from context; needs human triage                            |
 
-Adding a new category: pick a slug, document it in the table above in the same PR.
+Adding a new category: pick a kebab-case slug, document in this table.
 
 ### Cross-file consolidation pass
-
-After several test-unskip PRs land, an audit pass:
 
 ```bash
 grep -rn "BLOCKED:" packages/activerecord/src --include='*.test.ts' \
   | sed 's/.*BLOCKED: //' | cut -d' ' -f1 | sort | uniq -c | sort -rn
 ```
 
-Output ranks subsystems by blocked-test count. The biggest groups become focused subsystem-fix PRs. After a fix lands, un-skipping the affected tests is mechanical: run the previously-blocked file under `BLOCKED: <category>` and remove the annotation from any test that now passes.
+Output ranks subsystems by blocked-test count. The biggest groups become focused subsystem-fix PRs.
 
 ### Why this is better than per-test issues
 

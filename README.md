@@ -4,6 +4,8 @@ TypeScript packages that mirror the Ruby on Rails API.
 
 The goal is **100% API compatible with Rails**, with behavior matched **test for test** against the Rails source. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
 
+> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — see [`docs/activerecord-100-plan.md`](docs/activerecord-100-plan.md) for the post-100% Rails-fidelity work.
+
 ## Zero-declare models — `trails-tsc`
 
 Rails models look like this:
@@ -179,11 +181,11 @@ Ruby-to-TypeScript translation table.
 
 | Package                     | Rails Equivalent                                                      | API       | Tests     | Description                                              |
 | --------------------------- | --------------------------------------------------------------------- | --------- | --------- | -------------------------------------------------------- |
-| `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **91.0%** | **72.6%** | ORM — persistence, querying, associations, migrations    |
+| `@blazetrails/activerecord` | [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html) | **100%**  | **75.6%** | ORM — persistence, querying, associations, migrations    |
 | `@blazetrails/arel`         | [Arel](https://api.rubyonrails.org/classes/Arel.html)                 | **100%**  | **99.4%** | SQL AST builder and query generation                     |
 | `@blazetrails/activemodel`  | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)   | **99.6%** | **99.6%** | Attributes, validations, callbacks, dirty tracking, i18n |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **93.2% API** | **77.2% Tests**
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **99.9% API** (6473/6478) | **~78% Tests** _(test percentage pending a `sync-stats` refresh; AR + Arel public API at 100%, ActiveModel at 99.2%)_
 
 Per-package deviation guides catalog the places where Trails diverges
 from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/activerecord-rails-deviations.md)

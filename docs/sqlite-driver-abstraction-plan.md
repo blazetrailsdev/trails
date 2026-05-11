@@ -111,9 +111,9 @@ test gating. Capabilities: `inProcessSync: true`, `streaming: false`,
 `loadExtension: false`, `concurrentStatements: false`,
 `foreignKeysOnByDefault: false`, `immediateTransactions: true`.
 
-### PR 7 — expo-sqlite driver (planned)
+### PR 7 — expo-sqlite driver (#1299)
 
-Adds `packages/activesupport/src/sqlite-drivers/expo-sqlite.ts` wrapping
+Shipped `packages/activesupport/src/sqlite-drivers/expo-sqlite.ts` wrapping
 Expo's modern async API (`openDatabaseAsync`, `runAsync`, `getAllAsync`,
 `getEachAsync`, `closeAsync`). Same shape as node-sqlite (soft-load,
 self-register, expose `isExpoSqliteAvailable` for test gating).

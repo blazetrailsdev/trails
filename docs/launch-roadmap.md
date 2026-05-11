@@ -69,9 +69,8 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
 
 1. **ActiveSupport to 100%** — ~1,180 stub tests to unskip, ~817 missing.
    Many are utility functions that can be knocked out methodically.
-2. **ActiveRecord to 100%** — the big one. Work through the 100% plan in
-   `docs/activerecord-100-percent.md`. Associations, migrations, validations,
-   query interface are the priority areas.
+2. **ActiveRecord to 100%** — api:compare scoreboard is closed (4969/4969).
+   Post-100% Rails-fidelity work tracked in `docs/activerecord-100-plan.md`.
 3. **ActionController basics** — implement the rendering pipeline
    (JSON + EJS), params, filters, and CRUD. See the per-file 0% list
    in `docs/actioncontroller-100-percent.md`.

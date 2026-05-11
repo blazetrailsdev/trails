@@ -113,13 +113,13 @@ serves the sqlite-adapter side and is in `@blazetrails/activesupport/sqlite-adap
 
 **Still open under BC-3:**
 
-1. **Eager native imports leak from non-subpath-entry files.** Live grep against `packages/activerecord/src/connection-adapters/`:
-   - `postgresql/database-statements.ts` — `import pg from "pg"` (eager, not lazy)
-   - `postgresql/temporal-type-parsers.ts` — `import pg from "pg"`
-   - `mysql/temporal-type-cast.ts` — `import mysql from "mysql2/promise"`
+1. **Eager native imports leak from non-subpath-entry files.** Live grep against `packages/activerecord/src/connection-adapters/` (verified 2026-05-11):
+   - `postgresql/temporal-type-parsers.ts` — `import pg from "pg"` (eager, the one remaining leak)
+   - `postgresql/database-statements.ts` — `import type pg from "pg"` (type-only — OK; was eager, now stripped)
+   - `mysql/temporal-type-cast.ts` — `import type mysql from "mysql2/promise"` (type-only — OK)
    - `mysql2/database-statements.ts` — `import type mysql from "mysql2/promise"` (type-only — OK)
 
-   These get pulled in transitively when the main adapter file imports from them. The path forward: either gate behind a registry (lazy) or move the dep-using bits into the subpath entry only.
+   `temporal-type-parsers.ts` gets pulled in transitively when the main adapter file imports from it. The path forward: either gate behind a registry (lazy) or move the dep-using bits into the subpath entry only.
 
 2. **`pg` and `mysql2` peer-dep promotion** has not happened — `packages/activerecord/package.json` `dependencies` still lists only workspace deps (no native deps declared). They're picked up via the consumer app's installation. Worth formalizing as `optionalDependencies` so type-check works without a hard `pg` install.
 

@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import { mkdirSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
+import "@blazetrails/activesupport/sqlite/better-sqlite3";
 import { Base, MigrationContext } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
@@ -852,29 +853,117 @@ interface GhWorkflowJob {
 // Sync functions
 // ---------------------------------------------------------------------------
 
+const PR_FIELDS = [
+  "number",
+  "title",
+  "author",
+  "createdAt",
+  "mergedAt",
+  "closedAt",
+  "mergeCommit",
+  "additions",
+  "deletions",
+  "changedFiles",
+  "labels",
+  "headRefName",
+  "baseRefName",
+  "body",
+  "reviewDecision",
+  "isDraft",
+].join(",");
+
+function mapPr(pr: GhPrData) {
+  const endDate = pr.mergedAt ?? pr.closedAt;
+  const timeOpenMs =
+    endDate && pr.createdAt ? new Date(endDate).getTime() - new Date(pr.createdAt).getTime() : null;
+  return {
+    number: pr.number,
+    title: pr.title,
+    author: pr.author?.login ?? null,
+    branch: pr.headRefName,
+    base_branch: pr.baseRefName,
+    body: pr.body,
+    created_at: pr.createdAt,
+    merged_at: pr.mergedAt,
+    closed_at: pr.closedAt,
+    merge_commit_sha: pr.mergeCommit?.oid ?? null,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changed_files: pr.changedFiles,
+    labels: JSON.stringify(pr.labels.map((l) => l.name)),
+    review_count: -1,
+    comment_count: -1,
+    commit_count: 0,
+    time_open_seconds: timeOpenMs !== null ? Math.round(timeOpenMs / 1000) : null,
+    review_decision: pr.reviewDecision ?? null,
+    state: pr.mergedAt ? "merged" : pr.closedAt ? "closed" : "open",
+    is_draft: pr.isDraft ? 1 : 0,
+  };
+}
+
+function parsePrSpec(spec: string): number[] {
+  const out = new Set<number>();
+  for (const raw of spec.split(",")) {
+    const part = raw.trim();
+    if (!part) continue;
+    const m = part.match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) throw new Error(`Invalid PR spec segment: "${part}"`);
+    const lo = Number(m[1]);
+    const hi = m[2] ? Number(m[2]) : lo;
+    if (hi < lo) throw new Error(`Invalid range "${part}": end before start`);
+    for (let n = lo; n <= hi; n++) out.add(n);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+async function findMissingPrNumbers(): Promise<number[]> {
+  const rows = await PullRequest.findBySql("SELECT number FROM pull_requests ORDER BY number");
+  const present = new Set<number>(rows.map((r) => r.readAttribute("number") as number));
+  if (present.size === 0) return [];
+  const max = Math.max(...present);
+  const missing: number[] = [];
+  for (let n = 1; n <= max; n++) {
+    if (!present.has(n)) missing.push(n);
+  }
+  return missing;
+}
+
+async function syncPullRequestsByNumber(numbers: number[]): Promise<number> {
+  if (numbers.length === 0) {
+    console.log("No PRs to backfill.");
+    return 0;
+  }
+  console.log(`Backfilling ${numbers.length} PRs by number...`);
+  let synced = 0;
+  let skipped = 0;
+  for (const num of numbers) {
+    try {
+      const pr = ghJson<GhPrData>(`pr view ${num} --repo ${REPO} --json ${PR_FIELDS}`);
+      await PullRequest.upsertAll([mapPr(pr)], { uniqueBy: "number" });
+      synced++;
+      if (synced % 25 === 0) {
+        console.log(`  ...${synced}/${numbers.length}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // gh exits non-zero for numbers that are issues, not PRs, or that don't exist.
+      if (/no pull request|not found|could not resolve/i.test(msg)) {
+        skipped++;
+        continue;
+      }
+      console.warn(`  Failed to fetch PR #${num}: ${msg}`);
+    }
+  }
+  console.log(`Backfilled ${synced} PRs; skipped ${skipped} non-PR numbers`);
+  return synced;
+}
+
 async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
   const rows = await PullRequest.findBySql("SELECT MAX(number) as number FROM pull_requests");
   const lastSynced = (rows[0]?.readAttribute("number") as number) ?? 0;
   console.log(`Last synced PR: #${lastSynced}`);
 
-  const fields = [
-    "number",
-    "title",
-    "author",
-    "createdAt",
-    "mergedAt",
-    "closedAt",
-    "mergeCommit",
-    "additions",
-    "deletions",
-    "changedFiles",
-    "labels",
-    "headRefName",
-    "baseRefName",
-    "body",
-    "reviewDecision",
-    "isDraft",
-  ].join(",");
+  const fields = PR_FIELDS;
 
   const limit = mode === "latest" ? 1000 : 5000;
   const allPrs = ghJson<GhPrData[]>(
@@ -882,37 +971,6 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
   );
 
   console.log(`Found ${allPrs.length} new PRs to sync`);
-
-  const mapPr = (pr: GhPrData) => {
-    const endDate = pr.mergedAt ?? pr.closedAt;
-    const timeOpenMs =
-      endDate && pr.createdAt
-        ? new Date(endDate).getTime() - new Date(pr.createdAt).getTime()
-        : null;
-    return {
-      number: pr.number,
-      title: pr.title,
-      author: pr.author?.login ?? null,
-      branch: pr.headRefName,
-      base_branch: pr.baseRefName,
-      body: pr.body,
-      created_at: pr.createdAt,
-      merged_at: pr.mergedAt,
-      closed_at: pr.closedAt,
-      merge_commit_sha: pr.mergeCommit?.oid ?? null,
-      additions: pr.additions,
-      deletions: pr.deletions,
-      changed_files: pr.changedFiles,
-      labels: JSON.stringify(pr.labels.map((l) => l.name)),
-      review_count: -1,
-      comment_count: -1,
-      commit_count: 0,
-      time_open_seconds: timeOpenMs !== null ? Math.round(timeOpenMs / 1000) : null,
-      review_decision: pr.reviewDecision ?? null,
-      state: pr.mergedAt ? "merged" : pr.closedAt ? "closed" : "open",
-      is_draft: pr.isDraft ? 1 : 0,
-    };
-  };
 
   if (allPrs.length > 0) {
     await PullRequest.upsertAll(allPrs.map(mapPr), { uniqueBy: "number" });
@@ -1280,8 +1338,8 @@ async function syncPrReactions() {
   }
 }
 
-async function syncWorkflowRuns(mode: "latest" | "refresh"): Promise<number> {
-  const limitClause = mode === "latest" ? "LIMIT 10" : "";
+async function syncWorkflowRuns(mode: "latest" | "refresh" | "backfill"): Promise<number> {
+  const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const missingRuns = await PullRequest.findBySql(`
     SELECT DISTINCT merge_commit_sha, number FROM pull_requests
     WHERE merge_commit_sha IS NOT NULL
@@ -1565,7 +1623,7 @@ function parseApiCompareFromLogs(logs: string) {
   return results;
 }
 
-async function syncCheckAnnotations(mode: "latest" | "refresh") {
+async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToSync = await Base.adapter.execute(`
     SELECT wj.id as job_id, wr.id as run_id
@@ -1615,7 +1673,7 @@ async function syncCheckAnnotations(mode: "latest" | "refresh") {
   }
 }
 
-async function syncJobLogs(mode: "latest" | "refresh"): Promise<number> {
+async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<number> {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToFetch = await Base.adapter.execute(`
     SELECT wj.id as job_id, wj.run_id, wj.name as job_name,
@@ -1676,7 +1734,7 @@ async function syncJobLogs(mode: "latest" | "refresh"): Promise<number> {
   return fetched;
 }
 
-async function syncCompareStats(mode: "latest" | "refresh"): Promise<number> {
+async function syncCompareStats(mode: "latest" | "refresh" | "backfill"): Promise<number> {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const runsToProcess = await Base.adapter.execute(`
     SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
@@ -1998,19 +2056,43 @@ async function printSummary() {
 
 async function main() {
   const args = process.argv.slice(2);
-  const knownFlags = ["--latest", "--refresh", "--compare-only"];
-  const unknownFlags = args.filter((a) => a.startsWith("--") && !knownFlags.includes(a));
+  const knownFlags = ["--latest", "--refresh", "--compare-only", "--missing", "--prs"];
+  const unknownFlags = args.filter(
+    (a) => a.startsWith("--") && !knownFlags.includes(a.split("=")[0]),
+  );
   if (unknownFlags.length > 0) {
     console.error(`Unknown flag(s): ${unknownFlags.join(", ")}`);
-    console.error("Usage: stats:sync [--latest | --refresh | --compare-only]");
+    console.error(
+      "Usage: stats:sync [--latest | --refresh | --compare-only | --missing | --prs <spec>]",
+    );
     process.exit(1);
   }
 
-  const mode: "latest" | "refresh" | "compare-only" = args.includes("--refresh")
-    ? "refresh"
-    : args.includes("--compare-only")
-      ? "compare-only"
-      : "latest";
+  // --prs accepts either `--prs=408-460,500` or `--prs 408-460,500`
+  let prsSpec: string | null = null;
+  const prsEq = args.find((a) => a.startsWith("--prs="));
+  if (prsEq) {
+    prsSpec = prsEq.slice("--prs=".length);
+  } else {
+    const idx = args.indexOf("--prs");
+    if (idx >= 0) {
+      prsSpec = args[idx + 1] ?? null;
+      if (!prsSpec || prsSpec.startsWith("--")) {
+        console.error("--prs requires a spec like 408-460,500");
+        process.exit(1);
+      }
+    }
+  }
+  const backfillMissing = args.includes("--missing");
+  const isBackfill = prsSpec !== null || backfillMissing;
+
+  const mode: "latest" | "refresh" | "compare-only" | "backfill" = isBackfill
+    ? "backfill"
+    : args.includes("--refresh")
+      ? "refresh"
+      : args.includes("--compare-only")
+        ? "compare-only"
+        : "latest";
 
   if (mode === "latest") {
     console.log(
@@ -2018,6 +2100,10 @@ async function main() {
     );
   } else if (mode === "compare-only") {
     console.log("Running compare-only mode: syncing PRs, workflow runs, and compare logs.\n");
+  } else if (mode === "backfill") {
+    console.log(
+      "Running backfill mode: fetching targeted PRs by number, then deep-syncing files/commits/comments/reviews.\n",
+    );
   } else {
     console.log("Running full refresh sync.\n");
   }
@@ -2027,6 +2113,59 @@ async function main() {
 
   try {
     await migrateDb(adapter);
+
+    if (mode === "backfill") {
+      let numbers: number[] = [];
+      if (prsSpec !== null) {
+        numbers.push(...parsePrSpec(prsSpec));
+      }
+      if (backfillMissing) {
+        const missing = await findMissingPrNumbers();
+        console.log(`Found ${missing.length} missing PR numbers in the existing range.`);
+        numbers.push(...missing);
+      }
+      numbers = [...new Set(numbers)].sort((a, b) => a - b);
+
+      console.log("=== Backfilling PRs ===");
+      const prsSynced = await syncPullRequestsByNumber(numbers);
+
+      console.log("\n=== Syncing PR files ===");
+      await syncPrFiles();
+      console.log("\n=== Syncing PR commits ===");
+      await syncPrCommits();
+      console.log("\n=== Syncing PR comments & reviews ===");
+      await syncPrComments();
+      console.log("\n=== Syncing PR requested reviewers ===");
+      await syncPrRequestedReviewers();
+      console.log("\n=== Syncing PR linked issues ===");
+      await syncPrLinkedIssues();
+      console.log("\n=== Syncing PR timeline events ===");
+      await syncPrTimelineEvents();
+      console.log("\n=== Syncing PR reactions ===");
+      await syncPrReactions();
+
+      console.log("\n=== Backfilling workflow runs (uncapped) ===");
+      const runsSynced = await syncWorkflowRuns("backfill");
+
+      console.log("\n=== Backfilling check annotations (uncapped) ===");
+      await syncCheckAnnotations("backfill");
+
+      console.log("\n=== Backfilling job logs (uncapped) ===");
+      const logsFetched = await syncJobLogs("backfill");
+
+      console.log("\n=== Backfilling compare stats (uncapped) ===");
+      const logsParsed = await syncCompareStats("backfill");
+
+      await SyncLog.create({
+        synced_at: new Date().toISOString(),
+        prs_synced: prsSynced,
+        runs_synced: runsSynced,
+        logs_parsed: logsParsed,
+      });
+      console.log(`\nFetched ${logsFetched} job logs during backfill.`);
+      await printSummary();
+      return;
+    }
 
     const fetchMode = mode === "latest" ? "latest" : "refresh";
 
