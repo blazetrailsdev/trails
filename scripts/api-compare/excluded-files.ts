@@ -33,7 +33,7 @@ export type ExcludedFile = { reason: string } & (
 
 export const EXCLUDED_FILES: ExcludedFile[] = [
   {
-    pattern: "migration/compatibility",
+    pattern: "migration/compatibility", // test excluded by extract-ruby-tests.rb SKIP_PATTERNS (/\/migration\//)
     reason: "Pre-1.0: legacy Rails version migration compatibility shims.",
   },
   {
@@ -71,7 +71,7 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
       "MessagePack-the-format exists in JS but this file is the Marshal bridge, not a reusable impl.",
   },
   {
-    pattern: "legacy_yaml_adapter.rb",
+    pattern: "legacy_yaml_adapter.rb", // no test counterpart
     reason:
       "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; " +
       "JS doesn't use YAML for AR column serialization.",
@@ -112,13 +112,13 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
     reason: "Encrypts YAML fixture rows on load. Excluded transitively with fixtures.rb.",
   },
   {
-    pattern: "destroy_association_async_job.rb",
+    pattern: "destroy_association_async_job.rb", // no test counterpart
     reason:
       "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not " +
       "ported ActiveJob; async destroy is out of scope until a job framework lands.",
   },
   {
-    pattern: "dynamic_matchers.rb",
+    pattern: "dynamic_matchers.rb", // no test counterpart
     reason:
       "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` " +
       "at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at " +
@@ -126,6 +126,7 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
   },
   {
     pattern: "railties/controller_runtime.rb",
+    testFile: "controller_runtime_test.rb",
     reason:
       "Railties ActionController integration that logs DB runtime per request. " +
       "Trails has not ported Railties / ActionController; reintroduce when a web " +
