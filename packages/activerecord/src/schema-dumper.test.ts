@@ -67,11 +67,12 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("users");
   });
 
-  it.skip("schema dump uses force cascade on create table", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs force: :cascade option emitted in SchemaDumper output */
+  it("schema dump uses force cascade on create table", async () => {
+    await ctx.createTable("authors", {}, (t) => {
+      t.string("name");
+    });
+    const output = SchemaDumper.dump(ctx) as string;
+    expect(output).toMatch(/createTable\("authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
   });
 
   it.skip("schema dump excludes sqlite sequence", () => {
@@ -89,17 +90,35 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("CamelTable");
   });
 
-  it.skip("types no line up", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs column type alignment formatting */
+  it("types no line up", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+      t.integer("age");
+      t.boolean("active");
+      t.text("bio");
+    });
+    const output = SchemaDumper.dump(ctx) as string;
+    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
+    for (const line of columnLines) {
+      expect(line).not.toMatch(/\bt\.\w+\s{2,}/);
+    }
   });
-  it.skip("arguments no line up", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs argument alignment formatting */
+  it("arguments no line up", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name", { null: false });
+      t.integer("age", { default: 0 });
+      t.string("code", { limit: 10, null: false });
+    });
+    const output = SchemaDumper.dump(ctx) as string;
+    const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
+    // no padding before option keys — each key is preceded by "{ " or ", ", never extra spaces
+    for (const pattern of [/default: /, /limit: /, /null: /]) {
+      for (const line of columnLines.filter((l) => pattern.test(l))) {
+        const m = line.match(pattern)!;
+        const before = line.slice(m.index! - 2, m.index!);
+        expect(before === "{ " || before === ", ").toBe(true);
+      }
+    }
   });
 
   it("no dump errors", async () => {

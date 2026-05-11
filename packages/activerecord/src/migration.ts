@@ -431,7 +431,7 @@ export abstract class Migration {
   async createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean | "uuid"; force?: boolean; ifNotExists?: boolean }
+      | { id?: boolean | "uuid"; force?: boolean | "cascade"; ifNotExists?: boolean }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
@@ -1173,7 +1173,7 @@ export class MigrationContext {
     name: string,
     options?: {
       primaryKey?: string | false;
-      force?: boolean;
+      force?: boolean | "cascade";
       ifNotExists?: boolean;
       id?: boolean | "uuid";
     },
@@ -1186,7 +1186,9 @@ export class MigrationContext {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
     if (options?.force) {
-      await this.dropTable(name).catch(() => {});
+      await this.dropTable(name, {
+        force: options.force === "cascade" ? "cascade" : undefined,
+      }).catch(() => {});
     }
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
@@ -1249,8 +1251,10 @@ export class MigrationContext {
     }
   }
 
-  async dropTable(name: string): Promise<void> {
-    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
+  async dropTable(name: string, options?: { force?: "cascade" }): Promise<void> {
+    const cascade =
+      options?.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
+    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"${cascade}`);
     this._tables.delete(name);
     this._columns.delete(name);
     this._columnMeta.delete(name);
