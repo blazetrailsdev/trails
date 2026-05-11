@@ -21,12 +21,13 @@ describe("defineSchema", () => {
         price: "decimal",
         created_at: "datetime",
         born_on: "date",
+        start_time: "time",
         meta: "json",
       },
     });
 
     await adapter.executeMutation(
-      `INSERT INTO "things" ("name","body","count","big_count","ratio","price","created_at","born_on","meta") VALUES ('x','y',1,2,1.5,9.99,'2024-01-01','2024-01-01','{}')`,
+      `INSERT INTO "things" ("name","body","count","big_count","ratio","price","created_at","born_on","start_time","meta") VALUES ('x','y',1,2,1.5,9.99,'2024-01-01','2024-01-01','11:30:00','{}')`,
     );
     const rows = await adapter.execute(`SELECT * FROM "things"`);
     expect(rows).toHaveLength(1);

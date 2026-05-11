@@ -11,6 +11,7 @@ export type PrimitiveColumnSpec =
   | "boolean"
   | "datetime"
   | "date"
+  | "time"
   | "binary"
   | "json";
 
@@ -81,17 +82,19 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   boolean: "boolean",
   datetime: "datetime",
   date: "date",
+  time: "time",
   binary: "binary",
   json: "json",
 };
 
 // MySQL/MariaDB accepts native DATETIME columns with "YYYY-MM-DD HH:MM:SS" format
 // (no T/Z suffix). AR DateTime.serialize now emits this format, so datetime can
-// use the native column type. date/binary/json still use "string" (VARCHAR).
+// use the native column type. date/time/binary/json still use "string" (VARCHAR).
 /** @internal */
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   date: "string",
+  time: "string",
   binary: "string",
   json: "string",
 };
@@ -102,6 +105,7 @@ const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   datetime: "string",
   date: "string",
+  time: "string",
   binary: "string",
   json: "string",
 };
