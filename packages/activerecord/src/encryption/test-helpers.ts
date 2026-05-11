@@ -277,6 +277,25 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
 }
 
 /**
+ * EncryptedTrafficLightWithStoreState: `state` is a JSON store column (encrypted),
+ * with `color` exposed as a storeAccessor into it.
+ * Mirrors Rails' EncryptedTrafficLightWithStoreState fixture.
+ */
+export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter) {
+  return class EncryptedTrafficLightWithStoreState extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("state", "json");
+      this.adapter = adapter;
+      this.encrypts("state");
+      // storeAccessorFor delegates to EncryptedAttributeType.accessor() which
+      // forwards to JsonType.accessor(), so no separate store() call is needed.
+      this.storeAccessor("state", { accessors: ["color"] });
+    }
+  } as any;
+}
+
+/**
  * EncryptedBookWithBinary: logo is a binary attribute, encrypted.
  * Mirrors Rails' EncryptedBookWithBinary fixture (book_encrypted.rb).
  */
@@ -397,6 +416,16 @@ function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
   if (
     Array.isArray(readValue) &&
     Array.isArray(expectedValue) &&
+    JSON.stringify(readValue) === JSON.stringify(expectedValue)
+  )
+    return true;
+  if (
+    typeof readValue === "object" &&
+    readValue !== null &&
+    !Array.isArray(readValue) &&
+    typeof expectedValue === "object" &&
+    expectedValue !== null &&
+    !Array.isArray(expectedValue) &&
     JSON.stringify(readValue) === JSON.stringify(expectedValue)
   )
     return true;

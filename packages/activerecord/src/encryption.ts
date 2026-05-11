@@ -25,7 +25,7 @@ import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
-import { globalPreviousSchemesFor, EncryptableRecord } from "./encryption/encryptable-record.js";
+import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import {
@@ -164,10 +164,11 @@ function buildScheme(options: EncryptsOptions): Scheme {
       ? schemeOptions
       : { encryptor: new LegacyEncryptorShim(defaultEncryptor) };
 
-  const base = new Scheme(coreOpts);
-  const globalPrevious = globalPreviousSchemesFor(base);
-  const allPrevious = [...globalPrevious, ...localPrevious];
-  return allPrevious.length > 0 ? new Scheme({ ...coreOpts, previousSchemes: allPrevious }) : base;
+  // Only pass locally-declared previous schemes — global ones are resolved lazily
+  // in EncryptedAttributeType at serialize/deserialize time.
+  return localPrevious.length > 0
+    ? new Scheme({ ...coreOpts, previousSchemes: localPrevious })
+    : new Scheme(coreOpts);
 }
 
 interface PendingEncryption {

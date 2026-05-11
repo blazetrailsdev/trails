@@ -15,6 +15,7 @@ import {
   makeEncryptedBookWithSerializedFirstBinary,
   makeEncryptedBookWithSerializedSecondBinary,
   makeEncryptedBookWithCustomCompressor,
+  makeEncryptedTrafficLightWithStoreState,
   makeFreshModel,
   makeKeyProvider,
   assertEncryptedAttribute,
@@ -295,14 +296,19 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect("name" in book.previousChanges).toBe(true);
   });
 
-  it.skip("encryption schemes are resolved when used, not when declared", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
-    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
-    // Global previous schemes (config.previous) are baked into the scheme at
-    // encrypts() time. Supporting lazy re-evaluation after configure() requires
-    // making globalPreviousSchemesFor run at serialize/deserialize time, not at
-    // class definition time — a larger refactor.
+  it("encryption schemes are resolved when used, not when declared", () => {
+    // Declare the model BEFORE configuring supportSha1ForNonDeterministicEncryption.
+    // Global previous schemes must be resolved lazily (at previousTypes access time),
+    // not eagerly at encrypts() call time — mirrors Rails' lazy previous_schemes behavior.
+    const Post = makeFreshModel(freshAdapter(), { id: "integer", title: "string" });
+    Post.encrypts("title");
+
+    configureEncryption({ primaryKey: "the primary key", keyDerivationSalt: "the salt" });
+    Configurable.config.supportSha1ForNonDeterministicEncryption = true;
+
+    const type = Post.typeForAttribute("title");
+    // One lazy-resolved global previous scheme (the SHA1 key provider).
+    expect(type.previousTypes).toHaveLength(1);
   });
 
   it("isEncryptedAttribute identifies encrypted vs plain attributes", () => {
@@ -360,10 +366,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(reloaded.settings).toEqual(settings);
   });
 
-  it.skip("encrypts store attributes with accessors", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
-    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
+  it("encrypts store attributes with accessors", async () => {
+    const TrafficLight = makeEncryptedTrafficLightWithStoreState(freshAdapter());
+    const light = new (TrafficLight as any)();
+    // Set via JS property assignment so the storeAccessor setter fires.
+    light.color = "red";
+    await light.save();
+    expect(light.color).toBe("red");
+    await assertEncryptedAttribute(light, "state", { color: "red" });
   });
   it("encryption errors when saving records will raise the error and don't save anything", async () => {
     const Book = makeBookThatWillFailToEncryptName(freshAdapter());
@@ -469,11 +479,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(book, "name", "<untitled>");
   });
 
-  it.skip("loading records with encrypted attributes defined on columns with default values", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
-    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
-    // requires upsert/insert_on_duplicate_update support
+  it("loading records with encrypted attributes defined on columns with default values", async () => {
+    const Book = makeEncryptedBook(freshAdapter());
+    new Book();
+    // Base.insert is a thin single-record wrapper around insertAll; values are
+    // serialized through the attribute type so name is encrypted in the DB.
+    await Book.insert({ name: "<untitled>" });
+    const book = await Book.last();
+    expect(book.name).toBe("<untitled>");
   });
   it("can dump and load records that use encryption", async () => {
     // Mirrors Rails' Marshal.dump/Marshal.load test: after serializing a model's raw
@@ -583,11 +596,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
   });
   it.skip("deterministic ciphertexts remain constant", () => {
-    // BLOCKED: encryption — encryption subsystem gap in encryptable-record
-    // ROOT-CAUSE: encryption/encryptable-record.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in encryption/encryptable-record.ts; affects ~6–28 tests in encryptable-record.test.ts
-    // Requires exact Rails-compatible test key configuration to decrypt the
-    // hardcoded ciphertext. Deferred until key derivation parity is confirmed.
+    // BLOCKED: message-serializer format divergence — not a key-derivation gap.
+    // MRI Rails' MessageSerializer stores cipher headers (iv, at) as
+    // Base64.strict_encode64(raw_bytes) — single base64 of raw bytes.
+    // Our MessageSerializer stores them as base64(utf8(base64_string)) —
+    // double-base64 — because Aes256Gcm.encrypt adds headers as already-
+    // base64-encoded strings and encodeIfNeeded re-encodes them.
+    // Key derivation parity IS confirmed (SHA1, 65536 iters, same salt/password
+    // correctly produce the right AES key), but the serialized ciphertext format
+    // differs. Fixing requires changing Aes256Gcm to store raw bytes in headers
+    // and would be a breaking change for existing stored ciphertexts.
   });
 
   it("can compress data with custom compressor", async () => {
