@@ -26,7 +26,9 @@ export type ExcludedFile = { reason: string } & (
   | { pattern?: string; testFile: string; tests?: never }
   // Per-test exclusion: test-only — never affects api:compare.
   // Only the listed Ruby test descriptions are dropped from test:compare counts.
-  | { pattern?: never; testFile: string; tests: string[] }
+  // `className` narrows the match to a specific Ruby *Test class within the file,
+  // enabling exclusion of GVL-only subclasses that share test names with portable ones.
+  | { pattern?: never; testFile: string; className?: string; tests: string[] }
 );
 
 export const EXCLUDED_FILES: ExcludedFile[] = [
@@ -282,16 +284,33 @@ export const EXCLUDED_FILES: ExcludedFile[] = [
     tests: [
       // LoadAsyncTest — uses Concurrent::CountDownLatch + GVL thread interleaving
       "load async instrumentation is thread safe",
-      // LoadAsyncMultiThreadPoolExecutorTest — Concurrent::ThreadPoolExecutor
-      // min_length/max_length/max_queue/fallback_policy config; unique name in file
-      "async query executor and configuration",
     ],
     reason:
-      "Ruby Concurrent::ThreadPoolExecutor / Concurrent::CountDownLatch / GVL semantics. " +
-      "JS is single-threaded — thread-pool configuration and GVL race tests have no equivalent. " +
-      "Note: LoadAsyncMultiThreadPoolExecutorTest and LoadAsyncMixedThreadPoolExecutorTest share " +
-      "test names with the implementable LoadAsyncTest/NullExecutorTest classes; those duplicates " +
-      "cannot be excluded here without dropping the implementable counterparts.",
+      "Ruby Concurrent::CountDownLatch / GVL thread-interleaving semantics. " +
+      "JS is single-threaded — GVL race tests have no equivalent.",
+  },
+  {
+    testFile: "relation/load_async_test.rb",
+    className: "LoadAsyncMultiThreadPoolExecutorTest",
+    tests: [
+      "async query executor and configuration",
+      "scheduled?",
+      "reset",
+      "simple query",
+      "load async from transaction",
+      "eager loading query",
+      "contradiction",
+      "pluck",
+      "size",
+      "empty?",
+    ],
+    reason: "Concurrent::ThreadPoolExecutor — GVL semantics; no Node.js equivalent.",
+  },
+  {
+    testFile: "relation/load_async_test.rb",
+    className: "LoadAsyncMixedThreadPoolExecutorTest",
+    tests: ["scheduled?", "simple query"],
+    reason: "Concurrent::ThreadPoolExecutor — GVL semantics; no Node.js equivalent.",
   },
 ];
 
@@ -303,8 +322,17 @@ export function isTestExcluded(testFile: string): boolean {
   return EXCLUDED_FILES.some((e) => e.testFile && !e.tests && testFile.includes(e.testFile));
 }
 
-export function isTestCaseExcluded(testFile: string, testName: string): boolean {
+export function isTestCaseExcluded(
+  testFile: string,
+  testName: string,
+  className?: string,
+): boolean {
   return EXCLUDED_FILES.some(
-    (e) => e.testFile && e.tests && testFile.includes(e.testFile) && e.tests.includes(testName),
+    (e) =>
+      e.testFile &&
+      e.tests &&
+      testFile.includes(e.testFile) &&
+      e.tests.includes(testName) &&
+      (e.className === undefined || e.className === className),
   );
 }
