@@ -19,8 +19,8 @@ export interface TimeZoneConversion {
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter
  * Rails uses `DelegateClass(Type::Value)` to auto-delegate all methods; we extend
  * ValueType and explicitly delegate type/cast/deserialize/serialize/serializeCastValue
- * to the wrapped subtype. Other Type methods (isChanged, isSerializable, etc.) fall
- * back to ValueType defaults, matching the base type's behavior for time values.
+ * to the wrapped subtype. `isChanged` is also overridden to compare instants by value
+ * at the subtype's column precision (matching Rails' `TimeWithZone#==` semantics).
  */
 export class TimeZoneConverter extends ValueType<unknown> {
   private readonly _subtype: Type;
@@ -113,6 +113,40 @@ export class TimeZoneConverter extends ValueType<unknown> {
         : this._subtype.serialize(resolved);
     }
     return this._subtype.serialize(resolved);
+  }
+
+  override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
+    const oldInstant =
+      oldValue instanceof TimeWithZone
+        ? oldValue.utc()
+        : oldValue instanceof Temporal.Instant
+          ? oldValue
+          : null;
+    const newInstant =
+      newValue instanceof TimeWithZone
+        ? newValue.utc()
+        : newValue instanceof Temporal.Instant
+          ? newValue
+          : null;
+    if (oldInstant !== null && newInstant !== null) {
+      return (
+        this._nsAtPrecision(oldInstant.epochNanoseconds) !==
+        this._nsAtPrecision(newInstant.epochNanoseconds)
+      );
+    }
+    return oldValue !== newValue;
+  }
+
+  // Same floor-style truncation as DateTimeType._nsAtPrecision / _applySecondsPrecision.
+  // Uses the wrapped subtype's precision so behavior matches the column's serialize output.
+  private _nsAtPrecision(ns: bigint): bigint {
+    const raw = this._subtype.precision ?? 6;
+    const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
+    const mod = 10n ** BigInt(9 - p);
+    let subsec = ns % 1_000_000_000n;
+    if (subsec < 0n) subsec += 1_000_000_000n;
+    const roundedOff = subsec % mod;
+    return ns - roundedOff;
   }
 
   override equals(other: Type): boolean {

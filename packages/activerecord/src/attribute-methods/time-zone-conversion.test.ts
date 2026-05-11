@@ -4,7 +4,9 @@
  * Mirrors: ActiveRecord::AttributeMethods::TimeZoneConversionTest
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { typeRegistry } from "@blazetrails/activemodel";
+import { typeRegistry, Types } from "@blazetrails/activemodel";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
@@ -111,5 +113,53 @@ describe("TimeZoneConversionTest", () => {
     await loadSchemaFromAdapter.call(Post);
     expect(Post._attributeDefinitions.get("published_at")?.type).toBeInstanceOf(TimeZoneConverter);
     expect(Post._attributeDefinitions.get("title")?.type).not.toBeInstanceOf(TimeZoneConverter);
+  });
+});
+
+describe("TimeZoneConverter#isChanged", () => {
+  const zone = new TimeZone("Europe/Paris");
+  const MS1 = 1_000_000n; // exactly 1ms from epoch — clean boundary for all precision tests
+
+  function converter(precision?: number) {
+    return TimeZoneConverter.wrap(
+      new Types.DateTimeType(precision !== undefined ? { precision } : {}),
+    );
+  }
+  function twz(ns: bigint) {
+    return new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(ns), zone);
+  }
+
+  it("two distinct TimeWithZone wrapping the same instant are unchanged (DB round-trip)", () => {
+    expect(converter().isChanged(twz(MS1), twz(MS1))).toBe(false);
+  });
+
+  it("TimeWithZone objects differing only in sub-microsecond are unchanged (precision=null defaults 6)", () => {
+    expect(converter().isChanged(twz(MS1), twz(MS1 + 999n))).toBe(false);
+  });
+
+  it("TimeWithZone objects differing by one microsecond are changed (precision=null)", () => {
+    expect(converter().isChanged(twz(MS1), twz(MS1 + 1000n))).toBe(true);
+  });
+
+  it("TimeWithZone objects differing only in sub-millisecond are unchanged (precision=3)", () => {
+    expect(converter(3).isChanged(twz(MS1), twz(MS1 + 999_000n))).toBe(false);
+  });
+
+  it("TimeWithZone objects differing by one millisecond are changed (precision=3)", () => {
+    expect(converter(3).isChanged(twz(MS1), twz(MS1 + 1_000_000n))).toBe(true);
+  });
+
+  it("Temporal.Instant values with same epoch are unchanged", () => {
+    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
+    const b = Temporal.Instant.fromEpochNanoseconds(MS1);
+    expect(converter().isChanged(a, b)).toBe(false);
+  });
+
+  it("null vs null is unchanged", () => {
+    expect(converter().isChanged(null, null)).toBe(false);
+  });
+
+  it("null vs TimeWithZone is changed", () => {
+    expect(converter().isChanged(null, twz(MS1))).toBe(true);
   });
 });

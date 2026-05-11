@@ -471,7 +471,12 @@ describe("DirtyTest", () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       posts: { title: "string" },
-      pirates: { catchphrase: "string", created_on: "datetime", parrot_id: "integer" },
+      pirates: {
+        catchphrase: "string",
+        created_at: "datetime",
+        created_on: "datetime",
+        parrot_id: "integer",
+      },
     });
   });
 
@@ -494,7 +499,6 @@ describe("DirtyTest", () => {
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
-      pirate.created_on = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 48 }), zone);
       pirate.catchphrase = "arrrr, time zone!!";
       await pirate.saveBang();
       expect(pirate.attributeChanged("created_on")).toBe(false);
@@ -508,6 +512,29 @@ describe("DirtyTest", () => {
       );
       await pirate.reload();
       expect(pirate.attributeChanged("created_on")).toBe(false);
+    });
+  });
+  it("attributeWas reflects auto-timestamp baseline after create", async () => {
+    await withTimezoneConfig({ zone: "Europe/Paris", awareAttributes: true }, async () => {
+      class Pirate extends Base {
+        static {
+          this.tableName = "pirates";
+          this.attribute("created_at", "datetime");
+          this.attribute("catchphrase", "string");
+          this.adapter = adapter;
+        }
+      }
+      const zone = getZone()!;
+      const pirate = await Pirate.create({ catchphrase: "yo ho" });
+      expect(pirate.attributeChanged("created_at")).toBe(false);
+      expect(pirate.created_at).toBeInstanceOf(TimeWithZone);
+      const autoSetCreatedAt = pirate.created_at as TimeWithZone;
+      pirate.created_at = new TimeWithZone(Temporal.Now.instant().subtract({ hours: 1 }), zone);
+      expect(pirate.attributeChanged("created_at")).toBe(true);
+      expect(pirate.attributeWas("created_at")).toBeInstanceOf(TimeWithZone);
+      expect((pirate.attributeWas("created_at") as TimeWithZone).utc().epochMilliseconds).toBe(
+        autoSetCreatedAt.utc().epochMilliseconds,
+      );
     });
   });
   it("setting time attributes with time zone field to itself should not be marked as a change", async () => {

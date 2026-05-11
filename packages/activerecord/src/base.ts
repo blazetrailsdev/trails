@@ -2460,17 +2460,10 @@ export class Base extends Model {
     // Auto-populate timestamps (unless touch: false)
     if (!this._skipTouch) {
       const now = Temporal.Now.instant();
-      if (
-        ctor._attributeDefinitions.has("created_at") &&
-        this._readAttribute("created_at") === null
-      ) {
-        this._attributes.set("created_at", now);
-      }
-      if (
-        ctor._attributeDefinitions.has("updated_at") &&
-        this._readAttribute("updated_at") === null
-      ) {
-        this._attributes.set("updated_at", now);
+      for (const col of Timestamp.allTimestampAttributesInModel.call(ctor)) {
+        if (ctor._attributeDefinitions.has(col) && this._readAttribute(col) == null) {
+          this._writeAttribute(col, now);
+        }
       }
     }
 
