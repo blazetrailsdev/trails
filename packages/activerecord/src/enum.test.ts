@@ -749,6 +749,18 @@ describe("EnumTest", () => {
     // Method-friendly aliases replace non-word ASCII chars with _ then camelize
     expect(typeof (Cat as any).americanBobtail).toBe("function");
     expect(typeof (Cat as any).balineseJavanese).toBe("function");
+
+    // Original-form predicate/bang accessible via bracket notation (Rails parity)
+    const cat = Object.create(Cat.prototype) as any;
+    cat.writeAttribute = (_attr: string, val: unknown) => {
+      cat._val = val;
+    };
+    cat.readAttribute = () => "american_bobtail";
+    cat.isPersisted = () => false;
+    expect((cat as any)["isAmerican Bobtail"]()).toBe(true);
+    expect((cat as any)["isBalinese-Javanese"]()).toBe(false);
+    expect(typeof (cat as any)["American BobtailBang"]).toBe("function");
+    expect(typeof (cat as any)["Balinese-JavaneseBang"]).toBe("function");
   });
 });
 

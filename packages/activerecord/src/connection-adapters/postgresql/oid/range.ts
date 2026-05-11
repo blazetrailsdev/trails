@@ -259,7 +259,7 @@ export class MultiRangeType extends ValueType<MultiRange> {
   }
 
   castValue(value: unknown): MultiRange | null {
-    if (value == null || value === "") return null;
+    if (value == null) return null;
     if (value instanceof MultiRange) return value;
     if (typeof value !== "string") return value as MultiRange | null;
     const inner = value.slice(1, -1).trim();

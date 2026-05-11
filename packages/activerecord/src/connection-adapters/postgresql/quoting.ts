@@ -16,7 +16,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Array as OidArray, Data as ArrayData } from "./oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
-import { Range } from "./oid/range.js";
+import { MultiRange, Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 
 // Rails inherits from StandardError — use plain Error in TS for
@@ -179,6 +179,9 @@ export function quote(value: unknown): string {
   if (value instanceof Range) {
     return quoteString(encodeRange(value));
   }
+  if (value instanceof MultiRange) {
+    return quoteString(encodeMultirange(value));
+  }
   // Mirrors: PostgreSQL::Quoting#quote raises IntegerOutOf64BitRange for
   // integers exceeding the 64-bit signed range. Covers both bigint and
   // integer number values — JS integers beyond MAX_SAFE_INTEGER lose
@@ -235,6 +238,9 @@ export function typeCast(value: unknown): unknown {
   }
   if (value instanceof Range) {
     return encodeRange(value);
+  }
+  if (value instanceof MultiRange) {
+    return encodeMultirange(value);
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
     checkIntegerRange(value);
@@ -387,6 +393,21 @@ function encodeRange(value: Range): string {
   const lower = value.begin == null || value.begin === -Infinity ? "" : String(value.begin);
   const upper = value.end == null || value.end === Infinity ? "" : String(value.end);
   return `[${lower},${upper}${value.excludeEnd ? ")" : "]"}`;
+}
+
+/** @internal */
+function encodeMultirange(value: MultiRange): string {
+  return `{${value.ranges.map(encodeRangeLiteral).join(",")}}`;
+}
+
+/** @internal */
+function encodeRangeLiteral(value: Range): string {
+  const encode = (v: unknown): string => {
+    if (v === null || v === undefined || v === -Infinity || v === Infinity) return "";
+    const s = String(v);
+    return /[",\\\s[\]()]/.test(s) ? `"${s.replace(/\\/g, "\\\\").replace(/"/g, '""')}"` : s;
+  };
+  return `[${encode(value.begin)},${encode(value.end)}${value.excludeEnd ? ")" : "]"}`;
 }
 
 function isSqlLiteral(value: unknown): value is { value: string } {
