@@ -24,7 +24,10 @@ import {
 } from "../errors.js";
 import { sql as arelSql, type Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
-import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
+import {
+  SchemaCreation as MysqlSchemaCreation,
+  type MysqlAddColumnOptions,
+} from "./mysql/schema-creation.js";
 import {
   quoteString as mysqlQuoteString,
   quote as mysqlQuote,
@@ -1189,8 +1192,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // Guard against silently dropping Extra attributes we cannot reconstruct (e.g. generated
     // columns). AUTO_INCREMENT is preserved via ColumnOptions.autoIncrement; ON UPDATE <expr>
     // (including MySQL 8 compound form "DEFAULT_GENERATED on update CURRENT_TIMESTAMP") is
-    // preserved via ColumnOptions.onUpdate. Anything else triggers an explicit throw so callers
-    // know to upgrade MySQL rather than receive a lossy CHANGE clause.
+    // preserved via MysqlAddColumnOptions.onUpdate. Anything else triggers an explicit throw so
+    // callers know to upgrade MySQL rather than receive a lossy CHANGE clause.
     const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
     const extra = extraRaw.toLowerCase();
     const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
@@ -1209,7 +1212,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       typeof rawDefault === "string" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(rawDefault)
         ? () => rawDefault
         : rawDefault;
-    const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, {
+    const colOpts: MysqlAddColumnOptions = {
       // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
       // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
       // DEFAULT NULL on NOT NULL columns — mirrors Rails column_for + new_column_definition.
@@ -1219,7 +1222,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       comment: (col["Comment"] as string | undefined) || undefined,
       autoIncrement: extra === "auto_increment" || undefined,
       onUpdate: onUpdateMatch ? onUpdateMatch[1] : undefined,
-    });
+    };
+    const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, colOpts);
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);
   }

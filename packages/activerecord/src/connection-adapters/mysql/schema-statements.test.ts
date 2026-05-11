@@ -114,6 +114,51 @@ describe("MySQL::SchemaStatements", () => {
     expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
   });
 
+  it("newColumnFromField: NOW() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", () => {
+    const noInfo = () => null;
+    const col = newColumnFromField(
+      "events",
+      {
+        Field: "created_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "now()",
+        Extra: "DEFAULT_GENERATED",
+      },
+      noInfo,
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(now())");
+  });
+
+  it("newColumnFromField: UUID() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", () => {
+    const noInfo = () => null;
+    const col = newColumnFromField(
+      "items",
+      { Field: "uid", Type: "char(36)", Null: "NO", Default: "uuid()", Extra: "DEFAULT_GENERATED" },
+      noInfo,
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(uuid())");
+  });
+
+  it("newColumnFromField: CURRENT_DATE via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", () => {
+    const noInfo = () => null;
+    const col = newColumnFromField(
+      "items",
+      {
+        Field: "due_on",
+        Type: "date",
+        Null: "YES",
+        Default: "CURRENT_DATE",
+        Extra: "DEFAULT_GENERATED",
+      },
+      noInfo,
+    );
+    expect(col.default).toBeNull();
+    expect(col.defaultFunction).toBe("(CURRENT_DATE)");
+  });
+
   it("newColumnFromField: DEFAULT_GENERATED extra becomes defaultFunction", () => {
     const noInfo = () => null;
     const col = newColumnFromField(

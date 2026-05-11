@@ -229,9 +229,6 @@ export class SchemaCreation {
     if (options.autoIncrement) {
       sql += " AUTO_INCREMENT";
     }
-    if (options.onUpdate) {
-      sql += ` ON UPDATE ${options.onUpdate}`;
-    }
     if (options.primaryKey) {
       sql += " PRIMARY KEY";
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SchemaCreation } from "./schema-creation.js";
+import { SchemaCreation, type MysqlAddColumnOptions } from "./schema-creation.js";
 import {
   AddColumnDefinition,
   ChangeColumnDefinition,
@@ -110,5 +110,17 @@ describe("MySQL::SchemaCreation", () => {
     const col = new ColumnDefinition("id", "integer", { autoIncrement: true, null: false });
     const sql = sc.accept(new AddColumnDefinition(col));
     expect(sql).toMatch(/ADD .+ AUTO_INCREMENT/);
+  });
+
+  it("addColumnOptions emits ON UPDATE when onUpdate is set (MySQL-specific)", () => {
+    const opts: MysqlAddColumnOptions = { onUpdate: "CURRENT_TIMESTAMP" };
+    const result = sc.addColumnOptions("`updated_at` datetime", opts);
+    expect(result).toContain("ON UPDATE CURRENT_TIMESTAMP");
+  });
+
+  it("addColumnOptions does not emit ON UPDATE when onUpdate is absent", () => {
+    const col = new ColumnDefinition("updated_at", "datetime", {});
+    const result = sc.addColumnOptions("`updated_at` datetime", col.options);
+    expect(result).not.toContain("ON UPDATE");
   });
 });

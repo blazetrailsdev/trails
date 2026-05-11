@@ -24,49 +24,76 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("MysqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump includes default expression with single quotes reflected correctly", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump datetime includes default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump datetime includes precise default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump datetime includes precise default expression with on update", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump timestamp includes default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump timestamp includes precise default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump timestamp includes precise default expression with on update", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("schema dump timestamp without default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
 });
 
@@ -178,15 +205,21 @@ describe("DefaultTest", () => {
 
 describe("DefaultsTestWithoutTransactionalFixtures", () => {
   it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
     /* fixture-dependent */
   });
   it.skip("mysql not null defaults strict", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
     /* fixture-dependent */
   });
 });
@@ -255,17 +288,23 @@ describe("DefaultStringsTest", () => {
 
 describe("PostgresqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
 });
 
 describe("Sqlite3DefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
 });
 
@@ -273,9 +312,12 @@ describe("DefaultTest", () => {
   const adapter = freshAdapter();
 
   it.skip("default attribute value overrides from database", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
 
   it("default attribute value for integer", () => {
@@ -309,19 +351,28 @@ describe("DefaultTest", () => {
   });
 
   it.skip("default attribute value for datetime", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("default attribute value for date", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
   it.skip("default attribute value for decimal", () => {
-    // BLOCKED: schema — column default value handling gap
-    // ROOT-CAUSE: column.ts#defaultValue or schema-statements.ts#columnDefault not fully implementing Rails default semantics
-    // SCOPE: ~30 LOC fix in column.ts; affects ~17 tests in defaults.test.ts
+    // BLOCKED: schema — Column#default not deserialized at schema-dump time
+    // ROOT-CAUSE: newColumnFromField stores raw string (e.g. "5") in column.default; schema dump
+    //   then emits a quoted string instead of the typed value. Fix requires lookupCastType to return
+    //   a type object with deserialize() (currently returns shape-only metadata), then Column stores
+    //   raw + lazily deserializes via castType.deserialize(rawDefault).
+    // SCOPE: ~50 LOC — change lookupCastType return type + Column constructor + newColumnFromField call site
   });
 
   it("default value for float", () => {

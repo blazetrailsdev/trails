@@ -20,6 +20,9 @@ import {
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { quoteColumnName, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
 
+/** MySQL-specific column options — extends the abstract ColumnOptions with `onUpdate`. */
+export type MysqlAddColumnOptions = ColumnOptions & { onUpdate?: string };
+
 interface MysqlColumnOptions extends Record<string, unknown> {
   column?: { sqlType?: string; type?: string; null?: boolean };
   charset?: string;
@@ -32,6 +35,7 @@ interface MysqlColumnOptions extends Record<string, unknown> {
   null?: boolean;
   default?: unknown;
   comment?: string;
+  onUpdate?: string;
 }
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
@@ -142,7 +146,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+  override addColumnOptions(sql: string, options: ColumnOptions): string {
     const mo = options as MysqlColumnOptions;
     const col = mo.column;
     if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
@@ -156,7 +160,20 @@ export class SchemaCreation extends AbstractSchemaCreation {
       sql += ` AS (${mo.as})`;
       if (mo.stored) sql += this._mariadb ? " PERSISTENT" : " STORED";
     }
-    return this.addSqlCommentBang(super.addColumnOptionsBang(sql, options), mo.comment);
+    // Call super without primaryKey so ON UPDATE can be inserted before PRIMARY KEY,
+    // matching the original abstract ordering: DEFAULT → NOT NULL → AUTO_INCREMENT → ON UPDATE → PRIMARY KEY.
+    const optionsWithoutPk: ColumnOptions = mo.primaryKey
+      ? { ...options, primaryKey: false }
+      : options;
+    let withBase = super.addColumnOptions(sql, optionsWithoutPk);
+    if (mo.onUpdate) withBase += ` ON UPDATE ${mo.onUpdate}`;
+    if (mo.primaryKey) withBase += " PRIMARY KEY";
+    return this.addSqlCommentBang(withBase, mo.comment);
+  }
+
+  /** @internal */
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+    return this.addColumnOptions(sql, options);
   }
 
   /** @internal */
