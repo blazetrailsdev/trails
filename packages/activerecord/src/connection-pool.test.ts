@@ -12,6 +12,7 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter } from "./adapter.js";
 import { Result } from "./result.js";
+import { Base } from "./base.js";
 
 /**
  * Close any SQLite/underlying connections still pinned to the pool
@@ -509,11 +510,12 @@ it.skip("pool sets connection visitor", () => {
   /* needs visitor pattern */
 });
 
-it.skip("anonymous class exception", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs class-based pool resolution */
+it("anonymous class exception", async () => {
+  // Anonymous class (no name) cannot establish a connection — mirrors Rails
+  // `raise "Anonymous class is not allowed." unless name`
+  const makeAnon = (): typeof Base => class extends Base {} as unknown as typeof Base;
+  const Anon = makeAnon();
+  await expect(Anon.establishConnection()).rejects.toThrow("Anonymous class is not allowed.");
 });
 
 it.skip("connection notification is called", () => {

@@ -3,6 +3,7 @@ import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { Base } from "../base.js";
 
 describe("ConnectionHandlerTest", () => {
   let handler: ConnectionHandler;
@@ -177,11 +178,19 @@ describe("ConnectionHandlerTest", () => {
     /* needs Base class integration */
   });
 
-  it.skip("connection specification name should fallback to parent", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs class hierarchy connection resolution */
+  it("connection specification name should fallback to parent", () => {
+    class ParentModel extends Base {}
+    class ChildModel extends ParentModel {}
+
+    // Without explicit names both walk up to Base
+    expect(ChildModel.connectionSpecificationName).toBe(ParentModel.connectionSpecificationName);
+
+    // Setting on parent propagates to child via hierarchy walk
+    ParentModel.connectionSpecificationName = "readonly";
+    expect(ChildModel.connectionSpecificationName).toBe("readonly");
+
+    // Cleanup: reset so we don't leak into other tests
+    (ParentModel as any)._connectionSpecificationName = undefined;
   });
 
   it("remove connection should not remove parent", () => {
@@ -291,11 +300,9 @@ describe("ConnectionHandlerTest", () => {
     expect(handler.connectionPools).toHaveLength(1);
   });
 
-  it.skip("default handlers are writing and reading", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in connection-handler
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in connection-handler.test.ts
-    /* needs role-based handler setup */
+  it("default handlers are writing and reading", () => {
+    expect(Base.writingRole).toBe("writing");
+    expect(Base.readingRole).toBe("reading");
   });
 
   it.skip("connection pool per pid", () => {
