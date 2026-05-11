@@ -21,6 +21,7 @@ import { connectedToStack } from "./core.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { withTimezoneConfig } from "./test-helper.js";
@@ -2266,19 +2267,53 @@ describe("BasicsTest", () => {
     expect(u.name).toBe("");
   });
   it.skip("default in local time", () => {
-    // BLOCKED: DB column defaults + with_env_tz — reads Default.new.fixed_time which is a DB-level default ('2004-01-01 00:00:00'); no column-default propagation in our test adapter
+    // BLOCKED: with_env_tz — requires process-level TZ change (ENV["TZ"]); Node.js does not support changing the system TZ after startup
   });
-  it.skip("default in utc", () => {
-    // BLOCKED: DB column defaults — reads Default.new.fixed_time from a DB-level column default; our test adapter creates columns without defaults
+  it("default in utc", async () => {
+    await withTimezoneConfig({ default: "utc" }, () => {
+      class Default extends Base {
+        static {
+          this.tableName = "defaults";
+          this.attribute("fixed_date", "date", { default: "2004-01-01" });
+          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
+        }
+      }
+      const d = new Default();
+      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
+      expect(fd.year).toBe(2004);
+      expect(fd.month).toBe(1);
+      expect(fd.day).toBe(1);
+      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
+      expect(ft.epochNanoseconds).toBe(
+        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
+      );
+    });
   });
-  it.skip("default in utc with time zone", () => {
-    // BLOCKED: DB column defaults — same as "default in utc"; also uses Time.use_zone which doesn't affect DB-default reads
+  it("default in utc with time zone", async () => {
+    await withTimezoneConfig({ default: "utc", zone: "America/Chicago" }, () => {
+      class Default extends Base {
+        static {
+          this.tableName = "defaults";
+          this.attribute("fixed_date", "date", { default: "2004-01-01" });
+          this.attribute("fixed_time", "datetime", { default: "2004-01-01 00:00:00" });
+        }
+      }
+      const d = new Default();
+      const fd = d.readAttribute("fixed_date") as Temporal.PlainDate;
+      expect(fd.year).toBe(2004);
+      expect(fd.month).toBe(1);
+      expect(fd.day).toBe(1);
+      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
+      expect(ft.epochNanoseconds).toBe(
+        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
+      );
+    });
   });
   it.skip("switching default time zone", () => {
-    // BLOCKED: DB column defaults + with_env_tz — toggles default_timezone between :local and :utc while reading Default.new.fixed_time from DB default
+    // BLOCKED: with_env_tz — toggles default_timezone between :local and :utc using process-level TZ; Node.js does not support this
   });
   it.skip("mutating time objects", () => {
-    // BLOCKED: DB column defaults + with_env_tz — reads Default.new.fixed_time, calls .utc, confirms original unchanged; requires DB-level column default
+    // BLOCKED: with_env_tz — reads Default.new.fixed_time in local TZ, calls .utc; requires process-level TZ change
   });
   it.skip("connection in local time", () => {
     // BLOCKED: establish_connection — requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config
