@@ -157,7 +157,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     const key = `${this.supportUnencryptedData}:${_globalPreviousVersion}`;
     if (!this._previousTypesMemo || this._previousTypesMemoKey !== key) {
       this._previousTypesMemo = this.buildPreviousTypesFor(
-        this._effectivePreviousSchemesIncludingCleanText(),
+        this.previousSchemesIncludingCleanText(),
       );
       this._previousTypesMemoKey = key;
     }
@@ -186,7 +186,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   }
 
   /** @internal */
-  private _effectivePreviousSchemesIncludingCleanText(): Scheme[] {
+  private previousSchemesIncludingCleanText(): Scheme[] {
     const schemes = [...this._effectivePreviousSchemes()];
     if (this.supportUnencryptedData) schemes.push(this.cleanTextScheme());
     return schemes;
