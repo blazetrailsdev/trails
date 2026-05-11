@@ -851,6 +851,7 @@ export class SchemaDumper {
       if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
       if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
       // Mirrors Rails' export_name_on_schema_dump? — omit name when it matches the ignore pattern
+      fkIgnorePattern.lastIndex = 0;
       if (fk.name && !fkIgnorePattern.test(fk.name)) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);

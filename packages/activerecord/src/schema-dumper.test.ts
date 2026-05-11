@@ -466,7 +466,7 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain('"books"');
   });
   it("do not dump foreign keys when bypassed by config", async () => {
-    // Mirrors Rails' foreign_keys: false connection option (supports_foreign_keys? == false).
+    // Source has no foreignKeys hook — equivalent to a connection where FK dumping is unavailable.
     const source = {
       tables: async () => ["authors", "books"],
       columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
