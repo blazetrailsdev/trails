@@ -160,8 +160,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
       sql += ` AS (${mo.as})`;
       if (mo.stored) sql += this._mariadb ? " PERSISTENT" : " STORED";
     }
-    if (mo.onUpdate) sql += ` ON UPDATE ${mo.onUpdate}`;
-    return this.addSqlCommentBang(super.addColumnOptions(sql, options), mo.comment);
+    // Call super without primaryKey so ON UPDATE can be inserted before PRIMARY KEY,
+    // matching the original abstract ordering: DEFAULT → NOT NULL → AUTO_INCREMENT → ON UPDATE → PRIMARY KEY.
+    const optionsWithoutPk: ColumnOptions = mo.primaryKey
+      ? { ...options, primaryKey: false }
+      : options;
+    let withBase = super.addColumnOptions(sql, optionsWithoutPk);
+    if (mo.onUpdate) withBase += ` ON UPDATE ${mo.onUpdate}`;
+    if (mo.primaryKey) withBase += " PRIMARY KEY";
+    return this.addSqlCommentBang(withBase, mo.comment);
   }
 
   /** @internal */
