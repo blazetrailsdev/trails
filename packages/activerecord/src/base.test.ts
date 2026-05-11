@@ -2502,7 +2502,7 @@ describe("BasicsTest", () => {
   });
   it("column types on queries on postgresql", async () => {
     if (adapterType !== "postgres") return;
-    const result = await adapter.execQuery("SELECT 1 AS test");
+    const result = await (adapter as any).innerAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
   it.skip("connection_handler can be overridden", () => {
