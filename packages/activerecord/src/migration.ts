@@ -43,14 +43,16 @@ export {
 import { ActiveRecordError } from "./errors.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
-// Returns the `to` value for {from,to} hashes; passes through string|null directly.
-// Objects without a `to` key are not a valid comment value — return null rather than
-// forwarding a plain object to adapter SQL methods.
+// For {from,to} hashes, returns `to` (which may be null to clear a comment).
+// `to: undefined` is rejected — a missing value cannot be forwarded to SQL.
 function _extractNewCommentValue(
   v: string | null | { from?: unknown; to?: unknown },
 ): string | null {
   if (v !== null && typeof v === "object") {
-    return "to" in v ? ((v as { to: unknown }).to as string | null) : null;
+    if (!("to" in v) || (v as { to: unknown }).to === undefined) {
+      throw new ArgumentError("change_column_comment / change_table_comment requires a :to value");
+    }
+    return (v as { to: unknown }).to as string | null;
   }
   return v as string | null;
 }
@@ -432,7 +434,14 @@ export abstract class Migration {
       }
       case "changeColumnComment": {
         const [ccTable, ccCol, ccOpts] = args as [string, string, { from?: unknown; to?: unknown }];
-        if (!ccOpts || typeof ccOpts !== "object" || !("from" in ccOpts) || !("to" in ccOpts)) {
+        if (
+          !ccOpts ||
+          typeof ccOpts !== "object" ||
+          !("from" in ccOpts) ||
+          ccOpts.from === undefined ||
+          !("to" in ccOpts) ||
+          ccOpts.to === undefined
+        ) {
           throw new IrreversibleMigration(
             "change_column_comment is only reversible if given a :from and :to option.",
           );
@@ -442,7 +451,14 @@ export abstract class Migration {
       }
       case "changeTableComment": {
         const [ctTable, ctOpts] = args as [string, { from?: unknown; to?: unknown }];
-        if (!ctOpts || typeof ctOpts !== "object" || !("from" in ctOpts) || !("to" in ctOpts)) {
+        if (
+          !ctOpts ||
+          typeof ctOpts !== "object" ||
+          !("from" in ctOpts) ||
+          ctOpts.from === undefined ||
+          !("to" in ctOpts) ||
+          ctOpts.to === undefined
+        ) {
           throw new IrreversibleMigration(
             "change_table_comment is only reversible if given a :from and :to option.",
           );

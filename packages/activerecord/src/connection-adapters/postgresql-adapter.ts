@@ -2868,8 +2868,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       return;
     }
     const fks = await this.foreignKeys(fromTable);
-    const { table: toTbl } = this.parseSchemaQualifiedName(toTable);
-    const fk = (fks as any[]).find((f) => f.toTable === toTbl || f.toTable === toTable);
+    const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
+    const fk = (fks as any[]).find((f) => {
+      const { schema: fSchema, table: fTbl } = this.parseSchemaQualifiedName(String(f.toTable));
+      if (toSchema) return fSchema === toSchema && fTbl === toTbl;
+      return fTbl === toTbl;
+    });
     if (!fk) throw new Error(`No foreign key found from ${fromTable} to ${toTable}`);
     await this.validateConstraint(fromTable, fk.name);
   }

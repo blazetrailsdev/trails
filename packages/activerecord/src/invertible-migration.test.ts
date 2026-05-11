@@ -409,12 +409,8 @@ describe("InvertibleMigrationTest", () => {
   it("migrate revert add foreign key with invalid option", async () => {
     // addForeignKey is reversible even with unknown options (they're forwarded, not validated)
     const recorder = new CommandRecorder();
-    recorder.record("addForeignKey", [
-      "horses",
-      "horses",
-      { column: "parent_id", unknownOption: true },
-    ]);
-    const inv = recorder.inverseOf("addForeignKey", ["horses", "horses", { column: "parent_id" }]);
+    const fkArgs: unknown[] = ["horses", "horses", { column: "parent_id", unknownOption: true }];
+    const inv = recorder.inverseOf("addForeignKey", fkArgs);
     expect(inv.cmd).toBe("removeForeignKey");
     expect(inv.args[0]).toBe("horses");
   });
