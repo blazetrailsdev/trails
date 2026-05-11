@@ -394,7 +394,7 @@ async function dropTrackedTables(inner: any): Promise<void> {
   }
 }
 
-let _factory: () => DatabaseAdapter;
+let _factory: () => SchemaAdapter;
 
 if (PG_TEST_URL) {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
@@ -430,10 +430,16 @@ if (PG_TEST_URL) {
 // works even though _setOnAdapterSetHook runs at module load.
 _setOnAdapterSetHook(registerModel);
 
+/** DatabaseAdapter wrapper returned by {@link createTestAdapter}, with test-only accessors. */
+export interface TestDatabaseAdapter extends DatabaseAdapter {
+  readonly innerAdapter: DatabaseAdapter;
+  readonly tables: Set<string>;
+}
+
 /**
  * Create a fresh adapter for testing.
  */
-export function createTestAdapter(): DatabaseAdapter {
+export function createTestAdapter(): TestDatabaseAdapter {
   _needsCleanup = true;
   return _factory();
 }
@@ -552,9 +558,9 @@ class SchemaAdapter implements DatabaseAdapter {
     return this.inner?.isNoDatabaseError?.(error) ?? false;
   }
 
-  private inner: any;
+  private inner: DatabaseAdapter;
 
-  constructor(inner: any) {
+  constructor(inner: DatabaseAdapter) {
     this.inner = inner;
   }
 
@@ -567,7 +573,7 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   /** Expose the underlying adapter for tests that need adapter-specific behavior (e.g. columnTypes). */
-  get innerAdapter(): any {
+  get innerAdapter(): DatabaseAdapter {
     return this.inner;
   }
 
