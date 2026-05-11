@@ -1208,13 +1208,19 @@ export class AbstractAdapter implements Quoting {
     return attribute.eq(value);
   }
 
-  caseInsensitiveComparison(_attribute: unknown, _value: unknown): unknown {
-    return null;
+  /** @internal */
+  caseInsensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Nodes.Node | Promise<Nodes.Node> {
+    // Default: canPerformCaseInsensitiveComparisonFor returns true, so always LOWER.
+    // Adapters that need async column inspection (e.g. PG) override this whole method.
+    return attribute.lower().eq((attribute.relation as any).lower(value));
   }
 
   /** @internal */
-  canPerformCaseInsensitiveComparisonFor(_column: unknown): boolean {
-    return false;
+  canPerformCaseInsensitiveComparisonFor(_column: unknown): boolean | Promise<boolean> {
+    return true;
   }
 
   isDefaultIndexType(_index: unknown): boolean {

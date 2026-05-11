@@ -202,6 +202,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Pass this value as `unlogged` when constructing a PostgreSQL TableDefinition.
   static createUnloggedTables = false;
 
+  /** Mirrors: PostgreSQLAdapter.decode_dates class_attribute (postgresql_adapter.rb:132). */
+  static decodeDates = true;
+
   private static _spCounter = 0;
   private _driverPool: pg.Pool | null;
   private _pgPoolOptions: pg.PoolConfig | null = null;
@@ -212,6 +215,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
   private _minMessages = "warning";
+  private _warnedOids = new Set<number>();
+  private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
   private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};
   private _configuredClients = new WeakSet<pg.PoolClient>();
   // Per-pg.Client statement pool. PG's prepared statements are
@@ -298,7 +303,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._sessionVariables = {};
       this._pgPoolOptions = {
         connectionString: config,
-        types: { getTypeParser: getTemporalTypeParser },
+        types: {
+          getTypeParser: (oid: number, format?: string) =>
+            oid === 1082 && !PostgreSQLAdapter.decodeDates
+              ? format === "binary"
+                ? pg.types.getTypeParser(oid, "binary")
+                : (v: unknown) => v
+              : getTemporalTypeParser(oid, format),
+        },
       };
       this._driverPool = new pg.Pool(this._pgPoolOptions);
       return;
@@ -361,6 +373,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       types: {
         getTypeParser(oid: number, format?: string): unknown {
           // Our Temporal parsers handle text-format for the 5 datetime OIDs.
+          // When decodeDates is false, skip the date parser (OID 1082) so
+          // pg returns the raw string — mirrors Rails' decode_dates flag.
+          if (oid === 1082 && !PostgreSQLAdapter.decodeDates) {
+            const fallback =
+              format === "binary" ? pg.types.getTypeParser(oid, "binary") : (v: unknown) => v;
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
           // For all other OIDs, respect any user-supplied parser first, then
           // delegate to getTemporalTypeParser which falls back to pg built-ins.
           if (TEMPORAL_OIDS.has(oid) && (format === "text" || !format)) {
@@ -463,9 +482,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this.loadAdditionalTypes([oid]);
     }
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
-      console.warn(
-        `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
-      );
+      if (!this._warnedOids.has(oid)) {
+        this._warnedOids.add(oid);
+        console.warn(
+          `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
+        );
+      }
       const fallback = new ValueType();
       this.typeMap.registerType(oid, fallback);
       return fallback;
@@ -511,6 +533,59 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // building Column objects, so OIDs are registered by the time this is
     // called for type-casting during attribute reads.
     return this.typeMap.fetch(oid, column.fmod ?? -1, column.sqlType ?? "", () => new ValueType());
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#case_insensitive_comparison (via AbstractAdapter).
+   * Async override: looks up the column type and checks pg_proc before emitting LOWER.
+   * @internal
+   */
+  override async caseInsensitiveComparison(
+    attribute: Nodes.Attribute,
+    value: unknown,
+  ): Promise<Nodes.Node> {
+    const column = await this.columnForAttribute(attribute);
+    if (column && (await this.canPerformCaseInsensitiveComparisonFor(column))) {
+      return attribute.lower().eq((attribute.relation as any).lower(value));
+    }
+    return attribute.eq(value);
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#can_perform_case_insensitive_comparison_for?(column).
+   * Queries pg_proc once per sql_type and caches the result.
+   * citext is pre-seeded as false — case-insensitive by definition, LOWER() unnecessary.
+   * @internal
+   */
+  override async canPerformCaseInsensitiveComparisonFor(column: {
+    sqlType?: string | null;
+  }): Promise<boolean> {
+    const sqlType = column.sqlType ?? "";
+    if (!sqlType) {
+      this._caseInsensitiveCache.set(sqlType, false);
+      return false;
+    }
+    if (this._caseInsensitiveCache.has(sqlType)) {
+      return this._caseInsensitiveCache.get(sqlType)!;
+    }
+    const sql = `
+      SELECT (
+        exists(
+          SELECT * FROM pg_proc
+          WHERE proname = 'lower'
+            AND proargtypes = ARRAY[${this.quote(sqlType)}::regtype]::oidvector
+        ) OR exists(
+          SELECT * FROM pg_proc
+          INNER JOIN pg_cast
+            ON ARRAY[casttarget]::oidvector = proargtypes
+          WHERE proname = 'lower'
+            AND castsource = ${this.quote(sqlType)}::regtype
+        )
+      ) AS can_lower`;
+    const rows = await this.schemaQuery(sql);
+    const result = (rows[0]?.can_lower as boolean) === true;
+    this._caseInsensitiveCache.set(sqlType, result);
+    return result;
   }
 
   /**

@@ -326,8 +326,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("only reload type map once for every unrecognized type", async () => {
       // BLOCKED: assert_queries_count needed; SQLCounter doesn't isolate pg_type queries.
     });
-    it.skip("only warn on first encounter of unrecognized oid", async () => {
-      // BLOCKED: getOidType warns on every miss; needs a Set to deduplicate per OID.
+    it("only warn on first encounter of unrecognized oid", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        // execQuery goes through getOidType which triggers the dedup logic.
+        // execute() bypasses OID resolution so it cannot trigger the warn.
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
+        const oidWarns = warnSpy.mock.calls.filter(
+          (c) => typeof c[0] === "string" && /unknown OID \d+/.test(c[0]),
+        );
+        expect(oidWarns).toHaveLength(1);
+        expect(oidWarns[0][0]).toMatch(
+          /unknown OID \d+: failed to recognize type of 'regclass'\. It will be treated as String\./,
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
     it("extension enabled", async () => {
       await adapter.enableExtension("citext");
@@ -770,8 +786,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     it.skip("unparsed defaults are at least set when saving", async () => {
       // BLOCKED: Column.defaultFunction null for arithmetic defaults; reload() gap.
     });
-    it.skip("only check for insensitive comparison capability once", async () => {
-      // BLOCKED: caseInsensitiveComparison() + per-type cache not yet implemented.
+    it("only check for insensitive comparison capability once", async () => {
+      await adapter.execute(`CREATE DOMAIN example_type AS integer`);
+      const schemaQuerySpy = vi.spyOn(adapter, "schemaQuery");
+      try {
+        // canPerformCaseInsensitiveComparisonFor does the pg_proc lookup via schemaQuery.
+        // Spy on schemaQuery to verify the cache prevents a second DB round-trip.
+        const col = { sqlType: "example_type" };
+        await adapter.canPerformCaseInsensitiveComparisonFor(col);
+        const callsAfterFirst = schemaQuerySpy.mock.calls.length;
+        await adapter.canPerformCaseInsensitiveComparisonFor(col);
+        expect(schemaQuerySpy.mock.calls.length).toBe(callsAfterFirst);
+      } finally {
+        schemaQuerySpy.mockRestore();
+        await adapter.execute(`DROP DOMAIN example_type CASCADE`);
+      }
     });
     it("extensions omits current schema name", async () => {
       const wasEnabled = await adapter.extensionEnabled("hstore");
@@ -889,8 +918,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(d.day).toBe(15);
     });
 
-    it.skip("date decoding disabled", async () => {
-      // BLOCKED: Adapter always decodes DATE as Temporal.PlainDate; needs PostgreSQLAdapter.decodeDates flag.
+    it("date decoding disabled", async () => {
+      const saved = PostgreSQLAdapter.decodeDates;
+      PostgreSQLAdapter.decodeDates = false;
+      const localAdapter = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await localAdapter.exec(`CREATE TABLE "ex_dates_off" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
+        await localAdapter.exec(`INSERT INTO "ex_dates_off" ("d") VALUES ('2024-01-01')`);
+        const rows = await localAdapter.execute(`SELECT "d" FROM "ex_dates_off"`);
+        expect(rows[0].d).toBe("2024-01-01");
+      } finally {
+        await localAdapter.exec(`DROP TABLE IF EXISTS "ex_dates_off"`);
+        await localAdapter.close();
+        PostgreSQLAdapter.decodeDates = saved;
+      }
     });
 
     it("disable extension with schema", async () => {
