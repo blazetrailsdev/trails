@@ -119,11 +119,11 @@ export class TypeMapInitializer {
   }
 
   private registerMultirangeType(row: PgTypeRow): void {
-    // PG stores typelem=0 for multirange types in pg_type (unlike arrays).
-    // The range OID is only available via pg_range.rngtypid WHERE
-    // rngmultitypid = t.oid (PG 14+), which we don't currently SELECT.
-    // Fall back: iterate the type map for a RangeType whose typname matches
-    // the naming convention (e.g. "int4multirange" → "int4range").
+    // Real PG 14+ has typelem=0 for multirange rows in pg_type — the range
+    // OID is not stored there. Synthetic test rows may supply a non-zero
+    // typelem for convenience, and that fast path still works. When typelem=0
+    // (the real-PG case), fall back to iterating the type map for a RangeType
+    // whose typname matches the naming convention ("int4multirange" → "int4range").
     if (!this.store.lookup) {
       throw new Error(
         `TypeMap store must implement lookup() to register subtype-based OID ${row.oid}`,

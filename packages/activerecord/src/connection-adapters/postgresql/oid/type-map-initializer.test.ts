@@ -88,7 +88,7 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
   it("registers multirange types with the underlying range subtype", () => {
     const store = new TestStore();
     store.registerType(23, integerSubtype);
-    // int4range OID 3904, int4multirange OID 4451 (typelem → range OID)
+    // Synthetic rows supply typelem=3904 (fast path); real PG has typelem=0.
     new TypeMapInitializer(store).run([
       row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
       row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 }),
@@ -98,6 +98,44 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     const multiRange = store.lookup(4451) as MultiRangeType;
     expect(multiRange).toBeInstanceOf(MultiRangeType);
     expect(multiRange.subtype).toBe((store.lookup(3904) as RangeType).subtype);
+    expect(multiRange.name).toBe("int4multirange");
+  });
+
+  it("registers multirange types when typelem is 0 (real PG shape)", () => {
+    const store = new TestStore();
+    store.registerType(23, integerSubtype);
+    // Real PG 14+ sets typelem=0 for multirange rows; range OID is found
+    // by iterating the store for a RangeType matching the naming convention.
+    new TypeMapInitializer(store).run([
+      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
+      row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 0 }),
+    ]);
+
+    const multiRange = store.lookup(4451) as MultiRangeType;
+    expect(multiRange).toBeInstanceOf(MultiRangeType);
+    expect(multiRange.subtype).toBe((store.lookup(3904) as RangeType).subtype);
+    expect(multiRange.name).toBe("int4multirange");
+  });
+
+  it("defers multirange and retries after range OID is loaded", () => {
+    const store = new TestStore();
+    store.registerType(23, integerSubtype);
+    // Process only the multirange row first (no range row in batch).
+    const initializer = new TypeMapInitializer(store);
+    initializer.run([row({ oid: 4451, typname: "int4multirange", typtype: "m", typelem: 3904 })]);
+
+    // Not yet registered — range 3904 wasn't in the store.
+    expect(store.lookup(4451)).not.toBeInstanceOf(MultiRangeType);
+    expect(initializer.deferredMultirangeOids).toContain(3904);
+
+    // Simulate the adapter loading the range type, then retrying.
+    new TypeMapInitializer(store).run([
+      row({ oid: 3904, typname: "int4range", typtype: "r", rngsubtype: 23 }),
+    ]);
+    initializer.retryDeferredMultiranges();
+
+    const multiRange = store.lookup(4451) as MultiRangeType;
+    expect(multiRange).toBeInstanceOf(MultiRangeType);
     expect(multiRange.name).toBe("int4multirange");
   });
 
