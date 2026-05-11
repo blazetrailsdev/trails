@@ -1187,13 +1187,15 @@ export class MigrationContext {
     }
     if (options?.force) {
       if (options.force === "cascade" && typeof (this.adapter as any).dropTable === "function") {
-        await (this.adapter as any)
-          .dropTable(name, { ifExists: true, force: "cascade" })
-          .catch(() => {});
-        this._tables.delete(name);
-        this._columns.delete(name);
-        this._columnMeta.delete(name);
-        this._indexes.delete(name);
+        try {
+          await (this.adapter as any).dropTable(name, { ifExists: true, force: "cascade" });
+          this._tables.delete(name);
+          this._columns.delete(name);
+          this._columnMeta.delete(name);
+          this._indexes.delete(name);
+        } catch {
+          // table didn't exist or drop failed — proceed to create
+        }
       } else {
         await this.dropTable(name).catch(() => {});
       }
