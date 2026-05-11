@@ -46,13 +46,17 @@ export class RecordInvalid extends ActiveRecordError {
   readonly record: any;
 
   constructor(record: any) {
-    const fullMessages = record.errors?.fullMessages;
-    const errors = Array.isArray(fullMessages) ? fullMessages.join(", ") : "";
-    const message = I18n.t("activerecord.errors.messages.record_invalid", {
-      errors,
-      defaults: [{ key: "errors.messages.record_invalid" }],
-      defaultValue: "Validation failed: %{errors}",
-    });
+    let message: string;
+    if (record) {
+      const errors = (record.errors?.fullMessages as string[] | undefined)?.join(", ") ?? "";
+      message = I18n.t("activerecord.errors.messages.record_invalid", {
+        errors,
+        defaults: [{ key: "errors.messages.record_invalid" }],
+        defaultValue: "Validation failed: %{errors}",
+      });
+    } else {
+      message = "Record invalid";
+    }
     super(message);
     this.name = "RecordInvalid";
     this.record = record;
