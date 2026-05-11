@@ -38,8 +38,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const post = await withoutEncryption(() => Post.create({ title, body }));
     await post.encrypt();
 
-    assertEncryptedAttribute(post, "title", title);
-    assertEncryptedAttribute(post, "body", body);
+    await assertEncryptedAttribute(post, "title", title);
+    await assertEncryptedAttribute(post, "body", body);
 
     // Verify the DB was actually updated with ciphertext.
     const reloaded = await Post.find(post.id);
@@ -67,7 +67,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const title = "the Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
     const post = await Post.create({ title, body });
-    assertEncryptedAttribute(post, "title", title);
+    await assertEncryptedAttribute(post, "title", title);
 
     await post.decrypt();
 
@@ -99,7 +99,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     for (let i = 0; i < 3; i++) await post.encrypt();
 
     const reloaded = await Post.find(post.id);
-    assertEncryptedAttribute(reloaded, "title", "the Starfleet is here");
+    await assertEncryptedAttribute(reloaded, "title", "the Starfleet is here");
     expect(reloaded.encryptedAttribute("title")).toBe(true);
   });
 

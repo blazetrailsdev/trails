@@ -333,40 +333,66 @@ export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAda
 /**
  * Mirrors Rails' assert_encrypted_attribute.
  * Checks that the actual DB-bound value is ciphertext (≠ plaintext) and
- * that reading the attribute returns the expected plaintext.
- *
- * Uses _attributes.valuesForDatabase() to get the exact value that would
- * be written to the DB, matching what Rails' assert_encrypted_attribute
- * checks via read_attribute_before_type_cast on a persisted record.
+ * that reading the attribute returns the expected plaintext. For persisted
+ * records, reloads and re-checks — matching Rails' assert_encrypted_attribute
+ * which calls model.reload before the second assertion.
  */
-export function assertEncryptedAttribute(
+export async function assertEncryptedAttribute(
+  model: any,
+  attrName: string,
+  expectedValue: unknown,
+): Promise<void> {
+  _assertEncryptedAttributeOnModel(model, attrName, expectedValue);
+
+  if (typeof model.isPersisted === "function" && model.isPersisted()) {
+    await model.reload();
+    _assertEncryptedAttributeOnModel(model, attrName, expectedValue);
+  }
+}
+
+function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
+  if (readValue === expectedValue) return true;
+  if (
+    readValue instanceof Temporal.Instant &&
+    expectedValue instanceof Temporal.Instant &&
+    Temporal.Instant.compare(readValue, expectedValue) === 0
+  )
+    return true;
+  if (
+    readValue instanceof Temporal.PlainDate &&
+    expectedValue instanceof Temporal.PlainDate &&
+    Temporal.PlainDate.compare(readValue, expectedValue) === 0
+  )
+    return true;
+  if (
+    readValue instanceof Temporal.PlainDateTime &&
+    expectedValue instanceof Temporal.PlainDateTime &&
+    Temporal.PlainDateTime.compare(readValue, expectedValue) === 0
+  )
+    return true;
+  if (
+    readValue instanceof Uint8Array &&
+    expectedValue instanceof Uint8Array &&
+    readValue.length === expectedValue.length &&
+    readValue.every((b, i) => b === (expectedValue as Uint8Array)[i])
+  )
+    return true;
+  if (
+    Array.isArray(readValue) &&
+    Array.isArray(expectedValue) &&
+    JSON.stringify(readValue) === JSON.stringify(expectedValue)
+  )
+    return true;
+  return false;
+}
+
+function _assertEncryptedAttributeOnModel(
   model: any,
   attrName: string,
   expectedValue: unknown,
 ): void {
-  // Verify the attribute reads back as the expected plaintext.
   const readValue = model[attrName];
-  const temporalEqual =
-    (readValue instanceof Temporal.Instant &&
-      expectedValue instanceof Temporal.Instant &&
-      Temporal.Instant.compare(readValue, expectedValue) === 0) ||
-    (readValue instanceof Temporal.PlainDate &&
-      expectedValue instanceof Temporal.PlainDate &&
-      Temporal.PlainDate.compare(readValue, expectedValue) === 0) ||
-    (readValue instanceof Temporal.PlainDateTime &&
-      expectedValue instanceof Temporal.PlainDateTime &&
-      Temporal.PlainDateTime.compare(readValue, expectedValue) === 0);
-  const uint8Equal =
-    readValue instanceof Uint8Array &&
-    expectedValue instanceof Uint8Array &&
-    readValue.length === expectedValue.length &&
-    readValue.every((b, i) => b === (expectedValue as Uint8Array)[i]);
-  const arrayEqual =
-    Array.isArray(readValue) &&
-    Array.isArray(expectedValue) &&
-    JSON.stringify(readValue) === JSON.stringify(expectedValue);
-  const valuesEqual = readValue === expectedValue || temporalEqual || uint8Equal || arrayEqual;
-  if (!valuesEqual) {
+  if (!_valuesEqual(readValue, expectedValue)) {
     throw new Error(
       `assertEncryptedAttribute: expected ${attrName} to equal ` +
         `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
@@ -374,8 +400,6 @@ export function assertEncryptedAttribute(
   }
 
   // Verify the DB-bound value differs from the plaintext — confirms real encryption.
-  // For non-string types (e.g. Date), also compare against the serialized string
-  // form since dbValue is always a string while expectedValue may be an object.
   if (expectedValue !== null && expectedValue !== undefined) {
     const dbValues = model._attributes.valuesForDatabase();
     const dbValue = dbValues[attrName];
@@ -384,7 +408,6 @@ export function assertEncryptedAttribute(
       type && typeof (type as any).castType?.serialize === "function"
         ? (type as any).castType.serialize(expectedValue)
         : null;
-    // Normalize to string for comparison (EncryptedAttributeType calls String() before encrypting).
     const serializedPlaintext = rawSerialized != null ? String(rawSerialized) : null;
     if (
       dbValue === expectedValue ||

@@ -46,14 +46,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("encrypts the attribute seamlessly when creating and updating records", async () => {
     const Post = makeEncryptedPost(freshAdapter());
     const post = await Post.create({ title: "The Starfleet is here!", body: "take cover!" });
-    assertEncryptedAttribute(post, "title", "The Starfleet is here!");
+    await assertEncryptedAttribute(post, "title", "The Starfleet is here!");
 
     await post.update({ title: "The Klingons are coming!" });
-    assertEncryptedAttribute(post, "title", "The Klingons are coming!");
+    await assertEncryptedAttribute(post, "title", "The Klingons are coming!");
 
     post.title = "You sure?";
     await post.save();
-    assertEncryptedAttribute(post, "title", "You sure?");
+    await assertEncryptedAttribute(post, "title", "You sure?");
   });
 
   it("attribute is not accessible with the wrong key", async () => {
@@ -133,7 +133,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     Post.encrypts("body", { keyProvider });
 
     const post = await Post.create({ title: "The Starfleet is here!", body: "take cover!" });
-    assertEncryptedAttribute(post, "body", "take cover!");
+    await assertEncryptedAttribute(post, "body", "take cover!");
 
     // Verify round-trip: reload and decrypt using the scheme's own key provider.
     const reloaded = await Post.find(post.id);
@@ -146,7 +146,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     Author.encrypts("name", { key: customKey });
 
     const author = await Author.create({ name: "Stephen King" });
-    assertEncryptedAttribute(author, "name", "Stephen King");
+    await assertEncryptedAttribute(author, "name", "Stephen King");
 
     // Verify round-trip: reload and decrypt using the scheme's own key.
     const reloaded = await Author.find(author.id);
@@ -158,8 +158,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const title = "The Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
     const post = await Post.create({ title, body });
-    assertEncryptedAttribute(post, "title", title);
-    assertEncryptedAttribute(post, "body", body);
+    await assertEncryptedAttribute(post, "title", title);
+    await assertEncryptedAttribute(post, "body", body);
   });
 
   it("encrypted_attributes returns the list of encrypted attributes in a model (each record class holds their own list)", () => {
@@ -466,7 +466,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBook(freshAdapter());
     new Book();
     const book = await Book.create({});
-    assertEncryptedAttribute(book, "name", "<untitled>");
+    await assertEncryptedAttribute(book, "name", "<untitled>");
   });
 
   it.skip("loading records with encrypted attributes defined on columns with default values", () => {
@@ -529,8 +529,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBookIgnoreCase(freshAdapter());
     new Book();
     const book = await Book.create({ name: "Dune" });
-    assertEncryptedAttribute(book, "name", "Dune");
-    assertEncryptedAttribute(book, "original_name", "Dune");
+    await assertEncryptedAttribute(book, "name", "Dune");
+    await assertEncryptedAttribute(book, "original_name", "Dune");
     // In-memory read before save reflects the assigned value immediately.
     const unsaved = new Book({ name: "Arrakis" });
     expect(unsaved.name).toBe("Arrakis");
@@ -572,15 +572,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBookWithBinary(freshAdapter());
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
-    assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
-    assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
+    await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
+    await assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
   });
   it("serialized binary data can be encrypted", async () => {
     const jsonBytes = Array.from({ length: 96 }, (_, i) => String.fromCharCode(i + 32));
     const Book1 = makeEncryptedBookWithSerializedFirstBinary(freshAdapter());
-    assertEncryptedAttribute(await Book1.create({ logo: jsonBytes }), "logo", jsonBytes);
+    await assertEncryptedAttribute(await Book1.create({ logo: jsonBytes }), "logo", jsonBytes);
     const Book2 = makeEncryptedBookWithSerializedSecondBinary(freshAdapter());
-    assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
+    await assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
   });
   it.skip("deterministic ciphertexts remain constant", () => {
     // BLOCKED: encryption — encryption subsystem gap in encryptable-record
@@ -619,9 +619,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     BookNormalized.encrypts("logo", { deterministic: true, downcase: true });
     new BookNormalized();
     const b1 = await BookNormalized.create({ name: "Book" });
-    assertEncryptedAttribute(await BookNormalized.find(b1.id), "name", "book");
+    await assertEncryptedAttribute(await BookNormalized.find(b1.id), "name", "book");
     const b2 = await BookNormalized.create({ logo: "Book" });
-    assertEncryptedAttribute(await BookNormalized.find(b2.id), "logo", "book");
+    await assertEncryptedAttribute(await BookNormalized.find(b2.id), "logo", "book");
   });
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
@@ -666,11 +666,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost(adp);
     new Post();
     const post = await Post.create({ title: "Hello", body: "World" });
-    assertEncryptedAttribute(post, "title", "Hello");
+    await assertEncryptedAttribute(post, "title", "Hello");
     // Re-encrypt: DB gets fresh ciphertext, in-memory stays plaintext.
     await EncryptableRecord.encryptAttributes(post);
     expect(post.title).toBe("Hello");
-    assertEncryptedAttribute(await Post.find(post.id), "title", "Hello");
+    await assertEncryptedAttribute(await Post.find(post.id), "title", "Hello");
   });
 
   it("EncryptableRecord.decryptAttributes stores plaintext in DB", async () => {
@@ -679,7 +679,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost(adp);
     new Post();
     const post = await Post.create({ title: "Hello", body: "World" });
-    assertEncryptedAttribute(post, "title", "Hello");
+    await assertEncryptedAttribute(post, "title", "Hello");
     await EncryptableRecord.decryptAttributes(post);
     // supportUnencryptedData=true lets the EncryptedAttributeType pass through plaintext.
     const reloaded = await Post.find(post.id);
@@ -695,6 +695,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     BookDate.attribute("name", "date"); // override cast type to date (DB stays text)
     BookDate.encrypts("name");
     const book = await BookDate.create({ name: "2024-01-01" });
-    assertEncryptedAttribute(book, "name", Temporal.PlainDate.from("2024-01-01"));
+    await assertEncryptedAttribute(book, "name", Temporal.PlainDate.from("2024-01-01"));
   });
 });
