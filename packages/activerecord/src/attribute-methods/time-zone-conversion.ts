@@ -337,14 +337,8 @@ interface RangeLike {
 
 /** @internal */
 function isRangeLike(v: unknown): v is RangeLike {
-  return (
-    v != null &&
-    typeof v === "object" &&
-    !Array.isArray(v) &&
-    "begin" in v &&
-    "end" in v &&
-    "excludeEnd" in v
-  );
+  if (v == null || typeof v !== "object" || Array.isArray(v) || isPlainObject(v)) return false;
+  return "begin" in v && "end" in v && "excludeEnd" in v;
 }
 
 /** @internal */
