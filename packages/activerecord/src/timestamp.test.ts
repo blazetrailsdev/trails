@@ -939,7 +939,6 @@ describe("TimestampTest", () => {
   it("timestamps are persisted to the database", async () => {
     const article = await Article.create({ title: "Persisted" });
     const reloaded = await Article.find(article.id);
-    // MemoryAdapter stores the Date as-is, so it should match
     expect(reloaded.created_at).not.toBeNull();
     expect(reloaded.updated_at).not.toBeNull();
   });

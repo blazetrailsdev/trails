@@ -203,6 +203,28 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Tests `rails dbconsole` PTY/exec invocation for SQLite. " +
       "Spawning a PTY-backed interactive subprocess has no Node.js equivalent.",
   },
+  // --- Permanently not-portable: single-process SQLite driver limits ---
+  {
+    testFile: "adapters/sqlite3/transaction_test.rb",
+    tests: ["opens a `read_uncommitted` transaction"],
+    reason:
+      "Cross-connection read_uncommitted visibility requires SQLITE_OPEN_SHAREDCACHE. " +
+      "better-sqlite3 does not expose this flag, so two connections cannot share a cache.",
+  },
+  // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
+  {
+    testFile: "modules_test.rb",
+    tests: [
+      "module spanning associations",
+      "module spanning has and belongs to many associations",
+      "associations spanning cross modules",
+      "find account and include company",
+      "eager loading in modules",
+    ],
+    reason:
+      "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
+      "No JS equivalent for namespace-scoped class discovery.",
+  },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
     testFile: "connection_pool_test.rb",

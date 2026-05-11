@@ -2667,19 +2667,6 @@ describe("RelationTest", () => {
     const sql = User.all().lock().lock(false).toSql();
     expect(sql).not.toContain("FOR UPDATE");
   });
-
-  it("MemoryAdapter tolerates FOR UPDATE in queries", async () => {
-    const adapter = freshAdapter();
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "Alice" });
-    const result = await User.all().lock().toArray();
-    expect(result).toHaveLength(1);
-  });
 });
 
 describe("RelationTest", () => {
@@ -4332,18 +4319,6 @@ describe("RelationTest", () => {
       }
     }
     expect(User.all().lock("FOR SHARE").toSql()).toContain("FOR SHARE");
-  });
-
-  it("locked query still executes against MemoryAdapter", async () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    await User.create({ name: "Alice" });
-    const result = await User.all().lock().toArray();
-    expect(result).toHaveLength(1);
   });
 
   it("joins generates proper JOIN SQL", () => {

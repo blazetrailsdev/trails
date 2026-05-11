@@ -171,7 +171,7 @@ describe("InvertibleMigrationTest", () => {
     // BLOCKED: migration — migration runner gap in invertible-migration
     // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
     // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    // ALTER COLUMN SET DEFAULT not supported in SQLite/MemoryAdapter
+    // ALTER COLUMN SET DEFAULT not supported in SQLite
     class CreateHorses extends Migration {
       async change() {
         await this.createTable("horses", {}, (t) => {
@@ -453,8 +453,7 @@ describe("Reversible Migrations", () => {
 
     // Down — drops the table
     await migration.run(adapter, "down");
-    // Table was dropped; on MemoryAdapter it returns empty, on real DBs
-    // the SchemaAdapter auto-creates an empty table on missing-table error.
+    // Table was dropped; SchemaAdapter returns empty rows on a missing-table select.
     const afterDrop = await adapter.execute(`SELECT * FROM "posts"`);
     expect(afterDrop).toHaveLength(0);
   });

@@ -608,7 +608,6 @@ describe("Migration DDL (extended)", () => {
     }
     const m = new RemoveCol();
     await m.run(adapter, "up");
-    // MemoryAdapter may or may not enforce column removal, but SQL is generated
   });
 
   it("addIndex generates CREATE INDEX", async () => {
@@ -624,7 +623,6 @@ describe("Migration DDL (extended)", () => {
     }
     const m = new AddIdx();
     await m.run(adapter, "up");
-    // MemoryAdapter ignores indexes but migration runs without error
   });
 
   it("addIndex with unique option", async () => {
@@ -1928,7 +1926,7 @@ describe("MigrationTest", () => {
       // BLOCKED: migration — migration runner gap in migration
       // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
       // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* ALTER COLUMN TYPE not supported in SQLite/MemoryAdapter */
+      /* ALTER COLUMN TYPE not supported in SQLite */
     });
 
     it.skip("changing column null with default", () => {

@@ -20,28 +20,16 @@ describe("ModulesTest", () => {
   });
 
   it.skip("module spanning associations", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
-    /* needs cross-module association loading */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
   it.skip("module spanning has and belongs to many associations", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
-    /* needs HABTM cross-module */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
   it.skip("associations spanning cross modules", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
-    /* needs cross-module association loading */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
   it.skip("find account and include company", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
-    /* needs eager loading across modules */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
 
   it("table name", () => {
@@ -67,10 +55,7 @@ describe("ModulesTest", () => {
   });
 
   it.skip("eager loading in modules", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
-    /* needs eager loading support */
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
   });
 
   it("module table name prefix", () => {
@@ -158,13 +143,9 @@ describe("ModulesTest", () => {
   });
 
   it.skip("table name in mixins", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
+    // BLOCKED: unknown — no matching test in Rails modules_test.rb; likely a phantom from a prior merge
   });
   it.skip("inheritance in mixins", () => {
-    // BLOCKED: unknown — Ruby module / singleton_class semantics not translatable
-    // ROOT-CAUSE: Node.js has no Module#prepend, singleton_class, or Module#ancestors semantics
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
+    // BLOCKED: unknown — no matching test in Rails modules_test.rb; likely a phantom from a prior merge
   });
 });

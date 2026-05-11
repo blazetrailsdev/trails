@@ -2,13 +2,9 @@ import { describe, it } from "vitest";
 
 describe("TouchTest", () => {
   it.skip("many updates", () => {
-    // BLOCKED: unknown — Ruby singleton_class / mixin semantics not translatable to TS
-    // ROOT-CAUSE: Node.js / TypeScript has no singleton_class or Module#prepend equivalent
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
+    // BLOCKED: mixin — needs mixins table fixture (lft, updated_at, created_at) + vi.useFakeTimers for travel
   });
   it.skip("create turned off", () => {
-    // BLOCKED: unknown — Ruby singleton_class / mixin semantics not translatable to TS
-    // ROOT-CAUSE: Node.js / TypeScript has no singleton_class or Module#prepend equivalent
-    // SCOPE: ~0 LOC fix; likely permanent skip-list.ts candidate
+    // BLOCKED: mixin — needs mixins table fixture; recordTimestamps=false path is implemented
   });
 });

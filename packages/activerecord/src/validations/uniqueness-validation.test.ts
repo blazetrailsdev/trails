@@ -277,7 +277,6 @@ describe("UniquenessValidationTest", () => {
       }
     }
     await Post.create({ title: "Hello" });
-    // MemoryAdapter does exact match, so different case should pass
     const p2 = new Post({ title: "hello" });
     expect(await p2.save()).toBe(true);
   });
@@ -924,7 +923,7 @@ describe("UniquenessWithCompositeKey", () => {
     }
     await Order.create({ shop_id: null, order_num: 1 });
     const o2 = new Order({ shop_id: null, order_num: 1 });
-    // null scope values match each other in MemoryAdapter
+    // null scope values match each other in the uniqueness check
     expect(await o2.save()).toBe(false);
   });
 

@@ -114,7 +114,6 @@ describe("SignedIdTest", () => {
     // BLOCKED: unknown — SignedId feature gap; needs human triage
     // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
     // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // MemoryAdapter always auto-assigns to "id" column, not the custom primaryKey
   });
 
   it("find signed record for single table inheritance (STI Models)", async () => {
@@ -147,7 +146,6 @@ describe("SignedIdTest", () => {
     // BLOCKED: unknown — SignedId feature gap; needs human triage
     // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
     // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // MemoryAdapter always auto-assigns to "id" column, not the custom primaryKey
   });
 
   it("find signed record with a bang for single table inheritance (STI Models)", async () => {

@@ -509,11 +509,8 @@ describe("SQLite3AdapterTest", () => {
     expect(id).toBe(3);
   });
 
-  it.skip("supports extensions", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
-    // better-sqlite3 does not support loadExtension by default
+  it("supports extensions", () => {
+    expect(adapter.supportsExtensions()).toBe(false);
   });
 
   it("respond to enable extension", () => {

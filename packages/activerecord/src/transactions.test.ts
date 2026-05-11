@@ -1607,9 +1607,6 @@ describe("TransactionTest", () => {
     } catch {
       // expected
     }
-
-    // MemoryAdapter doesn't truly rollback, but the pattern is correct
-    // In a real adapter, the records would be gone
   });
 
   it("runs afterRollback callbacks on error", async () => {
@@ -1764,7 +1761,6 @@ describe("TransactionTest", () => {
     } catch {
       // expected
     }
-    // MemoryAdapter doesn't truly rollback, but pattern is correct
   });
 
   it("call after commit after transaction commits", async () => {
