@@ -343,8 +343,8 @@ singular_association,builder/*}.rb`
 
 ## Tests that don't translate to TypeScript / Node
 
-Permanently not-portable tests are excluded via `EXCLUDED_FILES` in
-`scripts/api-compare/excluded-files.ts` (whole-file entries with `testFile`).
+Permanently not-portable tests are excluded via `UNPORTED_FILES` in
+`scripts/api-compare/unported-files.ts` (whole-file entries with `testFile`).
 This drops them from both the Ruby denominator and the skipped backlog.
 
 **PR that added whole-file exclusions: #1304** (chore(test-compare): exclude permanently-not-portable Rails tests).

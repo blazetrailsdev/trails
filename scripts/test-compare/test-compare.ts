@@ -27,7 +27,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest } from "./types.js";
-import { isTestCaseExcluded, isTestExcluded } from "../api-compare/excluded-files.js";
+import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -259,11 +259,11 @@ function main() {
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     for (const file of pkgInfo.files) {
-      if (isTestExcluded(file.file)) continue;
+      if (isTestFileUnported(file.file)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
-        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
         if (!seenPaths.has(np)) {
@@ -286,7 +286,7 @@ function main() {
     let tsUnmapped = 0;
 
     for (const file of pkgInfo.files) {
-      if (isTestExcluded(file.file)) continue;
+      if (isTestFileUnported(file.file)) continue;
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
 
@@ -302,7 +302,7 @@ function main() {
       const matchedRuby = new Set<number>();
 
       const excludedCount = file.testCases.filter((tc) =>
-        isTestCaseExcluded(file.file, tc.description, tc.ancestors[0]),
+        isTestCaseUnported(file.file, tc.description, tc.ancestors[0]),
       ).length;
 
       let matched = 0;
@@ -316,7 +316,7 @@ function main() {
       // Pass 1: Path matches (exact ancestor + description match)
       for (let ri = 0; ri < file.testCases.length; ri++) {
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
         if (tsIdx >= 0) {
@@ -339,7 +339,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
@@ -377,7 +377,7 @@ function main() {
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
-        if (isTestCaseExcluded(file.file, tc.description, tc.ancestors[0])) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
@@ -510,7 +510,7 @@ function main() {
 
     results.push({
       package: pkg,
-      rubyFiles: pkgInfo.files.filter((f) => !isTestExcluded(f.file)).length,
+      rubyFiles: pkgInfo.files.filter((f) => !isTestFileUnported(f.file)).length,
       tsMapped,
       tsUnmapped,
       totalRubyTests: totalRuby,

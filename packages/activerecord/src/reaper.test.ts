@@ -111,7 +111,7 @@ describe("ReaperTest", () => {
   });
 
   it.skip("connection pool starts reaper in fork", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — fork
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — fork
   });
 
   it("reaper does not reap discarded connection pools", () => {

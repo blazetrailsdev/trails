@@ -138,7 +138,7 @@ helper that's missing, the author adds it under the matching Rails
 file path with a faithful port + tests. The headline percentage is
 not a target, just an indicator.
 
-If the headline number bothers you: extend `excluded-files.ts` to
+If the headline number bothers you: extend `unported-files.ts` to
 include the entire "Explicitly out" list above. The denominator drops
 ~700, and the displayed coverage realigns with what's actually being
 maintained.

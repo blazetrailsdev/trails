@@ -2488,19 +2488,19 @@ describe("BasicsTest", () => {
     expect(after).not.toBe(before);
   });
   it.skip("marshal inspected round trip", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it.skip("marshalling with associations 6 1", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it.skip("marshalling with associations 7 1", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it.skip("marshal between processes", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it.skip("marshalling new record round trip with associations", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
   it("attribute names on abstract class", () => {
     class AbstractModel extends Base {
@@ -2536,10 +2536,10 @@ describe("BasicsTest", () => {
     // BLOCKED: GVL — uses Ruby Thread.new to override connection_handler in a child thread and verify isolation; Node.js has no threads with shared object model
   });
   it.skip("new threads get default the default connection handler", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
   it.skip("changing a connection handler in a main thread does not poison the other threads", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   });
   it("ignored columns are not present in columns_hash", () => {
     class User extends Base {
@@ -2943,7 +2943,7 @@ describe("BasicsTest", () => {
   });
 
   it.skip("marshal round trip", async () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   it("benchmark with log level", async () => {

@@ -115,7 +115,7 @@ function makeTransactionAwarePool(size: number = 5): ConnectionPool {
 
 describe("ConnectionPoolThreadTest", () => {
   it.skip("lock thread allow fiber reentrency", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
     /* needs fiber/thread emulation */
   });
 });
@@ -136,7 +136,7 @@ it("checkout after close", () => {
 });
 
 it.skip("released connection moves between threads", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread emulation */
 });
 
@@ -267,7 +267,7 @@ it.skip("reap inactive", () => {
 });
 
 it.skip("inactive are returned from dead thread", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -378,7 +378,7 @@ it("remove connection", () => {
 });
 
 it.skip("remove connection for thread", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -549,32 +549,32 @@ it.skip("pool sets connection schema cache", () => {
 });
 
 it.skip("concurrent connection establishment", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs concurrency */
 });
 
 it.skip("non bang disconnect and clear reloadable connections throw exception if threads dont return their conns", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections attempt to wait for threads to return their conns", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections are able to preempt other waiting threads", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("clear reloadable connections creates new connections for waiting threads if necessary", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -590,7 +590,7 @@ it("connection pool stat", () => {
 });
 
 it.skip("public connections access threadsafe", () => {
-  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
   /* needs thread safety */
 });
 

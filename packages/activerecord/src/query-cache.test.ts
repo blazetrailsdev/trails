@@ -75,10 +75,10 @@ describe("QueryCacheTest", () => {
     // BLOCKED: connection-pool — db_config integration
   });
   it.skip("query cache with forked processes", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
   it.skip("query cache across threads", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
   it.skip("middleware delegates", () => {
     // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
@@ -385,7 +385,7 @@ describe("QueryCacheTest", () => {
     // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query caching is local to the current thread", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
   it.skip("query cache is enabled on all connection pools", () => {
     // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
@@ -394,10 +394,10 @@ describe("QueryCacheTest", () => {
     // BLOCKED: connection-pool — per-thread query-cache architecture not wired (>300 LOC prereq)
   });
   it.skip("query cache is enabled in threads with shared connection", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
   it.skip("query cache is cleared for all thread when a connection is shared", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
 
   it("query cache uncached dirties", async () => {
@@ -598,7 +598,7 @@ describe("QueryCacheExpiryTest", () => {
   });
 
   it.skip("threads use the same connection", () => {
-    // BLOCKED: GVL — Ruby threads/fork; candidate for excluded-files.ts
+    // BLOCKED: GVL — Ruby threads/fork; candidate for unported-files.ts
   });
 });
 

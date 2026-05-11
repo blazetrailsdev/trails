@@ -217,11 +217,11 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialized class attribute", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs class-based serialization */
   });
   it.skip("serialized class does not become frozen", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* Ruby-specific frozen concept */
   });
 
@@ -245,7 +245,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs write-time type validation in serialize (assert_valid_value on dump) */
   });
   it("should raise exception on serialized attribute with type mismatch", async () => {
@@ -268,19 +268,19 @@ describe("SerializedAttributeTest", () => {
     expect(() => found.content).toThrow(SerializationTypeMismatch);
   });
   it.skip("serialized attribute with class constraint", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs class-based serialization */
   });
   it.skip("where by serialized attribute with array", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs serialized where support */
   });
   it.skip("where by serialized attribute with hash", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs serialized where support */
   });
   it.skip("where by serialized attribute with hash in array", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs serialized where support */
   });
 
@@ -332,11 +332,11 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialize attribute via select method when time zone available", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs timezone support */
   });
   it.skip("serialize attribute can be serialized in an integer column", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs integer column serialize */
   });
 
@@ -397,7 +397,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("classes without no arg constructors are not supported", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* Ruby-specific */
   });
 
@@ -410,11 +410,11 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("is not changed when stored blob", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs blob support */
   });
   it.skip("is not changed when stored in blob frozen payload", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs blob support */
   });
 
@@ -477,11 +477,11 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("decorated type with type for attribute", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs custom type decoration */
   });
   it.skip("decorated type with decorator block", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs custom type decoration */
   });
 
@@ -501,7 +501,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it.skip("serialized attribute works under concurrent initial access", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     /* needs concurrency testing */
   });
 
@@ -617,7 +617,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   // Rails test_serialized_time_attribute is SKIPPED in the safe_load variant:
   // "Time is a DisallowedClass in Psych safe_load()"
   it.skip("serialized time attribute", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     // Skipped in Rails WithYamlSafeLoad: Time is a DisallowedClass for Psych safe_load.
   });
 
@@ -695,7 +695,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it.skip("supports permitted classes for default column serializer", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — yaml
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
     // Rails-specific: YAML permitted classes have no equivalent in trails (JSON serialization).
   });
 });
