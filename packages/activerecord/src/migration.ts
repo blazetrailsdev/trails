@@ -936,6 +936,10 @@ export abstract class Migration {
     return this._connectionOverride ?? this.adapter;
   }
 
+  set connection(conn: DatabaseAdapter | undefined) {
+    this._connectionOverride = conn;
+  }
+
   get connectionPool(): ConnectionPool {
     // Mirrors Rails: @pool || DatabaseTasks.migration_connection_pool.
     // _poolOverride is a real ConnectionPool when set by the migration runner.

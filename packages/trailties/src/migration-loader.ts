@@ -55,15 +55,24 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
       name,
       filename: filePath,
       migration: () => {
-        const loader = {
-          async up(adapter?: import("@blazetrails/activerecord").DatabaseAdapter): Promise<void> {
-            if (!adapter) throw new Error("migration-loader: adapter is required for up()");
+        const loader: import("@blazetrails/activerecord").MigrationLike = {
+          connection: undefined,
+          async up(): Promise<void> {
+            const adapter = loader.connection;
+            if (!adapter)
+              throw new Error(
+                "migration-loader: migration.connection must be set before calling up()",
+              );
             const MigrationClass = await loadMigrationClass(filePath);
             const instance = new MigrationClass();
             await instance.run(adapter, "up");
           },
-          async down(adapter?: import("@blazetrails/activerecord").DatabaseAdapter): Promise<void> {
-            if (!adapter) throw new Error("migration-loader: adapter is required for down()");
+          async down(): Promise<void> {
+            const adapter = loader.connection;
+            if (!adapter)
+              throw new Error(
+                "migration-loader: migration.connection must be set before calling down()",
+              );
             const MigrationClass = await loadMigrationClass(filePath);
             const instance = new MigrationClass();
             await instance.run(adapter, "down");

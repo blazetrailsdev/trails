@@ -19,6 +19,7 @@ import {
 import { Associations, loadBelongsTo } from "./associations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
+import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -7549,13 +7550,17 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const intType = { cast: (v: unknown) => Number(v) };
     const fakeNode = { modelClass: { attributeTypes: () => ({ credit_limit: intType }) } };
     const fakeJd = [fakeNode];
-    const result = lookupCastTypeFromJoinDependencies({} as any, "credit_limit", [fakeJd]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "credit_limit", [
+      fakeJd,
+    ] as unknown as JoinDependency[]);
     expect(result).toBe(intType);
   });
 
   it("returns null when name is not in any joined table", () => {
     const fakeNode = { modelClass: { attributeTypes: () => ({ other: {} }) } };
-    const result = lookupCastTypeFromJoinDependencies({} as any, "missing", [[fakeNode]]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "missing", [
+      [fakeNode],
+    ] as unknown as JoinDependency[]);
     expect(result).toBeNull();
   });
 
@@ -7564,21 +7569,28 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const type2 = { cast: (v: unknown) => Number(v) };
     const node1 = { modelClass: { attributeTypes: () => ({ name: type1 }) } };
     const node2 = { modelClass: { attributeTypes: () => ({ name: type2 }) } };
-    const result = lookupCastTypeFromJoinDependencies({} as any, "name", [[node1], [node2]]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "name", [
+      [node1],
+      [node2],
+    ] as unknown as JoinDependency[]);
     expect(result).toBe(type1);
   });
 
   it("supports attributeTypes as a plain object", () => {
     const strType = { cast: (v: unknown) => String(v) };
     const fakeNode = { modelClass: { attributeTypes: { title: strType } } };
-    const result = lookupCastTypeFromJoinDependencies({} as any, "title", [[fakeNode]]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "title", [
+      [fakeNode],
+    ] as unknown as JoinDependency[]);
     expect(result).toBe(strType);
   });
 
   it("supports attributeTypes as a Map", () => {
     const strType = { cast: (v: unknown) => String(v) };
     const fakeNode = { modelClass: { attributeTypes: new Map([["title", strType]]) } };
-    const result = lookupCastTypeFromJoinDependencies({} as any, "title", [[fakeNode]]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "title", [
+      [fakeNode],
+    ] as unknown as JoinDependency[]);
     expect(result).toBe(strType);
   });
 
@@ -7586,7 +7598,9 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const type = { cast: (v: unknown) => v };
     const nodeMissing = { modelClass: undefined };
     const nodeGood = { modelClass: { attributeTypes: () => ({ val: type }) } };
-    const result = lookupCastTypeFromJoinDependencies({} as any, "val", [[nodeMissing, nodeGood]]);
+    const result = lookupCastTypeFromJoinDependencies({} as any, "val", [
+      [nodeMissing, nodeGood],
+    ] as unknown as JoinDependency[]);
     expect(result).toBe(type);
   });
 });

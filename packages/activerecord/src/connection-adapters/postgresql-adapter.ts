@@ -3004,8 +3004,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         let column: string;
         let primaryKey: string;
         if (conkey.length > 1) {
-          const cols = await this.columnNamesFromColumnNumbers(row.conrelid as number, conkey);
-          const pks = await this.columnNamesFromColumnNumbers(row.confrelid as number, confkey);
+          const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+          const pks = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
           column = cols.join(",");
           primaryKey = pks.join(",");
         } else {
@@ -4631,8 +4631,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       format_type: r.format_type as string,
       pg_get_expr: (r.pg_get_expr as string | null) ?? null,
       attnotnull: r.attnotnull as boolean,
-      atttypid: r.atttypid as number,
-      atttypmod: r.atttypmod as number,
+      atttypid: Number(r.atttypid),
+      atttypmod: Number(r.atttypmod),
       collname: (r.collname as string | null) ?? null,
       comment: (r.comment as string | null) ?? null,
       identity: (r.identity as string | null) || null,
