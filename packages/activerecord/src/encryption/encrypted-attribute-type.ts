@@ -241,7 +241,14 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private serializeWithCurrent(value: unknown): unknown {
     const casted = this.castType.serialize?.(value) ?? value;
     if (casted === null || casted === undefined) return null;
-    const str = typeof casted === "string" ? casted : String(casted);
+    // Binary columns: convert each byte to the matching Latin-1 code point so
+    // the encryptor receives a valid string rather than "0,1,2,..." (Array#toString).
+    const str =
+      casted instanceof Uint8Array
+        ? Buffer.from(casted).toString("latin1")
+        : typeof casted === "string"
+          ? casted
+          : String(casted);
     const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
     const toEncrypt =
       this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
@@ -298,7 +305,17 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
 
   /** @internal */
   private textToDatabaseType(value: unknown): unknown {
-    if (value != null && this.castType.isBinary()) return new BinaryData(value as string);
+    if (value != null && this.castType.isBinary()) {
+      if (typeof value === "string") {
+        // Use Latin-1 so binary payload bytes > 127 round-trip correctly.
+        // UTF-8 (TextEncoder) would expand bytes 128–255 to two-byte sequences.
+        return new BinaryData(new Uint8Array(Buffer.from(value, "latin1")));
+      }
+      if (value instanceof Uint8Array) return new BinaryData(value);
+      // Already a BinaryData wrapper (e.g. supportUnencryptedData pass-through).
+      if (value instanceof BinaryData) return value;
+      return new BinaryData(String(value));
+    }
     return value;
   }
 
@@ -306,9 +323,11 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
       const raw = this.castType.deserialize?.(value) ?? value;
-      // BinaryType.deserialize returns Uint8Array; decode back to the ciphertext string
-      // so decryptAsText always receives a plain string.
-      return raw instanceof Uint8Array ? new TextDecoder().decode(raw) : raw;
+      // Use Latin-1 (not UTF-8) so bytes 128–255 survive the round-trip. The
+      // ciphertext is always ASCII so Latin-1 == UTF-8 for that path; for
+      // supportUnencryptedData rows the plaintext bytes must also be Latin-1
+      // decoded or they'll be corrupted before textToDatabaseType re-wraps them.
+      return raw instanceof Uint8Array ? Buffer.from(raw).toString("latin1") : raw;
     }
     return value;
   }
