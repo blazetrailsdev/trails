@@ -548,6 +548,11 @@ export class Base extends Model {
   static _primaryKey: string | string[] = "id";
   static readonly _isActiveRecordBase = true;
 
+  /** Mirrors: ActiveRecord.writing_role */
+  static writingRole = "writing";
+  /** Mirrors: ActiveRecord.reading_role */
+  static readingRole = "reading";
+
   // Mirrors: ActiveRecord::Base.filter_attributes = [] at class definition time.
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
 

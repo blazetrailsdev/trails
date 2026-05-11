@@ -513,6 +513,7 @@ export async function establishConnection(
         [key: string]: unknown;
       },
 ): Promise<void> {
+  if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
   // Clear cached adapters up the prototype chain (Base → ApplicationRecord → Model)
   let current: any = modelClass;
   while (current && typeof current === "function") {
