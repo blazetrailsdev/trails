@@ -150,6 +150,20 @@ class I18nService {
   }
 
   /**
+   * Mirrors: I18n.with_locale
+   * Sets locale for the duration of fn and restores it in finally.
+   */
+  withLocale<T>(locale: string, fn: () => T): T {
+    const prev = this._locale;
+    this._locale = locale;
+    try {
+      return fn();
+    } finally {
+      this._locale = prev;
+    }
+  }
+
+  /**
    * Configure the fallback chain. Pass an object mapping locale → chain,
    * or an array treated as a shared chain for every locale. Each chain
    * should include the originating locale as its first element, matching
@@ -186,6 +200,18 @@ class I18nService {
     this._fallbacks = {};
     this._sharedFallbacks = undefined;
     this._storeTranslations("en", defaultEnTranslations);
+  }
+
+  /**
+   * @internal Mirrors Rails' reset_i18n_load_path pattern in tests: clears all
+   * translations including built-in defaults, leaving a truly empty backend.
+   */
+  resetEmpty(): void {
+    this._translations = {};
+    this._locale = "en";
+    this._defaultLocale = "en";
+    this._fallbacks = {};
+    this._sharedFallbacks = undefined;
   }
 
   private _fallbackChain(locale: string): string[] {
@@ -293,6 +319,7 @@ const messages: TranslationTree = {
   passwordTooLong: "is too long",
   in: "must be in %{count}",
   model_invalid: "Validation failed: %{errors}",
+  record_invalid: "Validation failed: %{errors}",
 };
 
 const defaultEnTranslations: TranslationTree = {

@@ -1,59 +1,158 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { Base } from "../index.js";
+import { I18n } from "@blazetrails/activemodel";
+import { RecordInvalid } from "../validations.js";
+import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+import type { DatabaseAdapter } from "../adapter.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("I18nGenerateMessageValidationTest", () => {
-  it.skip("generate message invalid with default message", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+  let adapter: DatabaseAdapter;
+
+  beforeAll(() => {
+    adapter = createTestAdapter();
   });
-  it.skip("generate message invalid with custom message", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+  beforeEach(async () => {
+    await defineSchema(adapter, { topics: { title: "string" } });
   });
-  it.skip("generate message taken with default message", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+  afterEach(() => {
+    I18n.reset();
   });
-  it.skip("generate message taken with custom message", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+  afterAll(async () => {
+    await dropAllTables(adapter);
+    vi.unstubAllEnvs();
   });
-  it.skip("RecordInvalid exception can be localized", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  function makeTopic() {
+    class Topic extends Base {
+      static {
+        this._tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    return new Topic();
+  }
+
+  it("generate message invalid with default message", () => {
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "invalid", { value: "title" })).toBe("is invalid");
   });
-  it.skip("RecordInvalid exception translation falls back to the :errors namespace", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("generate message invalid with custom message", () => {
+    const topic = makeTopic();
+    expect(
+      topic.errors.generateMessage("title", "invalid", {
+        message: "custom message %{value}",
+        value: "title",
+      }),
+    ).toBe("custom message title");
   });
-  it.skip("translation for 'taken' can be overridden", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("generate message taken with default message", () => {
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+      "has already been taken",
+    );
   });
-  it.skip("translation for 'taken' can be overridden in activerecord scope", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("generate message taken with custom message", () => {
+    const topic = makeTopic();
+    expect(
+      topic.errors.generateMessage("title", "taken", {
+        message: "custom message %{value}",
+        value: "title",
+      }),
+    ).toBe("custom message title");
   });
-  it.skip("translation for 'taken' can be overridden in activerecord model scope", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("RecordInvalid exception can be localized", () => {
+    const topic = makeTopic();
+    topic.errors.add("title", "invalid");
+    topic.errors.add("title", "blank");
+    expect(new RecordInvalid(topic).message).toBe(
+      "Validation failed: Title is invalid, Title can't be blank",
+    );
   });
-  it.skip("translation for 'taken' can be overridden in activerecord attributes scope", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("RecordInvalid exception translation falls back to the :errors namespace", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", { errors: { messages: { record_invalid: "fallback message" } } });
+    const topic = makeTopic();
+    topic.errors.add("title", "blank");
+    expect(new RecordInvalid(topic).message).toBe("fallback message");
   });
-  it.skip("activerecord attributes scope falls back to parent locale before it falls back to the :errors namespace", () => {
-    // BLOCKED: i18n — translation / message generation gap in i18n-generate-message-validation
-    // ROOT-CAUSE: translation.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in translation.ts; affects ~4–11 tests in i18n-generate-message-validation.test.ts
+
+  it("translation for 'taken' can be overridden", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", {
+      errors: { attributes: { title: { taken: "Custom taken message" } } },
+    });
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+      "Custom taken message",
+    );
+  });
+
+  it("translation for 'taken' can be overridden in activerecord scope", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", {
+      activerecord: { errors: { messages: { taken: "Custom taken message" } } },
+    });
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+      "Custom taken message",
+    );
+  });
+
+  it("translation for 'taken' can be overridden in activerecord model scope", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", {
+      activerecord: { errors: { models: { topic: { taken: "Custom taken message" } } } },
+    });
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+      "Custom taken message",
+    );
+  });
+
+  it("translation for 'taken' can be overridden in activerecord attributes scope", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", {
+      activerecord: {
+        errors: { models: { topic: { attributes: { title: { taken: "Custom taken message" } } } } },
+      },
+    });
+    const topic = makeTopic();
+    expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+      "Custom taken message",
+    );
+  });
+
+  it("activerecord attributes scope falls back to parent locale before it falls back to the :errors namespace", () => {
+    I18n.resetEmpty();
+    I18n.storeTranslations("en", {
+      activerecord: {
+        errors: { models: { topic: { attributes: { title: { taken: "custom en message" } } } } },
+      },
+    });
+    I18n.storeTranslations("en-US", {
+      errors: { messages: { taken: "generic en-US fallback" } },
+    });
+    I18n.setFallbacks({ "en-US": ["en-US", "en"] });
+
+    const topic = makeTopic();
+    I18n.withLocale("en-US", () => {
+      expect(topic.errors.generateMessage("title", "taken", { value: "title" })).toBe(
+        "custom en message",
+      );
+      expect(topic.errors.generateMessage("heading", "taken", { value: "heading" })).toBe(
+        "generic en-US fallback",
+      );
+    });
   });
 });

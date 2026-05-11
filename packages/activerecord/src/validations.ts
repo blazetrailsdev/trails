@@ -6,6 +6,7 @@
  * and overrides save/valid? to run validations with context awareness.
  */
 import type { ValidationContext } from "@blazetrails/activemodel";
+import { I18n } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
 /**
@@ -45,11 +46,17 @@ export class RecordInvalid extends ActiveRecordError {
   readonly record: any;
 
   constructor(record: any) {
-    const fullMessages = record.errors?.fullMessages;
-    const message =
-      Array.isArray(fullMessages) && fullMessages.length > 0
-        ? `Validation failed: ${fullMessages.join(", ")}`
-        : "Validation failed";
+    let message: string;
+    if (record) {
+      const errors = (record.errors?.fullMessages as string[] | undefined)?.join(", ") ?? "";
+      message = I18n.t("activerecord.errors.messages.record_invalid", {
+        errors,
+        defaults: [{ key: "errors.messages.record_invalid" }],
+        defaultValue: "Validation failed: %{errors}",
+      });
+    } else {
+      message = "Record invalid";
+    }
     super(message);
     this.name = "RecordInvalid";
     this.record = record;
