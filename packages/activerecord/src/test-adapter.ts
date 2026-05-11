@@ -555,7 +555,7 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   isNoDatabaseError(error: unknown): boolean {
-    return this.inner?.isNoDatabaseError?.(error) ?? false;
+    return this.inner.isNoDatabaseError(error);
   }
 
   private inner: DatabaseAdapter;
