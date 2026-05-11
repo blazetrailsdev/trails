@@ -2488,29 +2488,19 @@ describe("BasicsTest", () => {
     expect(after).not.toBe(before);
   });
   it.skip("marshal inspected round trip", () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
   it.skip("marshalling with associations 6 1", () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
   it.skip("marshalling with associations 7 1", () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
   it.skip("marshal between processes", () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
   it.skip("marshalling new record round trip with associations", () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
   it("attribute names on abstract class", () => {
     class AbstractModel extends Base {
@@ -2546,14 +2536,10 @@ describe("BasicsTest", () => {
     // BLOCKED: GVL — uses Ruby Thread.new to override connection_handler in a child thread and verify isolation; Node.js has no threads with shared object model
   });
   it.skip("new threads get default the default connection handler", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   });
   it.skip("changing a connection handler in a main thread does not poison the other threads", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   });
   it("ignored columns are not present in columns_hash", () => {
     class User extends Base {
@@ -2957,10 +2943,7 @@ describe("BasicsTest", () => {
   });
 
   it.skip("marshal round trip", async () => {
-    // BLOCKED: serialization — Ruby Marshal round-trip, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Marshal.dump/load; Ruby object serialization tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
-    // Ruby-only serialization feature
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — marshal
   });
 
   it("benchmark with log level", async () => {

@@ -115,9 +115,7 @@ function makeTransactionAwarePool(size: number = 5): ConnectionPool {
 
 describe("ConnectionPoolThreadTest", () => {
   it.skip("lock thread allow fiber reentrency", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
     /* needs fiber/thread emulation */
   });
 });
@@ -138,9 +136,7 @@ it("checkout after close", () => {
 });
 
 it.skip("released connection moves between threads", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread emulation */
 });
 
@@ -271,9 +267,7 @@ it.skip("reap inactive", () => {
 });
 
 it.skip("inactive are returned from dead thread", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -384,9 +378,7 @@ it("remove connection", () => {
 });
 
 it.skip("remove connection for thread", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -557,44 +549,32 @@ it.skip("pool sets connection schema cache", () => {
 });
 
 it.skip("concurrent connection establishment", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs concurrency */
 });
 
 it.skip("non bang disconnect and clear reloadable connections throw exception if threads dont return their conns", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections attempt to wait for threads to return their conns", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("disconnect and clear reloadable connections are able to preempt other waiting threads", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
 it.skip("clear reloadable connections creates new connections for waiting threads if necessary", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread tracking */
 });
 
@@ -610,9 +590,7 @@ it("connection pool stat", () => {
 });
 
 it.skip("public connections access threadsafe", () => {
-  // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-  // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-  // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+  // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/excluded-files.ts) — gvl
   /* needs thread safety */
 });
 
