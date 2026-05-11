@@ -264,6 +264,13 @@ export class AdditionalValue {
     return this.type.serialize(value);
   }
 
+  // visitArelNodesCasted calls resolveValueForDatabase(node.valueForDatabase())
+  // before quoting; returning this.value here surfaces the already-serialized
+  // ciphertext string so strict adapter quoters (SQLite, PG) can handle it.
+  get valueForDatabase(): unknown {
+    return this.value;
+  }
+
   toString(): string {
     return String(this.value);
   }

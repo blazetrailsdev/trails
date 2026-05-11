@@ -3414,7 +3414,7 @@ export class Relation<T extends Base> {
 
     const manager = this._buildEagerJoinManager(jd, basePk);
 
-    let sql = manager.toSql();
+    let sql = this._compileSelectSql(manager);
     if (this._annotations.length > 0) {
       const comments = this._annotations.map((c) => `/* ${c} */`).join(" ");
       sql = `${sql} ${comments}`;
@@ -3459,7 +3459,7 @@ export class Relation<T extends Base> {
       manager.optimizerHints(...this._optimizerHints);
     }
 
-    let sql = manager.toSql();
+    let sql = this._compileSelectSql(manager);
 
     // Replace FROM clause if from() was used
     if (!this._fromClause.isEmpty()) {
@@ -3474,16 +3474,22 @@ export class Relation<T extends Base> {
         // for names that would produce invalid SQL or risk injection.
         fromExpr = `(${subSql}) ${_safeAlias(name)}`;
       } else if (raw instanceof Nodes.Node) {
-        // Arel node (e.g. SelectManager#as → Nodes.TableAlias) — call toSql()
-        // so the visitor emits correct SQL (e.g. "(SELECT ...) ranked").
-        // Rails accepts Arel::Nodes::As from relation.arel.as("alias") here.
-        fromExpr = raw.toSql();
+        // Compile via the same visitor _compileSelectSql uses so identifier
+        // quoting stays dialect-consistent across the whole SELECT.
+        const sv = this._selectVisitor();
+        fromExpr = sv ? sv.compile(raw) : raw.toSql();
       } else if (alias) {
         fromExpr = `${raw} ${_safeAlias(alias)}`;
       } else {
         fromExpr = raw;
       }
-      sql = sql.replace(/FROM\s+"[^"]+"/, `FROM ${fromExpr}`);
+      // Match ANSI double-quoted or MySQL backtick-quoted identifiers, including
+      // schema-qualified chains ("schema"."table" or `schema`.`table`). The
+      // function-form replacement avoids $ mangling from special replacement sequences.
+      sql = sql.replace(
+        /FROM\s+(?:"[^"]+"|[`][^`]+[`])(?:\.(?:"[^"]+"|[`][^`]+[`]))*/,
+        () => `FROM ${fromExpr}`,
+      );
     }
 
     // Append SQL comments from annotate()
@@ -3525,6 +3531,28 @@ export class Relation<T extends Base> {
       | (Visitors.ArelQuoter & { arelVisitor?: Visitors.ToSql })
       | null;
     return adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined);
+  }
+
+  /**
+   * Returns the adapter's SELECT visitor when one is defined, or null.
+   *
+   * Real adapters (PG, SQLite, MySQL) expose `arelVisitor` — use it to get
+   * dialect-correct quoting. SchemaAdapter (test wrapper) returns undefined,
+   * so callers fall back to manager.toSql() / node.toSql() (global registry
+   * visitor = ANSI double-quotes), which avoids MySQL backticks in toSql()
+   * output and DML execution in MariaDB's default non-ANSI mode.
+   */
+  private _selectVisitor(): Visitors.ToSql | null {
+    return ((this._modelClass as any)._adapter?.arelVisitor as Visitors.ToSql | undefined) ?? null;
+  }
+
+  /**
+   * Compile a SelectManager's AST using the adapter-specific visitor when one
+   * is defined (real PG/SQLite/MySQL adapter), or manager.toSql() otherwise.
+   */
+  private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
+    const v = this._selectVisitor();
+    return v ? v.compile(manager.ast) : manager.toSql();
   }
 
   private _compileArelNode(node: Nodes.Node): string {

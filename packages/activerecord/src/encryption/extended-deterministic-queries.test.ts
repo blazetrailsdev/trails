@@ -246,6 +246,17 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
       await EncryptedBookWithUnencryptedDataOptedIn.where("id > 0").findBy({ name: "Dune" }),
     ).not.toBeNull();
   });
+
+  it("AdditionalValue in where clause survives toSql without throwing", () => {
+    // Regression: visitArelNodesCasted must resolve valueForDatabase() on
+    // AdditionalValue so strict adapter quoters don't receive a raw object.
+    const { EncryptedBook } = books;
+    const relation = EncryptedBook.where({ name: "Agile Web Development" });
+    // toSql() must not throw and must produce a WHERE fragment with a string value.
+    const sql = relation.toSql();
+    expect(typeof sql).toBe("string");
+    expect(sql).toMatch(/WHERE/i);
+  });
 });
 
 function makeType(deterministic = true): EncryptedAttributeType {

@@ -1446,7 +1446,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesCasted(node: Nodes.Casted | Nodes.Quoted): SQLString {
-    const value = node.valueForDatabase();
+    // Mirrors AbstractAdapter#quote: resolve valueForDatabase on the wrapped
+    // value before quoting, so types that carry a valueForDatabase getter
+    // (e.g. encrypted AdditionalValue) surface the serialized form.
+    const value = resolveValueForDatabase(node.valueForDatabase());
     if (this._extractBinds) {
       this.collector.addBind(value, this.bindBlock());
     } else {
