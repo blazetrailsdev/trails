@@ -81,6 +81,15 @@ import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 
+function toError(value: unknown): Error {
+  if (value instanceof Error) return value;
+  try {
+    return new Error(String(value));
+  } catch {
+    return new Error(Object.prototype.toString.call(value));
+  }
+}
+
 /**
  * PostgreSQL adapter — connects ActiveRecord to a real PostgreSQL database.
  *
@@ -717,7 +726,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this._maybeConfigureConnection(client);
       await this._maybeDrainOrphanedPreparedStatements(client);
     } catch (error) {
-      client.release(error instanceof Error ? error : new Error(String(error)));
+      client.release(toError(error));
       throw error;
     }
     return client;
@@ -1123,7 +1132,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const client = this._client;
       this._client = null;
       this._inTransaction = false;
-      client?.release(error instanceof Error ? error : undefined);
+      client?.release(toError(error));
       throw error;
     }
   }
@@ -1289,7 +1298,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const client = this._client;
       this._client = null;
       this._inTransaction = false;
-      client?.release(error instanceof Error ? error : undefined);
+      client?.release(toError(error));
       throw error;
     }
   }
