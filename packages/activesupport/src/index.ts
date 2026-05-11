@@ -314,6 +314,7 @@ export {
   getZone,
   setZone,
   resetZone,
+  isZoneExplicit,
   getZoneDefault,
   setZoneDefault,
   useZone,

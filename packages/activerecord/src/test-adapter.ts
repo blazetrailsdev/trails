@@ -497,6 +497,7 @@ export async function resetTestAdapterState(): Promise<void> {
   try {
     if (_sharedAdapter) {
       await dropAllTables(_sharedAdapter);
+      _sharedAdapter.schemaCache?.clear();
     }
     _createdTables.clear();
     _createdColumns.clear();
@@ -563,6 +564,11 @@ class SchemaAdapter implements DatabaseAdapter {
 
   get pool(): unknown {
     return this.inner?.pool ?? this.inner;
+  }
+
+  /** Expose the underlying adapter for tests that need adapter-specific behavior (e.g. columnTypes). */
+  get innerAdapter(): any {
+    return this.inner;
   }
 
   /** Expose created tables for test introspection. */

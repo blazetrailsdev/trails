@@ -37,6 +37,20 @@ describe("TimeZoneConverterTest", () => {
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
   });
 
+  it("cast wraps Temporal.ZonedDateTime in current zone", () => {
+    setZone("Eastern Time (US & Canada)");
+    const converter = new TimeZoneConverter(new DateTime());
+    // ZonedDateTime in UTC at 14:00
+    const zdt = Temporal.Instant.from("2024-06-15T14:00:00Z").toZonedDateTimeISO("UTC");
+    const result = converter.cast(zdt);
+    expect(result).toBeInstanceOf(TimeWithZone);
+    const twz = result as TimeWithZone;
+    // 14:00 UTC = 10:00 EDT (UTC-4 in summer)
+    expect(twz.hour).toBe(10);
+    expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
+    expect(twz.toI()).toBe(zdt.toInstant().epochMilliseconds / 1000);
+  });
+
   it("cast moves existing TimeWithZone to current zone", () => {
     const pacific = TimeZone.find("Pacific Time (US & Canada)");
     const eastern = TimeZone.find("Eastern Time (US & Canada)");

@@ -130,6 +130,18 @@ describe("DateTimeTest", () => {
     );
   });
 
+  it("cast accepts numeric-keyed multiparameter hash and returns Temporal.Instant", () => {
+    const type = new Types.DateTimeType();
+    const result = type.cast({ 1: 2024, 2: 6, 3: 15, 4: 10, 5: 30 });
+    expect(result).toBeInstanceOf(Temporal.Instant);
+    const zdt = (result as Temporal.Instant).toZonedDateTimeISO("UTC");
+    expect(zdt.year).toBe(2024);
+    expect(zdt.month).toBe(6);
+    expect(zdt.day).toBe(15);
+    expect(zdt.hour).toBe(10);
+    expect(zdt.minute).toBe(30);
+  });
+
   it("valueFromMultiparameterAssignment defaults hour/minute to 0 when only date parts given (P21)", () => {
     class Probe extends Types.DateTimeType {
       call(values: Record<number, unknown>) {

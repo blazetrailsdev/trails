@@ -5,7 +5,7 @@
  */
 import { getDefaultTimezone, setDefaultTimezone } from "./type/internal/timezone.js";
 import { Base } from "./base.js";
-import { getZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
 
 interface TimezoneConfig {
   /** Mirrors Rails' `default_timezone` — "utc" or "local". */
@@ -36,6 +36,7 @@ export async function withTimezoneConfig(
   const oldAwareAttributes = base.timeZoneAwareAttributes;
   const hadAwareTypes = "timeZoneAwareTypes" in base;
   const oldAwareTypes = base.timeZoneAwareTypes;
+  const wasZoneExplicit = isZoneExplicit();
   const oldZone = getZone();
 
   try {
@@ -59,12 +60,12 @@ export async function withTimezoneConfig(
     } else {
       delete base.timeZoneAwareTypes;
     }
-    if (oldZone !== getZone()) {
-      if (oldZone) {
-        setZone(oldZone);
-      } else {
-        resetZone();
-      }
+    if (!wasZoneExplicit) {
+      resetZone();
+    } else if (oldZone) {
+      setZone(oldZone);
+    } else {
+      resetZone();
     }
   }
 }

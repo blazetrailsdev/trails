@@ -55,6 +55,13 @@ export function resetZone(): void {
 }
 
 /**
+ * Returns true if Time.zone was explicitly set (not falling through to zone_default).
+ */
+export function isZoneExplicit(): boolean {
+  return _zone !== undefined;
+}
+
+/**
  * Get/set the zone_default (used when Time.zone is not explicitly set).
  */
 export function getZoneDefault(): TimeZone | null {
