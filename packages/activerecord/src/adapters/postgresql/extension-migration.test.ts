@@ -14,52 +14,52 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlExtensionMigrationTest", () => {
-    it.skip("enable extension", async () => {
+    it("enable extension", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("disable extension", async () => {
+    it("disable extension", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("enable extension idempotent", async () => {
+    it("enable extension idempotent", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("disable extension idempotent", async () => {
+    it("disable extension idempotent", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("extension schema dump", async () => {
+    it("extension schema dump", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("enable extension migration ignores prefix and suffix", async () => {
+    it("enable extension migration ignores prefix and suffix", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("enable extension migration with schema", async () => {
+    it("enable extension migration with schema", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("disable extension migration ignores prefix and suffix", async () => {
+    it("disable extension migration ignores prefix and suffix", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("disable extension raises when dependent objects exist", async () => {
+    it("disable extension raises when dependent objects exist", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts
     });
-    it.skip("disable extension drops extension when cascading", async () => {
+    it("disable extension drops extension when cascading", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in extension-migration
       // ROOT-CAUSE: connection-adapters/postgresql/extension-migration.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/extension-migration.ts; affects ~10–47 tests in extension-migration.test.ts

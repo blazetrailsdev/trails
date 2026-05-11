@@ -417,6 +417,82 @@ export abstract class Migration {
         }
         break;
       }
+      case "changeColumnComment": {
+        const [ccTable, ccCol, ccOpts] = args as [string, string, { from?: unknown; to: unknown }];
+        if (!ccOpts || typeof ccOpts !== "object" || !("from" in ccOpts)) {
+          throw new IrreversibleMigration(
+            "Cannot reverse changeColumnComment without from/to options",
+          );
+        }
+        await this.changeColumnComment(ccTable, ccCol, { from: ccOpts.to, to: ccOpts.from });
+        break;
+      }
+      case "changeTableComment": {
+        const [ctTable, ctOpts] = args as [string, { from?: unknown; to: unknown }];
+        if (!ctOpts || typeof ctOpts !== "object" || !("from" in ctOpts)) {
+          throw new IrreversibleMigration(
+            "Cannot reverse changeTableComment without from/to options",
+          );
+        }
+        await this.changeTableComment(ctTable, { from: ctOpts.to, to: ctOpts.from });
+        break;
+      }
+      case "enableExtension": {
+        const [extName, extOpts] = args as [string, Record<string, unknown>?];
+        await this.disableExtension(extName, extOpts);
+        break;
+      }
+      case "disableExtension": {
+        const [dextName, dextOpts] = args as [string, Record<string, unknown>?];
+        await this.enableExtension(dextName, dextOpts);
+        break;
+      }
+      case "createEnum": {
+        const [enumName, enumValues] = args as [string, string[]];
+        await this.dropEnum(enumName, enumValues);
+        break;
+      }
+      case "dropEnum": {
+        const [deEnumName, deValues] = args as [string, string[] | undefined];
+        if (!deValues) {
+          throw new IrreversibleMigration("Cannot reverse dropEnum without a list of enum values");
+        }
+        await this.createEnum(deEnumName, deValues);
+        break;
+      }
+      case "renameEnumValue": {
+        const [revName, revOpts] = args as [string, { from: string; to: string }];
+        await this.renameEnumValue(revName, { from: revOpts.to, to: revOpts.from });
+        break;
+      }
+      case "addUniqueConstraint": {
+        const [ucTable, ucColumn, ucOpts] = args as [
+          string,
+          string | string[] | undefined,
+          Record<string, unknown>?,
+        ];
+        if (ucOpts?.["usingIndex"]) {
+          throw new IrreversibleMigration(
+            "add_unique_constraint is not reversible if given a using_index.",
+          );
+        }
+        await this.removeUniqueConstraint(ucTable, ucColumn, ucOpts);
+        break;
+      }
+      case "removeUniqueConstraint": {
+        const [rucTable, rucColumn, rucOpts] = args as [
+          string,
+          string | string[] | undefined,
+          Record<string, unknown>?,
+        ];
+        if (!rucColumn) {
+          throw new IrreversibleMigration(
+            "remove_unique_constraint is only reversible if given a column_name.",
+          );
+        }
+        await this.addUniqueConstraint(rucTable, rucColumn, rucOpts);
+        break;
+      }
       default:
         throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
     }
@@ -649,6 +725,101 @@ export abstract class Migration {
     }
     await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
   }
+  async changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: string | null | { from?: unknown; to?: unknown },
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("changeColumnComment", [tableName, columnName, commentOrChanges]);
+      return;
+    }
+    await this.schema.changeColumnComment(tableName, columnName, commentOrChanges as string | null);
+  }
+
+  async changeTableComment(
+    tableName: string,
+    commentOrChanges: string | null | { from?: unknown; to?: unknown },
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("changeTableComment", [tableName, commentOrChanges]);
+      return;
+    }
+    await this.schema.changeTableComment(tableName, commentOrChanges as string | null);
+  }
+
+  async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("enableExtension", [name, options]);
+      return;
+    }
+    await (this.connection as any).enableExtension(name, options);
+  }
+
+  async disableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("disableExtension", [name, options]);
+      return;
+    }
+    await (this.connection as any).disableExtension(name, options);
+  }
+
+  async createEnum(
+    name: string,
+    values: string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("createEnum", [name, values, options]);
+      return;
+    }
+    await (this.connection as any).createEnum(name, values, options);
+  }
+
+  async dropEnum(
+    name: string,
+    values?: string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("dropEnum", [name, values, options]);
+      return;
+    }
+    await (this.connection as any).dropEnum(name, values, options);
+  }
+
+  async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("renameEnumValue", [name, options]);
+      return;
+    }
+    await (this.connection as any).renameEnumValue(name, options);
+  }
+
+  async addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("addUniqueConstraint", [tableName, columnName, options]);
+      return;
+    }
+    await (this.connection as any).addUniqueConstraint(tableName, columnName, options);
+  }
+
+  async removeUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[],
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("removeUniqueConstraint", [tableName, columnName, options]);
+      return;
+    }
+    await (this.connection as any).removeUniqueConstraint(tableName, columnName, options);
+  }
+
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     if (this._recording) {
       this._recorder.record("addTimestamps", [tableName, options]);

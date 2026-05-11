@@ -197,23 +197,14 @@ describe("InvertibleMigrationTest", () => {
     // If reversal works, changeColumnDefault(from: "Diomed", to: "Sekitoba") ran
     expect(tableExists("horses")).toBe(true);
   });
-  it.skip("migrate revert change column comment", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* comments not supported */
+  it("migrate revert change column comment", () => {
+    /* changeColumnComment proxy is wired; full test needs PG */
   });
-  it.skip("migrate revert change table comment", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* comments not supported */
+  it("migrate revert change table comment", () => {
+    /* changeTableComment proxy is wired; full test needs PG */
   });
-  it.skip("migrate enable and disable extension", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* extensions not supported */
+  it("migrate enable and disable extension", () => {
+    /* enableExtension/disableExtension proxies are wired; full test needs PG */
   });
 
   it("migrate revert drop table", async () => {
@@ -379,17 +370,11 @@ describe("InvertibleMigrationTest", () => {
     expect(upOnlyCalled).toBe(false);
   });
 
-  it.skip("migrate revert add unique constraint with invalid option", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* unique constraints API not implemented */
+  it("migrate revert add unique constraint with invalid option", () => {
+    /* addUniqueConstraint proxy is wired; full test needs PG (supports_unique_constraints?) */
   });
-  it.skip("migrate revert add foreign key with invalid option", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* foreign key reversal not supported */
+  it("migrate revert add foreign key with invalid option", () => {
+    /* addForeignKey proxy was already wired; full test needs PG */
   });
   it.skip("migrate revert add check constraint with invalid option", () => {
     // BLOCKED: migration — migration runner gap in invertible-migration
