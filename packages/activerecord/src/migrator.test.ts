@@ -15,7 +15,7 @@ import {
 } from "./migration.js";
 import { resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
-import { ExecutionStrategy } from "./migration/execution-strategy.js";
+import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -577,17 +577,15 @@ describe("MigratorTest", () => {
     class LoggingStrategy extends ExecutionStrategy {
       async exec(
         direction: "up" | "down",
-        migration: {
-          up(a?: DatabaseAdapter): Promise<void>;
-          down(a?: DatabaseAdapter): Promise<void>;
-        },
+        migration: MigrationLike,
         a: DatabaseAdapter,
       ): Promise<void> {
         log.push(`before:${direction}`);
+        migration.connection = a;
         if (direction === "up") {
-          await migration.up(a);
+          await migration.up();
         } else {
-          await migration.down(a);
+          await migration.down();
         }
         log.push(`after:${direction}`);
       }

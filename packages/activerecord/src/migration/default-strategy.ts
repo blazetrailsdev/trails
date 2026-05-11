@@ -21,10 +21,11 @@ export class DefaultStrategy extends ExecutionStrategy {
   ): Promise<void> {
     this.migration = migration;
     this._adapter = adapter;
+    migration.connection = adapter;
     if (direction === "up") {
-      await migration.up(adapter);
+      await migration.up();
     } else {
-      await migration.down(adapter);
+      await migration.down();
     }
   }
 

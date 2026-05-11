@@ -61,32 +61,42 @@ function discoverMigrations(
           version: match[1],
           name: camelize(match[2].replace(/-/g, "_")),
           filename: file.path,
-          migration: (): MigrationLike => ({
-            async up(adapter) {
-              const content = vfs.read(file.path)?.content;
-              if (!content) throw new Error(`File not found: ${file.path}`);
-              await executeCode(content);
-              const reg = getMigrations().find((m) => m.version === match![1]);
-              if (!reg) {
-                throw new Error(
-                  `Migration ${match![1]} from ${file.path} did not register after execution`,
-                );
-              }
-              await (await reg.migration()).up(adapter);
-            },
-            async down(adapter) {
-              const content = vfs.read(file.path)?.content;
-              if (!content) throw new Error(`File not found: ${file.path}`);
-              await executeCode(content);
-              const reg = getMigrations().find((m) => m.version === match![1]);
-              if (!reg) {
-                throw new Error(
-                  `Migration ${match![1]} from ${file.path} did not register after execution`,
-                );
-              }
-              await (await reg.migration()).down(adapter);
-            },
-          }),
+          migration: (): MigrationLike => {
+            const m: MigrationLike = {
+              connection: undefined,
+              async up() {
+                const adapter = m.connection;
+                const content = vfs.read(file.path)?.content;
+                if (!content) throw new Error(`File not found: ${file.path}`);
+                await executeCode(content);
+                const reg = getMigrations().find((r) => r.version === match![1]);
+                if (!reg) {
+                  throw new Error(
+                    `Migration ${match![1]} from ${file.path} did not register after execution`,
+                  );
+                }
+                const inner = await reg.migration();
+                inner.connection = adapter;
+                await inner.up();
+              },
+              async down() {
+                const adapter = m.connection;
+                const content = vfs.read(file.path)?.content;
+                if (!content) throw new Error(`File not found: ${file.path}`);
+                await executeCode(content);
+                const reg = getMigrations().find((r) => r.version === match![1]);
+                if (!reg) {
+                  throw new Error(
+                    `Migration ${match![1]} from ${file.path} did not register after execution`,
+                  );
+                }
+                const inner = await reg.migration();
+                inner.connection = adapter;
+                await inner.down();
+              },
+            };
+            return m;
+          },
         },
       ];
     });

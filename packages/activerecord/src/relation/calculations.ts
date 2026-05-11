@@ -11,6 +11,7 @@
 import { Nodes, Table } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import type { AdapterName } from "../adapter.js";
+import type { JoinDependency } from "../associations/join-dependency.js";
 import { buildJoinDependencies } from "./query-methods.js";
 
 /**
@@ -562,8 +563,7 @@ export function typeFor(rel: CalculationRelation, field: string): unknown {
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
-  // @todo tighten to JoinDependency[] once test stubs migrate to real instances
-  joinDependencies?: Iterable<Iterable<{ modelClass?: { attributeTypes?: unknown } }>>,
+  joinDependencies?: JoinDependency[],
 ): unknown {
   const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
   for (const jd of deps) {

@@ -55,14 +55,17 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
       name,
       filename: filePath,
       migration: () => {
-        const loader = {
-          async up(adapter?: import("@blazetrails/activerecord").DatabaseAdapter): Promise<void> {
+        const loader: import("@blazetrails/activerecord").MigrationLike = {
+          connection: undefined,
+          async up(): Promise<void> {
+            const adapter = loader.connection;
             if (!adapter) throw new Error("migration-loader: adapter is required for up()");
             const MigrationClass = await loadMigrationClass(filePath);
             const instance = new MigrationClass();
             await instance.run(adapter, "up");
           },
-          async down(adapter?: import("@blazetrails/activerecord").DatabaseAdapter): Promise<void> {
+          async down(): Promise<void> {
+            const adapter = loader.connection;
             if (!adapter) throw new Error("migration-loader: adapter is required for down()");
             const MigrationClass = await loadMigrationClass(filePath);
             const instance = new MigrationClass();
