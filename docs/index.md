@@ -52,7 +52,6 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 | [`globalid-plan.md`](globalid-plan.md)                                   | P2       | M    | GID-0 vendor done; GID-1+ port plan. Early.                                                                                                            |
 | [`trailties-plan.md`](trailties-plan.md)                                 | P2       | XL   | Phase 0 done. Greenfield from Phase 1 onward — Paths, Initializable, generators, Engine, Application — ~30 PRs minimum.                                |
 | [`ci-improvement-plan.md`](ci-improvement-plan.md)                       | P2       | M    | Phase 0 mostly shipped. Phase 1 is the real work: composite setup action, shared build artifact, SQLite parallelism. Phase 2 = matrix + DB-per-worker. |
-| [`ar-query-parity-gap-plan.md`](ar-query-parity-gap-plan.md)             | P2       | S    | Single remaining gap tracked in `scripts/parity/canonical/query-known-gaps.json`.                                                                      |
 | [`sqlite-driver-abstraction-plan.md`](sqlite-driver-abstraction-plan.md) | P2       | S    | PR M / 4 / 5 / 7 shipped. Mostly archival; minor residual.                                                                                             |
 | [`browser-compat-plan.md`](browser-compat-plan.md)                       | P2       | S    | BC-3/3b shipped. One remaining eager `pg` import in `postgresql/temporal-type-parsers.ts`.                                                             |
 
