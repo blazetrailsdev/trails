@@ -110,6 +110,30 @@ const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();
 const _storeAccessorsModules = new WeakMap<typeof Base, Set<string>>();
 
 /**
+ * Intermediate prototype objects inserted into the prototype chain so that
+ * store accessors can be overridden on modelClass.prototype with `super`.
+ * Mirrors Rails: Module.new { include … } inserted via _store_accessors_module.
+ */
+const _storeModuleProtos = new WeakMap<typeof Base, object>();
+
+/**
+ * Returns (creating if needed) the intermediate prototype that holds store
+ * accessor descriptors for a model class. On first call the intermediate
+ * object is spliced into the chain between modelClass.prototype and its
+ * current parent so that user overrides on modelClass.prototype can call super.
+ *
+ * @internal
+ */
+function getOrCreateStoreModuleProto(modelClass: typeof Base): object {
+  if (_storeModuleProtos.has(modelClass)) return _storeModuleProtos.get(modelClass)!;
+  const currentParent = Object.getPrototypeOf(modelClass.prototype) as object;
+  const storeModule = Object.create(currentParent);
+  Object.setPrototypeOf(modelClass.prototype, storeModule);
+  _storeModuleProtos.set(modelClass, storeModule);
+  return storeModule;
+}
+
+/**
  * Returns (creating if needed) the store-accessor module for a model class.
  * Mirrors: ActiveRecord::Store::ClassMethods#_store_accessors_module
  */
@@ -312,13 +336,14 @@ export function storeAccessor(
       accessorName = `${accessorName}_${suf}`;
     }
 
-    // Capture `modelClass` at definition time so subclass instances still resolve
-    // the correct accessor even when `record.constructor` differs from the declaring class.
+    // Install on the intermediate storeModule prototype so that user overrides
+    // on modelClass.prototype can reach the store accessor via `super`.
     // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
     storeAccessorsModule(modelClass).add(accessorName);
 
     const declaringClass = modelClass;
-    Object.defineProperty(modelClass.prototype, accessorName, {
+    const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
+    Object.defineProperty(storeModuleProto, accessorName, {
       get: function (this: Base) {
         return readStoreAttribute(this, attribute, accessor, declaringClass);
       },
@@ -409,27 +434,10 @@ export function storeAccessorFor(
   // Check IndifferentCoder registered by store() (covers both standalone and Base.store()) — returns IndifferentHashAccessor.
   const coder = getStoreCoder(modelClass, storeAttribute);
   if (coder) return coder.accessor();
-  // Last resort: confirm the column was declared via store() and use IndifferentHashAccessor.
-  if (!_hasStoredAttribute(modelClass, storeAttribute)) {
-    throw new ConfigurationError(
-      `the column '${storeAttribute}' has not been configured as a store. ` +
-        `Please make sure the column is declared via store() or use a structured column type.`,
-    );
-  }
-  return IndifferentHashAccessor;
-}
-
-// Direct ancestry walk — short-circuits on first hit without building the full
-// merged map that storedAttributes() produces. Stops at Function.prototype
-// consistent with other prototype-chain walks in this codebase.
-function _hasStoredAttribute(klass: typeof Base, name: string): boolean {
-  let cls: typeof Base | null = klass;
-  while (cls && typeof cls === "function" && cls !== Function.prototype) {
-    const local = _storedAttributes.get(cls);
-    if (local && Object.prototype.hasOwnProperty.call(local, name)) return true;
-    cls = Object.getPrototypeOf(cls) as typeof Base | null;
-  }
-  return false;
+  throw new ConfigurationError(
+    `the column '${storeAttribute}' has not been configured as a store. ` +
+      `Please make sure the column is declared via store() or use a structured column type.`,
+  );
 }
 
 /**

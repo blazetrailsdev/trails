@@ -4,7 +4,12 @@
  */
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, store, storedAttributes, localStoredAttributes } from "./index.js";
-import { IndifferentHashAccessor, getStoreCoder, storeAccessorFor } from "./store.js";
+import {
+  IndifferentHashAccessor,
+  getStoreCoder,
+  storeAccessorFor,
+  storeAccessor,
+} from "./store.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -122,11 +127,28 @@ describe("StoreTest", () => {
     expect((u as any).theme).toBe("new");
   });
 
-  it.skip("overriding a read accessor using super", () => {
-    // BLOCKED: type — store accessor / serialized column type gap
-    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
-    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
-    /* needs Ruby-style super in JS property accessor */
+  it("overriding a read accessor using super", () => {
+    const a2 = freshAdapter();
+    class SongUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    store(SongUser, "settings", { accessors: ["color"] });
+    // The store accessor lives on the storeModule (intermediate proto below SongUser.prototype).
+    // We can override on SongUser.prototype and delegate to it — the TS analog of Ruby `super`.
+    const storeModule = Object.getPrototypeOf(SongUser.prototype) as object;
+    const baseGet = Object.getOwnPropertyDescriptor(storeModule, "color")!.get!;
+    Object.defineProperty(SongUser.prototype, "color", {
+      get() {
+        return baseGet.call(this) ?? "red";
+      },
+      configurable: true,
+    });
+    const u = new SongUser({ name: "John", settings: JSON.stringify({ color: null }) });
+    expect((u as any).color).toBe("red");
   });
 
   it("updating the store populates the changed array correctly", () => {
@@ -293,11 +315,31 @@ describe("StoreTest", () => {
     expect((u as any).theme).toBe("custom:blue");
   });
 
-  it.skip("overriding a write accessor using super", () => {
-    // BLOCKED: type — store accessor / serialized column type gap
-    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
-    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
-    /* needs Ruby-style super */
+  it("overriding a write accessor using super", () => {
+    const a2 = freshAdapter();
+    class SongUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("settings", "string");
+        this.adapter = a2;
+      }
+    }
+    store(SongUser, "settings", { accessors: ["color"] });
+    const storeModule = Object.getPrototypeOf(SongUser.prototype) as object;
+    const baseGet = Object.getOwnPropertyDescriptor(storeModule, "color")!.get!;
+    const baseSet = Object.getOwnPropertyDescriptor(storeModule, "color")!.set!;
+    Object.defineProperty(SongUser.prototype, "color", {
+      get() {
+        return baseGet.call(this);
+      },
+      set(v: unknown) {
+        baseSet.call(this, "blue");
+      },
+      configurable: true,
+    });
+    const u = new SongUser({ name: "John" });
+    (u as any).color = "yellow";
+    expect((u as any).color).toBe("blue");
   });
 
   it("preserve store attributes data in HashWithIndifferentAccess format without any conversion", () => {
@@ -327,11 +369,16 @@ describe("StoreTest", () => {
     expect((u as any).theme).toBe("ocean");
   });
 
-  it.skip("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", () => {
-    // BLOCKED: type — store accessor / serialized column type gap
-    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
-    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
-    /* Ruby-specific YAML behavior */
+  it("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", async () => {
+    const { HashWithIndifferentAccess: HWIA } = await import("@blazetrails/activesupport");
+    const { User } = makeModel();
+    const u = new User({ name: "test", settings: "somedata" });
+    (u as any).theme = "low";
+    const settings = u.settings as any;
+    expect(settings).toBeInstanceOf(HWIA);
+    expect((u as any).theme).toBe("low");
+    // Original non-hash data is lost — only the written key remains
+    expect(settings.get("language")).toBeUndefined();
   });
 
   it("accessing attributes not exposed by accessors encoded with JSON", () => {
@@ -570,11 +617,21 @@ describe("StoreTest", () => {
     expect(attrs["settings"]).toEqual(["theme", "language"]);
   });
 
-  it.skip("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
-    // BLOCKED: type — store accessor / serialized column type gap
-    // ROOT-CAUSE: store.ts#store or StoreType not fully implementing Rails store accessor semantics
-    // SCOPE: ~30 LOC fix in store.ts; affects ~4 tests in store.test.ts
-    /* needs type checking */
+  it("store_accessor raises an exception if the column is not either serializable or a structured type", () => {
+    const a2 = freshAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a2;
+      }
+    }
+    // storeAccessor on a plain string column (no store() called → no coder wired)
+    storeAccessor(Item, "name", { accessors: ["color"] });
+    const item = new Item({ name: "Alice" });
+    expect(() => (item as any).color).toThrow("has not been configured as a store");
+    expect(() => {
+      (item as any).color = "blue";
+    }).toThrow("has not been configured as a store");
   });
 
   it("reading store attributes through accessors with prefix", () => {
