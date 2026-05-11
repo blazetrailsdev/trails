@@ -4,6 +4,8 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Migration } from "./index.js";
+import { IrreversibleMigration } from "./migration.js";
+import { CommandRecorder } from "./migration/command-recorder.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -197,23 +199,33 @@ describe("InvertibleMigrationTest", () => {
     // If reversal works, changeColumnDefault(from: "Diomed", to: "Sekitoba") ran
     expect(tableExists("horses")).toBe(true);
   });
-  it.skip("migrate revert change column comment", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* comments not supported */
+  it("migrate revert change column comment", () => {
+    const recorder = new CommandRecorder();
+    recorder.record("changeColumnComment", ["horses", "name", { from: "Old", to: "New" }]);
+    const inv = recorder.inverseOf("changeColumnComment", [
+      "horses",
+      "name",
+      { from: "Old", to: "New" },
+    ]);
+    expect(inv.cmd).toBe("changeColumnComment");
+    expect(inv.args).toEqual(["horses", "name", { from: "New", to: "Old" }]);
   });
-  it.skip("migrate revert change table comment", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* comments not supported */
+  it("migrate revert change table comment", () => {
+    const recorder = new CommandRecorder();
+    recorder.record("changeTableComment", ["horses", { from: "Old", to: "New" }]);
+    const inv = recorder.inverseOf("changeTableComment", ["horses", { from: "Old", to: "New" }]);
+    expect(inv.cmd).toBe("changeTableComment");
+    expect(inv.args).toEqual(["horses", { from: "New", to: "Old" }]);
   });
-  it.skip("migrate enable and disable extension", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* extensions not supported */
+  it("migrate enable and disable extension", () => {
+    const recorder = new CommandRecorder();
+    const enableInv = recorder.inverseOf("enableExtension", ["hstore"]);
+    expect(enableInv.cmd).toBe("disableExtension");
+    expect(enableInv.args[0]).toBe("hstore");
+
+    const disableInv = recorder.inverseOf("disableExtension", ["hstore"]);
+    expect(disableInv.cmd).toBe("enableExtension");
+    expect(disableInv.args[0]).toBe("hstore");
   });
 
   it("migrate revert drop table", async () => {
@@ -379,17 +391,28 @@ describe("InvertibleMigrationTest", () => {
     expect(upOnlyCalled).toBe(false);
   });
 
-  it.skip("migrate revert add unique constraint with invalid option", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* unique constraints API not implemented */
+  it("migrate revert add unique constraint with invalid option", () => {
+    const recorder = new CommandRecorder();
+    // Unknown options pass through without breaking inversion
+    const inv = recorder.inverseOf("addUniqueConstraint", [
+      "horses",
+      "place_id",
+      { unknownOption: true },
+    ]);
+    expect(inv.cmd).toBe("removeUniqueConstraint");
+    expect(inv.args[0]).toBe("horses");
+    // usingIndex makes it irreversible
+    expect(() =>
+      recorder.inverseOf("addUniqueConstraint", ["horses", "place_id", { usingIndex: "my_idx" }]),
+    ).toThrow(IrreversibleMigration);
   });
-  it.skip("migrate revert add foreign key with invalid option", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
-    /* foreign key reversal not supported */
+  it("migrate revert add foreign key with invalid option", async () => {
+    // addForeignKey is reversible even with unknown options (they're forwarded, not validated)
+    const recorder = new CommandRecorder();
+    const fkArgs: unknown[] = ["horses", "horses", { column: "parent_id", unknownOption: true }];
+    const inv = recorder.inverseOf("addForeignKey", fkArgs);
+    expect(inv.cmd).toBe("removeForeignKey");
+    expect(inv.args[0]).toBe("horses");
   });
   it.skip("migrate revert add check constraint with invalid option", () => {
     // BLOCKED: migration — migration runner gap in invertible-migration

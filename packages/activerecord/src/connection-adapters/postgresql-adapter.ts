@@ -2224,7 +2224,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return Number(rows[0].count) > 0;
   }
 
-  async enableExtension(name: string): Promise<void> {
+  async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
     const parts = String(name).split(".");
     const extName = parts[parts.length - 1];
     const schema = parts.length > 1 ? parts[parts.length - 2] : null;
@@ -2238,6 +2238,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name: string,
     options: { force?: "cascade"; schema?: string } = {},
   ): Promise<void> {
+    // Mirrors Rails: _schema, name = name.to_s.split(".").values_at(-2, -1)
+    // Extensions are global in PG — DROP uses only extname, not schema.
+    const parts = String(name).split(".");
+    const extName = parts[parts.length - 1];
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     if (options.schema) {
       await this.withClient(async (client) => {
@@ -2245,7 +2249,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         const originalSearchPath = rows[0]?.search_path as string;
         await client.query(`SELECT set_config('search_path', $1, false)`, [options.schema]);
         try {
-          await client.query(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(name)}${cascade}`);
+          await client.query(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
         } finally {
           await client.query(`SELECT set_config('search_path', $1, false)`, [
             originalSearchPath ?? "public",
@@ -2253,7 +2257,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         }
       });
     } else {
-      await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(name)}${cascade}`);
+      await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
     }
   }
 
@@ -2847,6 +2851,45 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   async changeTableComment(tableName: string, comment: string | null): Promise<void> {
     await this.exec(`COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`);
+  }
+
+  /** @internal */
+  async validateConstraint(tableName: string, constraintName: string): Promise<void> {
+    await this.exec(
+      `ALTER TABLE ${this.quoteTableName(tableName)} VALIDATE CONSTRAINT ${this.quoteIdentifier(constraintName)}`,
+    );
+  }
+
+  async validateCheckConstraint(
+    tableName: string,
+    nameOrOptions: string | { name: string },
+  ): Promise<void> {
+    const name = typeof nameOrOptions === "string" ? nameOrOptions : nameOrOptions.name;
+    await this.validateConstraint(tableName, name);
+  }
+
+  async validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options?: { name?: string },
+  ): Promise<void> {
+    if (options?.name) {
+      await this.validateConstraint(fromTable, options.name);
+      return;
+    }
+    if (!toTable) throw new ArgumentError("validateForeignKey requires toTable or options.name");
+    const fks = await this.foreignKeys(fromTable);
+    const { schema: toSchema, table: toTbl } = this.parseSchemaQualifiedName(toTable);
+    const fk = (fks as any[]).find((f) => {
+      const { schema: fSchema, table: fTbl } = this.parseSchemaQualifiedName(String(f.toTable));
+      if (fTbl !== toTbl) return false;
+      // When the FK record has no schema prefix (PostgreSQL omits "public." when it
+      // is on the search path), treat it as matching any schema lookup or "public".
+      if (!fSchema) return !toSchema || toSchema === "public";
+      return fSchema === toSchema;
+    });
+    if (!fk) throw new ArgumentError(`No foreign key found from ${fromTable} to ${toTable}`);
+    await this.validateConstraint(fromTable, fk.name);
   }
 
   typeToSql(
@@ -3476,7 +3519,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Enum types
   // ---------------------------------------------------------------------------
 
-  async createEnum(name: string, values: string[]): Promise<void> {
+  async createEnum(
+    name: string,
+    values: string[],
+    _options?: Record<string, unknown>,
+  ): Promise<void> {
     const { schema, table: enumName } = this.parseSchemaQualifiedName(name);
     const qualifiedName = schema
       ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(enumName)}`
