@@ -1,6 +1,6 @@
 # Docs index
 
-Snapshot 2026-04-30. Every plan/audit/tracker doc in `docs/`, grouped by what
+Snapshot 2026-05-11. Every plan/tracker doc in `docs/`, grouped by what
 it's for, with current priority and rough remaining-work size.
 
 Priority legend:
@@ -45,19 +45,16 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 
 ## Plans / backlogs
 
-| Doc                                                          | Priority | Work | Notes                                                                                                                                                  |
-| ------------------------------------------------------------ | -------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`arel-alignment-plan.md`](arel-alignment-plan.md)           | P1       | M    | Behavioral fidelity (api:compare already 100%). 17 PRs remaining across 4 waves; in active progress.                                                   |
-| [`test-compare-100-plan.md`](test-compare-100-plan.md)       | P1       | XL   | AR tests at 71.8% (5872/8177). Phase 1 has ~30 single-feature PRs; Phases 2–3 cover PG / MySQL adapter polish (~450 tests).                            |
-| [`trailties-plan.md`](trailties-plan.md)                     | P2       | XL   | Phase 0 done. Greenfield from Phase 1 onward — Paths, Initializable, generators, Engine, Application — ~30 PRs minimum.                                |
-| [`ci-improvement-plan.md`](ci-improvement-plan.md)           | P2       | M    | Phase 0 mostly shipped. Phase 1 is the real work: composite setup action, shared build artifact, SQLite parallelism. Phase 2 = matrix + DB-per-worker. |
-| [`ar-query-parity-gap-plan.md`](ar-query-parity-gap-plan.md) | P2       | S    | Single remaining gap tracked in `scripts/parity/canonical/query-known-gaps.json`.                                                                      |
-
-## Design proposals (not started)
-
-| Doc                                          | Priority | Work | Notes                                                                                                               |
-| -------------------------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------------------------------- |
-| [`quoting-refactor.md`](quoting-refactor.md) | P3       | M    | Thread adapter through every `quote`/`quoteIdentifier` call site. Design; standalone-function pattern still in use. |
+| Doc                                                                      | Priority | Work | Notes                                                                                                                                                  |
+| ------------------------------------------------------------------------ | -------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`test-compare-100-plan.md`](test-compare-100-plan.md)                   | P1       | XL   | Strategy + BLOCKED vocab + workflow reference for AR test:compare un-skip work. Current slot tracker in `activerecord-100-plan.md`.                    |
+| [`explicit-test-schema-plan.md`](explicit-test-schema-plan.md)           | P1       | M    | `defineSchema` + `AR_NO_AUTO_SCHEMA` test-infra migration. TS-4 batches in progress.                                                                   |
+| [`globalid-plan.md`](globalid-plan.md)                                   | P2       | M    | GID-0 vendor done; GID-1+ port plan. Early.                                                                                                            |
+| [`trailties-plan.md`](trailties-plan.md)                                 | P2       | XL   | Phase 0 done. Greenfield from Phase 1 onward — Paths, Initializable, generators, Engine, Application — ~30 PRs minimum.                                |
+| [`ci-improvement-plan.md`](ci-improvement-plan.md)                       | P2       | M    | Phase 0 mostly shipped. Phase 1 is the real work: composite setup action, shared build artifact, SQLite parallelism. Phase 2 = matrix + DB-per-worker. |
+| [`ar-query-parity-gap-plan.md`](ar-query-parity-gap-plan.md)             | P2       | S    | Single remaining gap tracked in `scripts/parity/canonical/query-known-gaps.json`.                                                                      |
+| [`sqlite-driver-abstraction-plan.md`](sqlite-driver-abstraction-plan.md) | P2       | S    | PR M / 4 / 5 / 7 shipped. Mostly archival; minor residual.                                                                                             |
+| [`browser-compat-plan.md`](browser-compat-plan.md)                       | P2       | S    | BC-3/3b shipped. One remaining eager `pg` import in `postgresql/temporal-type-parsers.ts`.                                                             |
 
 ## Verification harnesses
 
@@ -65,20 +62,10 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 | -------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | [`parity-verification.md`](parity-verification.md) | P1       | —    | Schema + query parity pipelines (`pnpm parity:schema` / `pnpm parity:query`). Both shipped; reference for adding fixtures + format bumps. |
 
-## Audits (point-in-time snapshots)
+## Postmortems / archived
 
-These are read-once references. Don't actively prune them — they're a record
-of what was true at the audit date and inform plan PRs cited in their wake.
+These docs are explicitly archived — diagnosis or strategy captured for future readers; not active plans. Don't add new work here.
 
-| Doc                                            | Date       | Notes                                                                  |
-| ---------------------------------------------- | ---------- | ---------------------------------------------------------------------- |
-| [`activemodel-audit.md`](activemodel-audit.md) | 2026-04-26 | Source for activemodel parity PRs; large (569 lines). Mostly executed. |
-
----
-
-## What to delete next
-
-If you're looking for low-hanging cleanup:
-
-- `activemodel-audit.md` is mostly executed — could become a deletion candidate after one more sweep against current state.
-- `frontiers/` is a separate workstream (WS1/2/3) outside the package work — leave alone.
+| Doc                                                          | Notes                                                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [`ar-test-parallelism-plan.md`](ar-test-parallelism-plan.md) | ✅ shipped 2026-05-05/06 (#1223–#1228). Self-labeled archived; kept as diagnosis postmortem. |

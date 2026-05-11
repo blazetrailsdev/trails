@@ -207,10 +207,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * Note on `quotedTrue`/`quotedFalse`: Rails MySQL does NOT override
    * these — it inherits `"TRUE"`/`"FALSE"` from `abstract/quoting.rb:166`.
    * Trails MySQL's per-module standalone returns `"1"`/`"0"` (a
-   * pre-existing trails-vs-Rails divergence flagged in
-   * `docs/quoting-refactor.md`; not addressed here). We override on
-   * the adapter so `quote(true)` and `quotedTrue()` agree (both `"1"`
-   * via the per-module standalone). Without the override the adapter
+   * pre-existing trails-vs-Rails divergence; not addressed here). We
+   * override on the adapter so `quote(true)` and `quotedTrue()` agree
+   * (both `"1"` via the per-module standalone). Without the override
+   * the adapter
    * would inherit AbstractAdapter#quotedTrue (`"TRUE"`) while
    * `quote()` returns `"1"`, breaking call sites that switch between
    * the two through the Quoting interface.
