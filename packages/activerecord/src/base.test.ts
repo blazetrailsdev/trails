@@ -1861,33 +1861,35 @@ describe("BasicsTest", () => {
       }
     }
     await defineSchema(adapter, {
-      pres_tz_topics: { written_on: "datetime", bonus_time: "string" },
+      pres_tz_topics: { written_on: "datetime", bonus_time: "time" },
     });
+    const inst1 = Temporal.Instant.from("2003-07-16T14:28:11.223300Z");
+    const inst2 = Temporal.Instant.from("2003-07-16T14:28:11.009900Z");
+    const inst3 = Temporal.Instant.from("2003-07-16T14:28:11.129346Z");
     const t1 = await Topic.create({
-      written_on: Temporal.Instant.from("2003-07-16T14:28:11.223300Z"),
+      written_on: inst1,
       bonus_time: Temporal.PlainTime.from("11:30:00"),
     });
-    const t2 = await Topic.create({
-      written_on: Temporal.Instant.from("2003-07-16T14:28:11.009900Z"),
-    });
-    const t3 = await Topic.create({
-      written_on: Temporal.Instant.from("2003-07-16T14:28:11.129346Z"),
-    });
+    const t2 = await Topic.create({ written_on: inst2 });
+    const t3 = await Topic.create({ written_on: inst3 });
     const topic1 = await Topic.find(t1.id);
     expect(topic1.readAttribute("bonus_time")).toBeInstanceOf(Temporal.PlainTime);
     const wo1 = topic1.readAttribute("written_on") as Temporal.Instant;
     expect(wo1).toBeInstanceOf(Temporal.Instant);
+    expect(wo1.epochNanoseconds).toBe(inst1.epochNanoseconds);
     const zdt1 = wo1.toZonedDateTimeISO("UTC");
     expect(zdt1.second).toBe(11);
     expect(zdt1.millisecond * 1000 + zdt1.microsecond).toBe(223300);
-    const zdt2 = (
-      (await Topic.find(t2.id)).readAttribute("written_on") as Temporal.Instant
-    ).toZonedDateTimeISO("UTC");
-    expect(zdt2.millisecond * 1000 + zdt2.microsecond).toBe(9900);
-    const zdt3 = (
-      (await Topic.find(t3.id)).readAttribute("written_on") as Temporal.Instant
-    ).toZonedDateTimeISO("UTC");
-    expect(zdt3.millisecond * 1000 + zdt3.microsecond).toBe(129346);
+    const wo2 = (await Topic.find(t2.id)).readAttribute("written_on") as Temporal.Instant;
+    expect(wo2.epochNanoseconds).toBe(inst2.epochNanoseconds);
+    expect(
+      wo2.toZonedDateTimeISO("UTC").millisecond * 1000 + wo2.toZonedDateTimeISO("UTC").microsecond,
+    ).toBe(9900);
+    const wo3 = (await Topic.find(t3.id)).readAttribute("written_on") as Temporal.Instant;
+    expect(wo3.epochNanoseconds).toBe(inst3.epochNanoseconds);
+    expect(
+      wo3.toZonedDateTimeISO("UTC").millisecond * 1000 + wo3.toZonedDateTimeISO("UTC").microsecond,
+    ).toBe(129346);
   });
   it("preserving time objects with local time conversion to default timezone utc", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
@@ -1946,7 +1948,12 @@ describe("BasicsTest", () => {
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
       expect(savedTime.utc().epochNanoseconds).toBe(utcMidnight.epochNanoseconds);
-      expect(savedTime.hour).toBe(19); // midnight UTC = 19:00 EST (UTC-5)
+      // Rails: saved_time.to_a == [0, 0, 19, 31, 12, 1999, 5, 365, false, "EST"]
+      const local1 = savedTime.utc().toZonedDateTimeISO("America/New_York");
+      expect(local1.year).toBe(1999);
+      expect(local1.month).toBe(12);
+      expect(local1.day).toBe(31);
+      expect(local1.hour).toBe(19);
     });
   });
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
@@ -1969,7 +1976,12 @@ describe("BasicsTest", () => {
       const saved = await Topic.find(topic.id);
       const savedTime = saved.readAttribute("written_on") as TimeWithZone;
       expect(savedTime.utc().epochNanoseconds).toBe(cstMidnight.epochNanoseconds);
-      expect(savedTime.hour).toBe(1); // 06:00 UTC = 01:00 EST (UTC-5)
+      // Rails: saved_time.to_a == [0, 0, 1, 1, 1, 2000, 6, 1, false, "EST"]
+      const local2 = savedTime.utc().toZonedDateTimeISO("America/New_York");
+      expect(local2.year).toBe(2000);
+      expect(local2.month).toBe(1);
+      expect(local2.day).toBe(1);
+      expect(local2.hour).toBe(1);
     });
   });
   it("time zone aware attribute with default timezone utc on utc can be created", async () => {

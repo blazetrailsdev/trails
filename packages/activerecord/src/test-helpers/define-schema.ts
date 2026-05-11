@@ -11,6 +11,7 @@ export type PrimitiveColumnSpec =
   | "boolean"
   | "datetime"
   | "date"
+  | "time"
   | "binary"
   | "json";
 
@@ -81,6 +82,7 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   boolean: "boolean",
   datetime: "datetime",
   date: "date",
+  time: "time",
   binary: "binary",
   json: "json",
 };
@@ -92,6 +94,7 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   date: "string",
+  time: "string",
   binary: "string",
   json: "string",
 };
@@ -102,6 +105,7 @@ const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_PG,
   datetime: "string",
   date: "string",
+  time: "string",
   binary: "string",
   json: "string",
 };
