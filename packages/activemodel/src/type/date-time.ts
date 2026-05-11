@@ -76,6 +76,30 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     }
   }
 
+  override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
+    if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
+      return (
+        this._nsAtPrecision(oldValue.epochNanoseconds) !==
+        this._nsAtPrecision(newValue.epochNanoseconds)
+      );
+    }
+    return oldValue !== newValue;
+  }
+
+  // Truncate epoch nanoseconds to column precision, matching _applySecondsPrecision /
+  // Temporal.toString() floor-style sub-second truncation. Used by isChanged so that
+  // sub-precision nanosecond noise from Temporal.Now (when precision=null) doesn't
+  // produce spurious dirty marks after serialize → cast round-trips.
+  private _nsAtPrecision(ns: bigint): bigint {
+    const raw = this.precision ?? 6;
+    const p = Number.isInteger(raw) && raw >= 0 && raw <= 9 ? raw : 6;
+    const mod = 10n ** BigInt(9 - p);
+    let subsec = ns % 1_000_000_000n;
+    if (subsec < 0n) subsec += 1_000_000_000n;
+    const roundedOff = subsec % mod;
+    return ns - roundedOff;
+  }
+
   serialize(value: unknown): string | null {
     const cast = this.cast(value);
     // Sentinels are Postgres-specific; base type returns null. The Postgres
