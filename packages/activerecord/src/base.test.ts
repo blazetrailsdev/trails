@@ -834,7 +834,7 @@ describe("BasicsTest", () => {
   });
 
   it.skip("model classes with matching names", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // BLOCKED: unknown — Ruby module namespace / constant lookup semantics not translatable
   });
 
   it.skip("copy table with id", () => {

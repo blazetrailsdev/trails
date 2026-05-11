@@ -2,9 +2,9 @@ import { describe, it } from "vitest";
 
 describe("TouchTest", () => {
   it.skip("many updates", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // BLOCKED: mixin — needs mixins table fixture (lft, updated_at, created_at) + vi.useFakeTimers for travel
   });
   it.skip("create turned off", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+    // BLOCKED: mixin — needs mixins table fixture; recordTimestamps=false path is implemented
   });
 });

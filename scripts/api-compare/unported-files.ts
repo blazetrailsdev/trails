@@ -232,12 +232,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
       "No JS equivalent for namespace-scoped class discovery.",
   },
-  {
-    testFile: "mixin_test.rb",
-    tests: ["many updates", "create turned off"],
-    reason:
-      "Ruby singleton_class / Module#prepend mixin semantics — no JS equivalent for per-instance class mutation.",
-  },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
     testFile: "connection_pool_test.rb",
