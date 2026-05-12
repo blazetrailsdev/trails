@@ -412,15 +412,33 @@ describe("ReflectionTest", () => {
     expect((ref as ThroughReflection).source).toBe("hotProfile");
     expect(ref!.isThrough()).toBe(true);
   });
-  it.skip("column for attribute", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("column for attribute", () => {
+    class Topic2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    expect((Topic2 as any).columnForAttribute("title").type).toBe("string");
+    expect((Topic2 as any).columnForAttribute("approved").type).toBe("boolean");
+    const nullCol = (Topic2 as any).columnForAttribute("attribute_that_doesnt_exist");
+    expect(nullCol.name).toBe("attribute_that_doesnt_exist");
+    expect(nullCol.type).toBeNull();
   });
-  it.skip("columns for attribute", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("columns for attribute", () => {
+    class Topic2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    const hash = (Topic2 as any).columnsHash();
+    expect(hash["title"].name).toBe((Topic2 as any).columnForAttribute("title").name);
+    expect(hash["title"].type).toBe((Topic2 as any).columnForAttribute("title").type);
+    expect(hash["body"].name).toBe((Topic2 as any).columnForAttribute("body").name);
+    expect(hash["body"].type).toBe((Topic2 as any).columnForAttribute("body").type);
   });
   it("reflection class for", () => {
     const { Author, Book } = makeModels();
@@ -719,11 +737,18 @@ describe("ReflectionTest", () => {
     expect(colNames).toContain("author_name");
     expect(colNames).toContain("body");
   });
-  it.skip("non existent types are identity types", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* needs unknown type fallback to identity type */
+  it("non existent types are identity types", () => {
+    class Topic2 extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    const type = (Topic2 as any).typeForAttribute("attribute_that_doesnt_exist");
+    const object = { sentinel: true };
+    expect(type.deserialize(object)).toBe(object);
+    expect(type.cast(object)).toBe(object);
+    expect(type.serialize(object)).toBe(object);
   });
   it("reflection klass for nested class name", () => {
     const adp = freshAdapter();
@@ -766,15 +791,38 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(Person, "addresses");
     expect(ref!.klass).toBe(Address);
   });
-  it.skip("reflection klass with same demodularized different modularized name", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("reflection klass with same demodularized different modularized name", () => {
+    const adp = freshAdapter();
+    class NestedUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class AdminUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("Nested::User", NestedUser);
+    registerModel("Admin::User", AdminUser);
+    Associations.hasOne.call(AdminUser, "user", { className: "Nested::User" });
+    const ref = reflectOnAssociation(AdminUser, "user");
+    expect(ref!.klass).toBe(NestedUser);
   });
-  it.skip("reflection klass with same modularized name", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("reflection klass with same modularized name", () => {
+    const adp = freshAdapter();
+    class NestedNestedUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("NestedUser", NestedNestedUser);
+    Associations.hasMany.call(NestedNestedUser, "nestedUsers", {});
+    const ref = reflectOnAssociation(NestedNestedUser, "nestedUsers");
+    expect(ref!.klass).toBe(NestedNestedUser);
   });
   it("reflect on all autosave associations", () => {
     class Ship extends Base {
@@ -932,10 +980,24 @@ describe("ReflectionTest", () => {
     // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
     // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
   });
-  it.skip("class for class name", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("class for class name", () => {
+    class Firm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Client extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Firm", Firm);
+    registerModel("Client", Client);
+    expect(() => Associations.hasMany.call(Firm, "clients", { className: Client as any })).toThrow(
+      /expecting a string/,
+    );
   });
   it.skip("class for source type", () => {
     // BLOCKED: associations — reflection feature gap (macros / options inspection)
