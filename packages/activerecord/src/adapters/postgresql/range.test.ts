@@ -33,6 +33,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         num_range numrange,
         ts_range tsrange,
         tstz_range tstzrange,
+        ts_ranges tsrange[],
+        tstz_ranges tstzrange[],
         int4_range int4range,
         int8_range int8range,
         float_range floatrange,
@@ -553,8 +555,47 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
       expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
-    it.skip("timezone array awareness tzrange", () => {
-      // DEFERRED to follow-up PR: requires tstz_ranges tstzrange[] column in setup
+    it("timezone array awareness tzrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+
+      const fromStr = "2020-06-15T10:00:00-07:00";
+      const toStr = "2020-06-15T11:00:00-07:00";
+      const fromInstant = Temporal.Instant.from(fromStr);
+      const toInstant = Temporal.Instant.from(toStr);
+
+      // [exclusive, inclusive, endless, beginless]
+      const ranges = [
+        new Range(fromStr, toStr, true),
+        new Range(fromStr, toStr, false),
+        new Range(fromStr, null, true),
+        new Range(null, toStr, false),
+      ];
+      const r = new PostgresqlRangesTz({ tstz_ranges: ranges });
+      const pre = r.tstz_ranges as Range[];
+      expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
+      expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect((pre[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        fromInstant.epochMilliseconds,
+      );
+
+      await r.saveBang();
+      await r.reload();
+      const post = r.tstz_ranges as Range[];
+      expect(post).toHaveLength(4);
+      expect(post[0].begin).toBeInstanceOf(TimeWithZone);
+      expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect((post[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        fromInstant.epochMilliseconds,
+      );
+      expect((post[0].end as TimeWithZone).utc().epochMilliseconds).toBe(
+        toInstant.epochMilliseconds,
+      );
+      expect(post[2].begin).toBeInstanceOf(TimeWithZone);
+      expect(post[2].end).toBeNull();
+      expect(post[3].begin).toBeNull();
+      expect(post[3].end).toBeInstanceOf(TimeWithZone);
     });
     it("create tstzrange", async () => {
       // Rails: Time.parse("2010-01-01 14:30:00 +0100")...Time.parse("2011-02-02 14:30:00 CDT") → UTC-normalised
@@ -745,8 +786,46 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((range2.end as TimeWithZone).utc().epochMilliseconds).toBe(instant.epochMilliseconds);
       expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
     });
-    it.skip("timezone array awareness tsrange", () => {
-      // DEFERRED to follow-up PR: requires ts_ranges tsrange[] column in setup
+    it("timezone array awareness tsrange", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+
+      const fromStr = "2020-06-15T10:00:00-07:00";
+      const toStr = "2020-06-15T11:00:00-07:00";
+      const fromInstant = Temporal.Instant.from(fromStr);
+      const toInstant = Temporal.Instant.from(toStr);
+
+      const ranges = [
+        new Range(fromStr, toStr, true),
+        new Range(fromStr, toStr, false),
+        new Range(fromStr, null, true),
+        new Range(null, toStr, false),
+      ];
+      const r = new PostgresqlRangesTz({ ts_ranges: ranges });
+      const pre = r.ts_ranges as Range[];
+      expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
+      expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect((pre[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        fromInstant.epochMilliseconds,
+      );
+
+      await r.saveBang();
+      await r.reload();
+      const post = r.ts_ranges as Range[];
+      expect(post).toHaveLength(4);
+      expect(post[0].begin).toBeInstanceOf(TimeWithZone);
+      expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect((post[0].begin as TimeWithZone).utc().epochMilliseconds).toBe(
+        fromInstant.epochMilliseconds,
+      );
+      expect((post[0].end as TimeWithZone).utc().epochMilliseconds).toBe(
+        toInstant.epochMilliseconds,
+      );
+      expect(post[2].begin).toBeInstanceOf(TimeWithZone);
+      expect(post[2].end).toBeNull();
+      expect(post[3].begin).toBeNull();
+      expect(post[3].end).toBeInstanceOf(TimeWithZone);
     });
     it("create tstzrange preserve usec", async () => {
       // Rails: Time.parse("2010-01-01 14:30:00.670277 +0100")...Time.parse("2011-02-02 14:30:00.745125 CDT")
@@ -795,8 +874,30 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       expect(r.ts_range).toBeNull();
     });
-    it.skip("timezone awareness tsrange preserve usec", () => {
-      // DEFERRED to follow-up PR (LOC budget): same infrastructure as basic tests; µs precision
+    it("timezone awareness tsrange preserve usec", async () => {
+      // Rails: time_string = "2017-09-26 07:30:59.132451 -0700"; assert time.usec > 0
+      // Verifies sub-millisecond (µs) precision is preserved through the PG round-trip.
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      const timeString = "2017-09-26T07:30:59.132451-07:00";
+      const instant = Temporal.Instant.from(timeString);
+      // Confirm the instant has sub-millisecond precision (µs component = 451 µs)
+      expect(instant.toString()).toContain(".132451");
+
+      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
+      const range1 = r.ts_range as Range;
+      expect(range1.begin).toBeInstanceOf(TimeWithZone);
+      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      expect((range1.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
+
+      await r.saveBang();
+      await r.reload();
+      const range2 = r.ts_range as Range;
+      expect(range2.begin).toBeInstanceOf(TimeWithZone);
+      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      // µs precision round-trips through PostgreSQL tsrange
+      expect((range2.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))

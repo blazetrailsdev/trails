@@ -236,9 +236,8 @@ describe("AssociationValidationTest", () => {
     expect(r.errors.fullMessagesFor("topic")).toEqual(["Topic is invalid"]);
   });
   it.skip("validates associated with create context", () => {
-    // BLOCKED: validation — validator behavior gap in association-validation
-    // ROOT-CAUSE: validations/associated.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in validations/associated.ts; affects ~4–11 tests in association-validation.test.ts
-    /* needs update! and replies.create — complex persistence operations */
+    // BLOCKED: CollectionProxy.create — Rails uses t.replies.create(...) which requires
+    // a live has_many CollectionProxy with .create support. The validation logic in
+    // associated.ts is correct; the blocker is CollectionProxy.create, not associated.ts.
   });
 });

@@ -5,7 +5,30 @@
  * Builds a query against the model's table to check for existing records
  * with the same value, optionally scoped to other columns.
  */
-import { EachValidator } from "@blazetrails/activemodel";
+import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
+
+/**
+ * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
+ * and from UniquenessValidator#constructor (instantiation time). Mirrors Rails'
+ * ArgumentError raised in UniquenessValidator#initialize for non-symbol :scope values.
+ * @internal
+ */
+function validateScopeOption(scope: unknown): void {
+  if (scope == null) return;
+  const scopes = Array.isArray(scope) ? scope : [scope];
+  if (!scopes.every((s) => typeof s === "string")) {
+    let scopeRepr: string;
+    try {
+      scopeRepr = JSON.stringify(scope) ?? String(scope);
+    } catch {
+      scopeRepr = String(scope);
+    }
+    throw new ArgumentError(
+      `${scopeRepr} is not a supported format for :scope option. ` +
+        "Pass a string or an array of strings instead.",
+    );
+  }
+}
 
 /**
  * Register a deferred uniqueness validation to run on save (since uniqueness
@@ -23,6 +46,8 @@ export function validatesUniqueness(
     caseSensitive?: boolean;
   } = {},
 ): void {
+  // Validate options eagerly to match Rails' ArgumentError at declaration time.
+  validateScopeOption(options.scope);
   const klass = this as { _asyncValidations?: Array<unknown> };
   if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
     klass._asyncValidations = [...(klass._asyncValidations ?? [])];
@@ -46,16 +71,7 @@ export class UniquenessValidator extends EachValidator {
           "Pass a callable instead: `conditions: () => where({ approved: true })`",
       );
     }
-    const scope = options.scope;
-    if (scope != null) {
-      const scopes = Array.isArray(scope) ? scope : [scope];
-      if (!scopes.every((s) => typeof s === "string")) {
-        throw new Error(
-          `${scope} is not a supported format for :scope option. ` +
-            "Pass a string or an array of strings instead: `scope: 'userId'`",
-        );
-      }
-    }
+    validateScopeOption(options.scope);
     if (
       Object.prototype.hasOwnProperty.call(options, "caseSensitive") &&
       typeof options.caseSensitive !== "boolean"

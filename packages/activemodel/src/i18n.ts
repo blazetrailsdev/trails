@@ -322,11 +322,15 @@ const messages: TranslationTree = {
   record_invalid: "Validation failed: %{errors}",
 };
 
+// Rails only defines record_invalid under errors.messages, not activemodel.errors.messages.
+const amMessages = deepDup(messages) as Record<string, unknown>;
+delete amMessages["record_invalid"];
+
 const defaultEnTranslations: TranslationTree = {
   activemodel: {
     errors: {
       format: "%{attribute} %{message}",
-      messages: deepDup(messages) as TranslationTree,
+      messages: amMessages as TranslationTree,
     },
   },
   errors: {

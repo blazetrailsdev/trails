@@ -833,12 +833,6 @@ describe("BasicsTest", () => {
     expect(u.readAttribute("name")).toBe(null);
   });
 
-  it.skip("model classes with matching names", () => {
-    // BLOCKED: unknown — Ruby module namespace / constant lookup semantics not translatable
-    // ROOT-CAUSE: Node.js has no Ruby Module namespace for matching class names by constant path
-    // SCOPE: ~0 LOC fix; no matching test in Rails base_test.rb — likely permanent
-  });
-
   it.skip("copy table with id", () => {
     // BLOCKED: schema — SQLite copy_table DDL not implemented
     // ROOT-CAUSE: connection-adapters/sqlite3/schema-statements.ts#copyTable not implemented
