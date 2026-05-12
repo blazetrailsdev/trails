@@ -694,6 +694,10 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
+  schemaStatements(host?: DatabaseAdapter): SchemaStatements {
+    return new SchemaStatements((host ?? this) as unknown as DatabaseAdapter);
+  }
+
   get schemaCache(): SchemaCache {
     // Phase 11 made `pool.schemaCache` return a BoundSchemaReflection
     // (the Rails-shaped handle DatabaseTasks.dumpSchemaCache expects).

@@ -84,8 +84,8 @@ export interface SchemaStatements {
   primaryKeys(tableName: string): Promise<string[]>;
   dropTable(
     ...args:
-      | [...tableNames: string[], options: { ifExists?: boolean; force?: "cascade" }]
-      | string[]
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
   ): Promise<void>;
   validateConstraint(tableName: string, constraintName: string): Promise<void>;
   validateCheckConstraint(tableName: string, name: string): Promise<void>;

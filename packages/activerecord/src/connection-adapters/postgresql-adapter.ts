@@ -52,6 +52,8 @@ import {
   SQLWarning,
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
+import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
+import type { SchemaStatements } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -3864,27 +3866,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.createDatabase(name, options);
   }
 
+  override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
+    return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
+  }
+
   async dropTable(
     ...args:
-      | [...tableNames: string[], options: { ifExists?: boolean; force?: "cascade" }]
-      | string[]
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
   ): Promise<void> {
-    let tableNames: string[];
-    let options: { ifExists?: boolean; force?: "cascade" } = {};
-    const last = args[args.length - 1];
-    if (last !== null && last !== undefined && typeof last === "object") {
-      tableNames = args.slice(0, -1) as string[];
-      options = last as { ifExists?: boolean; force?: "cascade" };
-    } else {
-      tableNames = args as string[];
-    }
-    if (tableNames.length === 0) {
-      throw new Error("dropTable requires at least one table name");
-    }
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const quoted = tableNames.map((t) => this.quoteTableName(t)).join(", ");
-    await this.exec(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+    // Rails: PostgreSQLAdapter has no separate `drop_table` — the method comes
+    // solely from the included `PostgreSQL::SchemaStatements` module. Delegate
+    // here so schema-cache eviction + single-statement CASCADE behavior lives
+    // in one place (PostgreSQLSchemaStatements#dropTable).
+    await this.schemaStatements().dropTable(...args);
   }
 
   async currentDatabase(): Promise<string> {

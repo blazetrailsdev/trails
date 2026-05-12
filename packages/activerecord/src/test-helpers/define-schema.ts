@@ -115,7 +115,7 @@ export async function defineSchema(
   schema: Schema,
   opts?: DefineSchemaOpts,
 ): Promise<void> {
-  const ss = new SchemaStatements(adapter);
+  const ss = adapter.schemaStatements ? adapter.schemaStatements() : new SchemaStatements(adapter);
   const order = resolveReferences(schema);
   const typeMap =
     adapter.adapterName === "postgres"

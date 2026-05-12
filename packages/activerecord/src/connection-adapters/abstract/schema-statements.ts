@@ -140,31 +140,35 @@ export class SchemaStatements {
     }
   }
 
+  /**
+   * Splits Rails' `*table_names, **options` splat into a tuple. Shared by
+   * SchemaStatements#dropTable and its dialect overrides so a new option
+   * added here is automatically picked up by subclasses.
+   * @internal
+   */
+  protected _splitTableNamesAndOptions(
+    args: ReadonlyArray<unknown>,
+  ): [string[], { ifExists?: boolean; force?: "cascade" }] {
+    const last = args[args.length - 1];
+    if (last !== null && last !== undefined && typeof last === "object") {
+      return [args.slice(0, -1) as string[], last as { ifExists?: boolean; force?: "cascade" }];
+    }
+    return [args as string[], {}];
+  }
+
   async dropTable(
     ...args:
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
   ): Promise<void> {
-    let tableNames: string[];
-    let options: { ifExists?: boolean; force?: "cascade" } = {};
-    const last = args[args.length - 1];
-    if (last !== null && last !== undefined && typeof last === "object") {
-      tableNames = args.slice(0, -1) as string[];
-      options = last as { ifExists?: boolean; force?: "cascade" };
-    } else {
-      tableNames = args as string[];
-    }
+    const [tableNames, options] = this._splitTableNamesAndOptions(args);
     if (tableNames.length === 0) {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    // Rails adds CASCADE only in the PG adapter (pg/schema_statements.rb#drop_table).
-    // SchemaStatements wraps the adapter but calls executeMutation directly, so the
-    // PG adapter's dropTable override is bypassed. Mirror Rails by checking adapterName here.
-    const cascade =
-      options.force === "cascade" && this.adapterName === "postgres" ? " CASCADE" : "";
     for (const name of tableNames) {
-      await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}${cascade}`);
+      this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
+      await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}`);
     }
   }
 

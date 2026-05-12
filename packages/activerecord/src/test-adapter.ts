@@ -568,6 +568,17 @@ class SchemaAdapter implements DatabaseAdapter {
     return this.inner?.schemaCache;
   }
 
+  schemaStatements() {
+    if (!this.inner.schemaStatements) {
+      throw new Error(
+        `SchemaAdapter.schemaStatements: wrapped ${this.inner.adapterName} does not implement schemaStatements()`,
+      );
+    }
+    // Pass `this` so the inner adapter constructs its SchemaStatements
+    // around the wrapper — preserves visibility of executeMutation spies.
+    return this.inner.schemaStatements(this);
+  }
+
   get pool(): unknown {
     return this.inner?.pool ?? this.inner;
   }

@@ -237,7 +237,7 @@ export abstract class Migration {
     const conn = this.connection;
     if (!this._schema || this._schemaConn !== conn) {
       assertSchemaAdapter(conn);
-      this._schema = new SchemaStatements(conn);
+      this._schema = conn.schemaStatements ? conn.schemaStatements() : new SchemaStatements(conn);
       this._schemaConn = conn;
     }
     return this._schema;
