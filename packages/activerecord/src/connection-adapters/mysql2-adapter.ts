@@ -8,7 +8,12 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { Version } from "./abstract-adapter.js";
-import { MismatchedForeignKey, NoDatabaseError, NotImplementedError } from "../errors.js";
+import {
+  MismatchedForeignKey,
+  NoDatabaseError,
+  NotImplementedError,
+  SQLWarning,
+} from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
@@ -427,8 +432,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           : await conn.query(driverSql, driverBinds);
         const r = rows as Record<string, unknown>[];
         payload.row_count = Array.isArray(r) ? r.length : 0;
+        await this._handleWarningsOn(conn, driverSql);
         return r;
       } catch (e: any) {
+        if (e instanceof SQLWarning) {
+          payload.exception = e;
+          payload.exception_object = e;
+          throw e;
+        }
         // getConn() itself can throw (pool exhausted / connection
         // refused / closed pool); catching here lets subscribers see
         // acquisition failures as `payload.exception` too. Query-level
@@ -478,6 +489,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         this.dirtyCurrentTransaction();
         const info = result as mysql.ResultSetHeader;
         payload.row_count = info.affectedRows ?? 0;
+        await this._handleWarningsOn(conn, driverSql);
 
         // For INSERT, return the last inserted ID (or affected rows for multi-row)
         if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
@@ -490,6 +502,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // For UPDATE/DELETE, return affected rows
         return info.affectedRows;
       } catch (e: any) {
+        if (e instanceof SQLWarning) {
+          payload.exception = e;
+          payload.exception_object = e;
+          throw e;
+        }
         // Guard acquisition failures (pool exhausted / refused /
         // closed) so subscribers still see `payload.exception`. Driver
         // errors (ER_DUP_ENTRY etc.) are translated to Rails' typed
@@ -1307,6 +1324,75 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       });
     });
     return pool;
+  }
+
+  /**
+   * Query `SHOW COUNT(*) WARNINGS` to learn how many warnings the most
+   * recent statement on `conn` produced. SHOW statements do not reset the
+   * warning list (unlike a normal SELECT), so the subsequent SHOW WARNINGS
+   * still returns the rows.
+   *
+   * Exposed as a protected method so tests can stub it via `vi.spyOn` to
+   * exercise the "warning_count does not match returned warnings" branch.
+   * @internal
+   */
+  protected async _warningCount(conn: mysql.PoolConnection): Promise<number> {
+    const [rows] = await conn.query("SHOW COUNT(*) WARNINGS");
+    const row = (rows as Record<string, unknown>[])[0];
+    if (!row) return 0;
+    const v = Object.values(row)[0];
+    return typeof v === "number" ? v : Number(v) || 0;
+  }
+
+  /**
+   * Read pending warnings for `conn`, filter via {@link isWarningIgnored},
+   * and dispatch per the configured `dbWarningsAction`. Runs after every
+   * successful query in {@link execute}/{@link executeMutation} while the
+   * pool connection is still held — warnings are connection-scoped.
+   *
+   * Mirrors: AbstractMysqlAdapter#handle_warnings.
+   * @internal
+   */
+  protected async _handleWarningsOn(
+    conn: mysql.PoolConnection | undefined,
+    sql: string,
+  ): Promise<void> {
+    if (!conn) return;
+    const ctor = this.constructor as typeof Mysql2Adapter;
+    const action = ctor.dbWarningsAction;
+    if (!action || action === "ignore") return;
+    const count = await this._warningCount(conn);
+    if (count === 0) return;
+    const [rawRows] = await conn.query("SHOW WARNINGS");
+    let rows = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
+    if (rows.length === 0) {
+      rows = [
+        {
+          Level: "Warning",
+          Code: undefined,
+          Message: `Query had warning_count=${count} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+        },
+      ];
+    }
+    for (const row of rows) {
+      const level = row.Level ?? null;
+      const code = row.Code == null ? null : String(row.Code);
+      const message = row.Message ?? "";
+      const warning = new SQLWarning(message, code, level, sql);
+      if (this.isWarningIgnored({ level: level ?? undefined, code: code ?? undefined, message }))
+        continue;
+      if (action === "raise") throw warning;
+      if (action === "log") {
+        const logger = this.logger as { warn?: (msg: string) => void } | null;
+        const codeSuffix = code ? ` (${code})` : "";
+        const line = `[ActiveRecord::SQLWarning] ${message}${codeSuffix}`;
+        if (logger?.warn) logger.warn(line);
+        else console.warn(line);
+      }
+      // TODO(report): wire Rails.error.report(warning, handled: true) when ErrorReporter
+      // is exposed as a global singleton — same gap as PostgreSQLAdapter._flushWarnings.
+      if (typeof action === "function") action(warning);
+    }
   }
 }
 
