@@ -7,7 +7,10 @@
  */
 import type { Base } from "./base.js";
 import type { ValidationContextArg } from "./validations.js";
-import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
+import {
+  AssociationNotFoundError,
+  CompositePrimaryKeyMismatchError,
+} from "./associations/errors.js";
 import type { AssociationDefinition } from "./associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
@@ -23,6 +26,63 @@ function _guardKey(association: unknown): string {
   return String(association);
 }
 
+/**
+ * Returns the loaded Association instance for `name` (its `.target` may
+ * still be null in the negative-cache / preloaded-nil case — what matters
+ * here is that `isLoaded()` is true), or `null` when no cached data exists
+ * or the association name is unknown. Mirrors Rails'
+ * `association_instance_get(name)` read path used throughout autosave —
+ * `_cachedAssociations` / `_preloadedAssociations` are the storage backing,
+ * but lookups must go through the Association object so that subclass
+ * methods (`isUpdated`, `isStaleTarget`, `setInverseInstance`,
+ * `loadedBang`, etc.) are reachable.
+ *
+ * Configuration errors (`validateThroughReflection`, `resolveModel` for an
+ * unregistered target class, inverse-of validity, etc.) intentionally
+ * propagate to surface misconfiguration loudly, matching Rails'
+ * `Reflection#check_validity!` semantics. Only `AssociationNotFoundError`
+ * is caught — that is the case Rails' `association_instance_get` answers
+ * with a nil return.
+ *
+ * @internal
+ */
+function _loadedAssociation(record: any, name: string): any | null {
+  // Mirrors Rails' `association_instance_get(name)`. Always routes through
+  // `record.association(name)` so `syncAssociationInstance` re-pulls fresh
+  // target data from `_cachedAssociations` / `_preloadedAssociations` (our
+  // map-direct preloader writes in preloader/association.ts, relation.ts —
+  // Rails has no equivalent map shortcut; every preloader write lands in
+  // `@association_cache` via `association_instance_set`). Without the
+  // re-sync, an Association instance constructed before a later map write
+  // would surface stale target data here.
+  //
+  // Rails' helper never throws (only reads `@association_cache[name]`);
+  // ours can if the name is unknown. Only swallow `AssociationNotFoundError`
+  // (matches Rails' nil return for unknown names — `associations.rb:52-58`
+  // would raise it via `record.association(name)` but `association_instance_get`
+  // never does). Configuration errors from `validateThroughReflection`
+  // (through-reflection / inverse-of validity, `validate-through-reflection.ts`)
+  // must propagate so misconfiguration surfaces loudly, matching Rails'
+  // `Reflection#check_validity!`.
+  const existing = record.associationInstanceGet?.(name);
+  if (typeof record.association !== "function") {
+    return existing?.isLoaded?.() ? existing : null;
+  }
+  const hasCachedData =
+    record._cachedAssociations?.has(name) ||
+    record._preloadedAssociations?.has(name) ||
+    !!record._collectionProxies?.get?.(name)?.loaded ||
+    !!existing?.isLoaded?.();
+  if (!hasCachedData) return null;
+  try {
+    const inst = record.association(name);
+    return inst?.isLoaded?.() ? inst : null;
+  } catch (err) {
+    if (err instanceof AssociationNotFoundError) return null;
+    throw err;
+  }
+}
+
 const _nestedCheckInProgress = new WeakSet<object>();
 
 function _nestedRecordsChangedForAutosave(record: any): boolean {
@@ -32,11 +92,9 @@ function _nestedRecordsChangedForAutosave(record: any): boolean {
     const associations: AssociationDefinition[] = record.constructor._associations ?? [];
     for (const assoc of associations) {
       if (!assoc.options.autosave) continue;
-      const cached =
-        record._cachedAssociations?.get(assoc.name) ??
-        record._preloadedAssociations?.get(assoc.name);
-      if (!cached) continue;
-      const children: any[] = Array.isArray(cached) ? cached : [cached];
+      const inst = _loadedAssociation(record, assoc.name);
+      if (!inst || inst.target == null) continue;
+      const children: any[] = Array.isArray(inst.target) ? inst.target : [inst.target];
       if (
         children.some((c: any) =>
           typeof c.changedForAutosave === "function" ? c.changedForAutosave() : false,
@@ -213,12 +271,10 @@ export function validateAssociations(record: Base, context?: ValidationContextAr
       const isCollection = assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany";
       if (!isCollection && !assoc.options.autosave && assoc.options.validate !== true) continue;
 
-      const cached =
-        (record as any)._cachedAssociations?.get(assoc.name) ??
-        (record as any)._preloadedAssociations?.get(assoc.name);
-      if (!cached) continue;
+      const inst = _loadedAssociation(record, assoc.name);
+      if (!inst || inst.target == null) continue;
 
-      const records: Base[] = Array.isArray(cached) ? cached : [cached];
+      const records: Base[] = Array.isArray(inst.target) ? inst.target : [inst.target];
       for (const child of records) {
         if (typeof child.isDestroyed === "function" && child.isDestroyed()) continue;
         if (isMarkedForDestruction(child)) continue;
@@ -318,11 +374,8 @@ export async function autosaveAssociations(record: Base): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 async function autosaveAssociation(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const isLoaded =
-    (record as any)._cachedAssociations?.has(assoc.name) ||
-    (record as any)._preloadedAssociations?.has(assoc.name);
-  if (!isLoaded) return true;
-
+  // Each type-specific handler does its own `_loadedAssociation` lookup and
+  // short-circuits on a null target — no need for a dispatch-level gate.
   if (assoc.type === "hasMany") return autosaveHasMany(record, assoc);
   if (assoc.type === "hasOne") return autosaveHasOne(record, assoc);
   if (assoc.type === "belongsTo") return _autosaveBelongsTo(record, assoc);
@@ -331,10 +384,8 @@ async function autosaveAssociation(record: Base, assoc: AssociationDefinition): 
 }
 
 async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const cached =
-    (record as any)._cachedAssociations?.get(assoc.name) ??
-    (record as any)._preloadedAssociations?.get(assoc.name);
-  const children: Base[] = Array.isArray(cached) ? cached : [];
+  const inst = _loadedAssociation(record, assoc.name);
+  const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
 
   for (const child of children) {
     if (isMarkedForDestruction(child)) {
@@ -377,10 +428,9 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
 }
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const child =
-    (record as any)._cachedAssociations?.get(assoc.name) ??
-    (record as any)._preloadedAssociations?.get(assoc.name);
-  if (!child || !(child instanceof Object)) return true;
+  const inst = _loadedAssociation(record, assoc.name);
+  const child = inst?.target;
+  if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
 
   if (isMarkedForDestruction(childRecord)) {
@@ -422,10 +472,9 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
 }
 
 async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const associated =
-    (record as any)._cachedAssociations?.get(assoc.name) ??
-    (record as any)._preloadedAssociations?.get(assoc.name);
-  if (!associated || !(associated instanceof Object)) return true;
+  const inst = _loadedAssociation(record, assoc.name);
+  const associated = inst?.target;
+  if (!associated || Array.isArray(associated) || !(associated instanceof Object)) return true;
   const assocRecord = associated as Base;
 
   if (isMarkedForDestruction(assocRecord)) {
@@ -472,10 +521,8 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
 }
 
 async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const cached =
-    (record as any)._cachedAssociations?.get(assoc.name) ??
-    (record as any)._preloadedAssociations?.get(assoc.name);
-  const children: Base[] = Array.isArray(cached) ? cached : [];
+  const inst = _loadedAssociation(record, assoc.name);
+  const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
 
   for (const child of children) {
     if (isMarkedForDestruction(child)) {
@@ -534,9 +581,8 @@ export function isNestedRecordsChangedForAutosave(this: any): boolean {
 
 /** @internal */
 export function validateHasOneAssociation(this: any, reflection: any): void {
-  const record =
-    this._cachedAssociations?.get(reflection.name) ??
-    this._preloadedAssociations?.get(reflection.name);
+  const inst = _loadedAssociation(this, reflection.name);
+  const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   if (!(record.changedForAutosave?.() ?? false)) return;
   // Mirrors Rails: skip if the inverse belongs_to is currently validating or autosaving
@@ -546,11 +592,9 @@ export function validateHasOneAssociation(this: any, reflection: any): void {
       ? reflection.inverseOf()
       : (reflection.inverseOf ?? null);
   if (inverse) {
-    const inverseLoaded =
-      record._cachedAssociations?.has(inverse.name) ||
-      record._preloadedAssociations?.has(inverse.name);
+    const inverseInst = _loadedAssociation(record, inverse.name);
     if (
-      inverseLoaded &&
+      inverseInst &&
       (record.isValidatingBelongsToFor?.(inverse) || record.isAutosavingBelongsToFor?.(inverse))
     )
       return;
@@ -560,10 +604,9 @@ export function validateHasOneAssociation(this: any, reflection: any): void {
 
 /** @internal */
 export function validateBelongsToAssociation(this: any, reflection: any): void {
-  const record =
-    this._cachedAssociations?.get(reflection.name) ??
-    this._preloadedAssociations?.get(reflection.name);
-  if (!record || typeof record !== "object") return;
+  const inst = _loadedAssociation(this, reflection.name);
+  const record = inst?.target;
+  if (!record || typeof record !== "object" || Array.isArray(record)) return;
   if (!(record.changedForAutosave?.() ?? false)) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
@@ -576,11 +619,9 @@ export function validateBelongsToAssociation(this: any, reflection: any): void {
 /** @internal */
 export function validateCollectionAssociation(this: any, reflection: any): void {
   // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
-  const association = {
-    target:
-      this._cachedAssociations?.get(reflection.name) ??
-      this._preloadedAssociations?.get(reflection.name),
-  };
+  // Pass the real Association instance so downstream readers can reach
+  // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
+  const association = _loadedAssociation(this, reflection.name);
   const records = associatedRecordsToValidateOrSave(
     association,
     typeof this.isNewRecord === "function" ? this.isNewRecord() : false,

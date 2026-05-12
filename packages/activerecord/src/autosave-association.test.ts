@@ -3373,7 +3373,9 @@ describe("ChangedForAutosaveTest", () => {
       static {
         this.attribute("id", "integer");
         this.adapter = adapter;
-        (this as any)._associations = [{ name: "b", type: "hasOne", options: { autosave: true } }];
+        (this as any)._associations = [
+          { name: "b", type: "hasOne", options: { autosave: true, className: "CycleB" } },
+        ];
       }
     }
     class B extends Base {
@@ -3381,7 +3383,7 @@ describe("ChangedForAutosaveTest", () => {
         this.attribute("id", "integer");
         this.adapter = adapter;
         (this as any)._associations = [
-          { name: "a", type: "belongsTo", options: { autosave: true } },
+          { name: "a", type: "belongsTo", options: { autosave: true, className: "CycleA" } },
         ];
       }
     }
