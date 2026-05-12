@@ -1,116 +1,130 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/virtual_column_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+  let VirtualColumn: any;
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
+    await (adapter as any).createTable("virtual_columns", { force: true }, (t: any) => {
+      t.string("name");
+      t.column("upper_name", "virtual", {
+        type: "string",
+        as: "UPPER(name)",
+        stored: true,
+      });
+      t.column("name_length", "virtual", {
+        type: "integer",
+        as: "LENGTH(name)",
+        stored: true,
+      });
+      t.column("name_octet_length", "virtual", {
+        type: "integer",
+        as: "OCTET_LENGTH(name)",
+        stored: true,
+      });
+      t.integer("column1");
+      t.column("column2", "virtual", {
+        type: "integer",
+        as: "column1 + 1",
+        stored: true,
+      });
+    });
+    const { Base } = await import("../../index.js");
+    class VirtualColumnCls extends Base {
+      static tableName = "virtual_columns";
+      static {
+        this.adapter = adapter;
+      }
+    }
+    await VirtualColumnCls.loadSchema();
+    VirtualColumn = VirtualColumnCls;
+    await VirtualColumn.create({ name: "Rails" });
   });
+
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
     await adapter.close();
   });
 
   describe("PostgresqlVirtualColumnTest", () => {
-    it.skip("virtual column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+    it("virtual column with full inserts", async () => {
+      const partialInsertsWas = VirtualColumn.partialInserts;
+      VirtualColumn.partialInserts = false;
+      try {
+        await expect(VirtualColumn.create({ name: "Rails" })).resolves.toBeTruthy();
+      } finally {
+        VirtualColumn.partialInserts = partialInsertsWas;
+      }
     });
-    it.skip("virtual column default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column migration", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column stored", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("non persisted column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("virtual column with full inserts", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("stored column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("change table", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("build fixture sql", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-  });
 
-  describe("PostgresqlXmlTest", () => {
-    it.skip("xml column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+    it("virtual column", async () => {
+      const column = VirtualColumn.columnsHash["upper_name"];
+      expect(column.isVirtual()).toBe(true);
+      const row = await VirtualColumn.take();
+      expect(row.upper_name).toBe("RAILS");
     });
-    it.skip("xml default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+
+    it("stored column", async () => {
+      const column = VirtualColumn.columnsHash["name_length"];
+      expect(column.isVirtual()).toBe(true);
+      const row = await VirtualColumn.take();
+      expect(row.name_length).toBe(5);
     });
-    it.skip("xml type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+
+    it("change table", async () => {
+      await adapter.changeTable("virtual_columns", (t: any) => {
+        t.column("lower_name", "virtual", {
+          type: "string",
+          as: "LOWER(name)",
+          stored: true,
+        });
+      });
+      VirtualColumn.resetColumnInformation();
+      await VirtualColumn.loadSchema();
+      const column = VirtualColumn.columnsHash["lower_name"];
+      expect(column.isVirtual()).toBe(true);
+      const row = await VirtualColumn.take();
+      expect(row.lower_name).toBe("rails");
     });
-    it.skip("xml write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+
+    it("non persisted column", async () => {
+      await expect(
+        adapter.changeTable("virtual_columns", (t: any) => {
+          t.column("invalid_definition", "virtual", {
+            type: "string",
+            as: "LOWER(name)",
+          });
+        }),
+      ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
     });
-    it.skip("xml schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+
+    it("schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "virtual_columns");
+      expect(output).toMatch(
+        /t\.virtual\s+"upper_name",\s+type: :string,\s+as: "upper\(\(name\)::text\)", stored: true/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\s+"name_length",\s+type: :integer,\s+as: "length\(\(name\)::text\)", stored: true/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\s+"name_octet_length",\s+type: :integer,\s+as: "octet_length\(\(name\)::text\)", stored: true/i,
+      );
+      expect(output).toMatch(
+        /t\.virtual\s+"column2",\s+type: :integer,\s+as: "\(column1 \+ 1\)", stored: true/i,
+      );
     });
-    it.skip("null xml", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
-    });
-    it.skip("round trip", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in virtual-column
-      // ROOT-CAUSE: connection-adapters/postgresql/virtual-column.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/virtual-column.ts; affects ~10–47 tests in virtual-column.test.ts
+
+    it.skip("build fixture sql", () => {
+      // BLOCKED: fixtures — FixtureSet.createFixtures not ported
+      // ROOT-CAUSE: ActiveRecord::FixtureSet not implemented in @blazetrails/activerecord
+      // SCOPE: cross-cutting fixtures port; affects many tests
     });
   });
 });
