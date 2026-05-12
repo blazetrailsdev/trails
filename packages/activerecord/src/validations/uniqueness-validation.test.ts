@@ -152,7 +152,6 @@ describe("UniquenessValidationTest", () => {
           this.validatesUniqueness("title", { scope: { nonexistent_col: false } as any });
         }
       }
-      new Post();
     }).toThrow(/array of strings/);
   });
 

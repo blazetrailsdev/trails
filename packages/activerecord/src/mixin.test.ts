@@ -70,6 +70,7 @@ describe("TouchTest", () => {
       }
     }
 
+    const prevRecordTimestamps = Mixin.recordTimestamps;
     Mixin.recordTimestamps = false;
     try {
       const mixin = new Mixin();
@@ -77,7 +78,7 @@ describe("TouchTest", () => {
       await mixin.save();
       expect(mixin.readAttribute("updated_at")).toBeNull();
     } finally {
-      Mixin.recordTimestamps = true;
+      Mixin.recordTimestamps = prevRecordTimestamps;
     }
   });
 });

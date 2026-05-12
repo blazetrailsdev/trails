@@ -225,7 +225,10 @@ export class Encryptor {
 
   /** @internal */
   private compressIfWorthIt(clearText: string): [string | Buffer, boolean] {
-    if (this._compress && clearText.length > THRESHOLD_TO_JUSTIFY_COMPRESSION) {
+    if (
+      this._compress &&
+      Buffer.byteLength(clearText, "utf-8") > THRESHOLD_TO_JUSTIFY_COMPRESSION
+    ) {
       return [this.compress(clearText), true];
     }
     return [clearText, false];

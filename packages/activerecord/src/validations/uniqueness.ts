@@ -24,10 +24,12 @@ export function validatesUniqueness(
   } = {},
 ): void {
   // Validate options eagerly to match Rails' ArgumentError at declaration time.
-  const scope = (options as any).scope;
+  // No ArgumentError class exists in this codebase; plain Error matches the existing convention
+  // in UniquenessValidator#constructor (same message shape, same throw site pattern).
+  const scope = (options as Record<string, unknown>).scope;
   if (scope != null) {
     const scopes = Array.isArray(scope) ? scope : [scope];
-    if (!scopes.every((s: unknown) => typeof s === "string")) {
+    if (!scopes.every((s) => typeof s === "string")) {
       throw new Error(
         `${JSON.stringify(scope)} is not a supported format for :scope option. ` +
           "Pass a string or an array of strings instead.",
