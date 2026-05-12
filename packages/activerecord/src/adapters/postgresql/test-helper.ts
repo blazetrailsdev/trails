@@ -2,6 +2,8 @@ import { describe } from "vitest";
 import pg from "pg";
 import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 import { pgDatetimeConfig } from "../../connection-adapters/postgresql/pg-datetime-config.js";
+import { Notifications, squish } from "@blazetrails/activesupport";
+import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
 
 export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
@@ -52,3 +54,33 @@ export async function withNativeDatabaseTypeOverrides<T>(
 }
 
 export { PostgreSQLAdapter };
+
+/**
+ * Mirrors Rails' SQLSubscriber test helper from activerecord/test/cases/helper.rb.
+ * Records sql.active_record notifications so tests can assert on payload fields.
+ */
+export class SQLSubscriber {
+  readonly logged: Array<[string, string, unknown[]]> = [];
+  readonly payloads: Array<Record<string, unknown>> = [];
+  private _sub: NotificationSubscriber | null = null;
+
+  start(): void {
+    this.stop();
+    this._sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+      const p = event.payload as Record<string, unknown>;
+      this.payloads.push(p);
+      this.logged.push([
+        squish(String(p.sql ?? "")),
+        String(p.name ?? ""),
+        (p.binds as unknown[]) ?? [],
+      ]);
+    });
+  }
+
+  stop(): void {
+    if (this._sub) {
+      Notifications.unsubscribe(this._sub);
+      this._sub = null;
+    }
+  }
+}
