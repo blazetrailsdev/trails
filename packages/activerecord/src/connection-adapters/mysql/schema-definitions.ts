@@ -17,6 +17,8 @@ import type {
   ColumnType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
+import { quoteIdentifier, quoteTableName } from "./quoting.js";
+import { quoteDefaultExpression } from "../abstract/quoting.js";
 
 /**
  * MySQL-specific column type methods mixed into TableDefinition.
@@ -49,7 +51,15 @@ export class TableDefinition extends AbstractTableDefinition {
       collation?: string | null;
     } = {},
   ) {
-    super(tableName, { ...options, adapterName: "mysql" });
+    super(tableName, {
+      ...options,
+      adapterName: "mysql",
+      adapter: {
+        quoteIdentifier: quoteIdentifier,
+        quoteTableName: quoteTableName,
+        quoteDefaultExpression: quoteDefaultExpression,
+      },
+    });
     this.charset = options.charset ?? null;
     this.collation = options.collation ?? null;
   }

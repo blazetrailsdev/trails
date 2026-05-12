@@ -24,28 +24,8 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
 } from "./quoting.js";
-import {
-  quoteIdentifier as mysqlQuoteIdentifier,
-  quoteTableName as mysqlQuoteTableName,
-} from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-
-/** @internal */
-function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
-  if (name === "mysql") {
-    return {
-      quoteIdentifier: (n) => mysqlQuoteIdentifier(n),
-      quoteTableName: (n) => mysqlQuoteTableName(n),
-      quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
-    };
-  }
-  return {
-    quoteIdentifier: (n) => abstractQuoteIdentifier(n),
-    quoteTableName: (n) => abstractQuoteTableName(n),
-    quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
-  };
-}
 
 type Definition =
   | TableDefinition
@@ -64,7 +44,11 @@ export class SchemaCreation {
     protected adapterName: "sqlite" | "postgres" | "mysql",
     adapter?: SchemaQuoter,
   ) {
-    this.adapter = adapter ?? quoterForAdapterName(adapterName);
+    this.adapter = adapter ?? {
+      quoteIdentifier: abstractQuoteIdentifier,
+      quoteTableName: abstractQuoteTableName,
+      quoteDefaultExpression: abstractQuoteDefaultExpression,
+    };
   }
 
   protected supportsPartialIndex(): boolean {

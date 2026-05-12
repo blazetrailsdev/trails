@@ -3,29 +3,9 @@ import {
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
 } from "./quoting.js";
-import {
-  quoteIdentifier as mysqlQuoteIdentifier,
-  quoteTableName as mysqlQuoteTableName,
-} from "../mysql/quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize, pluralize } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-
-/** @internal */
-function quoterForAdapterName(name: "sqlite" | "postgres" | "mysql"): SchemaQuoter {
-  if (name === "mysql") {
-    return {
-      quoteIdentifier: (n) => mysqlQuoteIdentifier(n),
-      quoteTableName: (n) => mysqlQuoteTableName(n),
-      quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
-    };
-  }
-  return {
-    quoteIdentifier: (n) => abstractQuoteIdentifier(n),
-    quoteTableName: (n) => abstractQuoteTableName(n),
-    quoteDefaultExpression: (v) => abstractQuoteDefaultExpression(v),
-  };
-}
 
 /**
  * Column type mapping.
@@ -598,7 +578,11 @@ export class TableDefinition {
   ) {
     this.tableName = tableName;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
-    this._adapter = tdOptions.adapter ?? quoterForAdapterName(this._adapterName);
+    this._adapter = tdOptions.adapter ?? {
+      quoteIdentifier: abstractQuoteIdentifier,
+      quoteTableName: abstractQuoteTableName,
+      quoteDefaultExpression: abstractQuoteDefaultExpression,
+    };
     this._id = tdOptions.id ?? true;
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
