@@ -153,3 +153,44 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).not.toContain("DEFAULT 'json_array()'");
   });
 });
+
+describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", () => {
+  async function makeAdapter() {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    return Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+  }
+
+  it("adapter.quote(s) wraps result in single quotes", async () => {
+    const adapter = await makeAdapter();
+    const result = adapter.quote("hello");
+    expect(result).toBe("'hello'");
+  });
+
+  it("adapter.quoteString(s) is escape-only — no surrounding quotes", async () => {
+    const adapter = await makeAdapter();
+    const result = adapter.quoteString("hello");
+    expect(result).toBe("hello");
+  });
+
+  it("adapter.quote strips injection attempt — single quote, backslash, control chars", async () => {
+    const adapter = await makeAdapter();
+    const injection = "'; DROP TABLE users; --";
+    const quoted = adapter.quote(injection);
+    // Must start and end with surrounding single quotes
+    expect(quoted.startsWith("'")).toBe(true);
+    expect(quoted.endsWith("'")).toBe(true);
+    // Must not contain an unescaped bare single quote inside (other than surrounding)
+    const inner = quoted.slice(1, -1);
+    expect(inner).not.toMatch(/(?<!')'(?!')/);
+  });
+
+  it("adapter.quote is consistent with standalone quote for strings containing single quotes and backslashes", async () => {
+    const { quote: standaloneQuote } = await import("./mysql/quoting.js");
+    const adapter = await makeAdapter();
+    for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
+      expect(adapter.quote(s)).toBe(standaloneQuote(s));
+    }
+  });
+});
