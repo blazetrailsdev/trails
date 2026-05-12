@@ -11,8 +11,23 @@ const [REPO_OWNER, REPO_NAME] = REPO.split("/");
 const DB_PATH = join(homedir(), "github", "blazetrailsdev", "stats.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
+// Throttle gh calls to stay under GitHub's secondary rate limit (~80 req/min
+// for bursty patterns). 250ms between calls = ~240/min, comfortably safe for
+// read-only traffic.
+const GH_MIN_INTERVAL_MS = 250;
+const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
+let lastGhCallAt = 0;
+
 function gh(args: string): string {
-  return execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
+  const elapsed = Date.now() - lastGhCallAt;
+  if (elapsed < GH_MIN_INTERVAL_MS) {
+    Atomics.wait(sleepBuf, 0, 0, GH_MIN_INTERVAL_MS - elapsed);
+  }
+  try {
+    return execSync(`gh ${args}`, { encoding: "utf-8", maxBuffer: 50_000_000 });
+  } finally {
+    lastGhCallAt = Date.now();
+  }
 }
 
 function ghJson<T>(args: string): T {
@@ -82,6 +97,8 @@ class PrCommit extends Base {
 class PrComment extends Base {
   static {
     this.tableName = "pr_comments";
+    // GitHub IDs exceed 2^31 — must be bigint, not 32-bit integer.
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("author", "string");
     this.attribute("body", "string");
@@ -90,13 +107,14 @@ class PrComment extends Base {
     this.attribute("comment_type", "string");
     this.attribute("path", "string");
     this.attribute("diff_hunk", "string");
-    this.attribute("in_reply_to_id", "integer");
+    this.attribute("in_reply_to_id", "big_integer");
   }
 }
 
 class PrReview extends Base {
   static {
     this.tableName = "pr_reviews";
+    this.attribute("id", "big_integer");
     this.attribute("pr_number", "integer");
     this.attribute("author", "string");
     this.attribute("state", "string");
@@ -141,7 +159,7 @@ class PrReaction extends Base {
     this.tableName = "pr_reactions";
     this.primaryKey = "reaction_id";
     this.attribute("pr_number", "integer");
-    this.attribute("reaction_id", "integer");
+    this.attribute("reaction_id", "big_integer");
     this.attribute("user", "string");
     this.attribute("content", "string");
     this.attribute("created_at", "string");
@@ -151,6 +169,7 @@ class PrReaction extends Base {
 class WorkflowRun extends Base {
   static {
     this.tableName = "workflow_runs";
+    this.attribute("id", "big_integer");
     this.attribute("head_sha", "string");
     this.attribute("pr_number", "integer");
     this.attribute("event", "string");
@@ -168,7 +187,8 @@ class WorkflowRun extends Base {
 class WorkflowJob extends Base {
   static {
     this.tableName = "workflow_jobs";
-    this.attribute("run_id", "integer");
+    this.attribute("id", "big_integer");
+    this.attribute("run_id", "big_integer");
     this.attribute("name", "string");
     this.attribute("status", "string");
     this.attribute("conclusion", "string");
@@ -181,7 +201,7 @@ class WorkflowJob extends Base {
 class WorkflowStep extends Base {
   static {
     this.tableName = "workflow_steps";
-    this.attribute("job_id", "integer");
+    this.attribute("job_id", "big_integer");
     this.attribute("name", "string");
     this.attribute("status", "string");
     this.attribute("conclusion", "string");
@@ -195,8 +215,8 @@ class WorkflowStep extends Base {
 class CheckAnnotation extends Base {
   static {
     this.tableName = "check_annotations";
-    this.attribute("run_id", "integer");
-    this.attribute("job_id", "integer");
+    this.attribute("run_id", "big_integer");
+    this.attribute("job_id", "big_integer");
     this.attribute("path", "string");
     this.attribute("start_line", "integer");
     this.attribute("end_line", "integer");
@@ -263,8 +283,8 @@ class RawJobLog extends Base {
   static {
     this.tableName = "raw_job_logs";
     this.primaryKey = "job_id";
-    this.attribute("job_id", "integer");
-    this.attribute("run_id", "integer");
+    this.attribute("job_id", "big_integer");
+    this.attribute("run_id", "big_integer");
     this.attribute("job_name", "string");
     this.attribute("merge_commit_sha", "string");
     this.attribute("pr_number", "integer");
