@@ -593,6 +593,7 @@ export class TableDefinition {
       as?: string;
       options?: string;
       comment?: string;
+      default?: unknown;
     } = {},
   ) {
     this.tableName = tableName;
@@ -607,7 +608,9 @@ export class TableDefinition {
 
     if (this._id !== false) {
       const pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
-      this.columns.push(this.newColumnDefinition("id", pkType, { primaryKey: true }));
+      const pkOpts: Record<string, unknown> = { primaryKey: true };
+      if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+      this.columns.push(this.newColumnDefinition("id", pkType, pkOpts));
     }
   }
 
