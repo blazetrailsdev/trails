@@ -18,7 +18,8 @@ import {
   TableDefinition,
 } from "../abstract/schema-definitions.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
-import { quoteColumnName, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
+import { quoteIdentifier, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
+import { quoteDefaultExpression } from "../abstract/quoting.js";
 
 /** MySQL-specific column options — extends the abstract ColumnOptions with `onUpdate`. */
 export type MysqlAddColumnOptions = ColumnOptions & { onUpdate?: string };
@@ -45,7 +46,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected _mariadb = false;
 
   constructor() {
-    super("mysql");
+    super("mysql", {
+      quoteIdentifier: quoteIdentifier,
+      quoteTableName: quoteTableName,
+      quoteDefaultExpression: quoteDefaultExpression,
+    });
   }
 
   visitAddForeignKey(fromTable: string, toTable: string, options: Record<string, unknown>): string {
@@ -55,8 +60,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const fromIdentifier = fromTable.includes(".") ? fromTable.split(".").pop()! : fromTable;
     const name = (options.name as string) ?? `fk_rails_${fromIdentifier}_${column}`;
 
-    let sql = `ALTER TABLE ${quoteTableName(fromTable)} ADD CONSTRAINT ${quoteColumnName(name)} `;
-    sql += `FOREIGN KEY (${quoteColumnName(column)}) REFERENCES ${quoteTableName(toTable)} (${quoteColumnName(primaryKey)})`;
+    let sql = `ALTER TABLE ${this.adapter.quoteTableName(fromTable)} ADD CONSTRAINT ${this.adapter.quoteIdentifier(name)} `;
+    sql += `FOREIGN KEY (${this.adapter.quoteIdentifier(column)}) REFERENCES ${this.adapter.quoteTableName(toTable)} (${this.adapter.quoteIdentifier(primaryKey)})`;
 
     if (options.onDelete) {
       sql += ` ${this.actionSql("DELETE", options.onDelete as ReferentialAction)}`;
