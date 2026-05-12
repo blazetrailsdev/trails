@@ -316,10 +316,14 @@ function buildRelation(
       // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
       // which returns false from can_perform_case_insensitive_comparison_for? for uuid
       // (PG has no lower(uuid) function). Use plain equality instead.
+      const typeObj =
+        typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
       const colType =
-        typeof klass.typeForAttribute === "function"
-          ? (klass.typeForAttribute(attribute) as { type?: string } | null)?.type
-          : null;
+        typeObj == null
+          ? null
+          : typeof (typeObj as any).type === "function"
+            ? (typeObj as any).type()
+            : (typeObj as any).type;
       if (colType !== "uuid") {
         comparison = adapter?.caseInsensitiveComparison?.(attr, bind) ?? null;
         if (comparison == null && typeof value === "string") {
