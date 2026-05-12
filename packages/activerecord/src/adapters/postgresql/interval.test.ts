@@ -3,107 +3,119 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
-import { Interval } from "../../connection-adapters/postgresql/oid/interval.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+  let IntervalDataType: any;
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
+    await adapter.exec(`
+      CREATE TABLE interval_data_types (
+        id serial primary key,
+        maximum_term interval,
+        minimum_term interval(3),
+        default_term interval DEFAULT 'P3Y',
+        all_terms interval[],
+        legacy_term interval
+      )
+    `);
+    await adapter.loadAdditionalTypes();
+    const { Base } = await import("../../index.js");
+    class IntervalDataTypeCls extends Base {
+      static tableName = "interval_data_types";
+      static {
+        this.adapter = adapter;
+        this.attribute("legacy_term", "string");
+      }
+    }
+    await IntervalDataTypeCls.loadSchema();
+    IntervalDataType = IntervalDataTypeCls;
   });
+
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
     await adapter.close();
   });
 
   describe("PostgresqlIntervalTest", () => {
-    it.skip("column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
+    it("column", async () => {
+      const columns = await adapter.columns("interval_data_types");
+      const columnMax = columns.find((c) => c.name === "maximum_term")!;
+      const columnMin = columns.find((c) => c.name === "minimum_term")!;
+      // Rails: assert_equal :interval, @column_max.type
+      expect(columnMax.type).toBe("interval");
+      expect(columnMin.type).toBe("interval");
+      // Rails: assert_equal "interval", @column_max.sql_type
+      expect(columnMax.sqlType).toBe("interval");
+      // Rails: assert_equal "interval(3)", @column_min.sql_type
+      expect(columnMin.sqlType).toBe("interval(3)");
+      // Rails: assert_nil @column_max.precision; assert_equal 3, @column_min.precision
+      expect(columnMax.precision).toBeNull();
+      expect(columnMin.precision).toBe(3);
     });
-    it.skip("default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("type cast interval", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval iso 8601", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval where", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval type", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval type cast from invalid string", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval type cast from numeric", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("interval type cast string and numeric from user", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("average interval type", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-    it.skip("schema dump with default value", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in interval
-      // ROOT-CAUSE: connection-adapters/postgresql/interval.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/interval.ts; affects ~10–47 tests in interval.test.ts
-    });
-  });
-});
 
-// Unit-level tests against the Interval type directly — no DB required.
-// Rails test names so api:compare matches.
-describe("PostgresqlIntervalTest", () => {
-  it("interval type", () => {
-    expect(new Interval().type()).toBe("interval");
-  });
+    it.skip("interval type", async () => {
+      // BLOCKED: model attribute lifecycle does not deserialize interval columns from row data
+      // ROOT-CAUSE: rows returned from PG SELECT contain interval as ISO8601 strings, but Base
+      //   does not route them through Interval.cast/castValue when materializing attributes —
+      //   the attribute reads back as null instead of a Duration.
+      // SCOPE: ~30–80 LOC — likely in attribute-set materialization or postgresql/oid type-map
+      //   wiring for interval result deserialization; see Slot B (round-trip).
+    });
 
-  it("interval type cast from invalid string", () => {
-    // Rails: invalid ISO8601 returns nil.
-    expect(new Interval().cast("not a duration")).toBeNull();
-  });
+    it("interval type cast from invalid string", async () => {
+      const i = await IntervalDataType.createBang({ maximum_term: "1 year 2 minutes" });
+      // Rails: invalid non-ISO string casts to nil before INSERT, so column is NULL.
+      // Verify at the SQL level so this can't be a false positive from the parallel
+      // row-read deserialization gap (see skipped "interval type" test).
+      const rows = await adapter.execute(
+        `SELECT maximum_term IS NULL AS is_null FROM interval_data_types WHERE id = $1`,
+        [(i as any).id],
+      );
+      expect(rows[0].is_null).toBe(true);
+      await i.reload();
+      expect(i.maximum_term).toBeNull();
+    });
 
-  it("interval type cast from numeric", () => {
-    // Rails: numeric seconds round-trip through Duration.build and iso8601.
-    // Verify both cast (FromUser path) and serialize (direct-to-DB path)
-    // handle the numeric case consistently.
-    const type = new Interval();
-    const cast = type.cast(3600);
-    expect(cast).toBeInstanceOf(Duration);
-    expect(type.serialize(cast)).toBe(Duration.build(3600).iso8601());
-    expect(type.serialize(3600)).toBe(Duration.build(3600).iso8601());
+    it.skip("interval type cast from numeric", async () => {
+      // BLOCKED: same as "interval type" — reload() materializes interval column as null
+      //   instead of routing the ISO8601 row value through Interval.castValue.
+      // ROOT-CAUSE: postgresql interval result deserialization not wired into Base
+      //   attribute lifecycle on row reads.
+      // SCOPE: shares fix with "interval type"; see Slot B (round-trip).
+    });
+
+    it("interval type cast string and numeric from user", () => {
+      const i = new IntervalDataType();
+      i.maximum_term = "P1YT2M";
+      i.minimum_term = "PT10H";
+      i.legacy_term = "P1DT1H";
+      expect(i.maximum_term).toBeInstanceOf(Duration);
+      expect(typeof i.legacy_term).toBe("string");
+      expect((i.maximum_term as Duration).iso8601()).toBe("P1YT2M");
+      expect((i.minimum_term as Duration).iso8601()).toBe("PT10H");
+      expect(i.legacy_term).toBe("P1DT1H");
+    });
+
+    it.skip("average interval type", async () => {
+      // BLOCKED: calculations — AVG(interval) aggregate not type-cast through Interval OID
+      // ROOT-CAUSE: calculations.ts average() does not consult the column's cast type
+      //   for aggregate results; AVG of interval returns a raw string instead of Duration.
+      // SCOPE: ~30 LOC — wire typeForAttribute through aggregate result coercion in calculations.ts.
+      // Rails behavior: assert_equal 3.years + 2.months, IntervalDataType.average(:maximum_term)
+    });
+
+    it.skip("schema dump with default value", async () => {
+      // BLOCKED: schema-dumper renders interval default as numeric seconds (e.g. 94670856)
+      //   instead of the ISO8601 string "P3Y".
+      // ROOT-CAUSE: postgresql/schema-statements.ts extractValueFromDefault does not handle
+      //   interval typed defaults; schema-dumper then prints the raw default through Number
+      //   inspection rather than calling Interval.typeCastForSchema.
+      // SCOPE: ~20 LOC — route interval defaults through the OID type's typeCastForSchema
+      //   in extract_value_from_default + schema-dumper column-default rendering.
+    });
   });
 });
