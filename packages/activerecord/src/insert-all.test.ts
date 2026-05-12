@@ -7,6 +7,8 @@ import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -1107,5 +1109,35 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
       () =>
         new InsertAll(Book.all() as any, adapter, [{ id: 1, title: "x" }], { returning: "title" }),
     ).not.toThrow();
+  });
+});
+
+// ==========================================================================
+// Regression: upsertAll on returning DBs (cache miss path)
+// ==========================================================================
+describe("InsertAll async uniqueIndexes regression", () => {
+  it("upsertAll with uniqueBy succeeds when schema cache is cold (returning DB scenario)", async () => {
+    const adapter = createTestAdapter();
+    await defineSchema(adapter, { pkgs: { name: "string", sha: "string" } });
+    const ss = new SchemaStatements(adapter);
+    await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
+
+    class Pkg extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.attribute("sha", "string");
+        this.adapter = adapter;
+        this._tableName = "pkgs";
+      }
+    }
+
+    // Clear the cache to simulate a returning DB where migrateDb skipped createTable.
+    adapter.schemaCache?.clear();
+
+    // Should succeed — async _uniqueIndexes() fetches from the live DB.
+    await expect(
+      Pkg.upsertAll([{ name: "foo", sha: "abc123" }], { uniqueBy: ["sha", "name"] }),
+    ).resolves.toBeGreaterThanOrEqual(0);
   });
 });

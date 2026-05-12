@@ -111,21 +111,37 @@ export class InsertAll {
 
   async execute(): Promise<number> {
     if (this.inserts.length === 0) return 0;
+    await this._populateUpdatableColumns();
     const dialect = this.connection.adapterName;
     const builder = new Builder(this, dialect);
     return this.connection.executeMutation(builder.toSql());
   }
 
   updatableColumns(): string[] {
-    if (this._updatableColumns) return this._updatableColumns;
-    const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
+    return this._updatableColumns ?? [];
+  }
+
+  /** @internal Async init: resolves uniqueByColumns via cache.indexes() then finalizes updatableColumns. */
+  private async _populateUpdatableColumns(): Promise<void> {
+    if (this._updatableColumns) return;
+    const exclude = new Set([...this.readonlyColumns(), ...(await this._uniqueByColumns())]);
     if (this.recordTimestamps() && !this.updateOnly && !this.updateSql) {
       for (const col of TIMESTAMP_COLUMNS) {
         exclude.add(col);
       }
     }
     this._updatableColumns = [...this.keys].filter((k) => !exclude.has(k));
-    return this._updatableColumns;
+    // Mirrors Rails' elsif branch: only coerce "update"→"skip" on the auto-generated
+    // update path. Custom SQL (updateSql) and explicit updateOnly are handled earlier
+    // in configureOnDuplicateUpdateLogic and must not be overridden here.
+    if (
+      this.onDuplicate === "update" &&
+      !this.updateSql &&
+      !this.updateOnly &&
+      this._updatableColumns.length === 0
+    ) {
+      this.onDuplicate = "skip";
+    }
   }
 
   primaryKeys(): string[] {
@@ -211,7 +227,8 @@ export class InsertAll {
     } else if (onDuplicate === "skip") {
       this.onDuplicate = "skip";
     } else if (onDuplicate === "update") {
-      this.onDuplicate = this.updatableColumns().length === 0 ? "skip" : "update";
+      // Finalized in _populateUpdatableColumns() after async uniqueIndexes() resolves.
+      this.onDuplicate = "update";
     }
   }
 
@@ -221,8 +238,8 @@ export class InsertAll {
   }
 
   /** @internal */
-  private uniqueByColumns(): string[] {
-    return this.findUniqueIndexFor(this.uniqueBy);
+  private async _uniqueByColumns(): Promise<string[]> {
+    return this._findUniqueIndexFor(this.uniqueBy);
   }
 
   /** @internal */
@@ -278,11 +295,11 @@ export class InsertAll {
   }
 
   /** @internal */
-  private findUniqueIndexFor(uniqueBy: string | string[] | undefined): string[] {
+  private async _findUniqueIndexFor(uniqueBy: string | string[] | undefined): Promise<string[]> {
     const nameOrCols =
       uniqueBy == null ? this.primaryKeys() : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
     const sortedMatch = [...nameOrCols].sort().join(",");
-    const idx = this.uniqueIndexes().find(
+    const idx = (await this._uniqueIndexes()).find(
       (i: any) =>
         nameOrCols.includes(i.name) ||
         (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
@@ -296,12 +313,28 @@ export class InsertAll {
     throw new Error(`No unique index found for ${JSON.stringify(uniqueBy)}`);
   }
 
-  /** @internal */
-  private uniqueIndexes(): unknown[] {
-    const cache = this.model.schemaCache;
-    if (!cache) return [];
-    const indexes = (cache as any).indexes?.(this.model.arelTable.name) ?? [];
-    return (indexes as any[]).filter((i: any) => i.unique);
+  /**
+   * @internal
+   * Rails schema_cache.indexes() is synchronous; our TS port must be async because the
+   * underlying driver call is async. Always await this method.
+   *
+   * Uses the adapter's raw SchemaCache (AbstractAdapter#schema_cache) with the
+   * adapter's pool (or the adapter itself in tests) as the pool argument so
+   * SchemaCache.indexes(pool, tableName) can reach connection.indexes() on a
+   * cache miss. We do NOT fall back to ConnectionPool#schemaCache (a
+   * BoundSchemaReflection with a one-arg indexes()) — the two-arg call would
+   * misalign and pass the pool object as tableName.
+   */
+  private async _uniqueIndexes(): Promise<unknown[]> {
+    const conn = this.connection as any;
+    const cache = conn.schemaCache;
+    if (!cache || typeof cache.indexes !== "function") return [];
+    // Unwrap one level of adapter wrapping (e.g. TestAdapter → SQLite3Adapter)
+    // so the pool we pass to SchemaCache.indexes() can call connection.indexes().
+    const pool = conn.pool ?? conn;
+    const tableName = this.model.arelTable.name;
+    const indexes = await cache.indexes(pool, tableName);
+    return (indexes as unknown[]).filter((i: any) => i.unique);
   }
 
   /** @internal */
