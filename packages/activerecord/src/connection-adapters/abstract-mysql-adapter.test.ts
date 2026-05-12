@@ -176,7 +176,7 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
 
   it("adapter.quote escapes injection attempt — single quote, backslash, control chars", async () => {
     const adapter = await makeAdapter();
-    const injection = "'; DROP TABLE users; --";
+    const injection = "'; DROP TABLE users; --\\\0\n\r\x1a";
     const quoted = adapter.quote(injection);
     // Must start and end with surrounding single quotes
     expect(quoted.startsWith("'")).toBe(true);

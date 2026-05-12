@@ -236,10 +236,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       // Mirrors Rails Mysql2Adapter#initialize: always ensure FOUND_ROWS is set.
       this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
-      this._driverPool = Mysql2Adapter.newClient(
-        this._poolConfig,
-        this._buildConfigureConnectionClauses(),
-      );
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
       return;
     }
     // See PostgreSQLAdapter#constructor: Rails' database.yml merges
@@ -282,10 +279,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       waitTimeout,
       variables,
     };
-    this._driverPool = Mysql2Adapter.newClient(
-      this._poolConfig,
-      this._buildConfigureConnectionClauses(),
-    );
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
   }
 
   /** Returns true for raw mysql2 errors that indicate the database doesn't exist (ER_BAD_DB_ERROR). */
@@ -302,10 +296,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // close() sets _permanentlyClosed so we don't silently reopen after teardown.
     if (!this._driverPool) {
       if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
-      this._driverPool = Mysql2Adapter.newClient(
-        this._poolConfig,
-        this._buildConfigureConnectionClauses(),
-      );
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
       this._activeState = true;
     }
     try {
@@ -1064,10 +1055,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override reconnectBang(): void {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
     this.disconnectBang();
-    this._driverPool = Mysql2Adapter.newClient(
-      this._poolConfig,
-      this._buildConfigureConnectionClauses(),
-    );
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
     this._activeState = true;
   }
 
@@ -1404,7 +1392,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // for wait_timeout, sql_mode (per strict flag), and arbitrary session variables.
   // Called before createPool so a validation throw doesn't leak a live pool.
   /** @internal */
-  private _buildConfigureConnectionClauses(): string {
+  private _buildInitSql(): string {
     const { strict, waitTimeout, variables: configVars } = this._poolConfig;
     const vars: Record<string, string | number | boolean | null | ":default" | "default"> = {
       ...(configVars ?? {}),
