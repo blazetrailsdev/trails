@@ -554,11 +554,44 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(normalizeUuid("A0EEBC999C0B4EF8BB6D6BB9BD380A11")).toBe(expected);
     });
 
-    it.skip("uniqueness validation ignores uuid", () => {
-      // BLOCKED: Slot C — UniquenessValidator UUID-aware case-insensitive bypass.
-      // Rails skips the case-insensitive LOWER() comparison when the column is uuid
-      // (UUIDs are already normalized). Our validator doesn't check typeForAttribute.
-      // SCOPE: ~10 LOC in validations/uniqueness.ts.
+    it("uniqueness validation ignores uuid", async () => {
+      // Rails: can_perform_case_insensitive_comparison_for? returns false for uuid
+      // (no lower(uuid) in PG), so case_insensitive_comparison falls back to eq().
+      // Our fix: check typeForAttribute("guid").type === "uuid" and skip LOWER().
+      await adapter.exec(`DROP TABLE IF EXISTS uuid_uniqueness_validation_test`);
+      await adapter.exec(`
+        CREATE TABLE uuid_uniqueness_validation_test (
+          id serial primary key,
+          guid uuid UNIQUE
+        )
+      `);
+      try {
+        const { Base } = await import("../../index.js");
+        class UuidUniq extends Base {
+          static tableName = "uuid_uniqueness_validation_test";
+          static {
+            this.adapter = adapter;
+            this.validatesUniqueness("guid", { caseSensitive: false });
+          }
+        }
+        await UuidUniq.loadSchema();
+
+        const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+        const r1 = await UuidUniq.create({ guid: uuid });
+        expect(r1.isPersisted()).toBe(true);
+
+        // Duplicate — should fail validation, not throw a DB error about lower(uuid).
+        const r2 = new UuidUniq({ guid: uuid });
+        const saved = await r2.save();
+        expect(saved).toBe(false);
+        expect(r2.errors.on("guid")).toBeTruthy();
+
+        // Different UUID — should save fine.
+        const r3 = new UuidUniq({ guid: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" });
+        expect(await r3.save()).toBe(true);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS uuid_uniqueness_validation_test`);
+      }
     });
   });
 

@@ -313,13 +313,26 @@ function buildRelation(
     } else if (options.caseSensitive) {
       comparison = adapter?.caseSensitiveComparison?.(attr, bind) ?? null;
     } else {
-      comparison = adapter?.caseInsensitiveComparison?.(attr, bind) ?? null;
-      if (comparison == null && typeof value === "string") {
-        // No native CI form — fall back to LOWER() with a lowercased bind.
-        // Keeps the bind parameterized so the prepared-statement cache
-        // stays effective.
-        const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
-        comparison = attr.lower().eq(lowerBind);
+      // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
+      // which returns false from can_perform_case_insensitive_comparison_for? for uuid
+      // (PG has no lower(uuid) function). Use plain equality instead.
+      const typeObj =
+        typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
+      const colType =
+        typeObj == null
+          ? null
+          : typeof (typeObj as any).type === "function"
+            ? (typeObj as any).type()
+            : (typeObj as any).type;
+      if (colType !== "uuid") {
+        comparison = adapter?.caseInsensitiveComparison?.(attr, bind) ?? null;
+        if (comparison == null && typeof value === "string") {
+          // No native CI form — fall back to LOWER() with a lowercased bind.
+          // Keeps the bind parameterized so the prepared-statement cache
+          // stays effective.
+          const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
+          comparison = attr.lower().eq(lowerBind);
+        }
       }
     }
     if (comparison != null && typeof base.where === "function") {
