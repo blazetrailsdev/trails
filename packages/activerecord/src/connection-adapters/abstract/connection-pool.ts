@@ -18,8 +18,9 @@ import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
-import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import type { TransactionManager } from "./transaction.js";
+import { ConnectionPoolConfiguration, QueryCache, type QueryCacheHost } from "./query-cache.js";
+import { executionContextId } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext } from "../../migration.js";
@@ -40,26 +41,7 @@ interface PoolManagedConnection {
   expire?(): void;
 }
 
-let _contextIdCounter = 0;
-let _contextStorage: AsyncContext<number> | null = null;
-
-function executionContextId(): number {
-  if (!_contextStorage) {
-    _contextStorage = getAsyncContext().create<number>();
-  }
-  return _contextStorage.getStore() ?? 0;
-}
-
-/**
- * Run a callback in a new isolated execution context.
- * Leases obtained inside will not collide with the outer context.
- */
-export function withExecutionContext<T>(fn: () => T): T {
-  if (!_contextStorage) {
-    _contextStorage = getAsyncContext().create<number>();
-  }
-  return _contextStorage.run(++_contextIdCounter, fn);
-}
+export { withExecutionContext } from "./connection-pool/execution-context.js";
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractPool
@@ -245,6 +227,7 @@ export class ConnectionPool implements ReapablePool {
   private _idleTimeout: number | null;
   private _lastCheckinAt = new Map<DatabaseAdapter, number>();
   private _pinnedConnections = new Map<number, { connection: DatabaseAdapter; depth: number }>();
+  private _cacheConfig: ConnectionPoolConfiguration;
 
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
@@ -256,6 +239,7 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
+    this._cacheConfig = new ConnectionPoolConfiguration();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
@@ -452,6 +436,7 @@ export class ConnectionPool implements ReapablePool {
     if (!pin) {
       pin = { connection, depth: 0 };
       this._pinnedConnections.set(ctxId, pin);
+      this._cacheConfig.incrementPinnedCount();
     }
     pin.depth++;
 
@@ -471,6 +456,7 @@ export class ConnectionPool implements ReapablePool {
       pin.depth--;
       if (pin.depth === 0) {
         this._pinnedConnections.delete(ctxId);
+        this._cacheConfig.decrementPinnedCount();
         if (newlyCheckedOut) {
           this.checkin(connection);
         }
@@ -502,6 +488,7 @@ export class ConnectionPool implements ReapablePool {
       pin.depth--;
       if (pin.depth === 0) {
         this._pinnedConnections.delete(ctxId);
+        this._cacheConfig.decrementPinnedCount();
         this.checkin(connection);
       }
     }
@@ -520,9 +507,12 @@ export class ConnectionPool implements ReapablePool {
       if (this._connections && !this._connections.includes(pin.connection)) {
         this._connections.push(pin.connection);
       }
+      (pin.connection as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
       return pin.connection;
     }
-    return this._acquireConnection();
+    const conn = this._acquireConnection();
+    (conn as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+    return conn;
   }
 
   async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
@@ -534,10 +524,14 @@ export class ConnectionPool implements ReapablePool {
       if (this._connections && !this._connections.includes(pin.connection)) {
         this._connections.push(pin.connection);
       }
+      (pin.connection as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
       return pin.connection;
     }
     const conn = this._tryAcquire();
-    if (conn) return conn;
+    if (conn) {
+      (conn as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+      return conn;
+    }
 
     const t = timeout ?? this.checkoutTimeout;
     if (!this._available) {
@@ -557,6 +551,7 @@ export class ConnectionPool implements ReapablePool {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
     this._checkedOut.add(c);
+    (c as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
     return c;
   }
 
@@ -600,6 +595,7 @@ export class ConnectionPool implements ReapablePool {
     if (this._isConnectionPinned(conn)) return;
     this._connectionLease().clear(conn);
     if (this._checkedOut.has(conn)) {
+      QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
       this._checkedOut.delete(conn);
       (conn as unknown as PoolManagedConnection).expire?.();
       this._available?.add(conn);
@@ -1310,6 +1306,7 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
     const cleanable = c as unknown as { cleanBang?: () => void; clean?: () => void };
     if (typeof cleanable.cleanBang === "function") cleanable.cleanBang();
     else cleanable.clean?.();
+    (c as unknown as QueryCacheHost)._queryCache = pool._cacheConfig.queryCache;
     return c;
   } catch (err) {
     pool.remove(c);
