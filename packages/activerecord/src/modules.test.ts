@@ -141,11 +141,4 @@ describe("ModulesTest", () => {
     await p.save();
     expect(p.author_id).toBeNull();
   });
-
-  it.skip("table name in mixins", () => {
-    // BLOCKED: unknown — no matching test in Rails modules_test.rb; likely a phantom from a prior merge
-  });
-  it.skip("inheritance in mixins", () => {
-    // BLOCKED: unknown — no matching test in Rails modules_test.rb; likely a phantom from a prior merge
-  });
 });

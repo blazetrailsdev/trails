@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
@@ -143,21 +144,16 @@ describe("UniquenessValidationTest", () => {
     expect(await p2.save()).toBe(false);
   });
 
-  // Real DBs reject queries referencing nonexistent columns
-  it.skip("validate uniqueness with scope invalid syntax", async () => {
-    // BLOCKED: validation — validator behavior gap in uniqueness-validation
-    // ROOT-CAUSE: validations/uniqueness.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in validations/uniqueness.ts; affects ~4–11 tests in uniqueness-validation.test.ts
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-        this.validatesUniqueness("title", { scope: "nonexistent_col" });
+  it("validate uniqueness with scope invalid syntax", () => {
+    // Rails: assert_raises(ArgumentError) { Reply.validates_uniqueness_of(:content, scope: { parent_id: false }) }
+    // Passes a hash as scope (invalid); validatesUniqueness throws ArgumentError at declaration time.
+    expect(() => {
+      class Post extends Base {
+        static {
+          this.validatesUniqueness("title", { scope: { nonexistent_col: false } as any });
+        }
       }
-    }
-    const p = new Post({ title: "ok" });
-    expect(await p.save()).toBe(true);
+    }).toThrow(ArgumentError);
   });
 
   it("validate uniqueness with object scope", async () => {
