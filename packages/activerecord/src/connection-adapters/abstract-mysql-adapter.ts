@@ -109,13 +109,10 @@ const ER_TABLE_EXISTS = 1050;
 const RENAME_FUNC_DEFAULT_RE =
   /^(CURRENT_TIMESTAMP(\([0-6]?\))?|NOW(\([0-6]?\))?|CURRENT_DATE|CURRENT_TIME(\([0-6]?\))?|UUID\(\))$/i;
 
-// Hot-path constants for the escape-only `quoteString` override below.
-// Match `MYSQL_ESCAPE_RE` / `MYSQL_ESCAPE_MAP` in `mysql/quoting.ts`
-// (those are module-private). Hoisted here so each call avoids
-// re-allocating the regex and lookup table.
 // eslint-disable-next-line no-control-regex
-const MYSQL_ADAPTER_ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
-const MYSQL_ADAPTER_ESCAPE_MAP: Record<string, string> = {
+const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
+const QUOTE_STRING_MAP: Record<string, string> = {
+  "'": "\\'",
   "\\": "\\\\",
   "\0": "\\0",
   "\n": "\\n",
@@ -617,6 +614,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlColumnNameWithOrderMatcher();
   }
 
+  static quoteColumnName(name: string): string {
+    return mysqlQuoteColumnName(name);
+  }
+
+  static quoteTableName(name: string): string {
+    return mysqlQuoteTableName(name);
+  }
+
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     void tableName;
     return [];
@@ -715,15 +720,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Escape-only string quoting per the Quoting interface contract
    * (`abstract/quoting-interface.ts`). Mirrors Rails MySQL
-   * `quote_string` (`mysql/quoting.rb`): doubles `'` and backslash-
-   * escapes the same control chars MySQL's wire protocol requires.
-   * Distinct from the per-module `mysqlQuoteString` standalone, which
-   * wraps with surrounding `'...'` for SQL-literal contexts.
+   * `quote_string` (`abstract_mysql_adapter.rb`): backslash-escapes
+   * `'` and the control chars MySQL's wire protocol requires (`\0 \n
+   * \r \Z \\`). Distinct from the per-module `mysqlQuoteString`
+   * standalone, which wraps with surrounding `'...'` for SQL-literal
+   * contexts.
    */
   override quoteString(s: string): string {
-    return s
-      .replace(/'/g, "''")
-      .replace(MYSQL_ADAPTER_ESCAPE_RE, (ch) => MYSQL_ADAPTER_ESCAPE_MAP[ch] ?? ch);
+    return s.replace(QUOTE_STRING_RE, (ch) => QUOTE_STRING_MAP[ch] ?? ch);
   }
 
   static dbconsole(

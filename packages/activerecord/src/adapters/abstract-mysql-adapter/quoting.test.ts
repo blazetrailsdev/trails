@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/quoting_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -14,45 +14,36 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("QuotingTest", () => {
-    it.skip("cast bound integer", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("cast bound integer", () => {
+      expect(adapter.castBoundValue(42)).toBe("42");
     });
-    it.skip("cast bound big decimal", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("cast bound big decimal", () => {
+      expect(adapter.castBoundValue(4.2)).toBe("4.2");
     });
-    it.skip("cast bound rational", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("cast bound rational", () => {
+      expect(adapter.castBoundValue(0.75)).toBe("0.75");
     });
-    it.skip("cast bound true", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("cast bound true", () => {
+      expect(adapter.castBoundValue(true)).toBe("1");
     });
-    it.skip("cast bound false", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("cast bound false", () => {
+      expect(adapter.castBoundValue(false)).toBe("0");
     });
-    it.skip("quote string", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("quote string", () => {
+      expect(adapter.quoteString("'")).toBe("\\'");
     });
-    it.skip("quote column name", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("quote column name", () => {
+      for (const a of [adapter, Mysql2Adapter]) {
+        expect(a.quoteColumnName("foo")).toBe("`foo`");
+        expect(a.quoteColumnName('hel"lo')).toBe('`hel"lo`');
+      }
     });
-    it.skip("quote table name", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in quoting
-      // ROOT-CAUSE: adapters/mysql2/quoting.ts or abstract-mysql-adapter/quoting.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/quoting.ts; affects ~10–26 tests in quoting.test.ts
+    it("quote table name", () => {
+      for (const a of [adapter, Mysql2Adapter]) {
+        expect(a.quoteTableName("foo")).toBe("`foo`");
+        expect(a.quoteTableName("foo.bar")).toBe("`foo`.`bar`");
+      }
+      expect(adapter.quoteColumnName('hel"lo.wol\\d')).toBe('`hel"lo.wol\\d`');
     });
   });
 });
