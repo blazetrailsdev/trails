@@ -2,8 +2,10 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the advisory-lock slot
-// pool size. Worker count is no longer pinned to it: vitest spawns freely and
-// workers queue on advisory locks when all slots are held.
+// pool size. TRAILS_TEST_FORKS caps the vitest worker count for both pools so
+// that concurrent local worktrees don't saturate the machine. Precedence:
+// TRAILS_TEST_FORKS > AR_DB_FORKS > 6. Raise with TRAILS_TEST_FORKS=N for a
+// solo full run; CI sets AR_DB_FORKS=4 so those jobs stay at 4 workers.
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
@@ -11,6 +13,9 @@ const SHARED_EXCLUDE = [
   "packages/website/**",
   "packages/*/dx-tests/**",
 ];
+
+const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
+const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
@@ -109,9 +114,7 @@ export default defineConfig({
           // regression slips through.
           retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
           pool: "forks",
-          // Worker count is intentionally uncapped: advisory locks in
-          // test-setup-worker-db.ts bound real DB concurrency to AR_DB_FORKS
-          // slots, so extra workers simply wait for a free slot.
+          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
       {
@@ -127,6 +130,7 @@ export default defineConfig({
           ],
           exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
           setupFiles: ["./packages/activerecord/src/test-setup.ts"],
+          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
     ],
