@@ -48,8 +48,8 @@ describe("TouchTest", () => {
     // travel 5 minutes — vi.setSystemTime advances the fake clock without resetting it
     vi.setSystemTime(new Date(t0.getTime() + 5 * 60 * 1000));
 
-    // Change lft so the record is dirty and triggers an UPDATE with a new timestamp
-    stamped.writeAttribute("lft", 42);
+    // Mirror lft_will_change! — force-marks lft dirty without changing its value
+    (stamped as any)._dirty.forceChange("lft", stamped.readAttribute("lft"));
     await stamped.save();
 
     const newUpdatedAt = stamped.readAttribute("updated_at");

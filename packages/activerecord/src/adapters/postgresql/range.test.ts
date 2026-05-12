@@ -876,28 +876,28 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("timezone awareness tsrange preserve usec", async () => {
       // Rails: time_string = "2017-09-26 07:30:59.132451 -0700"; assert time.usec > 0
+      // Verifies sub-millisecond (µs) precision is preserved through the PG round-trip.
       const tz = "Pacific Time (US & Canada)";
       const zone = TimeZone.find(tz)!;
       setZone(tz);
       const timeString = "2017-09-26T07:30:59.132451-07:00";
       const instant = Temporal.Instant.from(timeString);
+      // Confirm the instant has sub-millisecond precision (µs component = 451 µs)
+      expect(instant.toString()).toContain(".132451");
 
       const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
       const range1 = r.ts_range as Range;
       expect(range1.begin).toBeInstanceOf(TimeWithZone);
       expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((range1.begin as TimeWithZone).utc().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
+      expect((range1.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
 
       await r.saveBang();
       await r.reload();
       const range2 = r.ts_range as Range;
       expect(range2.begin).toBeInstanceOf(TimeWithZone);
       expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((range2.begin as TimeWithZone).utc().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
+      // µs precision round-trips through PostgreSQL tsrange
+      expect((range2.begin as TimeWithZone).utc().toString()).toBe(instant.toString());
     });
     it("create numrange", async () => {
       // Rails: assert_equal_round_trip(@new_range, :num_range, BigDecimal("0.5")...BigDecimal("1"))

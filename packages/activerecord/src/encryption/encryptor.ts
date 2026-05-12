@@ -226,13 +226,7 @@ export class Encryptor {
   /** @internal */
   private compressIfWorthIt(clearText: string): [string | Buffer, boolean] {
     if (this._compress && clearText.length > THRESHOLD_TO_JUSTIFY_COMPRESSION) {
-      const compressed = this.compress(clearText);
-      // Extra guard: keep uncompressed if deflate doesn't shrink the data (e.g. already-compressed
-      // or high-entropy input). Rails trusts that >140-byte strings are worth compressing. Decrypt
-      // reads the `c` header so the asymmetry is interop-safe.
-      if (compressed.length < clearText.length) {
-        return [compressed, true];
-      }
+      return [this.compress(clearText), true];
     }
     return [clearText, false];
   }
