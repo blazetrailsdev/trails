@@ -449,7 +449,7 @@ async function _insertCollectionRecordFallback(
   } else {
     throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name);
   }
-  return !!(await child.save({ validate: false } as any));
+  return !!(await child.save({ validate: false }));
 }
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
@@ -493,7 +493,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     // Rails: record.save(validate: !autosave). autosaveHasOne only runs
     // for autosave-enabled reflections (gated in autosaveAssociation), so
     // !autosave is always false → validate: false.
-    const saved = await childRecord.save({ validate: false } as any);
+    const saved = await childRecord.save({ validate: false });
     if (!saved) {
       propagateErrors(record, childRecord, assoc.name);
       return false;
@@ -517,7 +517,7 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
     try {
       // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
       // autosave is always true on this code path (gated in autosaveAssociation).
-      const saved = await assocRecord.save({ validate: false } as any);
+      const saved = await assocRecord.save({ validate: false });
       if (!saved) {
         propagateErrors(record, assocRecord, assoc.name);
         return false;
