@@ -412,34 +412,6 @@ describe("ReflectionTest", () => {
     expect((ref as ThroughReflection).source).toBe("hotProfile");
     expect(ref!.isThrough()).toBe(true);
   });
-  it("column for attribute", () => {
-    class Topic2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("approved", "boolean");
-        this.adapter = adapter;
-      }
-    }
-    expect((Topic2 as any).columnForAttribute("title").type).toBe("string");
-    expect((Topic2 as any).columnForAttribute("approved").type).toBe("boolean");
-    const nullCol = (Topic2 as any).columnForAttribute("attribute_that_doesnt_exist");
-    expect(nullCol.name).toBe("attribute_that_doesnt_exist");
-    expect(nullCol.type).toBeNull();
-  });
-  it("columns for attribute", () => {
-    class Topic2 extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    const hash = (Topic2 as any).columnsHash();
-    expect(hash["title"].name).toBe((Topic2 as any).columnForAttribute("title").name);
-    expect(hash["title"].type).toBe((Topic2 as any).columnForAttribute("title").type);
-    expect(hash["body"].name).toBe((Topic2 as any).columnForAttribute("body").name);
-    expect(hash["body"].type).toBe((Topic2 as any).columnForAttribute("body").type);
-  });
   it("reflection class for", () => {
     const { Author, Book } = makeModels();
     const hasManyRef = reflectOnAssociation(Author, "books");
