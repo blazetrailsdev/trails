@@ -4,6 +4,7 @@ import {
   ActiveRecordError,
   PreparedStatementCacheExpired,
   NotImplementedError,
+  TransactionIsolationError,
 } from "../../errors.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -646,7 +647,9 @@ export class RestartParentTransaction extends Transaction {
     this._parent = parentTransaction;
 
     if (this.isolationLevel) {
-      throw new Error("cannot set transaction isolation in a nested transaction");
+      throw new TransactionIsolationError(
+        "cannot set transaction isolation in a nested transaction",
+      );
     }
 
     parentTransaction.state.addChild(this.state);
@@ -710,7 +713,9 @@ export class SavepointTransaction extends Transaction {
     parentTransaction.state.addChild(this.state);
 
     if (this.isolationLevel) {
-      throw new Error("cannot set transaction isolation in a nested transaction");
+      throw new TransactionIsolationError(
+        "cannot set transaction isolation in a nested transaction",
+      );
     }
 
     this.savepointName = savepointName;

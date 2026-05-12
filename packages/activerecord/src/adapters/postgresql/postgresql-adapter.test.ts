@@ -597,6 +597,24 @@ describeIfPg("PostgreSQLAdapter", () => {
       await bad.close();
     });
 
+    it("reconnection_error", async () => {
+      // Mirrors Rails: test_reconnection_error — adapter raises ConnectionNotEstablished
+      // when the underlying pool returns an error instead of a connection.
+      const fakePool = {
+        connect: () =>
+          Promise.reject(Object.assign(new Error("connection lost"), { code: "57P01" })),
+        end: () => Promise.resolve(),
+        on: () => {},
+        totalCount: 0,
+        idleCount: 0,
+        waitingCount: 0,
+      };
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      await a.execute("SELECT 1"); // establish pool
+      (a as any)._driverPool = fakePool;
+      await expect(a.execute("SELECT 1")).rejects.toThrow(ConnectionNotEstablished);
+    });
+
     it.skip("reconnect after bad connection on check version", async () => {
       // BLOCKED: Rails stubs raw_connection.server_version=0 on the PG::Connection to
       // simulate a bad version check during reconnect!. Our adapter uses a pg.Pool
@@ -774,11 +792,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       // execute(null) propagates TypeError unchanged (pg rejects null text; not a DatabaseError).
       await expect(adapter.execute(null as any)).rejects.toBeInstanceOf(TypeError);
     });
-    it.skip("translate no connection exception to not established", async () => {
-      // BLOCKED: Rails calls raw_connection.send_query("SELECT 1") directly on the
-      // PG::Connection to put it in CONNECTION_BAD state without waiting for the result.
-      // The pg npm driver doesn't expose send_query; _driverPoolForTest() gives the
-      // pg.Pool but no single-connection send_query equivalent exists.
+    it("translate no connection exception to not established", async () => {
+      // Mirrors Rails: test_translate_no_connection_exception_to_not_established.
+      // Uses pg_terminate_backend from a second connection to put the target
+      // connection into a bad state, then verifies ConnectionNotEstablished is raised.
+      let pid: number | null = null;
+      const pidPromise = adapter.execute("SELECT pg_backend_pid() AS pid");
+      const rows = await pidPromise;
+      pid = Number(rows[0]?.pid);
+      await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
+        await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
+      });
+      // Pool detects terminated connection and raises ConnectionNotEstablished.
+      await expect(adapter.execute("SELECT 1")).rejects.toThrow(ConnectionNotEstablished);
     });
     it.skip("reload type map for newly defined types", async () => {
       // BLOCKED: TypeMapInitializer registers enum OIDs as generic types, not OID::Enum.

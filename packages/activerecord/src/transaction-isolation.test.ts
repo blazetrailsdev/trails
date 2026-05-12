@@ -81,12 +81,12 @@ describe("TransactionIsolationTest", () => {
       );
     });
   });
-  it.skip("setting isolation when starting a nested transaction raises error", () => {
-    // BLOCKED: transactions — SavepointTransaction throws plain Error, not TransactionIsolationError
-    // ROOT-CAUSE: SavepointTransaction and RestartParentTransaction constructors in
-    //   connection-adapters/abstract/transaction.ts throw `new Error(...)` instead of
-    //   `new TransactionIsolationError(...)` when isolation is set on a nested txn.
-    //   Fix: 2-LOC change (lines 649, 713); deferred from Slot A (zero-src-change slot).
-    // SCOPE: ~2 LOC src fix + test body; unblocked in any subsequent src slot.
+  it("setting isolation when starting a nested transaction raises error", async () => {
+    const { Tag } = makeSQLiteTag();
+    await Tag.transaction(async () => {
+      await expect(Tag.transaction(async () => {}, { isolation: "serializable" })).rejects.toThrow(
+        TransactionIsolationError,
+      );
+    });
   });
 });
