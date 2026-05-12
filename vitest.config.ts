@@ -3,8 +3,9 @@ import path from "path";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the advisory-lock slot
 // pool size. TRAILS_TEST_FORKS caps the vitest worker count for both pools so
-// that concurrent local worktrees don't saturate the machine. Defaults to 6;
-// raise with TRAILS_TEST_FORKS=N for a solo full run.
+// that concurrent local worktrees don't saturate the machine. Precedence:
+// TRAILS_TEST_FORKS > AR_DB_FORKS > 6. Raise with TRAILS_TEST_FORKS=N for a
+// solo full run; CI sets AR_DB_FORKS=4 so those jobs stay at 4 workers.
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
@@ -13,7 +14,8 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
-const TEST_FORKS = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "6");
+const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
+const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
