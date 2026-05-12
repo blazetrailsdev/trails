@@ -3,6 +3,8 @@
  */
 import { it, expect, describe, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
+import { QueryAttribute } from "../../relation/query-attribute.js";
+import { Value } from "../../type.js";
 
 describeIfPg("PostgresqlConnectionTest", () => {
   let adapter: PostgreSQLAdapter;
@@ -99,15 +101,32 @@ describeIfPg("PostgresqlConnectionTest", () => {
     expect(subscriber.logged[0][1]).toBe("SCHEMA");
   });
 
-  it.skip("statement key is logged", async () => {
-    // BLOCKED: prepared-statements — execQuery with prepare:true and statement_name in payload not yet wired
+  it("statement key is logged", async () => {
+    const bind = new QueryAttribute("", 1, new Value());
+    await adapter.execQuery("SELECT $1::integer", "SQL", [bind], { prepare: true });
+
+    const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer");
+    const stmtName = payload?.["statement_name"] as string | undefined;
+    expect(stmtName).toBeTruthy();
+
+    const res = await adapter.execQuery(`EXPLAIN (FORMAT JSON) EXECUTE ${stmtName}(1)`);
+    const planType = res.columnTypes["QUERY PLAN"];
+    const plan = planType.deserialize(res.rows[0][0]) as unknown[];
+    expect(plan.length).toBeGreaterThan(0);
   });
 
-  it.skip("prepare false with binds", async () => {
-    // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in connection
-    // ROOT-CAUSE: connection-adapters/postgresql/connection.ts missing or incomplete Rails parity
-    // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/connection.ts; affects ~10–47 tests in connection.test.ts
-    // Requires QueryAttribute / Relation::QueryAttribute with prepare: false exec_query path
+  it("prepare false with binds", async () => {
+    const origPrepared = adapter.preparedStatements;
+    adapter.preparedStatements = false;
+    try {
+      const bind = new QueryAttribute("", 42, new Value());
+      const result = await adapter.execQuery("SELECT $1::integer", "SQL", [bind], {
+        prepare: false,
+      });
+      expect(result.rows).toEqual([[42]]);
+    } finally {
+      adapter.preparedStatements = origPrepared;
+    }
   });
 
   it.skip("reconnection after actual disconnection with verify", async () => {

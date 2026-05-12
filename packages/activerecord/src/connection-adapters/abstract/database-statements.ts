@@ -1113,9 +1113,13 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
  */
 export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
   return (binds ?? []).map((b: any) => {
+    // Rails: `ActiveModel::Attribute === value ? type_cast(value.value_for_database) : type_cast(value)`
+    // valueForDatabase is a getter on real Attribute instances; handle both getter and
+    // function-style mocks by checking presence with "in" then calling if it's a function.
     let v: unknown;
-    if (b && typeof b === "object" && typeof b.valueForDatabase === "function") {
-      v = b.valueForDatabase();
+    if (b && typeof b === "object" && "valueForDatabase" in b) {
+      const vfd = b.valueForDatabase;
+      v = typeof vfd === "function" ? b.valueForDatabase() : vfd;
     } else {
       v = b && typeof b === "object" && "value" in b ? b.value : b;
     }
@@ -1287,7 +1291,12 @@ export { deleteStatement as remove };
 interface DatabaseStatementsDefaultsHost {
   execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
-  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  execQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean },
+  ): Promise<Result>;
 }
 
 export const DatabaseStatements = {
@@ -1357,6 +1366,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
+    _options?: { prepare?: boolean },
   ): Promise<Result> {
     const rows = await this.execute(sql, binds, name ?? "SQL");
     return Result.fromRowHashes(rows);

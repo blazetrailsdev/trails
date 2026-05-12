@@ -626,7 +626,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * this override is the Rails-faithful PG version that actually
    * populates them.
    */
-  override async execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result> {
+  override async execQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean },
+  ): Promise<Result> {
     // Note: we do NOT call materializeTransactions() here. If a lazy tx
     // is pending but un-materialized, a SELECT against an ad-hoc pool
     // client sees pre-tx state — which is correct read-before-write
@@ -641,17 +646,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       fields: Array<{ name: string; dataTypeID: number }>;
       rows: unknown[][];
     }
-    // Convert any Temporal values to SQL strings before pg sees them.
-    // pg's extended/prepared protocol serializes parameters via its own
-    // writer which has no Temporal support.
-    const bindArray = (binds ?? []).map((v) => temporalToBindString(v, "postgres"));
+    // Type-cast bind objects (QueryAttribute) → primitives, then convert
+    // Temporal values to SQL strings before pg sees them.
+    const castBinds = typeCastedBinds(binds);
+    const bindArray = castBinds.map((v) => temporalToBindString(v, "postgres"));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const payload: Record<string, unknown> = {
       sql: rewritten,
       name: name ?? "SQL",
-      binds: bindArray,
-      type_casted_binds: typeCastedBinds(bindArray),
+      binds: binds ?? [],
+      type_casted_binds: bindArray,
       connection: this,
       row_count: 0,
     };
@@ -665,7 +670,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // duplicate column names and matching the field-index order.
             // Delegates to `_runQuery` so prepared-statement caching and
             // in-txn / out-of-txn cached-plan handling stay in one place.
-            this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, { rowMode: "array" }),
+            this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
+              rowMode: "array",
+              prepareOverride: options?.prepare,
+              onPrepared: (stmtName) => {
+                payload.statement_name = stmtName;
+              },
+            }),
           );
           payload.row_count = r.rows?.length ?? 0;
           return r;
@@ -936,16 +947,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     client: pg.PoolClient,
     sql: string,
     binds: unknown[],
-    extra: { rowMode?: "array" } = {},
+    extra: {
+      rowMode?: "array";
+      prepareOverride?: boolean;
+      onPrepared?: (stmtName: string) => void;
+    } = {},
   ): Promise<R> {
-    const prepare = this._shouldPrepare(binds, client);
+    const { prepareOverride, onPrepared, ...queryExtra } = extra;
+    const prepare =
+      prepareOverride === false ? false : (prepareOverride ?? this._shouldPrepare(binds, client));
     const attempt = async (): Promise<R> => {
       if (prepare) {
-        const name = this._preparedNameFor(client, sql);
-        return (await client.query({ name, text: sql, values: binds, ...extra })) as R;
+        const stmtName = this._preparedNameFor(client, sql);
+        onPrepared?.(stmtName);
+        return (await client.query({
+          name: stmtName,
+          text: sql,
+          values: binds,
+          ...queryExtra,
+        })) as R;
       }
-      if (extra.rowMode) {
-        return (await client.query({ text: sql, values: binds, ...extra })) as R;
+      if (queryExtra.rowMode) {
+        return (await client.query({ text: sql, values: binds, ...queryExtra })) as R;
       }
       return (await client.query(sql, binds)) as R;
     };
