@@ -31,12 +31,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_times";
       static {
         this.adapter = a;
-        // Rails declares `attribute :time_interval, :string` and
-        // `attribute :scaled_time_interval, :interval` on the model.
-        // The :interval override is redundant with column reflection;
-        // the :string override is only exercised by `time values` /
-        // `update large time in seconds`, which are blocked on the
-        // IntervalStyle = iso_8601 connection setting (see those skips).
+        this.attribute("time_interval", "string");
+        this.attribute("scaled_time_interval", "interval");
       }
     }
     await PostgresqlTime.loadSchema();
@@ -84,19 +80,32 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(first).toBeDefined();
     });
 
-    it.skip("time values", async () => {
-      // BLOCKED: pg-interval-style — driver returns intervals in 'postgres' format ("-1 years -2 days"),
-      // not ISO 8601 ("P-1Y-2D"). Rails sets `IntervalStyle = iso_8601` per connection.
-      // ROOT-CAUSE: postgresql-adapter does not set `IntervalStyle = iso_8601` on connect.
-      // SCOPE: ~5 LOC in postgresql-adapter.ts configureConnection; un-blocks this test and
-      // update_large_time_in_seconds.
+    it("time values", async () => {
+      const M = await setupTimesTable();
+      await adapter.exec(
+        `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
+      );
+      const first = await (M as any).find(1);
+      expect((first as any).time_interval).toBe("P-1Y-2D");
+      const { Duration } = await import("@blazetrails/activesupport");
+      expect((first as any).scaled_time_interval).toEqual(Duration.days(-21));
     });
 
-    it.skip("update large time in seconds", async () => {
-      // BLOCKED: pg-interval-style — same root cause as `time values`. Round-trip of a numeric
-      // seconds count (70.years.to_f) into an interval column requires the driver to return the
-      // value as an ISO8601 string for Duration.parse on read-back.
-      // SCOPE: ~5 LOC in postgresql-adapter.ts configureConnection (IntervalStyle = iso_8601).
+    it("update large time in seconds", async () => {
+      const M = await setupTimesTable();
+      await adapter.exec(
+        `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
+      );
+      const first = await (M as any).find(1);
+      const { Duration } = await import("@blazetrails/activesupport");
+      const seventyYearsSeconds = Duration.years(70).inSeconds();
+      (first as any).scaled_time_interval = seventyYearsSeconds;
+      expect(await (first as any).save()).toBeTruthy();
+      await (first as any).reload();
+      // Rails' assert_equal on Duration compares total seconds, not parts —
+      // PG stores numeric seconds as hours/minutes, so the value round-trips
+      // with the same inSeconds() but different shape.
+      expect((first as any).scaled_time_interval.eql(Duration.years(70))).toBe(true);
     });
 
     it("oid values", async () => {

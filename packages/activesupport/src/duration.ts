@@ -322,8 +322,11 @@ export class Duration {
       if (p.test(iso)) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
     }
 
+    // PG's intervalstyle=iso_8601 emits per-component signs (e.g. "P-1Y-2D"),
+    // so allow an optional leading `-` on each component in addition to the
+    // single overall sign Rails uses.
     const pattern =
-      /^([+-])?P(?:(\d+(?:[.,]\d+)?)Y)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)W)?(?:(\d+(?:[.,]\d+)?)D)?(?:T(?:(\d+(?:[.,]\d+)?)H)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)S)?)?$/;
+      /^([+-])?P(?:(-?\d+(?:[.,]\d+)?)Y)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)W)?(?:(-?\d+(?:[.,]\d+)?)D)?(?:T(?:(-?\d+(?:[.,]\d+)?)H)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)S)?)?$/;
 
     const match = pattern.exec(iso.replace(/,/g, "."));
     if (!match) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);

@@ -15,6 +15,7 @@ import {
   StringType,
   TimeType,
   Type,
+  typeRegistry,
 } from "@blazetrails/activemodel";
 
 import { Date as OidDate } from "./oid/date.js";
@@ -40,6 +41,12 @@ import { Timestamp } from "./oid/timestamp.js";
 import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
 import { Xml } from "./oid/xml.js";
+
+// Rails registers PG's :interval type into the AM type registry so that
+// `attribute :col, :interval` resolves on AR-PG models. Mirror that here
+// as a module side-effect — AR-side type.ts already does the same for
+// the built-in AR types (date/datetime/time/text/json).
+typeRegistry.register("interval", () => new Interval());
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.
