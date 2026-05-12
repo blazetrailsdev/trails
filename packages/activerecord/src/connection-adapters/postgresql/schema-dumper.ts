@@ -60,28 +60,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column);
   }
 
-  /**
-   * Mirrors Rails' AbstractAdapter::SchemaDumper#schema_default:
-   *   type = @connection.lookup_cast_type_from_column(column)
-   *   default = type.deserialize(column.default)
-   *   type.type_cast_for_schema(default)
-   * @internal
-   */
-  protected override schemaDefault(column: Column): string | undefined {
-    if (!column.hasDefault) return undefined;
-    if (column.default == null) return this.schemaExpression(column);
-    const adapter = this.pgAdapter();
-    if (adapter?.lookupCastTypeFromColumn) {
-      const type = adapter.lookupCastTypeFromColumn(column);
-      const deserialized = type.deserialize(column.default);
-      if (deserialized == null) return this.schemaExpression(column);
-      if (typeof type.typeCastForSchema === "function") {
-        return type.typeCastForSchema(deserialized);
-      }
-    }
-    return super.schemaDefault(column as any);
-  }
-
   /** @internal */
   protected override schemaExpression(column: Column): string | undefined {
     if (column.isSerial) return undefined;
@@ -189,8 +167,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   private pgAdapter(): any {
-    const src = (this as any)._source;
-    // AdapterSchemaSource wraps the adapter; raw adapter passed directly (e.g. createSchemaDumper)
-    return src?.adapter ?? src;
+    return this._adapter();
   }
 }

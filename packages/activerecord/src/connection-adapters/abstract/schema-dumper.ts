@@ -16,6 +16,8 @@ interface Column extends ColumnInfo {
   hasDefault?: boolean;
   defaultFunction?: string | null;
   comment?: string | null;
+  /** Raw SQL type string (e.g. "integer", "varchar(255)") — present on all schema-reflected columns. */
+  sqlType?: string | null;
 }
 
 export class SchemaDumper extends BaseSchemaDumper {
@@ -116,9 +118,23 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected schemaDefault(column: Column): string | undefined {
     if (!column.hasDefault && column.default === undefined) return undefined;
     if (column.default == null) return this.schemaExpression(column);
-    // Represent the default as its schema literal
+    const adapter = this._adapter();
+    if (adapter?.lookupCastTypeFromColumn) {
+      const type = adapter.lookupCastTypeFromColumn(column);
+      if (type != null && typeof type.deserialize === "function") {
+        const deserialized = type.deserialize(column.default);
+        if (deserialized == null) return this.schemaExpression(column);
+        return type.typeCastForSchema(deserialized);
+      }
+    }
     if (typeof column.default === "string") return JSON.stringify(column.default);
     return String(column.default);
+  }
+
+  /** @internal */
+  protected _adapter(): any {
+    const src = (this as any)._source;
+    return src?.adapter ?? src;
   }
 
   /** @internal */

@@ -1059,6 +1059,10 @@ class SchemaAdapter implements DatabaseAdapter {
     return undefined;
   }
 
+  lookupCastTypeFromColumn(column: unknown): unknown {
+    return (this.inner as any).lookupCastTypeFromColumn?.(column);
+  }
+
   async cleanup(): Promise<void> {
     await dropTrackedTables(this.inner);
   }
