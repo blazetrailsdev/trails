@@ -597,6 +597,30 @@ describeIfPg("PostgreSQLAdapter", () => {
       await bad.close();
     });
 
+    it("reconnection_error", async () => {
+      // Mirrors Rails: test_reconnection_error — adapter raises ConnectionNotEstablished
+      // when the underlying pool returns an error instead of a connection.
+      const fakePool = {
+        connect: () =>
+          Promise.reject(Object.assign(new Error("connection lost"), { code: "57P01" })),
+        end: () => Promise.resolve(),
+        on: () => {},
+        totalCount: 0,
+        idleCount: 0,
+        waitingCount: 0,
+      };
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      // Save original pool so it can be closed after injection — the constructor
+      // creates a real pg.Pool immediately and close() would call end() on the fake.
+      const originalPool = (a as any)._driverPool as pg.Pool | null;
+      (a as any)._driverPool = fakePool;
+      try {
+        await expect(a.execute("SELECT 1")).rejects.toThrow(ConnectionNotEstablished);
+      } finally {
+        await originalPool?.end().catch(() => {});
+      }
+    });
+
     it.skip("reconnect after bad connection on check version", async () => {
       // BLOCKED: Rails stubs raw_connection.server_version=0 on the PG::Connection to
       // simulate a bad version check during reconnect!. Our adapter uses a pg.Pool
@@ -775,10 +799,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.execute(null as any)).rejects.toBeInstanceOf(TypeError);
     });
     it.skip("translate no connection exception to not established", async () => {
-      // BLOCKED: Rails calls raw_connection.send_query("SELECT 1") directly on the
-      // PG::Connection to put it in CONNECTION_BAD state without waiting for the result.
-      // The pg npm driver doesn't expose send_query; _driverPoolForTest() gives the
-      // pg.Pool but no single-connection send_query equivalent exists.
+      // BLOCKED: pg_terminate_backend approach is inherently racy — pg.Pool reconnects
+      // transparently after a backend is killed, so the subsequent execute() may succeed
+      // instead of raising ConnectionNotEstablished. Rails avoids this by calling
+      // raw_connection.send_query() directly on a PG::Connection (no pool), but pg npm
+      // has no send_query equivalent. A reliable implementation requires holding an open
+      // pg.Client (not pool), terminating it, and exercising the error-translation path
+      // directly. 57P01 → ConnectionNotEstablished translation is verified by the
+      // reconnection_error test above (fake pool injection path).
     });
     it.skip("reload type map for newly defined types", async () => {
       // BLOCKED: TypeMapInitializer registers enum OIDs as generic types, not OID::Enum.

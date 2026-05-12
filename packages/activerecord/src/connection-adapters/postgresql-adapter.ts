@@ -1861,11 +1861,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this._clientsNeedingDeallocateAll.has(client);
   }
 
-  /** @internal — underlying pg.Pool, for test instrumentation. */
-  _driverPoolForTest(): pg.Pool | null {
-    return this._driverPool;
-  }
-
   /**
    * Clear cached prepared statements on the currently-held transaction
    * client. Mirrors Rails' `PostgreSQLAdapter#clear_cache!` which
@@ -2959,7 +2954,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const { schema: fSchema, table: fTbl } = this.parseSchemaQualifiedName(String(f.toTable));
       if (fTbl !== toTbl) return false;
       // When the FK record has no schema prefix (PostgreSQL omits "public." when it
-      // is on the search path), treat it as matching any schema lookup or "public".
+      // is on the search_path), treat it as matching any schema lookup or "public".
       if (!fSchema) return !toSchema || toSchema === "public";
       return fSchema === toSchema;
     });
@@ -3844,6 +3839,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         return new LockWaitTimeout(msg, { sql, binds, cause });
       case "57014": // query_canceled
         return new QueryCanceled(msg, { sql, binds, cause });
+      case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
+        return new ConnectionNotEstablished(msg, { cause });
       default:
         // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
         // 5-char shape alone isn't enough — Node system errors like
@@ -4832,6 +4829,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): { oid: number; name: string; coderClass: string } | null {
     if (!coderClass) return null;
     return { oid: Number(row.oid), name: row.typname, coderClass };
+  }
+
+  /** @internal */
+  _driverPoolForTest(): pg.Pool | null {
+    return this._driverPool;
   }
 }
 

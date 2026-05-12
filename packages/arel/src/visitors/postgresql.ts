@@ -136,11 +136,12 @@ export class PostgreSQLWithBinds extends PostgreSQL {
   }
 
   protected override visitArelNodesCasted(node: Nodes.Casted | Nodes.Quoted): SQLString {
+    const value = resolveValueForDatabase(node.valueForDatabase());
     if (this._extractBinds) {
       this.bindIndex += 1;
-      this.collector.addBind(node.valueForDatabase(), () => `$${this.bindIndex}`);
+      this.collector.addBind(value, () => `$${this.bindIndex}`);
     } else {
-      this.collector.append(this.quote(node.valueForDatabase()));
+      this.collector.append(this.quote(value));
     }
     return this.collector;
   }

@@ -855,8 +855,13 @@ export class SchemaDumper {
       const opts: string[] = [];
       if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
       if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      // Mirrors Rails' export_name_on_schema_dump? — omit name when it matches the ignore pattern
-      if (fk.name && !fkIgnorePattern.test(fk.name)) opts.push(`name: ${JSON.stringify(fk.name)}`);
+      // Mirrors Rails' export_name_on_schema_dump? — delegate to FK object when available
+      // (ForeignKeyDefinition incorporates the fk_rails_ ignore-pattern check), else fall back.
+      const exportName =
+        "isExportNameOnSchemaDump" in (fk as object)
+          ? (fk as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
+          : fk.name != null && !fkIgnorePattern.test(fk.name);
+      if (exportName && fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
       if (fk.deferrable !== undefined && fk.deferrable !== false)

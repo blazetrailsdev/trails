@@ -70,6 +70,7 @@ import { ConnectionHandler } from "./connection-adapters/abstract/connection-han
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
 import { fireAdapterSetHook } from "./_adapter-set-hook.js";
+import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
@@ -549,9 +550,9 @@ export class Base extends Model {
   static readonly _isActiveRecordBase = true;
 
   /** Mirrors: ActiveRecord.writing_role */
-  static writingRole = "writing";
+  static writingRole = WRITING_ROLE;
   /** Mirrors: ActiveRecord.reading_role */
-  static readingRole = "reading";
+  static readingRole = READING_ROLE;
 
   // Mirrors: ActiveRecord::Base.filter_attributes = [] at class definition time.
   static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];

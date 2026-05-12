@@ -5,6 +5,7 @@
  */
 
 import { RecordNotFound } from "./errors.js";
+import { WRITING_ROLE } from "./roles.js";
 import { Notifications, getAsyncContext, ParameterFilter } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -347,7 +348,7 @@ export function currentRole(this: CoreHost): string {
       return entry.role;
     }
   }
-  return "writing";
+  return WRITING_ROLE;
 }
 
 export function currentShard(this: CoreHost): string {

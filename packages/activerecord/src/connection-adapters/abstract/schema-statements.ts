@@ -158,8 +158,9 @@ export class SchemaStatements {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    // Rails adds CASCADE only in the PG adapter override (pg/schema_statements.rb).
-    // We replicate that here: append CASCADE only when adapterName is "postgres".
+    // Rails adds CASCADE only in the PG adapter (pg/schema_statements.rb#drop_table).
+    // SchemaStatements wraps the adapter but calls executeMutation directly, so the
+    // PG adapter's dropTable override is bypassed. Mirror Rails by checking adapterName here.
     const cascade =
       options.force === "cascade" && this.adapterName === "postgres" ? " CASCADE" : "";
     for (const name of tableNames) {
