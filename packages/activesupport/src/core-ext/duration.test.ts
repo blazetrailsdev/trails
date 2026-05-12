@@ -484,10 +484,38 @@ describe("DurationTest", () => {
   });
 
   it("iso8601 parsing wrong patterns with raise", () => {
-    const invalid = ["", "P", "PT", "P1YT", "T", "PW", "P1Y1W", "~P1Y", ".P1Y"];
+    const invalid = [
+      "",
+      "P",
+      "PT",
+      "P1YT",
+      "T",
+      "PW",
+      "P1Y1W",
+      "~P1Y",
+      ".P1Y",
+      "-P",
+      "-PT",
+      "+P",
+      "+PT",
+      "P-1YT",
+      "P-1Y-1W",
+      "-P1YT",
+      "+P1YT",
+      "P1.5YT",
+      "P1,5YT",
+      "-P-1Y", // mixed overall sign + per-component sign would double-negate
+    ];
     for (const pattern of invalid) {
       expect(() => Duration.parse(pattern)).toThrow();
     }
+  });
+
+  it("iso8601 parsing per-component negatives (PG intervalstyle=iso_8601)", () => {
+    // PG emits e.g. "P-1Y-2D" for "1 year 2 days ago".
+    expect(Duration.parse("P-1Y-2D").eql(Duration.years(-1).plus(Duration.days(-2)))).toBe(true);
+    expect(Duration.parse("P-21D").eql(Duration.days(-21))).toBe(true);
+    expect(Duration.parse("PT-3H").eql(Duration.hours(-3))).toBe(true);
   });
 
   it("iso8601 output", () => {

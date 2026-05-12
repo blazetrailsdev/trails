@@ -307,29 +307,54 @@ export class Duration {
 
   // ISO 8601 parsing
   static parse(iso: string): Duration {
-    if (!iso || iso === "P" || iso === "PT" || iso === "T" || /^[~.]/.test(iso)) {
+    if (
+      !iso ||
+      iso === "P" ||
+      iso === "PT" ||
+      iso === "-P" ||
+      iso === "-PT" ||
+      iso === "+P" ||
+      iso === "+PT" ||
+      iso === "T" ||
+      /^[~.]/.test(iso)
+    ) {
+      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
+    }
+
+    // A trailing `T` (e.g. "P1YT", "P1.5YT") is invalid: the time designator
+    // requires at least one of H/M/S after it. The main regex's optional time
+    // group would otherwise accept these.
+    if (iso.endsWith("T")) {
       throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
     }
 
     const moreInvalidPatterns = [
-      /^P\d+YT$/,
-      /^PW$/,
-      /^P\d+Y\d+W/,
-      /^P\d+\.\d+Y\d+\.\d+M/,
-      /^P\d+\.\d+MT\d+\.\d+S/,
+      /^[+-]?PW$/,
+      /^[+-]?P-?\d+Y-?\d+W/,
+      /^[+-]?P-?\d+\.\d+Y-?\d+\.\d+M/,
+      /^[+-]?P-?\d+\.\d+MT-?\d+\.\d+S/,
     ];
     for (const p of moreInvalidPatterns) {
       if (p.test(iso)) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
     }
 
+    // PG's intervalstyle=iso_8601 emits per-component signs (e.g. "P-1Y-2D"),
+    // so allow an optional leading `-` on each component in addition to the
+    // single overall sign Rails uses.
     const pattern =
-      /^([+-])?P(?:(\d+(?:[.,]\d+)?)Y)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)W)?(?:(\d+(?:[.,]\d+)?)D)?(?:T(?:(\d+(?:[.,]\d+)?)H)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)S)?)?$/;
+      /^([+-])?P(?:(-?\d+(?:[.,]\d+)?)Y)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)W)?(?:(-?\d+(?:[.,]\d+)?)D)?(?:T(?:(-?\d+(?:[.,]\d+)?)H)?(?:(-?\d+(?:[.,]\d+)?)M)?(?:(-?\d+(?:[.,]\d+)?)S)?)?$/;
 
     const match = pattern.exec(iso.replace(/,/g, "."));
     if (!match) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
 
+    // Reject mixing the overall `-` sign with any per-component `-`: combining
+    // them would silently double-negate (e.g. "-P-1Y" parsing to +1Y).
+    if (match[1] === "-" && match.slice(2).some((c) => c?.startsWith("-"))) {
+      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
+    }
+
     const sign = match[1] === "-" ? -1 : 1;
-    const parse = (s: string | undefined) => (s ? parseFloat(s.replace(",", ".")) * sign : 0);
+    const parse = (s: string | undefined) => (s ? parseFloat(s) * sign : 0);
 
     return new Duration({
       years: parse(match[2]),
