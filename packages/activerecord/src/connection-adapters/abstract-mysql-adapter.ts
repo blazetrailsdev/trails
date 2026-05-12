@@ -109,6 +109,17 @@ const ER_TABLE_EXISTS = 1050;
 const RENAME_FUNC_DEFAULT_RE =
   /^(CURRENT_TIMESTAMP(\([0-6]?\))?|NOW(\([0-6]?\))?|CURRENT_DATE|CURRENT_TIME(\([0-6]?\))?|UUID\(\))$/i;
 
+// eslint-disable-next-line no-control-regex
+const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
+const QUOTE_STRING_MAP: Record<string, string> = {
+  "'": "\\'",
+  "\\": "\\\\",
+  "\0": "\\0",
+  "\n": "\\n",
+  "\r": "\\r",
+  "\x1a": "\\Z",
+};
+
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
 
@@ -709,19 +720,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Escape-only string quoting per the Quoting interface contract
    * (`abstract/quoting-interface.ts`). Mirrors Rails MySQL
-   * `quote_string` (`mysql/quoting.rb`): doubles `'` and backslash-
-   * escapes the same control chars MySQL's wire protocol requires.
-   * Distinct from the per-module `mysqlQuoteString` standalone, which
-   * wraps with surrounding `'...'` for SQL-literal contexts.
+   * `quote_string` (`abstract_mysql_adapter.rb`): backslash-escapes
+   * `'` and the control chars MySQL's wire protocol requires (`\0 \n
+   * \r \Z \\`). Distinct from the per-module `mysqlQuoteString`
+   * standalone, which wraps with surrounding `'...'` for SQL-literal
+   * contexts.
    */
   override quoteString(s: string): string {
-    return s
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/\x00/g, "\\0") // eslint-disable-line no-control-regex
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\x1a/g, "\\Z"); // eslint-disable-line no-control-regex
+    return s.replace(QUOTE_STRING_RE, (ch) => QUOTE_STRING_MAP[ch] ?? ch);
   }
 
   static dbconsole(
