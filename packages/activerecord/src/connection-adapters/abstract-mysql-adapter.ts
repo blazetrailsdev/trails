@@ -214,7 +214,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * MySQL dialect overrides — backtick identifiers and integer bool
    * coercion. Matches Rails:
    *
-   * - `quote_column_name` / `quote_table_name` — backticks
+   * - `quote_column_name` / `quote_table_name` / `quote_identifier` — backticks
    *   (`mysql/quoting.rb:48-53`).
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
@@ -223,44 +223,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * these — it inherits `"TRUE"`/`"FALSE"` from `abstract/quoting.rb:166`.
    * Trails MySQL's per-module standalone returns `"1"`/`"0"` (a
    * pre-existing trails-vs-Rails divergence; not addressed here). We
-   * override on the adapter so `quote(true)` and `quotedTrue()` agree
-   * (both `"1"` via the per-module standalone). Without the override
-   * the adapter
-   * would inherit AbstractAdapter#quotedTrue (`"TRUE"`) while
+   * assign them here so `quote(true)` and `quotedTrue()` agree (both
+   * `"1"` via the per-module standalone). Without the assignment the
+   * adapter would inherit AbstractAdapter#quotedTrue (`"TRUE"`) while
    * `quote()` returns `"1"`, breaking call sites that switch between
    * the two through the Quoting interface.
    */
-  override quoteIdentifier(name: string): string {
-    return mysqlQuoteIdentifier(name);
-  }
-
-  override quoteTableName(name: string): string {
-    return mysqlQuoteTableName(name);
-  }
-
-  override quoteColumnName(name: string): string {
-    return mysqlQuoteColumnName(name);
-  }
+  override quoteIdentifier = mysqlQuoteIdentifier;
+  override quoteTableName = mysqlQuoteTableName;
+  override quoteColumnName = mysqlQuoteColumnName;
+  override quotedTrue = mysqlQuotedTrue;
+  override quotedFalse = mysqlQuotedFalse;
+  override unquotedTrue = mysqlUnquotedTrue;
+  override unquotedFalse = mysqlUnquotedFalse;
 
   /** @internal */
   override get arelVisitor(): Visitors.ToSql {
     return new Visitors.MySQL(this);
-  }
-
-  override quotedTrue(): string {
-    return mysqlQuotedTrue();
-  }
-
-  override quotedFalse(): string {
-    return mysqlQuotedFalse();
-  }
-
-  override unquotedTrue(): number {
-    return mysqlUnquotedTrue();
-  }
-
-  override unquotedFalse(): number {
-    return mysqlUnquotedFalse();
   }
 
   /**
