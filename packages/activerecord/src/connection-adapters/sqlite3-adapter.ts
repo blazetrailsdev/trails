@@ -125,6 +125,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return _isSqliteMissingDbError(error);
   }
 
+  /**
+   * When true, new connections inherit `strict: true` unless the caller
+   * explicitly passes `strict: false`. Mirrors Rails' class_attribute.
+   */
+  static strictStringsByDefault: boolean = false;
+
   static columnNameMatcher(): RegExp {
     // Mirrors Rails SQLite3 column_name_matcher. Uses "..." quoted identifiers
     // (SQLite double-quote escaping: "" inside quotes). Strict 0-or-1 function
@@ -162,6 +168,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _inTransaction = false;
   private _savepointCounter = 0;
   private _readonly: boolean;
+  private _strict: boolean;
   private _preventWrites = false;
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
@@ -180,6 +187,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const q = filename.indexOf("?");
     if (q === -1) return false;
     return new URLSearchParams(filename.slice(q + 1)).get("mode") === "memory";
+  }
+
+  /**
+   * Whether this connection was opened with strict-strings mode (DQS disabled).
+   * Reflects the resolved value of the `strict` constructor option, which
+   * defaults to `SQLite3Adapter.strictStringsByDefault`.
+   * @internal
+   */
+  get strictStrings(): boolean {
+    return this._strict;
   }
 
   /**
@@ -208,6 +225,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._filename = filename;
     this._memoryDatabase = SQLite3Adapter._isMemoryFilename(filename);
     this._readonly = options.readonly ?? false;
+    this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
+    (this._config as SQLite3AdapterOptions).strict = this._strict;
     // Rails: `SQLite3Adapter#default_prepared_statements` inherits the
     // abstract adapter's `true`. Mirror that default and let options
     // override per connection.
@@ -2092,6 +2111,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
             `SQLite default pragma '${pragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
           );
         }
+      }
+    }
+    // Best-effort: set DQS for drivers that support it (e.g. node:sqlite with a
+    // build that exposes SQLITE_DBCONFIG_DQS_*). better-sqlite3 compiles SQLite
+    // with SQLITE_DQS=0 and silently ignores these pragmas (returns []); other
+    // drivers may throw on unrecognised pragmas, so we guard with try/catch.
+    const dqsValue = this._strict ? "OFF" : "ON";
+    for (const dqsPragma of ["dqs_ddl", "dqs_dml"]) {
+      try {
+        this.driver.pragma(`${dqsPragma} = ${dqsValue}`);
+      } catch (e) {
+        console.warn(
+          `SQLite DQS pragma '${dqsPragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;

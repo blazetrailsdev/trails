@@ -49,6 +49,9 @@ export interface SQLite3AdapterOptions extends TrailsAdapterOptions {
   // String values must be identifier-like enum words (e.g. "WAL", "NORMAL") — arbitrary
   // strings are warned and skipped. Numbers and booleans are always accepted (boolean → "1"/"0").
   pragmas?: Record<string, string | number | boolean>;
+  // Mirrors: database.yml `strict:` — disables double-quoted string literal fallback
+  // (DQS) at the connection level. Defaults to SQLite3Adapter.strictStringsByDefault.
+  strict?: boolean;
 }
 
 /**

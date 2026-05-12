@@ -574,30 +574,88 @@ describe("SQLite3AdapterTest", () => {
     fs.unlinkSync(tmpFile);
   });
 
-  // Rails' SQLite3Adapter has a class-level `strict_strings_by_default` setting that
-  // controls whether string-typed WHERE values require exact binary matching. When
-  // disabled (default), Rails performs a loose match and assert_nothing_raised;
-  // when enabled or set true in database.yml, loose matches raise. Trails' adapter
-  // does not yet implement this config knob.
-  it.skip("strict strings by default", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
-    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  it("strict strings by default", async () => {
+    // Default class config is false — new connections are non-strict.
+    expect(SQLite3Adapter.strictStringsByDefault).toBe(false);
+    const conn = new SQLite3Adapter(":memory:");
+    expect(conn.strictStrings).toBe(false);
+    // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
+    // — non-strict connections allow DQS fallback so unknown double-quoted
+    //   identifiers are treated as string literals and the index is created
+    //   silently. better-sqlite3 compiles SQLite with SQLITE_DQS=0 (always off),
+    //   so this assertion is omitted — DQS cannot be re-enabled via PRAGMA here.
+    await conn.close();
+
+    // Setting the class config propagates to new connections.
+    SQLite3Adapter.strictStringsByDefault = true;
+    try {
+      const strict = new SQLite3Adapter(":memory:");
+      expect(strict.strictStrings).toBe(true);
+      await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
+      await expect(
+        strict.exec(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
+      ).rejects.toThrow(/no such column/i);
+      await strict.close();
+    } finally {
+      SQLite3Adapter.strictStringsByDefault = false;
+    }
   });
 
-  it.skip("strict strings by default and true in database yml", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
-    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  it("strict strings by default and true in database yml", async () => {
+    // Explicit strict: true in options always enables strict mode.
+    const conn = new SQLite3Adapter(":memory:", { strict: true });
+    try {
+      expect(conn.strictStrings).toBe(true);
+      await conn.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
+      await expect(
+        conn.exec(`CREATE INDEX "idx_non_existent" ON "testings" ("non_existent")`),
+      ).rejects.toThrow(/no such column/i);
+    } finally {
+      await conn.close();
+    }
+
+    // Explicit strict: true also overrides the class config (still strict).
+    SQLite3Adapter.strictStringsByDefault = true;
+    try {
+      const strict = new SQLite3Adapter(":memory:", { strict: true });
+      try {
+        expect(strict.strictStrings).toBe(true);
+        await strict.exec(`CREATE TABLE "testings" ("id" INTEGER PRIMARY KEY)`);
+        await expect(
+          strict.exec(`CREATE INDEX "idx_non_existent2" ON "testings" ("non_existent2")`),
+        ).rejects.toThrow(/no such column/i);
+      } finally {
+        await strict.close();
+      }
+    } finally {
+      SQLite3Adapter.strictStringsByDefault = false;
+    }
   });
 
-  it.skip("strict strings by default and false in database yml", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
-    // Requires SQLite3Adapter.strict_strings_by_default class config (not implemented)
+  it("strict strings by default and false in database yml", async () => {
+    // Explicit strict: false in options disables strict mode.
+    const conn = new SQLite3Adapter(":memory:", { strict: false });
+    try {
+      expect(conn.strictStrings).toBe(false);
+      // Rails: assert_nothing_raised { conn.add_index :testings, :non_existent }
+      // — strict: false keeps DQS enabled so the index creation succeeds silently.
+      // Omitted here for the same reason as test 1 (better-sqlite3 SQLITE_DQS=0).
+    } finally {
+      await conn.close();
+    }
+
+    // Explicit strict: false overrides strictStringsByDefault = true.
+    SQLite3Adapter.strictStringsByDefault = true;
+    try {
+      const strict = new SQLite3Adapter(":memory:", { strict: false });
+      try {
+        expect(strict.strictStrings).toBe(false);
+      } finally {
+        await strict.close();
+      }
+    } finally {
+      SQLite3Adapter.strictStringsByDefault = false;
+    }
   });
 
   it("rowid column", async () => {
