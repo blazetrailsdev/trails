@@ -2118,11 +2118,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // with SQLITE_DQS=0 and silently ignores these pragmas (returns []); other
     // drivers may throw on unrecognised pragmas, so we guard with try/catch.
     const dqsValue = this._strict ? "OFF" : "ON";
-    try {
-      this.driver.pragma(`dqs_ddl = ${dqsValue}`);
-      this.driver.pragma(`dqs_dml = ${dqsValue}`);
-    } catch {
-      // Pragma unsupported by this driver build — DQS state is driver-defined.
+    for (const dqsPragma of ["dqs_ddl", "dqs_dml"]) {
+      try {
+        this.driver.pragma(`${dqsPragma} = ${dqsValue}`);
+      } catch (e) {
+        console.warn(
+          `SQLite DQS pragma '${dqsPragma}' failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
     const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
     if (pragmas) {
