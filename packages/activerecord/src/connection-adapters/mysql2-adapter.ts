@@ -15,7 +15,6 @@ import {
   SQLWarning,
 } from "../errors.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
-import { quoteString as mysqlQuoteString } from "./mysql/quoting.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
@@ -237,7 +236,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       // Mirrors Rails Mysql2Adapter#initialize: always ensure FOUND_ROWS is set.
       this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
-      this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
       return;
     }
     // See PostgreSQLAdapter#constructor: Rails' database.yml merges
@@ -280,7 +279,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       waitTimeout,
       variables,
     };
-    this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
   }
 
   /** Returns true for raw mysql2 errors that indicate the database doesn't exist (ER_BAD_DB_ERROR). */
@@ -297,7 +296,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // close() sets _permanentlyClosed so we don't silently reopen after teardown.
     if (!this._driverPool) {
       if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
-      this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+      this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
       this._activeState = true;
     }
     try {
@@ -1056,7 +1055,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override reconnectBang(): void {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
     this.disconnectBang();
-    this._driverPool = Mysql2Adapter.newClient(this._poolConfig);
+    this._driverPool = Mysql2Adapter.newClient(this._poolConfig, this._buildInitSql());
     this._activeState = true;
   }
 
@@ -1163,9 +1162,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
          USING (constraint_schema, constraint_name)
        WHERE fk.referenced_column_name IS NOT NULL
          AND fk.table_schema = DATABASE()
-         AND fk.table_name = ${mysqlQuoteString(tableName)}
+         AND fk.table_name = ${this.quote(tableName)}
          AND rc.constraint_schema = DATABASE()
-         AND rc.table_name = ${mysqlQuoteString(tableName)}
+         AND rc.table_name = ${this.quote(tableName)}
        ORDER BY fk.constraint_name, fk.ordinal_position`,
     )) as Array<Record<string, unknown>>;
 
@@ -1267,7 +1266,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return false;
   }
 
-  static newClient(config: mysql.PoolOptions & MysqlAdapterOptions): mysql.Pool {
+  /** @internal */
+  static newClient(config: mysql.PoolOptions & MysqlAdapterOptions, initSql: string): mysql.Pool {
     // With supportBigNumbers:true, mysql2 returns a decimal string for BIGINT
     // values with ≥15 digits (i.e. ≥ 10^14) where parseInt would lose precision,
     // and a JS number for smaller values. Both are handled by BigIntegerType.cast().
@@ -1277,22 +1277,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Compose our Temporal typeCast with any user-supplied typeCast so callers
     // can still intercept non-temporal fields (e.g. custom ENUM handling) without
     // losing Temporal parsing on temporal columns.
+
     const {
-      strict,
-      waitTimeout,
-      variables: configVars,
       typeCast: userTypeCast,
+      strict: _strict,
+      waitTimeout: _wt,
+      variables: _vars,
       ...poolOptions
     } = config;
-    // Build configure_connection SET clauses before createPool — mirrors AbstractMysqlAdapter#configure_connection.
-    // time_zone is included here so all session setup is sent as ONE query, queued
-    // synchronously in the 'connection' handler before mysql2 adds the connection to its
-    // free-connection list. A second chained rawConn.query() inside the callback of the
-    // first would race against the caller's query (mysql2 makes the connection available
-    // after emitting 'connection', before our callbacks fire).
-    // Computed before createPool so a validation throw (e.g. bad variable name) doesn't leak a live pool.
-    const sessionClauses = buildConfigureConnectionClauses(strict, waitTimeout, configVars);
-    const initSql = `SET time_zone = '+00:00', ${sessionClauses}`;
 
     const composedTypeCast =
       typeof userTypeCast === "function"
@@ -1394,70 +1386,68 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       if (typeof action === "function") action(warning);
     }
   }
-}
 
-// Mirrors AbstractMysqlAdapter#configure_connection.
-// Returns the comma-separated SET clause list (without the SET keyword) for
-// wait_timeout, sql_mode (per strict flag), and arbitrary session variables.
-// The caller prepends additional clauses (e.g. time_zone) so everything is
-// sent as one atomic SET statement.
-function buildConfigureConnectionClauses(
-  strict: boolean | "default" | undefined,
-  waitTimeout: number | string | undefined,
-  configVars: Record<string, string | number | boolean | null | ":default" | "default"> | undefined,
-): string {
-  const vars: Record<string, string | number | boolean | null | ":default" | "default"> = {
-    ...(configVars ?? {}),
-  };
+  // Mirrors AbstractMysqlAdapter#configure_connection.
+  // Builds and returns the full SET statement (including the SET keyword and time_zone)
+  // for wait_timeout, sql_mode (per strict flag), and arbitrary session variables.
+  // Called before createPool so a validation throw doesn't leak a live pool.
+  /** @internal */
+  private _buildInitSql(): string {
+    const { strict, waitTimeout, variables: configVars } = this._poolConfig;
+    const vars: Record<string, string | number | boolean | null | ":default" | "default"> = {
+      ...(configVars ?? {}),
+    };
 
-  // Validate variable names before interpolating into SQL — matches the pattern used
-  // by PostgreSQLAdapter and SQLite3Adapter to catch misconfigured keys early.
-  const SAFE_VAR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-  for (const k of Object.keys(vars)) {
-    if (!SAFE_VAR_NAME.test(k)) {
-      throw new Error(`Invalid MySQL session variable name: ${JSON.stringify(k)}`);
+    // Validate variable names before interpolating into SQL — matches the pattern used
+    // by PostgreSQLAdapter and SQLite3Adapter to catch misconfigured keys early.
+    const SAFE_VAR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+    for (const k of Object.keys(vars)) {
+      if (!SAFE_VAR_NAME.test(k)) {
+        throw new Error(`Invalid MySQL session variable name: ${JSON.stringify(k)}`);
+      }
     }
-  }
 
-  const wt = typeof waitTimeout === "string" ? parseInt(waitTimeout, 10) : waitTimeout;
-  vars["wait_timeout"] = Number.isInteger(wt) ? (wt as number) : 2147483;
+    const wt = typeof waitTimeout === "string" ? parseInt(waitTimeout, 10) : waitTimeout;
+    vars["wait_timeout"] = Number.isInteger(wt) ? (wt as number) : 2147483;
 
-  const DEFAULTS = new Set([":default", "default"]);
+    const DEFAULTS = new Set([":default", "default"]);
 
-  let sqlMode: string | undefined;
-  const varSqlMode = vars["sql_mode"];
-  if (varSqlMode !== undefined && varSqlMode !== null) {
-    // Mirrors Rails: `if sql_mode = variables.delete("sql_mode")` — nil is falsy in Ruby,
-    // so null falls through to the strict-mode branch below.
-    delete vars["sql_mode"];
-    sqlMode = mysqlQuoteString(String(varSqlMode));
-  } else if (!DEFAULTS.has(strict as string)) {
-    if (strict !== false) {
-      sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
+    let sqlMode: string | undefined;
+    const varSqlMode = vars["sql_mode"];
+    if (varSqlMode !== undefined && varSqlMode !== null) {
+      // Mirrors Rails: `if sql_mode = variables.delete("sql_mode")` — nil is falsy in Ruby,
+      // so null falls through to the strict-mode branch below.
+      delete vars["sql_mode"];
+      sqlMode = this.quote(String(varSqlMode));
+    } else if (!DEFAULTS.has(strict as string)) {
+      if (strict !== false) {
+        sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
+      } else {
+        sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
+        sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
+        sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
+      }
+      sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
     } else {
-      sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
-      sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
-      sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
+      // strict: "default" — sync session to global, counteracting mysql2 Node.js
+      // CLIENT_IGNORE_SPACE flag which otherwise adds IGNORE_SPACE to session sql_mode.
+      sqlMode = "@@GLOBAL.sql_mode";
     }
-    sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
-  } else {
-    // strict: "default" — sync session to global, counteracting mysql2 Node.js
-    // CLIENT_IGNORE_SPACE flag which otherwise adds IGNORE_SPACE to session sql_mode.
-    sqlMode = "@@GLOBAL.sql_mode";
+
+    const sqlModeClause = sqlMode ? `@@SESSION.sql_mode = ${sqlMode}` : "";
+
+    const varClauses = Object.entries(vars)
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([k, v]) => {
+        if (DEFAULTS.has(String(v))) return `@@SESSION.${k} = DEFAULT`;
+        if (typeof v === "number") return `@@SESSION.${k} = ${v}`;
+        if (typeof v === "boolean") return `@@SESSION.${k} = '${v ? 1 : 0}'`;
+        return `@@SESSION.${k} = ${this.quote(String(v))}`;
+      });
+
+    const sessionClauses = [sqlModeClause, ...varClauses].filter(Boolean).join(", ");
+    return `SET time_zone = '+00:00', ${sessionClauses}`;
   }
-
-  const sqlModeClause = sqlMode ? `@@SESSION.sql_mode = ${sqlMode}` : "";
-
-  const varClauses = Object.entries(vars)
-    .filter(([, v]) => v !== null && v !== undefined)
-    .map(([k, v]) => {
-      if (DEFAULTS.has(String(v))) return `@@SESSION.${k} = DEFAULT`;
-      if (typeof v === "number") return `@@SESSION.${k} = ${v}`;
-      if (typeof v === "boolean") return `@@SESSION.${k} = '${v ? 1 : 0}'`;
-      return `@@SESSION.${k} = ${mysqlQuoteString(String(v))}`;
-    });
-
-  return [sqlModeClause, ...varClauses].filter(Boolean).join(", ");
 }
 
 /** @internal */
