@@ -9,6 +9,7 @@ import type { Base } from "./base.js";
 import type { ValidationContextArg } from "./validations.js";
 import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
 import type { AssociationDefinition } from "./associations.js";
+import { AssociationNotFoundError } from "./associations/errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
 
@@ -46,8 +47,13 @@ function _loadedAssociation(record: any, name: string): any | null {
   // would surface stale target data here.
   //
   // Rails' helper never throws (only reads `@association_cache[name]`);
-  // ours can if the name is unknown or the class can't be resolved. Mirror
-  // the nil-means-skip semantics by returning null on any throw.
+  // ours can if the name is unknown. Only swallow `AssociationNotFoundError`
+  // (matches Rails' nil return for unknown names — `associations.rb:52-58`
+  // would raise it via `record.association(name)` but `association_instance_get`
+  // never does). Configuration errors from `validateThroughReflection`
+  // (through-reflection / inverse-of validity, `validate-through-reflection.ts`)
+  // must propagate so misconfiguration surfaces loudly, matching Rails'
+  // `Reflection#check_validity!`.
   const existing = record.associationInstanceGet?.(name);
   if (typeof record.association !== "function") {
     return existing?.isLoaded?.() ? existing : null;
@@ -60,8 +66,9 @@ function _loadedAssociation(record: any, name: string): any | null {
   try {
     const inst = record.association(name);
     return inst?.isLoaded?.() ? inst : null;
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof AssociationNotFoundError) return null;
+    throw err;
   }
 }
 
