@@ -5,6 +5,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -648,7 +649,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids");
         expect(output).toMatch(/createTable\("pg_uuids".*id: "uuid"/);
-        expect(output).toMatch(/default: "gen_random_uuid\(\)"/);
+        expect(output).toMatch(/default: \(\) => "gen_random_uuid\(\)"/);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS pg_uuids`);
       }
@@ -656,20 +657,21 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dumper for uuid primary key with custom default", async () => {
       await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_2`);
-      await adapter.exec(`
-        CREATE OR REPLACE FUNCTION my_uuid_generator() RETURNS uuid
-        AS $$ SELECT gen_random_uuid() $$ LANGUAGE SQL VOLATILE
-      `);
-      await adapter.exec(`
-        CREATE TABLE pg_uuids_2 (
-          id uuid DEFAULT my_uuid_generator() PRIMARY KEY,
-          name text
-        )
-      `);
+      await adapter.exec(`DROP FUNCTION IF EXISTS my_uuid_generator()`);
       try {
+        await adapter.exec(`
+          CREATE OR REPLACE FUNCTION my_uuid_generator() RETURNS uuid
+          AS $$ SELECT gen_random_uuid() $$ LANGUAGE SQL VOLATILE
+        `);
+        await adapter.exec(`
+          CREATE TABLE pg_uuids_2 (
+            id uuid DEFAULT my_uuid_generator() PRIMARY KEY,
+            name text
+          )
+        `);
         const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_2");
         expect(output).toMatch(
-          /createTable\("pg_uuids_2".*id: "uuid".*default: "my_uuid_generator\(\)"/,
+          /createTable\("pg_uuids_2".*id: "uuid".*default: \(\) => "my_uuid_generator\(\)"/,
         );
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_2`);
@@ -688,10 +690,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_3");
         expect(output).toMatch(
-          /createTable\("pg_uuids_3".*id: "uuid".*default: "gen_random_uuid\(\)"/,
+          /createTable\("pg_uuids_3".*id: "uuid".*default: \(\) => "gen_random_uuid\(\)"/,
         );
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_3`);
+      }
+    });
+
+    it("createTable round-trips uuid PK default", async () => {
+      const ss = new SchemaStatements(adapter);
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
+      try {
+        await ss.createTable("pg_uuids_rt", {
+          id: "uuid",
+          default: () => "gen_random_uuid()",
+          force: "cascade",
+        });
+        const rows = await adapter.execute(
+          `SELECT column_default FROM information_schema.columns
+           WHERE table_name = 'pg_uuids_rt' AND column_name = 'id'`,
+        );
+        expect(rows[0].column_default).toMatch(/gen_random_uuid/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
       }
     });
 

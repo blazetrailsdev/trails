@@ -329,7 +329,7 @@ class AdapterSchemaSource implements SchemaSource {
       primaryKey: col.primaryKey,
       null: col.null,
       default: col.default,
-      defaultFunction: (col as any).defaultFunction ?? null,
+      defaultFunction: col.defaultFunction ?? null,
       limit: col.limit ?? undefined,
       precision: col.precision === undefined ? undefined : col.precision,
       scale: col.scale ?? undefined,
@@ -686,8 +686,15 @@ export class SchemaDumper {
    */
   protected primaryKeyTableOptions(column: ColumnInfo): Record<string, unknown> {
     if (column.type === "uuid") {
-      const def = column.defaultFunction ?? cleanDefault(column.default);
-      return { id: "uuid", default: def == null ? null : def };
+      const fn = column.defaultFunction;
+      if (typeof fn === "string" && fn.length > 0) {
+        // Emit as arrow returning the SQL expression — mirrors Rails'
+        // `default: -> { "gen_random_uuid()" }` and round-trips through
+        // `quoteDefaultExpression`, which routes function defaults to raw SQL.
+        return { id: "uuid", default: () => fn };
+      }
+      const literal = cleanDefault(column.default);
+      return { id: "uuid", default: literal == null ? null : literal };
     }
     return {};
   }
@@ -915,7 +922,15 @@ export class SchemaDumper {
   formatOptions(options: Record<string, unknown>): string {
     const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(options)
-      .map(([k, v]) => `${isIdent.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`)
+      .map(([k, v]) => {
+        const key = isIdent.test(k) ? k : JSON.stringify(k);
+        if (typeof v === "function") {
+          // Emit as an arrow returning the SQL expression — mirrors Rails'
+          // `-> { "fn()" }` syntax in dumped `schema.rb`.
+          return `${key}: () => ${JSON.stringify((v as () => unknown)())}`;
+        }
+        return `${key}: ${JSON.stringify(v)}`;
+      })
       .join(", ");
   }
 
