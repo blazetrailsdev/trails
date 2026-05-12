@@ -15,14 +15,8 @@ export class Enum extends ValueType<string> {
     return "enum";
   }
 
-  /** Rails' cast_value is `value.to_s` — matches `String(value)` here. */
-  cast(value: unknown): string | null {
-    if (value == null) return null;
+  /** @internal Mirrors: PostgreSQL::OID::Enum#cast_value (enum.rb:13). */
+  protected override castValue(value: unknown): string {
     return String(value);
   }
-}
-
-/** @internal */
-function castValue(value: unknown): string {
-  return String(value);
 }

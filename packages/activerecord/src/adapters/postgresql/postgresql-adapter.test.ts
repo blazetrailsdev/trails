@@ -808,11 +808,31 @@ describeIfPg("PostgreSQLAdapter", () => {
       // directly. 57P01 → ConnectionNotEstablished translation is verified by the
       // reconnection_error test above (fake pool injection path).
     });
-    it.skip("reload type map for newly defined types", async () => {
-      // BLOCKED: TypeMapInitializer registers enum OIDs as generic types, not OID::Enum.
+    it("reload type map for newly defined types", async () => {
+      const { Enum: OidEnum } = await import("../../connection-adapters/postgresql/oid/enum.js");
+      await adapter.createEnum("feeling", ["good", "bad"]);
+      try {
+        const result = await adapter.execQuery(`SELECT 'good'::feeling AS feeling`);
+        expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
+      } finally {
+        await adapter.dropEnum("feeling", { ifExists: true });
+      }
     });
-    it.skip("unparsed defaults are at least set when saving", async () => {
-      // BLOCKED: Column.defaultFunction null for arithmetic defaults; reload() gap.
+    it("unparsed defaults are at least set when saving", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_unparsed_defaults" (id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4)`,
+      );
+      const cols = await adapter.columns("ex_unparsed_defaults");
+      const numberCol = cols.find((c) => c.name === "number")!;
+      // Rails: arithmetic-expression defaults — extract_value_from_default and
+      // extract_default_function both return nil; the column carries neither a
+      // literal default nor a SQL function. The DB still applies the default
+      // on INSERT, so save! must NOT emit `number = NULL`.
+      expect(numberCol.default).toBeNull();
+      expect(numberCol.defaultFunction == null).toBe(true);
+      await adapter.exec(`INSERT INTO "ex_unparsed_defaults" DEFAULT VALUES`);
+      const rows = await adapter.execute(`SELECT number FROM "ex_unparsed_defaults"`);
+      expect(Number(rows[0].number)).toBe(4);
     });
     it("only check for insensitive comparison capability once", async () => {
       await adapter.execute(`CREATE DOMAIN example_type AS integer`);
@@ -893,9 +913,26 @@ describeIfPg("PostgreSQLAdapter", () => {
         ).rejects.toBeInstanceOf(SQLWarning);
       });
 
-      it.skip("reports when behaviour report", async () => {
-        // BLOCKED: Requires Rails.error / ErrorReporter global singleton.
-        // ErrorReporter class exists (activesupport) but not yet wired as Rails.error.
+      it("reports when behaviour report", async () => {
+        const { ErrorReporter, setErrorReporter } = await import("@blazetrails/activesupport");
+        PostgreSQLAdapter.dbWarningsAction = "report";
+        const reporter = new ErrorReporter();
+        const events: Array<{ error: Error; handled: boolean }> = [];
+        reporter.subscribe({
+          report: ({ error, handled }) => {
+            events.push({ error, handled });
+          },
+        });
+        setErrorReporter(reporter);
+        try {
+          await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
+          expect(events).toHaveLength(1);
+          expect(events[0].error).toBeInstanceOf(SQLWarning);
+          expect(events[0].error.message).toBe("PostgreSQL SQL warning");
+          expect(events[0].handled).toBe(true);
+        } finally {
+          setErrorReporter(null);
+        }
       });
 
       it("warnings behaviour can be customized with a proc", async () => {
