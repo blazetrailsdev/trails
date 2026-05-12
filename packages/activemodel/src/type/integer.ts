@@ -32,6 +32,14 @@ export class IntegerType extends NumericValueType {
    *     return if value.blank?
    *     value.to_i
    *   end
+   *
+   * Trails divergence: Rails calls `value.to_i`, which returns `0` for purely
+   * non-numeric strings (`"abc".to_i # => 0`) and parses leading digits
+   * (`"12abc".to_i # => 12`). Trails delegates to `castValue`, which uses
+   * `parseInt`: leading-digit strings still parse (`"12abc" → 12`), but
+   * fully non-numeric strings return `null` rather than `0`. Deserialize
+   * inputs come from the database driver — non-numeric junk is not a real
+   * input — so the divergence is theoretical, but documented here for fidelity.
    */
   deserialize(value: unknown): number | null {
     if (isBlank(value)) return null;

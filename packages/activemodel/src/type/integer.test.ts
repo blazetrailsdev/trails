@@ -57,6 +57,34 @@ describe("IntegerTest", () => {
     expect(type.cast("0")).toBe(0);
   });
 
+  // Mirrors: ActiveModel::Type::Integer#deserialize (integer.rb:60-63).
+  // Rails: blank → nil; otherwise value.to_i.
+  it("deserialize returns null for blank values", () => {
+    expect(type.deserialize(null)).toBeNull();
+    expect(type.deserialize(undefined)).toBeNull();
+    expect(type.deserialize("")).toBeNull();
+    expect(type.deserialize("   ")).toBeNull();
+  });
+
+  it("deserialize parses numeric strings", () => {
+    expect(type.deserialize("123")).toBe(123);
+    expect(type.deserialize("-45")).toBe(-45);
+    expect(type.deserialize("0")).toBe(0);
+  });
+
+  it("deserialize passes numbers through truncated like Rails to_i", () => {
+    expect(type.deserialize(42)).toBe(42);
+    expect(type.deserialize(3.9)).toBe(3);
+    expect(type.deserialize(-3.9)).toBe(-3);
+  });
+
+  it("deserialize on booleans bypasses Numeric helper (Rails to_i path)", () => {
+    // Rails: true.to_i raises NoMethodError; isBlank(false) is true, so false → null.
+    // true is not blank → castValue(true) → parseInt("true") → null.
+    expect(type.deserialize(false)).toBeNull();
+    expect(type.deserialize(true)).toBeNull();
+  });
+
   it("casting empty string", () => {
     expect(type.cast("")).toBeNull();
   });
