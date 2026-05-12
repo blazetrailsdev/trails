@@ -852,13 +852,6 @@ describe("TransactionTest", () => {
     expect(called).toBe(1);
   });
   it("rollback dirty changes then retry save on new record", async () => {
-    // Rails also asserts topic.changes["title"] == [nil, "Ruby on Rails"] after
-    // rollback (dirty tracking preserved), and topic.saved_changes["title"] after
-    // re-save. Those assertions currently fail: restoreTransactionRecordState
-    // (called from tx.afterRollback) re-writes the PK via _attributes.set() after
-    // _restoreTransactionRecordState has already called redetectChanges, clobbering
-    // the dirty baseline. See follow-up: fix restoreTransactionRecordState to skip
-    // PK write when id is already null.
     const { Topic } = makeSQLiteTopic();
     const topic = new Topic({ title: "Jeff" });
 

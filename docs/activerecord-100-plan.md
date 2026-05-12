@@ -24,37 +24,26 @@ Other panes from this session have either delivered audit reports (triaged into 
 
 ---
 
-## Post-merge fidelity followups (~270 LOC, 16 items)
+## Post-merge fidelity followups (~225 LOC, 10 items)
 
 > Triage hygiene: two items removed from earlier session triage as stale (Copilot #1419 review caught them): `addUniqueConstraint`/`removeUniqueConstraint` are already implemented in PG with passing tests (#1410 post-pr was outdated); `caseInsensitiveComparison` async runtime-bug is hypothetical — sync-base + no PG override means the call site at `uniqueness.ts:300` safely gets `null` today. Both will be addressed by PG-adapter cluster Slot C's actual scope.
 
 Small Rails-fidelity polish surfaced via PR reviews + post-merge findings:
 
-- **~15 LOC** — Drop `adapter` arg from `MigrationLike#up/down`; wire `migration.connection` in `DefaultStrategy#exec()`. (#1386)
-- **~5 LOC** — Tighten `lookupCastTypeFromJoinDependencies` param to `JoinDependency[]`. (#1386)
-- **~5 LOC** — Audit remaining PG query-row callers for `as number` casts → `Number(...)`. (#1385)
-- **~3 LOC** — PG schema-qualified FROM regex in `_toSqlWithoutSetOp`. (#1390 review)
-- **~20 LOC** — Consolidate `_compileSelectSql` / `_arelVisitor()` / `_compileArelNode` adapter-visitor lookup duplication. (#1390 review)
-- **~10 LOC** — Extract shared `_mapTimeWithZoneToUtc` helper in `time-zone-conversion.ts`. (#1395 review)
 - **~40 LOC** — 3 deferred tsrange/tstzrange array tests (need `ts_ranges`/`tstz_ranges` array columns). (#1395 deferred)
-- **~5 LOC** — Remove `RangeType.encodeLiteral` workaround in `pg/range.ts`. (#1390)
-- **~10 LOC** — Audit `PostgreSQLWithBinds.visitArelNodesCasted` — add `resolveValueForDatabase` before `collector.addBind`. (#1390)
 - **~50 LOC** — `with_env_tz` test-infra (stub `defaultSqlTimezone()` per-block). Unblocks 2 base.test.ts tests. (#1399)
 - **~10 LOC** — i18n minor: `record_invalid` over-populated in `activemodel.errors.messages` namespace. (#1403)
 - **~10 LOC** — Validate `HashAccessor.write` json-branch JSON-stringify behavior. (#1404)
 - **~30 LOC** — Validation audit findings: restore Rails test bodies in 2 validation test files. (audit-validation)
-- **~30 LOC** — `validateForeignKey` on `PostgreSQLAdapter`: replace `!fSchema → public` heuristic with `pg_namespace` join for the referenced table in `foreignKeys()` SQL. (#1410 followup)
-- **~30 LOC** — `Base.writingRole`/`Base.readingRole` not wired into `currentRole` / `preventWrites`. Extract to new `packages/activerecord/src/roles.ts` constants module to avoid core↔connection-handling circular import. (#1415 followup)
 - **~30 LOC** — `mixin_test.rb` "many updates" + "create turned off" un-skips. Blocked only on fixture wiring: `defineSchema` mixins table + `vi.useFakeTimers` for `travel 5.minutes`. (#1416 followup)
 - **~5 LOC** — Delete 3 phantom `it.skip` tests with no Rails counterpart: 2 in `modules.test.ts`, 1 in `base.test.ts`. (#1416 followup)
-- **~5 LOC** — `SchemaStatements.dropTable` CASCADE: refactor inline `adapterName === "postgres"` check to a PG-specific override. (#1407 followup)
 - **~30 LOC** — Wire `tableOptions()` into `schema-dumper.ts:emitTable` so MySQL charset/collation/engine + PG schema options land in the dump. May overlap pg-schema Slot B / Schema Slot E. (#1407 followup)
 - **~10 LOC** — `compressIfWorthIt` in `encryptor.ts` uses UTF-8 byte count; for Latin-1 binary payloads, compression threshold fires earlier than Rails. Round-trip correct but threshold drift. (#1409 followup)
-- **~5 LOC** — `reconnection_error` test residual: needs `vi.spyOn` on `pg.Pool` constructor. (#1411 followup)
-- **~20 LOC** — `translate no connection exception to not established` test residual: needs `pg_terminate_backend` from second connection. (#1411 followup)
 - **~10 LOC** — `reconnect after bad connection on check version` test residual: needs proxy returning malformed server_version response. (#1411 followup)
 
 **Closed via #1408:** `_performInsert` block, `_storeAccessorsModules` WeakMap, MySQL non-CT function defaults, `databaseTypeToText` serialized branch + `Serialized.isBinary` delegation, `assertEncryptedAttribute` round-trip.
+
+**Closed via fidelity-sweep A:** `MigrationLike#up/down` adapter arg (already done), `lookupCastTypeFromJoinDependencies` type (already done), PG `as number` casts (already done), schema-qualified FROM regex (already done), `_compileSelectSql`/visitor consolidation (already done), `_mapTimeWithZoneToUtc` helper (already done), `RangeType.encodeLiteral` workaround, `PostgreSQLWithBinds.visitArelNodesCasted` resolveValueForDatabase, `validateForeignKey` pg_namespace join, `roles.ts` WRITING_ROLE/READING_ROLE + `currentRole`/`preventWrites` wiring, `dropTable` CASCADE PG override, `reconnection_error` test, `translate no connection exception to not established` test, `restoreTransactionRecordState` PK-write guard, `SavepointTransaction`/`RestartParentTransaction` → `TransactionIsolationError`, `ForeignKeyDefinition#isExportNameOnSchemaDump` wired in schema-dumper.
 
 ---
 
@@ -127,7 +116,7 @@ Cluster details in [`activerecord-100-clusters.md`](activerecord-100-clusters.md
 | Transactions cluster (A in flight)        | 3    | ~350            |
 | MySQL onUpdate followups                  | 2    | ~30             |
 | NotImplementedError elimination (Phase 2) | 7    | ~610            |
-| Post-merge fidelity followups             | 16   | ~270            |
+| Post-merge fidelity followups             | 10   | ~225            |
 | Doc-hygiene + infra followups             | 3    | ~30             |
 | Test:compare audits queued                | 12   | n/a (read-only) |
 | Architectural deferred                    | 3    | ~410            |

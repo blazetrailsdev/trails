@@ -515,10 +515,16 @@ export function restoreTransactionRecordState(
     r._attributes = r._attributes.deepDup();
   }
 
-  // Restore the primary key if it was auto-assigned during insert
+  // Restore the primary key if it was auto-assigned during insert.
+  // Guard prevents clobbering dirty-tracking state already established by
+  // _restoreTransactionRecordState (which calls redetectChanges before this).
   if (snapshot.newRecord && !Array.isArray(this.id)) {
     const ctor = this.constructor as typeof Base;
-    r._attributes.set(ctor.primaryKey as string, snapshot.id);
+    const pk = ctor.primaryKey as string;
+    if (r._attributes.fetchValue(pk) !== snapshot.id) {
+      r._attributes.set(pk, snapshot.id);
+      r._dirty.redetectChanges(r._attributes);
+    }
   }
 
   // Re-apply the snapshot's frozen state *after* any internal restores.

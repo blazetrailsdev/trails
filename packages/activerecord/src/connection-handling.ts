@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
@@ -166,7 +167,7 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   }
 
   const { role, shard } = options;
-  const preventWrites = role === "reading" || !!options.preventWrites;
+  const preventWrites = role === READING_ROLE || !!options.preventWrites;
 
   const klasses = new Set(normalized.map((klass) => klass.connectionClassForSelf()));
   const entry = { role, shard, preventWrites, klasses };
@@ -225,8 +226,8 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = "writing", shard = "default" } = options;
-  const preventWrites = role === "reading" || !!options.preventWrites;
+  const { role = WRITING_ROLE, shard = "default" } = options;
+  const preventWrites = role === READING_ROLE || !!options.preventWrites;
   appendToConnectedToStack({
     role,
     shard,
@@ -425,7 +426,7 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  const resolvedPreventWrites = role === "reading" || preventWrites;
+  const resolvedPreventWrites = role === READING_ROLE || preventWrites;
   const connectionClass = this.connectionClassForSelf();
   const entry = {
     role,
