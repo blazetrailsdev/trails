@@ -43,6 +43,7 @@ describeIfMysql("Mysql2Adapter", () => {
         expect(a.quoteTableName("foo")).toBe("`foo`");
         expect(a.quoteTableName("foo.bar")).toBe("`foo`.`bar`");
       }
+      expect(adapter.quoteColumnName('hel"lo.wol\\d')).toBe('`hel"lo.wol\\d`');
     });
   });
 });
