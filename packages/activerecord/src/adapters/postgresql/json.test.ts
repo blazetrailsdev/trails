@@ -28,7 +28,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       ]);
       const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
       expect(rows).toHaveLength(1);
-      expect(rows[0].settings).toEqual(obj);
+      // adapter.execute returns raw strings for json/jsonb — Json#deserialize owns parsing
+      expect(JSON.parse(rows[0].settings as string)).toEqual(obj);
     });
 
     it("json default", async () => {
@@ -38,7 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.executeMutation(`INSERT INTO "json_default_test" DEFAULT VALUES`);
       const rows = await adapter.execute(`SELECT "config" FROM "json_default_test"`);
-      expect(rows[0].config).toEqual({});
+      expect(JSON.parse(rows[0].config as string)).toEqual({});
       await adapter.exec(`DROP TABLE IF EXISTS "json_default_test"`);
     });
 
@@ -48,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         JSON.stringify(arr),
       ]);
       const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
-      expect(rows[0].settings).toEqual(arr);
+      expect(JSON.parse(rows[0].settings as string)).toEqual(arr);
     });
 
     it("deserialize with array", async () => {
@@ -57,8 +58,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         JSON.stringify(arr),
       ]);
       const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
-      expect(Array.isArray(rows[0].settings)).toBe(true);
-      expect(rows[0].settings).toEqual(arr);
+      const parsed = JSON.parse(rows[0].settings as string);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toEqual(arr);
     });
 
     it("json string cast round-trip", async () => {
@@ -94,8 +96,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         [JSON.stringify(jsonVal), JSON.stringify(jsonbVal), "test"],
       );
       const rows = await adapter.execute(`SELECT "settings", "prefs", "name" FROM "json_test"`);
-      expect(rows[0].settings).toEqual(jsonVal);
-      expect(rows[0].prefs).toEqual(jsonbVal);
+      expect(JSON.parse(rows[0].settings as string)).toEqual(jsonVal);
+      expect(JSON.parse(rows[0].prefs as string)).toEqual(jsonbVal);
       expect(rows[0].name).toBe("test");
     });
   });
@@ -107,7 +109,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     );
     await adapter.executeMutation(`INSERT INTO "jsonb_default_test" DEFAULT VALUES`);
     const rows = await adapter.execute(`SELECT "data" FROM "jsonb_default_test"`);
-    expect(rows[0].data).toEqual([]);
+    expect(JSON.parse(rows[0].data as string)).toEqual([]);
     await adapter.exec(`DROP TABLE IF EXISTS "jsonb_default_test"`);
   });
 });
