@@ -331,6 +331,12 @@ export class Duration {
     const match = pattern.exec(iso.replace(/,/g, "."));
     if (!match) throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
 
+    // Reject mixing the overall `-` sign with any per-component `-`: combining
+    // them would silently double-negate (e.g. "-P-1Y" parsing to +1Y).
+    if (match[1] === "-" && match.slice(2).some((c) => c?.startsWith("-"))) {
+      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
+    }
+
     const sign = match[1] === "-" ? -1 : 1;
     const parse = (s: string | undefined) => (s ? parseFloat(s.replace(",", ".")) * sign : 0);
 
