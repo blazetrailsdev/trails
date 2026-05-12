@@ -693,6 +693,23 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     clients.forEach((c) => expect(c.isNewRecord()).toBe(false));
   });
 
+  it("collection-proxy build without load autosaves built children (Slot B)", async () => {
+    // Regression test for the proxy-build-without-load gap: building
+    // through `record.<collection>.build(...)` (CollectionProxy.build,
+    // no preload, no explicit load) must still surface the built record
+    // to the autosave loop. Mirrors Rails: `pirate.birds.build(name:)`
+    // followed by `pirate.save` persists the child. `_loadedAssociation`
+    // treats non-empty `proxy.target` as cached data without flipping
+    // proxy `loaded` (matches Rails' @_was_loaded ephemeral semantics).
+    const { Company, Client } = makeModels();
+    const company = new Company({ name: "Acme" });
+    const built = (company as any).clients.build({ name: "ProxyBuilt" }) as Base;
+    expect(built.isNewRecord()).toBe(true);
+    await company.save();
+    expect(company.isNewRecord()).toBe(false);
+    expect(built.isNewRecord()).toBe(false);
+  });
+
   it("replace on new object", async () => {
     const { Company, Client } = makeModels();
     const company = new Company({ name: "Acme" });

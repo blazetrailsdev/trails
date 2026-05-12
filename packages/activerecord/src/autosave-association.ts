@@ -68,15 +68,47 @@ function _loadedAssociation(record: any, name: string): any | null {
   if (typeof record.association !== "function") {
     return existing?.isLoaded?.() ? existing : null;
   }
+  // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
+  // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
+  // reset in `ensure`. So `CollectionProxy#build` records sit in
+  // `proxy._target` while `loaded === false`. Treat a non-empty proxy
+  // target as cached data: autosave's `save_collection_association` only
+  // gates on `if association = association_instance_get(...)` truthy,
+  // never on `loaded?` (autosave_association.rb:420).
+  const proxy = record._collectionProxies?.get?.(name) as
+    | { loaded?: boolean; target?: unknown[] }
+    | undefined;
+  const proxyHasBuiltRecords = Array.isArray(proxy?.target) && proxy.target.length > 0;
+  const existingHasBuiltRecords =
+    Array.isArray(existing?.target) && (existing.target as unknown[]).length > 0;
   const hasCachedData =
     record._cachedAssociations?.has(name) ||
     record._preloadedAssociations?.has(name) ||
-    !!record._collectionProxies?.get?.(name)?.loaded ||
+    !!proxy?.loaded ||
+    proxyHasBuiltRecords ||
+    existingHasBuiltRecords ||
     !!existing?.isLoaded?.();
   if (!hasCachedData) return null;
   try {
     const inst = record.association(name);
-    return inst?.isLoaded?.() ? inst : null;
+    if (inst?.isLoaded?.()) return inst;
+    // In-memory built records (no preload, no DB load). Surface them on
+    // the Association instance's `target` via direct assignment (not
+    // `setTarget` which flips `loadedBang`) so the Association stays
+    // unloaded — matches Rails' `@_was_loaded` ephemeral flag semantics
+    // (collection_association.rb:457-490) and keeps `_hydrateFromPreload`
+    // viable for later preload-after-build orderings.
+    if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
+      inst.target = proxy!.target as any;
+      return inst;
+    }
+    // Association-side build (e.g. `record.association(name).build(...)`)
+    // populates `existing.target` directly while `loaded` stays false —
+    // our `replaceOnTarget` doesn't `loadedBang`. Treat that as cached.
+    if (existingHasBuiltRecords && inst && inst === existing) {
+      return inst;
+    }
+    return null;
   } catch (err) {
     if (err instanceof AssociationNotFoundError) return null;
     throw err;
@@ -392,32 +424,13 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
       if (!child.isNewRecord()) await child.destroy();
       continue;
     }
-    if (child.isNewRecord() || child.changed) {
-      const ctor = record.constructor as typeof Base;
-      const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-      const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
-      if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-        if (primaryKey.length !== foreignKey.length) {
-          throw new CompositePrimaryKeyMismatchError(
-            (record.constructor as typeof Base).name,
-            assoc.name,
-          );
-        }
-        primaryKey.forEach((pk: string, i: number) => {
-          const pkValue = record._readAttribute(pk);
-          if (pkValue != null) child._writeAttribute((foreignKey as string[])[i], pkValue);
-        });
-      } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-        const pkValue = record._readAttribute(primaryKey);
-        if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
-      } else {
-        throw new CompositePrimaryKeyMismatchError(
-          (record.constructor as typeof Base).name,
-          assoc.name,
-        );
-      }
-
-      const saved = await child.save();
+    // Rails associated_records_to_validate_or_save (autosave_association.rb:
+    // 373-381): when the owner was new before save, every target record
+    // gets processed — not just new/changed ones. The dispatch inside
+    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
+    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
+    if (newRecordBeforeSave || child.isNewRecord() || child.changed) {
+      const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
         return false;
@@ -425,6 +438,66 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
     }
   }
   return true;
+}
+
+/**
+ * Mirrors Rails' `save_collection_association` per-record save dispatch
+ * (autosave_association.rb:442-457):
+ *
+ *   if autosave != false && (new_record_before_save || record.new_record?)
+ *     association.set_inverse_instance(record)
+ *     saved = association.insert_record(record, false)   # NEW INSERT
+ *   elsif autosave
+ *     saved = record.save(validate: false)               # UPDATE
+ *
+ * Only genuine inserts route through `insertRecord` (which fires
+ * `setOwnerAttributes`/counter-cache); already-persisted changed records
+ * use plain `save({validate:false})` so the counter cache isn't
+ * incremented on every update.
+ *
+ * @internal
+ */
+async function _insertCollectionRecord(
+  record: Base,
+  inst: any,
+  assoc: AssociationDefinition,
+  child: Base,
+): Promise<boolean> {
+  const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
+  const isInsert = child.isNewRecord() || newRecordBeforeSave;
+  if (!isInsert) {
+    return !!(await child.save({ validate: false }));
+  }
+  if (inst && typeof inst.insertRecord === "function") {
+    inst.setInverseInstance?.(child);
+    return !!(await inst.insertRecord(child, false, false));
+  }
+  return _insertCollectionRecordFallback(record, assoc, child);
+}
+
+async function _insertCollectionRecordFallback(
+  record: Base,
+  assoc: AssociationDefinition,
+  child: Base,
+): Promise<boolean> {
+  const ctor = record.constructor as typeof Base;
+  const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
+    if (primaryKey.length !== foreignKey.length) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name);
+    }
+    primaryKey.forEach((pk: string, i: number) => {
+      const pkValue = record._readAttribute(pk);
+      if (pkValue != null) child._writeAttribute((foreignKey as string[])[i], pkValue);
+    });
+  } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
+    const pkValue = record._readAttribute(primaryKey);
+    if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
+  } else {
+    throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name);
+  }
+  return !!(await child.save({ validate: false }));
 }
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
@@ -461,8 +534,14 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
         assoc.name,
       );
     }
+    // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
+    // after FK assignment, before save (autosave_association.rb:497).
+    inst?.setInverseInstance?.(childRecord);
 
-    const saved = await childRecord.save();
+    // Rails: record.save(validate: !autosave). autosaveHasOne only runs
+    // for autosave-enabled reflections (gated in autosaveAssociation), so
+    // !autosave is always false → validate: false.
+    const saved = await childRecord.save({ validate: false });
     if (!saved) {
       propagateErrors(record, childRecord, assoc.name);
       return false;
@@ -484,7 +563,9 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
   if (assocRecord.isNewRecord() || assocRecord.changed) {
     _setAutosavingBelongsToFor(record, assoc, true);
     try {
-      const saved = await assocRecord.save();
+      // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
+      // autosave is always true on this code path (gated in autosaveAssociation).
+      const saved = await assocRecord.save({ validate: false });
       if (!saved) {
         propagateErrors(record, assocRecord, assoc.name);
         return false;
@@ -516,6 +597,9 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
         assoc.name,
       );
     }
+    // Rails save_belongs_to_association:559-568: `association.loaded!` only
+    // fires inside the `if association.updated?` branch — after the FK write.
+    if (inst?.isUpdated?.()) inst.loadedBang?.();
   }
   return true;
 }
@@ -529,8 +613,13 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
       if (!child.isNewRecord()) await child.destroy();
       continue;
     }
-    if (child.isNewRecord() || child.changed) {
-      const saved = await child.save();
+    // Rails associated_records_to_validate_or_save (autosave_association.rb:
+    // 373-381): when the owner was new before save, every target record
+    // gets processed — not just new/changed ones. The dispatch inside
+    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
+    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
+    if (newRecordBeforeSave || child.isNewRecord() || child.changed) {
+      const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
         return false;

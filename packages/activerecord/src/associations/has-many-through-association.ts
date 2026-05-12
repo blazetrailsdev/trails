@@ -22,6 +22,44 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
+
+  /**
+   * Mirrors Rails' HasManyThroughAssociation#insert_record
+   * (has_many_through_association.rb:24-34):
+   *
+   *   ensure_not_nested
+   *   if record.new_record? || record.has_changes_to_save?
+   *     return unless super
+   *   end
+   *   save_through_record(record)
+   *   record
+   *
+   * Saves the target via `super` (HasManyAssociation#insertRecord — which
+   * no-ops setOwnerAttributes for through and just calls `record.save`),
+   * then creates/saves the join row via the through association.
+   */
+  override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
+    ensureNotNested(this);
+    const needsTargetSave =
+      record.isNewRecord() ||
+      (typeof (record as any).hasChangesToSave === "function" &&
+        (record as any).hasChangesToSave());
+    if (needsTargetSave) {
+      const saved = await super.insertRecord(record, validate, raise);
+      if (!saved) return false;
+    }
+    // Rails build_through_record + save_through_record: build the join
+    // record (cached in @through_records), save if changed. Inline rather
+    // than via the existing `saveThroughRecord` helper because that one
+    // filters the through association's target by FK match, which is the
+    // wrong direction for the build-and-save path.
+    const joinRecord = buildThroughRecord(this, record);
+    if (joinRecord && (joinRecord as any).changed) {
+      const saved = await (joinRecord as any).save();
+      if (!saved) return false;
+    }
+    return true;
+  }
 }
 
 /** @internal */
