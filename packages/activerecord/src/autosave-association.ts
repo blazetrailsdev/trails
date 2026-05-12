@@ -415,7 +415,12 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
       if (!child.isNewRecord()) await child.destroy();
       continue;
     }
-    if (child.isNewRecord() || child.changed) {
+    // Rails associated_records_to_validate_or_save (autosave_association.rb:
+    // 373-381): when the owner was new before save, every target record
+    // gets processed — not just new/changed ones. The dispatch inside
+    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
+    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
+    if (newRecordBeforeSave || child.isNewRecord() || child.changed) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
@@ -599,7 +604,12 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
       if (!child.isNewRecord()) await child.destroy();
       continue;
     }
-    if (child.isNewRecord() || child.changed) {
+    // Rails associated_records_to_validate_or_save (autosave_association.rb:
+    // 373-381): when the owner was new before save, every target record
+    // gets processed — not just new/changed ones. The dispatch inside
+    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
+    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
+    if (newRecordBeforeSave || child.isNewRecord() || child.changed) {
       const saved = await _insertCollectionRecord(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
