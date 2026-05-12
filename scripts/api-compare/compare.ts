@@ -182,6 +182,12 @@ const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
   { transform: (r) => `Base${r}` },
   { transform: (r) => `ActiveModel${r}` },
   { transform: (r) => `${r}Type` },
+  // `Numeric<X>Type`: ActiveModel's `Helpers::Numeric` is mixed into
+  // Integer/Float/Decimal via the `applyNumericMixin(ValueType)` HOC. The
+  // returned class is bound to a local const `NumericValueType` that the
+  // extractor sees as the immediate TS superclass; conceptually it is
+  // `ValueType` with the Numeric helper applied.
+  { transform: (r) => `Numeric${r}Type` },
 ];
 
 export function nameMatches(rubyName: string, tsName: string): boolean {

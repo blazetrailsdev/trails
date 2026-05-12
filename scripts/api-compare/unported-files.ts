@@ -80,6 +80,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "JS doesn't use YAML for AR column serialization.",
   },
   {
+    pattern: "attribute_set/yaml_encoder.rb", // no test counterpart
+    reason:
+      "Rails' Psych-specific YAML round-trip class for AttributeSet. Replaced by " +
+      "the pluggable AttributeSetCoder architecture in #1173 (P24a) / #1176 (P24b) " +
+      "— see packages/activemodel/src/attribute-set/{coder.ts,codecs/json.ts,codecs/yaml.ts}. " +
+      "Functional capability is shipped; the Rails class hierarchy doesn't map " +
+      "to the TS codec-injection pattern (no Psych, JSON is the default).",
+  },
+  {
     pattern: "coders/yaml_column.rb",
     testFile: "coders/yaml_column_test.rb",
     reason:
