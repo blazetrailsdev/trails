@@ -318,21 +318,22 @@ export class InsertAll {
    * Rails schema_cache.indexes() is synchronous; our TS port must be async because the
    * underlying driver call is async. Always await this method.
    *
-   * Uses the adapter's SchemaCache (AbstractAdapter#schema_cache) with the adapter
-   * itself as the pool argument. In production, the adapter's pool is a ConnectionPool
-   * whose withConnection checks out a live connection; in tests the adapter is the
-   * connection itself. BoundSchemaReflection (ConnectionPool#schema_cache) is not used
-   * here because its one-arg signature is pool-bound at construction time.
+   * Uses the adapter's raw SchemaCache (AbstractAdapter#schema_cache) with the
+   * adapter's pool (or the adapter itself in tests) as the pool argument so
+   * SchemaCache.indexes(pool, tableName) can reach connection.indexes() on a
+   * cache miss. We do NOT fall back to ConnectionPool#schemaCache (a
+   * BoundSchemaReflection with a one-arg indexes()) — the two-arg call would
+   * misalign and pass the pool object as tableName.
    */
   private async _uniqueIndexes(): Promise<unknown[]> {
     const conn = this.connection as any;
+    const cache = conn.schemaCache;
+    if (!cache || typeof cache.indexes !== "function") return [];
     // Unwrap one level of adapter wrapping (e.g. TestAdapter → SQLite3Adapter)
     // so the pool we pass to SchemaCache.indexes() can call connection.indexes().
     const pool = conn.pool ?? conn;
-    const cache = conn.schemaCache ?? (pool as any).schemaCache;
-    if (!cache || typeof (cache as any).indexes !== "function") return [];
     const tableName = this.model.arelTable.name;
-    const indexes = await (cache as any).indexes(pool, tableName);
+    const indexes = await cache.indexes(pool, tableName);
     return (indexes as unknown[]).filter((i: any) => i.unique);
   }
 
