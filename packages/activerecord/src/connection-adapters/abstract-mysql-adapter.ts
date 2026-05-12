@@ -30,7 +30,6 @@ import {
   type MysqlAddColumnOptions,
 } from "./mysql/schema-creation.js";
 import {
-  quoteString as mysqlQuoteString,
   quote as mysqlQuote,
   typeCast as mysqlTypeCast,
   castBoundValue as mysqlCastBoundValue,
@@ -586,7 +585,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   addSqlCommentBang(sql: string, comment: string): string {
-    if (comment) return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
+    if (comment) return `${sql} COMMENT ${this.quote(comment)}`;
     return sql;
   }
 
@@ -722,9 +721,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (`abstract/quoting-interface.ts`). Mirrors Rails MySQL
    * `quote_string` (`abstract_mysql_adapter.rb`): backslash-escapes
    * `'` and the control chars MySQL's wire protocol requires (`\0 \n
-   * \r \Z \\`). Distinct from the per-module `mysqlQuoteString`
-   * standalone, which wraps with surrounding `'...'` for SQL-literal
-   * contexts.
+   * \r \Z \\`). Distinct from `quote()`, which wraps with surrounding
+   * `'...'` for SQL-literal contexts.
    */
   override quoteString(s: string): string {
     return s.replace(QUOTE_STRING_RE, (ch) => QUOTE_STRING_MAP[ch] ?? ch);
@@ -1322,7 +1320,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       .join(", ");
     parts.push(`(${quotedCols})`);
     let idxSql = parts.join(" ");
-    if (comment) idxSql += ` COMMENT ${mysqlQuoteString(comment)}`;
+    if (comment) idxSql += ` COMMENT ${this.quote(comment)}`;
     return algorithmSql ? `ADD ${idxSql}, ${algorithmSql}` : `ADD ${idxSql}`;
   }
 

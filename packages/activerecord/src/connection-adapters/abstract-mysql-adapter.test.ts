@@ -153,3 +153,51 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).not.toContain("DEFAULT 'json_array()'");
   });
 });
+
+describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", () => {
+  async function makeAdapter() {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    return Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+  }
+
+  it("adapter.quote(s) wraps result in single quotes", async () => {
+    const adapter = await makeAdapter();
+    const result = adapter.quote("hello");
+    expect(result).toBe("'hello'");
+  });
+
+  it("adapter.quoteString(s) is escape-only — no surrounding quotes", async () => {
+    const adapter = await makeAdapter();
+    const result = adapter.quoteString("hello");
+    expect(result).toBe("hello");
+  });
+
+  it("adapter.quote escapes injection attempt — single quote, backslash, control chars", async () => {
+    const adapter = await makeAdapter();
+    const injection = "'; DROP TABLE users; --\\\0\n\r\x1a";
+    const quoted = adapter.quote(injection);
+    // Must start and end with surrounding single quotes
+    expect(quoted.startsWith("'")).toBe(true);
+    expect(quoted.endsWith("'")).toBe(true);
+    const inner = quoted.slice(1, -1);
+    // Single quote must be escaped (no unescaped bare single quote)
+    expect(inner).not.toMatch(/(?<!')'(?!')/);
+    // Backslash must be doubled
+    expect(inner).toContain("\\\\");
+    // Control chars must be escaped — no raw bytes
+    expect(inner).not.toContain("\0");
+    expect(inner).not.toContain("\n");
+    expect(inner).not.toContain("\r");
+    expect(inner).not.toContain("\x1a");
+  });
+
+  it("adapter.quote is consistent with standalone quote for strings containing single quotes and backslashes", async () => {
+    const { quote: standaloneQuote } = await import("./mysql/quoting.js");
+    const adapter = await makeAdapter();
+    for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
+      expect(adapter.quote(s)).toBe(standaloneQuote(s));
+    }
+  });
+});
