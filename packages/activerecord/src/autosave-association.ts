@@ -393,38 +393,64 @@ async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Prom
       continue;
     }
     if (child.isNewRecord() || child.changed) {
-      const ctor = record.constructor as typeof Base;
-      const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-      const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
-      if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-        if (primaryKey.length !== foreignKey.length) {
-          throw new CompositePrimaryKeyMismatchError(
-            (record.constructor as typeof Base).name,
-            assoc.name,
-          );
-        }
-        primaryKey.forEach((pk: string, i: number) => {
-          const pkValue = record._readAttribute(pk);
-          if (pkValue != null) child._writeAttribute((foreignKey as string[])[i], pkValue);
-        });
-      } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-        const pkValue = record._readAttribute(primaryKey);
-        if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
-      } else {
-        throw new CompositePrimaryKeyMismatchError(
-          (record.constructor as typeof Base).name,
-          assoc.name,
-        );
-      }
-
-      const saved = await child.save();
+      const saved = await saveCollectionChild(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
         return false;
       }
     }
   }
+  if (inst && typeof inst.loadedBang === "function") inst.loadedBang();
   return true;
+}
+
+/**
+ * Mirrors Rails' `save_collection_association` per-record path:
+ * `association.insert_record(record, false)` — the validate:false escape
+ * hatch the autosave pre-validation pass already covered. When the
+ * Association exposes Rails' `insertRecord`, delegate so subclass-level
+ * machinery (`setOwnerAttributes`, counter-cache, `setInverseInstance`)
+ * fires; otherwise fall back to the inline FK-write + save path used
+ * before #1426 landed Association-object indirection.
+ *
+ * @internal
+ */
+async function saveCollectionChild(
+  record: Base,
+  inst: any,
+  assoc: AssociationDefinition,
+  child: Base,
+): Promise<boolean> {
+  if (inst && typeof inst.insertRecord === "function") {
+    inst.setInverseInstance?.(child);
+    return !!(await inst.insertRecord(child, false, false));
+  }
+  return saveCollectionChildFallback(record, assoc, child);
+}
+
+async function saveCollectionChildFallback(
+  record: Base,
+  assoc: AssociationDefinition,
+  child: Base,
+): Promise<boolean> {
+  const ctor = record.constructor as typeof Base;
+  const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
+  if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
+    if (primaryKey.length !== foreignKey.length) {
+      throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name);
+    }
+    primaryKey.forEach((pk: string, i: number) => {
+      const pkValue = record._readAttribute(pk);
+      if (pkValue != null) child._writeAttribute((foreignKey as string[])[i], pkValue);
+    });
+  } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
+    const pkValue = record._readAttribute(primaryKey);
+    if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
+  } else {
+    throw new CompositePrimaryKeyMismatchError(ctor.name, assoc.name);
+  }
+  return !!(await child.save({ validate: false } as any));
 }
 
 async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
@@ -438,6 +464,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     return true;
   }
   if (childRecord.isNewRecord() || childRecord.changed) {
+    inst?.setInverseInstance?.(childRecord);
     const ctor = record.constructor as typeof Base;
     const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
@@ -467,6 +494,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
       propagateErrors(record, childRecord, assoc.name);
       return false;
     }
+    inst?.loadedBang?.();
   }
   return true;
 }
@@ -516,6 +544,7 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
         assoc.name,
       );
     }
+    inst?.loadedBang?.();
   }
   return true;
 }
@@ -530,13 +559,14 @@ async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promis
       continue;
     }
     if (child.isNewRecord() || child.changed) {
-      const saved = await child.save();
+      const saved = await saveCollectionChild(record, inst, assoc, child);
       if (!saved) {
         propagateErrors(record, child, assoc.name);
         return false;
       }
     }
   }
+  if (inst && typeof inst.loadedBang === "function") inst.loadedBang();
   return true;
 }
 

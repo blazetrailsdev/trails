@@ -613,6 +613,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
       if (allowed) {
         this._target.push(record);
+        this._targetLoaded = true;
         fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
       }
       return record;
@@ -623,6 +624,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const allowed = fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record);
     if (allowed) {
       this._target.push(record);
+      this._targetLoaded = true;
       fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     }
     return record;
