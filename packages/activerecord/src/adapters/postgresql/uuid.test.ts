@@ -4,6 +4,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -215,20 +217,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("uuid schema dump", async () => {
-      // BLOCKED: adapter-pg — SchemaDumper does not emit uuid primary key syntax
-      // ROOT-CAUSE: SchemaDumper.dumpTableSchema emits `force: :cascade` but not
-      // `id: :uuid, default: -> { "gen_random_uuid()" }` for UUID primary key tables.
-      // connection-adapters/abstract/schema-dumper.ts needs to detect uuid-typed id columns
-      // and emit the appropriate `id:` option. ~30 LOC in schema-dumper.ts.
-      // SCOPE: ~30 LOC; unblocks uuid schema dump + all "schema dumper for uuid primary key" tests.
+    it("uuid schema dump", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "uuid_data_type");
+      expect(output).toContain("uuid_data_type");
+      expect(output).toMatch(/"guid".*"uuid"/);
     });
     it.skip("uuid migration", async () => {
-      // BLOCKED: adapter-pg — migration framework not implemented
-      // ROOT-CAUSE: ActiveRecord::Migration.new.create_table :uuid_migration_test, id: :uuid
-      // requires the migration DSL. The adapter's createTable() is implemented but the
-      // migration class wrapper is not. Not a uuid-specific gap.
-      // SCOPE: Migration framework is a separate multi-PR effort.
+      // BLOCKED: migration framework — ActiveRecord::Migration class wrapper not implemented.
+      // The adapter's createTable() is implemented and verified by "uuid primary key" above.
+      // Not uuid-specific; separate multi-PR effort.
     });
 
     it("uuid gen random uuid", async () => {
@@ -316,11 +313,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uuid association", async () => {
-      // BLOCKED: adapter-pg — belongs_to/has_many association framework not wired for UUID FK
-      // ROOT-CAUSE: AR association loading (belongs_to :uuid_tag) requires the associations
-      // layer to find related records using UUID foreign keys. The associations framework
-      // is implemented but not connected to the UUID OID type for FK binding.
-      // SCOPE: ~20 LOC — association query builder needs to use Uuid#cast for FK values.
+      // BLOCKED: Slot B — associations + UUID FK binding. The associations framework
+      // exists but doesn't route FK values through the Uuid OID type when building queries.
+      // SCOPE: ~20 LOC in association query builder (Uuid#cast for FK values).
     });
 
     it("uuid foreign key", async () => {
@@ -560,11 +555,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("uniqueness validation ignores uuid", () => {
-      // BLOCKED: adapter-pg — AR uniqueness validator not wired for UUID type bypass
-      // ROOT-CAUSE: Rails' UniquenessValidator skips the case-insensitive check when
-      // the column type is uuid (since UUIDs are already normalized to lowercase).
-      // Our UniquenessValidator doesn't yet call typeForAttribute to check for UUID type.
-      // SCOPE: ~10 LOC in validations/uniqueness.ts; low priority.
+      // BLOCKED: Slot C — UniquenessValidator UUID-aware case-insensitive bypass.
+      // Rails skips the case-insensitive LOWER() comparison when the column is uuid
+      // (UUIDs are already normalized). Our validator doesn't check typeForAttribute.
+      // SCOPE: ~10 LOC in validations/uniqueness.ts.
     });
   });
 
@@ -643,28 +637,91 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key", () => {
-      // BLOCKED: adapter-pg — SchemaDumper does not emit id: :uuid for UUID PK tables
-      // ROOT-CAUSE: SchemaDumper.dumpTableSchema doesn't detect that the id column is uuid
-      // type and emit `id: :uuid`. Rails checks column.sql_type == "uuid" for the id column
-      // and emits `id: :uuid, default: nil` or `default: -> { "gen_random_uuid()" }`.
-      // SCOPE: ~30 LOC in connection-adapters/abstract/schema-dumper.ts; unblocks 6 tests.
+    it("schema dumper for uuid primary key", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids`);
+      await adapter.exec(`
+        CREATE TABLE pg_uuids (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          name text,
+          other_uuid uuid DEFAULT gen_random_uuid()
+        )
+      `);
+      try {
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids");
+        expect(output).toMatch(/createTable\("pg_uuids".*id: "uuid"/);
+        expect(output).toMatch(/default: \(\) => "gen_random_uuid\(\)"/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids`);
+      }
     });
-    it.skip("schema dumper for uuid primary key with custom default", () => {
-      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
-      // ROOT-CAUSE: Also needs SchemaDumper to emit the custom default lambda expression
-      // for uuid columns, e.g. `default: -> { "gen_random_uuid()" }`.
-      // SCOPE: Same fix as above.
+
+    it("schema dumper for uuid primary key with custom default", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_2`);
+      await adapter.exec(`DROP FUNCTION IF EXISTS my_uuid_generator()`);
+      try {
+        await adapter.exec(`
+          CREATE OR REPLACE FUNCTION my_uuid_generator() RETURNS uuid
+          AS $$ SELECT gen_random_uuid() $$ LANGUAGE SQL VOLATILE
+        `);
+        await adapter.exec(`
+          CREATE TABLE pg_uuids_2 (
+            id uuid DEFAULT my_uuid_generator() PRIMARY KEY,
+            name text
+          )
+        `);
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_2");
+        expect(output).toMatch(
+          /createTable\("pg_uuids_2".*id: "uuid".*default: \(\) => "my_uuid_generator\(\)"/,
+        );
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_2`);
+        await adapter.exec(`DROP FUNCTION IF EXISTS my_uuid_generator()`);
+      }
     });
-    it.skip("schema dumper for uuid primary key default", () => {
-      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
-      // ROOT-CAUSE: SchemaDumper id: :uuid emission gap.
-      // SCOPE: Same fix as above.
+
+    it("schema dumper for uuid primary key default", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_3`);
+      await adapter.exec(`
+        CREATE TABLE pg_uuids_3 (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          name text
+        )
+      `);
+      try {
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_3");
+        expect(output).toMatch(
+          /createTable\("pg_uuids_3".*id: "uuid".*default: \(\) => "gen_random_uuid\(\)"/,
+        );
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_3`);
+      }
     });
+
+    it("createTable round-trips uuid PK default", async () => {
+      const ss = new SchemaStatements(adapter);
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
+      try {
+        await ss.createTable("pg_uuids_rt", {
+          id: "uuid",
+          default: () => "gen_random_uuid()",
+          force: "cascade",
+        });
+        const rows = await adapter.execute(
+          `SELECT column_default FROM information_schema.columns
+           WHERE table_name = 'pg_uuids_rt' AND column_name = 'id'`,
+        );
+        expect(rows[0].column_default).toMatch(/gen_random_uuid/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_rt`);
+      }
+    });
+
     it.skip("schema dumper for uuid primary key default in legacy migration", () => {
-      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
-      // ROOT-CAUSE: SchemaDumper id: :uuid emission gap + legacy migration flavor.
-      // SCOPE: Same fix as above.
+      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
+      // semantics are not implemented. Once an id: :uuid table is created via the legacy
+      // migrator (with implicit gen_random_uuid default), schema dump emission already
+      // works (see "schema dumper for uuid primary key default" above).
+      // SCOPE: Migration framework — separate multi-PR effort.
     });
   });
 
@@ -688,46 +745,49 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key with default override via nil", () => {
-      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
-      // ROOT-CAUSE: SchemaDumper id: :uuid emission + nil default handling (id: :uuid, default: nil).
-      // SCOPE: Same fix as "schema dumper for uuid primary key".
+    it("schema dumper for uuid primary key with default override via nil", async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_nil`);
+      await adapter.exec(`
+        CREATE TABLE pg_uuids_nil (
+          id uuid PRIMARY KEY,
+          name text
+        )
+      `);
+      try {
+        const output = await SchemaDumper.dumpTableSchema(adapter, "pg_uuids_nil");
+        expect(output).toMatch(/createTable\("pg_uuids_nil".*id: "uuid".*default: null/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS pg_uuids_nil`);
+      }
     });
+
     it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {
-      // BLOCKED: adapter-pg — same as "schema dumper for uuid primary key"
-      // ROOT-CAUSE: SchemaDumper id: :uuid + nil default + legacy migration flavor.
-      // SCOPE: Same fix as "schema dumper for uuid primary key".
+      // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
+      // semantics are not implemented. Schema dump emission for `id: :uuid, default: nil`
+      // is already covered by "schema dumper for uuid primary key with default override via nil".
+      // SCOPE: Migration framework — separate multi-PR effort.
     });
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {
     it.skip("collection association with uuid", () => {
-      // BLOCKED: adapter-pg — has_many association with uuid FK + inverse_of not wired
-      // ROOT-CAUSE: Rails' has_many :uuid_tags, foreign_key: :tag_id requires association
-      // loading to bind UUID foreign key values through the Uuid OID type. Also needs
-      // inverse_of reflection to avoid duplicate queries. Not a uuid-specific gap but
-      // an association framework gap that affects uuid FK columns.
-      // SCOPE: Association framework; separate multi-PR effort.
+      // BLOCKED: Slot B — has_many UUID FK binding + inverse_of. Needs association
+      // loading to route FK values through Uuid#cast and an inverse_of reflection path.
     });
     it.skip("find with uuid", () => {
-      // BLOCKED: adapter-pg — has_many association with uuid FK
-      // ROOT-CAUSE: Same as "collection association with uuid" — association loading gap.
-      // SCOPE: Association framework.
+      // BLOCKED: Slot B — has_many UUID FK binding (same root cause as
+      // "collection association with uuid").
     });
     it.skip("find by with uuid", () => {
-      // BLOCKED: adapter-pg — has_many association with uuid FK
-      // ROOT-CAUSE: Same as "collection association with uuid" — association loading gap.
-      // SCOPE: Association framework.
+      // BLOCKED: Slot B — has_many UUID FK binding (same root cause as
+      // "collection association with uuid").
     });
   });
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     it.skip("uuid primary key and disable joins with delegate cache", () => {
-      // BLOCKED: adapter-pg — hasManyThrough with disableJoins + UUID PK not implemented
-      // ROOT-CAUSE: Rails' has_many :through with disable_joins: true uses a separate
-      // query per association and caches the delegate class. Requires hasManyThrough
-      // implementation + disableJoins option + delegate cache. Not uuid-specific.
-      // SCOPE: hasManyThrough + disableJoins; separate PR effort.
+      // BLOCKED: hasManyThrough + disableJoins not implemented (not uuid-specific).
+      // Separate PR effort; uuid PK emission verified by Slot A schema-dump tests above.
     });
   });
 });

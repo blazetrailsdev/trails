@@ -72,7 +72,12 @@ export class SchemaStatements {
   async createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean | "uuid"; force?: boolean | "cascade"; ifNotExists?: boolean }
+      | {
+          id?: boolean | "uuid";
+          force?: boolean | "cascade";
+          ifNotExists?: boolean;
+          default?: unknown;
+        }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
@@ -80,6 +85,7 @@ export class SchemaStatements {
       id?: boolean | "uuid";
       force?: boolean | "cascade";
       ifNotExists?: boolean;
+      default?: unknown;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 

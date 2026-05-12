@@ -41,6 +41,7 @@ export interface ColumnInfo {
   primaryKey?: boolean;
   null?: boolean;
   default?: unknown;
+  defaultFunction?: string | null;
   limit?: number | null;
   precision?: number | null;
   scale?: number | null;
@@ -261,7 +262,7 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
  * Clean up a PG default expression to a human-readable literal value.
  * E.g. "'happy'::mood" -> "happy", "'192.168.1.1'::inet" -> "192.168.1.1"
  */
-function cleanDefault(raw: unknown): unknown {
+export function cleanDefault(raw: unknown): unknown {
   if (raw === null || raw === undefined) return raw;
   const str = String(raw);
 
@@ -328,6 +329,7 @@ class AdapterSchemaSource implements SchemaSource {
       primaryKey: col.primaryKey,
       null: col.null,
       default: col.default,
+      defaultFunction: col.defaultFunction ?? null,
       limit: col.limit ?? undefined,
       precision: col.precision === undefined ? undefined : col.precision,
       scale: col.scale ?? undefined,
@@ -669,6 +671,34 @@ export class SchemaDumper {
     }
   }
 
+  /**
+   * DSL-typed primary-key options merged into `create_table` for non-default
+   * primary keys. Mirrors Rails' `column_spec_for_primary_key` call in
+   * `SchemaDumper#table` — but returns plain JS values for our TS DSL
+   * emitter rather than Ruby-format strings.
+   *
+   * Note: `SchemaDumper.dumpTableSchema(adapter, ...)` instantiates the base
+   * class (not an adapter-specific subclass), so this default branches on
+   * `column.type` directly. Rails has the same single dispatch point — its
+   * `column_spec_for_primary_key` lives on the adapter subclass, but our
+   * factory path doesn't pick that subclass yet, so we centralize.
+   * @internal
+   */
+  protected primaryKeyTableOptions(column: ColumnInfo): Record<string, unknown> {
+    if (column.type === "uuid") {
+      const fn = column.defaultFunction;
+      if (typeof fn === "string" && fn.length > 0) {
+        // Emit as arrow returning the SQL expression — mirrors Rails'
+        // `default: -> { "gen_random_uuid()" }` and round-trips through
+        // `quoteDefaultExpression`, which routes function defaults to raw SQL.
+        return { id: "uuid", default: () => fn };
+      }
+      const literal = cleanDefault(column.default);
+      return { id: "uuid", default: literal == null ? null : literal };
+    }
+    return {};
+  }
+
   private emitTable(
     lines: string[],
     tableName: string,
@@ -680,7 +710,11 @@ export class SchemaDumper {
     const stripped = this.removePrefixAndSuffix(tableName);
 
     const tableOpts: Record<string, unknown> = {};
-    if (!hasId) tableOpts.id = false;
+    if (!hasId) {
+      tableOpts.id = false;
+    } else if (pkColumn) {
+      Object.assign(tableOpts, this.primaryKeyTableOptions(pkColumn));
+    }
     tableOpts.force = "cascade";
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
@@ -888,7 +922,15 @@ export class SchemaDumper {
   formatOptions(options: Record<string, unknown>): string {
     const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(options)
-      .map(([k, v]) => `${isIdent.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`)
+      .map(([k, v]) => {
+        const key = isIdent.test(k) ? k : JSON.stringify(k);
+        if (typeof v === "function") {
+          // Emit as an arrow returning the SQL expression — mirrors Rails'
+          // `-> { "fn()" }` syntax in dumped `schema.rb`.
+          return `${key}: () => ${JSON.stringify((v as () => unknown)())}`;
+        }
+        return `${key}: ${JSON.stringify(v)}`;
+      })
       .join(", ");
   }
 
