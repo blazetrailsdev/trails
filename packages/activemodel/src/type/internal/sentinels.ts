@@ -5,7 +5,7 @@
  *
  * Mirrors Rails: `Float::INFINITY` / `-Float::INFINITY` are the canonical
  * sentinels for PG date/datetime infinity. Using `Number.POSITIVE_INFINITY`
- * /`Number.NEGATIVE_INFINITY` so `record.date == Float::INFINITY` parity holds
+ * / `Number.NEGATIVE_INFINITY` so `record.date == Float::INFINITY` parity holds
  * — `record.date === Infinity` for both string-typed ("infinity") and
  * numeric-typed (`Float::INFINITY`) user input.
  *

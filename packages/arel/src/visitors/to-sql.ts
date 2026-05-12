@@ -1498,7 +1498,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     } else if (typeof v === "string") {
       this.collector.append(this.quote(v));
     } else if (typeof v === "number") {
-      this.collector.append(String(v));
+      // Non-finite numbers must route through quote() so the adapter can emit
+      // a string literal ('Infinity' / 'NaN') rather than a bareword identifier.
+      this.collector.append(Number.isFinite(v) ? String(v) : this.quote(v));
     } else if (typeof v === "boolean") {
       this.collector.append(this.quote(v));
     } else if (typeof v === "bigint") {

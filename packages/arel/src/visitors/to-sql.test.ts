@@ -268,6 +268,20 @@ describe("the to_sql visitor", () => {
     expect(mgr.toSql()).toContain("VALUES (?)");
   });
 
+  it("string-quotes non-finite numbers in a ValuesList instead of emitting a bareword", () => {
+    // Databases reject `VALUES (Infinity)` because the unquoted identifier
+    // case-folds to a missing column; PG accepts `'Infinity'::float8`.
+    const mgr = new InsertManager(users);
+    mgr.insert([[users.get("name"), Number.POSITIVE_INFINITY]]);
+    expect(mgr.toSql()).toContain("VALUES ('Infinity')");
+    const mgr2 = new InsertManager(users);
+    mgr2.insert([[users.get("name"), Number.NEGATIVE_INFINITY]]);
+    expect(mgr2.toSql()).toContain("VALUES ('-Infinity')");
+    const mgr3 = new InsertManager(users);
+    mgr3.insert([[users.get("name"), Number.NaN]]);
+    expect(mgr3.toSql()).toContain("VALUES ('NaN')");
+  });
+
   describe("Nodes::UnionAll", () => {
     it("encloses SELECT statements with parentheses", () => {
       const sub = users.project(users.get("id"));
