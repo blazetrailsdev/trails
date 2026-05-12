@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { Base } from "../../index.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -58,6 +59,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = await adapter.execute(`SELECT "settings" FROM "json_test"`);
       expect(Array.isArray(rows[0].settings)).toBe(true);
       expect(rows[0].settings).toEqual(arr);
+    });
+
+    it("json string cast round-trip", async () => {
+      await adapter.exec(`CREATE TABLE "json_string_cast" ("id" SERIAL PRIMARY KEY, "data" JSON)`);
+      class JsonStringCast extends Base {
+        static {
+          this.tableName = "json_string_cast";
+        }
+      }
+      JsonStringCast.adapter = adapter;
+      await JsonStringCast.loadSchema();
+      const record = new JsonStringCast();
+      (record as any).data = '{"a":1}';
+      await record.save();
+      await record.reload();
+      expect((record as any).data).toBe('{"a":1}');
+      await adapter.exec(`DROP TABLE IF EXISTS "json_string_cast"`);
     });
 
     it("noname columns of different types", async () => {
