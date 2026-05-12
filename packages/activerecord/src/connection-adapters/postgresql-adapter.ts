@@ -70,8 +70,6 @@ import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-ty
 
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
-const OID_JSON = 114;
-const OID_JSONB = 3802;
 import { READ_QUERY } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -97,6 +95,9 @@ import {
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
+
+const OID_JSON = 114;
+const OID_JSONB = 3802;
 
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;

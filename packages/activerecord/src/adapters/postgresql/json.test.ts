@@ -62,7 +62,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("json string cast round-trip", async () => {
-      await adapter.exec(`CREATE TABLE "json_string_cast" ("id" SERIAL PRIMARY KEY, "data" JSON)`);
+      await adapter.exec(
+        `CREATE TABLE "json_string_cast" ("id" SERIAL PRIMARY KEY, "data" JSON, "meta" JSONB)`,
+      );
       class JsonStringCast extends Base {
         static {
           this.tableName = "json_string_cast";
@@ -72,9 +74,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       await JsonStringCast.loadSchema();
       const record = new JsonStringCast();
       (record as any).data = '{"a":1}';
+      (record as any).meta = '{"b":2}';
       await record.save();
       await record.reload();
       expect((record as any).data).toBe('{"a":1}');
+      expect((record as any).meta).toBe('{"b":2}');
       await adapter.exec(`DROP TABLE IF EXISTS "json_string_cast"`);
     });
 
