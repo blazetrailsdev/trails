@@ -64,6 +64,7 @@ export class SQLSubscriber {
   private _sub: NotificationSubscriber | null = null;
 
   start(): void {
+    this.stop();
     this._sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
       const p = event.payload as Record<string, unknown>;
       this.payloads.push(p);
