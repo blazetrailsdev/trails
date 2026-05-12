@@ -210,3 +210,21 @@ export class ErrorReporter {
     }
   }
 }
+
+/**
+ * Process-wide ErrorReporter accessor — Rails' `Rails.error` analogue.
+ * The reporter is opt-in; callers wire it via `setErrorReporter` (typically
+ * a Railtie initializer). Adapter code that wants to forward warnings via
+ * `:report` reads `getErrorReporter()` and no-ops when nothing is set.
+ */
+let _globalErrorReporter: ErrorReporter | null = null;
+
+/** @internal Mirrors: `Rails.error`. Returns null when no reporter is set. */
+export function getErrorReporter(): ErrorReporter | null {
+  return _globalErrorReporter;
+}
+
+/** @internal Mirrors: `Rails.define_singleton_method(:error) { reporter }`. */
+export function setErrorReporter(reporter: ErrorReporter | null): void {
+  _globalErrorReporter = reporter;
+}

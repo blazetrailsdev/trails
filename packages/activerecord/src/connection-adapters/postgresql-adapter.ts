@@ -1,6 +1,12 @@
 import pg from "pg";
 import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
-import { singularize, underscore, Notifications, getCrypto } from "@blazetrails/activesupport";
+import {
+  singularize,
+  underscore,
+  Notifications,
+  getCrypto,
+  getErrorReporter,
+} from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -1025,7 +1031,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           if (logger?.warn) logger.warn(msg);
           else console.warn(msg);
         }
-        // TODO(report): Rails calls `Rails.error.report(warning, handled: true)`; deferred until wired.
+        if (action === "report") {
+          // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
+          // (active_record.rb:248–249). When no reporter is wired, silently no-op
+          // — Rails' Rails.error always exists in a booted app, but our
+          // activesupport accessor is opt-in.
+          getErrorReporter()?.report(sw, { handled: true });
+        }
         if (typeof action === "function") action(sw);
       }
     } finally {
@@ -4633,10 +4645,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
-    return (
-      defaultValue == null &&
-      /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/.test(defaultExpr)
-    );
+    return defaultValue == null && DEFAULT_FUNCTION_RE.test(defaultExpr);
   }
 
   /**
@@ -5035,10 +5044,25 @@ function splitPgDefault(raw: string | null): { literal: unknown; fn: string | nu
   if (/^-?\d+(?:\.\d+)?$/.test(raw)) return { literal: raw, fn: null };
   if (raw === "true" || raw === "false") return { literal: raw === "true", fn: null };
   if (raw === "NULL") return { literal: null, fn: null };
-  // Everything else (nextval, CURRENT_TIMESTAMP, gen_random_uuid(), etc.)
-  // is a SQL expression.
-  return { literal: null, fn: raw };
+  // Everything else: only treat as a SQL function expression if it matches
+  // Rails' has_default_function? regex — a function call, a parenthesized
+  // expression with a cast, or CURRENT_DATE/CURRENT_TIMESTAMP. Arithmetic-
+  // expression defaults like `(((4 + 4) * 2) / 4)` match none of these and
+  // Rails reflects them with both `default` and `default_function` as nil
+  // (the DB still applies the default on INSERT).
+  if (DEFAULT_FUNCTION_RE.test(raw)) {
+    return { literal: null, fn: raw };
+  }
+  return { literal: null, fn: null };
 }
+
+/**
+ * Mirrors: PostgreSQLAdapter#has_default_function? regex
+ * (postgresql_adapter.rb:786). A function call, parenthesized cast, or
+ * CURRENT_DATE/CURRENT_TIMESTAMP — anything else is a literal default or
+ * unrecognized expression and does not populate Column#default_function.
+ */
+const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
 
 /**
  * Normalize a `pg_catalog.format_type(...)` string to the typname the

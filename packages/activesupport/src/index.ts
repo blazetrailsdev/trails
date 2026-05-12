@@ -366,7 +366,7 @@ export {
 // KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
-export { ErrorReporter } from "./error-reporter.js";
+export { ErrorReporter, getErrorReporter, setErrorReporter } from "./error-reporter.js";
 export type {
   ErrorSeverity,
   ErrorContext,
