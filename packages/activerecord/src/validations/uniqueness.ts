@@ -5,7 +5,7 @@
  * Builds a query against the model's table to check for existing records
  * with the same value, optionally scoped to other columns.
  */
-import { EachValidator } from "@blazetrails/activemodel";
+import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 
 /**
  * Register a deferred uniqueness validation to run on save (since uniqueness
@@ -24,13 +24,11 @@ export function validatesUniqueness(
   } = {},
 ): void {
   // Validate options eagerly to match Rails' ArgumentError at declaration time.
-  // No ArgumentError class exists in this codebase; plain Error matches the existing convention
-  // in UniquenessValidator#constructor (same message shape, same throw site pattern).
   const scope = (options as Record<string, unknown>).scope;
   if (scope != null) {
     const scopes = Array.isArray(scope) ? scope : [scope];
     if (!scopes.every((s) => typeof s === "string")) {
-      throw new Error(
+      throw new ArgumentError(
         `${JSON.stringify(scope)} is not a supported format for :scope option. ` +
           "Pass a string or an array of strings instead.",
       );

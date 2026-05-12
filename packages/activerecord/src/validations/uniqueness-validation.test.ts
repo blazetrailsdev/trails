@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
@@ -145,14 +146,14 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness with scope invalid syntax", () => {
     // Rails: assert_raises(ArgumentError) { Reply.validates_uniqueness_of(:content, scope: { parent_id: false }) }
-    // Passes a hash as scope (invalid); uniqueness.ts throws for non-string scope values.
+    // Passes a hash as scope (invalid); validatesUniqueness throws ArgumentError at declaration time.
     expect(() => {
       class Post extends Base {
         static {
           this.validatesUniqueness("title", { scope: { nonexistent_col: false } as any });
         }
       }
-    }).toThrow(/array of strings/);
+    }).toThrow(ArgumentError);
   });
 
   it("validate uniqueness with object scope", async () => {
