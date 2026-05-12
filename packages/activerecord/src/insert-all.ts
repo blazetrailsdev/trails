@@ -124,7 +124,7 @@ export class InsertAll {
   /** @internal Async init: resolves uniqueByColumns via cache.indexes() then finalizes updatableColumns. */
   private async _populateUpdatableColumns(): Promise<void> {
     if (this._updatableColumns) return;
-    const exclude = new Set([...this.readonlyColumns(), ...(await this._uniqueByColumns())]);
+    const exclude = new Set([...this.readonlyColumns(), ...(await this.uniqueByColumns())]);
     if (this.recordTimestamps() && !this.updateOnly && !this.updateSql) {
       for (const col of TIMESTAMP_COLUMNS) {
         exclude.add(col);
@@ -238,8 +238,8 @@ export class InsertAll {
   }
 
   /** @internal */
-  private async _uniqueByColumns(): Promise<string[]> {
-    return this._findUniqueIndexFor(this.uniqueBy);
+  private async uniqueByColumns(): Promise<string[]> {
+    return this.findUniqueIndexFor(this.uniqueBy);
   }
 
   /** @internal */
@@ -295,11 +295,11 @@ export class InsertAll {
   }
 
   /** @internal */
-  private async _findUniqueIndexFor(uniqueBy: string | string[] | undefined): Promise<string[]> {
+  private async findUniqueIndexFor(uniqueBy: string | string[] | undefined): Promise<string[]> {
     const nameOrCols =
       uniqueBy == null ? this.primaryKeys() : Array.isArray(uniqueBy) ? uniqueBy : [uniqueBy];
     const sortedMatch = [...nameOrCols].sort().join(",");
-    const idx = (await this._uniqueIndexes()).find(
+    const idx = (await this.uniqueIndexes()).find(
       (i: any) =>
         nameOrCols.includes(i.name) ||
         (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
@@ -325,7 +325,7 @@ export class InsertAll {
    * BoundSchemaReflection with a one-arg indexes()) — the two-arg call would
    * misalign and pass the pool object as tableName.
    */
-  private async _uniqueIndexes(): Promise<unknown[]> {
+  private async uniqueIndexes(): Promise<unknown[]> {
     const conn = this.connection as any;
     const cache = conn.schemaCache;
     if (!cache || typeof cache.indexes !== "function") return [];

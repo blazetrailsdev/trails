@@ -388,6 +388,17 @@ export function quotedDate(
   return abstractQuotedDate(value);
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting#encode_range. Serializes a Range to PG's
+ * range literal: `[begin,end)` or `[begin,end]` depending on excludeEnd.
+ * @internal
+ */
+export function encodeRange(range: Range): string {
+  const begin = typeCastRangeValue(range.begin);
+  const end = typeCastRangeValue(range.end);
+  return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
+}
+
 /** @internal */
 function encodeMultirange(value: MultiRange): string {
   return `{${value.ranges.map((r) => r.toString()).join(",")}}`;
