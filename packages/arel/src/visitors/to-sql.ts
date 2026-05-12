@@ -1498,7 +1498,9 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     } else if (typeof v === "string") {
       this.collector.append(this.quote(v));
     } else if (typeof v === "number") {
-      this.collector.append(String(v));
+      // Non-finite numbers must route through quote() so the adapter can emit
+      // a string literal ('Infinity' / 'NaN') rather than a bareword identifier.
+      this.collector.append(Number.isFinite(v) ? String(v) : this.quote(v));
     } else if (typeof v === "boolean") {
       this.collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
@@ -1556,7 +1558,14 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   protected quote(value: unknown): string {
     if (value === null || value === undefined) return "NULL";
-    if (typeof value === "number") return String(value);
+    if (typeof value === "number") {
+      // Non-finite numbers (Float::INFINITY / NaN) must be string-quoted so
+      // PostgreSQL parses them as float literals rather than identifiers.
+      // SQLite/MySQL reject the values either way; delegate to connection.quote
+      // for adapter-specific handling.
+      if (!Number.isFinite(value)) return this.connection.quote(value);
+      return String(value);
+    }
     if (typeof value === "boolean")
       return value ? this.connection.quotedTrue() : this.connection.quotedFalse();
     if (typeof value === "bigint") return value.toString();

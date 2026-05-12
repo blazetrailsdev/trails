@@ -3,26 +3,29 @@
  * Postgres can return 'infinity' / '-infinity' for timestamp/date columns;
  * these have no Temporal equivalent.
  *
- * Symbol.for ensures identity is stable across module duplication (pnpm
- * deduplication quirks, bundlers). The branded type ensures the two sentinels
- * remain nominally distinct even though both are plain `symbol` at runtime.
+ * Mirrors Rails: `Float::INFINITY` / `-Float::INFINITY` are the canonical
+ * sentinels for PG date/datetime infinity. Using `Number.POSITIVE_INFINITY`
+ * / `Number.NEGATIVE_INFINITY` so `record.date == Float::INFINITY` parity holds
+ * — `record.date === Infinity` for both string-typed ("infinity") and
+ * numeric-typed (`Float::INFINITY`) user input.
+ *
+ * The branded type narrows the public sentinel constants while still
+ * permitting plain numeric Infinity to satisfy `value === DateInfinity`
+ * comparisons throughout the date/datetime type chain.
  */
 
 declare const dateInfinityBrand: unique symbol;
 declare const dateNegativeInfinityBrand: unique symbol;
 
-export type DateInfinity = symbol & { readonly [dateInfinityBrand]: "DateInfinity" };
-export type DateNegativeInfinity = symbol & {
+export type DateInfinity = number & { readonly [dateInfinityBrand]: "DateInfinity" };
+export type DateNegativeInfinity = number & {
   readonly [dateNegativeInfinityBrand]: "DateNegativeInfinity";
 };
 
-export const DateInfinity: DateInfinity = Symbol.for(
-  "@blazetrails/activemodel:DateInfinity",
-) as DateInfinity;
+export const DateInfinity: DateInfinity = Number.POSITIVE_INFINITY as DateInfinity;
 
-export const DateNegativeInfinity: DateNegativeInfinity = Symbol.for(
-  "@blazetrails/activemodel:DateNegativeInfinity",
-) as DateNegativeInfinity;
+export const DateNegativeInfinity: DateNegativeInfinity =
+  Number.NEGATIVE_INFINITY as DateNegativeInfinity;
 
 export function isDateInfinity(v: unknown): v is DateInfinity {
   return v === DateInfinity;

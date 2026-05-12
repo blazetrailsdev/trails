@@ -1,108 +1,116 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/infinity_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
+    await adapter.exec(`
+      CREATE TABLE postgresql_infinities (
+        id serial primary key,
+        "float" double precision,
+        datetime timestamp,
+        date date
+      )
+    `);
   });
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
     await adapter.close();
   });
 
+  async function modelClass() {
+    const { Base } = await import("../../index.js");
+    const a = adapter;
+    class PostgresqlInfinity extends Base {
+      static tableName = "postgresql_infinities";
+      static {
+        this.adapter = a;
+      }
+    }
+    await PostgresqlInfinity.loadSchema();
+    return PostgresqlInfinity;
+  }
+
   describe("PostgresqlInfinityTest", () => {
-    it.skip("date positive infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+    it("type casting infinity on a float column", async () => {
+      const M = await modelClass();
+      const record = await (M as any).create({ float: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
     });
-    it.skip("date negative infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+
+    it("type casting string on a float column", async () => {
+      const M = await modelClass();
+      let record = new (M as any)({ float: "Infinity" });
+      expect(record.float).toBe(Number.POSITIVE_INFINITY);
+      record = new (M as any)({ float: "-Infinity" });
+      expect(record.float).toBe(Number.NEGATIVE_INFINITY);
+      record = new (M as any)({ float: "NaN" });
+      expect(Number.isNaN(record.float)).toBe(true);
     });
-    it.skip("timestamp positive infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+
+    it("update_all with infinity on a float column", async () => {
+      const M = await modelClass();
+      const record = await (M as any).create({});
+      await (M as any).updateAll({ float: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
     });
-    it.skip("timestamp negative infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+
+    it("type casting infinity on a datetime column", async () => {
+      const M = await modelClass();
+      let record = await (M as any).create({ datetime: "infinity" });
+      await (record as any).reload();
+      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
+
+      record = await (M as any).create({ datetime: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
     });
-    it.skip("float positive infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+
+    it("type casting infinity on a date column", async () => {
+      const M = await modelClass();
+      let record = await (M as any).create({ date: "infinity" });
+      await (record as any).reload();
+      expect((record as any).date).toBe(Number.POSITIVE_INFINITY);
+
+      record = await (M as any).create({ date: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).date).toBe(Number.POSITIVE_INFINITY);
     });
-    it.skip("float negative infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+
+    it("update_all with infinity on a datetime column", async () => {
+      const M = await modelClass();
+      const record = await (M as any).create({});
+      await (M as any).updateAll({ datetime: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).datetime).toBe(Number.POSITIVE_INFINITY);
     });
-    it.skip("integer positive infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("integer negative infinity", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("infinity where clause", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("type casting infinity on a float column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("type casting string on a float column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("update_all with infinity on a float column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("type casting infinity on a datetime column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("type casting infinity on a date column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
-    it.skip("update_all with infinity on a datetime column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
-    });
+
     it.skip("assigning 'infinity' on a datetime column with TZ aware attributes", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+      // BLOCKED: missing InTimeZone test helper + Base.timeZoneAwareAttributes /
+      // reset_column_information lifecycle. Sentinels already unified; this
+      // gap is purely about TZ-aware type wrapping + per-block time-zone state.
+      // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing
     });
+
     it.skip("where clause with infinite range on a datetime column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+      // BLOCKED: relation.where range support with Float::INFINITY endpoints
+      // does not yet emit "-infinity"/"infinity" wire strings via Arel range
+      // serialization. Sentinels are unified at the type layer; the gap is in
+      // QueryAttribute.serialize for endless/beginless ranges with Infinity bounds.
+      // SCOPE: ~40 LOC in arel/relation range visitor
     });
+
     it.skip("where clause with infinite range on a date column", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in infinity
-      // ROOT-CAUSE: connection-adapters/postgresql/infinity.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/infinity.ts; affects ~10–47 tests in infinity.test.ts
+      // BLOCKED: see "where clause with infinite range on a datetime column" —
+      // same Arel range-bound serialization gap; date column path identical.
+      // SCOPE: covered by the datetime fix above
     });
   });
 });

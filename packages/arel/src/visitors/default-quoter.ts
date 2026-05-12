@@ -2,7 +2,12 @@ import type { ArelConnection } from "./to-sql.js";
 
 function quoteScalar(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "number") {
+    // Non-finite numbers must be string-quoted; databases reject bare
+    // `Infinity` / `NaN` identifiers. PG accepts 'Infinity'::float8.
+    return Number.isFinite(value) ? String(value) : `'${String(value)}'`;
+  }
+  if (typeof value === "bigint") return String(value);
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   // Only escape single quotes here; backslash escaping is dialect-specific
   // and handled by quoteString (MySQL/PG adapters override quote() as needed).
