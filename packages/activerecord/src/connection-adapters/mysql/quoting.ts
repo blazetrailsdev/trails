@@ -27,8 +27,6 @@ export interface Quoting {
   unquotedFalse(): number;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
-  quoteString(value: string): string;
-  quotedBinaryString(value: Buffer): string;
 }
 
 export function quotedTrue(): string {
@@ -91,10 +89,6 @@ export function quoteString(value: string): string {
   return `'${escaped}'`;
 }
 
-export function quotedBinaryString(value: Buffer): string {
-  return `x'${value.toString("hex")}'`;
-}
-
 export function quotedBinary(value: Buffer | Uint8Array | string): string {
   const hex = Buffer.isBuffer(value)
     ? value.toString("hex")
@@ -104,6 +98,7 @@ export function quotedBinary(value: Buffer | Uint8Array | string): string {
   return `x'${hex}'`;
 }
 
+/** @internal */
 export function unquoteIdentifier(identifier: string | null | undefined): string | null {
   if (identifier && identifier.startsWith("`") && identifier.endsWith("`")) {
     return identifier.slice(1, -1).replace(/``/g, "`");
@@ -111,6 +106,7 @@ export function unquoteIdentifier(identifier: string | null | undefined): string
   return identifier ?? null;
 }
 
+/** @internal */
 export function castBoundValue(value: unknown): unknown {
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (value === true) return "1";
@@ -194,16 +190,6 @@ export function quote(value: unknown): string {
   // Rails: when Class then "'#{value}'"
   if (typeof value === "function" && value.name) return `'${value.name}'`;
   throw new TypeError(`can't quote ${(value as object).constructor?.name ?? typeof value}`);
-}
-
-/**
- * Type-cast a value for use as a column default in DDL.
- * MySQL represents booleans as 1/0 integers.
- */
-export function typecastForDatabase(value: unknown): unknown {
-  if (value === true) return 1;
-  if (value === false) return 0;
-  return value;
 }
 
 /**
