@@ -716,7 +716,7 @@ describe("ReflectionTest", () => {
         this.adapter = adapter;
       }
     }
-    const type = (Topic2 as any).typeForAttribute("attribute_that_doesnt_exist");
+    const type = Topic2.typeForAttribute("attribute_that_doesnt_exist");
     const object = { sentinel: true };
     expect(type.deserialize(object)).toBe(object);
     expect(type.cast(object)).toBe(object);
@@ -967,9 +967,12 @@ describe("ReflectionTest", () => {
     }
     registerModel("Firm", Firm);
     registerModel("Client", Client);
-    expect(() => Associations.hasMany.call(Firm, "clients", { className: Client as any })).toThrow(
-      /expecting a string/,
-    );
+    expect(() =>
+      Associations.hasMany.call(Firm, "clients", {
+        // @ts-expect-error className must be a string, not a class
+        className: Client,
+      }),
+    ).toThrow(/expecting a string/);
   });
   it.skip("class for source type", () => {
     // BLOCKED: associations — reflection feature gap (macros / options inspection)
