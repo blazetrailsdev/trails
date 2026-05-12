@@ -855,8 +855,8 @@ export class SchemaDumper {
       const opts: string[] = [];
       if (fk.column) opts.push(`column: ${JSON.stringify(fk.column)}`);
       if (fk.primaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      // Mirrors Rails' export_name_on_schema_dump? — delegate to FK object when available,
-      // else fall back to the ignore-pattern check.
+      // Mirrors Rails' export_name_on_schema_dump? — delegate to FK object when available
+      // (ForeignKeyDefinition incorporates the fk_rails_ ignore-pattern check), else fall back.
       const exportName =
         "isExportNameOnSchemaDump" in (fk as object)
           ? (fk as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump

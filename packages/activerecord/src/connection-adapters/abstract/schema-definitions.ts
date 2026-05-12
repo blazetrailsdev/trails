@@ -147,8 +147,9 @@ export class ForeignKeyDefinition {
     return this.validate;
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
-    return true;
+    return !/^fk_rails_[0-9a-f]{10}$/.test(this.name);
   }
 
   isDefinedFor(options: { toTable?: string; validate?: boolean } = {}): boolean {
