@@ -1,6 +1,34 @@
 import { describe } from "vitest";
 import mysql from "mysql2/promise";
+import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
+import type { SQLWarning } from "../../errors.js";
+
+/**
+ * Scope an `AbstractMysqlAdapter.dbWarningsAction` (+ optional ignore list)
+ * to a single block, restoring the prior values afterwards even on throw.
+ * Mirrors: Rails' `ActiveRecord::TestCase#with_db_warnings_action`.
+ */
+export async function withDbWarningsAction(
+  action: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void),
+  warningsToIgnore: (string | RegExp)[] | (() => Promise<void> | void),
+  fn?: () => Promise<void> | void,
+): Promise<void> {
+  const body = (
+    typeof warningsToIgnore === "function" ? warningsToIgnore : fn
+  ) as () => Promise<void> | void;
+  const ignore = Array.isArray(warningsToIgnore) ? warningsToIgnore : [];
+  const savedAction = AbstractMysqlAdapter.dbWarningsAction;
+  const savedIgnore = AbstractMysqlAdapter.dbWarningsIgnore;
+  AbstractMysqlAdapter.dbWarningsAction = action;
+  AbstractMysqlAdapter.dbWarningsIgnore = ignore;
+  try {
+    await body();
+  } finally {
+    AbstractMysqlAdapter.dbWarningsAction = savedAction;
+    AbstractMysqlAdapter.dbWarningsIgnore = savedIgnore;
+  }
+}
 
 export const MYSQL_TEST_URL =
   process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";

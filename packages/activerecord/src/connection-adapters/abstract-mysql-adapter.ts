@@ -18,6 +18,7 @@ import {
   MismatchedForeignKey,
   NotNullViolation,
   RecordNotUnique,
+  SQLWarning,
   StatementInvalid,
   ValueTooLong,
   sqlTypeToMigrationKeyword,
@@ -124,6 +125,16 @@ const MYSQL_ADAPTER_ESCAPE_MAP: Record<string, string> = {
 
 export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly Version = Version;
+
+  /**
+   * Behaviour when MySQL emits a warning. Mirrors `ActiveRecord.db_warnings_action`.
+   * One of "ignore" | "log" | "raise" | "report" | (warning) => void.
+   */
+  static dbWarningsAction: "ignore" | "log" | "raise" | "report" | ((w: SQLWarning) => void) =
+    "ignore";
+
+  /** Allow-list of warning messages or codes to skip. Mirrors `ActiveRecord.db_warnings_ignore`. */
+  static dbWarningsIgnore: (string | RegExp)[] = [];
 
   /**
    * Return Column objects for a table. Concrete adapters (Mysql2Adapter,
@@ -1043,9 +1054,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return Promise.resolve();
   }
 
-  /** @internal */
+  /** @internal Mirrors: AbstractMysqlAdapter#warning_ignored? */
   override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
-    return warning.level === "Note";
+    if (warning.level === "Note") return true;
+    return super.isWarningIgnored(warning);
   }
 
   /** @internal */
