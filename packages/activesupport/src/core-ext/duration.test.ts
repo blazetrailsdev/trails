@@ -502,6 +502,8 @@ describe("DurationTest", () => {
       "P-1Y-1W",
       "-P1YT",
       "+P1YT",
+      "P1.5YT",
+      "P1,5YT",
       "-P-1Y", // mixed overall sign + per-component sign would double-negate
     ];
     for (const pattern of invalid) {

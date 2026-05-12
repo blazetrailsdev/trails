@@ -321,8 +321,14 @@ export class Duration {
       throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
     }
 
+    // A trailing `T` (e.g. "P1YT", "P1.5YT") is invalid: the time designator
+    // requires at least one of H/M/S after it. The main regex's optional time
+    // group would otherwise accept these.
+    if (iso.endsWith("T")) {
+      throw new Error(`Invalid ISO 8601 duration: "${iso}"`);
+    }
+
     const moreInvalidPatterns = [
-      /^[+-]?P-?\d+YT$/,
       /^[+-]?PW$/,
       /^[+-]?P-?\d+Y-?\d+W/,
       /^[+-]?P-?\d+\.\d+Y-?\d+\.\d+M/,

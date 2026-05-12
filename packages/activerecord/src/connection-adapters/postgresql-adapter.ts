@@ -63,6 +63,7 @@ import {
 import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-type-parsers.js";
 
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
+const OID_INTERVAL = 1186;
 import { READ_QUERY } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
@@ -310,7 +311,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // PG interval (OID 1186): return the raw ISO 8601 string so the
             // AR Interval type can Duration.parse() it (Rails sets
             // intervalstyle = iso_8601 per connection).
-            if (oid === 1186 && format !== "binary") return (v: unknown) => v;
+            if (oid === OID_INTERVAL && format !== "binary") return (v: unknown) => v;
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
               ? format === "binary"
                 ? pg.types.getTypeParser(oid, "binary")
@@ -384,7 +385,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // pg returns the raw string — mirrors Rails' decode_dates flag.
           // PG interval (OID 1186): return raw ISO 8601 string for AR
           // Interval (intervalstyle = iso_8601 is set on connect).
-          if (oid === 1186 && format !== "binary") {
+          if (oid === OID_INTERVAL && format !== "binary") {
             const fallback = (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
