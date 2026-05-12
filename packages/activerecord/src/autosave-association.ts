@@ -469,10 +469,17 @@ async function _insertCollectionRecord(
   assoc: AssociationDefinition,
   child: Base,
 ): Promise<boolean> {
-  // Same through/HABTM gate as the autosaveHasMany/autosaveHabtm caller —
-  // route changed-existing through-targets via save({validate:false}) until
-  // HasManyThroughAssociation#insertRecord lands.
-  const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave && !assoc.options.through;
+  // Through/HABTM has no HasManyThroughAssociation#insertRecord override yet
+  // (audit-has-many-through cluster). Inherited HasMany#insertRecord no-ops
+  // setOwnerAttributes for through (collection-association.ts:457) — saves
+  // the target but never creates the join row, and can spuriously apply
+  // counter-cache mutations via updateCounterIfSuccess. Route every through
+  // record (insert or update) through plain save({validate:false}) until
+  // the override lands.
+  if (assoc.options.through) {
+    return !!(await child.save({ validate: false }));
+  }
+  const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
   const isInsert = child.isNewRecord() || newRecordBeforeSave;
   if (!isInsert) {
     return !!(await child.save({ validate: false }));
