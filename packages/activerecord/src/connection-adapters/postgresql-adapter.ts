@@ -2953,9 +2953,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const fk = (fks as any[]).find((f) => {
       const { schema: fSchema, table: fTbl } = this.parseSchemaQualifiedName(String(f.toTable));
       if (fTbl !== toTbl) return false;
-      // to_table is always schema-qualified via pg_namespace join, so fSchema is always present.
-      // Match against toSchema (defaulting to "public" when caller omits it).
-      return fSchema === (toSchema ?? "public");
+      // When the FK record has no schema prefix (PostgreSQL omits "public." when it
+      // is on the search_path), treat it as matching any schema lookup or "public".
+      if (!fSchema) return !toSchema || toSchema === "public";
+      return fSchema === toSchema;
     });
     if (!fk) throw new ArgumentError(`No foreign key found from ${fromTable} to ${toTable}`);
     await this.validateConstraint(fromTable, fk.name);
@@ -3099,8 +3100,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const scope = this.quotedScope(tableName);
     const rows = await this.schemaQuery(`
-      SELECT t4.nspname || '.' || t2.relname AS to_table,
-             a1.attname AS column, a2.attname AS primary_key,
+      SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key,
              c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete,
              c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred,
              c.conkey, c.confkey, c.conrelid, c.confrelid
@@ -3110,7 +3110,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       JOIN pg_attribute a1 ON a1.attnum = c.conkey[1] AND a1.attrelid = t1.oid
       JOIN pg_attribute a2 ON a2.attnum = c.confkey[1] AND a2.attrelid = t2.oid
       JOIN pg_namespace t3 ON c.connamespace = t3.oid
-      JOIN pg_namespace t4 ON t2.relnamespace = t4.oid
       WHERE c.contype = 'f'
         AND t1.relname = ${scope.name!}
         AND t3.nspname = ${scope.schema}

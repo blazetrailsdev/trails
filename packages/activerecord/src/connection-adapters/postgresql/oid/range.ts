@@ -119,6 +119,13 @@ export class RangeType extends ValueType<Range> {
     return value instanceof Range;
   }
 
+  /** @internal */
+  encodeLiteral(value: unknown): string {
+    const serialized = this.serialize(value);
+    if (!(serialized instanceof Range)) return String(value);
+    return serialized.toString();
+  }
+
   private typeCastSingle(value: unknown): unknown {
     // Rails calls @subtype.deserialize directly — no cast fallback. If a
     // subtype doesn't implement deserialize, surface that as a failure
@@ -275,10 +282,7 @@ export class MultiRangeType extends ValueType<MultiRange> {
   override serialize(value: unknown): unknown {
     if (!(value instanceof MultiRange)) return value;
     const rangeType = new RangeType(this.subtype, this.name);
-    const parts = value.ranges.map((r) => {
-      const serialized = rangeType.serialize(r);
-      return serialized instanceof Range ? serialized.toString() : String(serialized);
-    });
+    const parts = value.ranges.map((r) => rangeType.encodeLiteral(r));
     return `{${parts.join(",")}}`;
   }
 }
