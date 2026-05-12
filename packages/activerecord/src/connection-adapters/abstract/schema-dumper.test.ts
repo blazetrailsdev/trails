@@ -52,7 +52,7 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
       { hasDefault: true, default: "1", type: "boolean" },
       new BooleanType(),
     );
-    expect(result).toMatch(/^(true|false|1|0)$/);
+    expect(result).toBe("true");
   });
 
   it("text column with raw string default keeps quoted string", () => {

@@ -347,7 +347,7 @@ describe("DefaultTest", () => {
     expect(String(val)).toContain("2024");
   });
   it("default attribute value for decimal", async () => {
-    // Verify Change 2: column.default "2.78" is cast through DecimalType so
+    // Verify Change 2: column.default "2.789" is deserialized through DecimalType so
     // the model default is the typed decimal string, not the raw DB string.
     const { DecimalType } = await import("@blazetrails/activemodel");
     const decimalType = new DecimalType({ precision: 5, scale: 2 });

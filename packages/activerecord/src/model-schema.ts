@@ -709,7 +709,7 @@ function applyColumnsHash(
     }
 
     const rawDefault = (column as { default?: unknown }).default ?? null;
-    const defaultValue = rawDefault != null ? (type as any).deserialize(rawDefault) : rawDefault;
+    const defaultValue = rawDefault != null ? type.deserialize(rawDefault) : rawDefault;
     const colLimit = (column as { limit?: number | null }).limit ?? null;
 
     host._attributeDefinitions.set(name, {
