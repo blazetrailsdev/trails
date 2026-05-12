@@ -295,35 +295,56 @@ describe("DefaultTest", () => {
   });
 
   it("default attribute value for datetime", async () => {
-    const adp = freshAdapter();
-    await defineSchema(adp, {
-      events: { start_at: { type: "datetime", default: "2024-01-15 10:00:00" } },
-    });
+    // Verify Change 2: raw datetime string default is deserialized through DateTimeType
+    // so the model default is a Temporal.PlainDateTime, not the raw DB string.
+    const { DateTimeType } = await import("@blazetrails/activemodel");
+    const dtType = new DateTimeType();
+    const mockAdapter = {
+      schemaCache: {
+        dataSourceExists: async () => true,
+        columnsHash: async () => ({
+          start_at: { name: "start_at", sqlType: "datetime", default: "2024-01-15 10:00:00" },
+        }),
+        getCachedColumnsHash: () => undefined,
+        isCached: () => false,
+      },
+      lookupCastTypeFromColumn: () => dtType,
+    };
     class Event extends Base {
       static override tableName = "events";
-      static {
-        this.adapter = adp;
-      }
     }
+    (Event as any).adapter = mockAdapter;
     await loadSchemaFromAdapter.call(Event);
     const val = new Event().start_at;
-    // After Change 2 the default is cast through the type; for SQLite datetime→string columns
-    // the cast returns a Temporal.PlainDateTime (SQLiteDateTimeType) or Date-like object,
-    // not the raw string.
-    expect(typeof val === "string" ? val : String(val)).toContain("2024");
+    // DateTimeType.deserialize("2024-01-15 10:00:00") → Temporal.PlainDateTime
+    expect(val).not.toBeNull();
+    expect(String(val)).toContain("2024");
   });
   it("default attribute value for date", async () => {
-    const adp = freshAdapter();
-    await defineSchema(adp, { events: { on_date: { type: "date", default: "2024-06-01" } } });
+    // Verify Change 2: raw date string default is deserialized through DateType
+    // so the model default is a Temporal.PlainDate, not the raw DB string.
+    const { DateType } = await import("@blazetrails/activemodel");
+    const dateType = new DateType();
+    const mockAdapter = {
+      schemaCache: {
+        dataSourceExists: async () => true,
+        columnsHash: async () => ({
+          on_date: { name: "on_date", sqlType: "date", default: "2024-06-01" },
+        }),
+        getCachedColumnsHash: () => undefined,
+        isCached: () => false,
+      },
+      lookupCastTypeFromColumn: () => dateType,
+    };
     class Event extends Base {
       static override tableName = "events";
-      static {
-        this.adapter = adp;
-      }
     }
+    (Event as any).adapter = mockAdapter;
     await loadSchemaFromAdapter.call(Event);
     const val = new Event().on_date;
-    expect(typeof val === "string" ? val : String(val)).toContain("2024");
+    // DateType.deserialize("2024-06-01") → Temporal.PlainDate
+    expect(val).not.toBeNull();
+    expect(String(val)).toContain("2024");
   });
   it("default attribute value for decimal", async () => {
     // Verify Change 2: column.default "2.78" is cast through DecimalType so
