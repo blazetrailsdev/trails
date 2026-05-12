@@ -694,8 +694,8 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  schemaStatements(): SchemaStatements {
-    return new SchemaStatements(this as unknown as DatabaseAdapter);
+  schemaStatements(host?: DatabaseAdapter): SchemaStatements {
+    return new SchemaStatements((host ?? this) as unknown as DatabaseAdapter);
   }
 
   get schemaCache(): SchemaCache {

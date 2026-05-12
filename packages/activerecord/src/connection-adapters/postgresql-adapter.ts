@@ -3866,20 +3866,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.createDatabase(name, options);
   }
 
-  override schemaStatements(): SchemaStatements {
-    return new PostgreSQLSchemaStatements(this as unknown as DatabaseAdapter);
+  override schemaStatements(host?: DatabaseAdapter): SchemaStatements {
+    return new PostgreSQLSchemaStatements((host ?? this) as unknown as DatabaseAdapter);
   }
 
   async dropTable(
     ...args:
-      | [...tableNames: string[], options: { ifExists?: boolean; force?: "cascade" }]
-      | string[]
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade" }]
   ): Promise<void> {
     // Rails: PostgreSQLAdapter has no separate `drop_table` — the method comes
     // solely from the included `PostgreSQL::SchemaStatements` module. Delegate
     // here so schema-cache eviction + single-statement CASCADE behavior lives
     // in one place (PostgreSQLSchemaStatements#dropTable).
-    await this.schemaStatements().dropTable(...(args as Parameters<SchemaStatements["dropTable"]>));
+    await this.schemaStatements().dropTable(...args);
   }
 
   async currentDatabase(): Promise<string> {
