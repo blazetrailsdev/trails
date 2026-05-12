@@ -191,6 +191,7 @@ export function quote(value: unknown): string {
     return String(value);
   }
   if (value instanceof Uint8Array) return quotedBinary(value);
+  if (typeof value === "string") return quoteString(value);
   return abstractQuote(value);
 }
 
