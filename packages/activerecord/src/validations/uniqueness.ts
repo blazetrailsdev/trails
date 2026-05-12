@@ -47,7 +47,7 @@ export function validatesUniqueness(
   } = {},
 ): void {
   // Validate options eagerly to match Rails' ArgumentError at declaration time.
-  validateScopeOption((options as Record<string, unknown>).scope);
+  validateScopeOption(options.scope);
   const klass = this as { _asyncValidations?: Array<unknown> };
   if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
     klass._asyncValidations = [...(klass._asyncValidations ?? [])];
