@@ -8,6 +8,7 @@
  * cell values through the right OID::Type.
  */
 import { ValueType } from "@blazetrails/activemodel";
+import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Result } from "../result.js";
@@ -153,5 +154,67 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
     expect(varchar.constructor).not.toBe(ValueType);
     const bigint = adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "bigint" });
     expect(bigint.constructor).not.toBe(ValueType);
+  });
+});
+
+describe("PostgreSQLAdapter#execQuery prepare override", () => {
+  let adapter: PostgreSQLAdapter;
+  let capturedQueryArg: unknown;
+
+  const INT4_OID = 23;
+  const fakeResult = { fields: [{ name: "n", dataTypeID: INT4_OID }], rows: [[1]] };
+
+  beforeEach(() => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    adapter.typeMap.aliasType(INT4_OID, "int4");
+    capturedQueryArg = undefined;
+    const fakeClient = {
+      query: async (arg: unknown) => {
+        capturedQueryArg = arg;
+        return fakeResult;
+      },
+      release: () => {},
+    };
+    vi.spyOn(adapter as unknown as { getClient: () => unknown }, "getClient").mockResolvedValue(
+      fakeClient,
+    );
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  it("prepare:true tags statement_name in the sql.active_record payload", async () => {
+    const payloads: Record<string, unknown>[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      payloads.push(event.payload as Record<string, unknown>);
+    });
+    try {
+      adapter.preparedStatements = true;
+      await adapter.execQuery("SELECT 1", "SQL", [42], { prepare: true });
+      const payload = payloads.find((p) => p["sql"] === "SELECT 1");
+      expect(payload?.["statement_name"]).toBeTruthy();
+      expect(typeof payload?.["statement_name"]).toBe("string");
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+  });
+
+  it("prepare:false omits statement_name even when preparedStatements is true", async () => {
+    const payloads: Record<string, unknown>[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (event: any) => {
+      payloads.push(event.payload as Record<string, unknown>);
+    });
+    try {
+      adapter.preparedStatements = true;
+      await adapter.execQuery("SELECT 1", "SQL", [42], { prepare: false });
+      const payload = payloads.find((p) => p["sql"] === "SELECT 1");
+      expect(payload?.["statement_name"]).toBeUndefined();
+      // non-prepared path: query arg is an object with text (not a named statement)
+      expect((capturedQueryArg as any)?.name).toBeUndefined();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
   });
 });

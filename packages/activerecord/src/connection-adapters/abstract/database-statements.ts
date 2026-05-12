@@ -1119,7 +1119,7 @@ export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
     let v: unknown;
     if (b && typeof b === "object" && "valueForDatabase" in b) {
       const vfd = b.valueForDatabase;
-      v = typeof vfd === "function" ? vfd() : vfd;
+      v = typeof vfd === "function" ? b.valueForDatabase() : vfd;
     } else {
       v = b && typeof b === "object" && "value" in b ? b.value : b;
     }
