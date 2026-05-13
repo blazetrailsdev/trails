@@ -1,4 +1,4 @@
-import type { ArelConnection } from "./to-sql.js";
+import type { ArelConnection } from "./connection.js";
 
 function quoteScalar(value: unknown): string {
   if (value === null || value === undefined) return "NULL";

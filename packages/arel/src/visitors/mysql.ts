@@ -1,7 +1,8 @@
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { ToSql, type ArelConnection } from "./to-sql.js";
+import { ToSql } from "./to-sql.js";
+import type { ArelConnection } from "./connection.js";
 import { mysqlDefaultQuoter } from "./default-quoter.js";
 
 /**
