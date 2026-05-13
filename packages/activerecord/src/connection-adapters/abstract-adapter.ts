@@ -63,7 +63,7 @@ import {
 } from "./abstract/quoting.js";
 import type { Quoting } from "./abstract/quoting-interface.js";
 import { include } from "@blazetrails/activesupport";
-import { SchemaStatements } from "./abstract/schema-statements.js";
+import { SchemaStatements, type JoinTableOptions } from "./abstract/schema-statements.js";
 import { Savepoints as SavepointsMixin } from "./abstract/savepoints.js";
 import {
   maxIdentifierLength,
@@ -271,7 +271,7 @@ export interface AbstractAdapter {
   createJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string } | ((t: TableDefinition) => void),
+    options?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;
   dropJoinTable(table1: string, table2: string, options?: Record<string, unknown>): Promise<void>;

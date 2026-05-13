@@ -773,6 +773,8 @@ export class SchemaDumper {
     }
     tableOpts.force = "cascade";
     if (typeof adapterTableOpts.options === "string") tableOpts.options = adapterTableOpts.options;
+    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
+      tableOpts.comment = adapterTableOpts.comment;
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
     lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);

@@ -59,7 +59,7 @@ import {
 } from "../errors.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
-import type { SchemaStatements } from "./abstract/schema-statements.js";
+import type { SchemaStatements, JoinTableOptions } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
@@ -89,9 +89,11 @@ import {
   ChangeColumnDefaultDefinition,
   ColumnDefinition,
   ForeignKeyDefinition,
+  TableDefinition as AbstractTableDefinition,
   type ColumnType,
   type ReferentialAction,
 } from "./abstract/schema-definitions.js";
+import { joinTableName as deriveJoinTableName } from "../migration/join-table.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
@@ -2871,6 +2873,37 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         await this.exec(`ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET NOT NULL`);
       }
     }
+  }
+
+  // createJoinTable override: bypasses the callback-first createTable API by
+  // routing through schemaStatements().createTable, which uses the abstract
+  // options-first form and builds a real TableDefinition with correct column
+  // options (null: false) and full DSL support for the definer callback.
+  async createJoinTable(
+    table1: string,
+    table2: string,
+    options?: JoinTableOptions | ((t: AbstractTableDefinition) => void),
+    fn?: (t: AbstractTableDefinition) => void,
+  ): Promise<void> {
+    let opts: JoinTableOptions = {};
+    let definer: ((t: AbstractTableDefinition) => void) | undefined;
+    if (typeof options === "function") {
+      definer = options;
+    } else if (options) {
+      opts = options;
+      definer = fn;
+    }
+    const joinName = opts.tableName ?? deriveJoinTableName(table1, table2);
+    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
+    const mergedColOpts = { null: false, index: false, ...columnOptions };
+    const t1Ref = this.referenceNameForTable(table1);
+    const t2Ref = this.referenceNameForTable(table2);
+    const ss = this.schemaStatements(this as unknown as DatabaseAdapter);
+    await ss.createTable(joinName, { ...tableOpts, id: false }, (td) => {
+      td.references(t1Ref, mergedColOpts);
+      td.references(t2Ref, mergedColOpts);
+      if (definer) definer(td as unknown as AbstractTableDefinition);
+    });
   }
 
   // PG callback-first signature diverges from the abstract base; harmonize in a follow-up.

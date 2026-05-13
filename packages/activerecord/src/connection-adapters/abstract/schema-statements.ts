@@ -39,6 +39,19 @@ import { SchemaDumper } from "./schema-dumper.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
+/** Options accepted by `createJoinTable`. Extends the `createTable` option set with join-specific keys. */
+export type JoinTableOptions = {
+  tableName?: string;
+  columnOptions?: Record<string, unknown>;
+  id?: boolean | "uuid";
+  force?: boolean | "cascade";
+  ifNotExists?: boolean;
+  options?: string;
+  comment?: string;
+  temporary?: boolean;
+  as?: string;
+};
+
 /** @internal */
 function expandIndexOption<T>(opt: Record<string, T> | T, columns: string[]): Record<string, T> {
   if (typeof opt === "object" && opt !== null) return opt as Record<string, T>;
@@ -134,6 +147,23 @@ export class SchemaStatements {
     if (definer) definer(td);
 
     await this.adapter.executeMutation(td.toSql());
+
+    // Rails: if supports_comments? && !supports_comments_in_create?
+    //   change_table_comment(table_name, comment) if options[:comment].present?
+    if (options.comment != null && options.comment.length > 0) {
+      const adapterWithComments = this.adapter as {
+        supportsComments?: () => boolean;
+        supportsCommentsInCreate?: () => boolean;
+        changeTableComment?: (name: string, comment: string | null) => Promise<void>;
+      };
+      if (
+        adapterWithComments.supportsComments?.() &&
+        !adapterWithComments.supportsCommentsInCreate?.() &&
+        typeof adapterWithComments.changeTableComment === "function"
+      ) {
+        await adapterWithComments.changeTableComment(name, options.comment);
+      }
+    }
 
     for (const idx of td.indexes) {
       await this.addIndex(name, idx.columns, {
@@ -563,10 +593,10 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string } | ((t: TableDefinition) => void),
+    options?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let opts: { tableName?: string } = {};
+    let opts: JoinTableOptions = {};
     let definer: ((t: TableDefinition) => void) | undefined;
     if (typeof options === "function") {
       definer = options;
@@ -574,10 +604,15 @@ export class SchemaStatements {
       opts = options;
       definer = fn;
     }
-    const tableName = opts.tableName ?? [table1, table2].sort().join("_");
-    await this.createTable(tableName, { id: false }, (t) => {
-      t.integer(`${table1.replace(/s$/, "")}_id`);
-      t.integer(`${table2.replace(/s$/, "")}_id`);
+    const tableName = this.findJoinTableName(table1, table2, opts);
+    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
+    const mergedColOpts = { null: false, index: false, ...columnOptions };
+    const t1Ref = this.referenceNameForTable(table1);
+    const t2Ref = this.referenceNameForTable(table2);
+
+    await this.createTable(tableName, { ...tableOpts, id: false }, (t) => {
+      t.references(t1Ref, mergedColOpts);
+      t.references(t2Ref, mergedColOpts);
       if (definer) definer(t);
     });
   }
@@ -587,7 +622,7 @@ export class SchemaStatements {
     table2: string,
     options?: { tableName?: string },
   ): Promise<void> {
-    const tableName = options?.tableName ?? [table1, table2].sort().join("_");
+    const tableName = this.findJoinTableName(table1, table2, options ?? {});
     await this.dropTable(tableName);
   }
 

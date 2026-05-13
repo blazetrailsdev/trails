@@ -377,6 +377,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
+  supportsCommentsInCreate(): boolean {
+    return true;
+  }
+
   supportsDdlTransactions(): boolean {
     return false;
   }
