@@ -58,6 +58,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it.skip("marshal dump", () => {
     // BLOCKED: serialization
     // ROOT-CAUSE: Ruby Marshal.dump/load — no JS equivalent; permanent exclusion candidate
+    // SCOPE: unported-files.ts — add to permanent exclusions when confirmed
   });
 
   it.skip("should property quote string primary keys", () => {
@@ -811,8 +812,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it.skip("assign ids", () => {
     // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: projectIds= writer (replaces join rows) not implemented on habtm collection
-    // SCOPE: has-and-belongs-to-many-associations.ts — *_ids= replace-all path
+    // SCOPE: has-and-belongs-to-many-associations.ts — *_ids= replace-all path (writer not implemented)
   });
 
   it.skip("assign ids ignoring blanks", () => {
@@ -830,7 +830,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it.skip("scoped find on through association doesnt return read only records", () => {
     // BLOCKED: associations — scope chain composition
     // ROOT-CAUSE: scoped find on through/habtm incorrectly marks results readonly; scope composition gap
-    // SCOPE: collection-proxy.ts / association-scope.ts — readonly flag not set on scoped through result
+    // SCOPE: collection-proxy.ts / association-scope.ts — readonly flag incorrectly set on scoped through result
   });
 
   it.skip("has many through polymorphic has manys works", () => {
