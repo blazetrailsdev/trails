@@ -12,6 +12,7 @@ import {
   buildThroughAssociation,
   createThroughAssociation,
 } from "../associations.js";
+import { HasOneThroughCantAssociateThroughCollection } from "./errors.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -550,18 +551,34 @@ describe("HasOneThroughAssociationsTest", () => {
     // Requires default scope on join model
   });
 
-  it.skip("has one through many raises exception", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires exception on has-one through has-many
+  it("has one through many raises exception", () => {
+    class ManyMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(ManyMember);
+    Associations.hasMany.call(ManyMember, "memberships", {
+      className: "Membership",
+      foreignKey: "member_id",
+    });
+    Associations.hasOne.call(ManyMember, "clubThroughMany", {
+      className: "Club",
+      through: "memberships",
+      source: "club",
+    });
+    const rec = new ManyMember({ name: "Test" });
+    // Accessing the through-collection association should raise
+    expect(() => rec.association("clubThroughMany")).toThrow(
+      HasOneThroughCantAssociateThroughCollection,
+    );
   });
 
   it.skip("has one through polymorphic association", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires polymorphic through association
+    // BLOCKED: reflection — isPolymorphic() checks options.polymorphic but not options.as
+    // ROOT-CAUSE: ThroughReflection.isPolymorphic() needs to recognize has_one :as as polymorphic
+    // SCOPE: ~10 LOC fix in reflection.ts; unblocks HasOneAssociationPolymorphicThroughError guard
   });
 
   it("has one through belongs to should update when the through foreign key changes", async () => {
@@ -610,11 +627,17 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loadedMembership!.club_id).toBe(club.id);
   });
 
-  it.skip("assigning has one through belongs to with new record owner", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires assignment with new record owner
+  it("assigning has one through belongs to with new record owner", async () => {
+    const club = await Club.create({ name: "Rails Club" });
+    const member = new Member({ name: "New Member" });
+    // Assign club via through association on a new (unsaved) owner
+    (member.association("club") as any).writer(club);
+    expect(member.association("club").target).toBe(club);
+    await member.save();
+    // After save, membership should be created linking member to club
+    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    expect(memberships.length).toBe(1);
+    expect(memberships[0].readAttribute("club_id")).toBe(club.id);
   });
 
   it.skip("has one through with custom select on join model default scope", () => {
@@ -624,11 +647,20 @@ describe("HasOneThroughAssociationsTest", () => {
     // Requires custom select on join model
   });
 
-  it.skip("has one through relationship cannot have a counter cache", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires counter cache restriction
+  it("has one through relationship cannot have a counter cache", () => {
+    expect(() => {
+      class Thing extends Base {
+        static {
+          this.adapter = adapter;
+        }
+      }
+      registerModel(Thing);
+      Associations.hasOne.call(Thing, "club_thing", {
+        className: "Club",
+        through: "membership",
+        counterCache: true,
+      });
+    }).toThrow(/counter_cache/);
   });
 
   it.skip("has one through do not cache association reader if the though method has default scopes", () => {

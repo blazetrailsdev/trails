@@ -5,7 +5,7 @@ import {
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
-import { compositeQueryConstraintsList } from "../persistence.js";
+import { queryConstraintsList } from "../persistence.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -21,6 +21,51 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
 export class HasOneThroughAssociation extends HasOneAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation#replace
+   *
+   * Dispatches through createThroughRecord instead of setting a direct FK.
+   * DB work is deferred via _pendingReplace and flushed by persistReplace.
+   */
+  protected override replace(record: Base | null, save = true): void {
+    if (record) (this as any).raiseOnTypeMismatchBang(record);
+    const assigningAnother = this.target !== record;
+    if (assigningAnother || (record as any)?.hasChangesToSave?.()) {
+      if (save) {
+        // Store pending regardless of owner.isPersisted() — for new owners,
+        // persistReplace runs after owner.save() when owner is now persisted.
+        if (this._pendingReplace) {
+          const wasAssignedAnother =
+            this._pendingReplace.previousTarget !== this._pendingReplace.record;
+          if (wasAssignedAnother && record === this._pendingReplace.previousTarget) {
+            this._pendingReplace = null;
+          } else {
+            this._pendingReplace.record = record;
+          }
+        } else {
+          this._pendingReplace = { record, previousTarget: this.target };
+        }
+      }
+    }
+    this.target = record;
+    this.loadedBang();
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasOneThroughAssociation — deferred DB flush.
+   *
+   * Called by autosave after owner.save(). Calls createThroughRecord which
+   * creates/updates/destroys the join-model record as needed.
+   */
+  override async persistReplace(): Promise<void> {
+    const pending = this._pendingReplace;
+    if (!pending) return;
+    await transaction(this, async () => {
+      await createThroughRecord(this, pending.record, true);
+    });
+    this._pendingReplace = null;
   }
 }
 
@@ -155,12 +200,15 @@ function constructJoinAttributes(
     sourceRefl.primaryKey ??
     "id";
   const pkArr: string[] = Array.isArray(assocPk) ? assocPk : [assocPk];
-  const compositeConstraints: string[] = reflKlass
-    ? compositeQueryConstraintsList.call(reflKlass)
-    : [];
+  // compositeQueryConstraintsList falls back to the PK for simple string PKs, which would
+  // incorrectly trigger the "pass object" branch. queryConstraintsList returns null for
+  // simple single-PK models (avoiding that branch) and the composite PK for CPK models.
+  const queryConstraints: string[] | null = reflKlass ? queryConstraintsList.call(reflKlass) : null;
+  const compositeConstraints: string[] = queryConstraints ?? [];
 
   let joinAttributes: Record<string, unknown>;
   if (
+    queryConstraints &&
     pkArr.length === compositeConstraints.length &&
     pkArr.every((k: string, i: number) => k === compositeConstraints[i]) &&
     !refl.options?.sourceType
