@@ -22,6 +22,8 @@ export interface PgIndexDefinition {
   columns: string[];
   using: string;
   orders?: Record<string, string> | string;
+  where?: string;
+  nullsNotDistinct?: boolean;
 }
 
 export interface CreateDatabaseOptions {
