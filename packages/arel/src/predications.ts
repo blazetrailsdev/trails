@@ -65,7 +65,7 @@ function predicationDispatch<T extends PredicationHost>(
   if (typeof methodId === "function") {
     return (expr) => methodId.call(host, expr, ...extras);
   }
-  const member = (host as unknown as Record<string, unknown>)[methodId];
+  const member = (host as Record<string, unknown>)[methodId];
   if (typeof member !== "function") {
     throw new TypeError(
       `Predications.groupingAny/All: \`${methodId}\` is not a method on the host (${(host as object).constructor.name})`,
@@ -81,34 +81,34 @@ function predicationDispatch<T extends PredicationHost>(
  * Mirrors: Arel::Predications (activerecord/lib/arel/predications.rb)
  */
 export const Predications = {
-  eq(this: PredicationHost, other: unknown): Equality {
-    return new Equality(this as unknown as Node, this.quotedNode(other));
+  eq(this: Node & PredicationHost, other: unknown): Equality {
+    return new Equality(this, this.quotedNode(other));
   },
-  notEq(this: PredicationHost, other: unknown): NotEqual {
-    return new NotEqual(this as unknown as Node, this.quotedNode(other));
+  notEq(this: Node & PredicationHost, other: unknown): NotEqual {
+    return new NotEqual(this, this.quotedNode(other));
   },
-  gt(this: PredicationHost, other: unknown): GreaterThan {
-    return new GreaterThan(this as unknown as Node, this.quotedNode(other));
+  gt(this: Node & PredicationHost, other: unknown): GreaterThan {
+    return new GreaterThan(this, this.quotedNode(other));
   },
-  gteq(this: PredicationHost, other: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this as unknown as Node, this.quotedNode(other));
+  gteq(this: Node & PredicationHost, other: unknown): GreaterThanOrEqual {
+    return new GreaterThanOrEqual(this, this.quotedNode(other));
   },
-  lt(this: PredicationHost, other: unknown): LessThan {
-    return new LessThan(this as unknown as Node, this.quotedNode(other));
+  lt(this: Node & PredicationHost, other: unknown): LessThan {
+    return new LessThan(this, this.quotedNode(other));
   },
-  lteq(this: PredicationHost, other: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this as unknown as Node, this.quotedNode(other));
+  lteq(this: Node & PredicationHost, other: unknown): LessThanOrEqual {
+    return new LessThanOrEqual(this, this.quotedNode(other));
   },
 
-  isDistinctFrom(this: PredicationHost, other: unknown): IsDistinctFrom {
-    return new IsDistinctFrom(this as unknown as Node, this.quotedNode(other));
+  isDistinctFrom(this: Node & PredicationHost, other: unknown): IsDistinctFrom {
+    return new IsDistinctFrom(this, this.quotedNode(other));
   },
-  isNotDistinctFrom(this: PredicationHost, other: unknown): IsNotDistinctFrom {
-    return new IsNotDistinctFrom(this as unknown as Node, this.quotedNode(other));
+  isNotDistinctFrom(this: Node & PredicationHost, other: unknown): IsNotDistinctFrom {
+    return new IsNotDistinctFrom(this, this.quotedNode(other));
   },
 
   matches(
-    this: PredicationHost,
+    this: Node & PredicationHost,
     pattern: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
@@ -117,29 +117,28 @@ export const Predications = {
     // `quotedNode` (→ buildQuoted) already unwraps SelectManager/TreeManager
     // `.ast` and passes Nodes through untouched, so we don't need a
     // separate branch for AST-bearing inputs here.
-    return new Matches(this as unknown as Node, this.quotedNode(pattern), escape, caseSensitive);
+    return new Matches(this, this.quotedNode(pattern), escape, caseSensitive);
   },
   doesNotMatch(
-    this: PredicationHost,
+    this: Node & PredicationHost,
     pattern: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
-    return new DoesNotMatch(
-      this as unknown as Node,
-      this.quotedNode(pattern),
-      escape,
-      caseSensitive,
-    );
+    return new DoesNotMatch(this, this.quotedNode(pattern), escape, caseSensitive);
   },
-  matchesRegexp(this: PredicationHost, pattern: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this as unknown as Node, this.quotedNode(pattern), caseSensitive);
+  matchesRegexp(this: Node & PredicationHost, pattern: string, caseSensitive = true): RegexpNode {
+    return new RegexpNode(this, this.quotedNode(pattern), caseSensitive);
   },
-  doesNotMatchRegexp(this: PredicationHost, pattern: string, caseSensitive = true): NotRegexp {
-    return new NotRegexp(this as unknown as Node, this.quotedNode(pattern), caseSensitive);
+  doesNotMatchRegexp(
+    this: Node & PredicationHost,
+    pattern: string,
+    caseSensitive = true,
+  ): NotRegexp {
+    return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
   },
 
-  in(this: PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): In {
+  in(this: Node & PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): In {
     // Mirrors Arel::Predications#in:
     //   SelectManager → In(self, other.ast)
     //   Enumerable    → In(self, quoted_array(other))
@@ -147,7 +146,7 @@ export const Predications = {
     if (Array.isArray(other)) {
       // Node[] is valid NodeOrValue for In/NotIn — no cast needed.
       return new In(
-        this as unknown as Node,
+        this,
         other.map((v) => this.quotedNode(v)),
       );
     }
@@ -156,22 +155,22 @@ export const Predications = {
     // so we don't construct a malformed In with a stray non-Node ast.
     if (other && typeof other === "object" && !(other instanceof Node) && "ast" in other) {
       const ast = (other as { ast: unknown }).ast;
-      if (ast instanceof Node) return new In(this as unknown as Node, ast);
+      if (ast instanceof Node) return new In(this, ast);
     }
-    return new In(this as unknown as Node, this.quotedNode(other));
+    return new In(this, this.quotedNode(other));
   },
-  notIn(this: PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): NotIn {
+  notIn(this: Node & PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): NotIn {
     if (Array.isArray(other)) {
       return new NotIn(
-        this as unknown as Node,
+        this,
         other.map((v) => this.quotedNode(v)),
       );
     }
     if (other && typeof other === "object" && !(other instanceof Node) && "ast" in other) {
       const ast = (other as { ast: unknown }).ast;
-      if (ast instanceof Node) return new NotIn(this as unknown as Node, ast);
+      if (ast instanceof Node) return new NotIn(this, ast);
     }
-    return new NotIn(this as unknown as Node, this.quotedNode(other));
+    return new NotIn(this, this.quotedNode(other));
   },
 
   // `between` / `notBetween` accept three forms — `[begin, end]`,
@@ -182,38 +181,54 @@ export const Predications = {
   // half-comparisons, exclusive end uses `<` / `>=`, and degenerate
   // `b == e` collapses to eq.
   between: function (
-    this: PredicationHost,
+    this: Node & PredicationHost & RangeHost,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
   ): Node {
     const range = parseRange(beginOrRange, end, excludeEnd);
-    return betweenFromRange(this as unknown as RangeHost, range);
+    return betweenFromRange(this, range);
   } as {
-    (this: PredicationHost, range: readonly [unknown, unknown]): Node;
-    (this: PredicationHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-    (this: PredicationHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+    (this: Node & PredicationHost & RangeHost, range: readonly [unknown, unknown]): Node;
+    (
+      this: Node & PredicationHost & RangeHost,
+      range: { begin: unknown; end: unknown; excludeEnd?: boolean },
+    ): Node;
+    (
+      this: Node & PredicationHost & RangeHost,
+      begin: unknown,
+      end: unknown,
+      excludeEnd?: boolean,
+    ): Node;
   },
 
   notBetween: function (
-    this: PredicationHost,
+    this: Node & PredicationHost & RangeHost,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
   ): Node {
     const range = parseRange(beginOrRange, end, excludeEnd);
-    return notBetweenFromRange(this as unknown as RangeHost, range);
+    return notBetweenFromRange(this, range);
   } as {
-    (this: PredicationHost, range: readonly [unknown, unknown]): Node;
-    (this: PredicationHost, range: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-    (this: PredicationHost, begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+    (this: Node & PredicationHost & RangeHost, range: readonly [unknown, unknown]): Node;
+    (
+      this: Node & PredicationHost & RangeHost,
+      range: { begin: unknown; end: unknown; excludeEnd?: boolean },
+    ): Node;
+    (
+      this: Node & PredicationHost & RangeHost,
+      begin: unknown,
+      end: unknown,
+      excludeEnd?: boolean,
+    ): Node;
   },
 
-  isNull(this: PredicationHost): Equality {
-    return new Equality(this as unknown as Node, new Quoted(null));
+  isNull(this: Node & PredicationHost): Equality {
+    return new Equality(this, new Quoted(null));
   },
-  isNotNull(this: PredicationHost): NotEqual {
-    return new NotEqual(this as unknown as Node, new Quoted(null));
+  isNotNull(this: Node & PredicationHost): NotEqual {
+    return new NotEqual(this, new Quoted(null));
   },
 
   // -- _any / _all variants --
@@ -284,17 +299,17 @@ export const Predications = {
   notInAll(this: PredicationHost & { notIn(o: unknown[]): Node }, others: unknown[][]): Grouping {
     return groupedAll(others.map((o) => this.notIn(o)));
   },
-  when(this: PredicationHost, right: unknown): Case {
-    return new Case(this as unknown as Node).when(this.quotedNode(right));
+  when(this: Node & PredicationHost, right: unknown): Case {
+    return new Case(this).when(this.quotedNode(right));
   },
   concat(this: Node, other: Node): Concat {
     return new Concat(this, other);
   },
-  contains(this: PredicationHost, other: unknown): Contains {
-    return new Contains(this as unknown as Node, this.quotedNode(other));
+  contains(this: Node & PredicationHost, other: unknown): Contains {
+    return new Contains(this, this.quotedNode(other));
   },
-  overlaps(this: PredicationHost, other: unknown): Overlaps {
-    return new Overlaps(this as unknown as Node, this.quotedNode(other));
+  overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
+    return new Overlaps(this, this.quotedNode(other));
   },
   quotedArray(this: PredicationHost, others: unknown[]): Node[] {
     return others.map((v) => this.quotedNode(v));

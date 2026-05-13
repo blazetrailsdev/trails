@@ -31,7 +31,7 @@ export interface RangeLike {
   excludeEnd: boolean;
 }
 
-export interface RangeHost {
+export interface RangeHost extends Node {
   quotedNode(other: unknown): Node;
   in(values: unknown[]): Node;
   notIn(values: unknown[]): Node;
@@ -105,10 +105,7 @@ export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
   if (range.begin === range.end) {
     return host.eq(range.begin);
   }
-  return new Between(
-    host as unknown as Node,
-    new And([host.quotedNode(range.begin), host.quotedNode(range.end)]),
-  );
+  return new Between(host, new And([host.quotedNode(range.begin), host.quotedNode(range.end)]));
 }
 
 export function notBetweenFromRange(host: RangeHost, range: RangeLike): Node {

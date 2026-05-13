@@ -47,12 +47,10 @@ import { AliasPredication } from "./alias-predication.js";
 import { OrderPredications } from "./order-predications.js";
 import { FilterPredications } from "./filter-predications.js";
 import { WindowPredications } from "./window-predications.js";
-/* eslint-disable @typescript-eslint/no-explicit-any -- abstract class coercion for include() */
-const _Node = Node as unknown as new (...args: any[]) => Node;
-const _NodeExpression = NodeExpression as unknown as new (...args: any[]) => NodeExpression;
-const _TreeManager = TreeManager as unknown as new (...args: any[]) => TreeManager;
-const _SqlLiteral = SqlLiteral as unknown as new (...args: any[]) => SqlLiteral;
-/* eslint-enable @typescript-eslint/no-explicit-any */
+const _Node = Node as unknown as new (...args: unknown[]) => Node;
+const _NodeExpression = NodeExpression as unknown as new (...args: unknown[]) => NodeExpression;
+const _TreeManager = TreeManager as unknown as new (...args: unknown[]) => TreeManager;
+const _SqlLiteral = SqlLiteral as unknown as new (...args: unknown[]) => SqlLiteral;
 // Modules typed as explicit module interfaces (no string index sig) need
 // a cast to satisfy include()'s runtime constraint. The cast is type-only
 // and runtime semantics are unchanged — include() iterates Object.keys.
