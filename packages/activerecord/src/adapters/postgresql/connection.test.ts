@@ -41,11 +41,17 @@ describeIfPg("PostgresqlConnectionTest", () => {
     expect(level).toBe("warning");
   });
 
-  it.skip("connection options", async () => {
-    // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in connection
-    // ROOT-CAUSE: connection-adapters/postgresql/connection.ts missing or incomplete Rails parity
-    // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/connection.ts; affects ~10–47 tests in connection.test.ts
-    // Requires establish_connection with options: "-c geqo=off" and leasing model connections
+  it("connection options", async () => {
+    const optionsAdapter = new PostgreSQLAdapter({
+      connectionString: PG_TEST_URL,
+      options: "-c geqo=off",
+    });
+    try {
+      const result = await optionsAdapter.execute("SHOW geqo");
+      expect(result[0]?.geqo).toBe("off");
+    } finally {
+      await optionsAdapter.close();
+    }
   });
 
   it("reset", async () => {
