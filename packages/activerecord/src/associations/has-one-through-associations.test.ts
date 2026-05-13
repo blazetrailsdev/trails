@@ -13,6 +13,7 @@ import {
   createThroughAssociation,
 } from "../associations.js";
 import { HasOneThroughCantAssociateThroughCollection } from "./errors.js";
+import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -92,8 +93,15 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(loadedClub!.name).toBe("Rails Club");
   });
 
-  it.skip("has one through executes limited query", () => {
-    // BLOCKED: test infrastructure — query count assertions (assert_queries_match) not available in TS test suite
+  it("has one through executes limited query", async () => {
+    const club = await Club.create({ name: "Boring Club" });
+    const member = await Member.create({ name: "Groucho" });
+    await Membership.create({ member_id: member.id, club_id: club.id });
+    await assertQueriesMatch(/LIMIT/i, undefined, false, async () => {
+      const loaded = await member.loadHasOne("club");
+      expect(loaded).not.toBeNull();
+      expect((loaded as any).name).toBe("Boring Club");
+    });
   });
 
   it("creating association creates through record", async () => {
