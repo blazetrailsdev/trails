@@ -33,6 +33,7 @@ import {
   HasOneAssociationPolymorphicThroughError,
   HasOneThroughCantAssociateThroughCollection,
   InverseOfAssociationNotFoundError,
+  InverseOfAssociationRecursiveError,
 } from "./associations/errors.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
@@ -189,14 +190,14 @@ export class AbstractReflection {
     if (!this.isPolymorphic() && this.hasInverse()) {
       const inverse = this.inverseOf();
       if (inverse == null) {
-        const inverseOf = (this as any)._inverseNameCache as string;
+        const inverseOf = (this as any).inverseName?.() as string;
         throw new InverseOfAssociationNotFoundError((this as any).name, inverseOf);
       }
       if (
         (inverse as any).name === (this as any).name &&
         (inverse as any).activeRecord === (this as any).activeRecord
       ) {
-        throw new ConfigurationError(`Inverse association for ${(this as any).name} is recursive.`);
+        throw new InverseOfAssociationRecursiveError((this as any).name, (inverse as any).name);
       }
     }
   }
