@@ -25,33 +25,49 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("MysqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `defaults` table
-    // (uuid column with DEFAULT uuid() expression). Test adapter uses SQLite; no MySQL fixture infra.
+    // BLOCKED: schema — schema dumper does not reflect MySQL expression defaults (uuid() / CONCAT).
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `defaults` table (uuid, char2_concatenated columns with DEFAULT expressions).
   });
   it.skip("schema dump includes default expression with single quotes reflected correctly", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `defaults` table
-    // (char2_concatenated column with DEFAULT CONCAT expression). No MySQL fixture infra.
+    // BLOCKED: schema — schema dumper does not reflect MySQL expression defaults (uuid() / CONCAT).
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `defaults` table (char2_concatenated column with DEFAULT CONCAT expression).
   });
   it.skip("schema dump datetime includes default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `datetime_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
   });
   it.skip("schema dump datetime includes precise default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `datetime_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP(6) expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
   });
   it.skip("schema dump datetime includes precise default expression with on update", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `datetime_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL ON UPDATE expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `datetime_defaults` table.
   });
   it.skip("schema dump timestamp includes default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `timestamp_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
   });
   it.skip("schema dump timestamp includes precise default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `timestamp_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL CURRENT_TIMESTAMP(6) expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
   });
   it.skip("schema dump timestamp includes precise default expression with on update", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `timestamp_defaults` table.
+    // BLOCKED: schema — schema dumper does not reflect MySQL ON UPDATE expression defaults.
+    // ROOT-CAUSE: dump_table_schema / schemaCreation path does not preserve expression-default lambdas for MySQL.
+    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table.
   });
   it.skip("schema dump timestamp without default expression", () => {
-    // BLOCKED: fixture — requires MySQL live connection with pre-existing `timestamp_defaults` table.
+    // BLOCKED: schema — schema dumper requires MySQL live connection to dump `timestamp_defaults` table.
+    // ROOT-CAUSE: dump_table_schema not wired through Mysql2Adapter; no schema-dump path for MySQL in test suite.
+    // SCOPE: mysql2_specific_schema.rb `timestamp_defaults` table (nullable_timestamp column, no default).
   });
 });
 
@@ -163,12 +179,12 @@ describe("DefaultTest", () => {
 
 describe("DefaultsTestWithoutTransactionalFixtures", () => {
   it.skip("mysql not null defaults non strict", () => {
-    // BLOCKED: fixture — requires MySQL live connection + strict-mode toggle via `establish_connection`.
-    // No MySQL adapter in test environment; strict-mode reconfiguration not supported in test harness.
+    // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
+    // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
   });
   it.skip("mysql not null defaults strict", () => {
-    // BLOCKED: fixture — requires MySQL live connection + strict-mode toggle via `establish_connection`.
-    // No MySQL adapter in test environment; strict-mode reconfiguration not supported in test harness.
+    // BLOCKED: adapter-mysql — strict-mode toggle via `establish_connection` not supported in test harness.
+    // ROOT-CAUSE: we have no way to reconfigure MySQL strict_mode per-connection in tests.
   });
 });
 
@@ -236,15 +252,17 @@ describe("DefaultStringsTest", () => {
 
 describe("PostgresqlDefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: fixture — requires PostgreSQL live connection with pre-existing `defaults` table
-    // (modified_date/modified_time CURRENT_DATE/CURRENT_TIMESTAMP expressions). No PG fixture infra.
+    // BLOCKED: schema — schema dumper does not reflect PostgreSQL expression defaults (CURRENT_DATE / CURRENT_TIMESTAMP).
+    // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for PG.
+    // SCOPE: postgresql_specific_schema.rb `defaults` table (modified_date, modified_time columns).
   });
 });
 
 describe("Sqlite3DefaultExpressionTest", () => {
   it.skip("schema dump includes default expression", () => {
-    // BLOCKED: fixture — requires pre-existing `defaults` table with expression defaults
-    // (CURRENT_DATE, CURRENT_TIMESTAMP, ABS(RANDOM())). No fixture-table infra in test adapter.
+    // BLOCKED: schema — schema dumper does not reflect SQLite expression defaults (CURRENT_DATE, CURRENT_TIMESTAMP, ABS(RANDOM())).
+    // ROOT-CAUSE: dump_table_schema path does not preserve expression-default lambdas for SQLite.
+    // SCOPE: sqlite_specific_schema.rb `defaults` table with expression defaults.
   });
 });
 

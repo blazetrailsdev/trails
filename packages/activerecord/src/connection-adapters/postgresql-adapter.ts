@@ -70,7 +70,7 @@ import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-ty
 
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
-import { READ_QUERY } from "./postgresql/database-statements.js";
+import { READ_QUERY, executeBatch as pgExecuteBatch } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
   ExclusionConstraintDefinition,
@@ -1459,6 +1459,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   override isWriteQuery(sql: string): boolean {
     return !READ_QUERY.test(sql);
   }
+
+  // Mirrors: PostgreSQL::DatabaseStatements#execute_batch (database_statements.rb)
+  executeBatch = pgExecuteBatch;
 
   // Mirrors: DatabaseStatements#high_precision_current_timestamp (database_statements.rb:92)
   // Rails: HIGH_PRECISION_CURRENT_TIMESTAMP = Arel.sql("CURRENT_TIMESTAMP")

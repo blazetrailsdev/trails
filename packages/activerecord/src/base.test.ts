@@ -2304,8 +2304,20 @@ describe("BasicsTest", () => {
   it.skip("attributes on dummy time", () => {
     // BLOCKED: fixtures + with_env_tz — assigns "5:42:00AM" string to Topic.find(1).bonus_time; needs Topic fixture and process-level TZ change; then assert_equal using find_by, requiring DB
   });
-  it.skip("attributes on dummy time with invalid time", () => {
-    // BLOCKED: fixtures — reads Topic.find(1) and assigns invalid time string; relies on Topic fixture data
+  it("attributes on dummy time with invalid time", async () => {
+    const adp = freshAdapter();
+    await defineSchema(adp, { dummy_topics: { bonus_time: "time" } });
+    class DummyTopic extends Base {
+      static tableName = "dummy_topics";
+      static {
+        this.attribute("bonus_time", "time");
+        this.adapter = adp;
+      }
+    }
+    const t = await DummyTopic.create({});
+    const found = await DummyTopic.find(t.id);
+    found.assignAttributes({ bonus_time: "not a time" });
+    expect(found.bonus_time).toBeNull();
   });
   it("previously persisted returns boolean", async () => {
     class User extends Base {

@@ -216,14 +216,19 @@ interface ExecuteBatchHost {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#execute_batch
+ *
+ * Rails joins statements and calls execute once; we iterate because node-postgres returns
+ * an array of results for multi-statement queries and our execute() expects a single result.
  * @internal
  */
 export async function executeBatch(
   this: ExecuteBatchHost,
   statements: string[],
   name: string | null = null,
-): Promise<unknown> {
-  return this.execute(statements.join("; "), [], name ?? undefined);
+): Promise<void> {
+  for (const statement of statements) {
+    await this.execute(statement, [], name ?? undefined);
+  }
 }
 
 /** @internal */
