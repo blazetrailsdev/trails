@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, expectTypeOf } from "vitest";
 import { Model, Errors, I18n, StrictValidationFailed } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
 
@@ -1135,5 +1135,40 @@ describe("ErrorsTest", () => {
     const e = new Errors(null);
     e.add("name", "blank");
     expect(e.ofKind("name", "nonexistent type xyz")).toBe(false);
+  });
+});
+
+describe("Errors<TBase> type parameter", () => {
+  interface User {
+    name: string;
+    age: number;
+  }
+
+  it("base getter returns TBase | null", () => {
+    const e = new Errors<User>({ name: "Alice", age: 30 });
+    expectTypeOf(e.base).toEqualTypeOf<User | null>();
+  });
+
+  it("add() type callback receives TBase | null", () => {
+    const e = new Errors<User>({ name: "Alice", age: 30 });
+    e.add("name", (record, _opts) => {
+      expectTypeOf(record).toEqualTypeOf<User | null>();
+      return "invalid";
+    });
+  });
+
+  it("add() message callback receives TBase | null", () => {
+    const e = new Errors<User>({ name: "Alice", age: 30 });
+    e.add("name", "invalid", {
+      message: (record) => {
+        expectTypeOf(record).toEqualTypeOf<User | null>();
+        return "bad";
+      },
+    });
+  });
+
+  it("default Errors (= object) still compiles", () => {
+    const e = new Errors<object>({} as object);
+    expectTypeOf(e.base).toEqualTypeOf<object | null>();
   });
 });

@@ -312,7 +312,7 @@ export class Errors<TBase extends object = object> {
    *   end
    */
   mergeBang<U extends object>(other: Errors<U>): void {
-    if ((other as unknown) === this) return;
+    if (Object.is(other, this)) return;
     for (const error of other._errors) {
       this.import(error);
     }
