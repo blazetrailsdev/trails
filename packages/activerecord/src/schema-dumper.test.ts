@@ -215,30 +215,82 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs index length tracking (MySQL) */
   });
-  it.skip("schema dumps check constraints", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs check constraint support */
+  it.skipIf(adapterType !== "postgres" && adapterType !== "mysql")(
+    "schema dumps check constraints",
+    async () => {
+      const { SchemaStatements } =
+        await import("./connection-adapters/abstract/schema-statements.js");
+      const { adapter: testAdapter, ctx: testCtx } = freshCtx();
+      await testCtx.createTable("products", {}, (t) => {
+        t.decimal("price");
+        t.decimal("discounted_price");
+      });
+      const ss = new SchemaStatements(testAdapter as any);
+      await ss.addCheckConstraint("products", "price > discounted_price", {
+        name: "products_price_check",
+      });
+      const output = await SchemaDumper.dump(testAdapter);
+      expect(output).toContain("products_price_check");
+      expect(output).toContain("addCheckConstraint");
+    },
+  );
+  it.skipIf(adapterType !== "postgres")("schema dumps exclusion constraints", async () => {
+    const { SchemaDumper: PgSchemaDumper } =
+      await import("./connection-adapters/postgresql/schema-dumper.js");
+    const { adapter: testAdapter, ctx: testCtx } = freshCtx();
+    await testCtx.createTable("test_schema_exclusion", { id: false }, (t) => {
+      t.date("start_date");
+      t.date("end_date");
+    });
+    await (testAdapter as any).addExclusionConstraint(
+      "test_schema_exclusion",
+      "daterange(start_date, end_date) WITH &&",
+      { using: "gist", name: "test_schema_exclusion_date_overlap" },
+    );
+    const output = await PgSchemaDumper.dump(testAdapter);
+    expect(output).toContain("addExclusionConstraint");
+    expect(output).toContain("test_schema_exclusion_date_overlap");
+    expect(output).toContain("daterange(start_date, end_date) WITH &&");
   });
-  it.skip("schema dumps exclusion constraints", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs exclusion constraint support (PG) */
+  it.skipIf(adapterType !== "postgres")("schema dumps unique constraints", async () => {
+    const { SchemaDumper: PgSchemaDumper } =
+      await import("./connection-adapters/postgresql/schema-dumper.js");
+    const { adapter: testAdapter, ctx: testCtx } = freshCtx();
+    await testCtx.createTable("test_schema_unique", {}, (t) => {
+      t.integer("position_1");
+      t.integer("position_2");
+    });
+    await (testAdapter as any).addUniqueConstraint("test_schema_unique", ["position_1"], {
+      name: "test_schema_unique_position_1",
+    });
+    await (testAdapter as any).addUniqueConstraint("test_schema_unique", ["position_2"], {
+      nullsNotDistinct: true,
+      name: "test_schema_unique_position_2_nnd",
+    });
+    const output = await PgSchemaDumper.dump(testAdapter);
+    expect(output).toContain("addUniqueConstraint");
+    expect(output).toContain("test_schema_unique_position_1");
+    expect(output).toContain("test_schema_unique_position_2_nnd");
+    expect(output).toContain("nullsNotDistinct: true");
   });
-  it.skip("schema dumps unique constraints", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs unique constraint support (PG) */
-  });
-  it.skip("schema does not dump unique constraints as indexes", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs unique constraint support (PG) */
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "schema does not dump unique constraints as indexes",
+    async () => {
+      const { SchemaDumper: PgSchemaDumper } =
+        await import("./connection-adapters/postgresql/schema-dumper.js");
+      const { adapter: testAdapter, ctx: testCtx } = freshCtx();
+      await testCtx.createTable("test_uc_no_idx", {}, (t) => {
+        t.integer("position");
+      });
+      await (testAdapter as any).addUniqueConstraint("test_uc_no_idx", ["position"], {
+        name: "test_uc_no_idx_position",
+      });
+      const output = await PgSchemaDumper.dump(testAdapter);
+      expect(output).toContain("addUniqueConstraint");
+      // The backing index must not also appear as an addIndex call.
+      expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
+    },
+  );
 
   it("schema dump does not emit id false for normal tables", async () => {
     await ctx.createTable("users", {}, (t) => {

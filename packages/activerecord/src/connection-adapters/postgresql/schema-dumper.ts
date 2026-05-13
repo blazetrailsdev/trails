@@ -10,6 +10,7 @@ import type {
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
 import type { Column } from "./column.js";
+import type { IndexInfo } from "../../schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
@@ -111,6 +112,34 @@ export class SchemaDumper extends AbstractSchemaDumper {
       lines.push(`  create_schema ${JSON.stringify(name)}`);
     }
     lines.push("");
+  }
+
+  /** @internal */
+  protected override async filterIndexesForDump(
+    tableName: string,
+    indexes: IndexInfo[],
+  ): Promise<IndexInfo[]> {
+    const adapter = this.pgAdapter();
+    let filtered = indexes;
+    if (adapter?.exclusionConstraints) {
+      const exclConstraints: ExclusionConstraintDefinition[] =
+        await adapter.exclusionConstraints(tableName);
+      const exclNames = new Set(
+        exclConstraints.map((ec: ExclusionConstraintDefinition) => ec.name).filter(Boolean),
+      );
+      if (exclNames.size > 0)
+        filtered = filtered.filter((idx) => !idx.name || !exclNames.has(idx.name));
+    }
+    if (adapter?.uniqueConstraints) {
+      const uniqConstraints: UniqueConstraintDefinition[] =
+        await adapter.uniqueConstraints(tableName);
+      const uniqNames = new Set(
+        uniqConstraints.map((uc: UniqueConstraintDefinition) => uc.name).filter(Boolean),
+      );
+      if (uniqNames.size > 0)
+        filtered = filtered.filter((idx) => !idx.name || !uniqNames.has(idx.name));
+    }
+    return filtered;
   }
 
   /** @internal */
