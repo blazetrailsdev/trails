@@ -616,53 +616,71 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
-    const wasPreLeased = !!lease.connection;
-
-    const cleanup = () => {
-      restoreSticky();
-      if (!wasPreLeased && !lease.sticky) this.releaseConnection();
-    };
-
-    // Run fn and manage cleanup. Returns T when fn is sync, Promise<T> when async.
-    const runFn = (): T | Promise<T> => {
+    // Common pre-leased path — mirrors the original exactly; no extra closures.
+    if (lease.connection) {
       let result: T | Promise<T>;
       try {
-        result = fn(lease.connection!);
+        result = fn(lease.connection);
       } catch (err) {
-        cleanup();
+        restoreSticky();
         throw err;
       }
       if (result !== null && result !== undefined && typeof (result as any).then === "function") {
         return Promise.resolve(result).then(
           (v) => {
-            cleanup();
+            restoreSticky();
             return v;
           },
           (e) => {
-            cleanup();
+            restoreSticky();
             throw e;
           },
         );
       }
-      cleanup();
+      restoreSticky();
+      return result;
+    }
+
+    // Acquire path — checkout a new connection, then run fn.
+    const releaseOnDone = () => {
+      restoreSticky();
+      if (!lease.sticky) this.releaseConnection();
+    };
+
+    const runWithConn = (): T | Promise<T> => {
+      let result: T | Promise<T>;
+      try {
+        result = fn(lease.connection!);
+      } catch (err) {
+        releaseOnDone();
+        throw err;
+      }
+      if (result !== null && result !== undefined && typeof (result as any).then === "function") {
+        return Promise.resolve(result).then(
+          (v) => {
+            releaseOnDone();
+            return v;
+          },
+          (e) => {
+            releaseOnDone();
+            throw e;
+          },
+        );
+      }
+      releaseOnDone();
       return result;
     };
 
-    if (lease.connection) {
-      return runFn();
-    }
-
-    // Fast path: connection immediately available.
     try {
       lease.connection = this.checkout();
-      return runFn();
+      return runWithConn();
     } catch (err) {
       if (err instanceof ConnectionTimeoutError) {
         // Pool saturated — wait asynchronously for a connection to become free.
         return this.checkoutAsync(options.checkoutTimeout).then(
           (conn) => {
             lease.connection = conn;
-            return runFn();
+            return runWithConn();
           },
           (checkoutErr) => {
             restoreSticky();
