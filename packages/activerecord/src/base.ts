@@ -1,5 +1,11 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Model, type Type, typeRegistry, pushPendingDecorator } from "@blazetrails/activemodel";
+import {
+  Model,
+  type Type,
+  typeRegistry,
+  pushPendingDecorator,
+  type CallbackConditions,
+} from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
   Table,
@@ -215,6 +221,7 @@ import {
   rememberTransactionRecordState as _rememberTransactionRecordState,
   restoreTransactionRecordState as _restoreTransactionRecordState,
   isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
+  synthOnCondition as _synthOnCondition,
 } from "./transactions.js";
 
 import {
@@ -2943,6 +2950,44 @@ export class Base extends Model {
    */
   static currentTransaction() {
     return _currentTransactionPublic();
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback
+   *
+   * Intercepts `on:` before it reaches the activemodel chain, synthesizing it
+   * into an `if:` predicate that closes over `isTransactionIncludeAnyAction`.
+   * Rails does the same in transactions.rb#set_callback (lines 304–319).
+   */
+  static override afterCommit<T extends typeof Model>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ): void {
+    super.afterCommit(
+      fn,
+      _synthOnCondition(conditions as Record<string, unknown>) as CallbackConditions<
+        InstanceType<T>
+      >,
+    );
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Transactions::ClassMethods#set_callback (rollback variant)
+   *
+   * Same `on:` synthesis as afterCommit.
+   */
+  static override afterRollback<T extends typeof Model>(
+    this: T,
+    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ): void {
+    super.afterRollback(
+      fn,
+      _synthOnCondition(conditions as Record<string, unknown>) as CallbackConditions<
+        InstanceType<T>
+      >,
+    );
   }
 
   /**

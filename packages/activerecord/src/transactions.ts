@@ -274,18 +274,13 @@ export function beforeCommit(
   fn: CallbackFn,
   options?: CallbackOptions,
 ): void {
-  if (options?.on !== undefined) {
-    const actions = Array.isArray(options.on) ? options.on : [options.on];
-    for (const action of actions) {
-      if (action !== "create" && action !== "update" && action !== "destroy") {
-        throw new ArgumentError(
-          `:on conditions for after_commit and after_rollback callbacks have to be one of [:create, :destroy, :update]`,
-        );
-      }
-    }
-  }
   (modelClass as any)._ensureOwnCallbacks();
-  (modelClass as any)._callbackChain.register("before", "commit", fn, options);
+  (modelClass as any)._callbackChain.register(
+    "before",
+    "commit",
+    fn,
+    synthOnCondition(options as Record<string, unknown>),
+  );
 }
 
 /**
@@ -747,11 +742,13 @@ export function isTransactionIncludeAnyAction(this: Base, actions: string[]): bo
   return actions.some((action) => {
     switch (action) {
       case "create":
-        return this.isPersisted() && !!r._newRecordBeforeLastCommit;
+        return this.isPersisted() && r._newRecordBeforeLastCommit === true;
       case "update":
-        return !(r._newRecordBeforeLastCommit || this.isDestroyed()) && !!r._triggerUpdateCallback;
+        return (
+          !(r._newRecordBeforeLastCommit || this.isDestroyed()) && r._triggerUpdateCallback === true
+        );
       case "destroy":
-        return !!r._triggerDestroyCallback;
+        return r._triggerDestroyCallback === true;
       default:
         return false;
     }
@@ -791,31 +788,30 @@ function prependOption(this: unknown): Record<string, unknown> {
 
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
-// Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks!
-/** @internal */
-function setOptionsForCallbacksBang(
-  args: unknown[],
-  enforcedOptions: Record<string, unknown> = {},
-): void {
-  const lastArg = args[args.length - 1];
-  const options: Record<string, unknown> =
-    lastArg !== null && typeof lastArg === "object" && !Array.isArray(lastArg)
-      ? (args.pop() as Record<string, unknown>)
-      : {};
-  Object.assign(options, enforcedOptions);
-  args.push(options);
-
-  if (options.on) {
-    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
-    assertValidTransactionAction(fireOn);
-    const existingIf = options.if as CallbackFn | CallbackFn[] | undefined;
-    options.if = (record: Base) => {
-      if (!isTransactionIncludeAnyAction.call(record, fireOn)) return false;
-      if (!existingIf) return true;
-      if (Array.isArray(existingIf)) return existingIf.every((fn) => fn(record));
-      return (existingIf as CallbackFn)(record) as boolean;
-    };
-  }
+/**
+ * Synthesize an `on:` option into an `if:` predicate before the conditions
+ * reach the activemodel chain. Mirrors the transformation Rails performs in
+ * `ActiveRecord::Transactions::ClassMethods#set_callback` (transactions.rb:308-315).
+ *
+ * Returns a new conditions object with `on:` removed and a synthesized `if:`
+ * prepended, or the original conditions unchanged when `on:` is absent.
+ *
+ * @internal
+ */
+export function synthOnCondition(
+  conditions: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!conditions || conditions.on === undefined) return conditions;
+  const fireOn = (Array.isArray(conditions.on) ? conditions.on : [conditions.on]) as string[];
+  assertValidTransactionAction(fireOn);
+  const { on: _on, if: existingIf, ...rest } = conditions;
+  const synthIf = (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn);
+  return {
+    ...rest,
+    if: existingIf
+      ? (record: Base) => synthIf(record) && (existingIf as CallbackFn)(record)
+      : synthIf,
+  };
 }
 
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action
