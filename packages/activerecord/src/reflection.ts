@@ -274,7 +274,7 @@ export class AbstractReflection {
   }
 
   /** @internal */
-  protected inverseName(): string | null {
+  inverseName(): string | null {
     return null;
   }
 
@@ -599,7 +599,8 @@ export class AssociationReflection extends MacroReflection {
   private _inverseNameCache: string | null | undefined = undefined;
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
-  protected override inverseName(): string | null {
+  /** @internal */
+  override inverseName(): string | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
     const explicit = this.options.inverseOf;
     if (explicit !== undefined) {
@@ -1283,8 +1284,9 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.inverseOf();
   }
 
-  protected override inverseName(): string | null {
-    return (this._delegate as any).inverseName();
+  /** @internal */
+  override inverseName(): string | null {
+    return this._delegate.inverseName();
   }
 
   sourceReflectionNames(): string[] {

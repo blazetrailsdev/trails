@@ -3,8 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord } from "./index.js";
-import { UnknownPrimaryKey } from "./errors.js";
+import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord, UnknownPrimaryKey } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
