@@ -21,6 +21,8 @@ type StatementMethodsHost = {
 };
 
 export class StatementMethods {
+  declare protected ast: StatementMethodsHost["ast"];
+
   take(this: StatementMethodsHost, limit: unknown): unknown {
     if (limit != null) this.ast.limit = new Limit(buildQuoted(limit));
     return this;
@@ -42,21 +44,19 @@ export class StatementMethods {
   }
 
   set key(key: unknown) {
-    (this as unknown as StatementMethodsHost).ast.key = Array.isArray(key)
-      ? key.map((k) => buildQuoted(k))
-      : buildQuoted(key);
+    this.ast.key = Array.isArray(key) ? key.map((k) => buildQuoted(k)) : buildQuoted(key);
   }
 
   get key(): unknown {
-    return (this as unknown as StatementMethodsHost).ast.key;
+    return this.ast.key;
   }
 
   set wheres(exprs: Node[]) {
-    (this as unknown as StatementMethodsHost).ast.wheres = exprs;
+    this.ast.wheres = exprs;
   }
 
   get wheres(): Node[] {
-    return (this as unknown as StatementMethodsHost).ast.wheres ?? [];
+    return this.ast.wheres ?? [];
   }
 }
 
