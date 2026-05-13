@@ -346,7 +346,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const rows = await adapter.execute(
         `SELECT hstore_to_json('"a"=>"1", "b"=>"2"'::hstore) AS r`,
       );
-      expect(rows[0].r).toEqual({ a: "1", b: "2" });
+      // adapter.execute returns raw strings for json columns; Json#deserialize owns parsing
+      expect(JSON.parse(rows[0].r as string)).toEqual({ a: "1", b: "2" });
     });
     it.skip("hstore populate", async () => {
       // BLOCKED: test-name mismatch — no Rails test named "hstore populate" in hstore_test.rb

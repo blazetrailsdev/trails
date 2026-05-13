@@ -96,6 +96,9 @@ import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 
+const OID_JSON = 114;
+const OID_JSONB = 3802;
+
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;
   try {
@@ -318,6 +321,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // AR Interval type can Duration.parse() it (Rails sets
             // intervalstyle = iso_8601 per connection).
             if (oid === OID_INTERVAL && format !== "binary") return (v: unknown) => v;
+            if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
+              return (v: unknown) => v;
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
               ? format === "binary"
                 ? pg.types.getTypeParser(oid, "binary")
@@ -392,6 +397,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // PG interval (OID 1186): return raw ISO 8601 string for AR
           // Interval (intervalstyle = iso_8601 is set on connect).
           if (oid === OID_INTERVAL && format !== "binary") {
+            const fallback = (v: unknown) => v;
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
+          if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary") {
             const fallback = (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
