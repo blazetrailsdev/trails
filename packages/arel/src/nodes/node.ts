@@ -77,12 +77,25 @@ export interface NodeVisitor<T> {
   visit(node: Node): T;
 }
 
+// ArelConnection lives in visitors/to-sql.ts which imports Node — a direct
+// import would create a cycle. `never` satisfies the contravariant param
+// check: TS requires `never extends ConcreteConnection`, which holds because
+// never is a subtype of everything (bottom type).
+type ToSqlCtor = new (connection?: never) => { compile(node: Node): string };
+
+interface NodeRegistry {
+  Not?: new (expr: Node) => Node;
+  Grouping?: new (expr: Node) => Node;
+  Or?: new (children: Node[]) => Node;
+  And?: new (children: Node[]) => Node;
+  ToSql?: ToSqlCtor;
+}
+
 // Registry for breaking circular dependencies.
 // Populated by the index module after all classes are loaded.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _registry: Record<string, (new (...args: any[]) => any) | undefined> = {};
+const _registry: NodeRegistry = {};
 
-function assertRegistered(name: string): void {
+function assertRegistered(name: keyof NodeRegistry): void {
   if (!_registry[name]) {
     throw new Error(
       `Node.${name} requires the arel registry. Import from "@blazetrails/arel" instead of deep-importing node classes.`,
@@ -95,8 +108,7 @@ export function registerNodeDeps(deps: {
   Grouping: new (expr: Node) => Node;
   Or: new (children: Node[]) => Node;
   And: new (children: Node[]) => Node;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ToSql: new (...args: any[]) => { compile(node: Node): string };
+  ToSql: ToSqlCtor;
 }): void {
   _registry.Not = deps.Not;
   _registry.Grouping = deps.Grouping;

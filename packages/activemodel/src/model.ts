@@ -207,17 +207,15 @@ export class Model {
     let options: Record<string, unknown> = {};
     let fn: (value: unknown) => unknown;
     const lastArg = args[args.length - 1];
+    let attributes: string[];
     if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
       options = lastArg as Record<string, unknown>;
       fn = args[args.length - 2] as (value: unknown) => unknown;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      args = args.slice(0, -2) as any;
+      attributes = args.slice(0, -2) as unknown as string[];
     } else {
       fn = lastArg as (value: unknown) => unknown;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      args = args.slice(0, -1) as any;
+      attributes = args.slice(0, -1) as unknown as string[];
     }
-    const attributes = args as unknown as string[];
     const applyToNil = !!options.applyToNil;
 
     for (const attr of attributes) {
