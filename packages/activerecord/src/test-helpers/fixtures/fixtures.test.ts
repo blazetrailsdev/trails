@@ -216,7 +216,6 @@ describe("bookFixtureData", () => {
   });
 });
 
-<<<<<<< HEAD
 describe("companyFixtureData", () => {
   it("exports all 12 Rails companies fixtures", () => {
     expect(Object.keys(companyFixtureData)).toEqual([
@@ -334,8 +333,6 @@ describe("accountFixtureData", () => {
   });
 });
 
-||||||| parent of 28fa2ba99 (feat(activerecord) fixture replacement Phase 3c — developers + projects + developers_projects HABTM fixture data)
-=======
 describe("developerFixtureData", () => {
   it("exports david, jamis, dev_3..dev_10, poor_jamis", () => {
     const keys = Object.keys(developerFixtureData);
@@ -396,7 +393,6 @@ describe("developersProjectsFixtureData", () => {
   });
 });
 
->>>>>>> 28fa2ba99 (feat(activerecord) fixture replacement Phase 3c — developers + projects + developers_projects HABTM fixture data)
 describe("authorAddressFixtureData", () => {
   it("exports david_address, david_address_extra, mary_address, bob_address", () => {
     expect(Object.keys(authorAddressFixtureData)).toEqual([
