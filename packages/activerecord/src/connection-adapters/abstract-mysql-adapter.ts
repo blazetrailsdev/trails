@@ -469,7 +469,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
     await (this as unknown as { executeMutation(sql: string): Promise<number> }).executeMutation(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
-        `${this.quoteTableName(oldName)} TO ${this.quoteTableName(newName)}`,
+        `${this.quoteIdentifier(oldName)} TO ${this.quoteIdentifier(newName)}`,
     );
   }
 

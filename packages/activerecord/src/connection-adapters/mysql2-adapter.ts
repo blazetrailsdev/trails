@@ -1449,8 +1449,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
     // Mirrors Rails: `if @config[:encoding]` → `SET NAMES encoding [COLLATE collation], ...`
     // mysql2's `charset` pool option corresponds to Rails' database.yml `encoding:`.
+    const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
     const charset = this._poolConfig.charset as string | undefined;
     const charsetCollation = (this._poolConfig as { collation?: string }).collation;
+    if (charset && !SAFE_CHARSET_RE.test(charset)) {
+      throw new Error(`Invalid MySQL charset: ${JSON.stringify(charset)}`);
+    }
+    if (charsetCollation && !SAFE_CHARSET_RE.test(charsetCollation)) {
+      throw new Error(`Invalid MySQL collation: ${JSON.stringify(charsetCollation)}`);
+    }
     let namesPart = "";
     if (charset) {
       namesPart = `NAMES ${charset}`;
