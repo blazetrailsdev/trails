@@ -199,9 +199,12 @@ it("withConnection waits for a released connection when pool is saturated", asyn
   const held = pool.checkout();
 
   let connSeen: DatabaseAdapter | undefined;
-  const waiter = pool.withConnection((conn) => {
-    connSeen = conn;
-  });
+  const waiter = pool.withConnection(
+    (conn) => {
+      connSeen = conn;
+    },
+    { checkoutTimeout: 5 },
+  );
   pool.checkin(held);
   await waiter;
   expect(connSeen).toBe(held);
