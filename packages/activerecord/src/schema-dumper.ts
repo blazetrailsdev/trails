@@ -997,6 +997,9 @@ export class SchemaDumper {
   formatColspec(colspec: Record<string, unknown>): string {
     return Object.entries(colspec)
       .map(([k, v]) => {
+        if (typeof v === "function") {
+          return `${k}: () => ${JSON.stringify((v as () => unknown)())}`;
+        }
         if (v && typeof v === "object" && !Array.isArray(v)) {
           return `${k}: { ${this.formatColspec(v as Record<string, unknown>)} }`;
         }
