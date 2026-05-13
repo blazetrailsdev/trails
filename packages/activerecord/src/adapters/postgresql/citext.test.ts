@@ -85,6 +85,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("case insensitiveness", async () => {
+      await adapter.columns("citexts"); // warm schema cache so columnForAttribute doesn't need pool
       const table = new ArelTable("citexts");
       const attr = table.get("cival");
       const comparison = await adapter.caseInsensitiveComparison(attr, null);
