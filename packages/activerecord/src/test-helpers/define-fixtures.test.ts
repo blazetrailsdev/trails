@@ -45,7 +45,7 @@ describe("fixtureId", () => {
   });
 
   it("produces a stable known value for 'david' (CRC32 polynomial 0xedb88320)", () => {
-    // Value is stable across JS runtimes; not guaranteed to match Ruby Zlib.crc32 exactly.
+    // For ASCII labels this matches Ruby's Zlib.crc32(label) % (2**30 - 1) exactly.
     expect(fixtureId("david")).toBe(127326141);
   });
 });
@@ -130,6 +130,23 @@ describe("defineFixtures", () => {
 
     expect(first.david.id).toBe(davidId);
     expect(second.david.id).toBe(davidId);
+  });
+
+  it("HABTM join-table: two ref()s in one row both resolve", async () => {
+    const adapter = makeAdapter();
+    const joinRow = { post_id: fixtureId("welcome"), tag_id: fixtureId("rails") };
+    const rows = new Map([[fixtureId("welcome_rails"), joinRow]]);
+    const PostTag = makeModel("posts_tags", rows);
+
+    await defineFixtures(adapter, PostTag, {
+      welcome_rails: { post_id: ref("posts", "welcome"), tag_id: ref("tags", "rails") },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO"));
+    expect(insertSql).toContain(String(fixtureId("welcome")));
+    expect(insertSql).toContain(String(fixtureId("rails")));
   });
 
   it("STI: type column passed explicitly is preserved in INSERT", async () => {

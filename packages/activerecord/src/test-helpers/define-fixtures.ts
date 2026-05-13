@@ -8,7 +8,8 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 
 const FIXTURE_MAX_ID = 2 ** 30 - 1;
 
-// CRC32 lookup table — matches Rails' Zlib.crc32(label) % MAX_ID algorithm
+// CRC32 lookup table (polynomial 0xedb88320). For ASCII labels this produces values
+// identical to Ruby's Zlib.crc32(label) % MAX_ID, matching Rails' FixtureSet.identify.
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -50,8 +51,10 @@ export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
 }
 
-type ModelClass = typeof Base;
+type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
+type InsertHost = DatabaseStatementsHost &
+  Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
 /**
  * Inserts fixture rows for a model and returns persisted instances keyed by label.
@@ -59,7 +62,7 @@ type FixtureAttrs = Record<string, unknown>;
  * IDs are deterministic: same label → same ID across test runs, enabling cross-batch
  * FK references via `ref(tableName, label)` without insertion-order coupling.
  */
-export async function defineFixtures<T extends ModelClass, K extends string>(
+export async function defineFixtures<T extends BaseClass, K extends string>(
   adapter: DatabaseAdapter,
   ModelClass: T,
   fixtures: Record<K, FixtureAttrs>,
@@ -82,7 +85,10 @@ export async function defineFixtures<T extends ModelClass, K extends string>(
         const refId = fixtureId(val.fixtureName);
         row[col] = refId;
       } else if (val !== null && typeof val === "object" && pkCol in val) {
-        // Direct model instance: extract its PK value
+        // Heuristic: plain object or model instance carrying the PK — extract it.
+        // Limitation: a JSON column value shaped like { id: ... } will also match.
+        // Avoid ambiguity by using ref() for cross-batch FKs and direct instances only
+        // for same-batch model objects returned by a prior defineFixtures call.
         row[col] = (val as FixtureAttrs)[pkCol];
       } else {
         row[col] = val;
@@ -92,8 +98,6 @@ export async function defineFixtures<T extends ModelClass, K extends string>(
   }
 
   // Insert via existing adapter infrastructure (wrapped in transaction, honours disableReferentialIntegrity)
-  type InsertHost = DatabaseStatementsHost &
-    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
   await insertFixturesSet.call(adapter as unknown as InsertHost, {
     [tableName]: rows,
   });
