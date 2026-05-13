@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { fixtureId, ref, isFixtureRef, defineFixtures } from "./define-fixtures.js";
+import {
+  fixtureId,
+  ref,
+  isFixtureRef,
+  defineFixtures,
+  resolveModelForTable,
+} from "./define-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 function makeAdapter(): DatabaseAdapter {
@@ -152,6 +158,154 @@ describe("defineFixtures", () => {
       .find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain(String(fixtureId("welcome")));
     expect(insertSql).toContain(String(fixtureId("rails")));
+  });
+
+  it("HABTM: string values for FK columns auto-resolve to fixtureId when table matches a_b pattern", async () => {
+    const adapter = makeAdapter();
+
+    // Register developers and projects first
+    const developerRows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
+    const Developer = makeModel("developers", developerRows);
+    const projectRows = new Map([[fixtureId("trails"), { id: fixtureId("trails") }]]);
+    const Project = makeModel("projects", projectRows);
+    await defineFixtures(adapter, Developer, { david: {} });
+    await defineFixtures(adapter, Project, { trails: {} });
+
+    // Join-table: developers_projects auto-detects "developers" and "projects" in registry
+    const joinRow = {
+      developer_id: fixtureId("david"),
+      project_id: fixtureId("trails"),
+    };
+    const joinRows = new Map([[fixtureId("david_trails"), joinRow]]);
+    const DevelopersProject = makeModel("developers_projects", joinRows);
+
+    await defineFixtures(adapter, DevelopersProject, {
+      david_trails: { developer_id: "david", project_id: "trails" },
+    });
+
+    const insertCalls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("developers_projects"));
+    expect(insertCalls.length).toBeGreaterThan(0);
+    expect(insertCalls[0]).toContain(String(fixtureId("david")));
+    expect(insertCalls[0]).toContain(String(fixtureId("trails")));
+  });
+
+  it("tableName registry: resolveModelForTable returns the model after defineFixtures", async () => {
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
+    const User = makeModel("users", rows);
+
+    expect(resolveModelForTable(adapter, "users")).toBeUndefined();
+    await defineFixtures(adapter, User, { david: {} });
+    expect(resolveModelForTable(adapter, "users")).toBe(User);
+  });
+
+  it("tableName registry: each adapter has its own isolated registry", async () => {
+    const adapter1 = makeAdapter();
+    const adapter2 = makeAdapter();
+    const rows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
+    const User = makeModel("users", rows);
+
+    await defineFixtures(adapter1, User, { david: {} });
+    expect(resolveModelForTable(adapter1, "users")).toBe(User);
+    expect(resolveModelForTable(adapter2, "users")).toBeUndefined();
+  });
+
+  it("polymorphic ref: { taggable: instance } expands to taggable_type + taggable_id", async () => {
+    const adapter = makeAdapter();
+
+    // Post instance with a known ID
+    const postId = fixtureId("welcome");
+    class Post {
+      static tableName = "posts";
+      static primaryKey = "id";
+      id = postId;
+    }
+    const postInstance = new Post();
+
+    // Tagging model with a polymorphic belongs_to :taggable reflection
+    const taggingId = fixtureId("welcome_tag");
+    const taggingRow = {
+      id: taggingId,
+      taggable_type: "Post",
+      taggable_id: postId,
+    };
+    const rows = new Map([[taggingId, taggingRow]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: {
+        macro: "belongsTo",
+        isPolymorphic: () => true,
+      },
+    };
+
+    await defineFixtures(adapter, Tagging, {
+      welcome_tag: { taggable: postInstance as any },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    expect(insertSql).toContain("taggable_type");
+    expect(insertSql).toContain("Post");
+    expect(insertSql).toContain(String(postId));
+  });
+
+  it("polymorphic ref: explicit taggable_type/taggable_id pass through without expansion", async () => {
+    // When the caller already provides the concrete type/id columns directly (no association key),
+    // they should pass through unchanged — no expansion is triggered.
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("welcome_tag"), { id: fixtureId("welcome_tag") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+
+    await defineFixtures(adapter, Tagging, {
+      welcome_tag: { taggable_type: "CustomPost", taggable_id: 999 },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    expect(insertSql).toContain("CustomPost");
+    expect(insertSql).toContain("999");
+  });
+
+  it("polymorphic ref: null value sets both type and id columns to null", async () => {
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("untagged"), { id: fixtureId("untagged") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+
+    await defineFixtures(adapter, Tagging, {
+      untagged: { taggable: null },
+    });
+
+    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    expect(insertSql).toContain("taggable_type");
+    expect(insertSql).toContain("taggable_id");
+    // Both FK columns appear with null values (test adapter serialises null as "null")
+    const nullCount = (insertSql!.match(/\bnull\b/g) ?? []).length;
+    expect(nullCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("polymorphic ref: non-instance non-null value throws a clear error", async () => {
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+
+    await expect(
+      defineFixtures(adapter, Tagging, { bad: { taggable: 42 as any } }),
+    ).rejects.toThrow("polymorphic association");
   });
 
   it("STI: type column passed explicitly is preserved in INSERT", async () => {
