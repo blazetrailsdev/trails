@@ -184,7 +184,7 @@ export function readAttributeForValidation(this: any, attribute: string): unknow
   if (typeof this.association === "function") {
     try {
       const assoc = this.association(attribute);
-      if (assoc?.loaded === true && assoc.target !== undefined) return assoc.target;
+      if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
     } catch {
       // Not an association — fall through
     }

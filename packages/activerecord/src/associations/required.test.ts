@@ -93,17 +93,61 @@ describe("RequiredAssociationsTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
     /* global config not implemented */
   });
-  it.skip("required has_one associations have presence validated", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/required.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
-    /* has_one required option not implemented */
+  it("required has_one associations have presence validated", () => {
+    const adapter = freshAdapter();
+    class RHProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("r_h_user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class RHUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(RHUser, "rHProfile", {
+      foreignKey: "r_h_user_id",
+      className: "RHProfile",
+      required: true,
+    });
+    registerModel("RHUser", RHUser);
+    registerModel("RHProfile", RHProfile);
+    const user = new RHUser({ name: "test" });
+    expect(user.isValid()).toBe(false);
+    expect(user.errors.on("rHProfile").length).toBeGreaterThan(0);
   });
-  it.skip("required has_one associations have a correct error message", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/required.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in required.test.ts
-    /* has_one required option not implemented */
+  it("required has_one associations have a correct error message", () => {
+    const adapter = freshAdapter();
+    class RMProfile extends Base {
+      static {
+        this.attribute("bio", "string");
+        this.attribute("r_m_user_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class RMUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasOne.call(RMUser, "rMProfile", {
+      foreignKey: "r_m_user_id",
+      className: "RMProfile",
+      required: true,
+    });
+    registerModel("RMUser", RMUser);
+    registerModel("RMProfile", RMProfile);
+    const user = new RMUser({ name: "test" });
+    user.isValid();
+    const messages = user.errors.fullMessages;
+    expect(messages.length).toBeGreaterThan(0);
+    // Rails translates :required → "must exist"; message includes the association name
+    expect(messages.some((m) => /must exist/i.test(m))).toBe(true);
+    expect(messages.some((m) => /profile/i.test(m))).toBe(true);
   });
 
   it("required belongs_to associations have a correct error message", async () => {
