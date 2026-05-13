@@ -93,10 +93,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through executes limited query", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires query count assertions
+    // BLOCKED: test infrastructure — query count assertions (assert_queries_match) not available in TS test suite
   });
 
   it("creating association creates through record", async () => {
@@ -144,17 +141,11 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("building multiple associations builds through record", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires multiple has_one :through on same model
+    // BLOCKED: fixture — MemberDetail (member_type_id + admittable polymorphic) model not defined in test suite
   });
 
   it.skip("building works with has one through belongs to", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires belongs_to :through configuration
+    // BLOCKED: fixture — current_membership / has_one :through :belongs_to chain fixture setup not defined
   });
 
   it("creating multiple associations creates through record", async () => {
@@ -353,45 +344,115 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through with conditions eager loading", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires eager loading with conditions
+    // BLOCKED: fixture — favorite_club/hairy_club scoped associations (WHERE on through + source) not defined in test suite
+    // BLOCKED: associations — scoped has_one_through (where conditions on through/source) not wired into targetScope chain
   });
 
-  it.skip("has one through polymorphic with source type", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires polymorphic with source type
+  it("has one through polymorphic with source type", async () => {
+    // Club has_one :sponsor (polymorphic sponsorable), has_one :sponsored_member through sponsor with source_type
+    class StClub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StSponsor extends Base {
+      static {
+        this.attribute("club_id", "integer");
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(StClub);
+    registerModel(StSponsor);
+    registerModel(StMember);
+    Associations.hasOne.call(StClub, "sponsor", { className: "StSponsor", foreignKey: "club_id" });
+    Associations.hasOne.call(StClub, "sponsoredMember", {
+      className: "StMember",
+      through: "sponsor",
+      source: "sponsorable",
+      sourceType: "StMember",
+    });
+    Associations.belongsTo.call(StSponsor, "sponsorable", { polymorphic: true });
+
+    const club = await StClub.create({ name: "Moustache Club" });
+    const member = await StMember.create({ name: "Groucho" });
+    await StSponsor.create({
+      club_id: club.id,
+      sponsorable_id: member.id,
+      sponsorable_type: "StMember",
+    });
+
+    const sponsoredMember = await (club as any).loadHasOne("sponsoredMember");
+    expect(sponsoredMember).not.toBeNull();
+    expect((sponsoredMember as any).name).toBe("Groucho");
   });
 
-  it.skip("eager has one through polymorphic with source type", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires eager polymorphic with source type
+  it("eager has one through polymorphic with source type", async () => {
+    class EsClub extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EsSponsor extends Base {
+      static {
+        this.attribute("club_id", "integer");
+        this.attribute("sponsorable_id", "integer");
+        this.attribute("sponsorable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EsMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(EsClub);
+    registerModel(EsSponsor);
+    registerModel(EsMember);
+    Associations.hasOne.call(EsClub, "sponsor", { className: "EsSponsor", foreignKey: "club_id" });
+    Associations.hasOne.call(EsClub, "sponsoredMember", {
+      className: "EsMember",
+      through: "sponsor",
+      source: "sponsorable",
+      sourceType: "EsMember",
+    });
+    Associations.belongsTo.call(EsSponsor, "sponsorable", { polymorphic: true });
+
+    const club = await EsClub.create({ name: "Moustache Club" });
+    const member = await EsMember.create({ name: "Groucho" });
+    await EsSponsor.create({
+      club_id: club.id,
+      sponsorable_id: member.id,
+      sponsorable_type: "EsMember",
+    });
+
+    const clubs = await EsClub.all().includes("sponsoredMember").toArray();
+    expect(clubs).toHaveLength(1);
+    const preloaded = (clubs[0] as any)._preloadedAssociations?.get("sponsoredMember");
+    expect(preloaded).not.toBeNull();
+    expect((preloaded as any).name).toBe("Groucho");
   });
 
   it.skip("has one through nonpreload eagerloading", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires non-preload eager loading
+    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
   });
 
   it.skip("has one through nonpreload eager loading through polymorphic", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires non-preload eager loading through polymorphic
+    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
   });
 
   it.skip("has one through nonpreload eager loading through polymorphic with more than one through record", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires multi-record non-preload through polymorphic eager loading
+    // BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented; requires eager_load path
   });
 
   it("uninitialized has one through should return nil for unsaved record", async () => {
@@ -429,24 +490,15 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires proxy method visibility
+    // BLOCKED: unported — Ruby private-method visibility (NoMethodError on private) has no TS equivalent
   });
 
   it.skip("has one through proxy should respond to private methods via send", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires proxy method visibility via send
+    // BLOCKED: unported — Ruby send / private-method dispatch has no TS equivalent
   });
 
   it.skip("assigning to has one through preserves decorated join record", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires decorated join record preservation
+    // BLOCKED: fixture — MemberDetail / Organization fixture models not defined in test suite
   });
 
   it("reassigning has one through", async () => {
@@ -524,31 +576,20 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("value is properly quoted", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires SQL quoting
+    // BLOCKED: fixture — Minivan / Dashboard / Speedometer fixture models not defined in test suite
   });
 
   it.skip("has one through polymorphic with primary key option", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires polymorphic with primary key option
+    // BLOCKED: fixture — Author / Essay / Owner fixture models with custom primary_key option not defined
   });
 
   it.skip("has one through with primary key option", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires primary key option on through
+    // BLOCKED: fixture — Author / Essay / Category fixture models with custom primary_key option not defined
   });
 
   it.skip("has one through with default scope on join model", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires default scope on join model
+    // BLOCKED: fixture — Author / Post / Comment fixture models not defined
+    // BLOCKED: associations — ThroughAssociation.targetScope chain merge (default_scope on join model) not implemented
   });
 
   it("has one through many raises exception", () => {
@@ -641,10 +682,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through with custom select on join model default scope", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires custom select on join model
+    // BLOCKED: associations — default_scope with custom SELECT on join model not wired into through scope chain
   });
 
   it("has one through relationship cannot have a counter cache", () => {
@@ -664,10 +702,8 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through do not cache association reader if the though method has default scopes", () => {
-    // BLOCKED: associations — has-one-through feature gap
-    // ROOT-CAUSE: associations/has-one-through-associations.ts or preloader.ts missing has-one-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-one-through-associations.test.ts
-    // Requires cache invalidation with scoped through
+    // BLOCKED: associations — scope-based association-scope cache invalidation not implemented
+    // BLOCKED: associations — default_scope with custom SELECT on join model not wired into through scope chain
   });
 
   it("loading cpk association with unpersisted owner", async () => {
