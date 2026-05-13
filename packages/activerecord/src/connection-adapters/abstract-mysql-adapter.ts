@@ -48,6 +48,7 @@ import {
 import {
   ChangeColumnDefinition,
   ColumnDefinition,
+  CreateIndexDefinition,
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
@@ -459,9 +460,35 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    void tableName;
-    void oldName;
-    void newName;
+    await this.getDatabaseVersion();
+    this.schemaStatements().validateIndexLengthBang(tableName, newName);
+    if (!this.supportsRenameIndex()) {
+      throw new Error(
+        "renameIndex requires MySQL >= 5.7.6 or MariaDB >= 10.5.2; upgrade your server to use this feature",
+      );
+    }
+    await this._execMutation(
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
+        `${this.quoteIdentifier(oldName)} TO ${this.quoteIdentifier(newName)}`,
+    );
+  }
+
+  /**
+   * Execute a DDL/DML statement on the concrete adapter.
+   * AbstractMysqlAdapter itself does not hold a connection; this delegates to
+   * the concrete subclass (Mysql2Adapter, TrilogyAdapter) which implements
+   * executeMutation on DatabaseAdapter.
+   * @internal
+   */
+  protected async _execMutation(sql: string): Promise<void> {
+    const exec = (this as unknown as { executeMutation?: (sql: string) => Promise<number> })
+      .executeMutation;
+    if (typeof exec !== "function") {
+      throw new Error(
+        `${this.constructor.name} must implement executeMutation() to use DDL helpers`,
+      );
+    }
+    await exec.call(this, sql);
   }
 
   async changeColumnDefault(
@@ -543,9 +570,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    void tableName;
-    void columnName;
-    void options;
+    const ss = this.schemaStatements();
+    const [idx, algorithmClause, ifNotExists] = ss.addIndexOptions(tableName, columnName, options);
+    if (ifNotExists && (await ss.indexExists(tableName, idx.columns, { name: idx.name }))) {
+      return;
+    }
+    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
+    await this._execMutation(new MysqlSchemaCreation().accept(createDef));
   }
 
   buildCreateIndexDefinition(

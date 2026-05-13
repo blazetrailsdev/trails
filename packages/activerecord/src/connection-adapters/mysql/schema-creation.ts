@@ -20,6 +20,7 @@ import {
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { quoteIdentifier, quoteTableName, quoteString as mysqlQuoteString } from "./quoting.js";
 import { quoteDefaultExpression } from "../abstract/quoting.js";
+import { addOptionsForIndexColumns } from "./schema-statements.js";
 
 /** MySQL-specific column options — extends the abstract ColumnOptions with `onUpdate`. */
 export type MysqlAddColumnOptions = ColumnOptions & { onUpdate?: string };
@@ -140,6 +141,20 @@ export class SchemaCreation extends AbstractSchemaCreation {
     parts.push(`(${this.quotedColumns(o)})`);
 
     return this.addSqlCommentBang(parts.join(" "), o.comment);
+  }
+
+  /** @internal */
+  protected override quotedColumns(o: { columns: string | string[] }): string {
+    if (typeof o.columns === "string") return o.columns;
+    const idx = o as IndexDefinition;
+    const quotedMap = new Map<string, string>(
+      o.columns.map((c) => [c, this.adapter.quoteIdentifier(c)]),
+    );
+    addOptionsForIndexColumns(quotedMap, {
+      length: idx.lengths as Record<string, number> | number | undefined,
+      order: idx.orders as Record<string, string> | string | undefined,
+    });
+    return [...quotedMap.values()].join(", ");
   }
 
   /** @internal */

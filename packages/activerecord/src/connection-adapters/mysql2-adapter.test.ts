@@ -846,3 +846,46 @@ describeIfMysql("Mysql2Adapter", () => {
     });
   });
 });
+
+// Unit tests that do not require a live MySQL connection.
+describe("Mysql2Adapter unit", () => {
+  describe("_buildInitSql", () => {
+    it("includes SET NAMES when charset is configured", async () => {
+      const adapter = new Mysql2Adapter({ host: "localhost", charset: "utf8mb4" });
+      const sql = (adapter as any)._buildInitSql() as string;
+      expect(sql).toMatch(/^SET NAMES utf8mb4,/);
+      await adapter.close();
+    });
+
+    it("includes SET NAMES with COLLATE when both charset and collation are configured", async () => {
+      const adapter = new Mysql2Adapter({
+        host: "localhost",
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      } as any);
+      const sql = (adapter as any)._buildInitSql() as string;
+      expect(sql).toMatch(/^SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci,/);
+      await adapter.close();
+    });
+
+    it("includes SET NAMES when Rails-style encoding is configured", async () => {
+      const adapter = new Mysql2Adapter({ host: "localhost", encoding: "utf8mb4" } as any);
+      const sql = (adapter as any)._buildInitSql() as string;
+      expect(sql).toMatch(/^SET NAMES utf8mb4,/);
+      await adapter.close();
+    });
+
+    it("omits SET NAMES when no charset is configured", async () => {
+      const adapter = new Mysql2Adapter({ host: "localhost" });
+      const sql = (adapter as any)._buildInitSql() as string;
+      expect(sql).not.toContain("NAMES");
+      await adapter.close();
+    });
+
+    it("throws for invalid charset", () => {
+      expect(
+        () => new Mysql2Adapter({ host: "localhost", charset: "utf8'; DROP TABLE x; --" }),
+      ).toThrow(/Invalid MySQL charset/);
+    });
+  });
+});

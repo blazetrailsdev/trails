@@ -1446,7 +1446,29 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       });
 
     const sessionClauses = [sqlModeClause, ...varClauses].filter(Boolean).join(", ");
-    return `SET time_zone = '+00:00', ${sessionClauses}`;
+
+    // Mirrors Rails: `if @config[:encoding]` → `SET NAMES encoding [COLLATE collation], ...`
+    // mysql2's `charset` pool option corresponds to Rails' database.yml `encoding:`.
+    const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
+    // mysql2 uses `charset`; Rails database.yml uses `encoding`. Support both, preferring charset.
+    const charset =
+      (this._poolConfig.charset as string | undefined) ??
+      (this._poolConfig as { encoding?: string }).encoding;
+    const charsetCollation = (this._poolConfig as { collation?: string }).collation;
+    if (charset && !SAFE_CHARSET_RE.test(charset)) {
+      throw new Error(`Invalid MySQL charset: ${JSON.stringify(charset)}`);
+    }
+    if (charsetCollation && !SAFE_CHARSET_RE.test(charsetCollation)) {
+      throw new Error(`Invalid MySQL collation: ${JSON.stringify(charsetCollation)}`);
+    }
+    let namesPart = "";
+    if (charset) {
+      namesPart = `NAMES ${charset}`;
+      if (charsetCollation) namesPart += ` COLLATE ${charsetCollation}`;
+      namesPart += ", ";
+    }
+
+    return `SET ${namesPart}time_zone = '+00:00', ${sessionClauses}`;
   }
 }
 
