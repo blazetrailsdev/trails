@@ -1,10 +1,6 @@
 import { ref } from "../define-fixtures.js";
 
-/**
- * Canonical fixture data for the Rails `comments` table.
- * Mirrors activerecord/test/fixtures/comments.yml.
- * Use via defineFixtures(adapter, Comment, commentFixtureData).
- */
+// activerecord/test/fixtures/comments.yml
 export const commentFixtureData = {
   greetings: {
     body: "Thank you for the welcome",
@@ -18,7 +14,7 @@ export const commentFixtureData = {
   },
   does_it_hurt: {
     body: "Don't think too hard about it",
-    post_id: ref("posts", "thinking"),
-    type: "Comment",
+    post_id: ref("posts", "sti_comments"),
+    type: "SpecialComment",
   },
 };

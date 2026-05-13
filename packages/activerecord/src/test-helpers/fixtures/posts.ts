@@ -1,10 +1,6 @@
 import { ref } from "../define-fixtures.js";
 
-/**
- * Canonical fixture data for the Rails `posts` table.
- * Mirrors activerecord/test/fixtures/posts.yml.
- * Use via defineFixtures(adapter, Post, postFixtureData).
- */
+// activerecord/test/fixtures/posts.yml
 export const postFixtureData = {
   welcome: {
     title: "Welcome to the weblog",

@@ -1,10 +1,6 @@
 import { ref } from "../define-fixtures.js";
 
-/**
- * Canonical fixture data for the Rails `topics` table.
- * Mirrors activerecord/test/fixtures/topics.yml.
- * Use via defineFixtures(adapter, Topic, topicFixtureData).
- */
+// activerecord/test/fixtures/topics.yml
 export const topicFixtureData = {
   first: {
     title: "The First Topic",

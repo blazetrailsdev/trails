@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { DatabaseAdapter } from "../../adapter.js";
-import { defineFixtures, fixtureId, isFixtureRef } from "../define-fixtures.js";
+import { defineFixtures, fixtureId, isFixtureRef, type FixtureRef } from "../define-fixtures.js";
 import { topicFixtureData } from "./topics.js";
 import { postFixtureData } from "./posts.js";
 import { commentFixtureData } from "./comments.js";
@@ -63,12 +63,10 @@ describe("topicFixtureData", () => {
 
   it("second fixture has Mary as author and a cross-ref to first", () => {
     expect(topicFixtureData.second.author_name).toBe("Mary");
-    expect(isFixtureRef(topicFixtureData.second.parent_id)).toBe(true);
-    const parentRef = topicFixtureData.second.parent_id as ReturnType<
-      typeof import("../define-fixtures.js").ref
-    >;
-    expect((parentRef as any).fixtureName).toBe("first");
-    expect((parentRef as any).tableName).toBe("topics");
+    const parentRef = topicFixtureData.second.parent_id as FixtureRef;
+    expect(isFixtureRef(parentRef)).toBe(true);
+    expect(parentRef.fixtureName).toBe("first");
+    expect(parentRef.tableName).toBe("topics");
   });
 
   it("defineFixtures resolves cross-refs: second.parent_id equals fixtureId(first)", async () => {
@@ -106,9 +104,17 @@ describe("postFixtureData", () => {
 describe("commentFixtureData", () => {
   it("greetings comment references welcome post via ref()", () => {
     expect(commentFixtureData.greetings.body).toBe("Thank you for the welcome");
-    expect(isFixtureRef(commentFixtureData.greetings.post_id)).toBe(true);
-    expect((commentFixtureData.greetings.post_id as any).fixtureName).toBe("welcome");
-    expect((commentFixtureData.greetings.post_id as any).tableName).toBe("posts");
+    const postRef = commentFixtureData.greetings.post_id as FixtureRef;
+    expect(isFixtureRef(postRef)).toBe(true);
+    expect(postRef.fixtureName).toBe("welcome");
+    expect(postRef.tableName).toBe("posts");
+  });
+
+  it("does_it_hurt is a SpecialComment on sti_comments post", () => {
+    expect(commentFixtureData.does_it_hurt.type).toBe("SpecialComment");
+    const postRef = commentFixtureData.does_it_hurt.post_id as FixtureRef;
+    expect(isFixtureRef(postRef)).toBe(true);
+    expect(postRef.fixtureName).toBe("sti_comments");
   });
 
   it("defineFixtures resolves comment→post cross-ref correctly", async () => {
