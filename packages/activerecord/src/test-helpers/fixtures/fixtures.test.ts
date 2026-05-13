@@ -120,7 +120,7 @@ describe("commentFixtureData", () => {
     expect(commentFixtureData.does_it_hurt.type).toBe("SpecialComment");
     const postRef = commentFixtureData.does_it_hurt.post_id as FixtureRef;
     expect(isFixtureRef(postRef)).toBe(true);
-    expect(postRef.fixtureName).toBe("sti_comments");
+    expect(postRef.fixtureName).toBe("thinking");
   });
 
   it("defineFixtures resolves comment→post cross-ref correctly", async () => {
