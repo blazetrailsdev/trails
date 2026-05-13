@@ -1434,17 +1434,13 @@ describe("InheritanceTest", () => {
   });
 
   it.skip("scope inherited properly", async () => {
-    // BLOCKED: STI — single-table inheritance routing gap
-    // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-    // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
-    // requires default_scope on subclass
+    // BLOCKED: fixture — test requires a fixture model with a default_scope on a subclass;
+    // no STI routing gap (STI dispatch works); gap is missing test infrastructure
   });
 
   it.skip("inheritance with default scope", async () => {
-    // BLOCKED: STI — single-table inheritance routing gap
-    // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-    // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
-    // requires default_scope
+    // BLOCKED: fixture — test requires a fixture model with a default_scope on a subclass;
+    // no STI routing gap (STI dispatch works); gap is missing test infrastructure
   });
 
   it("company descends from active record", async () => {

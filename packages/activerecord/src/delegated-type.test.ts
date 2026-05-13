@@ -154,17 +154,11 @@ describe("DelegatedTypeTest", () => {
   });
 
   it.skip("association uuid", () => {
-    // BLOCKED: STI — single-table inheritance routing gap
-    // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-    // SCOPE: ~50 LOC fix in inheritance.ts; affects ~8–15 tests in delegated-type.test.ts
-    /* needs UUID primary key support */
+    // BLOCKED: uuid-pk — delegated type uses a UUID primary key; no STI routing gap
   });
 
   it.skip("touch account", () => {
-    // BLOCKED: STI — single-table inheritance routing gap
-    // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-    // SCOPE: ~50 LOC fix in inheritance.ts; affects ~8–15 tests in delegated-type.test.ts
-    /* needs touch support on polymorphic association */
+    // BLOCKED: uuid + polymorphic-touch — requires UUID PK + touch on a polymorphic delegated_type association; no STI routing gap
   });
 
   it("builder method", () => {

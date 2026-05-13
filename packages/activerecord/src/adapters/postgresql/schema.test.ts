@@ -710,14 +710,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
     });
     it.skip("inherited table options is dumped", () => {
-      // BLOCKED: STI — single-table inheritance routing gap
-      // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-      // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
+      // BLOCKED: pg-schema — requires schema-dump support for CREATE TABLE ... INHERITS (PostgreSQL table inheritance); no STI routing gap
     });
     it.skip("multiple inherited table options is dumped", () => {
-      // BLOCKED: STI — single-table inheritance routing gap
-      // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-      // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
+      // BLOCKED: pg-schema — requires schema-dump support for CREATE TABLE ... INHERITS (PostgreSQL table inheritance); no STI routing gap
     });
     it.skip("no partition options are dumped", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
