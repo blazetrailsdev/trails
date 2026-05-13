@@ -48,18 +48,27 @@ describeIfPg("PostgresqlConnectionTest", () => {
     // Requires establish_connection with options: "-c geqo=off" and leasing model connections
   });
 
-  it.skip("reset", async () => {
-    // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in connection
-    // ROOT-CAUSE: connection-adapters/postgresql/connection.ts missing or incomplete Rails parity
-    // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/connection.ts; affects ~10–47 tests in connection.test.ts
-    // Requires reset!() — clears session config and returns connection to clean state
+  it("reset", async () => {
+    await adapter.execute("SET geqo TO off");
+    const before = await adapter.execute("SHOW geqo");
+    expect(before[0]?.geqo).toBe("off");
+
+    await adapter.resetBang();
+
+    const after = await adapter.execute("SHOW geqo");
+    expect(after[0]?.geqo).toBe("on");
   });
 
-  it.skip("reset with transaction", async () => {
-    // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in connection
-    // ROOT-CAUSE: connection-adapters/postgresql/connection.ts missing or incomplete Rails parity
-    // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/connection.ts; affects ~10–47 tests in connection.test.ts
-    // Requires reset!() with an open transaction
+  it("reset with transaction", async () => {
+    await adapter.execute("SET geqo TO off");
+    const before = await adapter.execute("SHOW geqo");
+    expect(before[0]?.geqo).toBe("off");
+
+    await adapter.beginTransaction();
+    await adapter.resetBang();
+
+    const after = await adapter.execute("SHOW geqo");
+    expect(after[0]?.geqo).toBe("on");
   });
 
   it("tables logs name", async () => {
