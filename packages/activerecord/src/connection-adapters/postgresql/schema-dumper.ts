@@ -162,6 +162,13 @@ export class SchemaDumper extends AbstractSchemaDumper {
     lines.push("");
   }
 
+  /** @internal */
+  protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
+    const adapter = this.pgAdapter();
+    if (!adapter?.tableOptions) return {};
+    return adapter.tableOptions(tableName);
+  }
+
   defaultPrimaryKeyType(): string {
     return "bigserial";
   }

@@ -663,12 +663,18 @@ export class SchemaDumper {
     try {
       const columns = await this._source.columns(tableName);
       const indexes = await this._source.indexes(tableName);
-      this.emitTable(lines, tableName, columns, indexes);
+      const adapterTableOpts = await this.fetchTableOptions(tableName);
+      this.emitTable(lines, tableName, columns, indexes, adapterTableOpts);
       await this.checkConstraintsInCreate(tableName, lines);
       lines.push("");
     } finally {
       this.tableName = undefined;
     }
+  }
+
+  /** @internal */
+  protected async fetchTableOptions(_tableName: string): Promise<Record<string, unknown>> {
+    return {};
   }
 
   /**
@@ -699,11 +705,13 @@ export class SchemaDumper {
     return {};
   }
 
-  private emitTable(
+  /** @internal */
+  protected emitTable(
     lines: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
+    adapterTableOpts: Record<string, unknown> = {},
   ): void {
     const pkColumn = columns.find((c) => c.primaryKey);
     const hasId = pkColumn?.name === "id";
@@ -716,6 +724,7 @@ export class SchemaDumper {
       Object.assign(tableOpts, this.primaryKeyTableOptions(pkColumn));
     }
     tableOpts.force = "cascade";
+    if (adapterTableOpts.options) tableOpts.options = adapterTableOpts.options;
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
     lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);
