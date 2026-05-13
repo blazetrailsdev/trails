@@ -117,7 +117,7 @@ describe("RequiredAssociationsTest", () => {
     registerModel("RHProfile", RHProfile);
     const user = new RHUser({ name: "test" });
     expect(user.isValid()).toBe(false);
-    expect((user as any).errors.on("rHProfile").length).toBeGreaterThan(0);
+    expect(user.errors.on("rHProfile").length).toBeGreaterThan(0);
   });
   it("required has_one associations have a correct error message", () => {
     const adapter = freshAdapter();
@@ -143,7 +143,7 @@ describe("RequiredAssociationsTest", () => {
     registerModel("RMProfile", RMProfile);
     const user = new RMUser({ name: "test" });
     user.isValid();
-    const messages = (user as any).errors.fullMessages as string[];
+    const messages = user.errors.fullMessages;
     expect(messages.length).toBeGreaterThan(0);
     // Rails translates :required → "must exist"; message includes the association name
     expect(messages.some((m) => /must exist/i.test(m))).toBe(true);
