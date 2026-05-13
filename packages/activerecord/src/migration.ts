@@ -1419,7 +1419,17 @@ export class MigrationContext {
       }
     >
   >();
-  private _indexes = new Map<string, { columns: string[]; unique: boolean; name?: string }[]>();
+  private _indexes = new Map<
+    string,
+    {
+      columns: string[];
+      unique: boolean;
+      name?: string;
+      where?: string;
+      orders?: Record<string, string>;
+      nullsNotDistinct?: boolean;
+    }[]
+  >();
   tableNamePrefix = "";
   tableNameSuffix = "";
 
@@ -1509,7 +1519,11 @@ export class MigrationContext {
         `CREATE ${unique}INDEX "${indexName}" ON "${name}" (${colsList})`,
       );
       if (!this._indexes.has(name)) this._indexes.set(name, []);
-      this._indexes.get(name)!.push({ ...idx, name: indexName });
+      const orders =
+        typeof idx.orders === "string"
+          ? Object.fromEntries(idx.columns.map((c) => [c, idx.orders as string]))
+          : idx.orders;
+      this._indexes.get(name)!.push({ ...idx, name: indexName, orders });
     }
   }
 
@@ -1696,6 +1710,7 @@ export class MigrationContext {
       name?: string;
       where?: string;
       order?: Record<string, string>;
+      nullsNotDistinct?: boolean;
       ifNotExists?: boolean;
     },
   ): Promise<void> {
@@ -1707,7 +1722,8 @@ export class MigrationContext {
     const ifNotExistsStr = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const colsStr = cols
       .map((c) => {
-        let col = this.adapter.quoteIdentifier(c);
+        const isExpr = /\W/.test(c);
+        let col = isExpr ? c : this.adapter.quoteIdentifier(c);
         if (an !== "mysql") {
           const ord = options?.order?.[c];
           if (ord) col += ` ${ord.toUpperCase()}`;
@@ -1716,10 +1732,18 @@ export class MigrationContext {
       })
       .join(", ");
     let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(table)} (${colsStr})`;
+    if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
     if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
     await this.adapter.executeMutation(sql);
     if (!this._indexes.has(table)) this._indexes.set(table, []);
-    this._indexes.get(table)!.push({ columns: cols, unique, name: indexName });
+    this._indexes.get(table)!.push({
+      columns: cols,
+      unique,
+      name: indexName,
+      where: options?.where,
+      orders: options?.order,
+      nullsNotDistinct: options?.nullsNotDistinct,
+    });
   }
 
   async removeIndex(
@@ -1827,7 +1851,14 @@ export class MigrationContext {
     return Array.from(cols).map((name) => ({ name, type: "string" }));
   }
 
-  indexes(tableName: string): Array<{ columns: string[]; unique: boolean; name?: string }> {
+  indexes(tableName: string): Array<{
+    columns: string[];
+    unique: boolean;
+    name?: string;
+    where?: string;
+    orders?: Record<string, string>;
+    nullsNotDistinct?: boolean;
+  }> {
     const idxs = this._indexes.get(tableName);
     if (!idxs) return [];
     return idxs.map((i) => ({ ...i, columns: [...i.columns] }));

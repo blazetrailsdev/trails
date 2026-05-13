@@ -16,10 +16,6 @@
  */
 
 import type { DatabaseAdapter } from "./adapter.js";
-// Type-only import: SchemaStatements -> SchemaDumper (abstract inner
-// extends this file's base) -> schema-dumper.ts would be a runtime
-// cycle that `ReferenceError`s on evaluation order. We lazy-import
-// the implementation inside `AdapterSchemaSource.indexes()` below.
 import type { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
@@ -61,6 +57,7 @@ export interface IndexInfo {
   opclasses?: string | Record<string, string>;
   where?: string;
   using?: string;
+  nullsNotDistinct?: boolean;
 }
 
 /**
@@ -302,11 +299,6 @@ class AdapterSchemaSource implements SchemaSource {
   get adapter(): DatabaseAdapter {
     return this._adapter;
   }
-  // Lazily constructed on first `indexes()` call so the static import
-  // cycle (schema-dumper -> schema-statements -> abstract/schema-dumper
-  // -> schema-dumper) doesn't fire at module init. Type-only import
-  // above keeps the compile-time reference; runtime construction
-  // happens inside `indexes()` via dynamic import.
   private _schema?: SchemaStatements;
 
   /** @internal */
@@ -340,16 +332,42 @@ class AdapterSchemaSource implements SchemaSource {
 
   /** @internal */
   async indexes(tableName: string): Promise<IndexInfo[]> {
-    if (!this._schema) {
-      const mod = await import("./connection-adapters/abstract/schema-statements.js");
-      assertSchemaAdapter(this._adapter);
-      this._schema = new mod.SchemaStatements(this._adapter);
+    type RichIdx = {
+      columns: string[];
+      unique: boolean;
+      name?: string;
+      where?: string;
+      orders?: Record<string, string> | string;
+      nullsNotDistinct?: boolean;
+      using?: string;
+      lengths?: number | Record<string, number>;
+      opclasses?: string | Record<string, string>;
+    };
+    let raw: RichIdx[];
+    const adapterAny = this._adapter as unknown as { indexes?(t: string): Promise<unknown[]> };
+    if (typeof adapterAny.indexes === "function") {
+      raw = (await adapterAny.indexes(tableName)) as RichIdx[];
+    } else {
+      if (!this._schema) {
+        const mod = await import("./connection-adapters/abstract/schema-statements.js");
+        assertSchemaAdapter(this._adapter);
+        this._schema = new mod.SchemaStatements(this._adapter);
+      }
+      raw = (await this._schema.indexes(tableName)) as RichIdx[];
     }
-    const idxs = await this._schema.indexes(tableName);
-    return idxs.map((idx) => ({
+    return raw.map((idx) => ({
       columns: idx.columns,
       unique: idx.unique,
       name: idx.name,
+      where: idx.where,
+      orders:
+        typeof idx.orders === "string"
+          ? Object.fromEntries(idx.columns.map((c) => [c, idx.orders as string]))
+          : idx.orders,
+      nullsNotDistinct: idx.nullsNotDistinct,
+      using: idx.using,
+      lengths: idx.lengths,
+      opclasses: idx.opclasses,
     }));
   }
 }
@@ -824,7 +842,8 @@ export class SchemaDumper {
     if (index.opclasses !== undefined)
       parts.push(`opclass: ${this.formatIndexParts(index.opclasses)}`);
     if (index.where) parts.push(`where: ${JSON.stringify(index.where)}`);
-    if (index.using) parts.push(`using: ${JSON.stringify(index.using)}`);
+    if (index.using && index.using !== "btree") parts.push(`using: ${JSON.stringify(index.using)}`);
+    if (index.nullsNotDistinct) parts.push("nullsNotDistinct: true");
     return parts;
   }
 

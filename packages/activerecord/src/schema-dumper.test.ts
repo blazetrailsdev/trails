@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 function freshCtx(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
@@ -174,23 +174,40 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("idx_ba");
   });
 
-  it.skip("schema dumps partial indices", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs partial index WHERE clause tracking */
+  it.skipIf(adapterType === "mysql")("schema dumps partial indices", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+      t.boolean("active");
+    });
+    await ctx.addIndex("users", "email", {
+      name: "idx_users_email_where_active",
+      where: "active = true",
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('where: "active = true"');
   });
-  it.skip("schema dumps nulls not distinct", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs nulls not distinct tracking (PG 15+) */
+  it.skipIf(adapterType !== "postgres")("schema dumps nulls not distinct", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
+    await ctx.addIndex("users", "email", {
+      name: "idx_users_email_unique",
+      unique: true,
+      nullsNotDistinct: true,
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("nullsNotDistinct: true");
   });
-  it.skip("schema dumps index sort order", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs index sort order tracking */
+  it("schema dumps index sort order", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("name");
+    });
+    await ctx.addIndex("users", "name", {
+      name: "idx_users_name_desc",
+      order: { name: "desc" },
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('order: { name: "desc" }');
   });
   it.skip("schema dumps index length", () => {
     // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
@@ -281,17 +298,26 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs type aliasing support */
   });
-  it.skip("schema dump expression indices", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs expression index tracking */
+  it.skipIf(adapterType === "mysql")("schema dump expression indices", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("email");
+    });
+    await ctx.addIndex("users", "lower(email)", { name: "idx_users_lower_email" });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain('"lower(email)"');
+    expect(output).toContain("idx_users_lower_email");
   });
-  it.skip("schema dump expression indices escaping", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs expression index tracking */
+  it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
+    await ctx.createTable("users", {}, (t) => {
+      t.string("first_name");
+      t.string("last_name");
+    });
+    await ctx.addIndex("users", "lower(first_name || ' ' || last_name)", {
+      name: "idx_users_full_name",
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toContain("idx_users_full_name");
+    expect(output).toContain("lower(first_name");
   });
   it.skip("schema dump includes length for mysql binary fields", () => {
     // BLOCKED: schema — schema introspection / dumper gap in schema-dumper

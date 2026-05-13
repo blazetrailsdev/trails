@@ -2488,6 +2488,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         }
       }
 
+      const whereMatch = def.match(/\bWHERE\s+(.+)$/i);
+      const where = whereMatch ? whereMatch[1].trim() : undefined;
+      const nullsNotDistinct = /\bNULLS NOT DISTINCT\b/i.test(def) ? true : undefined;
+
       return {
         table: row.table_name as string,
         name: row.index_name as string,
@@ -2495,6 +2499,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         columns,
         using: row.using as string,
         orders,
+        where,
+        nullsNotDistinct,
       };
     });
   }
