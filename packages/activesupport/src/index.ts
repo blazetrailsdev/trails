@@ -276,6 +276,7 @@ export type {
   BeforeCallback,
   AfterCallback,
   AroundCallback,
+  CallbackObject,
 } from "./callbacks.js";
 
 export { concern, includeConcern, hasConcern } from "./concern.js";
