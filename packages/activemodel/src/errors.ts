@@ -1,6 +1,3 @@
-/** The model instance that owns this Errors collection. */
-type ModelBase = object | null;
-
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 
@@ -22,15 +19,15 @@ const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
  *
  * Mirrors: ActiveModel::Errors
  */
-export class Errors {
+export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
-  private _base: ModelBase;
+  private _base: TBase | null;
 
-  constructor(base: ModelBase) {
+  constructor(base: TBase | null) {
     this._base = base;
   }
 
-  get base(): ModelBase {
+  get base(): TBase | null {
     return this._base;
   }
 
@@ -58,8 +55,10 @@ export class Errors {
    */
   add(
     attribute: string,
-    type: string | ((record: ModelBase, options: Record<string, unknown>) => string) = "invalid",
-    options?: { message?: string | ((record: ModelBase) => string) } & Record<string, unknown>,
+    type: string | ((record: TBase | null, options: Record<string, unknown>) => string) = "invalid",
+    options?: {
+      message?: string | ((record: TBase | null, options: Record<string, unknown>) => string);
+    } & Record<string, unknown>,
   ): ActiveModelError {
     const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
     const error = new ActiveModelError(this._base, normAttr, normType, normOpts);
@@ -86,7 +85,7 @@ export class Errors {
    */
   normalizeArguments(
     attribute: string,
-    type: string | ((record: ModelBase, options: Record<string, unknown>) => string),
+    type: string | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): [string, string, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
@@ -109,7 +108,7 @@ export class Errors {
    */
   where(
     attribute: string,
-    type?: string | ((record: ModelBase, options: Record<string, unknown>) => string),
+    type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): ActiveModelError[] {
     if (type === undefined) {
@@ -292,12 +291,12 @@ export class Errors {
    *     @errors.each { |error| error.instance_variable_set(:@base, @base) }
    *   end
    */
-  copyBang(other: Errors): void {
+  copyBang<U extends object>(other: Errors<U>): void {
     this._errors = other._errors.map((e) => e.dupWithBase(this._base));
   }
 
   /** Alias for `copyBang` — Rails ships only `copy!`. */
-  copy(other: Errors): void {
+  copy<U extends object>(other: Errors<U>): void {
     this.copyBang(other);
   }
 
@@ -312,15 +311,15 @@ export class Errors {
    *     other.errors.each { |error| import(error) }
    *   end
    */
-  mergeBang(other: Errors): void {
-    if (other === this) return;
+  mergeBang<U extends object>(other: Errors<U>): void {
+    if (Object.is(other, this)) return;
     for (const error of other._errors) {
       this.import(error);
     }
   }
 
   /** Alias for `mergeBang` — Rails ships only `merge!`. */
-  merge(other: Errors): void {
+  merge<U extends object>(other: Errors<U>): void {
     this.mergeBang(other);
   }
 
