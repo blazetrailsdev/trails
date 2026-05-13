@@ -24,13 +24,13 @@ export type UseFixturesResult<M extends FixtureMap> = {
     : never;
 };
 
-/** Returns true for "table does not exist" errors from any adapter. */
+/** Returns true for "table/relation does not exist" errors from any adapter. */
 function isTableMissingError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
   return (
     msg.includes("no such table") || // SQLite
-    msg.includes("doesn't exist") || // MySQL
-    msg.includes("does not exist") // PostgreSQL
+    /Table '.*' doesn't exist/i.test(msg) || // MySQL: Table 'db.tbl' doesn't exist
+    /relation ".*" does not exist/i.test(msg) // PostgreSQL: relation "tbl" does not exist
   );
 }
 

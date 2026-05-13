@@ -119,7 +119,7 @@ describe("commentFixtureData", () => {
     expect(postRef.tableName).toBe("posts");
   });
 
-  it("does_it_hurt is a SpecialComment on sti_comments post", () => {
+  it("does_it_hurt is a SpecialComment on thinking post", () => {
     expect(commentFixtureData.does_it_hurt.type).toBe("SpecialComment");
     const postRef = commentFixtureData.does_it_hurt.post_id as FixtureRef;
     expect(isFixtureRef(postRef)).toBe(true);

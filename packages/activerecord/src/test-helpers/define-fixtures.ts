@@ -70,6 +70,11 @@ function getRegistry(adapter: object): Map<string, BaseClass> {
   return reg;
 }
 
+/** Clears the model registry for the given adapter. Useful in test suites that reuse one adapter across multiple files. */
+export function clearTableRegistry(adapter: DatabaseAdapter): void {
+  tableRegistries.delete(adapter);
+}
+
 /** @internal */
 export function resolveModelForTable(
   adapter: DatabaseAdapter,

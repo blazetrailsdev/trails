@@ -59,6 +59,8 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "authors";
       this.attribute("name", "string");
       this.attribute("author_address_id", "integer");
+      this.attribute("author_address_extra_id", "integer");
+      this.attribute("owned_essay_id", "integer");
       this.attribute("organization_id", "string");
       this.adapter = adapter;
     }
@@ -94,6 +96,7 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("post_id", "integer");
       this.attribute("type", "string");
       this.attribute("parent_id", "integer");
+      this.attribute("company_id", "integer");
       this.attribute("children_count", "integer", { default: 0 });
       this.adapter = adapter;
     }
@@ -198,6 +201,7 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this._tableName = "developers";
       this.attribute("name", "string");
       this.attribute("salary", "integer", { default: 70000 });
+      this.attribute("shared_computers", "string");
       this.adapter = adapter;
     }
   }
@@ -220,6 +224,10 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("firm_id", "integer");
       this.attribute("client_of", "integer");
       this.attribute("firm_name", "string");
+      this.attribute("rating", "integer");
+      this.attribute("description", "string");
+      this.attribute("account_id", "integer");
+      this.attribute("status", "integer");
       this.adapter = adapter;
     }
   }
@@ -245,6 +253,15 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("name", "string");
       this.attribute("author_id", "integer");
       this.attribute("format", "string");
+      this.attribute("status", "integer");
+      this.attribute("last_read", "integer");
+      this.attribute("language", "integer");
+      this.attribute("author_visibility", "integer");
+      this.attribute("illustrator_visibility", "integer");
+      this.attribute("font_size", "integer");
+      this.attribute("difficulty", "integer");
+      this.attribute("boolean_status", "integer");
+      this.attribute("cover", "string");
       this.adapter = adapter;
     }
   }
@@ -267,6 +284,8 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("credit_limit", "integer");
       this.attribute("firm_name", "string");
       this.attribute("status", "string");
+      this.attribute("transactions_count", "integer");
+      this.attribute("updated_at", "datetime");
       this.adapter = adapter;
     }
   }

@@ -1,9 +1,9 @@
 // activerecord/test/fixtures/developers.yml
-// Schema gap: shared_computers exists in Rails YAML but is not declared in test-fixtures.ts Developer.
 export const developerFixtureData = {
   david: {
     name: "David",
     salary: 80000,
+    shared_computers: "laptop",
   },
   jamis: {
     name: "Jamis",

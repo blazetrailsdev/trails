@@ -1,8 +1,6 @@
 import { ref } from "../define-fixtures.js";
 
 // activerecord/test/fixtures/comments.yml
-// Schema gap: recursive_association_comment has company:15 in Rails YAML; company column
-// is not declared in test-fixtures.ts Comment.
 export const commentFixtureData = {
   greetings: {
     body: "Thank you for the welcome",
@@ -64,5 +62,6 @@ export const commentFixtureData = {
     body: "afrase",
     post_id: ref("posts", "sti_post_and_comments"),
     type: "Comment",
+    company_id: ref("companies", "recursive_association_fk"),
   },
 };

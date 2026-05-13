@@ -1,9 +1,7 @@
 import { ref } from "../define-fixtures.js";
 
 // activerecord/test/fixtures/accounts.yml
-// Belongs to Company (firm_id FK). Schema gap: Rails schema also carries
-// transactions_count (counter_cache column on accounts) — omitted; test-fixtures.ts
-// Account only declares firm_id/credit_limit/firm_name/status.
+// Belongs to Company (firm_id FK).
 export const accountFixtureData = {
   signals37: {
     firm_id: ref("companies", "first_firm"),
