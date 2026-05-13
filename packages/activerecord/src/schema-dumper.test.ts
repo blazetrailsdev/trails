@@ -174,7 +174,7 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain("idx_ba");
   });
 
-  it("schema dumps partial indices", async () => {
+  it.skipIf(adapterType === "mysql")("schema dumps partial indices", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
       t.boolean("active");
@@ -186,7 +186,7 @@ describe("SchemaDumperTest", () => {
     const output = SchemaDumper.dump(ctx);
     expect(output).toContain('where: "active = true"');
   });
-  it("schema dumps nulls not distinct", async () => {
+  it.skipIf(adapterType !== "postgres")("schema dumps nulls not distinct", async () => {
     await ctx.createTable("users", {}, (t) => {
       t.string("email");
     });
