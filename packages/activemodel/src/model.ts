@@ -18,7 +18,7 @@ import {
 } from "./translation.js";
 import { Type } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
-import { ModelName } from "./naming.js";
+import { ModelLike, ModelName } from "./naming.js";
 import { DirtyTracker, initInternals as dirtyInitInternals } from "./dirty.js";
 import {
   CallbackChain,
@@ -1196,8 +1196,8 @@ export class Model {
 
   static get modelName(): ModelName {
     if (!this._modelName || this._modelName.name !== this.name) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Model satisfies ModelLike but TS can't prove it due to circular types
-      this._modelName = new ModelName(this.name, { klass: this as any });
+      // Model satisfies ModelLike but TS can't prove it due to circular types.
+      this._modelName = new ModelName(this.name, { klass: this as unknown as ModelLike });
     }
     return this._modelName;
   }

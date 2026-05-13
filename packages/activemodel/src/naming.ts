@@ -64,7 +64,7 @@ export namespace Naming {
 }
 import { I18n } from "./i18n.js";
 
-interface ModelLike {
+export interface ModelLike {
   readonly name: string;
   i18nScope?: string;
   lookupAncestors?: () => ModelLike[];

@@ -18,8 +18,7 @@ export class NestedError extends ActiveModelError {
   readonly innerError: ErrorLike;
 
   constructor(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    base: any,
+    base: unknown,
     innerError: ErrorLike,
     options?: { attribute?: string; type?: string },
   ) {
@@ -53,8 +52,7 @@ export class NestedError extends ActiveModelError {
    * Inner error's own `base` is preserved (the inner error belongs to the
    * inner model, not the outer one) — only the NestedError's base changes.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override dupWithBase(newBase: any): NestedError {
+  override dupWithBase(newBase: unknown): NestedError {
     const inner = this.innerError;
     const innerDup: ErrorLike =
       inner instanceof ActiveModelError

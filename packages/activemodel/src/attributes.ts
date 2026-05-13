@@ -57,8 +57,7 @@ export function attribute(
   this: {
     _attributeDefinitions: Map<string, AttributeDefinition>;
     prototype: object;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _cachedDefaultAttributes?: any;
+    _cachedDefaultAttributes?: AttributeSet | null;
   },
   name: string,
   typeName: string,

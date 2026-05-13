@@ -441,14 +441,12 @@ export class StrictValidationFailed extends globalThis.Error {
  *
  * Mirrors: ActiveModel::UnknownAttributeError
  */
-export class UnknownAttributeError extends globalThis.Error {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly record: any;
+export class UnknownAttributeError<TRecord extends object = object> extends globalThis.Error {
+  readonly record: TRecord;
   readonly attribute: string;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(record: any, attribute: string) {
-    const model = record?.constructor?.name ?? "Record";
+  constructor(record: TRecord, attribute: string) {
+    const model = record.constructor?.name ?? "Record";
     super(`unknown attribute '${attribute}' for ${model}.`);
     this.name = "UnknownAttributeError";
     this.record = record;

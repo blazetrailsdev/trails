@@ -9,6 +9,7 @@ export {
 } from "./errors.js";
 export { NestedError } from "./nested-error.js";
 export { ValidationError, ValidationContext } from "./validations.js";
+export type { ModelWithErrors } from "./validations.js";
 export { Validator, EachValidator, BlockValidator } from "./validator.js";
 export {
   MissingAttributeError,
@@ -55,6 +56,7 @@ export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter
 export { MutableModule } from "./type/helpers/mutable.js";
 export type { Mutable } from "./type/helpers/mutable.js";
 export { ModelName } from "./naming.js";
+export type { ModelLike } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
 export { CallbackChain } from "./callbacks.js";
 export type { CallbackConditions } from "./callbacks.js";

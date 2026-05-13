@@ -135,13 +135,12 @@ function _walkAncestors(
   start: object,
 ): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
   const result: Array<{ new (...args: never[]): unknown; modelName: ModelName }> = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let klass: any = start;
+  let klass: object | null = start;
   while (klass != null && klass !== Function.prototype && klass !== Object.prototype) {
-    if (klass.modelName != null) {
+    if ((klass as { modelName?: unknown }).modelName != null) {
       result.push(klass as { new (...args: never[]): unknown; modelName: ModelName });
     }
-    klass = Object.getPrototypeOf(klass);
+    klass = Object.getPrototypeOf(klass) as object | null;
   }
   return result;
 }

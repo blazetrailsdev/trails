@@ -134,14 +134,20 @@ export interface ValidationsClassMethods {
   inherited(subclass: unknown): void;
 }
 
+/** Minimum shape required by ValidationError. */
+export interface ModelWithErrors {
+  errors: { fullMessages: string[] };
+}
+
 /**
  * Raised by validateBang when validation fails.
  *
  * Mirrors: ActiveModel::ValidationError
  */
-export class ValidationError extends globalThis.Error {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly model: any;
+export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
+  extends globalThis.Error
+{
+  readonly model: TModel;
 
   // Mirrors Rails `ActiveModel::ValidationError#initialize`
   // (activemodel/lib/active_model/validations.rb:496-500):
@@ -153,12 +159,11 @@ export class ValidationError extends globalThis.Error {
   //                  errors: errors, default: :"errors.messages.model_invalid"))
   //   end
   //
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructor(model: any) {
+  constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
     // Match the guard used by `error.ts`'s I18n lookups — only treat
     // `i18nScope` as a scope when the class actually exposes a string.
-    const rawScope = model.constructor?.i18nScope;
+    const rawScope = (model as { constructor?: { i18nScope?: unknown } }).constructor?.i18nScope;
     const scope = typeof rawScope === "string" ? rawScope : "activemodel";
     const message = I18n.t(`${scope}.errors.messages.model_invalid`, {
       errors,
