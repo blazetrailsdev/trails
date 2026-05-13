@@ -55,33 +55,42 @@ export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
 }
 
-// --- Phase 1b: tableName → ModelClass registry ---
+// --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
 
-const tableRegistry = new Map<string, BaseClass>();
+// WeakMap prevents cross-file leakage: each adapter object gets its own registry that
+// lives only as long as the adapter, so tests using distinct adapter instances are isolated.
+const tableRegistries = new WeakMap<object, Map<string, BaseClass>>();
 
-/** @internal Exposed for testing. */
-export function resolveModelForTable(tableName: string): BaseClass | undefined {
-  return tableRegistry.get(tableName);
+function getRegistry(adapter: object): Map<string, BaseClass> {
+  let reg = tableRegistries.get(adapter);
+  if (!reg) {
+    reg = new Map();
+    tableRegistries.set(adapter, reg);
+  }
+  return reg;
 }
 
 /** @internal */
-export function clearTableRegistry(): void {
-  tableRegistry.clear();
+export function resolveModelForTable(adapter: object, tableName: string): BaseClass | undefined {
+  return getRegistry(adapter).get(tableName);
 }
 
 // --- Phase 1b: HABTM join-table detection ---
 
 /**
- * Given a join-table name like "developers_projects", returns [singularA, singularB] if both
- * corresponding plural table names are registered, otherwise null.
- * @internal
+ * Given a join-table name like "developers_projects" and the adapter's registry, returns the
+ * two *plural* table-name parts (e.g. `["developers", "projects"]`) if both are registered,
+ * otherwise null. Singularization happens at call time when building the FK column names.
  */
-function detectHabtmParts(tableName: string): [string, string] | null {
+function detectHabtmParts(
+  registry: Map<string, BaseClass>,
+  tableName: string,
+): [string, string] | null {
   const parts = tableName.split("_");
   for (let i = 1; i < parts.length; i++) {
     const left = parts.slice(0, i).join("_");
     const right = parts.slice(i).join("_");
-    if (tableRegistry.has(left) && tableRegistry.has(right)) {
+    if (registry.has(left) && registry.has(right)) {
       return [left, right];
     }
   }
@@ -99,7 +108,11 @@ function findPolymorphicRef(modelClass: BaseClass, colName: string): Polymorphic
   const reflections: Record<string, any> = (modelClass as any)._reflections ?? {};
   const refl = reflections[colName];
   if (!refl || refl.macro !== "belongsTo" || !refl.isPolymorphic?.()) return null;
-  return { typeColumn: `${colName}_type`, idColumn: `${colName}_id` };
+  // Prefer the reflection's own foreignType/foreignKey to honour custom column overrides.
+  const typeColumn: string = refl.foreignType ?? `${colName}_type`;
+  const rawFk: string | string[] = refl.foreignKey ?? `${colName}_id`;
+  const idColumn = typeof rawFk === "string" ? rawFk : rawFk[0]!;
+  return { typeColumn, idColumn };
 }
 
 type BaseClass = typeof Base;
@@ -135,10 +148,11 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   }
   const pkCol = pk;
 
-  // Register this model in the tableName registry (Phase 1b).
-  tableRegistry.set(tableName, ModelClass);
+  // Register this model in the adapter-scoped tableName registry (Phase 1b).
+  const registry = getRegistry(adapter);
+  registry.set(tableName, ModelClass);
 
-  const habtmParts = detectHabtmParts(tableName);
+  const habtmParts = detectHabtmParts(registry, tableName);
 
   const labels = Object.keys(fixtures) as K[];
 
@@ -157,9 +171,11 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         continue;
       }
 
-      // Polymorphic belongs_to expansion: { taggable: instance } → taggable_type + taggable_id
+      // Polymorphic belongs_to expansion: { taggable: instance } → taggable_type + taggable_id.
+      // Only fires for actual model instances (constructor !== Object); plain JSON objects fall
+      // through to the normal object-with-PK handling below.
       const poly = findPolymorphicRef(ModelClass, col);
-      if (poly && val !== null && typeof val === "object") {
+      if (poly && val !== null && typeof val === "object" && (val as any).constructor !== Object) {
         const instance = val as FixtureAttrs;
         const instanceClass = (instance as any).constructor as BaseClass | undefined;
         const instancePk = (instanceClass as any)?.primaryKey ?? pkCol;

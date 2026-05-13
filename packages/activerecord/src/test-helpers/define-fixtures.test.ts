@@ -1,11 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   fixtureId,
   ref,
   isFixtureRef,
   defineFixtures,
   resolveModelForTable,
-  clearTableRegistry,
 } from "./define-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -34,10 +33,6 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
-
-beforeEach(() => {
-  clearTableRegistry();
-});
 
 describe("fixtureId", () => {
   it("returns a non-negative integer below 2^30 - 1", () => {
@@ -201,9 +196,20 @@ describe("defineFixtures", () => {
     const rows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
     const User = makeModel("users", rows);
 
-    expect(resolveModelForTable("users")).toBeUndefined();
+    expect(resolveModelForTable(adapter, "users")).toBeUndefined();
     await defineFixtures(adapter, User, { david: {} });
-    expect(resolveModelForTable("users")).toBe(User);
+    expect(resolveModelForTable(adapter, "users")).toBe(User);
+  });
+
+  it("tableName registry: each adapter has its own isolated registry", async () => {
+    const adapter1 = makeAdapter();
+    const adapter2 = makeAdapter();
+    const rows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
+    const User = makeModel("users", rows);
+
+    await defineFixtures(adapter1, User, { david: {} });
+    expect(resolveModelForTable(adapter1, "users")).toBe(User);
+    expect(resolveModelForTable(adapter2, "users")).toBeUndefined();
   });
 
   it("polymorphic ref: { taggable: instance } expands to taggable_type + taggable_id", async () => {
