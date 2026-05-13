@@ -1434,13 +1434,13 @@ describe("InheritanceTest", () => {
   });
 
   it.skip("scope inherited properly", async () => {
-    // BLOCKED: fixture — test requires a fixture model with a default_scope on a subclass;
-    // no STI routing gap (STI dispatch works); gap is missing test infrastructure
+    // BLOCKED: default-scope — test requires a fixture model with a default_scope on a subclass;
+    // no STI routing gap (STI dispatch works); gap is missing test fixture model
   });
 
   it.skip("inheritance with default scope", async () => {
-    // BLOCKED: fixture — test requires a fixture model with a default_scope on a subclass;
-    // no STI routing gap (STI dispatch works); gap is missing test infrastructure
+    // BLOCKED: default-scope — test requires a fixture model with a default_scope on a subclass;
+    // no STI routing gap (STI dispatch works); gap is missing test fixture model
   });
 
   it("company descends from active record", async () => {
