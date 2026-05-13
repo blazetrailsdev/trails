@@ -1,8 +1,6 @@
-type AnyRecord = any;
-
 export type CallbackKind = "before" | "after" | "around";
 
-export type CallbackCondition = (target: AnyRecord) => boolean;
+export type CallbackCondition = (target: any) => boolean;
 
 export interface CallbackOptions {
   if?: CallbackCondition | CallbackCondition[];
@@ -16,14 +14,16 @@ export interface DefineCallbacksOptions {
    * to halt) or `false` to disable halting entirely. Defaults to halting when a before callback
    * returns `false`.
    */
-  terminator?: ((target: AnyRecord, fn: () => unknown) => boolean) | false;
+  terminator?: ((target: any, fn: () => unknown) => boolean) | false;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
 }
 
-export type BeforeCallback = (target: AnyRecord) => AnyRecord;
-export type AfterCallback = (target: AnyRecord) => void;
-export type AroundCallback = (target: AnyRecord, next: () => void) => void;
+export type BeforeCallback = (target: any) => unknown;
+
+export type AfterCallback = (target: any) => void;
+
+export type AroundCallback = (target: any, next: () => void) => void;
 export type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
 // ---------------------------------------------------------------------------
@@ -32,17 +32,17 @@ export type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
 /** Mirrors: ActiveSupport::Callbacks::Conditionals::Value */
 export class Value {
-  private readonly block: (value: AnyRecord) => unknown;
+  private readonly block: (value: unknown) => unknown;
 
-  constructor(block: (value: AnyRecord) => unknown) {
+  constructor(block: (value: unknown) => unknown) {
     this.block = block;
   }
 
-  call(_target: AnyRecord, value: AnyRecord): unknown {
+  call(_target: object, value: unknown): unknown {
     return this.block(value);
   }
 
-  static check(options: CallbackOptions, target: AnyRecord): boolean {
+  static check(options: CallbackOptions, target: object): boolean {
     if (options.if) {
       const conditions = Array.isArray(options.if) ? options.if : [options.if];
       if (!conditions.every((cond) => cond(target))) return false;
@@ -61,151 +61,163 @@ export class Value {
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate */
 export interface CallTemplate {
-  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[];
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown;
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean;
+  expand(target: object, value: unknown, block: (() => unknown) | null): unknown[];
+  makeLambda(): (target: object, value: unknown) => unknown;
+  invertedLambda(): (target: object, value: unknown) => boolean;
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::MethodCall */
 export class MethodCall implements CallTemplate {
   constructor(readonly methodName: PropertyKey) {}
 
-  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, block, this.methodName];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const m = this.methodName;
-    return (target: AnyRecord) => target[m]?.();
+    return (target: object) =>
+      ((target as Record<PropertyKey, unknown>)[m] as (() => unknown) | undefined)?.();
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const m = this.methodName;
-    return (target: AnyRecord) => !target[m]?.();
+    return (target: object) =>
+      !((target as Record<PropertyKey, unknown>)[m] as (() => unknown) | undefined)?.();
   }
 
-  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
-    return target[this.methodName]?.call(target);
+  make(target: object, _value: unknown): unknown {
+    const t = target as Record<PropertyKey, unknown>;
+    return (t[this.methodName] as ((this: unknown) => unknown) | undefined)?.call(target);
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::ObjectCall */
 export class ObjectCall implements CallTemplate {
   constructor(
-    readonly target: AnyRecord,
+    readonly target: object | null,
     readonly methodName: string,
   ) {}
 
-  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
     return [this.target ?? target, block, this.methodName, target];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const ot = this.target;
     const m = this.methodName;
-    return (target: AnyRecord) => (ot ?? target)[m]?.(target);
+    return (target: object) => {
+      const receiver = (ot ?? target) as Record<string, unknown>;
+      return (receiver[m] as ((arg: object) => unknown) | undefined)?.(target);
+    };
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const ot = this.target;
     const m = this.methodName;
-    return (target: AnyRecord) => !(ot ?? target)[m]?.(target);
+    return (target: object) => {
+      const receiver = (ot ?? target) as Record<string, unknown>;
+      return !(receiver[m] as ((arg: object) => unknown) | undefined)?.(target);
+    };
   }
 
-  make(instance: AnyRecord, _value: AnyRecord): AnyRecord {
-    const t = this.target ?? instance;
-    return t[this.methodName]?.call(t, instance);
+  make(instance: object, _value: unknown): unknown {
+    const t = (this.target ?? instance) as Record<string, unknown>;
+    return (t[this.methodName] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
+      t,
+      instance,
+    );
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec0 */
 export class InstanceExec0 implements CallTemplate {
-  constructor(readonly fn: () => AnyRecord) {}
+  constructor(readonly fn: () => unknown) {}
 
-  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, this.fn, "instanceExec"];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const f = this.fn;
-    return (target: AnyRecord) => f.call(target);
+    return (target: object) => f.call(target);
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
-    return (target: AnyRecord) => !f.call(target);
+    return (target: object) => !f.call(target);
   }
 
-  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+  make(target: object, _value: unknown): unknown {
     return this.fn.call(target);
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec1 */
 export class InstanceExec1 implements CallTemplate {
-  constructor(readonly fn: (target: AnyRecord) => AnyRecord) {}
+  constructor(readonly fn: (target: object) => unknown) {}
 
-  expand(target: AnyRecord, _value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, this.fn, "instanceExec", target];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const f = this.fn;
-    return (target: AnyRecord) => f(target);
+    return (target: object) => f(target);
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
-    return (target: AnyRecord) => !f(target);
+    return (target: object) => !f(target);
   }
 
-  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+  make(target: object, _value: unknown): unknown {
     return this.fn(target);
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::InstanceExec2 */
 export class InstanceExec2 implements CallTemplate {
-  constructor(readonly fn: (target: AnyRecord, value: AnyRecord) => AnyRecord) {}
+  constructor(readonly fn: (target: object, value: unknown) => unknown) {}
 
-  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [target, this.fn, "instanceExec", target, block];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const f = this.fn;
-    return (target: AnyRecord, value: AnyRecord) => f(target, value);
+    return (target: object, value: unknown) => f(target, value);
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
-    return (target: AnyRecord, value: AnyRecord) => !f(target, value);
+    return (target: object, value: unknown) => !f(target, value);
   }
 
-  make(target: AnyRecord, value: AnyRecord): AnyRecord {
+  make(target: object, value: unknown): unknown {
     return this.fn(target, value);
   }
 }
 
 /** Mirrors: ActiveSupport::Callbacks::CallTemplate::ProcCall */
 export class ProcCall implements CallTemplate {
-  constructor(readonly fn: (...args: AnyRecord[]) => AnyRecord) {}
+  constructor(readonly fn: (...args: any[]) => unknown) {}
 
-  expand(target: AnyRecord, value: AnyRecord, block: (() => unknown) | null): unknown[] {
+  expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [this.fn, block, "call", target, value];
   }
 
-  makeLambda(): (target: AnyRecord, value: AnyRecord) => unknown {
+  makeLambda(): (target: object, value: unknown) => unknown {
     const f = this.fn;
-    return (target: AnyRecord, value: AnyRecord) => f(target, value);
+    return (target: object, value: unknown) => f(target, value);
   }
 
-  invertedLambda(): (target: AnyRecord, value: AnyRecord) => boolean {
+  invertedLambda(): (target: object, value: unknown) => boolean {
     const f = this.fn;
-    return (target: AnyRecord, value: AnyRecord) => !f(target, value);
+    return (target: object, value: unknown) => !f(target, value);
   }
 
-  make(target: AnyRecord, _value: AnyRecord): AnyRecord {
+  make(target: object, _value: unknown): unknown {
     return this.fn(target);
   }
 }
@@ -216,23 +228,23 @@ export class ProcCall implements CallTemplate {
 
 /** Environment struct threaded through the compiled filter chain. */
 export interface FilterEnvironment {
-  target: AnyRecord;
+  target: object;
   halted: boolean;
-  value: AnyRecord;
+  value: unknown;
 }
 
 /** Mirrors: ActiveSupport::Callbacks::Filters::Before */
 export class Before {
-  readonly userCallback: (target: AnyRecord, value: AnyRecord) => unknown;
-  readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
-  readonly haltedLambda: (target: AnyRecord, fn: () => unknown) => boolean;
+  readonly userCallback: (target: object, value: unknown) => unknown;
+  readonly userConditions: Array<(target: object, value: unknown) => boolean>;
+  readonly haltedLambda: (target: object, fn: () => unknown) => boolean;
   readonly filter: AnyCallback | string | symbol;
   readonly name: string;
 
   constructor(
-    userCallback: (target: AnyRecord, value: AnyRecord) => unknown,
-    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
-    chainConfig: { terminator?: ((target: AnyRecord, fn: () => unknown) => boolean) | false },
+    userCallback: (target: object, value: unknown) => unknown,
+    userConditions: Array<(target: object, value: unknown) => boolean>,
+    chainConfig: { terminator?: ((target: object, fn: () => unknown) => boolean) | false },
     filter: AnyCallback | string | symbol = "",
     name: string = "",
   ) {
@@ -240,11 +252,11 @@ export class Before {
     this.userConditions = userConditions;
     this.haltedLambda =
       chainConfig.terminator === false
-        ? (_t: AnyRecord, fn: () => unknown) => {
+        ? (_t: object, fn: () => unknown) => {
             fn();
             return false;
           }
-        : (chainConfig.terminator ?? ((_t: AnyRecord, fn: () => unknown) => fn() === false));
+        : (chainConfig.terminator ?? ((_t: object, fn: () => unknown) => fn() === false));
     this.filter = filter;
     this.name = name;
   }
@@ -262,12 +274,9 @@ export class Before {
     return seq.before(this);
   }
 
-  static build(
-    callback: Callback,
-    options: DefineCallbacksOptions,
-  ): (target: AnyRecord) => boolean {
+  static build(callback: Callback, options: DefineCallbacksOptions): (target: object) => boolean {
     const terminatorFn = options.terminator;
-    return (target: AnyRecord) => {
+    return (target: object) => {
       if (!Value.check(callback.options, target)) return true;
       const cb = callback.filter as BeforeCallback;
       if (terminatorFn === false) {
@@ -282,13 +291,13 @@ export class Before {
 
 /** Mirrors: ActiveSupport::Callbacks::Filters::After */
 export class After {
-  readonly userCallback: (target: AnyRecord, value: AnyRecord) => unknown;
-  readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
+  readonly userCallback: (target: object, value: unknown) => unknown;
+  readonly userConditions: Array<(target: object, value: unknown) => boolean>;
   readonly halting: boolean;
 
   constructor(
-    userCallback: (target: AnyRecord, value: AnyRecord) => unknown,
-    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+    userCallback: (target: object, value: unknown) => unknown,
+    userConditions: Array<(target: object, value: unknown) => boolean>,
     chainConfig: { skipAfterCallbacksIfTerminated?: boolean },
   ) {
     this.userCallback = userCallback;
@@ -308,8 +317,8 @@ export class After {
     return seq.after(this);
   }
 
-  static build(callback: Callback): (target: AnyRecord) => void {
-    return (target: AnyRecord) => {
+  static build(callback: Callback): (target: object) => void {
+    return (target: object) => {
       if (!Value.check(callback.options, target)) return;
       (callback.filter as AfterCallback)(target);
     };
@@ -319,11 +328,11 @@ export class After {
 /** Mirrors: ActiveSupport::Callbacks::Filters::Around */
 export class Around {
   private readonly userCallback: CallTemplate;
-  private readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>;
+  private readonly userConditions: Array<(target: object, value: unknown) => boolean>;
 
   constructor(
     userCallback: CallTemplate,
-    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+    userConditions: Array<(target: object, value: unknown) => boolean>,
   ) {
     this.userCallback = userCallback;
     this.userConditions = userConditions;
@@ -333,8 +342,8 @@ export class Around {
     return seq.around(this.userCallback, this.userConditions);
   }
 
-  static build(callback: Callback): (target: AnyRecord, block: () => void) => void {
-    return (target: AnyRecord, block: () => void) => {
+  static build(callback: Callback): (target: object, block: () => void) => void {
+    return (target: object, block: () => void) => {
       if (!Value.check(callback.options, target)) {
         block();
         return;
@@ -415,7 +424,7 @@ export class Callback {
   get compiled(): Before | After | Around {
     if (this._compiled) return this._compiled;
 
-    const userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> = [];
+    const userConditions: Array<(target: object, value: unknown) => boolean> = [];
     const ifConds = Array.isArray(this.options.if)
       ? this.options.if
       : this.options.if
@@ -454,10 +463,12 @@ export class Callback {
 
   currentScopes(): string[] {
     const scope = this.chainConfig.scope ?? ["kind"];
-    return scope.map((s) => (s === "kind" ? String(this.kind) : String((this as AnyRecord)[s])));
+    return scope.map((s) =>
+      s === "kind" ? String(this.kind) : String((this as Record<string, unknown>)[s]),
+    );
   }
 
-  apply(target: AnyRecord, block?: () => void): boolean {
+  apply(target: object, block?: () => void): boolean {
     if (!Value.check(this.options, target)) return true;
 
     if (this.kind === "before") {
@@ -485,14 +496,14 @@ export class Callback {
 export class CallbackSequence {
   readonly nested: CallbackSequence | null;
   private readonly callTemplate: CallTemplate | null;
-  private readonly userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> | null;
+  private readonly userConditions: Array<(target: object, value: unknown) => boolean> | null;
   private beforeList: Before[] | null = null;
   private afterList: After[] | null = null;
 
   constructor(
     nested: CallbackSequence | null = null,
     callTemplate: CallTemplate | null = null,
-    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean> | null = null,
+    userConditions: Array<(target: object, value: unknown) => boolean> | null = null,
   ) {
     this.nested = nested;
     this.callTemplate = callTemplate;
@@ -511,7 +522,7 @@ export class CallbackSequence {
 
   around(
     callTemplate: CallTemplate,
-    userConditions: Array<(target: AnyRecord, value: AnyRecord) => boolean>,
+    userConditions: Array<(target: object, value: unknown) => boolean>,
   ): CallbackSequence {
     const sequence = new CallbackSequence(this, callTemplate, userConditions);
     sequence._callbackChain = this._callbackChain;
@@ -540,7 +551,7 @@ export class CallbackSequence {
     this.afterList?.forEach((a) => a.call(env));
   }
 
-  invoke(target: AnyRecord, block?: () => void): boolean {
+  invoke(target: object, block?: () => void): boolean {
     const callbackChain = this._callbackChain;
     if (!callbackChain) {
       block?.();
@@ -566,7 +577,7 @@ export class CallbackChain {
     this.name = name;
     this.config = {
       // Default terminator: halt if before-callback returns false
-      terminator: (_target: AnyRecord, fn: () => unknown) => fn() === false,
+      terminator: (_target: object, fn: () => unknown) => fn() === false,
       ...config,
     };
     this.chain = [];
@@ -619,7 +630,7 @@ export class CallbackChain {
     return this.chain.length === 0;
   }
 
-  _invoke(target: AnyRecord, block?: () => void): boolean {
+  _invoke(target: object, block?: () => void): boolean {
     const terminatorFn = this.config.terminator;
     const skipAfterIfTerminated = this.config.skipAfterCallbacksIfTerminated ?? false;
     const entries = this.chain;
@@ -718,7 +729,7 @@ export function __updateCallbacks(
     getCallbacks(name: string): CallbackChain;
     setCallbacks(name: string, chain: CallbackChain): void;
   }>,
-  fn: (target: AnyRecord, chain: CallbackChain) => void,
+  fn: (target: object, chain: CallbackChain) => void,
 ): void {
   [...targets].reverse().forEach((target) => {
     const chain = target.getCallbacks(name);
@@ -772,9 +783,10 @@ export interface ClassMethods {
 
 const CALLBACKS = Symbol("callbacks");
 
-function getCallbackChains(target: AnyRecord): Map<string, CallbackChain> {
+function getCallbackChains(target: object): Map<string, CallbackChain> {
+  const t = target as Record<symbol, unknown>;
   if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-    const parent: Map<string, CallbackChain> | undefined = target[CALLBACKS];
+    const parent = t[CALLBACKS] as Map<string, CallbackChain> | undefined;
     const own = new Map<string, CallbackChain>();
     if (parent) {
       for (const [name, chain] of parent) {
@@ -787,14 +799,14 @@ function getCallbackChains(target: AnyRecord): Map<string, CallbackChain> {
         own.set(name, newChain);
       }
     }
-    target[CALLBACKS] = own;
+    t[CALLBACKS] = own;
   }
-  return target[CALLBACKS];
+  return t[CALLBACKS] as Map<string, CallbackChain>;
 }
 
 export namespace Callbacks {
   export function defineCallbacks(
-    target: AnyRecord,
+    target: object,
     name: string,
     options: DefineCallbacksOptions = {},
   ): void {
@@ -805,7 +817,7 @@ export namespace Callbacks {
   }
 
   export function setCallback(
-    target: AnyRecord,
+    target: object,
     name: string,
     kind: CallbackKind,
     callback: AnyCallback,
@@ -825,7 +837,7 @@ export namespace Callbacks {
   }
 
   export function skipCallback(
-    target: AnyRecord,
+    target: object,
     name: string,
     kind: CallbackKind,
     callback?: AnyCallback,
@@ -836,13 +848,13 @@ export namespace Callbacks {
     chain.remove(kind, callback);
   }
 
-  export function resetCallbacks(target: AnyRecord, name: string): void {
+  export function resetCallbacks(target: object, name: string): void {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (chain) chain.clear();
   }
 
-  export function runCallbacks(target: AnyRecord, name: string, block?: () => void): boolean {
+  export function runCallbacks(target: object, name: string, block?: () => void): boolean {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
@@ -855,7 +867,7 @@ export namespace Callbacks {
 }
 
 export function defineCallbacks(
-  target: AnyRecord,
+  target: object,
   name: string,
   options: DefineCallbacksOptions = {},
 ): void {
@@ -863,7 +875,7 @@ export function defineCallbacks(
 }
 
 export function setCallback(
-  target: AnyRecord,
+  target: object,
   name: string,
   kind: CallbackKind,
   callback: AnyCallback,
@@ -873,7 +885,7 @@ export function setCallback(
 }
 
 export function skipCallback(
-  target: AnyRecord,
+  target: object,
   name: string,
   kind: CallbackKind,
   callback?: AnyCallback,
@@ -881,15 +893,15 @@ export function skipCallback(
   Callbacks.skipCallback(target, name, kind, callback);
 }
 
-export function resetCallbacks(target: AnyRecord, name: string): void {
+export function resetCallbacks(target: object, name: string): void {
   Callbacks.resetCallbacks(target, name);
 }
 
-export function runCallbacks(target: AnyRecord, name: string, block?: () => void): boolean {
+export function runCallbacks(target: object, name: string, block?: () => void): boolean {
   return Callbacks.runCallbacks(target, name, block);
 }
 
-export function CallbacksMixin<TBase extends new (...args: AnyRecord[]) => object>(Base?: TBase) {
+export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
   const ActualBase = (Base ?? class {}) as TBase;
 
   class WithCallbacks extends ActualBase {

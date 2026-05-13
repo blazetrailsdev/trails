@@ -32,8 +32,7 @@ export abstract class Node {
 
   toSql(): string {
     assertRegistered("ToSql");
-    const visitor = new _registry.ToSql!();
-    return (visitor as unknown as { compile(node: Node): string }).compile(this);
+    return new _registry.ToSql!().compile(this);
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {
@@ -77,11 +76,9 @@ export interface NodeVisitor<T> {
   visit(node: Node): T;
 }
 
-// ArelConnection lives in visitors/to-sql.ts which imports Node — a direct
-// import would create a cycle. `never` satisfies the contravariant param
-// check: TS requires `never extends ConcreteConnection`, which holds because
-// never is a subtype of everything (bottom type).
-type ToSqlCtor = new (connection?: never) => { compile(node: Node): string };
+type ToSqlCtor = new (connection?: import("../visitors/connection.js").ArelConnection) => {
+  compile(node: Node): string;
+};
 
 interface NodeRegistry {
   Not?: new (expr: Node) => Node;

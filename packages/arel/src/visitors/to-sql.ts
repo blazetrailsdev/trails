@@ -14,6 +14,8 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 import { defaultQuoter } from "./default-quoter.js";
+export type { ArelConnection } from "./connection.js";
+import type { ArelConnection } from "./connection.js";
 
 /**
  * Connection-quoting surface exposed to the Arel visitor.
@@ -28,33 +30,6 @@ import { defaultQuoter } from "./default-quoter.js";
  * @deprecated Use `ArelConnection` — this alias will be removed in a future release.
  */
 export type ArelQuoter = ArelConnection;
-
-/**
- * Connection-quoting surface exposed to the Arel visitor.
- *
- * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
- * Rails dispatches every quoting decision through the connection so adapters
- * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
- * etc.).  We accept this subset so `arel` stays dependency-free from
- * `activerecord`; `AbstractAdapter` is a structural superset and always
- * satisfies this interface.
- */
-export interface ArelConnection {
-  /** @internal */
-  quoteTableName(name: string): string;
-  /** @internal */
-  quoteColumnName(name: string): string;
-  /** @internal */
-  quoteString(s: string): string;
-  /** @internal */
-  quote(value: unknown): string;
-  /** @internal */
-  quotedBinary(value: unknown): string;
-  /** @internal */
-  quotedTrue(): string;
-  /** @internal */
-  quotedFalse(): string;
-}
 
 /**
  * Resolve a bind's database value. QueryAttribute exposes
