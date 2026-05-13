@@ -1,78 +1,102 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/citext_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import { Table as ArelTable } from "@blazetrails/arel";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS citext`);
+    await adapter.exec(`DROP TABLE IF EXISTS citexts`);
+    await adapter.exec(`CREATE TABLE citexts (id serial primary key, cival citext)`);
+    await adapter.loadAdditionalTypes();
   });
+
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS citexts`);
+    await adapter.exec(`DROP EXTENSION IF EXISTS citext CASCADE`);
     await adapter.close();
   });
 
   describe("PostgresqlCitextTest", () => {
-    it.skip("citext column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+    it("citext enabled", async () => {
+      expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
-    it.skip("citext default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("citext column", async () => {
+      const cols = await adapter.columns("citexts");
+      const col = cols.find((c) => c.name === "cival")!;
+      expect(col).toBeDefined();
+      expect(col.type).toBe("citext");
+      expect(col.sqlType).toBe("citext");
+      expect((col as any).isArray()).toBe(false);
+      expect(col.type).not.toBe("binary");
     });
-    it.skip("citext type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("change table supports json", async () => {
+      await adapter.changeTable("citexts", async (t) => {
+        await t.column("username", "citext");
+      });
+      const cols = await adapter.columns("citexts");
+      const col = cols.find((c) => c.name === "username")!;
+      expect(col).toBeDefined();
+      expect(col.type).toBe("citext");
     });
-    it.skip("case insensitive where", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("write", async () => {
+      const { Base } = await import("../../index.js");
+      class Citext extends Base {
+        static tableName = "citexts";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await Citext.loadSchema();
+
+      await Citext.createBang({ cival: "Some CI Text" } as any);
+      const citext = (await Citext.first()) as any;
+      expect(citext.cival).toBe("Some CI Text");
+
+      citext.cival = "Some NEW CI Text";
+      await citext.saveBang();
+      await citext.reload();
+      expect(citext.cival).toBe("Some NEW CI Text");
     });
-    it.skip("case insensitive uniqueness", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("select case insensitive", async () => {
+      await adapter.exec(`INSERT INTO citexts (cival) VALUES ('Cased Text')`);
+      const { Base } = await import("../../index.js");
+      class Citext extends Base {
+        static tableName = "citexts";
+        static {
+          this.adapter = adapter;
+        }
+      }
+      await Citext.loadSchema();
+
+      const result = await (Citext as any).where({ cival: "cased text" }).first();
+      expect(result).not.toBeNull();
+      expect((result as any).cival).toBe("Cased Text");
     });
-    it.skip("case insensitive comparison", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("case insensitiveness", async () => {
+      const cols = await adapter.columns("citexts");
+      adapter.schemaCache.setColumns("citexts", cols); // warm cache so columnForAttribute doesn't need pool
+      const table = new ArelTable("citexts");
+      const attr = table.get("cival");
+      const comparison = await adapter.caseInsensitiveComparison(attr, null);
+      const sql = adapter.arelVisitor.compile(comparison);
+      expect(sql).not.toMatch(/lower/i);
     });
-    it.skip("citext schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
-    });
-    it.skip("citext enabled", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
-    });
-    it.skip("change table supports json", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
-    });
-    it.skip("write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
-    });
-    it.skip("select case insensitive", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
-    });
-    it.skip("case insensitiveness", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in citext
-      // ROOT-CAUSE: connection-adapters/postgresql/citext.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/citext.ts; affects ~10–47 tests in citext.test.ts
+
+    it("schema dump with shorthand", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "citexts");
+      expect(output).toMatch(/t\.citext\("cival"\)/);
     });
   });
 });

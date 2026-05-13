@@ -194,6 +194,7 @@ const DSL_HELPER_METHODS = new Set([
   "binary",
   "json",
   "jsonb",
+  "citext",
   "int4range",
   "int8range",
   "numrange",
