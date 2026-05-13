@@ -1540,11 +1540,13 @@ export class MigrationContext {
       const using = idx.using && idx.using !== "btree" ? ` USING ${idx.using}` : "";
       const colsList = idx.columns
         .map((c) => {
+          const isExpr = /\W/.test(c);
+          const quoted = isExpr ? c : this.adapter.quoteIdentifier(c);
           const order = ordersMap[c];
-          return `"${c}"${order ? ` ${order.toUpperCase()}` : ""}`;
+          return `${quoted}${order ? ` ${order.toUpperCase()}` : ""}`;
         })
         .join(", ");
-      let sql = `CREATE ${unique}INDEX "${indexName}" ON "${name}"${using} (${colsList})`;
+      let sql = `CREATE ${unique}INDEX ${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(name)}${using} (${colsList})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.adapter.executeMutation(sql);
       if (!this._indexes.has(name)) this._indexes.set(name, []);
