@@ -1,6 +1,7 @@
 import { Errors, StrictValidationFailed } from "./errors.js";
 import {
   ValidationContext,
+  ValidationsContextHost,
   initInternals as validationsInitInternals,
   contextForValidation as validationsContextForValidation,
   runValidationsBang as validationsRunValidationsBang,
@@ -74,8 +75,10 @@ import {
 } from "./attribute-registration.js";
 import { _toPartialPath } from "./conversion.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+/** Args accepted by `Model.normalizes` — attributes, transform fn, and optional options. */
+export type NormalizesArgs =
+  | [...string[], (value: unknown) => unknown]
+  | [...string[], (value: unknown) => unknown, { applyToNil?: boolean }];
 
 /**
  * Anything `validates_with` accepts: a full `Validator`/`EachValidator`
@@ -197,9 +200,7 @@ export class Model {
    * Example:
    *   User.normalizes("email", (v) => typeof v === "string" ? v.trim().toLowerCase() : v);
    */
-  static normalizes(
-    ...args: [...string[], ((value: unknown) => unknown) | Record<string, unknown>]
-  ): void {
+  static normalizes(...args: NormalizesArgs): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_normalizations")) {
       // Deep copy parent normalizations for stacking
       this._normalizations = new Map();
@@ -212,17 +213,17 @@ export class Model {
     }
 
     // Parse args: attributes..., fn, [options]
-    let options: Record<string, unknown> = {};
+    let options: { applyToNil?: boolean } = {};
     let fn: (value: unknown) => unknown;
     const lastArg = args[args.length - 1];
     let attributes: string[];
     if (typeof lastArg === "object" && lastArg !== null && !Array.isArray(lastArg)) {
-      options = lastArg as Record<string, unknown>;
+      options = lastArg as { applyToNil?: boolean };
       fn = args[args.length - 2] as (value: unknown) => unknown;
-      attributes = args.slice(0, -2) as unknown as string[];
+      attributes = args.slice(0, -2) as string[];
     } else {
       fn = lastArg as (value: unknown) => unknown;
-      attributes = args.slice(0, -1) as unknown as string[];
+      attributes = args.slice(0, -1) as string[];
     }
     const applyToNil = !!options.applyToNil;
 
@@ -316,13 +317,13 @@ export class Model {
   static withOptions(defaults: Record<string, unknown>, fn: (model: typeof Model) => void): void {
     // Create a proxy that merges defaults into validates() calls
     const proxy = new Proxy(this, {
-      get(target: AnyRecord, prop: string | symbol) {
+      get(target: typeof Model, prop: string | symbol) {
         if (prop === "validates") {
           return (attr: string, rules: Record<string, unknown>) => {
             target.validates(attr, { ...defaults, ...rules });
           };
         }
-        return target[prop];
+        return (target as unknown as Record<string | symbol, unknown>)[prop];
       },
     });
     fn(proxy);
@@ -350,17 +351,17 @@ export class Model {
     }> = [];
 
     if (rules.presence) {
-      const opts = rules.presence === true ? {} : (rules.presence as AnyRecord);
+      const opts = rules.presence === true ? {} : (rules.presence as Record<string, unknown>);
       validatorSpecs.push({ klass: PresenceValidator, opts });
     }
 
     if (rules.absence) {
-      const opts = rules.absence === true ? {} : (rules.absence as AnyRecord);
+      const opts = rules.absence === true ? {} : (rules.absence as Record<string, unknown>);
       validatorSpecs.push({ klass: AbsenceValidator, opts });
     }
 
     if (rules.length) {
-      const opts = { ...(rules.length as AnyRecord) };
+      const opts = { ...(rules.length as Record<string, unknown>) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -369,7 +370,8 @@ export class Model {
     }
 
     if (rules.numericality) {
-      const opts = rules.numericality === true ? {} : { ...(rules.numericality as AnyRecord) };
+      const opts =
+        rules.numericality === true ? {} : { ...(rules.numericality as Record<string, unknown>) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -378,7 +380,7 @@ export class Model {
     }
 
     if (rules.inclusion) {
-      const opts = { ...(rules.inclusion as AnyRecord) };
+      const opts = { ...(rules.inclusion as Record<string, unknown>) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -387,7 +389,7 @@ export class Model {
     }
 
     if (rules.exclusion) {
-      const opts = { ...(rules.exclusion as AnyRecord) };
+      const opts = { ...(rules.exclusion as Record<string, unknown>) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -396,7 +398,7 @@ export class Model {
     }
 
     if (rules.format) {
-      const opts = { ...(rules.format as AnyRecord) };
+      const opts = { ...(rules.format as Record<string, unknown>) };
       if (sharedAllowNil !== undefined && opts.allowNil === undefined)
         opts.allowNil = sharedAllowNil;
       if (sharedAllowBlank !== undefined && opts.allowBlank === undefined)
@@ -405,7 +407,7 @@ export class Model {
     }
 
     if (rules.acceptance) {
-      const opts = rules.acceptance === true ? {} : (rules.acceptance as AnyRecord);
+      const opts = rules.acceptance === true ? {} : (rules.acceptance as Record<string, unknown>);
       if (!this._attributeDefinitions.has(attribute)) {
         this.attribute(attribute, "string", { virtual: true });
       }
@@ -413,7 +415,8 @@ export class Model {
     }
 
     if (rules.confirmation) {
-      const opts = rules.confirmation === true ? {} : (rules.confirmation as AnyRecord);
+      const opts =
+        rules.confirmation === true ? {} : (rules.confirmation as Record<string, unknown>);
       const confirmationAttr = `${attribute}Confirmation`;
       if (!this._attributeDefinitions.has(confirmationAttr)) {
         this.attribute(confirmationAttr, "string", { virtual: true });
@@ -422,7 +425,10 @@ export class Model {
     }
 
     if (rules.comparison) {
-      validatorSpecs.push({ klass: ComparisonValidator, opts: rules.comparison as AnyRecord });
+      validatorSpecs.push({
+        klass: ComparisonValidator,
+        opts: rules.comparison as Record<string, unknown>,
+      });
     }
 
     for (const { klass, opts } of validatorSpecs) {
@@ -445,18 +451,19 @@ export class Model {
     return this._attributeDefinitions.has(attribute);
   }
 
-  static validate(
-    methodOrFn: string | ((record: AnyRecord) => unknown),
+  static validate<T extends ValidatableRecord = ValidatableRecord>(
+    methodOrFn: string | ((record: T) => unknown),
     options: ConditionalOptions = {},
   ): void {
-    const fn: CallbackFn = (record: AnyRecord) => {
+    const fn: CallbackFn = (record: object) => {
       // Return the underlying result so an `async` validator's Promise flows
       // into the callback runner, where strict-sync mode (on the `validate`
       // event) will throw instead of dropping it as an unhandled rejection.
+      const r = record as T & Record<string, unknown>;
       if (typeof methodOrFn === "function") {
-        return methodOrFn(record) as void;
-      } else if (typeof record[methodOrFn] === "function") {
-        return record[methodOrFn]() as void;
+        return methodOrFn(r) as void;
+      } else if (typeof r[methodOrFn] === "function") {
+        return (r[methodOrFn] as () => void)();
       }
     };
     this._ensureOwnCallbacks();
@@ -468,18 +475,21 @@ export class Model {
    *
    * Mirrors: ActiveModel::Validations.validates_each
    */
-  static validatesEach(
+  static validatesEach<T extends ValidatableRecord = ValidatableRecord>(
     attributes: string[],
-    fn: (record: AnyRecord, attribute: string, value: unknown) => void,
+    fn: (record: T, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
-    const validator = new BlockValidator({ attributes, ...options }, fn);
+    const validator = new BlockValidator(
+      { attributes, ...options },
+      fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
+    );
     this._registerValidator(validator);
     this._ensureOwnCallbacks();
     this._callbackChain.register(
       "before",
       "validate",
-      (record: AnyRecord) => validator.validate(record) as unknown as void,
+      (record: object) => validator.validate(record as ValidatableRecord),
       this._buildValidateConditions(options),
     );
   }
@@ -538,15 +548,16 @@ export class Model {
 
       let callbackFn: CallbackFn;
       if (isStrict) {
-        callbackFn = (record: AnyRecord) => {
-          const origErrors = record.errors;
-          const tempErrors = new Errors(record);
-          record.errors = tempErrors;
+        callbackFn = (record: object) => {
+          const r = record as ValidatableRecord & { errors: Errors };
+          const origErrors = r.errors;
+          const tempErrors = new Errors(r);
+          r.errors = tempErrors;
           let validateResult: unknown;
           try {
-            validateResult = validator.validate(record);
+            validateResult = validator.validate(r);
           } finally {
-            record.errors = origErrors;
+            r.errors = origErrors;
           }
           if (tempErrors.any) {
             throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
@@ -554,7 +565,7 @@ export class Model {
           return validateResult as void;
         };
       } else {
-        callbackFn = (record: AnyRecord) => validator.validate(record) as unknown as void;
+        callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
       }
 
       this._ensureOwnCallbacks();
@@ -1146,30 +1157,35 @@ export class Model {
   private static _buildValidateConditions(
     options: ConditionalOptions,
   ): CallbackConditions | undefined {
-    const parts: Array<(record: AnyRecord) => boolean> = [];
+    const parts: Array<(record: object) => boolean> = [];
 
     if (options.on !== undefined) {
       // Mirrors Rails (validations.rb:170-172): the `on:` clause is
       // installed via `predicate_for_validation_context(options[:on])`,
       // so route through the same module-level cache here. Single
       // source of truth for the intersection-vs-equality semantics.
-      parts.push(validationsPredicateForValidationContext(options.on));
+      const pred = validationsPredicateForValidationContext(options.on);
+      parts.push((record: object) => pred(record as ValidationsContextHost));
     }
 
     if (options.if !== undefined) {
       const conds = Array.isArray(options.if) ? options.if : [options.if];
-      parts.push((record: AnyRecord) => conds.every((c) => evaluateCondition(record, c)));
+      parts.push((record: object) =>
+        conds.every((c) => evaluateCondition(record as ValidatableRecord, c)),
+      );
     }
 
     if (options.unless !== undefined) {
       const conds = Array.isArray(options.unless) ? options.unless : [options.unless];
-      parts.push((record: AnyRecord) => !conds.some((c) => evaluateCondition(record, c)));
+      parts.push(
+        (record: object) => !conds.some((c) => evaluateCondition(record as ValidatableRecord, c)),
+      );
     }
 
     if (parts.length === 0) return undefined;
 
     return {
-      if: (record: AnyRecord) => parts.every((fn) => fn(record)),
+      if: (record: object) => parts.every((fn) => fn(record)),
     };
   }
 

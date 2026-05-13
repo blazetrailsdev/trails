@@ -10,7 +10,7 @@
  * Mirrors: ActiveRecord::Normalization
  */
 
-import { Model } from "@blazetrails/activemodel";
+import { Model, NormalizesArgs } from "@blazetrails/activemodel";
 
 /**
  * NormalizedValueType — decorates an underlying cast type with a normalizer.
@@ -64,10 +64,7 @@ export class NormalizedValueType {
 // These exist for api:compare discoverability — the actual implementations
 // are on ActiveModel::Model, inherited by ActiveRecord::Base.
 
-export function normalizes(
-  modelClass: typeof Model,
-  ...args: Parameters<typeof Model.normalizes>
-): void {
+export function normalizes(modelClass: typeof Model, ...args: NormalizesArgs): void {
   return modelClass.normalizes(...args);
 }
 

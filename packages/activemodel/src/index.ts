@@ -1,4 +1,5 @@
 export { Model } from "./model.js";
+export type { NormalizesArgs } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";
 export {
