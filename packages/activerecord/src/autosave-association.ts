@@ -253,7 +253,7 @@ export function isDestroyable(record: Base): boolean {
   return !record.isNewRecord() && isMarkedForDestruction(record);
 }
 
-export function build(_model: typeof Base, reflection: { options: Record<string, any> }): void {
+export function build(_model: typeof Base, reflection: { options: Record<string, unknown> }): void {
   if (reflection.options.autosave && reflection.options.validate === undefined) {
     reflection.options.validate = true;
   }

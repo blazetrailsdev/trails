@@ -707,7 +707,7 @@ export function references<T extends typeof Base>(
 }
 
 /** Mirrors: ActiveRecord::Querying#extending */
-export function extending<T extends typeof Base, M extends Record<string, Function>>(
+export function extending<T extends typeof Base, M extends Record<string, (...args: any[]) => any>>(
   this: T,
   mod: M,
 ): Relation<InstanceType<T>> & M;
@@ -718,9 +718,11 @@ export function extending<T extends typeof Base>(
 export function extending<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
 export function extending<T extends typeof Base>(
   this: T,
-  mod?: Record<string, Function> | ((rel: Relation<InstanceType<T>>) => void),
+  mod?: Record<string, (...args: any[]) => any> | ((rel: Relation<InstanceType<T>>) => void),
 ): Relation<InstanceType<T>> {
-  return mod ? this.all().extending(mod as Record<string, Function>) : this.all().extending();
+  return mod
+    ? this.all().extending(mod as Record<string, (...args: any[]) => any>)
+    : this.all().extending();
 }
 
 /** Mirrors: ActiveRecord::Querying#unscope */

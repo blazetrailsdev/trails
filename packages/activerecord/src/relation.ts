@@ -291,7 +291,7 @@ export class Relation<T extends Base> {
   private _referencesValues: string[] = [];
   private _fromClause: FromClause = FromClause.empty();
   private _createWithAttrs: Record<string, unknown> = {};
-  private _extending: Array<Record<string, Function>> = [];
+  private _extending: Array<Record<string, (...args: any[]) => any>> = [];
   private _ctes: Array<{ name: string; sql: string; recursive: boolean }> = [];
   private _skipPreloading = false;
   private _skipQueryCache = false;
@@ -1187,13 +1187,15 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#extending
    */
-  extending<M extends Record<string, Function>>(mod: M): Relation<T> & M;
-  extending<M extends Record<string, Function>>(mod: M | undefined): Relation<T> & Partial<M>;
+  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T> & M;
+  extending<M extends Record<string, (...args: any[]) => any>>(
+    mod: M | undefined,
+  ): Relation<T> & Partial<M>;
   extending(fn: (rel: Relation<T>) => void): Relation<T>;
   extending(): Relation<T>;
   extending(
-    mod?: Record<string, Function> | ((rel: Relation<T>) => void),
-  ): Relation<T> | (Relation<T> & Record<string, Function>) {
+    mod?: Record<string, (...args: any[]) => any> | ((rel: Relation<T>) => void),
+  ): Relation<T> | (Relation<T> & Record<string, (...args: any[]) => any>) {
     if (!mod) return this._clone();
     return this._clone().extendingBang(mod);
   }

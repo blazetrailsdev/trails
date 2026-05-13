@@ -17,7 +17,7 @@ export function scope<T extends typeof Base>(
   this: T,
   name: string,
   fn: (rel: Relation<InstanceType<T>>, ...args: any[]) => Relation<any>,
-  extension?: Record<string, Function>,
+  extension?: Record<string, (...args: any[]) => any>,
 ): void {
   const modelClass = this as any;
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_scopes")) {

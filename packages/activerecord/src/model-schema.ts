@@ -357,7 +357,7 @@ interface SchemaHost {
   _protectedEnvironments?: string[];
   _attributeDefinitions: Map<string, any>;
   _defaultAttributes(): { deepDup(): { toHash(): Record<string, unknown> } };
-  _columnsHash?: Record<string, any>;
+  _columnsHash?: Record<string, unknown>;
   _columns?: any[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
@@ -605,7 +605,7 @@ export function loadSchema(this: SchemaHost): void {
   // work host so subclasses don't fork _columnsHash (which would persist
   // past a later base reflection).
   if (!workHost._columnsHash && workHost._attributeDefinitions.size > 0) {
-    const hash: Record<string, any> = {};
+    const hash: Record<string, unknown> = {};
     const ignored = new Set(workHost._ignoredColumns ?? []);
     for (const [name, def] of workHost._attributeDefinitions) {
       if (ignored.has(name)) continue;
@@ -621,7 +621,7 @@ export function loadSchema(this: SchemaHost): void {
   workHost._schemaLoaded = true;
 }
 
-function getColumnsHash(host: SchemaHost): Record<string, any> {
+function getColumnsHash(host: SchemaHost): Record<string, unknown> {
   if (host._columnsHash != null) return host._columnsHash;
   const ch = (host as any).columnsHash;
   if (typeof ch === "function") return ch.call(host) ?? {};

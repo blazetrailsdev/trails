@@ -12,7 +12,7 @@ import { withoutEncryption } from "./context.js";
  */
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
-  private static _originalValidateEach: Function | undefined;
+  private static _originalValidateEach: ((...args: any[]) => unknown) | undefined;
 
   /**
    * Wraps UniquenessValidator#validateEach so uniqueness checks also cover
@@ -26,7 +26,7 @@ export class ExtendedDeterministicUniquenessValidator {
     UniquenessValidator,
     EncryptedUniquenessValidator: EUV,
   }: {
-    UniquenessValidator: { prototype: { validateEach: Function } };
+    UniquenessValidator: { prototype: { validateEach: (...args: any[]) => unknown } };
     EncryptedUniquenessValidator: typeof EncryptedUniquenessValidator;
   }): void {
     if (this._installed) return;
@@ -57,7 +57,9 @@ export class ExtendedDeterministicUniquenessValidator {
   }
 
   /** Restores the original validateEach — for use in test teardown. */
-  static resetSupport(UniquenessValidator: { prototype: { validateEach: Function } }): void {
+  static resetSupport(UniquenessValidator: {
+    prototype: { validateEach: (...args: any[]) => unknown };
+  }): void {
     if (!this._installed || !this._originalValidateEach) return;
     UniquenessValidator.prototype.validateEach = this._originalValidateEach;
     this._installed = false;

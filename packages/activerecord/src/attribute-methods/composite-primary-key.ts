@@ -8,7 +8,10 @@ interface CompositePKRecord {
   id: unknown;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  constructor: Function & { primaryKey: string | string[]; compositePrimaryKey: boolean };
+  constructor: (abstract new (...args: any[]) => any) & {
+    primaryKey: string | string[];
+    compositePrimaryKey: boolean;
+  };
 }
 
 /**

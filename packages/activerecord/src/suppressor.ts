@@ -61,7 +61,9 @@ export function registry(): Record<string, true | undefined> {
  *
  * Mirrors: ActiveRecord::Suppressor.suppress
  */
-export async function suppress<R>(modelClass: Function, fn: () => R | Promise<R>): Promise<R> {
+type AnyClass = abstract new (...args: any[]) => any;
+
+export async function suppress<R>(modelClass: AnyClass, fn: () => R | Promise<R>): Promise<R> {
   const name = modelClass.name;
   if (!name) {
     // Anonymous classes can't participate in the name-keyed registry
@@ -81,11 +83,11 @@ export async function suppress<R>(modelClass: Function, fn: () => R | Promise<R>
  * Check if the given model class (or any ancestor) is currently
  * suppressed in the active scope.
  */
-export function isSuppressed(modelClass: Function): boolean {
+export function isSuppressed(modelClass: AnyClass): boolean {
   const reg = currentRegistry();
   let current: unknown = modelClass;
   while (current && typeof current === "function") {
-    const klassName = (current as Function).name;
+    const klassName = (current as AnyClass).name;
     if (klassName && reg[klassName]) return true;
     current = Object.getPrototypeOf(current);
   }

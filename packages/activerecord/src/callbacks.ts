@@ -193,7 +193,7 @@ function registerCallback(
   modelClass: ModelCtor,
   timing: "before" | "after",
   event: string,
-  fn: Function,
+  fn: (...args: any[]) => unknown,
   options?: AnyCallbackOptions,
 ): void {
   const klass = modelClass as unknown as {
@@ -202,7 +202,7 @@ function registerCallback(
       register(
         timing: "before" | "after",
         event: string,
-        fn: Function,
+        fn: (...args: any[]) => unknown,
         conditions: Record<string, unknown>,
       ): void;
     };
