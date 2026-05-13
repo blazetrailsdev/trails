@@ -14,17 +14,119 @@ Closed slots are pruned as PRs merge — `git log --grep "audit Slot"` is the cl
 
 ---
 
-## Encryption cluster (~250 LOC, Slot C remaining)
+## Associations-autosave cluster (~940 LOC across 4 remaining slots)
 
-Slot A closed in #1405, Slot B closed in #1409. Remaining:
+Slots A (#1426) + B (#1434) closed.
 
-- **Slot C — Lazy previousSchemes + store_accessor + insert/defaults + ciphertext constancy** (~250 LOC). Lazy `previousSchemes` getter invalidated by `Configurable.onConfigure`; `EncryptedTrafficLightWithStoreState` fixture; single-row `Base.insert` wrapper; un-skip 4 tests.
+3. **Slot C** (~230 LOC) — Transaction wrapping of autosave chain + `RecordInvalid` raise from saveBang.
+4. **Slot D** (~280 LOC) — `Associations::NestedError` propagation + `errors.indexErrors` + i18n full-message.
+5. **Slot E** (~220 LOC) — CPK / queryConstraints / polymorphic-inverse / custom-context.
+6. **Slot F** (~210 LOC) — Reflection introspection + per-class non-cyclic guard.
 
-## Serialization cluster (~70 LOC, Slot B remaining)
+## Associations-reflection cluster (~900 LOC across 5 slots, from audit-associations-reflection)
 
-Slot A closed in #1404. Remaining:
+31 empty-stub tests with generic boilerplate annotation. **Impl is fundamentally complete**; gaps are fixture plumbing + test-body writing + 3 fixture-model gaps.
 
-- **Slot B — serialized-column join fixture** (~60–80 LOC, optional). Add fixture-style models to `serialization.test.ts`; un-skip 1 join test.
+1. **Slot A** (~80 LOC) — Error-type parity (`UnknownPrimaryKey`, `ConfigurationError` from plain `Error`).
+2. **Slot B** (~120 LOC) — Empty-stub bodies for already-implemented features (`columnForAttribute`, `columnsForAttribute` — re-uses existing impl from `attribute-methods.test.ts` / `calculations.test.ts`).
+3. **Slot C** (~250 LOC) — Polymorphic HMT fixture (Hotel/Department/Chef/CakeDesigner/DrinkDesigner) + scope-chain tests.
+4. **Slot D** (~250 LOC) — Author/Organization essay fixture + dependent tests.
+5. **Slot E** (~200 LOC) — Namespace resolution (`MacroReflection#_klass`) + `sourceType`-as-class guard.
+
+3 const_missing/NameError tests → unported-list candidates (Ruby-only language semantics).
+
+## MySQL warnings cluster — **closed via #1435** ✅
+
+Slot A shipped (~240 LOC, 9 unskips, full feature port). Slot B ignore-list delegation rolled into A.
+
+## MySQL schema cluster (~400 LOC across 3 slots, from audit-mysql-schema)
+
+8 tests. One real behavior gap + one option drop + 6 fixture/test-helper gaps.
+
+1. **Slot A** (~120 LOC) — `t.float :foo, limit: N` → `FLOAT(N)` MySQL DDL + `indexes()` retains `using` / `type`.
+2. **Slot B** (~80 LOC) — `temporary:` option propagation on `dropTable` + annotation rewrite.
+3. **Slot C** (~200 LOC) — MySQL fixture/test-helper infrastructure: `posts`, `key_tests`, `lessons_students`/`topics`/`students` fixtures + subclassing `Base` with qualified `db.table` table_name.
+
+## MySQL quoting cluster — Slot A closed ✅ (consolidation cluster below)
+
+Slot A shipped (#1442): instance `quoteString` backslash + static `quoteColumnName`/`quoteTableName`. The post-merge divergence triggered a follow-on 4-phase cleanup — see "MySQL quoting consolidation cluster" below.
+
+## MySQL quoting consolidation cluster — **closed** ✅
+
+All 4 phases shipped: #1447 (abstract leakage) → #1448 (call-site routing) → #1450 (delete invented helpers) → #1451 (module-mixin conversion). Standalone-vs-instance divergence eliminated.
+
+## PG connection cluster (~130 LOC across 3 remaining slots, from audit-pg-connection)
+
+Slots A (#1439) + B (#1446) closed.
+
+3. **Slot C** (~50 LOC) — PG `resetBang()` override + un-skip 2 reset tests.
+4. **Slot D** (~60 LOC) — `verify!` server-side-disconnect recovery + 1 test.
+5. **Slot E** (~20 LOC) — `connection options` test rewrite (driver supports `-c geqo=off`; just need adapter constructed with that config).
+
+Could bundle as 2 PRs (A+B ~160 LOC and C+D+E ~130 LOC) given size policy — or keep granular if all 5 land quickly.
+
+## PG datatype cluster — **closed via #1432** ✅
+
+Slot A shipped: 9 stale stubs deleted + 2 fixtures added + 6 fixture-backed un-skips.
+
+## PG interval cluster (~180 LOC, Slot B remaining)
+
+Slot A closed in #1431 (Rails-aligned test names + 6 fabricated deletions + round-trip verification).
+
+- **Slot B** (~180 LOC) — Interval schema-default extraction + AVG aggregate typecast.
+
+## PG long-tail cluster (~1760 LOC across 8 slots, from audit-pg-long-tail)
+
+**73 skipped tests** across 12 PG long-tail files (citext, money, ltree, tsquery, bit-string, geometric, enum, cidr, composite, change-schema-timestamptz, …). **Annotation drift on all 73** — identical generic template points at fictional per-feature OID files. Real gaps live in `schema-statements` / `schema-dumper` / `schema-creation` / adapter helpers / `type-map-init` / schema-definitions DSL. A few features (composite, geometric beyond Point, tsquery serialize) have no source counterpart at all.
+
+1. **Slot A** (~250 LOC) — citext end-to-end.
+2. **Slot B** (~200 LOC) — money column metadata + serialize.
+3. **Slot C** (~250 LOC) — ltree + tsquery + bit-string write/cast.
+4. **Slot D** (~280 LOC) — geometric long-tail OIDs.
+5. **Slot E** (~280 LOC) — enum schema-dump round-trip.
+6. **Slot F** (~150 LOC) — composite Identity fallback.
+7. **Slot G** (~200 LOC) — cidr IPAddr value + prefix-aware changed?
+8. **Slot H** (~150 LOC) — change-schema timestamptz default.
+
+## PG UUID residual cluster (~250 LOC, Slot B remaining)
+
+Slots A (#1433) + C (#1444) closed.
+
+2. **Slot B** (~250 LOC) — Associations + UUID FK binding.
+
+Plus: 1 test references "migration framework" gap — leave skipped with sharpened annotation.
+
+## MySQL table-options cluster (~480 LOC across 2 slots, from audit-mysql-table-options)
+
+9 tests, **all blocked by two foundational gaps** (not per-test):
+
+1. `AbstractMysqlAdapter.tableOptions(tableName)` is a `{}` stub — must parse `SHOW CREATE TABLE` for `charset` / `collation` / `comment` / residual `options:` string.
+2. Base `SchemaDumper.emitTable` never calls `source.tableOptions(table)`; emits TS-DSL `await ctx.createTable(...)` instead of Ruby-mirroring `create_table "name", charset: ..., options: ..., force: :cascade do |t| ...`.
+
+Plus: MySQL `SchemaDumper.tableCollationCache` is never populated; base `createTable` lacks `options`/`charset`/`collation`/composite-`primaryKey`.
+
+1. **Slot A** (~230 LOC) — `tableOptions` parsing + dumper wiring.
+2. **Slot B** (~250 LOC) — Ruby-style dump output + composite PK + remaining tests.
+
+## MySQL charset-collation cluster (~315 LOC across 3 slots, from audit-mysql-charset-collation)
+
+7 tests sharing one Rails setup (`create_table :charset_collations, id: { type: :string, collation: "utf8mb4_bin" }`).
+
+1. **Slot A** (~120–180 LOC) — `createTable` `id` hash form `{ type, collation, ... }` + `ColumnOptions.charset` + test #3 ("add column with charset and collation"). Most other gaps already plumbed in `mysql/schema-creation.ts` (CHARACTER SET / COLLATE) and `newColumnFromField` (reads `Collation` from `SHOW FULL FIELDS`).
+2. **Slot B** (~150–220 LOC) — MySQL `changeColumn` + `buildChangeColumnDefinition` stubs (both empty today). Includes "preserve existing collation for text→text/string" + `:no_collation` sentinel semantics. Unblocks tests 4–7.
+3. **Slot C** (~15 LOC, optional) — BLOCKED annotation cleanup.
+
+## Encryption cluster (closed)
+
+All three slots shipped:
+
+- Slot A — Binary-column encryption fixtures (#1405)
+- Slot B — `messageSerializer` per-encrypts() option pass-through + msgpack fixture (#1409)
+- Slot C — Lazy `previousSchemes` + `store_accessor` + insert/defaults (#1420). One residual: deterministic ciphertext byte-parity with MRI Rails (blocked on `MessageSerializer` double-base64 bug — in post-merge fidelity followups).
+
+## Serialization cluster — **closed** ✅
+
+Slot A (#1404) + Slot B (#1445) shipped.
 
 ## Relation cluster (~1660 LOC across 7 slots, from audit-relation)
 
@@ -123,14 +225,15 @@ Slot A closed in #1415. 155 actual skipped (estimate revised down from ~209). Si
 2. **Slot B — Translate-exception depth: timeout + statement-timeout** (~200 LOC). `read_timeout` → `AdapterTimeout`, `ER_FILSORT_ABORT` / `ER_QUERY_TIMEOUT` → `StatementTimeout`.
 3. **Slot C — Timezone re-sync + db_warnings_action + test-helper infra** (~280 LOC). `query_options[:database_timezone]` plumbing + `with_db_warnings_action`.
 
-## SQLite adapter cluster (~120 LOC, from audit-adapter-sqlite)
+## SQLite adapter cluster (~50 LOC, Slot B remaining)
 
-9 BLOCKED tests in `adapters/sqlite3/sqlite3-adapter.test.ts`. Two real slots + 2 unported-list candidates (folded into Unported-list additions in plan):
+Slot A closed in #1443 (`strict_strings_by_default` class-config knob + 3 unskips; DQS toggle is a no-op in better-sqlite3 — followups for future driver support).
 
-1. **Slot A — `strict_strings_by_default` class-config knob** (~70 LOC). 3 tests; one Rails feature + 2 variations.
 2. **Slot B — `assertLogged` SCHEMA-event parity** (~50 LOC). 2 test-infra gap tests.
 
-## PG infinity cluster (~250 LOC, from audit-pg-infinity)
+## PG infinity cluster (closed — #1427 shipped 6 unskips; 3 deferred to fidelity followups, ~135 LOC residual)
+
+Original: ~250 LOC, from audit-pg-infinity)
 
 **Audit finding: feature is already implemented.** The 18-test file is fabricated; Rails' `infinity_test.rb` has only 9 tests. The 9 extra positive/negative splits + "infinity where clause" name are TS-only inventions.
 
@@ -138,20 +241,21 @@ Slot A closed in #1415. 155 actual skipped (estimate revised down from ~209). Si
 
 **Slot A** (~250 LOC) — Sentinel unification (replace `Symbol` sentinels with `Number.POSITIVE_INFINITY`/`Number.NEGATIVE_INFINITY` for date/datetime types) + prune the 9 fabricated tests + add `PostgresqlInfinity` fixture + `InTimeZone` test helper.
 
-## PG foreign-table cluster (~230 LOC, from audit-pg-foreign-table)
+## PG foreign-table cluster (closed — #1429 shipped 16 unskips; 1 deferred to fidelity followups)
+
+Original: ~230 LOC, from audit-pg-foreign-table)
 
 **Audit finding: feature is already complete** (`foreignTables`/`foreignTableExists` + `dataSourceSql(..., type: "FOREIGN TABLE")` branch). 17 BLOCKED tests are empty stubs; their BLOCKED annotation points at `connection-adapters/postgresql/foreign-table.ts` which **does not exist and need not exist**. Rails creates foreign tables via raw `execute("CREATE FOREIGN TABLE ...")` after `postgres_fdw` setup — no schema-statement methods.
 
 **Slot A** (~200–260 LOC) — Port `foreign_table_test.rb` bodies. Pure test work; zero adapter changes.
 
-## PG virtual-column cluster (~400 LOC, from audit-pg-virtual-column)
+## PG virtual-column cluster (~250 LOC, Slot B remaining)
 
-**Audit finding: feature itself is already implemented.** The 19 BLOCKED tests in `adapters/postgresql/virtual-column.test.ts` are largely fabricated — they don't mirror Rails' `virtual_column_test.rb` (which has only 8 tests). **7 of the 19 tests belong to `xml_test.rb`** and are misplaced in a `PostgresqlXmlTest` describe block.
+Slot A closed in #1430 (rewrite TS file to mirror Rails + XML relocation).
 
-1. **Slot A — Rewrite TS test file to mirror Rails + buildFixtureSql virtual filter** (~150 LOC). Re-locate the 7 XML tests to a new `pg/xml.test.ts`; rewrite the remaining tests to match the 8 Rails-mirrored ones. Drop fabricated tests.
-2. **Slot B — Live-PG round-trip harness + un-skip 5 Rails-mirrored tests** (~250 LOC). `defineSchema`-less `create_table` path; `change_table { |t| t.virtual ... }`; small `buildFixtureSql` virtual-column filter.
+- **Slot B** (~250 LOC) — Live-PG round-trip harness + un-skip 5 Rails-mirrored tests. `defineSchema`-less `create_table`; `change_table { |t| t.virtual ... }`; `buildFixtureSql` virtual-column filter.
 
-Deferred: `test_build_fixture_sql` until fixture feature lands.
+---
 
 ## PG-schema audit cluster (~530 LOC across 3 slots, from audit-pg-schema)
 
@@ -177,9 +281,9 @@ Re-categorization of all 89 `BLOCKED: unknown` annotations. **Single foundationa
 
 audit-STI found **no STI implementation gap**. All 6 `BLOCKED: STI` tests are mis-labeled — real causes are missing fixture scopes, UUID PK + touch on polymorphic delegated_type, and PG `CREATE TABLE … INHERITS` schema-dump (closed by pg-schema Slot B above). Single tests-only PR re-annotates the 6 tests under correct categories.
 
-## Schema cluster (~1540 LOC across 8 remaining slots + annotation sweep, from audit-schema)
+## Schema cluster (~1390 LOC across 7 remaining slots + annotation sweep, from audit-schema)
 
-Slot A closed in #1407; Slot B in flight as #1418; Slot G superseded by MySQL active-schema cluster.
+Slot A closed in #1407; Slot B closed in #1418; Slot G superseded by MySQL active-schema cluster.
 
 3. **Slot C** (~80–120 LOC, sized down per #1407) — Index dump metadata (partial `where:`, `order:`, `nulls_not_distinct`, expression indices). ~7 un-skips.
 4. **Slot D** (~220 LOC) — Check / exclusion / unique constraints in dumper. 5 un-skips.
@@ -190,17 +294,16 @@ Slot A closed in #1407; Slot B in flight as #1418; Slot G superseded by MySQL ac
 9. **Slot J** (~120 LOC) — `Schema.define` with `tableNamePrefix` + bulk-change timestamps default + SchemaCache portable bits. 5 un-skips.
 10. **Slot K** — Annotation normalization across all 128 BLOCKED annotations. Lands AFTER C–J.
 
-## PG-adapter cluster (~620 LOC across 3 remaining slots + 1 optional, from audit-pg-postgresql-adapter)
+## PG-adapter cluster (~340 LOC across 2 remaining slots)
 
-Slot B closed in #1414; Slot D closed in #1411 (as `withSecondAdapter` + SQLSTATE wiring; 3 follow-up residuals in fidelity followups).
+Slot B closed in #1414; Slot C closed in #1436; Slot D closed in #1411.
 
 1. **Slot A** (~220 LOC) — `execInsert` returning-disabled fallback + `extractTableRefFromInsertSql` helper. 4 un-skips.
-2. **Slot C** (~280 LOC) — Enum OID registration + `Column.defaultFunction` arithmetic + ErrorReporter `:report` wiring. 3 un-skips.
-3. **Slot E** (optional, ~120 LOC) — Prepared-statements introspection. 3 un-skips.
+2. **Slot E** (optional, ~120 LOC) — Prepared-statements introspection. 3 un-skips.
 
 ## Transactions cluster (~350 LOC across 3 remaining slots + 1 deferred, from audit-transactions)
 
-Slot A in flight as #1417.
+Slot A closed in #1417 (2 followup-LOC bugs surfaced: dirty-tracking clobber + isolation-error-type; both in post-merge fidelity followups).
 
 2. **Slot B** (~120 LOC) — Fixture-model gaps: `Topic+Reply`, `Movie` (custom PK), `Cpk::Book` (composite PK). 4 un-skips.
 3. **Slot C** (~80 LOC) — Test helpers: `open_transactions` probe + callback-raises listener. 2–3 un-skips.
