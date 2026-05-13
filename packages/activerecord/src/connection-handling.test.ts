@@ -33,17 +33,17 @@ describe("ConnectionHandlingTest", () => {
     Base.connectionHandler.clearAllConnectionsBang();
   });
 
-  it("#with_connection lease the connection for the duration of the block", () => {
+  it("#with_connection lease the connection for the duration of the block", async () => {
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
-    Base.withConnection((conn) => {
+    await Base.withConnection((conn) => {
       expect(conn).toBeTruthy();
       expect(pool.activeConnection).toBeTruthy();
     });
   });
 
-  it("#lease_connection makes the lease permanent even inside #with_connection", () => {
-    Base.withConnection(() => {
+  it("#lease_connection makes the lease permanent even inside #with_connection", async () => {
+    await Base.withConnection(() => {
       const leased = Base.leaseConnection();
       expect(leased).toBeTruthy();
     });
@@ -58,17 +58,17 @@ describe("ConnectionHandlingTest", () => {
     // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-handling.test.ts
   });
 
-  it("#with_connection use the already leased connection if available", () => {
+  it("#with_connection use the already leased connection if available", async () => {
     const leased = Base.leaseConnection();
-    Base.withConnection((conn) => {
+    await Base.withConnection((conn) => {
       expect(conn).toBe(leased);
     });
     Base.releaseConnection();
   });
 
-  it("#with_connection is reentrant", () => {
-    Base.withConnection((outer) => {
-      Base.withConnection((inner) => {
+  it("#with_connection is reentrant", async () => {
+    await Base.withConnection(async (outer) => {
+      await Base.withConnection((inner) => {
         expect(inner).toBe(outer);
       });
     });
@@ -338,8 +338,8 @@ describe("ConnectionHandlingTest", () => {
     Base.releaseConnection();
   });
 
-  it("#connection returns the active connection inside withConnection", () => {
-    Base.withConnection((leased) => {
+  it("#connection returns the active connection inside withConnection", async () => {
+    await Base.withConnection((leased) => {
       const conn = Base.connection();
       expect(conn).toBe(leased);
     });

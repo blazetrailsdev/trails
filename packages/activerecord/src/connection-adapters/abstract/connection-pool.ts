@@ -604,9 +604,9 @@ export class ConnectionPool implements ReapablePool {
   }
 
   withConnection<T>(
-    fn: (conn: DatabaseAdapter) => T,
-    options: { preventPermanentCheckout?: boolean } = {},
-  ): T {
+    fn: (conn: DatabaseAdapter) => T | Promise<T>,
+    options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
+  ): T | Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
     const lease = this._connectionLease();
     const stickyWas = lease.sticky;
@@ -616,31 +616,87 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
+    // Common pre-leased path — mirrors the original exactly; no extra closures.
     if (lease.connection) {
+      let result: T | Promise<T>;
       try {
-        return fn(lease.connection);
-      } finally {
+        result = fn(lease.connection);
+      } catch (err) {
         restoreSticky();
+        throw err;
       }
+      if (result !== null && result !== undefined && typeof (result as any).then === "function") {
+        return Promise.resolve(result).then(
+          (v) => {
+            restoreSticky();
+            return v;
+          },
+          (e) => {
+            restoreSticky();
+            throw e;
+          },
+        );
+      }
+      restoreSticky();
+      return result;
     }
 
-    lease.connection = this.checkout();
-    try {
-      const result = fn(lease.connection);
-      if (result && typeof (result as any).then === "function") {
-        return Promise.resolve(result).finally(() => {
-          restoreSticky();
-          if (!lease.sticky) this.releaseConnection();
-        }) as T;
+    // Acquire path — checkout a new connection, then run fn.
+    const releaseOnDone = () => {
+      restoreSticky();
+      if (!lease.sticky) this.releaseConnection();
+    };
+
+    const runWithConn = (): T | Promise<T> => {
+      let result: T | Promise<T>;
+      try {
+        result = fn(lease.connection!);
+      } catch (err) {
+        releaseOnDone();
+        throw err;
       }
-      restoreSticky();
-      if (!lease.sticky) this.releaseConnection();
+      if (result !== null && result !== undefined && typeof (result as any).then === "function") {
+        return Promise.resolve(result).then(
+          (v) => {
+            releaseOnDone();
+            return v;
+          },
+          (e) => {
+            releaseOnDone();
+            throw e;
+          },
+        );
+      }
+      releaseOnDone();
       return result;
-    } catch (error) {
-      restoreSticky();
-      if (!lease.sticky) this.releaseConnection();
-      throw error;
+    };
+
+    let checkoutErr: unknown;
+    try {
+      lease.connection = this.checkout();
+    } catch (err) {
+      checkoutErr = err;
     }
+
+    if (checkoutErr === undefined) {
+      return runWithConn();
+    }
+
+    if (checkoutErr instanceof ConnectionTimeoutError && options.checkoutTimeout !== undefined) {
+      // Pool saturated and caller explicitly opted in — wait for a free connection.
+      return this.checkoutAsync(options.checkoutTimeout).then(
+        (conn) => {
+          lease.connection = conn;
+          return runWithConn();
+        },
+        (asyncErr) => {
+          restoreSticky();
+          throw asyncErr;
+        },
+      );
+    }
+    restoreSticky();
+    throw checkoutErr;
   }
 
   // --- Pool statistics ---

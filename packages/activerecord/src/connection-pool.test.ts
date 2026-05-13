@@ -144,7 +144,7 @@ it.skip("released connection moves between threads", () => {
 
 it("with connection", async () => {
   const pool = makePool();
-  const result = pool.withConnection((conn) => {
+  const result = await pool.withConnection((conn) => {
     expect(conn).toBeTruthy();
     return "ok";
   });
@@ -167,11 +167,11 @@ it("with connection", async () => {
   expect(pool.stat().busy).toBe(0);
 });
 
-it("with connection prevent permanent checkout releases connection", () => {
+it("with connection prevent permanent checkout releases connection", async () => {
   const pool = makePool();
   pool.leaseConnection();
   expect(pool.activeConnection).toBeTruthy();
-  pool.withConnection(
+  await pool.withConnection(
     (conn) => {
       expect(conn).toBeTruthy();
     },
@@ -182,9 +182,9 @@ it("with connection prevent permanent checkout releases connection", () => {
   pool.releaseConnection();
 });
 
-it("with connection prevent permanent checkout on fresh lease releases", () => {
+it("with connection prevent permanent checkout on fresh lease releases", async () => {
   const pool = makePool();
-  pool.withConnection(
+  await pool.withConnection(
     (conn) => {
       expect(conn).toBeTruthy();
     },
@@ -192,6 +192,43 @@ it("with connection prevent permanent checkout on fresh lease releases", () => {
   );
   // No prior sticky lease, so connection should be released
   expect(pool.activeConnection).toBeNull();
+});
+
+it("withConnection waits for a released connection when pool is saturated", async () => {
+  const pool = makePool(1);
+  const held = pool.checkout();
+
+  let connSeen: DatabaseAdapter | undefined;
+  const waiter = pool.withConnection(
+    (conn) => {
+      connSeen = conn;
+    },
+    { checkoutTimeout: 5 },
+  );
+  pool.checkin(held);
+  await waiter;
+  expect(connSeen).toBe(held);
+  // withConnection releases the connection after fn returns — pool should be idle
+  expect(pool.stat().busy).toBe(0);
+  expect(pool.stat().idle).toBe(1);
+});
+
+it("withConnection rejects with ConnectionTimeoutError when pool stays saturated past timeout", async () => {
+  const { ConnectionTimeoutError } = await import("./errors.js");
+  vi.useFakeTimers();
+  try {
+    const pool = makePool(1);
+    pool.checkout();
+
+    const waiter = pool.withConnection(() => {}, { checkoutTimeout: 0.05 });
+    // Attach the rejection handler before advancing timers to avoid an
+    // unhandled-rejection window during IPC serialization.
+    const assertion = expect(waiter).rejects.toThrow(ConnectionTimeoutError);
+    await vi.runAllTimersAsync();
+    await assertion;
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it.skip("new connection no query", () => {
@@ -437,7 +474,7 @@ it("automatic reconnect restores after disconnect", () => {
   pool.releaseConnection();
 });
 
-it("automatic reconnect can be disabled", () => {
+it("automatic reconnect can be disabled", async () => {
   const pool = makePool();
   pool.disconnectBang();
   pool.automaticReconnect = false;
@@ -818,7 +855,7 @@ describe("ConnectionPool schema cache", () => {
     });
     const pool = new ConnectionPool(pc);
     try {
-      const cache = pool.withConnection(
+      const cache = await pool.withConnection(
         (conn) => (conn as unknown as { schemaCache: unknown }).schemaCache,
       );
       // The key regression: adapter.schemaCache must be a plain
