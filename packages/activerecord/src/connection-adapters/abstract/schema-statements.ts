@@ -77,6 +77,10 @@ export class SchemaStatements {
           force?: boolean | "cascade";
           ifNotExists?: boolean;
           default?: unknown;
+          options?: string;
+          comment?: string;
+          temporary?: boolean;
+          as?: string;
         }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
@@ -86,6 +90,10 @@ export class SchemaStatements {
       force?: boolean | "cascade";
       ifNotExists?: boolean;
       default?: unknown;
+      options?: string;
+      comment?: string;
+      temporary?: boolean;
+      as?: string;
     } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
 

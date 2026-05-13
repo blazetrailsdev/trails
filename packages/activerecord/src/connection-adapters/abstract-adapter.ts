@@ -165,7 +165,15 @@ export interface AbstractAdapter {
   createTable(
     name: string,
     optionsOrFn?:
-      | { id?: boolean | "uuid"; force?: boolean | "cascade"; ifNotExists?: boolean }
+      | {
+          id?: boolean | "uuid";
+          force?: boolean | "cascade";
+          ifNotExists?: boolean;
+          options?: string;
+          comment?: string;
+          temporary?: boolean;
+          as?: string;
+        }
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;

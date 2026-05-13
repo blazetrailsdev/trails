@@ -4023,6 +4023,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       WHERE child.relname = ${name}
         AND child.relkind IN ('r','p')
         AND n.nspname = ${schema}
+      ORDER BY i.inhseqno
     `);
     return rows.map((r) => r.name as string);
   }

@@ -709,15 +709,33 @@ describeIfPg("PostgreSQLAdapter", () => {
       // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
       // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
     });
-    it.skip("inherited table options is dumped", () => {
-      // BLOCKED: STI — single-table inheritance routing gap
-      // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-      // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
+    it("inherited table options is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE transportation_modes (name varchar(50), kind varchar(50))`,
+        );
+        await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes)`);
+        const lines: string[] = [];
+        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes)"`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+        await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
+      }
     });
-    it.skip("multiple inherited table options is dumped", () => {
-      // BLOCKED: STI — single-table inheritance routing gap
-      // ROOT-CAUSE: inheritance.ts#instantiateWithCtiMixin or findSubclass not fully wired
-      // SCOPE: ~50 LOC fix in inheritance.ts; affects this test + others sharing STI root cause
+    it("multiple inherited table options is dumped", async () => {
+      try {
+        await adapter.exec(`CREATE TABLE vehicles (name varchar(50))`);
+        await adapter.exec(`CREATE TABLE transportation_modes (kind varchar(50))`);
+        await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes, vehicles)`);
+        const lines: string[] = [];
+        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes, vehicles)"`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+        await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
+        await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
+      }
     });
     it.skip("no partition options are dumped", () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
