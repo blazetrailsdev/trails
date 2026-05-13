@@ -7,6 +7,8 @@ import { commentFixtureData } from "./comments.js";
 import { authorFixtureData } from "./authors.js";
 import { bookFixtureData } from "./books.js";
 import { authorAddressFixtureData } from "./author-addresses.js";
+import { companyFixtureData } from "./companies.js";
+import { accountFixtureData } from "./accounts.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -208,6 +210,119 @@ describe("bookFixtureData", () => {
     const awdrInsert = insertSqls.find((s) => s.includes(String(fixtureId("awdr"))));
     expect(awdrInsert).toBeTruthy();
     expect(awdrInsert).toContain(String(fixtureId("david")));
+  });
+});
+
+describe("companyFixtureData", () => {
+  it("exports all 12 Rails companies fixtures", () => {
+    expect(Object.keys(companyFixtureData)).toEqual([
+      "first_firm",
+      "first_client",
+      "second_client",
+      "another_firm",
+      "another_client",
+      "a_third_client",
+      "rails_core",
+      "leetsoft",
+      "jadedpixel",
+      "odegy",
+      "another_first_firm_client",
+      "recursive_association_fk",
+    ]);
+  });
+
+  it("first_firm is a Firm with STI type column", () => {
+    expect(companyFixtureData.first_firm.type).toBe("Firm");
+    expect(companyFixtureData.first_firm.name).toBe("37signals");
+  });
+
+  it("first_client is a Client with firm_id cross-ref to first_firm", () => {
+    expect(companyFixtureData.first_client.type).toBe("Client");
+    const firmRef = companyFixtureData.first_client.firm_id as FixtureRef;
+    expect(isFixtureRef(firmRef)).toBe(true);
+    expect(firmRef.tableName).toBe("companies");
+    expect(firmRef.fixtureName).toBe("first_firm");
+  });
+
+  it("rails_core is a DependentFirm", () => {
+    expect(companyFixtureData.rails_core.type).toBe("DependentFirm");
+  });
+
+  it("leetsoft has no type (falls back to Company base)", () => {
+    expect((companyFixtureData.leetsoft as any).type).toBeUndefined();
+    const clientOfRef = companyFixtureData.leetsoft.client_of as FixtureRef;
+    expect(isFixtureRef(clientOfRef)).toBe(true);
+    expect(clientOfRef.fixtureName).toBe("rails_core");
+  });
+
+  it("odegy is an ExclusivelyDependentFirm", () => {
+    expect(companyFixtureData.odegy.type).toBe("ExclusivelyDependentFirm");
+  });
+
+  it("defineFixtures resolves first_client.firm_id to first_firm id", async () => {
+    const adapter = makeAdapter();
+    const Company = makeModel("companies");
+    for (const k of Object.keys(companyFixtureData) as Array<keyof typeof companyFixtureData>) {
+      seedRows(Company, k, { name: (companyFixtureData[k] as any).name });
+    }
+
+    await defineFixtures(adapter, Company, companyFixtureData);
+
+    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("companies"));
+    const clientInsert = insertSqls.find((s) => s.includes(String(fixtureId("first_client"))));
+    expect(clientInsert).toBeTruthy();
+    expect(clientInsert).toContain(String(fixtureId("first_firm")));
+  });
+});
+
+describe("accountFixtureData", () => {
+  it("exports all 6 Rails accounts fixtures", () => {
+    expect(Object.keys(accountFixtureData)).toEqual([
+      "signals37",
+      "unknown",
+      "rails_core_account",
+      "last_account",
+      "rails_core_account_2",
+      "odegy_account",
+    ]);
+  });
+
+  it("signals37 has firm_id cross-ref to first_firm and correct credit_limit", () => {
+    expect(accountFixtureData.signals37.credit_limit).toBe(50);
+    const firmRef = accountFixtureData.signals37.firm_id as FixtureRef;
+    expect(isFixtureRef(firmRef)).toBe(true);
+    expect(firmRef.tableName).toBe("companies");
+    expect(firmRef.fixtureName).toBe("first_firm");
+  });
+
+  it("unknown has no firm_id", () => {
+    expect((accountFixtureData.unknown as any).firm_id).toBeUndefined();
+    expect(accountFixtureData.unknown.credit_limit).toBe(50);
+  });
+
+  it("odegy_account references odegy company", () => {
+    const firmRef = accountFixtureData.odegy_account.firm_id as FixtureRef;
+    expect(isFixtureRef(firmRef)).toBe(true);
+    expect(firmRef.fixtureName).toBe("odegy");
+  });
+
+  it("defineFixtures resolves signals37.firm_id to first_firm id", async () => {
+    const adapter = makeAdapter();
+    const Account = makeModel("accounts");
+    for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {
+      seedRows(Account, k, { credit_limit: (accountFixtureData[k] as any).credit_limit });
+    }
+
+    await defineFixtures(adapter, Account, accountFixtureData);
+
+    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("accounts"));
+    const signals37Insert = insertSqls.find((s) => s.includes(String(fixtureId("signals37"))));
+    expect(signals37Insert).toBeTruthy();
+    expect(signals37Insert).toContain(String(fixtureId("first_firm")));
   });
 });
 

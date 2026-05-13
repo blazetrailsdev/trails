@@ -43,6 +43,7 @@ export interface TestFixtures {
   Developer: typeof Base;
   Project: typeof Base;
   Company: typeof Base;
+  Account: typeof Base;
   Topic: typeof Base;
   Book: typeof Base;
   Person: typeof Base;
@@ -257,6 +258,18 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     }
   }
 
+  // ── Account ─────────────────────────────────────────────────────────
+  class Account extends Base {
+    static {
+      this._tableName = "accounts";
+      this.attribute("firm_id", "integer");
+      this.attribute("credit_limit", "integer");
+      this.attribute("firm_name", "string");
+      this.attribute("status", "string");
+      this.adapter = adapter;
+    }
+  }
+
   // ── Register models ─────────────────────────────────────────────────
   const models = {
     Author,
@@ -278,6 +291,7 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
     Topic,
     Book,
     Person,
+    Account,
   };
 
   for (const [name, model] of Object.entries(models)) {
@@ -392,6 +406,12 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
 
   // Company associations (self-referential firm)
   Associations.belongsTo.call(Company, "firm", {
+    className: "Company",
+    foreignKey: "firm_id",
+  });
+
+  // Account associations
+  Associations.belongsTo.call(Account, "firm", {
     className: "Company",
     foreignKey: "firm_id",
   });
