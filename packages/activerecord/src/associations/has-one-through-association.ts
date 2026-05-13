@@ -127,7 +127,7 @@ function transaction<R>(
   block: (tx?: any) => Promise<R>,
 ): Promise<R | undefined> {
   const tr = throughReflection(assoc) as { klass?: unknown } | null;
-  const klass = safeKlass(tr) as { transaction?: Function } | null;
+  const klass = safeKlass(tr) as { transaction?: (...args: any[]) => any } | null;
   if (klass && typeof klass.transaction === "function") {
     return klass.transaction(block) as Promise<R | undefined>;
   }

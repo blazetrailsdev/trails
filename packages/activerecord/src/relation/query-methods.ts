@@ -126,7 +126,7 @@ interface QueryMethodsHost {
   _referencesValues: string[];
   _fromClause: FromClause;
   _createWithAttrs: Record<string, unknown>;
-  _extending: Array<Record<string, Function>>;
+  _extending: Array<Record<string, (...args: any[]) => any>>;
   _ctes: Array<{ name: string; sql: string; recursive: boolean }>;
   _skipPreloading: boolean;
   _skipQueryCache: boolean;
@@ -244,7 +244,7 @@ function upsertCte(
   }
 }
 
-function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): any {
+function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
   for (const cte of ctes) {
     if (!isPlainObject(cte)) {
       const typeName =
@@ -261,7 +261,7 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): 
   return this;
 }
 
-function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string, any>>): any {
+function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
   for (const cte of ctes) {
     if (!isPlainObject(cte)) {
       const typeName =
@@ -1031,7 +1031,7 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
 
 function extendingBang(
   this: QueryMethodsHost,
-  ...modules: Array<Record<string, Function> | ((rel: any) => void)>
+  ...modules: Array<Record<string, (...args: any[]) => any> | ((rel: any) => void)>
 ): any {
   for (const mod of modules) {
     if (typeof mod === "function") {

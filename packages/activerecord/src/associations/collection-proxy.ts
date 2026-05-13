@@ -85,7 +85,10 @@ type DelegatedRelationMethods<T extends Base> = {
  */
 export type AssociationProxy<
   T extends Base = Base,
-  TExtensions extends Record<string, any> = Record<string, any>,
+  TExtensions extends Record<string, (...args: any[]) => any> = Record<
+    string,
+    (...args: any[]) => any
+  >,
 > = CollectionProxy<T> &
   DelegatedRelationMethods<T> &
   TExtensions & {

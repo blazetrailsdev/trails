@@ -21,11 +21,11 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
   let savedExtendQueries: boolean;
   const savedMethods: {
-    where?: Function;
-    exists?: Function;
-    scopeForCreate?: Function;
-    findBy?: Function;
-    serialize?: Function;
+    where?: (...args: any[]) => unknown;
+    exists?: (...args: any[]) => unknown;
+    scopeForCreate?: (...args: any[]) => unknown;
+    findBy?: (...args: any[]) => unknown;
+    serialize?: (...args: any[]) => unknown;
   } = {};
 
   beforeEach(() => {

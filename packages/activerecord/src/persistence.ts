@@ -36,7 +36,7 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
-  _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, any>): any;
+  _instantiate(row: Record<string, unknown>, columnTypes?: Record<string, unknown>): any;
   /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
@@ -114,7 +114,7 @@ export function build(
 export function instantiate(
   this: PersistenceHost,
   attributes: Record<string, unknown>,
-  columnTypes: Record<string, any> = {},
+  columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
   // Rails: klass = discriminate_class_for_record(attributes)
@@ -1326,9 +1326,9 @@ export function _raiseRecordNotTouchedError(): never {
 
 /** @internal */
 function instantiateInstanceOf(
-  klass: { _instantiate(attrs: Record<string, unknown>, colTypes?: Record<string, any>): any },
+  klass: { _instantiate(attrs: Record<string, unknown>, colTypes?: Record<string, unknown>): any },
   attributes: Record<string, unknown>,
-  columnTypes: Record<string, any> = {},
+  columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
   const record = klass._instantiate(attributes, columnTypes);

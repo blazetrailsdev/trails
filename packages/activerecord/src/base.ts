@@ -1122,8 +1122,12 @@ export class Base extends Model {
   }
 
   // -- Logger --
-  static _logger: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null =
-    null;
+  static _logger: {
+    debug?: (...args: any[]) => void;
+    info?: (...args: any[]) => void;
+    warn?: (...args: any[]) => void;
+    error?: (...args: any[]) => void;
+  } | null = null;
 
   /**
    * Set or get the logger for SQL and lifecycle events.
@@ -1131,16 +1135,21 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Base.logger
    */
   static get logger(): {
-    debug?: Function;
-    info?: Function;
-    warn?: Function;
-    error?: Function;
+    debug?: (...args: any[]) => void;
+    info?: (...args: any[]) => void;
+    warn?: (...args: any[]) => void;
+    error?: (...args: any[]) => void;
   } | null {
     return this._logger;
   }
 
   static set logger(
-    log: { debug?: Function; info?: Function; warn?: Function; error?: Function } | null,
+    log: {
+      debug?: (...args: any[]) => void;
+      info?: (...args: any[]) => void;
+      warn?: (...args: any[]) => void;
+      error?: (...args: any[]) => void;
+    } | null,
   ) {
     this._logger = log;
   }
@@ -1522,7 +1531,7 @@ export class Base extends Model {
   }
 
   // Scope extension methods: scope name -> Record of extra methods
-  static _scopeExtensions: Map<string, Record<string, Function>> = new Map();
+  static _scopeExtensions: Map<string, Record<string, (...args: any[]) => any>> = new Map();
 
   /**
    * Define a named scope with an optional extension block.

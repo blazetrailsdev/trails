@@ -1704,7 +1704,7 @@ export function addReflection(
 ): void {
   clearReflectionsCache(activeRecord);
   const hasOwn = Object.prototype.hasOwnProperty.call(activeRecord, "_reflections");
-  const inherited: Record<string, any> = (activeRecord as any)._reflections ?? {};
+  const inherited: Record<string, unknown> = (activeRecord as any)._reflections ?? {};
   const reflections = hasOwn ? inherited : { ...inherited };
   reflections[name] = reflection;
   (activeRecord as any)._reflections = reflections;
@@ -1751,9 +1751,10 @@ export function normalizedReflections(
   const cached = _normalizedReflectionsCache.get(modelClass);
   if (cached) return cached;
 
-  const rawReflections: Record<string, any> = (modelClass as any)._reflections ?? {};
-  const result: Record<string, any> = {};
-  for (const [name, ref] of Object.entries(rawReflections)) {
+  const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
+  const result: Record<string, unknown> = {};
+  for (const [name, rawRef] of Object.entries(rawReflections)) {
+    const ref = rawRef as any;
     const parent = ref.parentReflection;
     if (parent) {
       result[parent.name] = parent;
@@ -1763,8 +1764,9 @@ export function normalizedReflections(
   }
 
   Object.freeze(result);
-  _normalizedReflectionsCache.set(modelClass, result);
-  return result;
+  const frozen = result as Readonly<Record<string, AssociationReflection | ThroughReflection>>;
+  _normalizedReflectionsCache.set(modelClass, frozen);
+  return frozen;
 }
 
 export function clearReflectionsCache(modelClass: typeof Base): void {
@@ -1794,8 +1796,8 @@ export function _reflectOnAssociation(
   modelClass: typeof Base,
   name: string,
 ): AssociationReflection | ThroughReflection | null {
-  const rawReflections: Record<string, any> = (modelClass as any)._reflections ?? {};
-  return rawReflections[name] ?? null;
+  const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
+  return (rawReflections[name] as AssociationReflection | ThroughReflection | undefined) ?? null;
 }
 
 /**

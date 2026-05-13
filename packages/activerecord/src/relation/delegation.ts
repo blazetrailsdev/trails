@@ -17,8 +17,11 @@ import { Delegation as ASDelegation } from "@blazetrails/activesupport";
  *
  * Mirrors: ActiveRecord::Delegation
  */
+type AnyClass = abstract new (...args: any[]) => any;
+type AnyCallable = (...args: any[]) => any;
+
 export interface Delegation {
-  delegatedClasses: Set<Function>;
+  delegatedClasses: Set<AnyClass>;
 }
 
 /**
@@ -38,13 +41,13 @@ export interface ClassSpecificRelation {}
  * Mirrors: ActiveRecord::Delegation::GeneratedRelationMethods
  */
 export class GeneratedRelationMethods {
-  private _methods: Map<string, Function> = new Map();
+  private _methods: Map<string, AnyCallable> = new Map();
 
-  generate(name: string, fn: Function): void {
+  generate(name: string, fn: AnyCallable): void {
     this._methods.set(name, fn);
   }
 
-  get(name: string): Function | undefined {
+  get(name: string): AnyCallable | undefined {
     return this._methods.get(name);
   }
 
@@ -52,7 +55,7 @@ export class GeneratedRelationMethods {
     return this._methods.has(name);
   }
 
-  entries(): IterableIterator<[string, Function]> {
+  entries(): IterableIterator<[string, AnyCallable]> {
     return this._methods.entries();
   }
 }
@@ -65,19 +68,19 @@ export class GeneratedRelationMethods {
  * Mirrors: ActiveRecord::Delegation::DelegateCache
  */
 export class DelegateCache {
-  private _cache: Map<Function, Set<string>> = new Map();
+  private _cache: Map<AnyClass, Set<string>> = new Map();
 
-  initialize(modelClass: Function): void {
+  initialize(modelClass: AnyClass): void {
     if (!this._cache.has(modelClass)) {
       this._cache.set(modelClass, new Set());
     }
   }
 
-  hasDelegated(modelClass: Function, method: string): boolean {
+  hasDelegated(modelClass: AnyClass, method: string): boolean {
     return this._cache.get(modelClass)?.has(method) ?? false;
   }
 
-  register(modelClass: Function, method: string): void {
+  register(modelClass: AnyClass, method: string): void {
     this.initialize(modelClass);
     this._cache.get(modelClass)!.add(method);
   }
@@ -90,11 +93,11 @@ export class DelegateCache {
  * Constrained to `object` because Relation._modelClass is private;
  * internal access uses `any` casts.
  */
-const _delegatedClasses = new Set<Function>();
+const _delegatedClasses = new Set<AnyClass>();
 const _uncacheableMethods = new Set<string>(["to_a", "to_ary", "records", "inspect"]);
 const _delegateCache = new DelegateCache();
 
-export function delegatedClasses(): Set<Function> {
+export function delegatedClasses(): Set<AnyClass> {
   return _delegatedClasses;
 }
 
@@ -102,12 +105,12 @@ export function uncacheableMethods(): Set<string> {
   return _uncacheableMethods;
 }
 
-export function delegateBaseMethods(klass: Function): void {
+export function delegateBaseMethods(klass: AnyClass): void {
   _delegatedClasses.add(klass);
   _delegateCache.initialize(klass);
 }
 
-export function relationDelegateClass(klass: Function): Function {
+export function relationDelegateClass(klass: AnyClass): AnyClass {
   _delegatedClasses.add(klass);
   return klass;
 }
@@ -116,9 +119,9 @@ export function initializeRelationDelegateCache(): void {
   _delegateCache.initialize(Object);
 }
 
-const _generatedMethodsByModel = new WeakMap<Function, GeneratedRelationMethods>();
+const _generatedMethodsByModel = new WeakMap<AnyClass, GeneratedRelationMethods>();
 
-function generatedMethodsFor(modelClass: Function): GeneratedRelationMethods {
+function generatedMethodsFor(modelClass: AnyClass): GeneratedRelationMethods {
   let methods = _generatedMethodsByModel.get(modelClass);
   if (!methods) {
     methods = new GeneratedRelationMethods();
@@ -127,11 +130,11 @@ function generatedMethodsFor(modelClass: Function): GeneratedRelationMethods {
   return methods;
 }
 
-export function generateRelationMethod(modelClass: Function, name: string, fn: Function): void {
+export function generateRelationMethod(modelClass: AnyClass, name: string, fn: AnyCallable): void {
   generatedMethodsFor(modelClass).generate(name, fn);
 }
 
-export function generateMethod(name: string): Function {
+export function generateMethod(name: string): AnyCallable {
   const holder = { model: null } as any;
   ASDelegation.generate(holder, [name], { to: "model", allowNil: true });
   if (typeof holder[name] === "function") return holder[name];
@@ -179,7 +182,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 }
 
 /** @internal */
-function relationClassFor(klass: Function): typeof GeneratedRelationMethods {
+function relationClassFor(klass: AnyClass): typeof GeneratedRelationMethods {
   return GeneratedRelationMethods;
 }
 
@@ -191,6 +194,6 @@ function includeRelationMethods(target: object, methods: GeneratedRelationMethod
 }
 
 /** @internal */
-function generatedRelationMethods(modelClass: Function): GeneratedRelationMethods {
+function generatedRelationMethods(modelClass: AnyClass): GeneratedRelationMethods {
   return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
 }

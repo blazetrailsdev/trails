@@ -215,7 +215,6 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unsafe-function-type": "off",
       "@typescript-eslint/no-this-alias": "off",
       "unused-imports/no-unused-vars": "off",
       "no-empty": "off",

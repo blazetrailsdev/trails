@@ -3,7 +3,7 @@ import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
-import { DatabaseConfigurations } from "./database-configurations.js";
+import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 import { _setAdapterClassResolver } from "./database-configurations/database-config.js";
@@ -681,7 +681,7 @@ function resolveConfig(
   return { adapterName, url, config: fullConfig };
 }
 
-async function loadConfigFile(modelClass: typeof Base): Promise<Record<string, any>> {
+async function loadConfigFile(modelClass: typeof Base): Promise<RawConfigurations> {
   if ((modelClass as any)._configPath) {
     return loadJsonConfig((modelClass as any)._configPath);
   }
@@ -714,7 +714,7 @@ async function loadConfigFile(modelClass: typeof Base): Promise<Record<string, a
   return loadJsonConfig(pathAdapter.resolve(cwd, "config", "database.json"));
 }
 
-async function loadJsonConfig(configPath: string): Promise<Record<string, any>> {
+async function loadJsonConfig(configPath: string): Promise<RawConfigurations> {
   try {
     const fsAdapter = await getFsAsync();
     return JSON.parse(fsAdapter.readFileSync(configPath, "utf-8"));

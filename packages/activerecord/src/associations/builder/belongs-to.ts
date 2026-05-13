@@ -113,7 +113,7 @@ export class BelongsTo extends SingularAssociation {
   private static buildFindConditions(
     pk: string | string[],
     fkValue: any,
-  ): Record<string, any> | null {
+  ): Record<string, unknown> | null {
     if (Array.isArray(pk)) {
       const values = Array.isArray(fkValue) ? fkValue : [fkValue];
       if (pk.length !== values.length) return null;
@@ -126,7 +126,7 @@ export class BelongsTo extends SingularAssociation {
 
   static async touchRecord(
     record: any,
-    changes: Record<string, any>,
+    changes: Record<string, unknown>,
     foreignKey: string | string[],
     name: string,
     touch: any,
@@ -136,7 +136,7 @@ export class BelongsTo extends SingularAssociation {
     // Fill missing old FK parts from current attributes for composite keys —
     // unchanged columns have the same old/new value.
     const oldFkValues = fkColumns.map((col) => {
-      const change = changes[col];
+      const change = changes[col] as [unknown, unknown] | undefined;
       if (change) return change[0];
       return typeof (record as any)._readAttribute === "function"
         ? (record as any)._readAttribute(col)
@@ -161,7 +161,7 @@ export class BelongsTo extends SingularAssociation {
             reflection?.options?.foreignType ??
             `${underscore(name)}_type`;
           const typeName =
-            changes[foreignType]?.[0] ??
+            (changes[foreignType] as [unknown, unknown] | undefined)?.[0] ??
             (typeof (record as any)._readAttribute === "function"
               ? (record as any)._readAttribute(foreignType)
               : record[foreignType]);

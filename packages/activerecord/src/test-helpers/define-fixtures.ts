@@ -113,8 +113,15 @@ interface PolymorphicBelongsTo {
 }
 
 function findPolymorphicRef(modelClass: BaseClass, colName: string): PolymorphicBelongsTo | null {
-  const reflections: Record<string, any> = (modelClass as any)._reflections ?? {};
-  const refl = reflections[colName];
+  const reflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
+  const refl = reflections[colName] as
+    | {
+        macro?: string;
+        isPolymorphic?: () => boolean;
+        foreignType?: string;
+        foreignKey?: string | string[];
+      }
+    | undefined;
   if (!refl || refl.macro !== "belongsTo" || !refl.isPolymorphic?.()) return null;
   // Prefer the reflection's own foreignType/foreignKey to honour custom column overrides.
   const typeColumn: string = refl.foreignType ?? `${colName}_type`;
