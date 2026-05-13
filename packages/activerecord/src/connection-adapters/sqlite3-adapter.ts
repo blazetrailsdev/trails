@@ -1325,23 +1325,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * matches Rails' SQLite3::SchemaStatements#tables filter.
    */
   async tables(): Promise<string[]> {
-    // Uses pragma_table_list (SQLite 3.37+) to match Rails' data_source_sql.
-    // type='table' excludes shadow tables (FTS5 etc.) and virtual tables.
-    // Falls back to sqlite_master for older SQLite versions.
-    let rows: Array<{ name: string }>;
-    try {
-      rows = (await this.execute(
-        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        [],
-        "SCHEMA",
-      )) as Array<{ name: string }>;
-    } catch {
-      rows = (await this.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        [],
-        "SCHEMA",
-      )) as Array<{ name: string }>;
-    }
+    const rows = (await this.execute(
+      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
+      [],
+      "SCHEMA",
+    )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
 
@@ -1376,12 +1364,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async tableExists(name: string): Promise<boolean> {
-    const { sqliteMaster, bare } = this._sqliteMasterFor(name);
+    if (name.includes(".")) {
+      // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
+      const { sqliteMaster, bare } = this._sqliteMasterFor(name);
+      const rows = (await this.execute(
+        `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`,
+        [],
+        "SCHEMA",
+      )) as Array<{ one: number }>;
+      return rows.length > 0;
+    }
     const rows = (await this.execute(
-      `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`,
+      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(name)} AND type IN ('table')`,
       [],
       "SCHEMA",
-    )) as Array<{ one: number }>;
+    )) as Array<{ name: string }>;
     return rows.length > 0;
   }
 

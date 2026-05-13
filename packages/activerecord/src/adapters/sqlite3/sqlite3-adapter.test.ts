@@ -3,7 +3,25 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, squish } from "@blazetrails/activesupport";
+import type { NotificationEvent } from "@blazetrails/activesupport";
+
+async function assertLogged(
+  expected: Array<[string, string, unknown[]]>,
+  fn: () => unknown | Promise<unknown>,
+): Promise<void> {
+  const logged: Array<[string, string, unknown[]]> = [];
+  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+    const p = event.payload as Record<string, unknown>;
+    logged.push([squish(String(p.sql ?? "")), String(p.name ?? ""), (p.binds as unknown[]) ?? []]);
+  });
+  try {
+    await fn();
+  } finally {
+    Notifications.unsubscribe(sub);
+  }
+  expect(logged).toEqual(expected);
+}
 
 let adapter: SQLite3Adapter;
 
@@ -314,12 +332,6 @@ describe("SQLite3AdapterTest", () => {
     const names = rows.map((r: any) => r.name);
     expect(names).toContain("items");
   });
-
-  // null-overridden: Rails logging instrumentation
-  // it.skip("tables logs name", () => {});
-
-  // null-overridden: Rails logging instrumentation
-  // it.skip("table exists logs name", () => {});
 
   it("columns", async () => {
     const cols = await adapter.execute(`PRAGMA table_info("items")`);
@@ -706,15 +718,20 @@ describe("SQLite3AdapterTest", () => {
     const pkCols = cols.filter((c: any) => c.pk > 0);
     expect(pkCols).toHaveLength(2);
   });
-  it.skip("tables logs name", async () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
+  it("tables logs name", async () => {
+    const sql =
+      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')";
+    await assertLogged([[sql, "SCHEMA", []]], () => adapter.tables());
   });
 
-  it.skip("table exists logs name", async () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in sqlite3-adapter
-    // ROOT-CAUSE: adapters/sqlite3/sqlite3-adapter.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/sqlite3-adapter.ts; affects ~1–17 tests in sqlite3-adapter.test.ts
+  it("table exists logs name", async () => {
+    await adapter.exec(
+      `CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`,
+    );
+    const sql =
+      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = 'ex' AND type IN ('table')";
+    await assertLogged([[sql, "SCHEMA", []]], async () => {
+      expect(await adapter.tableExists("ex")).toBe(true);
+    });
   });
 });
