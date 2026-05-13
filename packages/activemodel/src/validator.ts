@@ -1,7 +1,7 @@
 import { isBlank, underscore } from "@blazetrails/activesupport";
 
 /** Minimum shape required of a record passed to validators. */
-export interface ValidatableRecord {
+export interface ValidatableRecord<TBase extends object = object> {
   errors: { add(attribute: string, type?: string, options?: Record<string, unknown>): void };
 }
 
@@ -72,7 +72,7 @@ export function shouldValidate(record: ValidatableRecord, options: ConditionalOp
  *
  * Mirrors: ActiveModel::Validator
  */
-export abstract class Validator {
+export abstract class Validator<TBase extends object = object> {
   readonly options: Record<string, unknown>;
 
   constructor(options: Record<string, unknown> = {}) {
@@ -89,7 +89,7 @@ export abstract class Validator {
     return (this.constructor as typeof Validator).kind;
   }
 
-  abstract validate(_record: ValidatableRecord): void;
+  abstract validate(_record: ValidatableRecord<TBase>): void;
 }
 
 /**
@@ -97,7 +97,7 @@ export abstract class Validator {
  *
  * Mirrors: ActiveModel::EachValidator
  */
-export class EachValidator extends Validator {
+export class EachValidator<TBase extends object = object> extends Validator<TBase> {
   readonly attributes: readonly string[];
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
@@ -120,7 +120,10 @@ export class EachValidator extends Validator {
    * NumericalityValidator) reuse this helper so the lookup chain
    * stays in one place.
    */
-  protected readAttributeForValidation(record: ValidatableRecord, attribute: string): unknown {
+  protected readAttributeForValidation(
+    record: ValidatableRecord<TBase>,
+    attribute: string,
+  ): unknown {
     const rec = record as unknown as Record<string, unknown>;
     if (typeof rec.readAttributeForValidation === "function") {
       return (rec.readAttributeForValidation as (a: string) => unknown)(attribute);
@@ -131,7 +134,7 @@ export class EachValidator extends Validator {
     return rec[attribute];
   }
 
-  validate(record: ValidatableRecord): void {
+  validate(record: ValidatableRecord<TBase>): void {
     for (const attribute of this.attributes) {
       let value = this.readAttributeForValidation(record, attribute);
       if (value == null && this.options.allowNil === true) continue;
@@ -151,13 +154,13 @@ export class EachValidator extends Validator {
    */
   protected prepareValueForValidation(
     value: unknown,
-    _record: ValidatableRecord,
+    _record: ValidatableRecord<TBase>,
     _attribute: string,
   ): unknown {
     return value;
   }
 
-  validateEach(_record: ValidatableRecord, _attribute: string, _value: unknown): void {
+  validateEach(_record: ValidatableRecord<TBase>, _attribute: string, _value: unknown): void {
     throw new Error("Subclasses must implement validateEach(record, attribute, value)");
   }
 
@@ -194,18 +197,18 @@ export class EachValidator extends Validator {
  *
  * Mirrors: ActiveModel::BlockValidator
  */
-export class BlockValidator extends EachValidator {
-  private block: (record: ValidatableRecord, attribute: string, value: unknown) => void;
+export class BlockValidator<TBase extends object = object> extends EachValidator<TBase> {
+  private block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
 
   constructor(
     options: Record<string, unknown> & { attributes?: string | string[] },
-    block: (record: ValidatableRecord, attribute: string, value: unknown) => void,
+    block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void,
   ) {
     super(options);
     this.block = block;
   }
 
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord<TBase>, attribute: string, value: unknown): void {
     this.block(record, attribute, value);
   }
 }
