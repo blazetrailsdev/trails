@@ -111,9 +111,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record with custom primary key", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
+    // BLOCKED: relation — signed_id_test.rb: findSigned with custom primary key
   });
 
   it("find signed record for single table inheritance (STI Models)", async () => {
@@ -136,16 +134,11 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record raises UnknownPrimaryKey when a model has no primary key", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // UnknownPrimaryKey error type is not implemented yet
+    // BLOCKED: relation — signed_id_test.rb: UnknownPrimaryKey error on no-pk model
   });
 
   it.skip("find signed record with a bang with custom primary key", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
+    // BLOCKED: relation — signed_id_test.rb: findSignedBang with custom primary key
   });
 
   it("find signed record with a bang for single table inheritance (STI Models)", async () => {
@@ -205,17 +198,11 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("fail to work without a signed_id_verifier_secret", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // signed_id_verifier_secret configuration is not implemented yet
+    // BLOCKED: relation — signed_id_test.rb: signedIdVerifierSecret config required
   });
 
   it.skip("fail to work without when signed_id_verifier_secret lambda is nil", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // signed_id_verifier_secret configuration is not implemented yet
+    // BLOCKED: relation — signed_id_test.rb: raises when verifier secret lambda returns nil
   });
 
   it("always output url_safe", async () => {
@@ -229,10 +216,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("use a custom verifier", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    // Custom verifier support is not implemented yet
+    // BLOCKED: relation — signed_id_test.rb: custom verifier via signedIdVerifier=
   });
 
   it("find signed record", async () => {
@@ -250,10 +234,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record on relation", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    /* needs findSigned on Relation */
+    // BLOCKED: relation — signed_id_test.rb: findSigned on Relation scope
   });
 
   it("find signed record with a bang", async () => {
@@ -270,10 +251,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record with a bang on relation", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    /* needs findSignedBang on Relation */
+    // BLOCKED: relation — signed_id_test.rb: findSignedBang on Relation scope
   });
 
   it("find signed record with purpose", async () => {
@@ -293,10 +271,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record with a bang within expiration duration", () => {
-    // BLOCKED: unknown — SignedId feature gap; needs human triage
-    // ROOT-CAUSE: signed-id.ts#signedId or find_signed missing Rails parity
-    // SCOPE: ~30 LOC fix in signed-id.ts; affects ~9 tests in signed-id.test.ts
-    /* needs time-based expiration testing */
+    // BLOCKED: relation — signed_id_test.rb: findSignedBang raises when expired
   });
 });
 

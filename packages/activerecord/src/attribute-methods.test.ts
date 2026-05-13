@@ -906,17 +906,11 @@ describe("AttributeMethodsTest", () => {
   });
 
   it.skip("time attributes are retrieved in the current time zone", async () => {
-    // BLOCKED: unknown — attribute-methods feature gap; needs human triage
-    // ROOT-CAUSE: attribute-methods.ts missing Rails parity; exact symbol unclear without running the test
-    // SCOPE: ~30–100 LOC fix in attribute-methods.ts; affects ~1–10 tests in attribute-methods.test.ts
-    // requires timezone-aware attribute handling
+    // BLOCKED: type — attribute_methods_test.rb: time_zone_aware_attributes read in current TZ
   });
 
   it.skip("setting time zone-aware attribute in other time zone", async () => {
-    // BLOCKED: unknown — attribute-methods feature gap; needs human triage
-    // ROOT-CAUSE: attribute-methods.ts missing Rails parity; exact symbol unclear without running the test
-    // SCOPE: ~30–100 LOC fix in attribute-methods.ts; affects ~1–10 tests in attribute-methods.test.ts
-    // requires timezone-aware attribute handling
+    // BLOCKED: type — attribute_methods_test.rb: time_zone_aware_attributes write across TZ
   });
 });
 

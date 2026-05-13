@@ -106,7 +106,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all raises on unknown attribute", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
+    // BLOCKED: relation — insert_all.rb: unknown-attr rejection
     // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
     // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
     const adapter = freshAdapter();
@@ -192,7 +192,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all raises on unknown attribute", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
+    // BLOCKED: relation — insert_all.rb: unknown-attr rejection
     // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
     // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
     const adapter = freshAdapter();
@@ -202,15 +202,11 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all raises on duplicate records", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: raises on duplicate (unique constraint)
     /* needs unique constraint enforcement in memory adapter */
   });
   it.skip("insert all with returning", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
     /* needs RETURNING clause support */
   });
   it("insert all skip duplicates", async () => {
@@ -252,16 +248,12 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("upsert all does not update readonly attributes", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: readonly attrs not updated
     /* needs readonly attribute checking in upsert */
   });
 
   it.skip("upsert all updates changed columns only", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: updateOnly / ON CONFLICT filtering
     /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
   });
 
@@ -276,9 +268,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert_all has a clear error message when a column does not exist", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: clear error on missing column
     /* needs column validation */
   });
 
@@ -301,9 +291,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert_all with on_duplicate updates record timestamps", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: timestamp touch on on_duplicate
     /* needs ON CONFLICT DO UPDATE with timestamp columns */
   });
   it("insert_all with raw sql on_duplicate", async () => {
@@ -320,35 +308,25 @@ describe("InsertAllTest", () => {
     expect((all[0] as any).author).toBe("Updated");
   });
   it.skip("upsert all has a clear error message when a column does not exist", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: clear error on missing column in upsert
     /* needs column validation */
   });
   it.skip("upsert all with unique_by column not an index raises error", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: uniqueBy column must be an index
     /* needs index introspection */
   });
 
   it.skip("upsert all supports update_only option", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: updateOnly option support
     /* updateOnly generates correct SQL but memory/SQLite adapter doesn't honor ON CONFLICT DO UPDATE SET restrictions */
   });
 
   it.skip("upsert all supports returning option", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
     /* needs RETURNING clause support */
   });
   it.skip("insert_all! raises on duplicate", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: insert_all! raises on duplicate
     /* needs unique constraint enforcement */
   });
   it("insert_all with empty array", async () => {
@@ -364,9 +342,7 @@ describe("InsertAllTest", () => {
     expect(count).toBe(0);
   });
   it.skip("insert all with partial unique index", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: partial unique index support
   });
   it("insert_all works without callbacks or validations", async () => {
     const adapter = freshAdapter();
@@ -378,9 +354,7 @@ describe("InsertAllTest", () => {
     expect(all.some((b: any) => b.title === "NoCallback")).toBe(true);
   });
   it.skip("upsert_all works with custom primary key", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: custom primary key in upsert
     const adapter = freshAdapter();
     class Item extends Base {
       static {
@@ -424,9 +398,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert_all respects attribute aliases", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: aliasAttribute support
     /* needs aliasAttribute support */
   });
   it("insert_all does not modify given array", async () => {
@@ -472,27 +444,19 @@ describe("InsertAllTest", () => {
     expect(record.name).toBe("updated");
   });
   it.skip("insert_all can insert rows with all defaults", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: insert row with all-default columns
     /* needs default value insertion without explicit columns */
   });
   it.skip("insert_all generates correct sql", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: SQL generation for insertAll
     /* needs SQL inspection / adapter-specific SQL generation */
   });
   it.skip("upsert_all generates correct sql", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: SQL generation for upsertAll
     /* needs SQL inspection / adapter-specific SQL generation */
   });
   it.skip("insert_all with returning and on_duplicate", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: RETURNING + ON CONFLICT clause
     /* needs RETURNING + ON CONFLICT */
   });
   it("insert_all with on_duplicate raw sql", async () => {
@@ -508,27 +472,19 @@ describe("InsertAllTest", () => {
     expect((book as any).author).toBe("B");
   });
   it.skip("insert_all does not include readonly attributes", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: readonly attrs excluded from insertAll
     /* needs readonly attribute filtering in insertAll */
   });
   it.skip("upsert_all does not include readonly attributes", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: readonly attrs excluded from upsertAll
     /* needs readonly attribute filtering in upsertAll */
   });
   it.skip("insert_all! raises for duplicate records", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: insert_all! raises for duplicate records
     /* needs unique constraint enforcement */
   });
   it.skip("insert! raises for invalid records", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: validation — insert_all.rb: insert! validates records
     /* needs validation in insert! */
   });
 
@@ -539,49 +495,31 @@ describe("InsertAllTest", () => {
     expect(count).toBe(0);
   });
   it.skip("insert with type casting and serialize is consistent", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: type — insert_all.rb: type-cast + serialize consistency
   });
   it.skip("insert all returns requested sql fields", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: RETURNING requested sql fields
   });
   it.skip("insert all with skip duplicates and autonumber id not given", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: skip duplicates, autonumber id absent
   });
   it.skip("insert all with skip duplicates and autonumber id given", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: skip duplicates, autonumber id given
   });
   it.skip("insert all will raise if duplicates are skipped only for a certain conflict target", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: conflict-target-specific duplicate skip
   });
   it.skip("insert all and upsert all with index finding options", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: index lookup for uniqueBy
   });
   it.skip("insert all and upsert all with expression index", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: expression index support
   });
   it.skip("insert all and upsert all raises when index is missing", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: raises when matching index missing
   });
   it.skip("insert all and upsert all finds index with inverted unique by columns", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: inverted uniqueBy column order match
   });
   it("insert all and upsert all works with composite primary keys when unique by is provided", async () => {
     const adapter = freshAdapter();
@@ -621,119 +559,73 @@ describe("InsertAllTest", () => {
     expect(count).toBe(1);
   });
   it.skip("insert all and upsert all with aliased attributes", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: aliasAttribute in insertAll / upsertAll
   });
   it.skip("insert all and upsert all with sti", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: STI — insert_all.rb: STI type-column handling
   });
   it.skip("upsert and db warnings", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
   });
   it.skip("upsert all does notupdates existing record by when there is no key", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: upsert with no conflict key is no-op
   });
   it.skip("upsert all updates existing record by configured primary key fails when database supports insert conflict target", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: conflict-target required on PG
   });
   it.skip("upsert all does not update primary keys", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: PK columns not overwritten by upsert
   });
   it.skip("upsert all does not perform an upsert if a partial index doesnt apply", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: schema — insert_all.rb: partial index condition gate
   });
   it.skip("upsert all respects updated at precision when touched implicitly", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: updated_at precision respected
   });
   it.skip("upsert all uses given updated at over implicit updated at", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: explicit updated_at wins over implicit
   });
   it.skip("upsert all uses given updated on over implicit updated on", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: explicit updated_on wins over implicit
   });
   it.skip("upsert all implicitly sets timestamps on create when model record timestamps is true", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: implicit timestamps on create (true)
   });
   it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: no implicit timestamps on create when overridden
   });
   it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is false", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: no implicit timestamps on create (false)
   });
   it.skip("upsert all implicitly sets timestamps on create when model record timestamps is false but overridden", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: implicit timestamps on create when false overridden
   });
   it.skip("upsert all respects created at precision when touched implicitly", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: created_at precision respected
   });
   it.skip("upsert all implicitly sets timestamps on update when model record timestamps is true", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: implicit timestamps on update (true)
   });
   it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: no implicit timestamps on update when overridden
   });
   it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is false", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: no implicit timestamps on update (false)
   });
   it.skip("upsert all implicitly sets timestamps on update when model record timestamps is false but overridden", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: implicit timestamps on update when false overridden
   });
   it.skip("upsert all implicitly sets timestamps even when columns are aliased", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: implicit timestamps with aliased columns
   });
   it.skip("upsert all works with partitioned indexes", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: partitioned index support
   });
   it.skip("insert all has many through", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: associations — insert_all.rb: has-many-through insertAll
   });
   it.skip("upsert all has many through", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: associations — insert_all.rb: has-many-through upsertAll
   });
   it("upsert all updates using provided sql", async () => {
     const Book = makeBookWithAdapter();
@@ -749,9 +641,7 @@ describe("InsertAllTest", () => {
     expect((all[0] as any).author).toBe("Bob");
   });
   it.skip("upsert all updates using values function on duplicate raw sql", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-mysql — insert_all.rb: VALUES() function in ON DUPLICATE KEY
   });
   it("upsert all updates using provided sql and unique by", async () => {
     const Book = makeBookWithAdapter();
@@ -769,9 +659,7 @@ describe("InsertAllTest", () => {
     expect((all[0] as any).status).toBe(0);
   });
   it.skip("insert all when table name contains database", () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: table name with schema/database prefix
   });
 
   let adapter: DatabaseAdapter;
@@ -836,9 +724,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all can skip duplicate records", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: skip-duplicates strategy
     const Book = makeBookWithAdapter();
     const b = await Book.create({ title: "Existing", author: "A" });
     // upsertAll with skip behavior
@@ -880,30 +766,22 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all generates correct sql", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: SQL generation for insertAll
     // SQL generation test - adapter specific
   });
 
   it.skip("insert all returns primary key if returning is supported", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: adapter-pg — insert_all.rb: RETURNING primary key
     // RETURNING clause support depends on the adapter
   });
 
   it.skip("upsert all does not touch updated at when values do not change", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: no updated_at touch when values unchanged
     // requires timestamps tracking
   });
 
   it.skip("upsert all touches updated at and updated on when values change", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: updated_at + updated_on touch on change
     // requires timestamps tracking
   });
 
@@ -928,9 +806,7 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all succeeds when passed no attributes", async () => {
-    // BLOCKED: unknown — insert-all test setup gap; impl at 100% (#1255)
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
+    // BLOCKED: relation — insert_all.rb: insert record with no attributes
     const Book = makeBookWithAdapter();
     const result = await Book.insertAll([{}]);
     expect(result).toBeDefined();

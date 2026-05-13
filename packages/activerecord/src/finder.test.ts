@@ -2424,10 +2424,7 @@ describe("FinderTest", () => {
   });
 
   it.skip("find with eager loading collection and ordering by collection primary key", async () => {
-    // BLOCKED: unknown — finder feature gap; needs human triage
-    // ROOT-CAUSE: finder.ts missing Rails parity; exact symbol unclear without running the test
-    // SCOPE: ~30–100 LOC fix in finder.ts; affects ~1–10 tests in finder.test.ts
-    // requires eager loading
+    // BLOCKED: associations — finder_test.rb: eager load + ORDER BY association pk
   });
 });
 
