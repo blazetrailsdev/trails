@@ -448,7 +448,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         JSON.stringify(obj),
       ]);
       const rows = await adapter.execute(`SELECT "val" FROM "ex_json"`);
-      expect(rows[0].val).toEqual(obj);
+      // adapter.execute returns raw strings for json/jsonb; Json#deserialize owns parsing
+      expect(JSON.parse(rows[0].val as string)).toEqual(obj);
     });
 
     it("jsonb decoding", async () => {
@@ -461,7 +462,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         '{"b":2}',
       ]);
       expect(rows).toHaveLength(1);
-      expect(rows[0].val).toEqual({ b: 2 });
+      expect(JSON.parse(rows[0].val as string)).toEqual({ b: 2 });
+    });
+
+    it("backslash string round-trip", async () => {
+      await adapter.exec(`CREATE TABLE "ex_backslash" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
+      const value = "a\\b";
+      await adapter.executeMutation(`INSERT INTO "ex_backslash" ("val") VALUES (?)`, [value]);
+      const rows = await adapter.execute(`SELECT "val" FROM "ex_backslash"`);
+      expect(rows[0].val).toBe(value);
     });
 
     it("hstore decoding", async () => {
