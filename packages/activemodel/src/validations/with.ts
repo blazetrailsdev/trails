@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 
 export class WithValidator extends EachValidator {
   override checkValidity(): void {
@@ -12,9 +12,9 @@ export class WithValidator extends EachValidator {
     }
   }
 
-  validateEach(record: AnyRecord, attribute: string, _value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, _value: unknown): void {
     const methodName = this.options.with as string;
-    const method = record[methodName];
+    const method = (record as unknown as Record<string, unknown>)[methodName];
     if (typeof method !== "function") {
       throw new globalThis.Error(
         `WithValidator expected ${methodName} to be a function on the record`,

@@ -1,5 +1,5 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+/** The model instance that owns this Errors collection. */
+type ModelBase = object | null;
 
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
@@ -24,13 +24,13 @@ const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
  */
 export class Errors {
   private _errors: ActiveModelError[] = [];
-  private _base: AnyRecord;
+  private _base: ModelBase;
 
-  constructor(base: AnyRecord) {
+  constructor(base: ModelBase) {
     this._base = base;
   }
 
-  get base(): AnyRecord {
+  get base(): ModelBase {
     return this._base;
   }
 
@@ -58,8 +58,8 @@ export class Errors {
    */
   add(
     attribute: string,
-    type: string | ((record: AnyRecord, options: Record<string, unknown>) => string) = "invalid",
-    options?: { message?: string | ((record: AnyRecord) => string) } & Record<string, unknown>,
+    type: string | ((record: ModelBase, options: Record<string, unknown>) => string) = "invalid",
+    options?: { message?: string | ((record: ModelBase) => string) } & Record<string, unknown>,
   ): ActiveModelError {
     const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
     const error = new ActiveModelError(this._base, normAttr, normType, normOpts);
@@ -86,7 +86,7 @@ export class Errors {
    */
   normalizeArguments(
     attribute: string,
-    type: string | ((record: AnyRecord, options: Record<string, unknown>) => string),
+    type: string | ((record: ModelBase, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): [string, string, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
@@ -109,7 +109,7 @@ export class Errors {
    */
   where(
     attribute: string,
-    type?: string | ((record: AnyRecord, options: Record<string, unknown>) => string),
+    type?: string | ((record: ModelBase, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): ActiveModelError[] {
     if (type === undefined) {

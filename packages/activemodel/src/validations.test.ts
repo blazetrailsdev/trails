@@ -1375,7 +1375,12 @@ describe("validatesEach", () => {
               record.errors.add(attr, "invalid", { message: "must be non-negative" });
             }
           },
-          { if: (record) => record.readAttribute("price") !== null },
+          {
+            if: (record) =>
+              (record as unknown as { readAttribute(a: string): unknown }).readAttribute(
+                "price",
+              ) !== null,
+          },
         );
       }
     }

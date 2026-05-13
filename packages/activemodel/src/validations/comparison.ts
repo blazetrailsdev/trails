@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -63,7 +63,7 @@ export class ComparisonValidator extends EachValidator {
     }
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     for (const optKey of COMPARE_CHECKS) {
       const raw = (this.options as Record<string, unknown>)[optKey];
       if (raw === undefined) continue;

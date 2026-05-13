@@ -1,7 +1,7 @@
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
 
 interface AssociationLike {
-  owner: unknown;
+  owner: object | null;
   reflection: { name: string };
   isCollection?(): boolean;
   target?: unknown[];

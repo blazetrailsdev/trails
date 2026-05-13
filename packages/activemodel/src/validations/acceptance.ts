@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { inspectAccessor } from "./_accessor.js";
 
 /**
@@ -51,7 +51,7 @@ export class AcceptanceValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare isAcceptableOption: typeof isAcceptableOption;
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const allowNil = this.options.allowNil ?? true;
     if (allowNil && (value === null || value === undefined)) return;
     if (!this.isAcceptableOption(value)) {

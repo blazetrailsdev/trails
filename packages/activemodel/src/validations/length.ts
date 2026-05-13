@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -117,7 +117,7 @@ export class LengthValidator extends EachValidator {
     }
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
     // For nil → 0 (nil.to_s.length); for non-nil values without a .length
     // (numbers, booleans, plain objects) → String(value).length.
@@ -186,7 +186,7 @@ export class LengthValidator extends EachValidator {
  */
 function resolveLengthOpt(
   this: { resolveValue(record: unknown, value: unknown): unknown },
-  record: AnyRecord,
+  record: ValidatableRecord,
   raw: unknown,
 ): number | undefined {
   if (raw === undefined || raw === null) return undefined;

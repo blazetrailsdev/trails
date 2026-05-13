@@ -27,8 +27,16 @@ export interface AttributeRegistrationClassMethods {
 
 export type AttributeRegistration = AttributeRegistrationClassMethods;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyAttributeHost = any;
+export interface AttributeHostInternals {
+  _cachedDefaultAttributes?: AttributeSet | null;
+  _attributesBuilder?: unknown;
+  _attributeDefinitions?: Map<
+    string,
+    { name: string; type?: Type; virtual?: boolean; userProvidedDefault?: boolean }
+  >;
+  _pendingAttributeModifications?: PendingModification[];
+  _attributeAliases?: Record<string, string>;
+}
 
 // ---------------------------------------------------------------------------
 // Pending modification structs
@@ -107,12 +115,17 @@ export class PendingDecorator implements PendingModification {
  * Mirrors: ActiveSupport::DescendantsTracker registration triggered by
  * Class.inherited in Rails.
  */
-export function registerWithSuperclass(cls: AnyAttributeHost): void {
-  const superclass = Object.getPrototypeOf(cls);
-  if (!superclass || superclass === Function.prototype) return;
+type HostAsClass = new (...args: unknown[]) => unknown;
+
+export function registerWithSuperclass(cls: AttributeHostInternals): void {
+  const superclass = Object.getPrototypeOf(cls) as AttributeHostInternals;
+  if (!superclass || (superclass as unknown) === Function.prototype) return;
   // Only register if the superclass participates in the attribute system.
   if (!("_attributeDefinitions" in superclass)) return;
-  DescendantsTracker.registerSubclass(superclass, cls);
+  DescendantsTracker.registerSubclass(
+    superclass as unknown as HostAsClass,
+    cls as unknown as HostAsClass,
+  );
 }
 
 /**
@@ -124,10 +137,10 @@ export function registerWithSuperclass(cls: AnyAttributeHost): void {
  *
  * @internal
  */
-export function resetDefaultAttributes(cls: AnyAttributeHost): void {
+export function resetDefaultAttributes(cls: AttributeHostInternals): void {
   resetDefaultAttributesBang.call(cls);
-  for (const sub of DescendantsTracker.subclasses(cls)) {
-    resetDefaultAttributes(sub);
+  for (const sub of DescendantsTracker.subclasses(cls as unknown as HostAsClass)) {
+    resetDefaultAttributes(sub as unknown as AttributeHostInternals);
   }
 }
 
@@ -135,8 +148,9 @@ export function resetDefaultAttributes(cls: AnyAttributeHost): void {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function collectPendingModifications(cls: AnyAttributeHost): PendingModification[] {
-  if (!cls || cls === Function.prototype || !cls._pendingAttributeModifications) return [];
+function collectPendingModifications(cls: AttributeHostInternals): PendingModification[] {
+  if (!cls || (cls as unknown) === Function.prototype || !cls._pendingAttributeModifications)
+    return [];
   const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
   const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
     ? (cls._pendingAttributeModifications as PendingModification[])
@@ -150,7 +164,7 @@ function collectPendingModifications(cls: AnyAttributeHost): PendingModification
  * @internal
  */
 export function applyPendingAttributeModifications(
-  cls: AnyAttributeHost,
+  cls: AttributeHostInternals,
   attributeSet: AttributeSet,
 ): void {
   for (const mod of collectPendingModifications(cls)) {
@@ -168,7 +182,7 @@ export function applyPendingAttributeModifications(
  *
  * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
  */
-export function pushPendingType(cls: AnyAttributeHost, name: string, type: Type): void {
+export function pushPendingType(cls: AttributeHostInternals, name: string, type: Type): void {
   pendingAttributeModifications.call(cls).push(new PendingType(name, type));
 }
 
@@ -178,7 +192,11 @@ export function pushPendingType(cls: AnyAttributeHost, name: string, type: Type)
  *
  * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
  */
-export function pushPendingDefault(cls: AnyAttributeHost, name: string, value: unknown): void {
+export function pushPendingDefault(
+  cls: AttributeHostInternals,
+  name: string,
+  value: unknown,
+): void {
   pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
 }
 
@@ -189,7 +207,7 @@ export function pushPendingDefault(cls: AnyAttributeHost, name: string, value: u
  * Mirrors: the PendingDecorator push inside ActiveModel::AttributeRegistration#decorate_attributes
  */
 export function pushPendingDecorator(
-  cls: AnyAttributeHost,
+  cls: AttributeHostInternals,
   names: string[] | null,
   decorator: (name: string, type: Type) => Type,
 ): void {
@@ -204,7 +222,7 @@ export function pushPendingDecorator(
  *
  * AR overrides this to seed from columnsHash first, then replay.
  */
-export function _defaultAttributes(this: AnyAttributeHost): AttributeSet {
+export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   if (!this._cachedDefaultAttributes) {
     // Register with our superclass so resetDefaultAttributes() cascades to us
     // when the superclass gains new attribute declarations. Mirrors the
@@ -228,7 +246,7 @@ export function _defaultAttributes(this: AnyAttributeHost): AttributeSet {
  * see the decorated type without waiting for _defaultAttributes to be rebuilt.
  */
 export function decorateAttributes(
-  this: AnyAttributeHost,
+  this: AttributeHostInternals,
   names: string[] | null,
   decorator: (name: string, type: Type) => Type,
 ): void {
@@ -261,7 +279,7 @@ export function decorateAttributes(
  * Wraps the cast-types record in a Proxy so unknown keys return a fallback
  * ValueType — same effect as Rails setting `hash.default = Type.default_value`.
  */
-export function attributeTypes(this: AnyAttributeHost): Record<string, Type> {
+export function attributeTypes(this: AttributeHostInternals): Record<string, Type> {
   const cast = _defaultAttributes.call(this).castTypes();
   return new Proxy(cast, {
     get(target, prop, receiver) {
@@ -280,7 +298,7 @@ export function attributeTypes(this: AnyAttributeHost): Record<string, Type> {
  * Delegates to attributeTypes — single codepath. Returns a fallback ValueType
  * for unknown names (never null), matching Rails' Type.default_value behavior.
  */
-export function typeForAttribute(this: AnyAttributeHost, name: string): Type {
+export function typeForAttribute(this: AttributeHostInternals, name: string): Type {
   const resolved = resolveAttributeName.call(this, name);
   return attributeTypes.call(this)[resolved];
 }
@@ -292,7 +310,7 @@ export function typeForAttribute(this: AnyAttributeHost, name: string): Type {
  *
  * @internal Rails-private helper.
  */
-export function pendingAttributeModifications(this: AnyAttributeHost): PendingModification[] {
+export function pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
   if (!Object.prototype.hasOwnProperty.call(this, "_pendingAttributeModifications")) {
     this._pendingAttributeModifications = [];
   }
@@ -307,7 +325,7 @@ export function pendingAttributeModifications(this: AnyAttributeHost): PendingMo
  *
  * @internal Rails-private helper.
  */
-export function resetDefaultAttributesBang(this: AnyAttributeHost): void {
+export function resetDefaultAttributesBang(this: AttributeHostInternals): void {
   this._cachedDefaultAttributes = null;
   // _attributesBuilder is an AR-specific derived cache. Shadow with undefined
   // so prototype-chain lookup never returns a stale superclass builder after
@@ -324,7 +342,7 @@ export function resetDefaultAttributesBang(this: AnyAttributeHost): void {
  *
  * @internal Rails-private helper.
  */
-export function resolveAttributeName(this: AnyAttributeHost, name: string): string {
+export function resolveAttributeName(this: AttributeHostInternals, name: string): string {
   return name;
 }
 
@@ -336,7 +354,7 @@ export function resolveAttributeName(this: AnyAttributeHost, name: string): stri
  * @internal Rails-private helper.
  */
 export function resolveTypeName(
-  this: AnyAttributeHost,
+  this: AttributeHostInternals,
   name: string,
   _options?: Record<string, unknown>,
 ): Type {
@@ -351,6 +369,10 @@ export function resolveTypeName(
  *
  * @internal Rails-private helper.
  */
-export function hookAttributeType(this: AnyAttributeHost, _attribute: string, type: Type): Type {
+export function hookAttributeType(
+  this: AttributeHostInternals,
+  _attribute: string,
+  type: Type,
+): Type {
   return type;
 }

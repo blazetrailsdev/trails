@@ -15,15 +15,18 @@ export interface Conversion {
   toPartialPath(): string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyConversionHost = any;
+interface ConversionHost {
+  name: string;
+  modelName?: { collection: string; element: string };
+  _cachedToPartialPath?: string;
+}
 
 /**
  * Class-level cache for toPartialPath.
  *
  * Mirrors: ActiveModel::Conversion::ClassMethods#_to_partial_path
  */
-export function _toPartialPath(this: AnyConversionHost): string {
+export function _toPartialPath(this: ConversionHost): string {
   if (!this._cachedToPartialPath) {
     if (this.modelName != null) {
       const mn = this.modelName;

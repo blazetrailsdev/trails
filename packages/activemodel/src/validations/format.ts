@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -46,7 +46,7 @@ export class FormatValidator extends EachValidator {
     this.checkOptionsValidity("without");
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     // Rails uses Ruby truthiness on options[:with] / options[:without] —
     // nil/false skip the branch entirely. Mirror that so an explicit
     // `null` / `false` option doesn't crash at .test time.
@@ -76,7 +76,7 @@ export class FormatValidator extends EachValidator {
  */
 export function recordError(
   this: { options: Record<string, unknown> },
-  record: AnyRecord,
+  record: ValidatableRecord,
   attribute: string,
   name: "with" | "without",
   value: unknown,

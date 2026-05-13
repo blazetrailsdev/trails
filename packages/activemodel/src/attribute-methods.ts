@@ -111,8 +111,15 @@ export class AttributeMethodPattern {
 // ClassMethods — assigned directly to Model's static side
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+/** Minimum shape required of an instance accessed through a generated attribute method closure. */
+interface ReadWriteHost {
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, value: unknown): void;
+  [key: string]: unknown;
+}
+
+/** Function extended with a generated-method marker. */
+type TaggedFn = ((...args: unknown[]) => unknown) & { __generatedAttributeMethod?: boolean };
 
 export interface AttributeMethodHost {
   _attributeDefinitions: Map<string, { name: string }>;
@@ -120,7 +127,7 @@ export interface AttributeMethodHost {
   _attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
   _generatedMethods: Set<string>;
-  prototype: AnyRecord;
+  prototype: { [key: string]: unknown };
 }
 
 function ensureOwnPatterns(host: AttributeMethodHost): void {
@@ -194,13 +201,13 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
 
   // Define the direct alias property (bare name → original)
   ensureOwnGeneratedMethods(this);
-  const getter = function (this: AnyRecord) {
+  const getter: TaggedFn = function (this: ReadWriteHost) {
     return this.readAttribute(oldName);
   };
-  (getter as AnyRecord).__generatedAttributeMethod = true;
+  getter.__generatedAttributeMethod = true;
   Object.defineProperty(this.prototype, newName, {
     get: getter,
-    set(this: AnyRecord, value: unknown) {
+    set(this: ReadWriteHost, value: unknown) {
       this.writeAttribute(oldName, value);
     },
     configurable: true,
@@ -223,7 +230,7 @@ export function undefineAttributeMethods(this: AttributeMethodHost): void {
     if (!desc) continue;
     // Only delete if the method is still the generated one (has our marker)
     const fn = desc.value ?? desc.get;
-    if (fn && (fn as AnyRecord).__generatedAttributeMethod) {
+    if (fn && (fn as TaggedFn).__generatedAttributeMethod) {
       delete this.prototype[methodName];
     }
   }
@@ -269,10 +276,10 @@ export function defineAttributeMethodPattern(
   const methodName = pattern.methodName(attrName);
   if (host.prototype[methodName] !== undefined && !options?.override) return;
   ensureOwnGeneratedMethods(host);
-  const fn = function (this: AnyRecord) {
+  const fn: TaggedFn = function (this: ReadWriteHost) {
     return this.readAttribute(attrName);
   };
-  (fn as AnyRecord).__generatedAttributeMethod = true;
+  fn.__generatedAttributeMethod = true;
   Object.defineProperty(host.prototype, methodName, {
     value: fn,
     writable: true,
@@ -308,14 +315,14 @@ export function aliasAttributeMethodDefinition(
   const methodName = pattern.methodName(newName);
   const targetName = pattern.methodName(oldName);
   ensureOwnGeneratedMethods(host);
-  const fn = function (this: AnyRecord, ...args: unknown[]) {
+  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
     const target = this[targetName];
     if (typeof target === "function") {
-      return target.apply(this, args);
+      return (target as (...a: unknown[]) => unknown).apply(this, args);
     }
     return this.readAttribute(oldName);
   };
-  (fn as AnyRecord).__generatedAttributeMethod = true;
+  fn.__generatedAttributeMethod = true;
   Object.defineProperty(host.prototype, methodName, {
     value: fn,
     writable: true,
@@ -476,16 +483,16 @@ export function defineProxyCall(
   attrName: string,
 ): void {
   ensureOwnGeneratedMethods(this);
-  const fn = function (this: AnyRecord, ...args: unknown[]) {
+  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
     const handler = this[proxyTarget];
     if (typeof handler !== "function") {
       throw new MissingAttributeError(
         `attribute_missing dispatch failed: ${proxyTarget} not defined`,
       );
     }
-    return handler.call(this, attrName, ...args);
+    return (handler as (...a: unknown[]) => unknown).call(this, attrName, ...args);
   };
-  (fn as AnyRecord).__generatedAttributeMethod = true;
+  fn.__generatedAttributeMethod = true;
   Object.defineProperty(this.prototype, name, { value: fn, writable: true, configurable: true });
   this._generatedMethods.add(name);
 }
@@ -509,7 +516,7 @@ export function defineCall(
 // Instance-level Rails privates (attribute_methods.rb)
 // ---------------------------------------------------------------------------
 
-type InstanceHost = {
+export type InstanceHost = {
   _attributes?: { has(name: string): boolean };
   _attributeMethodPatterns?: AttributeMethodPattern[];
   constructor: AttributeMethodHost;

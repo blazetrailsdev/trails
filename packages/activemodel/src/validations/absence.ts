@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { isBlank } from "@blazetrails/activesupport";
 
 /**
@@ -24,7 +24,7 @@ export interface HelperMethods {
 }
 
 export class AbsenceValidator extends EachValidator {
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!isBlank(value)) {
       record.errors.add(attribute, "present", this.filteredErrorOptions());
     }

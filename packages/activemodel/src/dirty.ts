@@ -6,6 +6,7 @@ import {
   matchedAttributeMethod as _matchedAttributeMethod,
   missingAttribute as _missingAttribute,
   _readAttribute as __readAttribute,
+  type InstanceHost,
 } from "./attribute-methods.js";
 
 /**
@@ -420,30 +421,31 @@ export class DirtyTracker {
 // Rails privates surfaced by dirty.rb
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyInstanceHost = any;
-
 /** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
-export function isAttributeMethod(this: AnyInstanceHost, attrName: string): boolean {
+export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
   return _isAttributeMethod.call(this, attrName);
 }
 
 /** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
 export function matchedAttributeMethod(
-  this: AnyInstanceHost,
+  this: InstanceHost,
   methodName: string,
 ): { proxyTarget: string; attrName: string } | null {
   return _matchedAttributeMethod.call(this, methodName);
 }
 
 /** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: AnyInstanceHost, attrName: string): never {
+export function missingAttribute(this: InstanceHost, attrName: string): never {
   return _missingAttribute.call(this, attrName);
 }
 
 /** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
-export function _readAttribute(this: AnyInstanceHost, attr: string): unknown {
-  return __readAttribute.call(this, attr);
+export function _readAttribute(this: InstanceHost, attr: string): unknown {
+  type ReadAttributeThis = InstanceHost & {
+    _attributes?: { fetchValue(name: string): unknown };
+    _readAttribute?(name: string): unknown;
+  };
+  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
 }
 
 type DirtyDispatchHost = {

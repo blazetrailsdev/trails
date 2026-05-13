@@ -1,7 +1,15 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+/** Minimum shape required of a record object passed to serialization helpers. */
+export interface SerializationRecord {
+  [key: string]: unknown;
+  _attributes?: unknown;
+  attributes?: Record<string, unknown>;
+  readAttribute?: (key: string) => unknown;
+  _preloadedAssociations?: Map<string, unknown> | null;
+  _cachedAssociations?: Map<string, unknown> | null;
+  constructor: { name: string; _attributeDefinitions?: unknown };
+}
 
 /**
  * Set `key` on `target` as an own data property, even when `key` is
@@ -52,7 +60,7 @@ export interface SerializeOptions {
  * (serialization.rb:111-138)
  */
 export function serializableHash(
-  record: AnyRecord,
+  record: SerializationRecord,
   options: SerializeOptions = {},
 ): Record<string, unknown> {
   // Prefer an instance-level override (Rails' subclass-override
@@ -78,7 +86,7 @@ export function serializableHash(
   if (options.methods) {
     for (const method of options.methods) {
       if (typeof record[method] === "function") {
-        safeSet(result, method, record[method]());
+        safeSet(result, method, (record[method] as () => unknown)());
       } else if (method in record) {
         safeSet(result, method, record[method]);
       } else {
@@ -94,10 +102,14 @@ export function serializableHash(
       safeSet(
         result,
         assocName,
-        records.map((r: AnyRecord) => serializableHash(r, opts)),
+        records.map((r: SerializationRecord) => serializableHash(r, opts)),
       );
-    } else if (records && typeof records === "object" && (records as AnyRecord)._attributes) {
-      safeSet(result, assocName, serializableHash(records, opts));
+    } else if (
+      records &&
+      typeof records === "object" &&
+      (records as unknown as SerializationRecord)._attributes
+    ) {
+      safeSet(result, assocName, serializableHash(records as unknown as SerializationRecord, opts));
     } else {
       safeSet(result, assocName, records);
     }
@@ -122,11 +134,21 @@ export function serializableHash(
  *
  * @internal Rails-private helper.
  */
-export function attributeNamesForSerialization(record: AnyRecord): string[] {
-  const attrStore = record._attributes;
+type AttributeStore =
+  | { keys(): string[]; fetchValue(key: string): unknown }
+  | Map<string, unknown>
+  | null
+  | undefined;
+
+export function attributeNamesForSerialization(record: SerializationRecord): string[] {
+  const attrStore = record._attributes as AttributeStore;
   let keys: string[];
-  if (attrStore && typeof attrStore.keys === "function" && !(attrStore instanceof Map)) {
-    keys = attrStore.keys();
+  if (
+    attrStore &&
+    typeof (attrStore as { keys?: unknown }).keys === "function" &&
+    !(attrStore instanceof Map)
+  ) {
+    keys = (attrStore as { keys(): string[] }).keys();
   } else if (attrStore instanceof Map) {
     keys = Array.from(attrStore.keys());
   } else if (record.attributes) {
@@ -135,7 +157,7 @@ export function attributeNamesForSerialization(record: AnyRecord): string[] {
     keys = [];
   }
 
-  const defs = record.constructor?._attributeDefinitions as
+  const defs = record.constructor._attributeDefinitions as
     | Map<string, { virtual?: boolean }>
     | undefined;
   if (defs) {
@@ -160,15 +182,15 @@ export function attributeNamesForSerialization(record: AnyRecord): string[] {
  * @internal Rails-private helper.
  */
 export function serializableAttributes(
-  record: AnyRecord,
+  record: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  const attrStore = record._attributes;
+  const attrStore = record._attributes as AttributeStore;
   const result: Record<string, unknown> = {};
   for (const key of attributeNames) {
     let value: unknown;
-    if (attrStore && typeof attrStore.fetchValue === "function") {
-      value = attrStore.fetchValue(key);
+    if (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") {
+      value = (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
     } else if (attrStore instanceof Map) {
       value = attrStore.get(key);
     } else if (record.readAttribute) {
@@ -206,7 +228,7 @@ export function serializableAttributes(
  * @internal Rails-private helper.
  */
 export function serializableAddIncludes(
-  record: AnyRecord,
+  record: SerializationRecord,
   options: SerializeOptions = {},
   callback: (association: string, records: unknown, opts: SerializeOptions) => void,
 ): void {

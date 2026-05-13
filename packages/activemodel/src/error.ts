@@ -1,8 +1,17 @@
 import { humanize, underscore, deepDup } from "@blazetrails/activesupport";
 import { I18n } from "./i18n.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
+/** The model instance that owns this error. Rails tests pass null for base-only errors. */
+type ModelBase = object | null;
+
+/** Shape of a model class accessed for I18n/human-attribute lookups. */
+interface ModelClass {
+  name?: string;
+  i18nScope?: string;
+  modelName?: { i18nKey?: string };
+  humanAttributeName?: (attr: string) => string;
+  lookupAncestors?: () => ModelClass[];
+}
 
 // Rails `CALLBACKS_OPTIONS` / `MESSAGE_OPTIONS` — option keys that are
 // stripped from the identity of an error for strict-match / hash purposes
@@ -68,14 +77,14 @@ function optionsEqual(a: unknown, b: unknown): boolean {
 export class Error {
   static i18nCustomizeFullMessage: boolean = false;
 
-  readonly base: AnyRecord;
+  readonly base: ModelBase;
   readonly attribute: string;
   readonly type: string;
   readonly rawType: string;
   readonly options: Record<string, unknown>;
 
   constructor(
-    base: AnyRecord,
+    base: ModelBase,
     attribute: string,
     type: string = "invalid",
     options: Record<string, unknown> = {},
@@ -103,7 +112,7 @@ export class Error {
    * between `type` and `rawType` when a NestedError-style override was in
    * play.
    */
-  dupWithBase(newBase: AnyRecord): Error {
+  dupWithBase(newBase: ModelBase): Error {
     return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
   }
 
@@ -206,7 +215,7 @@ export class Error {
    *
    * @internal Rails-private helper.
    */
-  protected attributesForHash(): [AnyRecord, string, string, Record<string, unknown>] {
+  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
     const own: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this.options)) {
       if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
@@ -230,9 +239,9 @@ export class Error {
     });
   }
 
-  static fullMessage(attribute: string, message: string, base: AnyRecord): string {
+  static fullMessage(attribute: string, message: string, base: ModelBase): string {
     if (attribute === "base") return message;
-    const modelClass = base?.constructor;
+    const modelClass = base?.constructor as ModelClass | undefined;
     const rawScope = modelClass?.i18nScope;
     const i18nScope = typeof rawScope === "string" ? rawScope : "activemodel";
 
@@ -249,7 +258,7 @@ export class Error {
     let format: string;
     if (Error.i18nCustomizeFullMessage) {
       const modelKey =
-        (modelClass as AnyRecord)?.modelName?.i18nKey ??
+        (modelClass as ModelClass)?.modelName?.i18nKey ??
         (modelClass?.name ? underscore(modelClass.name) : undefined);
       const defaults: string[] = [];
       if (modelKey) {
@@ -289,13 +298,13 @@ export class Error {
   static generateMessage(
     attribute: string,
     type: string,
-    base: AnyRecord,
+    base: ModelBase,
     options: Record<string, unknown> = {},
   ): string {
     const msgOpt = options.message;
     // Proc/lambda message: call with (base, options) and return result.
     if (typeof msgOpt === "function") {
-      const result = (msgOpt as (b: AnyRecord, o: Record<string, unknown>) => unknown)(
+      const result = (msgOpt as (b: ModelBase, o: Record<string, unknown>) => unknown)(
         base,
         options,
       );
@@ -310,9 +319,9 @@ export class Error {
       return Error.interpolate(msgOpt, options);
     }
 
-    const modelClass = base?.constructor;
+    const modelClass = base?.constructor as ModelClass | undefined;
     const modelKey =
-      (modelClass as AnyRecord)?.modelName?.i18nKey ??
+      modelClass?.modelName?.i18nKey ??
       (modelClass?.name ? underscore(modelClass.name) : undefined);
     const humanAttr = modelClass?.humanAttributeName
       ? modelClass.humanAttributeName(attribute)
@@ -321,7 +330,8 @@ export class Error {
     const i18nOptions: Record<string, unknown> = {
       model: modelKey,
       attribute: humanAttr,
-      value: base && attribute !== "base" ? base[attribute] : undefined,
+      value:
+        base && attribute !== "base" ? (base as Record<string, unknown>)[attribute] : undefined,
       object: base,
       ...options,
     };

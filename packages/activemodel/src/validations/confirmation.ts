@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { humanize } from "@blazetrails/activesupport";
 import { inspectAccessor } from "./_accessor.js";
 
@@ -12,12 +12,17 @@ export class ConfirmationValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare isConfirmationValueEqual: typeof isConfirmationValueEqual;
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
-    const confirmation = record.readAttribute?.(confirmationAttr) ?? record[confirmationAttr];
+    const rec = record as unknown as Record<string, unknown>;
+    const confirmation =
+      (rec.readAttribute as ((a: string) => unknown) | undefined)?.(confirmationAttr) ??
+      rec[confirmationAttr];
     if (confirmation == null) return;
     if (!this.isConfirmationValueEqual(record, attribute, value, confirmation)) {
-      const modelClass = (record as AnyRecord).constructor;
+      const modelClass = rec.constructor as
+        | { humanAttributeName?: (a: string) => string }
+        | undefined;
       const humanAttr = modelClass?.humanAttributeName
         ? modelClass.humanAttributeName(attribute)
         : humanize(attribute);
@@ -92,7 +97,7 @@ export function setupBang(this: ConfirmationHost, klass: unknown): void {
  */
 export function isConfirmationValueEqual(
   this: { options: Record<string, unknown> },
-  _record: AnyRecord,
+  _record: ValidatableRecord,
   _attribute: string,
   value: unknown,
   confirmed: unknown,

@@ -5,6 +5,7 @@ import {
   serializableAddIncludes,
   coerceForJson,
   type SerializeOptions,
+  type SerializationRecord,
 } from "../serialization.js";
 import { ModelName } from "../naming.js";
 
@@ -50,11 +51,14 @@ export class JSON {
   // model.ts:1179-1185 pattern).
   protected static _modelName?: ModelName;
 
+  /** Plain attribute store for lightweight adopters; subclasses override with their storage shape. */
+  declare attributes: Record<string, unknown>;
+
   // Rails: included do; extend ActiveModel::Naming; end — surfaces
   // model_name on the host class. Subclasses override to customize.
   static get modelName(): ModelName {
     if (!this._modelName || this._modelName.name !== this.name) {
-      this._modelName = new ModelName(this.name, { klass: this as unknown as { name: string } });
+      this._modelName = new ModelName(this.name, { klass: this });
     }
     return this._modelName;
   }
@@ -68,7 +72,7 @@ export class JSON {
    * `:methods`, `:include`.
    */
   serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash(this as unknown as Parameters<typeof serializableHash>[0], options);
+    return serializableHash(this as unknown as SerializationRecord, options);
   }
 
   /**
@@ -78,7 +82,7 @@ export class JSON {
    * @internal Rails-private helper.
    */
   protected attributeNamesForSerialization(): string[] {
-    return attributeNamesForSerialization(this);
+    return attributeNamesForSerialization(this as unknown as SerializationRecord);
   }
 
   /**
@@ -88,7 +92,7 @@ export class JSON {
    * @internal Rails-private helper.
    */
   protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
-    return serializableAttributes(this, attributeNames);
+    return serializableAttributes(this as unknown as SerializationRecord, attributeNames);
   }
 
   /**
@@ -101,7 +105,7 @@ export class JSON {
     options: SerializeOptions = {},
     callback: (association: string, records: unknown, opts: SerializeOptions) => void = () => {},
   ): void {
-    serializableAddIncludes(this, options, callback);
+    serializableAddIncludes(this as unknown as SerializationRecord, options, callback);
   }
 
   /**
@@ -168,10 +172,7 @@ export class JSON {
         );
       }
     }
-    (this as unknown as { attributes: Record<string, unknown> }).attributes = hash as Record<
-      string,
-      unknown
-    >;
+    this.attributes = hash as Record<string, unknown>;
     return this;
   }
 

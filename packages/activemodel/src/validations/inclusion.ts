@@ -1,5 +1,5 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import {
   checkValidityBang,
   delimiter,
@@ -44,7 +44,7 @@ export class InclusionValidator extends EachValidator {
     checkValidityBang.call(this);
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (!this.isInclude(record, value)) {
       record.errors.add(attribute, "inclusion", exceptInWithinMergeValue(this.options, value));
     }

@@ -1,7 +1,9 @@
 import { isBlank, underscore } from "@blazetrails/activesupport";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyRecord = any;
+/** Minimum shape required of a record passed to validators. */
+export interface ValidatableRecord {
+  errors: { add(attribute: string, type?: string, options?: Record<string, unknown>): void };
+}
 
 /**
  * Universal validator control keys recognised by `validates(...)`.
@@ -26,7 +28,7 @@ const FILTER_FROM_ERROR_OPTIONS = VALIDATOR_DEFAULT_KEYS.filter(
   (k) => k !== "strict",
 ) as readonly string[];
 
-export type ConditionFn = ((record: AnyRecord) => boolean) | string;
+export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
@@ -41,14 +43,15 @@ export interface ConditionalOptions {
   on?: string | string[];
 }
 
-export function evaluateCondition(record: AnyRecord, cond: ConditionFn): boolean {
+export function evaluateCondition(record: ValidatableRecord, cond: ConditionFn): boolean {
   if (typeof cond === "function") return cond(record);
-  const method = record[cond];
-  if (typeof method === "function") return method.call(record);
-  return !!method;
+  const rec = record as unknown as Record<string, unknown>;
+  const method = rec[cond];
+  if (typeof method === "function") return (method as () => boolean).call(record);
+  return !!rec[cond];
 }
 
-export function shouldValidate(record: AnyRecord, options: ConditionalOptions): boolean {
+export function shouldValidate(record: ValidatableRecord, options: ConditionalOptions): boolean {
   if (options.if !== undefined) {
     const conds = Array.isArray(options.if) ? options.if : [options.if];
     for (const cond of conds) {
@@ -86,7 +89,7 @@ export abstract class Validator {
     return (this.constructor as typeof Validator).kind;
   }
 
-  abstract validate(_record: AnyRecord): void;
+  abstract validate(_record: ValidatableRecord): void;
 }
 
 /**
@@ -117,17 +120,18 @@ export class EachValidator extends Validator {
    * NumericalityValidator) reuse this helper so the lookup chain
    * stays in one place.
    */
-  protected readAttributeForValidation(record: AnyRecord, attribute: string): unknown {
-    if (typeof record.readAttributeForValidation === "function") {
-      return record.readAttributeForValidation(attribute);
+  protected readAttributeForValidation(record: ValidatableRecord, attribute: string): unknown {
+    const rec = record as unknown as Record<string, unknown>;
+    if (typeof rec.readAttributeForValidation === "function") {
+      return (rec.readAttributeForValidation as (a: string) => unknown)(attribute);
     }
-    if (typeof record.readAttribute === "function") {
-      return record.readAttribute(attribute);
+    if (typeof rec.readAttribute === "function") {
+      return (rec.readAttribute as (a: string) => unknown)(attribute);
     }
-    return record[attribute];
+    return rec[attribute];
   }
 
-  validate(record: AnyRecord): void {
+  validate(record: ValidatableRecord): void {
     for (const attribute of this.attributes) {
       let value = this.readAttributeForValidation(record, attribute);
       if (value == null && this.options.allowNil === true) continue;
@@ -147,13 +151,13 @@ export class EachValidator extends Validator {
    */
   protected prepareValueForValidation(
     value: unknown,
-    _record: AnyRecord,
+    _record: ValidatableRecord,
     _attribute: string,
   ): unknown {
     return value;
   }
 
-  validateEach(_record: AnyRecord, _attribute: string, _value: unknown): void {
+  validateEach(_record: ValidatableRecord, _attribute: string, _value: unknown): void {
     throw new Error("Subclasses must implement validateEach(record, attribute, value)");
   }
 
@@ -191,17 +195,17 @@ export class EachValidator extends Validator {
  * Mirrors: ActiveModel::BlockValidator
  */
 export class BlockValidator extends EachValidator {
-  private block: (record: AnyRecord, attribute: string, value: unknown) => void;
+  private block: (record: ValidatableRecord, attribute: string, value: unknown) => void;
 
   constructor(
     options: Record<string, unknown> & { attributes?: string | string[] },
-    block: (record: AnyRecord, attribute: string, value: unknown) => void,
+    block: (record: ValidatableRecord, attribute: string, value: unknown) => void,
   ) {
     super(options);
     this.block = block;
   }
 
-  validateEach(record: AnyRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     this.block(record, attribute, value);
   }
 }

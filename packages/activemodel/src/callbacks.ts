@@ -1,7 +1,7 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecord = any;
-
 import { ArgumentError } from "./attribute-assignment.js";
+
+/** Minimum shape required of a record object threaded through a callback chain. */
+export type CallbackRecord = object;
 
 /**
  * Callbacks mixin contract — defines model callback registration.
@@ -32,15 +32,13 @@ export type Callbacks = CallbacksClassMethods;
  *
  * Mirrors: ActiveModel::Callbacks.define_model_callbacks
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- mixin `this` must accept any class constructor */
-export function defineModelCallbacks(this: any, event: string, ...rest: string[]): void;
+export function defineModelCallbacks(this: object, event: string, ...rest: string[]): void;
 export function defineModelCallbacks(
-  this: any,
+  this: object,
   event: string,
   ...rest: [...string[], DefineModelCallbacksOptions]
 ): void;
-export function defineModelCallbacks(this: any, ...args: unknown[]): void {
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   let options: DefineModelCallbacksOptions = {};
   const eventNames: string[] = [];
 
@@ -97,9 +95,7 @@ export function defineModelCallbacks(this: any, ...args: unknown[]): void {
   }
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- mixin host accepts any class constructor */
-type CallbackHost = any;
-/* eslint-enable @typescript-eslint/no-explicit-any */
+type CallbackHost = object;
 
 /**
  * Define a `before<Event>` class method that registers a before callback.
@@ -187,10 +183,10 @@ function resolveCallback(
     throw new ArgumentError(`Callback object must implement ${methodName} or ${camelMethod}`);
   }
   if (timing === "around") {
-    return ((record: AnyRecord, proceed: () => void | Promise<void>) =>
+    return ((record: CallbackRecord, proceed: () => void | Promise<void>) =>
       method.call(fnOrObject, record, proceed)) as AroundCallbackFn;
   }
-  return ((record: AnyRecord) => method.call(fnOrObject, record)) as CallbackFn;
+  return ((record: CallbackRecord) => method.call(fnOrObject, record)) as CallbackFn;
 }
 
 /**
@@ -208,9 +204,9 @@ function resolveCallback(
  * wrapped block may be async (e.g., DB operations in persistence). Around
  * callbacks that wrap async blocks should await proceed().
  */
-export type CallbackFn = (record: AnyRecord) => void | boolean | Promise<void | boolean>;
+export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;
 export type AroundCallbackFn = (
-  record: AnyRecord,
+  record: CallbackRecord,
   proceed: () => void | Promise<void>,
 ) => void | Promise<void>;
 
@@ -241,9 +237,9 @@ function swallowRejection(v: unknown): void {
 export type CallbackTiming = "before" | "after" | "around";
 export type CallbackEvent = string;
 
-export interface CallbackConditions<TRecord = AnyRecord> {
-  if?: (record: TRecord) => boolean;
-  unless?: (record: TRecord) => boolean;
+export interface CallbackConditions<TRecord = CallbackRecord> {
+  if?(record: TRecord): boolean;
+  unless?(record: TRecord): boolean;
   prepend?: boolean;
   on?: string | string[];
 }
@@ -330,7 +326,7 @@ export class CallbackChain {
     }
   }
 
-  private _shouldRun(entry: CallbackEntry, record: AnyRecord): boolean {
+  private _shouldRun(entry: CallbackEntry, record: CallbackRecord): boolean {
     if (entry.conditions?.if && !entry.conditions.if(record)) return false;
     if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
     if (
@@ -340,7 +336,7 @@ export class CallbackChain {
       const allowed = Array.isArray(entry.conditions.on)
         ? entry.conditions.on
         : [entry.conditions.on];
-      const action: string | undefined = record._transactionAction;
+      const action = (record as { _transactionAction?: string })._transactionAction;
       if (!action || !allowed.includes(action)) return false;
     }
     return true;
@@ -406,17 +402,17 @@ export class CallbackChain {
    */
   runBefore(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): boolean;
   runBefore(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean>;
   runBefore(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
     const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
@@ -456,17 +452,17 @@ export class CallbackChain {
    */
   runAfter(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): void;
   runAfter(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): void | Promise<void>;
   runAfter(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): void | Promise<void> {
     const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
@@ -503,19 +499,19 @@ export class CallbackChain {
    */
   runCallbacks(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     block: () => unknown,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): boolean;
   runCallbacks(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean>;
   runCallbacks(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
@@ -531,7 +527,7 @@ export class CallbackChain {
 
   private _runAroundBlockAndAfter(
     event: CallbackEvent,
-    record: AnyRecord,
+    record: CallbackRecord,
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {

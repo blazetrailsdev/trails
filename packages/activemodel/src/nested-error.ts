@@ -18,7 +18,7 @@ export class NestedError extends ActiveModelError {
   readonly innerError: ErrorLike;
 
   constructor(
-    base: unknown,
+    base: object | null,
     innerError: ErrorLike,
     options?: { attribute?: string; type?: string },
   ) {
@@ -52,7 +52,7 @@ export class NestedError extends ActiveModelError {
    * Inner error's own `base` is preserved (the inner error belongs to the
    * inner model, not the outer one) — only the NestedError's base changes.
    */
-  override dupWithBase(newBase: unknown): NestedError {
+  override dupWithBase(newBase: object | null): NestedError {
     const inner = this.innerError;
     const innerDup: ErrorLike =
       inner instanceof ActiveModelError

@@ -1,10 +1,10 @@
 import { EachValidator } from "../validator.js";
-import type { AnyRecord } from "../validator.js";
+import type { ValidatableRecord } from "../validator.js";
 import { isBlank, RoundingHelper } from "@blazetrails/activesupport";
 import { errorOptions } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 
-type NumericValue = number | ((record: AnyRecord) => number) | string;
+type NumericValue = number | ((record: ValidatableRecord) => number) | string;
 
 /**
  * Mirrors: ActiveModel::Validations::NumericalityValidator (numericality.rb)
@@ -48,7 +48,7 @@ export class NumericalityValidator extends EachValidator {
 
   private resolveNumeric(
     val: NumericValue | undefined,
-    record: AnyRecord,
+    record: ValidatableRecord,
     precision: number,
     scale?: number,
   ): number | undefined {
@@ -90,7 +90,7 @@ export class NumericalityValidator extends EachValidator {
    * an integer column casting "abc" to null mustn't bypass the check
    * (numericality.rb's validate_each operates on raw input).
    */
-  override validate(record: AnyRecord): void {
+  override validate(record: ValidatableRecord): void {
     for (const attribute of this.attributes) {
       // Reuses EachValidator.readAttributeForValidation so the lookup
       // chain stays in one place. The flow then runs through
@@ -106,7 +106,7 @@ export class NumericalityValidator extends EachValidator {
   }
 
   validateEach(
-    record: AnyRecord,
+    record: ValidatableRecord,
     attribute: string,
     value: unknown,
     precision = 15,
@@ -402,7 +402,7 @@ export function optionAsNumber(
   this: {
     resolveValue(record: unknown, value: unknown): unknown;
   },
-  record: AnyRecord,
+  record: ValidatableRecord,
   optionValue: unknown,
   precision: number,
   scale?: number,
@@ -488,7 +488,7 @@ export function isAllowOnlyInteger(
     options: Record<string, unknown>;
     resolveValue(record: unknown, value: unknown): unknown;
   },
-  record: AnyRecord,
+  record: ValidatableRecord,
 ): boolean {
   // Ruby truthiness: only nil/false count as false. Boolean(0) and
   // Boolean('') would diverge (Ruby treats both as truthy), so use the
@@ -538,7 +538,7 @@ interface RecordWithRawAttribute {
 export function prepareValueForValidation(
   this: unknown,
   value: unknown,
-  record: AnyRecord,
+  record: ValidatableRecord,
   attrName: string,
 ): unknown {
   // Rails has an early `return value if record_attribute_changed_in_place?`
@@ -557,7 +557,7 @@ export function prepareValueForValidation(
   // Rails per-attribute generated `${attr}_before_type_cast` methods.
   // Duck-type the lookup so other hosts implementing the same shape
   // (or AR Base subclasses) work too.
-  const r = record as RecordWithRawAttribute;
+  const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
   if (typeof r.cameFromUser === "function") {
     if (r.cameFromUser(attrName)) {
@@ -589,8 +589,11 @@ export function prepareValueForValidation(
  *
  * @internal Rails-private helper.
  */
-export function isRecordAttributeChangedInPlace(record: AnyRecord, attrName: string): boolean {
-  const r = record as RecordWithRawAttribute;
+export function isRecordAttributeChangedInPlace(
+  record: ValidatableRecord,
+  attrName: string,
+): boolean {
+  const r = record as unknown as RecordWithRawAttribute;
   return typeof r.attributeChangedInPlace === "function" && r.attributeChangedInPlace(attrName);
 }
 
