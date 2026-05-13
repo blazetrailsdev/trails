@@ -349,7 +349,6 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it("has one through polymorphic with source type", async () => {
-    // Club has_one :sponsor (polymorphic sponsorable), has_one :sponsored_member through sponsor with source_type
     class StClub extends Base {
       static {
         this.attribute("name", "string");
