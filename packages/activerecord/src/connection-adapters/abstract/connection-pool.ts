@@ -603,7 +603,7 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  async withConnection<T>(
+  withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
   ): Promise<T> {
@@ -616,24 +616,57 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
-    if (lease.connection) {
+    // Track whether we acquired the connection here (vs it being pre-leased).
+    const wasPreLeased = !!lease.connection;
+
+    // Wrap fn execution + cleanup into one place to avoid duplication across paths.
+    const runFn = (): Promise<T> => {
+      let result: T | Promise<T>;
       try {
-        return await fn(lease.connection);
-      } finally {
+        result = fn(lease.connection!);
+      } catch (err) {
         restoreSticky();
+        if (!wasPreLeased && !lease.sticky) this.releaseConnection();
+        return Promise.reject(err) as Promise<T>;
       }
+      return Promise.resolve(result).then(
+        (v) => {
+          restoreSticky();
+          if (!wasPreLeased && !lease.sticky) this.releaseConnection();
+          return v;
+        },
+        (e) => {
+          restoreSticky();
+          if (!wasPreLeased && !lease.sticky) this.releaseConnection();
+          throw e;
+        },
+      );
+    };
+
+    if (lease.connection) {
+      return runFn();
     }
 
-    lease.connection = await this.checkoutAsync(options.checkoutTimeout);
+    // Fast path: connection immediately available — stay synchronous.
     try {
-      const result = await fn(lease.connection);
+      lease.connection = this.checkout();
+      return runFn();
+    } catch (err) {
+      if (err instanceof ConnectionTimeoutError) {
+        // Pool saturated — wait asynchronously for a connection to become free.
+        return this.checkoutAsync(options.checkoutTimeout).then(
+          (conn) => {
+            lease.connection = conn;
+            return runFn();
+          },
+          (checkoutErr) => {
+            restoreSticky();
+            throw checkoutErr;
+          },
+        );
+      }
       restoreSticky();
-      if (!lease.sticky) this.releaseConnection();
-      return result;
-    } catch (error) {
-      restoreSticky();
-      if (!lease.sticky) this.releaseConnection();
-      throw error;
+      throw err;
     }
   }
 
