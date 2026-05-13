@@ -1231,7 +1231,7 @@ export class Model {
 
   _attributes: AttributeSet = new AttributeSet();
   _accessedFields: Set<string> = new Set();
-  errors!: Errors;
+  errors!: Errors<this>;
   _dirty!: DirtyTracker;
 
   /**

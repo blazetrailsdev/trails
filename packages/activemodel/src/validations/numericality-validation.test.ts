@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Model } from "../index.js";
+import { Model, Errors } from "../index.js";
 import { prepareValueForValidation } from "./numericality.js";
 
 describe("NumericalityValidationTest", () => {
@@ -658,12 +658,11 @@ describe("numericality with in: range", () => {
     // reaches isNumber.
     const { NumericalityValidator } = await import("./numericality.js");
     const v = new NumericalityValidator({ attributes: ["x"] });
-    const errors: Array<[string, string]> = [];
-    const stubRecord = {
-      errors: { add: (attr: string, key: string) => errors.push([attr, key]) },
-    };
+    const errs = new Errors(null);
+    const stubRecord = { errors: errs };
     v.validateEach(stubRecord, "x", { not: "a number" });
-    expect(errors).toEqual([["x", "not_a_number"]]);
+    expect(errs.get("x")).toHaveLength(1);
+    expect(errs.where("x", "not_a_number")).toHaveLength(1);
   });
 
   it("validates against the raw before-type-cast value (prepareValueForValidation)", () => {

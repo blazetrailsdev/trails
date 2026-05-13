@@ -1,6 +1,15 @@
 import { describe, it, expect, afterEach, expectTypeOf } from "vitest";
-import { Model, Errors, I18n, StrictValidationFailed } from "./index.js";
+import {
+  Model,
+  Errors,
+  I18n,
+  StrictValidationFailed,
+  Validator,
+  EachValidator,
+  BlockValidator,
+} from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
+import type { ValidatableRecord } from "./validator.js";
 
 describe("ErrorsTest", () => {
   // =========================================================================
@@ -1240,5 +1249,61 @@ describe("Errors<TBase> type parameter", () => {
       expectTypeOf(record).toEqualTypeOf<User | null>();
       return "invalid";
     });
+  });
+});
+
+describe("ValidatableRecord<TBase> type tests", () => {
+  interface User {
+    name: string;
+    age: number;
+  }
+  interface Post {
+    title: string;
+  }
+
+  it("ValidatableRecord<User>.errors is Errors<User>", () => {
+    type R = ValidatableRecord<User>;
+    expectTypeOf<R["errors"]>().toEqualTypeOf<Errors<User>>();
+  });
+
+  it("Errors<User> and Errors<Post> are not mutually assignable", () => {
+    expectTypeOf<Errors<User>>().not.toMatchTypeOf<Errors<Post>>();
+    expectTypeOf<Errors<Post>>().not.toMatchTypeOf<Errors<User>>();
+  });
+
+  it("ValidatableRecord<User> and ValidatableRecord<Post> are not mutually assignable", () => {
+    expectTypeOf<ValidatableRecord<User>>().not.toMatchTypeOf<ValidatableRecord<Post>>();
+    expectTypeOf<ValidatableRecord<Post>>().not.toMatchTypeOf<ValidatableRecord<User>>();
+  });
+
+  it("Validator<User>.validate receives ValidatableRecord<User>", () => {
+    abstract class UserValidator extends Validator<User> {}
+    expectTypeOf<Parameters<UserValidator["validate"]>[0]>().toEqualTypeOf<
+      ValidatableRecord<User>
+    >();
+  });
+
+  it("EachValidator<User>.validateEach receives ValidatableRecord<User>", () => {
+    class UserEachValidator extends EachValidator<User> {
+      validateEach(_record: ValidatableRecord<User>, _attr: string, _val: unknown): void {}
+    }
+    expectTypeOf<Parameters<UserEachValidator["validateEach"]>[0]>().toEqualTypeOf<
+      ValidatableRecord<User>
+    >();
+  });
+
+  it("BlockValidator<User> callback receives ValidatableRecord<User>", () => {
+    type BlockFn = ConstructorParameters<typeof BlockValidator<User>>[1];
+    expectTypeOf<Parameters<BlockFn>[0]>().toEqualTypeOf<ValidatableRecord<User>>();
+  });
+
+  it("Model subclass .errors resolves to Errors<ConcreteModel>", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person();
+    expectTypeOf(p.errors).toEqualTypeOf<Errors<Person>>();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Model } from "../index.js";
+import { Model, Errors } from "../index.js";
 import { WithValidator } from "./with.js";
 
 describe("ValidatesWithTest", () => {
@@ -286,7 +286,7 @@ describe("ValidatesWithTest", () => {
 describe("WithValidator arity dispatch", () => {
   it("calls zero-arity method without arguments", () => {
     const spy = vi.fn();
-    const record = { myCheck: spy, errors: { add: vi.fn() } };
+    const record = { myCheck: spy, errors: new Errors(null) };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
     expect(spy).toHaveBeenCalledWith();
@@ -299,7 +299,7 @@ describe("WithValidator arity dispatch", () => {
       myCheck(attr: string) {
         capturedArg = attr;
       },
-      errors: { add: vi.fn() },
+      errors: new Errors(null),
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
@@ -316,7 +316,7 @@ describe("WithValidator arity dispatch", () => {
       myCheck(...args: unknown[]) {
         received.push(...args);
       },
-      errors: { add: vi.fn() },
+      errors: new Errors(null),
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
@@ -330,7 +330,7 @@ describe("WithValidator arity dispatch", () => {
       myCheck(attr: string = "") {
         capturedArg = attr;
       },
-      errors: { add: vi.fn() },
+      errors: new Errors(null),
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");

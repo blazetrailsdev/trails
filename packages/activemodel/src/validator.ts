@@ -1,8 +1,9 @@
 import { isBlank, underscore } from "@blazetrails/activesupport";
+import type { Errors } from "./errors.js";
 
 /** Minimum shape required of a record passed to validators. */
 export interface ValidatableRecord<TBase extends object = object> {
-  errors: { add(attribute: string, type?: string, options?: Record<string, unknown>): void };
+  errors: Errors<TBase>;
 }
 
 /**

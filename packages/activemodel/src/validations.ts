@@ -48,8 +48,8 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
  *
  * @internal Rails-private helper.
  */
-export function initInternals(this: ValidationsInternalsHost): void {
-  this.errors = new Errors(this);
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  this.errors = new Errors(this as unknown as TBase);
   this._validationContext = null;
   this._contextForValidation = undefined;
 }
@@ -59,8 +59,8 @@ export function initInternals(this: ValidationsInternalsHost): void {
  * the validation-related fields satisfies it without circular imports
  * back to `Model`.
  */
-export interface ValidationsInternalsHost {
-  errors: Errors;
+export interface ValidationsInternalsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
   _validationContext: string | string[] | null;
   _contextForValidation?: ValidationContext;
 }
@@ -323,8 +323,8 @@ export function runValidationsBang(this: RunValidationsHost): boolean {
 /**
  * Host shape consumed by `runValidationsBang`.
  */
-export interface RunValidationsHost {
-  errors: Errors;
+export interface RunValidationsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
   _runValidateCallbacks(): void;
 }
 
@@ -335,7 +335,9 @@ export interface RunValidationsHost {
  *
  * @internal Rails-private helper.
  */
-export function raiseValidationError(this: { errors: Errors }): never {
+export function raiseValidationError<TBase extends object = object>(this: {
+  errors: Errors<TBase>;
+}): never {
   throw new ValidationError(this);
 }
 
