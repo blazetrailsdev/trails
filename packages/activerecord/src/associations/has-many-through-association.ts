@@ -6,6 +6,7 @@ import {
   HasManyThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
+import { raiseValidationError } from "../validations.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -55,8 +56,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // wrong direction for the build-and-save path.
     const joinRecord = buildThroughRecord(this, record);
     if (joinRecord && (joinRecord as any).changed) {
-      const saved = await (joinRecord as any).save();
-      if (!saved) return false;
+      const saved = await (joinRecord as any).save({ validate });
+      if (!saved) {
+        if (raise) raiseValidationError(joinRecord);
+        return false;
+      }
     }
     return true;
   }

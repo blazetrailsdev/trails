@@ -8040,4 +8040,58 @@ describe("HasManyThroughAssociationsTest", () => {
     const ids = posts.map((p) => p.id).sort();
     expect(ids).toEqual([post1.id, post2.id].sort());
   });
+
+  it("insertRecord with validate false skips join record validation", async () => {
+    // Rails autosave calls insertRecord(child, validate:false, raise:false) so join
+    // records with failing validations should still be saved when validate is false.
+    class IrpvJoin extends Base {
+      static {
+        this.attribute("irpv_owner_id", "integer");
+        this.attribute("irpv_item_id", "integer");
+        this.adapter = adapter;
+        this.validate((r: any) => {
+          r.errors.add("base", "Join always invalid");
+        });
+      }
+    }
+    class IrpvItem extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IrpvOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("IrpvJoin", IrpvJoin);
+    registerModel("IrpvItem", IrpvItem);
+    registerModel("IrpvOwner", IrpvOwner);
+    Associations.belongsTo.call(IrpvJoin, "irpv_item", {
+      className: "IrpvItem",
+      foreignKey: "irpv_item_id",
+    });
+    Associations.hasMany.call(IrpvOwner, "irpv_joins", {
+      className: "IrpvJoin",
+      foreignKey: "irpv_owner_id",
+    });
+    Associations.hasMany.call(IrpvOwner, "irpv_items", {
+      className: "IrpvItem",
+      through: "irpv_joins",
+      source: "irpv_item",
+    });
+
+    const owner = await IrpvOwner.create({ name: "Firm" });
+    const item = await IrpvItem.create({ name: "Item" });
+    // Call insertRecord directly (the autosave path), with validate=false.
+    // Before the fix, joinRecord.save() was called without validate option,
+    // which defaulted to true and would fail. Now it passes validate through.
+    const assoc = (owner as any).association("irpv_items");
+    const result = await assoc.insertRecord(item, false, false);
+    expect(result).toBe(true);
+    const joins = await IrpvJoin.all().where({ irpv_owner_id: owner.id }).toArray();
+    expect(joins.length).toBe(1);
+  });
 });

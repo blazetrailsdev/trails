@@ -669,15 +669,20 @@ export class UnknownAttributeReference extends ActiveRecordError {
 }
 
 export class UnknownPrimaryKey extends ActiveRecordError {
-  readonly model: typeof import("./base.js").Base;
+  readonly model: typeof import("./base.js").Base | null;
 
-  constructor(model: typeof import("./base.js").Base, description?: string) {
-    const msg = description
-      ? `Unknown primary key for table ${model.tableName} in model ${model.name}. ${description}`
-      : `Unknown primary key for table ${model.tableName} in model ${model.name}.`;
+  constructor(model?: typeof import("./base.js").Base | null, description?: string) {
+    let msg: string;
+    if (model == null) {
+      msg = "Unknown primary key.";
+    } else if (description) {
+      msg = `Unknown primary key for table ${model.tableName} in model ${model.name}.\n ${description}`;
+    } else {
+      msg = `Unknown primary key for table ${model.tableName} in model ${model.name}.`;
+    }
     super(msg);
     this.name = "UnknownPrimaryKey";
-    this.model = model;
+    this.model = model ?? null;
   }
 }
 

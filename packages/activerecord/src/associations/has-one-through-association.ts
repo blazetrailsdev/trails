@@ -82,7 +82,12 @@ async function createThroughRecord(
   const throughProxy = (assoc.owner as any).association?.(throughName);
   if (!throughProxy) return null;
 
-  const throughRecord = await throughProxy.loadTarget?.();
+  let throughRecord = await throughProxy.loadTarget?.();
+
+  if (throughRecord && (throughRecord as any).isDestroyed?.()) {
+    await throughProxy.reload?.();
+    throughRecord = (throughProxy as any).target ?? null;
+  }
 
   if (throughRecord && !record) {
     await (throughRecord as any).destroy?.();
@@ -156,22 +161,6 @@ function throughReflection(assoc: HasOneThroughAssociation): unknown {
     refl = refl.throughReflection;
   }
   return refl;
-}
-
-/**
- * Returns the live Association wrapper that owns the join model — i.e.,
- * `owner.association(throughReflection.name)`.
- *
- * Mirrors: ActiveRecord::Associations::ThroughAssociation#through_association
- *
- * @internal
- */
-function throughAssociation(assoc: HasOneThroughAssociation): unknown {
-  const tr = throughReflection(assoc) as { name?: string } | null;
-  if (!tr?.name) return null;
-  return (assoc.owner as unknown as { association?: (n: string) => unknown }).association?.(
-    tr.name,
-  );
 }
 
 /**

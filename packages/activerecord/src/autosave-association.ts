@@ -898,31 +898,6 @@ function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any)
 }
 
 /** @internal */
-function addAutosaveAssociationCallbacks(klass: any, reflection: any): void {
-  const saveName = `autosaveAssociatedRecordsFor_${reflection.name}`;
-  const isCol =
-    typeof reflection.isCollection === "function"
-      ? reflection.isCollection()
-      : !!reflection.collection;
-  const isHasOne =
-    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
-  if (isCol) {
-    defineNonCyclicMethod(klass, saveName, function (this: any) {
-      return saveCollectionAssociation.call(this, reflection);
-    });
-  } else if (isHasOne) {
-    defineNonCyclicMethod(klass, saveName, function (this: any) {
-      return saveHasOneAssociation.call(this, reflection);
-    });
-  } else {
-    defineNonCyclicMethod(klass, saveName, function (this: any) {
-      return saveBelongsToAssociation.call(this, reflection);
-    });
-  }
-  defineAutosaveValidationCallbacks(klass, reflection);
-}
-
-/** @internal */
 function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;

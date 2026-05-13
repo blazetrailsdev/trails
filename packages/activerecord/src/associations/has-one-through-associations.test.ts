@@ -747,6 +747,25 @@ describe("HasOneThroughAssociationsTest", () => {
     expect(reloaded).toBeNull();
   });
 
+  it("creating through record when through record destroyed reloads before reuse", async () => {
+    // Rails: createThroughRecord guards against reusing a destroyed through-record
+    // by reloading the proxy before proceeding.
+    const club1 = await Club.create({ name: "Old Club" });
+    const member = await Member.create({ name: "Groucho" });
+    const membership = await Membership.create({ member_id: member.id, club_id: club1.id });
+    // Destroy the membership so it's marked destroyed in memory
+    await membership.destroy();
+    expect(membership.isDestroyed()).toBe(true);
+    // Now create a new through association — should not try to reuse the destroyed record
+    const newClub = await createThroughAssociation(member, "club", { name: "New Club" });
+    expect(newClub.isPersisted()).toBe(true);
+    expect(newClub.name).toBe("New Club");
+    // A fresh membership should exist in the DB
+    const memberships = await Membership.all().where({ member_id: member.id }).toArray();
+    expect(memberships.length).toBe(1);
+    expect(memberships[0].club_id).toBe(newClub.id);
+  });
+
   it("set record after delete association", async () => {
     const club = await Club.create({ name: "Rails Club" });
     const member = await Member.create({ name: "DHH" });

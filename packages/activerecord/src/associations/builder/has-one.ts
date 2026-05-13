@@ -68,11 +68,7 @@ export class HasOne extends SingularAssociation {
     super.defineValidations(model, reflection);
     const options = reflection.options ?? {};
     if (options.required) {
-      if (typeof model.validatesPresenceOf === "function") {
-        model.validatesPresenceOf(reflection.name, { message: "required" });
-      } else if (typeof model.validates === "function") {
-        model.validates(reflection.name, { presence: { message: "required" } });
-      }
+      model.validatesPresenceOf(reflection.name, { message: "required" });
     }
   }
 

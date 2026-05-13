@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord } from "./index.js";
+import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord, UnknownPrimaryKey } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -241,5 +241,22 @@ describe("Error Classes (Rails-guided)", () => {
 
     await expect(p.save()).rejects.toThrow(ReadOnlyRecord);
     await expect(p.destroy()).rejects.toThrow(ReadOnlyRecord);
+  });
+});
+
+describe("UnknownPrimaryKeyTest", () => {
+  it("no-arg constructor produces generic message", () => {
+    const err = new UnknownPrimaryKey();
+    expect(err.message).toBe("Unknown primary key.");
+    expect(err.model).toBeNull();
+  });
+
+  it("description is separated by newline+space", () => {
+    class Dummy extends Base {
+      static _tableName = "dummies";
+    }
+    const err = new UnknownPrimaryKey(Dummy, "No PK configured.");
+    expect(err.message).toContain("\n No PK configured.");
+    expect(err.model).toBe(Dummy);
   });
 });
