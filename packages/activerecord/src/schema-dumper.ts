@@ -724,7 +724,7 @@ export class SchemaDumper {
       Object.assign(tableOpts, this.primaryKeyTableOptions(pkColumn));
     }
     tableOpts.force = "cascade";
-    if (adapterTableOpts.options) tableOpts.options = adapterTableOpts.options;
+    if (adapterTableOpts.options != null) tableOpts.options = adapterTableOpts.options;
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;
 
     lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);
