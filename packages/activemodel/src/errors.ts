@@ -446,7 +446,7 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
   readonly attribute: string;
 
   constructor(record: TRecord, attribute: string) {
-    const model = record?.constructor?.name ?? "Record";
+    const model = record.constructor?.name ?? "Record";
     super(`unknown attribute '${attribute}' for ${model}.`);
     this.name = "UnknownAttributeError";
     this.record = record;
