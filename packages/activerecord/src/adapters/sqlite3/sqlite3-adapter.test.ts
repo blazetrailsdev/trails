@@ -725,7 +725,9 @@ describe("SQLite3AdapterTest", () => {
   });
 
   it("table exists logs name", async () => {
-    adapter.exec(`CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`);
+    await adapter.exec(
+      `CREATE TABLE "ex" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "number" INTEGER)`,
+    );
     const sql =
       "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = 'ex' AND type IN ('table')";
     await assertLogged([[sql, "SCHEMA", []]], async () => {
