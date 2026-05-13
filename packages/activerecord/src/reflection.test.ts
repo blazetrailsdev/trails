@@ -846,7 +846,7 @@ describe("ReflectionTest", () => {
   it("association primary key raises when missing primary key", () => {
     class NoPkModel extends Base {
       static {
-        this._primaryKey = "" as any;
+        this._primaryKey = "";
         this.adapter = adapter;
       }
     }
@@ -865,7 +865,7 @@ describe("ReflectionTest", () => {
   it("active record primary key raises when missing primary key", () => {
     class NoPkOwner extends Base {
       static {
-        this._primaryKey = "" as any;
+        this._primaryKey = "";
         this.adapter = adapter;
       }
     }
