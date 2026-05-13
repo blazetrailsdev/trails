@@ -287,7 +287,7 @@ describe("SchemaDumperTest", () => {
         name: "test_uc_no_idx_position",
       });
       const output = await PgSchemaDumper.dump(testAdapter.innerAdapter);
-      expect(output).toContain("addUniqueConstraint");
+      expect(output).toContain("t.uniqueConstraint");
       // The backing index must not also appear as an addIndex call.
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
     },
