@@ -9,6 +9,9 @@ import { bookFixtureData } from "./books.js";
 import { authorAddressFixtureData } from "./author-addresses.js";
 import { companyFixtureData } from "./companies.js";
 import { accountFixtureData } from "./accounts.js";
+import { developerFixtureData } from "./developers.js";
+import { projectFixtureData } from "./projects.js";
+import { developersProjectsFixtureData } from "./developers-projects.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -327,6 +330,66 @@ describe("accountFixtureData", () => {
     const signals37Insert = insertSqls.find((s) => s.includes(String(fixtureId("signals37"))));
     expect(signals37Insert).toBeTruthy();
     expect(signals37Insert).toContain(String(fixtureId("first_firm")));
+  });
+});
+
+describe("developerFixtureData", () => {
+  it("exports david, jamis, dev_3..dev_10, poor_jamis", () => {
+    const keys = Object.keys(developerFixtureData);
+    expect(keys).toContain("david");
+    expect(keys).toContain("jamis");
+    expect(keys).toContain("poor_jamis");
+    expect(keys.filter((k) => k.startsWith("dev_"))).toHaveLength(8);
+  });
+
+  it("david has correct name and salary", () => {
+    expect(developerFixtureData.david.name).toBe("David");
+    expect(developerFixtureData.david.salary).toBe(80000);
+  });
+
+  it("jamis has high salary, poor_jamis has low salary", () => {
+    expect(developerFixtureData.jamis.salary).toBe(150000);
+    expect(developerFixtureData.poor_jamis.salary).toBe(9000);
+  });
+
+  it("defineFixtures inserts david", async () => {
+    const adapter = makeAdapter();
+    const Developer = makeModel("developers");
+    for (const k of Object.keys(developerFixtureData) as Array<keyof typeof developerFixtureData>) {
+      seedRows(Developer, k, { name: developerFixtureData[k].name });
+    }
+    await defineFixtures(adapter, Developer, developerFixtureData);
+    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("developers"));
+    expect(insertSqls.some((s) => s.includes(String(fixtureId("david"))))).toBe(true);
+  });
+});
+
+describe("projectFixtureData", () => {
+  it("exports active_record and action_controller", () => {
+    expect(Object.keys(projectFixtureData)).toEqual(["active_record", "action_controller"]);
+  });
+
+  it("active_record has correct name", () => {
+    expect(projectFixtureData.active_record.name).toBe("Active Record");
+  });
+});
+
+describe("developersProjectsFixtureData", () => {
+  it("exports four join rows", () => {
+    expect(Object.keys(developersProjectsFixtureData)).toHaveLength(4);
+  });
+
+  it("david_active_record refs david in developers and active_record in projects", () => {
+    const devRef = developersProjectsFixtureData.david_active_record.developer_id as FixtureRef;
+    const projRef = developersProjectsFixtureData.david_active_record.project_id as FixtureRef;
+    expect(isFixtureRef(devRef)).toBe(true);
+    expect(devRef.tableName).toBe("developers");
+    expect(devRef.fixtureName).toBe("david");
+    expect(isFixtureRef(projRef)).toBe(true);
+    expect(projRef.tableName).toBe("projects");
+    expect(projRef.fixtureName).toBe("active_record");
   });
 });
 
