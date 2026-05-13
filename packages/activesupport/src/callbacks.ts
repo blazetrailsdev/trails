@@ -1,30 +1,33 @@
 export type CallbackKind = "before" | "after" | "around";
 
-export type CallbackCondition = (target: any) => boolean;
+export type CallbackCondition<T extends object = object> = (target: T) => boolean;
 
-export interface CallbackOptions {
-  if?: CallbackCondition | CallbackCondition[];
-  unless?: CallbackCondition | CallbackCondition[];
+export interface CallbackOptions<T extends object = object> {
+  if?: CallbackCondition<T> | CallbackCondition<T>[];
+  unless?: CallbackCondition<T> | CallbackCondition<T>[];
   prepend?: boolean;
 }
 
-export interface DefineCallbacksOptions {
+export interface DefineCallbacksOptions<T extends object = object> {
   /**
    * Mirrors Rails' :terminator option. Pass a function `(target, fn) => boolean` (returns true
    * to halt) or `false` to disable halting entirely. Defaults to halting when a before callback
    * returns `false`.
    */
-  terminator?: ((target: any, fn: () => unknown) => boolean) | false;
+  terminator?: ((target: T, fn: () => unknown) => boolean) | false;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
 }
 
-export type BeforeCallback = (target: any) => unknown;
+export type BeforeCallback<T extends object = object> = (target: T) => unknown;
 
-export type AfterCallback = (target: any) => void;
+export type AfterCallback<T extends object = object> = (target: T) => void;
 
-export type AroundCallback = (target: any, next: () => void) => void;
-export type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
+export type AroundCallback<T extends object = object> = (target: T, next: () => void) => void;
+export type AnyCallback<T extends object = object> =
+  | BeforeCallback<T>
+  | AfterCallback<T>
+  | AroundCallback<T>;
 
 // ---------------------------------------------------------------------------
 // Conditionals
@@ -772,12 +775,12 @@ export namespace Filters {
 // Runtime API (unchanged from original)
 // ---------------------------------------------------------------------------
 
-export interface ClassMethods {
-  defineCallbacks(name: string, options?: DefineCallbacksOptions): void;
-  beforeCallback(name: string, callback: BeforeCallback, options?: CallbackOptions): void;
-  afterCallback(name: string, callback: AfterCallback, options?: CallbackOptions): void;
-  aroundCallback(name: string, callback: AroundCallback, options?: CallbackOptions): void;
-  skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback): void;
+export interface ClassMethods<T extends object = object> {
+  defineCallbacks(name: string, options?: DefineCallbacksOptions<T>): void;
+  beforeCallback(name: string, callback: BeforeCallback<T>, options?: CallbackOptions<T>): void;
+  afterCallback(name: string, callback: AfterCallback<T>, options?: CallbackOptions<T>): void;
+  aroundCallback(name: string, callback: AroundCallback<T>, options?: CallbackOptions<T>): void;
+  skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback<T>): void;
   resetCallbacks(name: string): void;
 }
 
@@ -805,30 +808,36 @@ function getCallbackChains(target: object): Map<string, CallbackChain> {
 }
 
 export namespace Callbacks {
-  export function defineCallbacks(
-    target: object,
+  export function defineCallbacks<T extends object>(
+    target: T,
     name: string,
-    options: DefineCallbacksOptions = {},
+    options: DefineCallbacksOptions<T> = {},
   ): void {
     const chains = getCallbackChains(target);
     if (!chains.has(name)) {
-      chains.set(name, new CallbackChain(name, options));
+      chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
     }
   }
 
-  export function setCallback(
-    target: object,
+  export function setCallback<T extends object>(
+    target: T,
     name: string,
     kind: CallbackKind,
-    callback: AnyCallback,
-    options: CallbackOptions = {},
+    callback: AnyCallback<T>,
+    options: CallbackOptions<T> = {},
   ): void {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
-    const entry = new Callback(name, callback, kind, options, chain.config);
+    const entry = new Callback(
+      name,
+      callback as AnyCallback,
+      kind,
+      options as CallbackOptions,
+      chain.config,
+    );
     if (options.prepend) {
       chain.prepend(entry);
     } else {
@@ -836,16 +845,16 @@ export namespace Callbacks {
     }
   }
 
-  export function skipCallback(
-    target: object,
+  export function skipCallback<T extends object>(
+    target: T,
     name: string,
     kind: CallbackKind,
-    callback?: AnyCallback,
+    callback?: AnyCallback<T>,
   ): void {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) return;
-    chain.remove(kind, callback);
+    chain.remove(kind, callback as AnyCallback | undefined);
   }
 
   export function resetCallbacks(target: object, name: string): void {
@@ -866,29 +875,29 @@ export namespace Callbacks {
   }
 }
 
-export function defineCallbacks(
-  target: object,
+export function defineCallbacks<T extends object>(
+  target: T,
   name: string,
-  options: DefineCallbacksOptions = {},
+  options: DefineCallbacksOptions<T> = {},
 ): void {
   Callbacks.defineCallbacks(target, name, options);
 }
 
-export function setCallback(
-  target: object,
+export function setCallback<T extends object>(
+  target: T,
   name: string,
   kind: CallbackKind,
-  callback: AnyCallback,
-  options: CallbackOptions = {},
+  callback: AnyCallback<T>,
+  options: CallbackOptions<T> = {},
 ): void {
   Callbacks.setCallback(target, name, kind, callback, options);
 }
 
-export function skipCallback(
-  target: object,
+export function skipCallback<T extends object>(
+  target: T,
   name: string,
   kind: CallbackKind,
-  callback?: AnyCallback,
+  callback?: AnyCallback<T>,
 ): void {
   Callbacks.skipCallback(target, name, kind, callback);
 }
@@ -905,35 +914,47 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
   const ActualBase = (Base ?? class {}) as TBase;
 
   class WithCallbacks extends ActualBase {
-    static defineCallbacks(name: string, options: DefineCallbacksOptions = {}): void {
+    static defineCallbacks<T extends object>(
+      this: { prototype: T },
+      name: string,
+      options: DefineCallbacksOptions<T> = {},
+    ): void {
       defineCallbacks(this.prototype, name, options);
     }
 
-    static beforeCallback(
+    static beforeCallback<T extends object>(
+      this: { prototype: T },
       name: string,
-      callback: BeforeCallback,
-      options: CallbackOptions = {},
+      callback: BeforeCallback<T>,
+      options: CallbackOptions<T> = {},
     ): void {
       setCallback(this.prototype, name, "before", callback, options);
     }
 
-    static afterCallback(
+    static afterCallback<T extends object>(
+      this: { prototype: T },
       name: string,
-      callback: AfterCallback,
-      options: CallbackOptions = {},
+      callback: AfterCallback<T>,
+      options: CallbackOptions<T> = {},
     ): void {
       setCallback(this.prototype, name, "after", callback, options);
     }
 
-    static aroundCallback(
+    static aroundCallback<T extends object>(
+      this: { prototype: T },
       name: string,
-      callback: AroundCallback,
-      options: CallbackOptions = {},
+      callback: AroundCallback<T>,
+      options: CallbackOptions<T> = {},
     ): void {
       setCallback(this.prototype, name, "around", callback, options);
     }
 
-    static skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback): void {
+    static skipCallback<T extends object>(
+      this: { prototype: T },
+      name: string,
+      kind: CallbackKind,
+      callback?: AnyCallback<T>,
+    ): void {
       skipCallback(this.prototype, name, kind, callback);
     }
 
