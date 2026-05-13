@@ -8,7 +8,7 @@ export const topicFixtureData = {
     author_email_address: "david@loudthinking.com",
     written_on: "2003-07-16 14:28:11",
     last_read: "2004-04-15",
-    bonus_time: "15:28:00",
+    bonus_time: "14:28:00",
     content: "Have a nice day",
     approved: false,
     replies_count: 1,
