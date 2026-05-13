@@ -1722,6 +1722,17 @@ describe("CallbackObject dispatch", () => {
     expect(log).toEqual(["after-mixin"]);
   });
 
+  it("skipCallback removes object-form callback by original reference", () => {
+    const target = { log: [] as string[] };
+    defineCallbacks(target, "save");
+    const obj = { beforeSave: (t: typeof target) => t.log.push("obj") };
+    setCallback(target, "save", "before", obj);
+    setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn"));
+    skipCallback(target, "save", "before", obj);
+    runCallbacks(target, "save");
+    expect(target.log).toEqual(["fn"]);
+  });
+
   it("CallbacksMixin.aroundCallback accepts object form", () => {
     class Model extends CallbacksMixin() {}
     Model.defineCallbacks("save");
