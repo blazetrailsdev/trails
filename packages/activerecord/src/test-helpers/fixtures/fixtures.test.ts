@@ -96,8 +96,9 @@ describe("postFixtureData", () => {
   });
 
   it("posts reference authors table via ref()", () => {
-    expect(isFixtureRef(postFixtureData.welcome.author_id)).toBe(true);
-    expect((postFixtureData.welcome.author_id as any).tableName).toBe("authors");
+    const authorRef = postFixtureData.welcome.author_id as FixtureRef;
+    expect(isFixtureRef(authorRef)).toBe(true);
+    expect(authorRef.tableName).toBe("authors");
   });
 });
 
