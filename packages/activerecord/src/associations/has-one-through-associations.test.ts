@@ -389,7 +389,7 @@ describe("HasOneThroughAssociationsTest", () => {
       sponsorable_type: "StMember",
     });
 
-    const sponsoredMember = await (club as any).loadHasOne("sponsoredMember");
+    const sponsoredMember = await club.loadHasOne("sponsoredMember");
     expect(sponsoredMember).not.toBeNull();
     expect((sponsoredMember as any).name).toBe("Groucho");
   });
