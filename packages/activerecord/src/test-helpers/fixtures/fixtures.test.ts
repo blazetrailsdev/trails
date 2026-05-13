@@ -4,6 +4,9 @@ import { defineFixtures, fixtureId, isFixtureRef, type FixtureRef } from "../def
 import { topicFixtureData } from "./topics.js";
 import { postFixtureData } from "./posts.js";
 import { commentFixtureData } from "./comments.js";
+import { authorFixtureData } from "./authors.js";
+import { bookFixtureData } from "./books.js";
+import { authorAddressFixtureData } from "./author-addresses.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -133,5 +136,93 @@ describe("commentFixtureData", () => {
     const greetingsInsert = insertSqls.find((s) => s.includes(String(fixtureId("greetings"))));
     expect(greetingsInsert).toBeTruthy();
     expect(greetingsInsert).toContain(String(fixtureId("welcome")));
+  });
+});
+
+describe("authorFixtureData", () => {
+  it("exports david, mary, bob", () => {
+    expect(Object.keys(authorFixtureData)).toEqual(["david", "mary", "bob"]);
+  });
+
+  it("david has correct name and cross-refs to author_addresses", () => {
+    expect(authorFixtureData.david.name).toBe("David");
+    const addrRef = authorFixtureData.david.author_address_id as FixtureRef;
+    expect(isFixtureRef(addrRef)).toBe(true);
+    expect(addrRef.tableName).toBe("author_addresses");
+    expect(addrRef.fixtureName).toBe("david_address");
+  });
+
+  it("mary refs mary_address", () => {
+    const addrRef = authorFixtureData.mary.author_address_id as FixtureRef;
+    expect(isFixtureRef(addrRef)).toBe(true);
+    expect(addrRef.fixtureName).toBe("mary_address");
+  });
+
+  it("defineFixtures resolves author→address cross-ref", async () => {
+    const adapter = makeAdapter();
+    const Author = makeModel("authors");
+    for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
+      seedRows(Author, k, { name: authorFixtureData[k].name });
+    }
+
+    await defineFixtures(adapter, Author, authorFixtureData);
+
+    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("authors"));
+    const davidInsert = insertSqls.find((s) => s.includes(String(fixtureId("david"))));
+    expect(davidInsert).toBeTruthy();
+    expect(davidInsert).toContain(String(fixtureId("david_address")));
+  });
+});
+
+describe("bookFixtureData", () => {
+  it("exports awdr, rfr, ddd, tlg", () => {
+    expect(Object.keys(bookFixtureData)).toEqual(["awdr", "rfr", "ddd", "tlg"]);
+  });
+
+  it("awdr has correct name and format", () => {
+    expect(bookFixtureData.awdr.name).toBe("Agile Web Development with Rails");
+    expect(bookFixtureData.awdr.format).toBe("paperback");
+  });
+
+  it("rfr refs authors via ref()", () => {
+    const authorRef = bookFixtureData.rfr.author_id as FixtureRef;
+    expect(isFixtureRef(authorRef)).toBe(true);
+    expect(authorRef.tableName).toBe("authors");
+    expect(authorRef.fixtureName).toBe("david");
+  });
+
+  it("defineFixtures resolves book→author cross-ref", async () => {
+    const adapter = makeAdapter();
+    const Book = makeModel("books");
+    for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
+      seedRows(Book, k, { name: bookFixtureData[k].name });
+    }
+
+    await defineFixtures(adapter, Book, bookFixtureData);
+
+    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
+    const awdrInsert = insertSqls.find((s) => s.includes(String(fixtureId("awdr"))));
+    expect(awdrInsert).toBeTruthy();
+    expect(awdrInsert).toContain(String(fixtureId("david")));
+  });
+});
+
+describe("authorAddressFixtureData", () => {
+  it("exports david_address, david_address_extra, mary_address, bob_address", () => {
+    expect(Object.keys(authorAddressFixtureData)).toEqual([
+      "david_address",
+      "david_address_extra",
+      "mary_address",
+      "bob_address",
+    ]);
+  });
+
+  it("address fixtures are empty objects (PK-only rows)", () => {
+    expect(authorAddressFixtureData.david_address).toEqual({});
+    expect(authorAddressFixtureData.mary_address).toEqual({});
   });
 });
