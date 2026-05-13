@@ -1827,6 +1827,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override resetBang(): void {
     if (this._client) {
+      this._cancelAnyRunningQuery();
       const client = this._client;
       this._client = null;
       client.query("ROLLBACK").then(
