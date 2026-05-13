@@ -27,6 +27,7 @@ import { Table } from "@blazetrails/arel";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { UnknownPrimaryKey } from "./errors.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -842,15 +843,42 @@ describe("ReflectionTest", () => {
     const specialRef = reflectOnAssociation(Author, "specialBooks") as AssociationReflection;
     expect(specialRef.associationPrimaryKey).toBe("isbn");
   });
-  it.skip("association primary key raises when missing primary key", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("association primary key raises when missing primary key", () => {
+    class NoPkModel extends Base {
+      static {
+        this._primaryKey = "";
+        this.adapter = adapter;
+      }
+    }
+    class Owner extends Base {
+      static {
+        this.attribute("no_pk_model_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NoPkModel", NoPkModel);
+    registerModel("Owner", Owner);
+    Associations.belongsTo.call(Owner, "noPkModel", {});
+    const ref = reflectOnAssociation(Owner, "noPkModel") as AssociationReflection;
+    expect(() => ref.associationPrimaryKey).toThrow(UnknownPrimaryKey);
   });
-  it.skip("active record primary key raises when missing primary key", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("active record primary key raises when missing primary key", () => {
+    class NoPkOwner extends Base {
+      static {
+        this._primaryKey = "";
+        this.adapter = adapter;
+      }
+    }
+    class Target extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NoPkOwner", NoPkOwner);
+    registerModel("Target", Target);
+    Associations.hasMany.call(NoPkOwner, "targets", {});
+    const ref = reflectOnAssociation(NoPkOwner, "targets") as AssociationReflection;
+    expect(() => ref.activeRecordPrimaryKey).toThrow(UnknownPrimaryKey);
   });
   it("foreign type", () => {
     class Sponsor extends Base {

@@ -207,6 +207,7 @@ export {
   UnknownAttributeError,
   NameError,
   SQLWarning,
+  UnknownPrimaryKey,
   MultiparameterAssignmentErrors,
   SerializationTypeMismatch,
   ConnectionNotDefined,

@@ -668,6 +668,19 @@ export class UnknownAttributeReference extends ActiveRecordError {
   }
 }
 
+export class UnknownPrimaryKey extends ActiveRecordError {
+  readonly model: typeof import("./base.js").Base;
+
+  constructor(model: typeof import("./base.js").Base, description?: string) {
+    const msg = description
+      ? `Unknown primary key for table ${model.tableName} in model ${model.name}. ${description}`
+      : `Unknown primary key for table ${model.tableName} in model ${model.name}.`;
+    super(msg);
+    this.name = "UnknownPrimaryKey";
+    this.model = model;
+  }
+}
+
 export class MultiparameterAssignmentErrors extends ActiveRecordError {
   readonly errors: Error[];
 

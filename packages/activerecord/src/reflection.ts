@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
+import { ConfigurationError, UnknownPrimaryKey } from "./errors.js";
 import {
   underscore,
   pluralize,
@@ -31,6 +32,8 @@ import {
   HasManyThroughSourceAssociationNotFoundError,
   HasOneAssociationPolymorphicThroughError,
   HasOneThroughCantAssociateThroughCollection,
+  InverseOfAssociationNotFoundError,
+  InverseOfAssociationRecursiveError,
 } from "./associations/errors.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
@@ -187,13 +190,14 @@ export class AbstractReflection {
     if (!this.isPolymorphic() && this.hasInverse()) {
       const inverse = this.inverseOf();
       if (inverse == null) {
-        throw new Error(`Could not find the inverse association for ${(this as any).name}.`);
+        const inverseOf = (this as any).inverseName?.() as string;
+        throw new InverseOfAssociationNotFoundError((this as any).name, inverseOf);
       }
       if (
         (inverse as any).name === (this as any).name &&
         (inverse as any).activeRecord === (this as any).activeRecord
       ) {
-        throw new Error(`Inverse association for ${(this as any).name} is recursive.`);
+        throw new InverseOfAssociationRecursiveError((this as any).name, (inverse as any).name);
       }
     }
   }
@@ -450,7 +454,7 @@ export class AssociationReflection extends MacroReflection {
     const opts = { ...options };
 
     if (opts.queryConstraints) {
-      throw new Error(
+      throw new ArgumentError(
         `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${name}\` is not allowed. ` +
           `To get the same behavior, use the \`foreignKey\` option instead.`,
       );
@@ -462,7 +466,7 @@ export class AssociationReflection extends MacroReflection {
     }
 
     if (opts.className && typeof opts.className === "function") {
-      throw new Error("A class was passed to `:className` but we are expecting a string.");
+      throw new ArgumentError("A class was passed to `:className` but we are expecting a string.");
     }
 
     super(name, scope, opts, activeRecord);
@@ -515,7 +519,7 @@ export class AssociationReflection extends MacroReflection {
     const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
 
     if (primaryQueryConstraints.length > 2) {
-      throw new Error(
+      throw new ConfigurationError(
         `The query constraints list on the \`${this.activeRecord.name}\` model has more than 2 ` +
           `attributes. Active Record is unable to derive the query constraints ` +
           `for the association. You need to explicitly define the query constraints ` +
@@ -524,7 +528,7 @@ export class AssociationReflection extends MacroReflection {
     }
 
     if (ownerPkStr && !primaryQueryConstraints.includes(ownerPkStr)) {
-      throw new Error(
+      throw new ConfigurationError(
         `The query constraints on the \`${this.activeRecord.name}\` model do not include the primary ` +
           `key so Active Record is unable to derive the foreign key constraints for ` +
           `the association. You need to explicitly define the query constraints for this ` +
@@ -542,7 +546,7 @@ export class AssociationReflection extends MacroReflection {
       return [firstKey, foreignKey];
     }
 
-    throw new Error(
+    throw new ConfigurationError(
       `Active Record couldn't correctly interpret the query constraints ` +
         `for the \`${this.activeRecord.name}\` model. The query constraints on \`${this.activeRecord.name}\` are ` +
         `\`${primaryQueryConstraints}\` and the foreign key is \`${foreignKey}\`. ` +
@@ -741,7 +745,7 @@ export class AssociationReflection extends MacroReflection {
 
   protected primaryKeyForModel(klass: typeof Base): string | string[] {
     const pk = klass.primaryKey;
-    if (!pk) throw new Error(`Unknown primary key for ${klass.name}`);
+    if (!pk) throw new UnknownPrimaryKey(klass);
     return pk;
   }
 
@@ -783,7 +787,7 @@ export class AssociationReflection extends MacroReflection {
     // Instance-dependent scopes also receive the owner (arity >= 2).
     // Rails checks scope.arity == 0 because it uses instance_exec for the relation.
     if (this.scope.length > 1) {
-      throw new Error(
+      throw new ArgumentError(
         `The association scope '${this.name}' is instance dependent (the scope ` +
           `block takes more than one argument). Eager loading instance dependent scopes is not supported.`,
       );
@@ -832,9 +836,7 @@ export class AssociationReflection extends MacroReflection {
       if (!name) return null;
       const inverseRelationship = associatedClass._reflectOnAssociation(name);
       if (!inverseRelationship) {
-        throw new Error(
-          `Could not find the inverse association for ${this.name} (:${name} in ${associatedClass.name})`,
-        );
+        throw new InverseOfAssociationNotFoundError(this.name, name, [], associatedClass.name);
       }
       return inverseRelationship;
     }
