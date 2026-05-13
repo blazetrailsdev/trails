@@ -665,10 +665,19 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaJoinTablesTest", () => {
-    it.skip("create join table", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("create join table", async () => {
+      try {
+        await adapter.exec(`CREATE SCHEMA IF NOT EXISTS some_schema`);
+        await adapter.createJoinTable("some_schema.users", "some_schema.roles");
+        expect(await adapter.tableExists("some_schema.roles_users")).toBe(true);
+        const cols = await adapter.columns("some_schema.roles_users");
+        const colNames = cols.map((c) => c.name);
+        expect(colNames).toContain("role_id");
+        expect(colNames).toContain("user_id");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS some_schema.roles_users`);
+        await adapter.exec(`DROP SCHEMA IF EXISTS some_schema CASCADE`);
+      }
     });
   });
 
@@ -699,15 +708,29 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaCreateTableOptionsTest", () => {
-    it.skip("list partition options is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("list partition options is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE list_partitioned (id integer, city varchar(50)) PARTITION BY LIST (city)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper({}).dumpTable(lines, "list_partitioned");
+        expect(lines.join("\n")).toContain(`options: "PARTITION BY LIST (city)"`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS list_partitioned`);
+      }
     });
-    it.skip("range partition options is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("range partition options is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE range_partitioned (id integer, amount integer) PARTITION BY RANGE (amount)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper({}).dumpTable(lines, "range_partitioned");
+        expect(lines.join("\n")).toContain(`options: "PARTITION BY RANGE (amount)"`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS range_partitioned`);
+      }
     });
     it("inherited table options is dumped", async () => {
       try {
@@ -737,10 +760,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
       }
     });
-    it.skip("no partition options are dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("no partition options are dumped", async () => {
+      try {
+        await adapter.exec(`CREATE TABLE regular_table (id integer, name varchar(50))`);
+        const lines: string[] = [];
+        await adapter.createSchemaDumper({}).dumpTable(lines, "regular_table");
+        expect(lines.join("\n")).not.toContain("PARTITION BY");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS regular_table`);
+      }
     });
   });
 });

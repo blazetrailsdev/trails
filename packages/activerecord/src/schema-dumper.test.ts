@@ -753,6 +753,24 @@ describe("SchemaDumperAdapterTest", () => {
     const result = await TopLevelDumper.dumpWithVersion(adapter);
     expect(result).toContain("Schema version: 20240201000000");
   });
+
+  it("emitTable forwards comment from fetchTableOptions into createTable options", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["users"],
+      columns: () => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: () => [],
+    };
+    class CommentDumper extends TopLevelDumper {
+      protected override fetchTableOptions(_tableName: string): Record<string, unknown> {
+        return { comment: "user accounts" };
+      }
+    }
+    const dumper = CommentDumper.create(source as any);
+    const lines: string[] = [];
+    await (dumper as any).table("users", lines);
+    expect(lines.join("\n")).toContain(`comment: "user accounts"`);
+  });
 });
 
 describe("SchemaDumper async header ordering", () => {

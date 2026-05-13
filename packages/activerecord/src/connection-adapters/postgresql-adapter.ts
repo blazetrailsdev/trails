@@ -2873,6 +2873,42 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
+  // createJoinTable override adapts the callback-first createTable API for join tables.
+  // @ts-expect-error TS2416
+  async createJoinTable(
+    table1: string,
+    table2: string,
+    options?: { tableName?: string; [key: string]: unknown } | ((t: SimpleTableBuilder) => void),
+    fn?: (t: SimpleTableBuilder) => void,
+  ): Promise<void> {
+    let tableName: string | undefined;
+    let definer: ((t: SimpleTableBuilder) => void) | undefined;
+    if (typeof options === "function") {
+      definer = options;
+    } else if (options) {
+      tableName = options.tableName;
+      definer = fn;
+    }
+    const joinName =
+      tableName ??
+      [table1, table2]
+        .sort()
+        .join("\0")
+        .replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3")
+        .replaceAll("\0", "_");
+    const t1Col = `${singularize(table1.split(".").at(-1) ?? table1)}_id`;
+    const t2Col = `${singularize(table2.split(".").at(-1) ?? table2)}_id`;
+    await this.createTable(
+      joinName,
+      (t: SimpleTableBuilder) => {
+        t.integer(t1Col);
+        t.integer(t2Col);
+        if (definer) definer(t);
+      },
+      { id: false },
+    );
+  }
+
   // PG callback-first signature diverges from the abstract base; harmonize in a follow-up.
   // @ts-expect-error TS2416
   async createTable(

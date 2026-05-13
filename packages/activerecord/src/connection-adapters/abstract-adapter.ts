@@ -271,7 +271,9 @@ export interface AbstractAdapter {
   createJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string } | ((t: TableDefinition) => void),
+    options?:
+      | { tableName?: string; columnOptions?: Record<string, unknown>; [key: string]: unknown }
+      | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;
   dropJoinTable(table1: string, table2: string, options?: Record<string, unknown>): Promise<void>;

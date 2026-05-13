@@ -563,10 +563,16 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    options?: { tableName?: string } | ((t: TableDefinition) => void),
+    options?:
+      | { tableName?: string; columnOptions?: Record<string, unknown>; [key: string]: unknown }
+      | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let opts: { tableName?: string } = {};
+    let opts: {
+      tableName?: string;
+      columnOptions?: Record<string, unknown>;
+      [key: string]: unknown;
+    } = {};
     let definer: ((t: TableDefinition) => void) | undefined;
     if (typeof options === "function") {
       definer = options;
@@ -574,10 +580,12 @@ export class SchemaStatements {
       opts = options;
       definer = fn;
     }
-    const tableName = opts.tableName ?? [table1, table2].sort().join("_");
+    const tableName = this.findJoinTableName(table1, table2, opts);
+    const t1Col = `${this.referenceNameForTable(table1)}_id`;
+    const t2Col = `${this.referenceNameForTable(table2)}_id`;
     await this.createTable(tableName, { id: false }, (t) => {
-      t.integer(`${table1.replace(/s$/, "")}_id`);
-      t.integer(`${table2.replace(/s$/, "")}_id`);
+      t.integer(t1Col);
+      t.integer(t2Col);
       if (definer) definer(t);
     });
   }
