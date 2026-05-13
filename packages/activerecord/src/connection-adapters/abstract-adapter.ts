@@ -662,7 +662,7 @@ export class AbstractAdapter implements Quoting {
     this._connection = null;
   }
 
-  verifyBang(): void {
+  async verifyBang(): Promise<void> {
     if (!this.active) {
       this.reconnectBang();
     }
@@ -1427,7 +1427,7 @@ export class AbstractAdapter implements Quoting {
       let reconnectable = this.isReconnectCanRestoreState();
       const last = this.secondsSinceLastActivity;
       const recent = last !== null && last < this.verifyTimeout;
-      if (!this._verified && !recent && reconnectable && !allowRetry) this.verifyBang();
+      if (!this._verified && !recent && reconnectable && !allowRetry) await this.verifyBang();
 
       for (;;) {
         try {

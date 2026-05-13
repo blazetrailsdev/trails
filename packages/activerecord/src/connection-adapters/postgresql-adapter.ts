@@ -332,6 +332,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         },
       };
       this._driverPool = new pg.Pool(this._pgPoolOptions);
+      this._driverPool.on("error", () => {});
       return;
     }
     // Rails' database.yml merges driver connection params + adapter
@@ -419,6 +420,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       },
     };
     this._driverPool = new pg.Pool(this._pgPoolOptions);
+    // Suppress unhandled error events from idle pool clients (e.g. a
+    // server-side FATAL from idle_in_transaction_session_timeout or
+    // pg_terminate_backend). Without this listener Node emits an
+    // uncaughtException; with it the pool quietly removes the dead client.
+    this._driverPool.on("error", () => {});
   }
 
   /**
@@ -1769,6 +1775,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   connect(): void {
     if (!this._pgPoolOptions || this._driverPool) return;
     this._driverPool = new pg.Pool(this._pgPoolOptions);
+    this._driverPool.on("error", () => {});
   }
 
   /**
@@ -1810,6 +1817,36 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override reconnectBang(): void {
     this.reconnect();
+  }
+
+  /**
+   * Mirrors Rails' `PostgreSQLAdapter#active?` + `AbstractAdapter#verify!`.
+   * Pings the server with a lightweight query; on PG::Error (server-side
+   * disconnect, timeout, pg_terminate_backend) tears down the pool and
+   * reconnects so the next checkout gets a fresh connection.
+   *
+   * @internal
+   */
+  override async verifyBang(): Promise<void> {
+    if (!this._driverPool) {
+      this.reconnect();
+      this.verifiedBang();
+      return;
+    }
+    // Use _driverPool.connect() directly rather than _acquireFreshClient():
+    // _acquireFreshClient releases the client internally on drain failure,
+    // which would cause a double-release in the finally block here. A plain
+    // pool checkout + query(";") is sufficient for a liveness ping.
+    let client: pg.PoolClient | null = null;
+    try {
+      client = await this._driverPool.connect();
+      await client.query(";");
+    } catch {
+      this.reconnect();
+    } finally {
+      if (client) client.release();
+    }
+    this.verifiedBang();
   }
 
   /**

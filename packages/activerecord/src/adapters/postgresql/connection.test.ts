@@ -144,12 +144,14 @@ describeIfPg("PostgresqlConnectionTest", () => {
     }
   });
 
-  it.skip("reconnection after actual disconnection with verify", async () => {
-    // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in connection
-    // ROOT-CAUSE: connection-adapters/postgresql/connection.ts missing or incomplete Rails parity
-    // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/connection.ts; affects ~10–47 tests in connection.test.ts
-    // Requires verify!() / active?() and fixture connection pool repair infrastructure
-  });
+  it("reconnection after actual disconnection with verify", async () => {
+    await adapter.execQuery("BEGIN");
+    await adapter.execQuery("SET idle_in_transaction_session_timeout = '10ms'");
+    await new Promise((r) => setTimeout(r, 50));
+    await adapter.verifyBang();
+    const result = await adapter.execQuery("SELECT 1 AS n");
+    expect(result.rows).toEqual([[1]]);
+  }, 10_000);
 
   it("set session variable true", async () => {
     const a = new PostgreSQLAdapter({
