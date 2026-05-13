@@ -751,7 +751,6 @@ describe("HasOneThroughAssociationsTest", () => {
     // Rails: createThroughRecord guards against reusing a destroyed through-record
     // by reloading the proxy before proceeding.
     const club1 = await Club.create({ name: "Old Club" });
-    const club2 = await Club.create({ name: "New Club" });
     const member = await Member.create({ name: "Groucho" });
     const membership = await Membership.create({ member_id: member.id, club_id: club1.id });
     // Destroy the membership so it's marked destroyed in memory

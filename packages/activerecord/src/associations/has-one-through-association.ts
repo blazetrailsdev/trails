@@ -86,7 +86,7 @@ async function createThroughRecord(
 
   if (throughRecord && (throughRecord as any).isDestroyed?.()) {
     await throughProxy.reload?.();
-    throughRecord = await throughProxy.loadTarget?.();
+    throughRecord = (throughProxy as any).target ?? null;
   }
 
   if (throughRecord && !record) {
