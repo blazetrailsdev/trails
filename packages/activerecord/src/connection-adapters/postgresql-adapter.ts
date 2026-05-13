@@ -1813,6 +1813,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors Rails' `PostgreSQLAdapter#reset!`. Rails issues ROLLBACK (if in
+   * a transaction), DISCARD ALL, then re-runs configure_connection on the
+   * single raw connection. pg doesn't expose PQreset; the pool equivalent is
+   * to fire a best-effort ROLLBACK on the held client (if any), then tear
+   * down the entire pool — discarding all physical connections and their
+   * session state. The rollback is fire-and-forget so reconnect() always runs
+   * even if the connection is already broken, matching Rails' error-tolerant
+   * reset semantics. New checkouts are configured on first use via
+   * `_maybeConfigureConnection`, matching Rails' `super` call.
+   *
+   * @internal
+   */
+  override resetBang(): void {
+    if (this._client) {
+      this._cancelAnyRunningQuery();
+      const client = this._client;
+      this._releaseStatementPool(client);
+      this._client = null;
+      client.query("ROLLBACK").then(
+        () => client.release(),
+        (err) => client.release(toError(err)),
+      );
+    }
+    this.reconnect();
+    super.resetBang();
+  }
+
+  /**
    * Mirrors Rails' `PostgreSQLAdapter#configure_connection`. Applies
    * per-connection settings (standard_conforming_strings, intervalstyle,
    * client_min_messages, session variables). Delegates to the internal
