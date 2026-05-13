@@ -14,7 +14,7 @@ import type { IndexInfo } from "../../schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   // Per-table constraint cache populated by filterIndexesForDump and consumed
-  // by exclusionConstraintsInCreate / uniqueConstraintsInCreate to avoid
+  // by _emitExclusionConstraints / _emitUniqueConstraints to avoid
   // fetching the same constraint lists twice per table.
   private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
   private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;

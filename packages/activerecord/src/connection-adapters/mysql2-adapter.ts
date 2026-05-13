@@ -21,6 +21,35 @@ import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { Text as TextType } from "../type/text.js";
+import type { SchemaSource } from "../schema-dumper.js";
+import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
+import { SchemaStatements } from "./abstract/schema-statements.js";
+
+/**
+ * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
+ * the `temporary: true` option, which emits `DROP TEMPORARY TABLE` — a MySQL/MariaDB
+ * extension required to drop temporary tables without affecting base tables.
+ *
+ * Returned by `Mysql2Adapter#schemaStatements()` so Migration#schema picks it up.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
+ */
+class MysqlSchemaStatements extends SchemaStatements {
+  override async dropTable(
+    ...args:
+      | [string, ...string[]]
+      | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
+  ): Promise<void> {
+    const last = args[args.length - 1];
+    const hasOpts = last !== null && last !== undefined && typeof last === "object";
+    const opts = (hasOpts ? last : {}) as { temporary?: boolean };
+    if (opts.temporary) {
+      return (this.adapter as Mysql2Adapter).dropTable(...(args as any));
+    }
+
+    return super.dropTable(...(args as any));
+  }
+}
 
 /**
  * Mysql2-flavored StatementPool. Evicted entries send COM_STMT_CLOSE
@@ -672,6 +701,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
+  createSchemaDumper(source: SchemaSource, _options: unknown = {}): MysqlSchemaDumper {
+    const dumper = new MysqlSchemaDumper(source);
+    dumper.connection = this;
+    return dumper;
+  }
+
+  override schemaStatements(host?: DatabaseAdapter): MysqlSchemaStatements {
+    return new MysqlSchemaStatements((host ?? this) as DatabaseAdapter);
+  }
+
   // ── Schema DDL ──
 
   /**
@@ -842,10 +881,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       const numPrec = r.num_precision ?? r.NUM_PRECISION ?? r.NUMERIC_PRECISION;
       const numScale = r.num_scale ?? r.NUM_SCALE ?? r.NUMERIC_SCALE;
       // character_maximum_length covers string types; for numeric types (float, int, etc.)
-      // it is NULL, so fall back to the type-map limit (e.g. float→24, double→53).
+      // it is NULL, so fall back to the type-map limit keyed on DATA_TYPE (not COLUMN_TYPE).
+      // On MariaDB, FLOAT COLUMN_TYPE is normalized to "double" which gives limit=53; using
+      // DATA_TYPE ("float") correctly yields limit=24 matching Rails' native_database_types.
       const charLimitVal = charLen != null ? Number(charLen) : null;
       const typeMapLimit =
-        charLimitVal == null ? (this.lookupCastType(sqlType)?.limit ?? null) : null;
+        charLimitVal == null ? (this.lookupCastType(baseType)?.limit ?? null) : null;
       const meta = new SqlTypeMetadata({
         sqlType,
         type: baseType,

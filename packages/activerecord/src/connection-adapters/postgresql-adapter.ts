@@ -96,6 +96,7 @@ import {
 import { joinTableName as deriveJoinTableName } from "../migration/join-table.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
+import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 
 const OID_JSON = 114;
@@ -4411,8 +4412,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return new PgTable(tableName, base as SchemaStatementsConstraintLike);
   }
 
-  createSchemaDumper(_options: unknown): PgSchemaDumper {
-    return new PgSchemaDumper(this);
+  createSchemaDumper(source: SchemaSource, _options: unknown = {}): PgSchemaDumper {
+    return new PgSchemaDumper(source);
   }
 
   /** @internal */

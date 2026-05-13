@@ -295,6 +295,19 @@ describe("defineFixtures", () => {
     expect(nullCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("polymorphic ref: ref() on a poly key throws instead of inserting spurious column", async () => {
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+
+    await expect(
+      defineFixtures(adapter, Tagging, { bad: { taggable: ref("posts", "welcome") as any } }),
+    ).rejects.toThrow(/polymorphic association.*model instance/);
+  });
+
   it("polymorphic ref: non-instance non-null value throws a clear error", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);

@@ -484,9 +484,7 @@ export class SchemaDumper {
     // the base class when unavailable, which is what the old code always did.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
-      dumper = (source as any).createSchemaDumper({}) as SchemaDumper;
-      // Swap to the wrapped source so column normalization applies.
-      (dumper as any)._source = wrappedSource;
+      dumper = (source as any).createSchemaDumper(wrappedSource, {}) as SchemaDumper;
     } else {
       dumper = this.create(wrappedSource);
     }

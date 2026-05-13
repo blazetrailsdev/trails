@@ -484,4 +484,29 @@ export interface DatabaseAdapter {
    * @internal
    */
   readonly arelVisitor?: Visitors.ToSql;
+
+  /**
+   * Whether the adapter supports table/column comments.
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_comments?
+   */
+  supportsComments?(): boolean;
+
+  /**
+   * Whether comments can be emitted inline in CREATE TABLE (vs a separate ALTER).
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_comments_in_create?
+   */
+  supportsCommentsInCreate?(): boolean;
+
+  /**
+   * Set or clear the comment on a table after it has been created.
+   * Called by SchemaStatements#createTable when supportsComments() is true but
+   * supportsCommentsInCreate() is false. The second parameter is `string | null`
+   * when called from createTable; MySQL's override also accepts a column-map shape
+   * for `change_table_comment`, hence the wider union in the interface.
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#change_table_comment
+   */
+  changeTableComment?(
+    tableName: string,
+    comment: string | null | Record<string, string | null>,
+  ): Promise<void>;
 }

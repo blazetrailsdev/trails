@@ -679,6 +679,15 @@ describeIfMysql("Mysql2Adapter", () => {
       });
     });
 
+    it("schemaStatements().dropTable supports temporary:true via MigrationContext.schema path", async () => {
+      await adapter.exec("CREATE TEMPORARY TABLE `tmp_sweep_e` (`id` INT)");
+      const schema = adapter.schemaStatements!();
+      await (schema as any).dropTable("tmp_sweep_e", { temporary: true });
+      // If temporary: true wasn't forwarded the SQL would be DROP TABLE (not TEMPORARY),
+      // which would fail on MariaDB / MySQL when only a temp table with that name exists.
+      // The absence of an error confirms the correct SQL was issued.
+    });
+
     it("SchemaCache.addAll populates from MySQL", async () => {
       // Integration with Phase 5's dumpSchemaCache — MySQL now exposes
       // the full surface (dataSources/columns/primaryKey/indexes) the
@@ -818,6 +827,14 @@ describeIfMysql("Mysql2Adapter", () => {
       expect((adapter as any).isTextType("  VARCHAR(255)  ")).toBe(true);
       expect((adapter as any).isTextType("TEXT")).toBe(true);
       expect((adapter as any).isTextType("  INT  ")).toBe(false);
+    });
+
+    it("lookupCastType float vs double limits differ (MariaDB FLOAT fix)", () => {
+      // On MariaDB, information_schema.column_type reports "double" for FLOAT columns.
+      // columns() must use DATA_TYPE ("float") not COLUMN_TYPE ("double") for the limit
+      // lookup so float columns get limit=24 instead of the double limit of 53.
+      expect((adapter as any).lookupCastType("float")?.limit).toBe(24);
+      expect((adapter as any).lookupCastType("double")?.limit).toBe(53);
     });
 
     it("connect is a no-op and leaves the adapter connected", () => {

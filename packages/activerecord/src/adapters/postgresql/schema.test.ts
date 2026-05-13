@@ -714,7 +714,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE TABLE list_partitioned (id integer, city varchar(50)) PARTITION BY LIST (city)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "list_partitioned");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "list_partitioned");
         expect(lines.join("\n")).toContain(`options: "PARTITION BY LIST (city)"`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS list_partitioned`);
@@ -726,7 +726,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE TABLE range_partitioned (id integer, amount integer) PARTITION BY RANGE (amount)`,
         );
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "range_partitioned");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "range_partitioned");
         expect(lines.join("\n")).toContain(`options: "PARTITION BY RANGE (amount)"`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS range_partitioned`);
@@ -739,7 +739,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes)`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes)"`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -752,7 +752,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.exec(`CREATE TABLE transportation_modes (kind varchar(50))`);
         await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes, vehicles)`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
         expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes, vehicles)"`);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS trains`);
@@ -764,7 +764,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.exec(`CREATE TABLE regular_table (id integer, name varchar(50))`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "regular_table");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "regular_table");
         expect(lines.join("\n")).not.toContain("PARTITION BY");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS regular_table`);
@@ -777,7 +777,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         await adapter.exec(`COMMENT ON TABLE commented_table IS 'a test table'`);
         const lines: string[] = [];
-        await adapter.createSchemaDumper({}).dumpTable(lines, "commented_table");
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "commented_table");
         const dump = lines.join("\n");
         expect(dump).toContain(`comment: "a test table"`);
         await adapter.exec(`DROP TABLE IF EXISTS commented_table`);

@@ -150,19 +150,14 @@ export class SchemaStatements {
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
-    if (options.comment != null && options.comment.length > 0) {
-      const adapterWithComments = this.adapter as {
-        supportsComments?: () => boolean;
-        supportsCommentsInCreate?: () => boolean;
-        changeTableComment?: (name: string, comment: string | null) => Promise<void>;
-      };
-      if (
-        adapterWithComments.supportsComments?.() &&
-        !adapterWithComments.supportsCommentsInCreate?.() &&
-        typeof adapterWithComments.changeTableComment === "function"
-      ) {
-        await adapterWithComments.changeTableComment(name, options.comment);
-      }
+    if (
+      options.comment != null &&
+      options.comment.length > 0 &&
+      this.adapter.supportsComments?.() &&
+      !this.adapter.supportsCommentsInCreate?.() &&
+      typeof this.adapter.changeTableComment === "function"
+    ) {
+      await this.adapter.changeTableComment(name, options.comment);
     }
 
     for (const idx of td.indexes) {

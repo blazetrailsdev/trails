@@ -77,6 +77,8 @@ import {
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import type { SchemaSource } from "../schema-dumper.js";
+import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 
 /**
  * SQLite-specific DateTime type.
@@ -911,6 +913,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       throw new Error("No index name or column specified");
     }
     await this.executeMutation(`DROP INDEX IF EXISTS ${quoteColumnName(indexName)}`);
+  }
+
+  createSchemaDumper(source: SchemaSource, _options: unknown = {}): Sqlite3SchemaDumper {
+    return new Sqlite3SchemaDumper(source);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?

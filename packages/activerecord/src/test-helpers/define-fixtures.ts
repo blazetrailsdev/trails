@@ -177,7 +177,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
     for (const [col, val] of Object.entries(attrs)) {
       if (col === pkCol) continue; // deterministic ID wins; caller must not override it
 
+      // Evaluate poly once so both the ref guard and the expansion below share the result.
+      const poly = findPolymorphicRef(ModelClass, col);
+
       if (isFixtureRef(val)) {
+        if (poly) {
+          throw new Error(
+            `defineFixtures: "${col}" is a polymorphic association — pass a model instance instead of ref(). ` +
+              `Use explicit ${poly.typeColumn}/${poly.idColumn} if you need to reference by ID.`,
+          );
+        }
         row[col] = fixtureId(val.fixtureName);
         continue;
       }
@@ -190,7 +199,6 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       // Polymorphic belongs_to: "col" is an association name, never a real column.
       // It must always be consumed here — falling through to `row[col] = val` would
       // attempt to INSERT a non-existent column and break fixture insertion.
-      const poly = findPolymorphicRef(ModelClass, col);
       if (poly) {
         const hasType = poly.typeColumn in attrs;
         const hasId = poly.idColumn in attrs;
