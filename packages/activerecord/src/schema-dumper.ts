@@ -694,7 +694,8 @@ export class SchemaDumper {
     this.tableName = tableName;
     try {
       const columns = await this._source.columns(tableName);
-      const indexes = await this._source.indexes(tableName);
+      const rawIndexes = await this._source.indexes(tableName);
+      const indexes = await this.filterIndexesForDump(tableName, rawIndexes);
       const adapterTableOpts = await this.fetchTableOptions(tableName);
       this.emitTable(lines, tableName, columns, indexes, adapterTableOpts);
       await this.checkConstraintsInCreate(tableName, lines);
@@ -702,6 +703,19 @@ export class SchemaDumper {
     } finally {
       this.tableName = undefined;
     }
+  }
+
+  /**
+   * Hook for adapter subclasses to strip indexes that are already represented
+   * by a constraint (e.g. PG unique/exclusion constraints create backing indexes
+   * that must not also appear as `addIndex` calls). Default: identity.
+   * @internal
+   */
+  protected async filterIndexesForDump(
+    _tableName: string,
+    indexes: IndexInfo[],
+  ): Promise<IndexInfo[]> {
+    return indexes;
   }
 
   /** @internal */
