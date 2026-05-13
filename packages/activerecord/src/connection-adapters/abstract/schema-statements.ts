@@ -581,16 +581,35 @@ export class SchemaStatements {
       definer = fn;
     }
     const tableName = this.findJoinTableName(table1, table2, opts);
-    const { columnOptions = {}, tableName: _t, ...rest } = opts;
+    const {
+      columnOptions = {},
+      tableName: _t,
+      force,
+      ifNotExists,
+      options: tableOptions,
+      comment,
+      temporary,
+    } = opts;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
     const t1Ref = this.referenceNameForTable(table1);
     const t2Ref = this.referenceNameForTable(table2);
 
-    await this.createTable(tableName, { ...rest, id: false } as any, (t) => {
-      t.references(t1Ref, mergedColOpts);
-      t.references(t2Ref, mergedColOpts);
-      if (definer) definer(t);
-    });
+    await this.createTable(
+      tableName,
+      {
+        id: false,
+        ...(force !== undefined && { force: force as boolean | "cascade" }),
+        ...(ifNotExists !== undefined && { ifNotExists: ifNotExists as boolean }),
+        ...(tableOptions !== undefined && { options: tableOptions as string }),
+        ...(comment !== undefined && { comment: comment as string }),
+        ...(temporary !== undefined && { temporary: temporary as boolean }),
+      },
+      (t) => {
+        t.references(t1Ref, mergedColOpts);
+        t.references(t2Ref, mergedColOpts);
+        if (definer) definer(t);
+      },
+    );
   }
 
   async dropJoinTable(

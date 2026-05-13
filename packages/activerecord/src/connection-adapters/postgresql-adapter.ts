@@ -2900,16 +2900,35 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       definer = fn;
     }
     const joinName = opts.tableName ?? deriveJoinTableName(table1, table2);
-    const { columnOptions = {}, tableName: _t, ...rest } = opts;
+    const {
+      columnOptions = {},
+      tableName: _t,
+      force,
+      ifNotExists,
+      options: tableOptions,
+      comment,
+      temporary,
+    } = opts;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
     const ss = this.schemaStatements(this as unknown as DatabaseAdapter);
     const t1Ref = ss.referenceNameForTable(table1);
     const t2Ref = ss.referenceNameForTable(table2);
-    await ss.createTable(joinName, { ...rest, id: false } as any, (td) => {
-      td.references(t1Ref, mergedColOpts as any);
-      td.references(t2Ref, mergedColOpts as any);
-      if (definer) definer(td as unknown as AbstractTableDefinition);
-    });
+    await ss.createTable(
+      joinName,
+      {
+        id: false,
+        ...(force !== undefined && { force: force as boolean | "cascade" }),
+        ...(ifNotExists !== undefined && { ifNotExists: ifNotExists as boolean }),
+        ...(tableOptions !== undefined && { options: tableOptions as string }),
+        ...(comment !== undefined && { comment: comment as string }),
+        ...(temporary !== undefined && { temporary: temporary as boolean }),
+      },
+      (td) => {
+        td.references(t1Ref, mergedColOpts);
+        td.references(t2Ref, mergedColOpts);
+        if (definer) definer(td as unknown as AbstractTableDefinition);
+      },
+    );
   }
 
   // PG callback-first signature diverges from the abstract base; harmonize in a follow-up.
