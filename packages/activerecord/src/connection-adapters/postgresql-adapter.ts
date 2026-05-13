@@ -419,6 +419,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       },
     };
     this._driverPool = new pg.Pool(this._pgPoolOptions);
+    // Suppress unhandled error events from idle pool clients (e.g. a
+    // server-side FATAL from idle_in_transaction_session_timeout or
+    // pg_terminate_backend). Without this listener Node emits an
+    // uncaughtException; with it the pool quietly removes the dead client.
+    this._driverPool.on("error", () => {});
   }
 
   /**
@@ -1769,6 +1774,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   connect(): void {
     if (!this._pgPoolOptions || this._driverPool) return;
     this._driverPool = new pg.Pool(this._pgPoolOptions);
+    this._driverPool.on("error", () => {});
   }
 
   /**
@@ -1826,20 +1832,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this.verifiedBang();
       return;
     }
+    // Use _driverPool.connect() directly rather than _acquireFreshClient():
+    // _acquireFreshClient releases the client internally on drain failure,
+    // which would cause a double-release in the finally block here. A plain
+    // pool checkout + query(";") is sufficient for a liveness ping.
     let client: pg.PoolClient | null = null;
     try {
       client = await this._driverPool.connect();
       await client.query(";");
-      client.release();
     } catch {
-      if (client) {
-        try {
-          client.release(new Error("verify failed"));
-        } catch {
-          /* ignore */
-        }
-      }
       this.reconnect();
+    } finally {
+      if (client) client.release();
     }
     this.verifiedBang();
   }
