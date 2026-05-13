@@ -272,6 +272,7 @@ export type {
   CallbackCondition,
   CallbackOptions,
   DefineCallbacksOptions,
+  RunCallbacksOptions,
   BeforeCallback,
   AfterCallback,
   AroundCallback,

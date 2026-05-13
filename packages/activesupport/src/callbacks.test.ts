@@ -121,6 +121,22 @@ describe("Callbacks", () => {
 
       expect(target.log).toEqual(["halted"]);
     });
+
+    it("after callbacks still run when around does not yield", () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (t: any) => {
+        t.log.push("around");
+      });
+      setCallback(target, "save", "after", (t: any) => {
+        t.log.push("after");
+      });
+      const result = runCallbacks(target, "save", () => {
+        target.log.push("block");
+      });
+      expect(result).toBe(false);
+      expect(target.log).toEqual(["around", "after"]);
+    });
   });
 
   describe("conditional callbacks", () => {
@@ -1505,6 +1521,13 @@ describe("custom terminator function", () => {
     expect(log).toContain("second");
     expect(log).toContain("block");
   });
+
+  it("throws when an async before callback is registered with a custom terminator", () => {
+    const t = {};
+    defineCallbacks(t, "v", { terminator: (_t, fn) => fn() === "halt" });
+    setCallback(t, "v", "before", async () => "halt");
+    expect(() => runCallbacks(t, "v")).toThrow(/unsupported with a custom terminator/);
+  });
 });
 
 describe("skipAfterCallbacksIfTerminated", () => {
@@ -1537,5 +1560,63 @@ describe("skipAfterCallbacksIfTerminated", () => {
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     runCallbacks(target, "save");
     expect(log).toContain("after");
+  });
+});
+
+describe("Callbacks — async propagation", () => {
+  it("sync chain returns synchronously when no callback is async", () => {
+    const t = { log: [] as string[] };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "before", (x: any) => x.log.push("b"));
+    setCallback(t, "save", "after", (x: any) => x.log.push("a"));
+    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    expect(r).toBe(true);
+    expect(typeof (r as any)?.then).toBe("undefined");
+    expect(t.log).toEqual(["b", "block", "a"]);
+  });
+
+  it("async before callback propagates Promise and preserves order", async () => {
+    const t = { log: [] as string[] };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "before", async (x: any) => x.log.push("b1"));
+    setCallback(t, "save", "before", (x: any) => x.log.push("b2"));
+    setCallback(t, "save", "after", (x: any) => x.log.push("a"));
+    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    expect(r).toBeInstanceOf(Promise);
+    await r;
+    expect(t.log).toEqual(["b1", "b2", "block", "a"]);
+  });
+
+  it("async after callback propagates Promise and runs in reverse order", async () => {
+    const t = { log: [] as string[] };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "after", async (x: any) => x.log.push("a1"));
+    setCallback(t, "save", "after", (x: any) => x.log.push("a2"));
+    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    expect(r).toBeInstanceOf(Promise);
+    await r;
+    expect(t.log).toEqual(["block", "a2", "a1"]);
+  });
+
+  it("async around callback propagates Promise and runs after callbacks when complete", async () => {
+    const t = { log: [] as string[] };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "around", async (x: any, next) => {
+      x.log.push("ao");
+      await next();
+      x.log.push("ac");
+    });
+    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
+    const r = runCallbacks(t, "save", async () => t.log.push("block"));
+    expect(r).toBeInstanceOf(Promise);
+    await r;
+    expect(t.log).toEqual(["ao", "block", "ac", "after"]);
+  });
+
+  it("strict:sync throws on async callback", () => {
+    const t = {};
+    defineCallbacks(t, "v");
+    setCallback(t, "v", "before", async () => {});
+    expect(() => runCallbacks(t, "v", undefined, { strict: "sync" })).toThrow(/sync chain/);
   });
 });

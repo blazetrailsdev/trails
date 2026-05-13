@@ -13,6 +13,11 @@ export interface DefineCallbacksOptions<T extends object = object> {
    * Mirrors Rails' :terminator option. Pass a function `(target, fn) => boolean` (returns true
    * to halt) or `false` to disable halting entirely. Defaults to halting when a before callback
    * returns `false`.
+   *
+   * **Async constraint**: async before callbacks (those returning a Promise) are only supported
+   * with the default terminator. Registering a custom terminator function and then running an
+   * async before callback throws at runtime, because the terminator would receive a Promise
+   * rather than the resolved callback result and cannot make a correct halt decision.
    */
   terminator?: ((target: T, fn: () => unknown) => boolean) | false;
   skipAfterCallbacksIfTerminated?: boolean;
@@ -21,13 +26,37 @@ export interface DefineCallbacksOptions<T extends object = object> {
 
 export type BeforeCallback<T extends object = object> = (target: T) => unknown;
 
-export type AfterCallback<T extends object = object> = (target: T) => void;
+export type AfterCallback<T extends object = object> = (target: T) => unknown;
 
-export type AroundCallback<T extends object = object> = (target: T, next: () => void) => void;
+export type AroundCallback<T extends object = object> = (
+  target: T,
+  next: () => void | Promise<void>,
+) => void | Promise<void>;
 export type AnyCallback<T extends object = object> =
   | BeforeCallback<T>
   | AfterCallback<T>
   | AroundCallback<T>;
+
+export interface RunCallbacksOptions {
+  /** If "sync", throw when any callback or block returns a Promise. */
+  strict?: "sync";
+}
+
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return (
+    v !== null &&
+    (typeof v === "object" || typeof v === "function") &&
+    typeof (v as { then?: unknown }).then === "function"
+  );
+}
+
+/**
+ * Consume a thenable's rejection before re-throwing in strict-sync mode so the
+ * error we throw isn't accompanied by an unhandled-rejection warning.
+ */
+function swallowRejection(v: unknown): void {
+  if (isThenable(v)) void Promise.resolve(v).catch(() => {});
+}
 
 // ---------------------------------------------------------------------------
 // Conditionals
@@ -554,13 +583,32 @@ export class CallbackSequence {
     this.afterList?.forEach((a) => a.call(env));
   }
 
-  invoke(target: object, block?: () => void): boolean {
+  invoke(
+    target: object,
+    block: (() => unknown) | undefined,
+    opts: RunCallbacksOptions & { strict: "sync" },
+  ): boolean;
+  invoke(
+    target: object,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean>;
+  invoke(
+    target: object,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
     const callbackChain = this._callbackChain;
     if (!callbackChain) {
-      block?.();
-      return true;
+      const r = block?.();
+      if (!isThenable(r)) return true;
+      if (opts?.strict === "sync") {
+        swallowRejection(r);
+        throw new Error("Async block on chain with no callbacks");
+      }
+      return Promise.resolve(r).then(() => true);
     }
-    return callbackChain._invoke(target, block);
+    return callbackChain._invoke(target, block, opts);
   }
 
   // Back-reference set by CallbackChain.compile() for invoke() convenience
@@ -574,15 +622,17 @@ export class CallbackSequence {
 export class CallbackChain {
   readonly name: string;
   readonly config: DefineCallbacksOptions;
+  /** True when a custom (non-default) terminator was supplied at define time. */
+  private readonly _hasCustomTerminator: boolean;
   private chain: Callback[];
 
   constructor(name: string, config: DefineCallbacksOptions = {}) {
+    this._hasCustomTerminator = typeof config.terminator === "function";
     this.name = name;
-    this.config = {
-      // Default terminator: halt if before-callback returns false
-      terminator: (_target: object, fn: () => unknown) => fn() === false,
-      ...config,
-    };
+    // Do NOT inject a default terminator into config — undefined means "use default"
+    // and is what gets passed when cloning chains. Injecting a function would make
+    // cloned chains think they have a custom terminator (_hasCustomTerminator).
+    this.config = { ...config };
     this.chain = [];
   }
 
@@ -633,62 +683,224 @@ export class CallbackChain {
     return this.chain.length === 0;
   }
 
-  _invoke(target: object, block?: () => void): boolean {
+  _invoke(
+    target: object,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
     const terminatorFn = this.config.terminator;
     const skipAfterIfTerminated = this.config.skipAfterCallbacksIfTerminated ?? false;
-    const entries = this.chain;
+    const befores = this.chain.filter((e) => e.kind === "before");
+    const afters = this.chain.filter((e) => e.kind === "after");
+    const arounds = this.chain.filter((e) => e.kind === "around");
 
-    const befores = entries.filter((e) => e.kind === "before");
-    const afters = entries.filter((e) => e.kind === "after");
-    const arounds = entries.filter((e) => e.kind === "around");
-
-    // Run before callbacks; track whether the chain was halted.
+    // ---- Before phase ----
     let halted = false;
-    for (const entry of befores) {
+    for (let i = 0; i < befores.length; i++) {
+      const entry = befores[i];
       if (!Value.check(entry.options, target)) continue;
       const cb = entry.filter as BeforeCallback;
+      // Capture cbResult as a side effect inside the terminator's fn() so the
+      // terminator controls whether the callback runs at all (its API contract).
+      let cbResult: unknown;
+      let terminatorHalted = false;
       if (terminatorFn === false) {
-        cb(target); // terminator disabled — never halt
+        cbResult = cb(target);
       } else if (terminatorFn) {
-        if (terminatorFn(target, () => cb(target))) {
-          halted = true;
-          break;
-        }
+        terminatorHalted = terminatorFn(target, () => {
+          cbResult = cb(target);
+          return cbResult;
+        });
       } else {
-        if (cb(target) === false) {
-          halted = true;
-          break;
+        cbResult = cb(target);
+      }
+
+      if (isThenable(cbResult)) {
+        if (opts?.strict === "sync") {
+          swallowRejection(cbResult);
+          throw new Error(
+            `Async callback on sync chain "${this.name}" — before returned a Promise`,
+          );
         }
+        // Custom terminators receive fn()'s return value to decide halting, but async
+        // callbacks return a Promise — the terminator cannot await it to get the real
+        // result. Fail fast rather than silently apply wrong halt logic.
+        if (this._hasCustomTerminator) {
+          swallowRejection(cbResult);
+          throw new Error(
+            `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
+              `Custom terminators cannot evaluate Promise-returning callbacks. ` +
+              `Use the default terminator (halt on false) or make all before callbacks synchronous.`,
+          );
+        }
+        const remaining = befores.slice(i + 1);
+        // Default-terminator async halt: resolved === false. The terminator already fired
+        // once (for invocation control, saw the Promise); we use === false directly to avoid
+        // calling it a second time with the resolved value.
+        const asyncHalted = (v: unknown) => terminatorFn !== false && v === false;
+        return (async () => {
+          if (asyncHalted(await cbResult))
+            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+          for (const rem of remaining) {
+            if (!Value.check(rem.options, target)) continue;
+            // Invoke each remaining before through the terminator's lazy wrapper so
+            // the terminator retains invocation control (it may choose not to call fn).
+            let remVal: unknown;
+            let remSyncHalt = false;
+            if (terminatorFn === false) {
+              remVal = (rem.filter as BeforeCallback)(target);
+            } else if (terminatorFn) {
+              remSyncHalt = terminatorFn(target, () => {
+                remVal = (rem.filter as BeforeCallback)(target);
+                return remVal;
+              });
+            } else {
+              remVal = (rem.filter as BeforeCallback)(target);
+            }
+            const resolved = isThenable(remVal) ? await remVal : remVal;
+            if (remSyncHalt || asyncHalted(resolved))
+              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+          }
+          return this._runAroundAndAfter(
+            arounds,
+            afters,
+            target,
+            block,
+            skipAfterIfTerminated,
+            opts,
+          );
+        })();
+      }
+
+      if (terminatorFn === false) {
+        // never halt
+      } else if (terminatorFn ? terminatorHalted : cbResult === false) {
+        halted = true;
+        break;
       }
     }
 
-    // Run around+block only when not halted (mirrors Rails CallbackSequence#skip?).
-    if (!halted) {
-      let core = () => {
-        block?.();
-      };
-      for (let i = arounds.length - 1; i >= 0; i--) {
-        const entry = arounds[i];
-        const inner = core;
-        if (!Value.check(entry.options, target)) continue;
-        core = () => {
-          (entry.filter as AroundCallback)(target, inner);
-        };
-      }
-      core();
-    }
+    if (halted) return this._runAfters(afters, true, skipAfterIfTerminated, target, opts);
+    return this._runAroundAndAfter(arounds, afters, target, block, skipAfterIfTerminated, opts);
+  }
 
-    // After callbacks run even when halted unless skipAfterCallbacksIfTerminated is true.
-    // Mirrors: Filters::After#call — `(!halted || !@halting)`
-    if (!halted || !skipAfterIfTerminated) {
-      for (let i = afters.length - 1; i >= 0; i--) {
-        const entry = afters[i];
-        if (!Value.check(entry.options, target)) continue;
-        (entry.filter as AfterCallback)(target);
+  private _runAfters(
+    afters: Callback[],
+    halted: boolean,
+    skipIfTerminated: boolean,
+    target: object,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
+    if (halted && skipIfTerminated) return false;
+    for (let i = afters.length - 1; i >= 0; i--) {
+      const entry = afters[i];
+      if (!Value.check(entry.options, target)) continue;
+      const result = (entry.filter as AfterCallback)(target);
+      if (isThenable(result)) {
+        if (opts?.strict === "sync") {
+          swallowRejection(result);
+          throw new Error(`Async callback on sync chain "${this.name}" — after returned a Promise`);
+        }
+        const remaining: Callback[] = [];
+        for (let j = i - 1; j >= 0; j--) remaining.push(afters[j]);
+        return (async () => {
+          await result;
+          for (const rem of remaining) {
+            if (!Value.check(rem.options, target)) continue;
+            await (rem.filter as AfterCallback)(target);
+          }
+          return !halted;
+        })();
       }
     }
-
     return !halted;
+  }
+
+  private _runAroundAndAfter(
+    arounds: Callback[],
+    afters: Callback[],
+    target: object,
+    block: (() => unknown) | undefined,
+    skipAfterIfTerminated: boolean,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
+    let blockExecuted = false;
+    const trackedBlock = (): void | Promise<void> => {
+      const r = block?.();
+      if (isThenable(r)) {
+        return Promise.resolve(r).then(() => {
+          blockExecuted = true;
+        });
+      }
+      blockExecuted = true;
+    };
+
+    let chain: () => void | Promise<void> = trackedBlock;
+    for (let i = arounds.length - 1; i >= 0; i--) {
+      const entry = arounds[i];
+      if (!Value.check(entry.options, target)) continue;
+      const prev = chain;
+      chain = () => {
+        let pendingProceed: Promise<void> | undefined;
+        const next = (): void | Promise<void> => {
+          const r = prev();
+          if (isThenable(r)) pendingProceed = Promise.resolve(r) as Promise<void>;
+          return r;
+        };
+        let cbResult: void | Promise<void>;
+        try {
+          cbResult = (entry.filter as AroundCallback)(target, next);
+        } catch (err) {
+          if (pendingProceed) {
+            return (async () => {
+              await pendingProceed!.catch(() => {});
+              throw err;
+            })();
+          }
+          throw err;
+        }
+        if (isThenable(cbResult) || pendingProceed) {
+          if (opts?.strict === "sync") {
+            swallowRejection(cbResult);
+            swallowRejection(pendingProceed);
+            throw new Error(
+              `Async callback on sync chain "${this.name}" — around callback or block returned a Promise`,
+            );
+          }
+          return (async () => {
+            try {
+              await cbResult;
+              if (pendingProceed) await pendingProceed;
+            } catch (err) {
+              if (pendingProceed) await pendingProceed.catch(() => {});
+              throw err;
+            }
+          })();
+        }
+      };
+    }
+
+    const chainResult = chain();
+
+    const finish = (): boolean | Promise<boolean> => {
+      // After callbacks run even when around halts (didn't yield) — mirrors the
+      // original _invoke which ran afters after core() regardless of whether
+      // the block executed. Return blockExecuted so callers can detect around-halt.
+      const afterResult = this._runAfters(afters, false, skipAfterIfTerminated, target, opts);
+      if (isThenable(afterResult)) return Promise.resolve(afterResult).then(() => blockExecuted);
+      return blockExecuted;
+    };
+
+    if (isThenable(chainResult)) {
+      if (opts?.strict === "sync") {
+        swallowRejection(chainResult);
+        throw new Error(
+          `Async callback on sync chain "${this.name}" — around callback or block returned a Promise`,
+        );
+      }
+      return Promise.resolve(chainResult).then(finish);
+    }
+    return finish();
   }
 }
 
@@ -863,15 +1075,37 @@ export namespace Callbacks {
     if (chain) chain.clear();
   }
 
-  export function runCallbacks(target: object, name: string, block?: () => void): boolean {
+  export function runCallbacks(
+    target: object,
+    name: string,
+    block: (() => unknown) | undefined,
+    opts: RunCallbacksOptions & { strict: "sync" },
+  ): boolean;
+  export function runCallbacks(
+    target: object,
+    name: string,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean>;
+  export function runCallbacks(
+    target: object,
+    name: string,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+  ): boolean | Promise<boolean> {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
-      block?.();
-      return true;
+      const r = block?.();
+      if (!isThenable(r)) return true;
+      if (opts?.strict === "sync") {
+        swallowRejection(r);
+        throw new Error("Async block on chain with no callbacks");
+      }
+      return Promise.resolve(r).then(() => true);
     }
     const sequence = chain.compile();
-    return sequence.invoke(target, block);
+    return sequence.invoke(target, block, opts);
   }
 }
 
@@ -906,8 +1140,25 @@ export function resetCallbacks(target: object, name: string): void {
   Callbacks.resetCallbacks(target, name);
 }
 
-export function runCallbacks(target: object, name: string, block?: () => void): boolean {
-  return Callbacks.runCallbacks(target, name, block);
+export function runCallbacks(
+  target: object,
+  name: string,
+  block: (() => unknown) | undefined,
+  opts: RunCallbacksOptions & { strict: "sync" },
+): boolean;
+export function runCallbacks(
+  target: object,
+  name: string,
+  block?: () => unknown,
+  opts?: RunCallbacksOptions,
+): boolean | Promise<boolean>;
+export function runCallbacks(
+  target: object,
+  name: string,
+  block?: () => unknown,
+  opts?: RunCallbacksOptions,
+): boolean | Promise<boolean> {
+  return Callbacks.runCallbacks(target, name, block, opts);
 }
 
 export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
@@ -962,8 +1213,22 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       resetCallbacks(this.prototype, name);
     }
 
-    runCallbacks(name: string, block?: () => void): boolean {
-      return runCallbacks(this, name, block);
+    runCallbacks(
+      name: string,
+      block: (() => unknown) | undefined,
+      opts: RunCallbacksOptions & { strict: "sync" },
+    ): boolean;
+    runCallbacks(
+      name: string,
+      block?: () => unknown,
+      opts?: RunCallbacksOptions,
+    ): boolean | Promise<boolean>;
+    runCallbacks(
+      name: string,
+      block?: () => unknown,
+      opts?: RunCallbacksOptions,
+    ): boolean | Promise<boolean> {
+      return runCallbacks(this, name, block, opts);
     }
   }
 
