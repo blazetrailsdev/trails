@@ -41,6 +41,11 @@ interface AttributeRecord {
  * Minimal shape required by instance methods that delegate to sub-modules or
  * access primary-key / attribute internals on `this`.
  *
+ * Note: `constructor` is intentionally absent. Typing it conflicts with
+ * TypeScript's built-in `constructor: Function` on class instances, causing
+ * assignment errors at call sites (e.g. `Base`). Methods that need
+ * `this.constructor.primaryKey` etc. use `(this.constructor as any)` instead.
+ *
  * @internal
  */
 interface InstanceMethodHost {
