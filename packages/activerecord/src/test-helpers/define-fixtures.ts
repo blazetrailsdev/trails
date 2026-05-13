@@ -192,8 +192,14 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       // attempt to INSERT a non-existent column and break fixture insertion.
       const poly = findPolymorphicRef(ModelClass, col);
       if (poly) {
-        const hasExplicit = poly.typeColumn in attrs || poly.idColumn in attrs;
-        if (hasExplicit) continue; // explicit type/id win; association key is not a column
+        const hasType = poly.typeColumn in attrs;
+        const hasId = poly.idColumn in attrs;
+        if (hasType !== hasId) {
+          throw new Error(
+            `defineFixtures: "${col}" — provide both ${poly.typeColumn} and ${poly.idColumn} explicitly, or neither (use the association key instead)`,
+          );
+        }
+        if (hasType) continue; // both explicit columns present; association key is not a column
 
         if (val === null) {
           // null clears the association: mirrors Rails setting both FK columns to NULL.
