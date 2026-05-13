@@ -112,6 +112,20 @@ describe("MySQL::SchemaCreation", () => {
     expect(sql).toMatch(/ADD .+ AUTO_INCREMENT/);
   });
 
+  it("typeToSql emits FLOAT for float without limit", () => {
+    expect(sc.typeToSql("float", {})).toBe("FLOAT");
+  });
+
+  it("typeToSql emits FLOAT(N) for float with limit", () => {
+    expect(sc.typeToSql("float", { limit: 5 })).toBe("FLOAT(5)");
+    expect(sc.typeToSql("float", { limit: 53 })).toBe("FLOAT(53)");
+  });
+
+  it("typeToSql delegates non-float types to super", () => {
+    expect(sc.typeToSql("integer", {})).not.toContain("FLOAT");
+    expect(sc.typeToSql("string", {})).toMatch(/VARCHAR/i);
+  });
+
   it("addColumnOptions emits ON UPDATE when onUpdate is set (MySQL-specific)", () => {
     const opts: MysqlAddColumnOptions = { onUpdate: "CURRENT_TIMESTAMP" };
     const result = sc.addColumnOptions("`updated_at` datetime", opts);

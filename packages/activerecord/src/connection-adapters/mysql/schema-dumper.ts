@@ -102,6 +102,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
   protected override schemaLimit(column: MysqlColumn): string | undefined {
     if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
+    // Mirrors Rails schema_limit: suppress limit when it equals the native default.
+    // Native default for float is 24 (abstract_mysql_adapter.rb native_database_types).
+    if (column.type === "float" && column.limit === 24) return undefined;
     return super.schemaLimit(column);
   }
 

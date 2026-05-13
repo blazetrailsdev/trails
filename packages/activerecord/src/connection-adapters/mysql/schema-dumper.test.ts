@@ -45,6 +45,14 @@ describe("MySQL::SchemaDumper", () => {
       expect((make() as any).schemaLimit(col({ sqlType: "varchar(100)", limit: 100 }))).toBe(
         "100",
       ));
+    it("suppresses default limit 24 for float", () =>
+      expect(
+        (make() as any).schemaLimit(col({ type: "float", sqlType: "float", limit: 24 })),
+      ).toBeUndefined());
+    it("emits non-default limit for float (double precision)", () =>
+      expect(
+        (make() as any).schemaLimit(col({ type: "float", sqlType: "double", limit: 53 })),
+      ).toBe("53"));
   });
 
   describe("schemaPrecision", () => {

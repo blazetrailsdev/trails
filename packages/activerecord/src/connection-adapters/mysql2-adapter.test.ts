@@ -606,7 +606,9 @@ describeIfMysql("Mysql2Adapter", () => {
 
     it("indexes() returns user-created indexes and skips PRIMARY", async () => {
       const idx = await adapter.indexes("widgets");
-      expect(idx).toEqual([{ name: "widgets_on_owner", columns: ["owner"], unique: false }]);
+      expect(idx).toEqual([
+        { name: "widgets_on_owner", columns: ["owner"], unique: false, using: "btree" },
+      ]);
     });
 
     it("indexes() represents MySQL 8+ functional indexes via their expression", async () => {
