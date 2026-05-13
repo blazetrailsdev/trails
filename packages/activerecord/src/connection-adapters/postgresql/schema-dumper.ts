@@ -125,8 +125,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
     indexes: IndexInfo[],
   ): Promise<IndexInfo[]> {
     const adapter = this.pgAdapter();
-    // Fetch and cache both constraint lists so exclusionConstraintsInCreate /
-    // uniqueConstraintsInCreate can reuse them without a second DB round-trip.
+    // Fetch and cache both constraint lists so gatherInlineConstraints can
+    // reuse them without a second DB round-trip.
     const excl: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
       ? await adapter.exclusionConstraints(tableName)
       : [];
@@ -144,12 +144,27 @@ export class SchemaDumper extends AbstractSchemaDumper {
     );
   }
 
+  /**
+   * Emit PG exclusion/unique constraints as post-block ctx.add*Constraint()
+   * calls — these methods are PG-specific and not on the abstract TableDefinition
+   * passed to the createTable callback, so they cannot be inlined as t.* calls.
+   * @internal
+   */
+  override async table(tableName: string, lines: string[]): Promise<void> {
+    await super.table(tableName, lines);
+    // Remove the trailing blank pushed by super.table so constraints land before it.
+    if (lines[lines.length - 1] === "") lines.pop();
+    await this._emitExclusionConstraints(tableName, lines);
+    await this._emitUniqueConstraints(tableName, lines);
+    lines.push("");
+  }
+
   /** @internal */
-  protected async exclusionConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  private async _emitExclusionConstraints(tableName: string, lines: string[]): Promise<void> {
     const adapter = this.pgAdapter();
-    if (!adapter?.exclusionConstraints) return;
     const constraints: ExclusionConstraintDefinition[] =
-      this._cachedExclConstraints ?? (await adapter.exclusionConstraints(tableName));
+      this._cachedExclConstraints ??
+      (adapter?.exclusionConstraints ? await adapter.exclusionConstraints(tableName) : []);
     this._cachedExclConstraints = undefined;
     if (constraints.length === 0) return;
     const stripped = this.removePrefixAndSuffix(tableName);
@@ -166,11 +181,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected async uniqueConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  private async _emitUniqueConstraints(tableName: string, lines: string[]): Promise<void> {
     const adapter = this.pgAdapter();
-    if (!adapter?.uniqueConstraints) return;
     const constraints: UniqueConstraintDefinition[] =
-      this._cachedUniqConstraints ?? (await adapter.uniqueConstraints(tableName));
+      this._cachedUniqConstraints ??
+      (adapter?.uniqueConstraints ? await adapter.uniqueConstraints(tableName) : []);
     this._cachedUniqConstraints = undefined;
     if (constraints.length === 0) return;
     const stripped = this.removePrefixAndSuffix(tableName);
@@ -184,16 +199,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
       return `  await ctx.addUniqueConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(uc.column)}${optStr});`;
     });
     lines.push(...stmts.sort());
-  }
-
-  /** @internal */
-  override async table(tableName: string, lines: string[]): Promise<void> {
-    await super.table(tableName, lines);
-    // Remove the trailing empty line pushed by super.table so we can append constraints first.
-    if (lines[lines.length - 1] === "") lines.pop();
-    await this.exclusionConstraintsInCreate(tableName, lines);
-    await this.uniqueConstraintsInCreate(tableName, lines);
-    lines.push("");
   }
 
   /** @internal */

@@ -2513,19 +2513,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         let hasOrder = false;
         for (let ci = 0; ci < columns.length; ci++) {
           const colDef = colDefs[ci] || "";
-          if (colDef.match(/\bDESC\b/i)) {
-            orderMap[columns[ci]] = "desc";
+          const descFlag = colDef.match(/\bDESC\b/i);
+          const nullsFlag = colDef.match(/\bNULLS\s+(FIRST|LAST)\b/i);
+          if (descFlag || nullsFlag) {
+            let order = descFlag ? "desc" : "asc";
+            if (nullsFlag) order += ` NULLS ${nullsFlag[1].toUpperCase()}`;
+            orderMap[columns[ci]] = order;
             hasOrder = true;
           }
         }
         if (hasOrder) {
           if (columns.length === 1) {
-            orders = "desc" as string;
+            orders = orderMap[columns[0]];
           } else {
             orders = orderMap;
           }
         }
       }
+
+      // Parse INCLUDE (...) for covering indexes.
+      const includeMatch = def.match(/\bINCLUDE\s*\(([^)]+)\)/i);
+      const include = includeMatch
+        ? includeMatch[1].split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
+        : undefined;
 
       const whereMatch = def.match(/\bWHERE\s+(.+)$/i);
       const where = whereMatch ? whereMatch[1].trim() : undefined;
@@ -2538,6 +2548,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         columns,
         using: row.using as string,
         orders,
+        include,
         where,
         nullsNotDistinct,
       };
@@ -2906,22 +2917,24 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     });
   }
 
-  // PG callback-first signature diverges from the abstract base; harmonize in a follow-up.
+  // SimpleTableBuilder is narrower than TableDefinition; suppress the override error.
   // @ts-expect-error TS2416
   async createTable(
     tableName: string,
-    callback: (t: SimpleTableBuilder) => void,
-    options: { id?: boolean | "uuid" } = {},
+    options: { id?: boolean | "uuid" } | ((t: SimpleTableBuilder) => void) = {},
+    fn?: (t: SimpleTableBuilder) => void,
   ): Promise<void> {
+    const opts = typeof options === "function" ? {} : options;
+    const callback = typeof options === "function" ? options : fn;
     const table = new SimpleTableBuilder();
-    if (options.id !== false) {
-      if (typeof options.id === "string" && options.id === "uuid") {
+    if (opts.id !== false) {
+      if (typeof opts.id === "string" && opts.id === "uuid") {
         table.column("id", "uuid default gen_random_uuid() primary key");
       } else {
         table.column("id", "serial primary key");
       }
     }
-    callback(table);
+    if (callback) callback(table);
     const quotedTable = this.quoteTableName(tableName);
     const columnDefs = table.getColumns().map((c) => `${this.quoteIdentifier(c.name)} ${c.type}`);
     await this.exec(`CREATE TABLE ${quotedTable} (${columnDefs.join(", ")})`);

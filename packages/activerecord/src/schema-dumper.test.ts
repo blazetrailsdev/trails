@@ -230,7 +230,7 @@ describe("SchemaDumperTest", () => {
     });
     const output = await SchemaDumper.dump(testAdapter.innerAdapter);
     expect(output).toContain("products_price_check");
-    expect(output).toContain("addCheckConstraint");
+    expect(output).toContain("t.checkConstraint");
   });
   it.skipIf(adapterType !== "postgres")("schema dumps exclusion constraints", async () => {
     const { SchemaDumper: PgSchemaDumper } =
@@ -415,6 +415,40 @@ describe("SchemaDumperTest", () => {
     });
     const output = SchemaDumper.dump(ctx);
     expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
+  });
+
+  it("schema dump emits defaultFunction as arrow for non-PK columns", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["gen_defaults"],
+      columns: () => [
+        { name: "id", type: "integer", primaryKey: true },
+        { name: "token", type: "string", defaultFunction: "gen_random_uuid()" },
+      ],
+      indexes: () => [],
+    };
+    const output = TopLevelDumper.dump(source) as string;
+    expect(output).toContain(`() => "gen_random_uuid()"`);
+  });
+
+  it("indexParts emits include for covering indexes", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (TopLevelDumper as any)(emptySource);
+    const parts = dumper.indexParts({ columns: ["a"], unique: false, include: ["b", "c"] });
+    expect(parts.join(", ")).toContain(`include: ["b","c"]`);
+  });
+
+  it("indexParts emits NULLS FIRST/LAST order strings verbatim", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const emptySource = { tables: () => [], columns: () => [], indexes: () => [] };
+    const dumper = new (TopLevelDumper as any)(emptySource);
+    const parts = dumper.indexParts({
+      columns: ["created_at"],
+      unique: false,
+      orders: "desc NULLS LAST",
+    });
+    expect(parts.join(", ")).toContain(`order: "desc NULLS LAST"`);
   });
 
   it.skip("schema dump includes limit on array type", () => {
