@@ -56,9 +56,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("marshal dump", () => {
-    // BLOCKED: serialization
-    // ROOT-CAUSE: Ruby Marshal.dump/load — no JS equivalent; permanent exclusion candidate
-    // SCOPE: unported-files.ts — add to permanent exclusions when confirmed
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   it.skip("should property quote string primary keys", () => {
@@ -806,13 +804,14 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it.skip("get ids for unloaded associations does not load them", () => {
     // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: projectIds reader issues a SELECT id query instead of loading full records; not yet implemented
+    // ROOT-CAUSE: no SELECT-id-only path exists; *_ids reader not implemented on habtm collection
     // SCOPE: has-and-belongs-to-many-associations.ts — *_ids lazy SELECT-id path
   });
 
   it.skip("assign ids", () => {
     // BLOCKED: associations — *_ids reader/writer
-    // SCOPE: has-and-belongs-to-many-associations.ts — *_ids= replace-all path (writer not implemented)
+    // ROOT-CAUSE: projectIds= writer (replace-all via join table diff) is not implemented
+    // SCOPE: has-and-belongs-to-many-associations.ts — *_ids= replace-all path
   });
 
   it.skip("assign ids ignoring blanks", () => {
