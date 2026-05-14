@@ -70,16 +70,20 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("charset and partitioned table options", async () => {
-      // Use raw SQL to create composite-PK + partitioned table since our createTable
-      // DSL does not yet support composite primary keys as a table option.
-      await adapter.dropTable("mysql_table_options", { ifExists: true });
-      await adapter.execute(
-        "CREATE TABLE `mysql_table_options` (" +
-          "`id` BIGINT NOT NULL AUTO_INCREMENT, " +
-          "`account_id` BIGINT UNSIGNED NOT NULL, " +
-          "PRIMARY KEY (`id`, `account_id`)" +
-          ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin\n" +
-          "/*!50100 PARTITION BY HASH (`account_id`)\nPARTITIONS 128 */",
+      await adapter.createTable(
+        "mysql_table_options",
+        {
+          force: true,
+          id: false,
+          primaryKey: ["id", "account_id"],
+          charset: "utf8mb4",
+          collation: "utf8mb4_bin",
+          options: "ENGINE=InnoDB\n/*!50100 PARTITION BY HASH (`account_id`)\nPARTITIONS 128 */",
+        },
+        (t: any) => {
+          t.bigint("id", { null: false });
+          t.bigint("account_id", { null: false, unsigned: true });
+        },
       );
       const output = await dumpTable(adapter, "mysql_table_options");
       expect(output).toMatch(/primaryKey:\s*\["id",\s*"account_id"\]/);
