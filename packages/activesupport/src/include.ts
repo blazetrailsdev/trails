@@ -100,10 +100,13 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
     }
   } else {
     for (const key of Object.keys(mod as Module)) {
+      const value = (mod as Module)[key];
+      // Ruby's include copies only instance methods — skip non-function values
+      if (typeof value !== "function") continue;
       // Ruby's include doesn't replace methods already defined on the class
       if (Object.prototype.hasOwnProperty.call(klass.prototype, key)) continue;
       descriptors[key] = {
-        value: (mod as Module)[key],
+        value,
         writable: true,
         configurable: true,
         enumerable: false,
