@@ -616,9 +616,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // { from:, to: } change-descriptor hash. Both keys are required for
     // the unwrap branch — `{ to: "x" }` alone falls through as-is in
     // Rails too, so the type explicitly requires both.
-    commentOrChanges: string | null | { from: unknown; to: unknown },
+    commentOrChanges: string | null | { from: unknown; to: string | null },
   ): Promise<void> {
-    const comment = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    const extracted = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    // Normalize JS-only `undefined` → `null` so changeColumn doesn't
+    // misinterpret an explicit clear (`{from, to: undefined}` shape) as
+    // "no comment key present" and silently keep the existing comment.
+    // Rails has no nil/undefined split — defensive normalization, no
+    // Rails analogue.
+    const comment = extracted === undefined ? null : extracted;
     await this.changeColumn(tableName, columnName, "", { comment });
   }
 
