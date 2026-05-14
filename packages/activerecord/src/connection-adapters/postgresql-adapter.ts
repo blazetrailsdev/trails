@@ -1761,13 +1761,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    // Mirrors Rails: `if use_insert_returning? || pk == false`. `pk === false`
-    // is the explicit caller opt-out for "this table has no PK / don't fetch
-    // the inserted id" (Rails passes false from InsertAll for skip-rows).
-    // Pass `false` (not null) through to super so the abstract sqlForInsert
-    // takes the false-opt-out branch and does NOT auto-resolve a RETURNING
-    // column from the table's primary key.
-    if (this._useInsertReturning || pk === false) {
+    // Mirrors Rails: `if use_insert_returning? || pk == false`.
+    if (pk === false) {
+      // Explicit caller opt-out: skip the pk-derived RETURNING column.
+      // Cannot delegate to super here — our mixed-in DatabaseStatements
+      // default routes through executeMutation, which auto-appends
+      // `RETURNING id` for bare INSERTs when use_insert_returning is on
+      // (postgresql-adapter.ts:1238-1243). That would defeat the opt-out.
+      // Instead: honour an explicit `returning:` arg ourselves, then
+      // run via execQuery which executes the SQL as-is.
+      if (returning && returning.length > 0) {
+        const cols = returning.map((c) => this.quoteColumnName(c)).join(", ");
+        sql = `${sql} RETURNING ${cols}`;
+      }
+      return this.execQuery(sql, name, binds);
+    }
+    if (this._useInsertReturning) {
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);
     }
     // Resolve sequence name before acquiring the INSERT client so the
