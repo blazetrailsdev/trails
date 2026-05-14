@@ -2,7 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/change_schema_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import {
+  describeIfPg,
+  PostgreSQLAdapter,
+  PG_TEST_URL,
+  withPostgresqlDatetimeType,
+} from "./test-helper.js";
 
 describeIfPg("Migration", () => {
   let adapter: PostgreSQLAdapter;
@@ -94,20 +99,35 @@ describeIfPg("Migration", () => {
       expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
-    it.skip("change type with symbol using timestamp with timestamptz as default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
-      // ROOT-CAUSE: connection-adapters/postgresql/change-schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    it("change type with symbol using timestamp with timestamptz as default", async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.changeColumn("strings", "somedate", "timestamp", {
+          castAs: "timestamp",
+        });
+        const cols = await adapter.columns("strings");
+        const col = cols.find((c) => c.name === "somedate");
+        expect(col!.sqlType).toBe("timestamp without time zone");
+      });
     });
-    it.skip("change type with symbol with timestamptz as default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
-      // ROOT-CAUSE: connection-adapters/postgresql/change-schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    it("change type with symbol with timestamptz as default", async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.changeColumn("strings", "somedate", "timestamptz", {
+          castAs: "timestamptz",
+        });
+        const cols = await adapter.columns("strings");
+        const col = cols.find((c) => c.name === "somedate");
+        expect(col!.sqlType).toBe("timestamp with time zone");
+      });
     });
-    it.skip("change type with symbol using datetime with timestamptz as default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in change-schema
-      // ROOT-CAUSE: connection-adapters/postgresql/change-schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/change-schema.ts; affects ~10–47 tests in change-schema.test.ts
+    it("change type with symbol using datetime with timestamptz as default", async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.changeColumn("strings", "somedate", "datetime", {
+          castAs: "datetime",
+        });
+        const cols = await adapter.columns("strings");
+        const col = cols.find((c) => c.name === "somedate");
+        expect(col!.sqlType).toBe("timestamp with time zone");
+      });
     });
 
     it("change type with array", async () => {
