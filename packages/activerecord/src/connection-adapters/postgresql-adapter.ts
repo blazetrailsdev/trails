@@ -1211,7 +1211,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               }
               if (result.rows.length > 0) {
                 const firstCol = Object.keys(result.rows[0])[0];
-                return Number(result.rows[0][firstCol]);
+                const v = result.rows[0][firstCol];
+                return typeof v === "number" ? v : (v as unknown as number);
               }
               return result.rowCount ?? 0;
             } catch (err) {
@@ -1240,7 +1241,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             payload.row_count = result.rowCount ?? 0;
             if (result.rows.length > 0) {
               const firstCol = Object.keys(result.rows[0])[0];
-              return Number(result.rows[0][firstCol]);
+              const v = result.rows[0][firstCol];
+              return typeof v === "number" ? v : (v as unknown as number);
             }
             return result.rowCount ?? 0;
           }
