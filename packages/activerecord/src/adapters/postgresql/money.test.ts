@@ -165,17 +165,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(negative[0].wealth)).toBeCloseTo(-567.89, 2);
     });
 
-    it("money regex backtracking", async () => {
-      // Rails: test_money_regex_backtracking — verifies no catastrophic backtracking (ReDoS)
-      // on long repeated-separator inputs by running within a Timeout.timeout(0.1).
-      // JS fix: replaced \D* with [^0-9,.] in castValue regex (money.ts).
-      const type = new Money();
-      const commas = ",".repeat(100000);
-      const dots = ".".repeat(100000);
-      expect(Number(type.cast("$" + commas + ".11!") ?? 0)).toBeCloseTo(0, 2);
-      expect(Number(type.cast("$" + dots + ",11!") ?? 0)).toBeCloseTo(0, 2);
-    });
-
     // Needs ORM layer (Relation#sum with type cast)
     it.skip("sum with type cast", async () => {
       // BLOCKED: relation
@@ -245,6 +234,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 // Unit-level tests that don't need a live PG connection — Rails test
 // names so api:compare matches.
 describe("PostgresqlMoneyTest", () => {
+  it("money regex backtracking", () => {
+    // Ruby uses possessive quantifiers (\D*+) to prevent ReDoS; JS has none.
+    // [^0-9,.] in the prefix avoids overlap with [\d,]+ / [\d.]+ so no O(n²) path.
+    const type = new Money();
+    expect(Number(type.cast("$" + ",".repeat(100000) + ".11!"))).toBeCloseTo(0, 2);
+    expect(Number(type.cast("$" + ".".repeat(100000) + ",11!"))).toBeCloseTo(0, 2);
+  });
+
   it("money type cast", () => {
     const type = new Money();
     for (const [str, num] of [
