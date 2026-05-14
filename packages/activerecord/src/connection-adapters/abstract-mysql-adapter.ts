@@ -47,11 +47,13 @@ import {
 } from "./mysql/quoting.js";
 import {
   ChangeColumnDefinition,
+  ChangeColumnDefaultDefinition,
   ColumnDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
+import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -500,47 +502,130 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await exec.call(this, sql);
   }
 
+  /**
+   * Mirrors: AbstractMysqlAdapter#change_column_default
+   *   execute "ALTER TABLE #{quote_table_name(table_name)}
+   *            #{change_column_default_for_alter(table_name, column_name, default_or_changes)}"
+   */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    void tableName;
-    void columnName;
-    void defaultOrChanges;
+    const fragment = await this.changeColumnDefaultForAlter(
+      tableName,
+      columnName,
+      defaultOrChanges,
+    );
+    await this._execMutation(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
   }
 
-  buildChangeColumnDefaultDefinition(
+  /**
+   * MySQL routes the abstract base's `change_column_default_for_alter` through
+   * `build_change_column_default_definition` + schema_creation, so the
+   * dumper-friendly visitor handles `DROP DEFAULT` vs `SET DEFAULT <expr>`.
+   *
+   *   def change_column_default_for_alter(table_name, column_name, default_or_changes)
+   *     cd = build_change_column_default_definition(table_name, column_name, default_or_changes)
+   *     schema_creation.accept(cd)
+   *   end
+   *
+   * @internal
+   */
+  async changeColumnDefaultForAlter(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
-  ): Record<string, unknown> {
-    void tableName;
-    void columnName;
-    void defaultOrChanges;
-    return {};
+  ): Promise<string> {
+    const cd = await this.buildChangeColumnDefaultDefinition(
+      tableName,
+      columnName,
+      defaultOrChanges,
+    );
+    return new MysqlSchemaCreation().accept(cd);
   }
 
+  /**
+   * Mirrors: AbstractMysqlAdapter#build_change_column_default_definition.
+   *
+   *   column = column_for(table_name, column_name)
+   *   return unless column
+   *   default = extract_new_default_value(default_or_changes)
+   *   ChangeColumnDefaultDefinition.new(column, default)
+   *
+   * Rails' `column_for` itself raises ActiveRecordError when the column is
+   * missing (the `return unless column` guard is defensive against an
+   * unreachable nil branch), so we let columnFor's throw propagate the
+   * same way rather than silently returning null.
+   */
+  async buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition> {
+    const column = await this.columnFor(tableName, columnName);
+    const extracted = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
+    // Normalize JS-only `undefined` → `null` so the schema-creation
+    // visitor's SET branch produces `SET DEFAULT NULL` rather than the
+    // bare `SET` that quoteDefaultExpression(undefined) → "" would emit.
+    // Rails has no nil/undefined split, so this is TS-specific defense.
+    const newDefault = extracted === undefined ? null : extracted;
+    // Match the PG adapter's shape: build ColumnDefinition with the
+    // semantic type and set sqlType separately so dumper/visitor paths
+    // see both. visitChangeColumnDefaultDefinition reads name +
+    // options.null, but preserve type metadata for any downstream visitor.
+    const colDef = new ColumnDefinition(
+      column.name,
+      (column.type ?? "string") as ColumnType,
+      { null: column.null } as ColumnOptions,
+    );
+    colDef.sqlType = column.sqlType ?? undefined;
+    return new ChangeColumnDefaultDefinition(colDef, newDefault);
+  }
+
+  /**
+   * Mirrors AbstractMysqlAdapter#change_column_null.
+   * Validates `null_`, backfills NULLs from `default_` when flipping to
+   * NOT NULL, then routes through change_column with `null:` set.
+   */
   async changeColumnNull(
     tableName: string,
     columnName: string,
     null_: boolean,
     default_?: unknown,
   ): Promise<void> {
-    void tableName;
-    void columnName;
-    void null_;
-    void default_;
+    this.schemaStatements().validateChangeColumnNullArgumentBang(null_);
+    if (!null_ && default_ != null) {
+      const colId = this.quoteIdentifier(columnName);
+      await this._execMutation(
+        `UPDATE ${this.quoteTableName(tableName)} SET ${colId}=${this.quote(default_)} WHERE ${colId} IS NULL`,
+      );
+    }
+    await this.changeColumn(tableName, columnName, "", { null: null_ });
   }
 
+  /**
+   * Mirrors AbstractMysqlAdapter#change_column_comment.
+   * MySQL has no dedicated ALTER COMMENT syntax; mirrors Rails by routing
+   * through change_column with the resolved comment.
+   */
   async changeColumnComment(
     tableName: string,
     columnName: string,
-    commentOrChanges: string | Record<string, string | null>,
+    // Mirrors Rails: comment is either a plain value (string|nil) or the
+    // { from:, to: } change-descriptor hash. Both keys are required for
+    // the unwrap branch — `{ to: "x" }` alone falls through as-is in
+    // Rails too, so the type explicitly requires both.
+    commentOrChanges: string | null | { from: unknown; to: string | null },
   ): Promise<void> {
-    void tableName;
-    void columnName;
-    void commentOrChanges;
+    const extracted = this.schemaStatements().extractNewCommentValue(commentOrChanges);
+    // Normalize JS-only `undefined` → `null` so changeColumn doesn't
+    // misinterpret an explicit clear (`{from, to: undefined}` shape) as
+    // "no comment key present" and silently keep the existing comment.
+    // Rails has no nil/undefined split — defensive normalization, no
+    // Rails analogue.
+    const comment = extracted === undefined ? null : extracted;
+    await this.changeColumn(tableName, columnName, "", { comment });
   }
 
   async changeColumn(
