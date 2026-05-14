@@ -160,19 +160,22 @@ describe("PostgresqlNetworkTest", () => {
 
   it("invalid network address", () => {
     // Rails: test_invalid_network_address — IPAddr.new raises on garbage,
-    // so Cidr#cast_value returns nil. Mirror that in TS.
+    // so Cidr#cast_value returns nil. cast returns IPAddr on valid input.
     const type = new Cidr();
     expect(type.cast("invalid addr")).toBeNull();
     expect(type.cast("not-an-ip")).toBeNull();
     expect(type.cast(42)).toBeNull();
     // Out-of-range prefixes are rejected too.
     expect(type.cast("192.168.1.0/999")).toBeNull();
-    // Valid IPv4 / IPv6 / prefixed forms pass through.
-    expect(type.cast("192.168.1.1")).toBe("192.168.1.1");
-    expect(type.cast("192.168.1.0/24")).toBe("192.168.1.0/24");
-    expect(type.cast("::1")).toBe("::1");
-    expect(type.cast("2001:db8::/32")).toBe("2001:db8::/32");
+    // Valid inputs produce IPAddr with correct address + prefixLength.
+    expect(type.cast("192.168.1.1")).toMatchObject({ address: "192.168.1.1", prefixLength: 32 });
+    expect(type.cast("192.168.1.0/24")).toMatchObject({ address: "192.168.1.0", prefixLength: 24 });
+    expect(type.cast("::1")).toMatchObject({ address: "::1", prefixLength: 128 });
+    expect(type.cast("2001:db8::/32")).toMatchObject({ address: "2001:db8::", prefixLength: 32 });
     // IPv4-embedded IPv6 is valid (e.g. IPv4-mapped addresses).
-    expect(type.cast("::ffff:192.168.0.1")).toBe("::ffff:192.168.0.1");
+    expect(type.cast("::ffff:192.168.0.1")).toMatchObject({
+      address: "::ffff:192.168.0.1",
+      prefixLength: 128,
+    });
   });
 });
