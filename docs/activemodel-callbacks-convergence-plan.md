@@ -108,16 +108,27 @@ Migrate AR `base.ts` run-path call sites — `_callbackChain.runBefore` /
 pre-existing Rails fidelity gap where `aroundSave` silently wraps a
 no-op instead of the DB write.
 
-### PR 7 — Migrate AR register paths + retire the bridge (~100 LOC)
+### PR 7 — Migrate AR register paths + retire the bridge (#1526 ✅)
 
-Migrate `activerecord/src/callbacks.ts` register path,
-`transactions.ts` register + `_ensureOwnCallbacks` call,
-`inheritance.ts`, `timestamp.ts`. Delete the `CallbackChain` bridge
-class from `packages/activemodel/src/callbacks.ts`. Remove the
-`_ensureOwnCallbacks` no-op shim from `Model`. Remove `getCallbackChains`
-and `peekCallbackChain` `@internal` barrel exports from activesupport
-once no AR caller remains. Update the `_callbackChain` clone comment in
-`activerecord/src/encryption.ts:284`.
+Migrated AR register paths in `callbacks.ts`, `transactions.ts`,
+`inheritance.ts`, `timestamp.ts`. Deleted the `CallbackChain` bridge
+class. Removed the `_ensureOwnCallbacks` shim from `Model`.
+
+**Convergence complete: PRs 1–7 all merged.** activemodel and
+activerecord now route through activesupport's engine directly, no
+bridge layer.
+
+### Remaining followup (deferred from PR 7, sized)
+
+- **~30 LOC** — Move `autosaveBelongsTo` inside the `around_save` chain
+  rather than running it as an explicit pre-save check. Real Rails-fidelity
+  improvement (the current ordering diverges from Rails when autosave
+  fails); behavior risk for `after_save` firing. Standalone PR.
+- **~20 LOC** — Targeted test for a model with only `beforeCommit`
+  callbacks to pin the `hasTransactionalCallbacks` path (PR 7 simplified
+  this to check only `commit`/`rollback` chains; before_commit entries
+  live in the `commit` chain as "before"-kind callbacks). Prevents
+  future regression.
 
 Validation (PRs 4–7):
 
