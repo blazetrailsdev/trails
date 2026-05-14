@@ -140,6 +140,20 @@ interface TimestampHost {
   _allTimestampAttributesInModel?: string[];
 }
 
+/** Minimal instance-side surface used by Timestamp private/internal helpers. */
+interface TimestampInstanceHost {
+  _touchRecord: boolean | null;
+  _createOrUpdate: () => Promise<boolean>;
+  readAttribute?(name: string): unknown;
+  _readAttribute?(name: string): unknown;
+  _writeAttribute?(name: string, val: unknown): void;
+  willSaveChangeToAttribute?(name: string): boolean;
+  clearAttributeChange?(name: string): void;
+  hasChangesToSave?: boolean;
+  id?: unknown;
+  constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
+}
+
 export function touchAttributesWithTime(
   this: TimestampHost,
   ...names: string[]
@@ -208,20 +222,20 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export function initializeDup(this: any, _other: any): void {
+export function initializeDup(this: TimestampInstanceHost, _other: unknown): void {
   clearTimestampAttributes.call(this);
 }
 
 /** @internal */
-export function initInternals(this: any): void {
+export function initInternals(this: TimestampInstanceHost): void {
   this._touchRecord = null;
 }
 
 /** @internal */
-export async function _createRecord(this: any): Promise<unknown> {
-  if ((this.constructor as any).recordTimestamps) {
+export async function _createRecord(this: TimestampInstanceHost): Promise<unknown> {
+  if (this.constructor.recordTimestamps !== false) {
     const time = currentTimeFromProperTimezone();
-    for (const col of allTimestampAttributesInModel.call(this.constructor as TimestampHost)) {
+    for (const col of allTimestampAttributesInModel.call(this.constructor)) {
       if (this._readAttribute?.(col) == null) {
         this._writeAttribute?.(col, time);
       }
@@ -234,7 +248,7 @@ export async function _createRecord(this: any): Promise<unknown> {
 }
 
 /** @internal */
-export async function _updateRecord(this: any): Promise<boolean> {
+export async function _updateRecord(this: TimestampInstanceHost): Promise<boolean> {
   await recordUpdateTimestamps.call(this);
   // Rails yields to super (persistence layer) inside record_update_timestamps.
   // In trails the persistence layer is wired separately via callbacks.ts.
@@ -242,17 +256,16 @@ export async function _updateRecord(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export function createOrUpdate(this: any, touch = true): Promise<boolean> {
+export function createOrUpdate(this: TimestampInstanceHost, touch = true): Promise<boolean> {
   this._touchRecord = touch;
-  return (this._createOrUpdate as () => Promise<boolean>).call(this);
+  return this._createOrUpdate.call(this);
 }
 
 /** @internal */
-export async function recordUpdateTimestamps(this: any): Promise<void> {
+export async function recordUpdateTimestamps(this: TimestampInstanceHost): Promise<void> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
     const time = currentTimeFromProperTimezone();
-    const ctor = this.constructor as TimestampHost;
-    for (const col of timestampAttributesForUpdateInModel.call(ctor)) {
+    for (const col of timestampAttributesForUpdateInModel.call(this.constructor)) {
       if (!this.willSaveChangeToAttribute?.(col)) {
         this._writeAttribute?.(col, time);
       }
@@ -261,17 +274,16 @@ export async function recordUpdateTimestamps(this: any): Promise<void> {
 }
 
 /** @internal */
-export function shouldRecordTimestamps(this: any): boolean {
-  const ctor = this.constructor as any;
+export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
   return (
-    ctor.recordTimestamps !== false && (!ctor.partialUpdates || this.hasChangesToSave !== false)
+    this.constructor.recordTimestamps !== false &&
+    (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
   );
 }
 
 /** @internal */
-export function maxUpdatedColumnTimestamp(this: any): Temporal.Instant | null {
-  const ctor = this.constructor as TimestampHost;
-  const attrs = timestampAttributesForUpdateInModel.call(ctor);
+export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): Temporal.Instant | null {
+  const attrs = timestampAttributesForUpdateInModel.call(this.constructor);
   let max: Temporal.Instant | null = null;
   for (const attr of attrs) {
     const v = this.readAttribute?.(attr);
@@ -286,10 +298,9 @@ export function maxUpdatedColumnTimestamp(this: any): Temporal.Instant | null {
 }
 
 /** @internal */
-export function clearTimestampAttributes(this: any): void {
-  const ctor = this.constructor as TimestampHost;
-  for (const attr of allTimestampAttributesInModel.call(ctor)) {
-    this[attr] = null;
+export function clearTimestampAttributes(this: TimestampInstanceHost): void {
+  for (const attr of allTimestampAttributesInModel.call(this.constructor)) {
+    (this as unknown as Record<string, unknown>)[attr] = null;
     this.clearAttributeChange?.(attr);
   }
 }
@@ -310,13 +321,13 @@ export const InstanceMethods = {
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   // Rails instance methods delegate to the class; mirrors `self.class.xxx_in_model`.
-  timestampAttributesForCreateInModel(this: any): string[] {
+  timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {
     return timestampAttributesForCreateInModel.call(this.constructor);
   },
-  timestampAttributesForUpdateInModel(this: any): string[] {
+  timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): string[] {
     return timestampAttributesForUpdateInModel.call(this.constructor);
   },
-  allTimestampAttributesInModel(this: any): string[] {
+  allTimestampAttributesInModel(this: { constructor: TimestampHost }): string[] {
     return allTimestampAttributesInModel.call(this.constructor);
   },
   currentTimeFromProperTimezone,

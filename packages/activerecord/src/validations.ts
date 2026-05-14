@@ -89,6 +89,20 @@ export interface ValidationsClassMethods {
   validatesUniquenessOf(...attrNames: (string | Record<string, unknown>)[]): void;
 }
 
+/** Minimal instance-side surface used by Validations instance helpers. */
+interface ValidationsHost {
+  _validationContext?: ValidationContextArg;
+  isNewRecord?(): boolean;
+  _newRecord?: boolean;
+  errors: { any: boolean };
+  isValid(context?: ValidationContextArg): boolean;
+  _cachedAssociations?: { get?(name: string): unknown };
+  _preloadedAssociations?: { get?(name: string): unknown };
+  _collectionProxies?: { get?(name: string): unknown };
+  association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
+  readAttribute(name: string): unknown;
+}
+
 // Reference to the parent class's isValid (Model.prototype.isValid).
 // Set by Base at module load via _setSuperIsValid to avoid circular imports.
 let _superIsValid: ((context?: ValidationContextArg) => boolean) | null = null;
@@ -105,7 +119,7 @@ export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean
  * :update for persisted). Sets _validationContext for the duration
  * matching Rails' with_validation_context.
  */
-export function isValid(this: any, context?: ValidationContextArg): boolean {
+export function isValid(this: ValidationsHost, context?: ValidationContextArg): boolean {
   const effectiveContext =
     context ?? this._validationContext ?? defaultValidationContext.call(this);
   if (_superIsValid == null) {
@@ -127,14 +141,14 @@ export function isValid(this: any, context?: ValidationContextArg): boolean {
  * Mirrors: ActiveRecord::Validations#validate — inherited alias of `valid?`
  * (activemodel/lib/active_model/validations.rb:370).
  */
-export function validate(this: any, context?: ValidationContextArg): boolean {
+export function validate(this: ValidationsHost, context?: ValidationContextArg): boolean {
   return isValid.call(this, context);
 }
 
 /**
  * Mirrors: ActiveRecord::Validations#custom_validation_context?
  */
-export function customValidationContext(this: any): boolean {
+export function customValidationContext(this: ValidationsHost): boolean {
   const ctx = this._validationContext;
   return ctx != null && ctx !== "create" && ctx !== "update";
 }
@@ -144,7 +158,7 @@ export function customValidationContext(this: any): boolean {
  *
  * @internal
  */
-export function defaultValidationContext(this: any): string {
+export function defaultValidationContext(this: ValidationsHost): string {
   return this.isNewRecord?.() || this._newRecord ? "create" : "update";
 }
 
@@ -154,7 +168,7 @@ export function defaultValidationContext(this: any): string {
  * @internal
  */
 export function performValidations(
-  this: any,
+  this: ValidationsHost,
   options?: { validate?: boolean; context?: string },
 ): boolean {
   if (options?.validate === false) return true;
@@ -169,12 +183,14 @@ export function performValidations(
  * association caches first, falling back to readAttribute for regular
  * columns.
  */
-export function readAttributeForValidation(this: any, attribute: string): unknown {
+export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
   const cached = this._cachedAssociations?.get?.(attribute);
   if (cached !== undefined) return cached;
   const preloaded = this._preloadedAssociations?.get?.(attribute);
   if (preloaded !== undefined) return preloaded;
-  const proxy = this._collectionProxies?.get?.(attribute);
+  const proxy = this._collectionProxies?.get?.(attribute) as
+    | { loaded?: boolean; target?: unknown[] }
+    | undefined;
   if (
     proxy &&
     (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))

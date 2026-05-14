@@ -29,6 +29,16 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
   return enumRegistry.get(modelClass)!;
 }
 
+/** Minimal instance-side surface for enum-generated prototype callbacks. */
+interface EnumInstanceHost {
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, val: unknown): void;
+  isPersisted(): boolean;
+  updateColumn(name: string, val: unknown): Promise<void>;
+  updateBang(attrs: Record<string, unknown>): Promise<true>;
+  readAttributeForDatabase(name: string): unknown;
+}
+
 /**
  * Define an enum on a model class.
  *
@@ -164,7 +174,7 @@ export function defineEnum(
         configurable: true,
       });
       Object.defineProperty(modelClass.prototype, `${friendlyName}Bang`, {
-        value: async function (this: any) {
+        value: async function (this: EnumInstanceHost) {
           this.writeAttribute(attribute, value);
           if (this.isPersisted()) {
             await this.updateColumn(attribute, value);
@@ -196,7 +206,7 @@ export function defineEnum(
 
     // Bang setter: record.draftBang() or record.statusDraftBang()
     Object.defineProperty(modelClass.prototype, bangName, {
-      value: async function (this: any) {
+      value: async function (this: EnumInstanceHost) {
         this.writeAttribute(attribute, value);
         if (this.isPersisted()) {
           await this.updateColumn(attribute, value);
@@ -223,7 +233,7 @@ export function defineEnum(
         configurable: true,
       });
       Object.defineProperty(modelClass.prototype, origBang, {
-        value: async function (this: any) {
+        value: async function (this: EnumInstanceHost) {
           this.writeAttribute(attribute, value);
           if (this.isPersisted()) {
             await this.updateColumn(attribute, value);
@@ -379,7 +389,7 @@ export class EnumMethods {
     if (instanceMethods) {
       detectEnumConflictBang.call(klass, name, `${valueMethodName}?`);
       Object.defineProperty(klass.prototype, `${valueMethodName}?`, {
-        value: function (this: any) {
+        value: function (this: EnumInstanceHost) {
           return this.readAttributeForDatabase(name) === value;
         },
         writable: true,
@@ -387,7 +397,7 @@ export class EnumMethods {
       });
       detectEnumConflictBang.call(klass, name, `${valueMethodName}!`);
       Object.defineProperty(klass.prototype, `${valueMethodName}!`, {
-        value: async function (this: any) {
+        value: async function (this: EnumInstanceHost) {
           await this.updateBang({ [name]: value });
         },
         writable: true,
