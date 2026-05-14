@@ -1,6 +1,12 @@
 import type { Base } from "./base.js";
 
-import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  ArgumentError,
+  _registerCallbackOnProto,
+  runBeforeCallbacksOnProto,
+  runAfterCallbacksOnProto,
+} from "@blazetrails/activemodel";
+import { peekCallbackChain as asPeekCallbackChain } from "@blazetrails/activesupport";
 import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import { PreparedStatementCacheExpired, Rollback, TransactionIsolationError } from "./errors.js";
 export { Rollback };
@@ -274,8 +280,8 @@ export function beforeCommit(
   fn: CallbackFn,
   options?: CallbackOptions,
 ): void {
-  (modelClass as any)._ensureOwnCallbacks();
-  (modelClass as any)._callbackChain.register(
+  _registerCallbackOnProto(
+    (modelClass as unknown as { prototype: object }).prototype,
     "before",
     "commit",
     fn,
@@ -363,7 +369,7 @@ export function setCallback(
  */
 export async function beforeCommittedBang(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  await (ctor as any)._callbackChain?.runBefore?.("commit", record);
+  await runBeforeCallbacksOnProto((ctor as any).prototype, "commit", record);
 }
 
 /**
@@ -381,7 +387,7 @@ export async function committedBang(
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
       const ctor = this.constructor as typeof Base;
-      await (ctor as any)._callbackChain?.runAfter?.("commit", this);
+      await runAfterCallbacksOnProto((ctor as any).prototype, "commit", this);
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -405,7 +411,7 @@ export async function rolledbackBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       const ctor = this.constructor as typeof Base;
-      await (ctor as any)._callbackChain?.runAfter?.("rollback", this);
+      await runAfterCallbacksOnProto((ctor as any).prototype, "rollback", this);
     }
   } finally {
     _restoreTransactionRecordState.call(this, forceRestoreState);
@@ -767,13 +773,11 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 // Mirrors: ActiveRecord::Transactions#has_transactional_callbacks?
 /** @internal */
 export function hasTransactionalCallbacks(this: Base): boolean {
-  const ctor = this.constructor as any;
-  const chain = ctor._callbackChain;
-  if (!chain) return false;
-  const entries: Array<{ event: string }> = (chain as any).callbacks ?? [];
-  return entries.some(
-    (e) => e.event === "rollback" || e.event === "commit" || e.event === "before_commit",
-  );
+  const proto = (this.constructor as any).prototype;
+  const commit = asPeekCallbackChain(proto, "commit");
+  if (commit && commit.entries.length > 0) return true;
+  const rollback = asPeekCallbackChain(proto, "rollback");
+  return !!(rollback && rollback.entries.length > 0);
 }
 
 // ---------------------------------------------------------------------------

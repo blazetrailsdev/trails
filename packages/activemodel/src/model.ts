@@ -11,7 +11,11 @@ import {
   _validatesDefaultKeys as validationsValidatesDefaultKeys,
   _parseValidatesOptions as validationsParseValidatesOptions,
 } from "./validations.js";
-import { dasherize, htmlEscape } from "@blazetrails/activesupport";
+import {
+  dasherize,
+  htmlEscape,
+  resetCallbacks as asResetCallbacks,
+} from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   humanAttributeName as translationHumanAttributeName,
@@ -22,13 +26,18 @@ import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import { DirtyTracker, initInternals as dirtyInitInternals } from "./dirty.js";
 import {
-  CallbackChain,
   CallbackFn,
   AroundCallbackFn,
   type CallbackObject,
   CallbackConditions,
   type RunCallbacksOptions,
   defineModelCallbacks,
+  _registerCallbackOnProto,
+  hasCallbackOnProto,
+  skipCallbackOnProto,
+  runAllCallbacks,
+  runBeforeCallbacksOnProto,
+  runAfterCallbacksOnProto,
 } from "./callbacks.js";
 import { serializableHash, SerializeOptions, coerceForJson } from "./serialization.js";
 import { BlockValidator, EachValidator, Validator as ValidatorBase } from "./validator.js";
@@ -125,21 +134,6 @@ export class Model {
   // `static { this.validates(...) }` blocks at class-definition time);
   // only the "defined but never written to" window diverges from Rails.
   static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
-  /** @internal */
-  static get _callbackChain(): CallbackChain {
-    return new CallbackChain(this.prototype);
-  }
-  /** @internal */
-  static set _callbackChain(_: CallbackChain) {
-    // no-op: subclass isolation is handled automatically by activesupport's
-    // copy-on-write in getCallbackChains when register/setCallback is first called.
-  }
-  /**
-   * @internal Compat shim for AR call sites (transactions.ts) that have not yet
-   * been migrated to the direct activesupport API (PR 6). COW is now automatic;
-   * this is a no-op.
-   */
-  static _ensureOwnCallbacks(): void {}
   private static _modelName: ModelName | null = null;
 
   // -- Attributes (Phase 1000) --
@@ -457,7 +451,7 @@ export class Model {
   static clearValidatorsBang(): void {
     // Rails: `_validators.clear` (activemodel/lib/active_model/validations.rb:248).
     this._validators = new Map();
-    this._callbackChain.clearEvent("validate");
+    asResetCallbacks(this.prototype, "validate");
   }
 
   static isAttributeMethod(attribute: string): boolean {
@@ -479,7 +473,13 @@ export class Model {
         return (r[methodOrFn] as () => void)();
       }
     };
-    this._callbackChain.register("before", "validate", fn, this._buildValidateConditions(options));
+    _registerCallbackOnProto(
+      this.prototype,
+      "before",
+      "validate",
+      fn,
+      this._buildValidateConditions(options),
+    );
   }
 
   /**
@@ -497,7 +497,8 @@ export class Model {
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
     );
     this._registerValidator(validator);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "before",
       "validate",
       (record: object) => validator.validate(record as ValidatableRecord),
@@ -579,7 +580,7 @@ export class Model {
         callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
       }
 
-      this._callbackChain.register("before", "validate", callbackFn, conditions);
+      _registerCallbackOnProto(this.prototype, "before", "validate", callbackFn, conditions);
     }
   }
 
@@ -717,7 +718,8 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "before",
       "validation",
       fn as CallbackFn | CallbackObject,
@@ -730,7 +732,8 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "after",
       "validation",
       fn as CallbackFn | CallbackObject,
@@ -744,7 +747,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("before", "save", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "before",
+      "save",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static afterSave<T extends typeof Model>(
@@ -753,7 +762,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("after", "save", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "save",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static beforeCreate<T extends typeof Model>(
@@ -762,7 +777,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("before", "create", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "before",
+      "create",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static afterCreate<T extends typeof Model>(
@@ -771,7 +792,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("after", "create", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "create",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static beforeUpdate<T extends typeof Model>(
@@ -780,7 +807,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("before", "update", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "before",
+      "update",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static afterUpdate<T extends typeof Model>(
@@ -789,7 +822,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("after", "update", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "update",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static beforeDestroy<T extends typeof Model>(
@@ -798,7 +837,8 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "before",
       "destroy",
       fn as CallbackFn | CallbackObject,
@@ -812,7 +852,13 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register("after", "destroy", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "destroy",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static aroundSave<T extends typeof Model>(
@@ -823,7 +869,8 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "around",
       "save",
       fn as AroundCallbackFn | CallbackObject,
@@ -839,7 +886,8 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "around",
       "create",
       fn as AroundCallbackFn | CallbackObject,
@@ -855,7 +903,8 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "around",
       "update",
       fn as AroundCallbackFn | CallbackObject,
@@ -871,7 +920,8 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "around",
       "destroy",
       fn as AroundCallbackFn | CallbackObject,
@@ -887,7 +937,13 @@ export class Model {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
-    this._callbackChain.register("after", "commit", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "commit",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static afterSaveCommit<T extends typeof Model>(
@@ -930,7 +986,8 @@ export class Model {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "after",
       "rollback",
       fn as CallbackFn | CallbackObject,
@@ -943,7 +1000,8 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._callbackChain.register(
+    _registerCallbackOnProto(
+      this.prototype,
       "after",
       "initialize",
       fn as CallbackFn | CallbackObject,
@@ -956,7 +1014,13 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._callbackChain.register("after", "find", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "find",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   static afterTouch<T extends typeof Model>(
@@ -964,7 +1028,13 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._callbackChain.register("after", "touch", fn as CallbackFn | CallbackObject, conditions);
+    _registerCallbackOnProto(
+      this.prototype,
+      "after",
+      "touch",
+      fn as CallbackFn | CallbackObject,
+      conditions,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -981,7 +1051,7 @@ export class Model {
    * "around"`). Mirrors Rails `set_callback(event, timing, filter, options)`
    * (activesupport/lib/active_support/callbacks.rb:737-749). `filter` may be
    * a function (most common in TS) or a method-object that our existing
-   * `CallbackChain.register` accepts; `options` covers the usual Rails
+   * `_registerCallbackOnProto` accepts; `options` covers the usual Rails
    * conditionals (`if`, `unless`, `prepend`). `on` is only valid for
    * transactional callbacks (`commit` / `rollback`) — any other event
    * raises if `on` is set, matching the existing per-event helpers.
@@ -1009,13 +1079,11 @@ export class Model {
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
     options?: CallbackConditions<InstanceType<T>>,
   ): void {
-    // `CallbackChain.register` below enforces both `on:` applicability
-    // (only commit/rollback) and value validity
-    // (:create/:update/:destroy) using key-presence checks, so every
-    // entry point — setCallback, defineModelCallbacks helpers, direct
-    // chain.register — shares the same gate. No extra guard needed
-    // here.
-    this._callbackChain.register(
+    // `_registerCallbackOnProto` enforces `on:` applicability (only commit/rollback)
+    // and value validity (:create/:update/:destroy) so every entry point shares the
+    // same gate. No extra guard needed here.
+    _registerCallbackOnProto(
+      this.prototype,
       timing,
       event,
       fn as CallbackFn | AroundCallbackFn | CallbackObject,
@@ -1063,8 +1131,8 @@ export class Model {
     // that will never see future parent registrations. Check via the
     // inherited chain first; only clone when we're actually going to
     // mutate (match found).
-    if (!this._callbackChain.has(event, timing, fn)) return false;
-    return this._callbackChain.skip(event, timing, fn);
+    if (!hasCallbackOnProto(this.prototype, event, timing, fn)) return false;
+    return skipCallbackOnProto(this.prototype, event, timing, fn);
   }
 
   /**
@@ -1073,7 +1141,7 @@ export class Model {
    * (activesupport/lib/active_support/callbacks.rb:811-821).
    */
   static resetCallbacks<T extends typeof Model>(this: T, event: string): void {
-    this._callbackChain.clearEvent(event);
+    asResetCallbacks(this.prototype, event);
   }
 
   private static _ensureOwnValidators(): void {
@@ -1304,7 +1372,7 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      ctor._callbackChain.runAfter("initialize", this, { strict: "sync" });
+      runAfterCallbacksOnProto(ctor.prototype, "initialize", this, { strict: "sync" });
     }
   }
 
@@ -1524,7 +1592,8 @@ export class Model {
     this._validationContext = normalized;
 
     try {
-      const completed = ctor._callbackChain.runCallbacks(
+      const completed = runAllCallbacks(
+        ctor.prototype,
         "validation",
         this,
         () => {
@@ -1542,7 +1611,7 @@ export class Model {
   /** @internal */
   _runValidateCallbacks(): void {
     const ctor = this.constructor as typeof Model;
-    ctor._callbackChain.runBefore("validate", this, { strict: "sync" });
+    runBeforeCallbacksOnProto(ctor.prototype, "validate", this, { strict: "sync" });
   }
 
   /**
@@ -2222,7 +2291,7 @@ export class Model {
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    return (this.constructor as typeof Model)._callbackChain.runCallbacks(event, this, block, opts);
+    return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
   }
 }
 

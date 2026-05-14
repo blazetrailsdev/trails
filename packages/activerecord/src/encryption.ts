@@ -281,8 +281,8 @@ export function applyPendingEncryptions(klass: any): void {
 
   // Register the frozen-encryption validator once per class. Own-property check
   // so subclasses that have already snapped their callback chain don't miss it —
-  // if a subclass cloned _callbackChain before the parent installed this
-  // validator, `in` would suppress installation even though the clone lacks it.
+  // if a subclass registered callbacks before the parent installed this
+  // validator, `in` would suppress installation even though the subclass lacks it.
   // The validator reads `record.constructor._encryptedAttributes` at call time,
   // so it correctly handles STI subclasses with different encrypted attribute sets.
   if (

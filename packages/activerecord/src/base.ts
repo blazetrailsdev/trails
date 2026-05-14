@@ -82,6 +82,10 @@ import {
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
 } from "./callbacks.js";
+import {
+  runAllCallbacks as cbRunAll,
+  runAfterCallbacksOnProto as cbRunAfter,
+} from "@blazetrails/activemodel";
 // Lazy-loaded to avoid pulling node:crypto into browser bundles
 let _signedIdModule: typeof import("./signed-id.js") | null = null;
 let _signedIdModulePromise: Promise<typeof import("./signed-id.js")> | null = null;
@@ -2195,8 +2199,8 @@ export class Base extends Model {
     if (this._strictLoadingByDefault) {
       record._strictLoading = true;
     }
-    this._callbackChain.runAfter("find", record, { strict: "sync" });
-    this._callbackChain.runAfter("initialize", record, { strict: "sync" });
+    cbRunAfter(this.prototype, "find", record, { strict: "sync" });
+    cbRunAfter(this.prototype, "initialize", record, { strict: "sync" });
     return record;
   }
 
@@ -2265,7 +2269,7 @@ export class Base extends Model {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
-        ctor._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
+        cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
       // For the regular (non-multiparameter) path, mirror the multiparameter
@@ -2301,7 +2305,7 @@ export class Base extends Model {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
-        ctor2._callbackChain.runAfter("initialize", this, { strict: "sync" } as any);
+        cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
     }
   }
@@ -2427,35 +2431,18 @@ export class Base extends Model {
     }
 
     // Rails: Callbacks#create_or_update wraps super in run_callbacks(:save) { ... }.
-    // Unifying before/after into a single runCallbacks so that around_save callbacks
-    // correctly wrap the DB write (the old split runBefore+runAfter was a no-op for around).
-    const saveOk = await ctor._callbackChain.runCallbacks("save", this, async () => {
+    // Around_save callbacks correctly wrap the _createRecord/_updateRecord calls which
+    // themselves run their own run_callbacks(:create/:update) { ... } chains.
+    const saveOk = await cbRunAll(ctor.prototype, "save", this, async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
-        const createOk = await ctor._callbackChain.runCallbacks("create", this, async () => {
-          this._performInsert();
-          if (this._pendingOperation) {
-            await this._pendingOperation;
-            this._pendingOperation = null;
-          }
-          this._previouslyNewRecord = true;
-          this._newRecord = false;
-          this.changesApplied();
-          saved = true;
-        });
-        if (!createOk) saved = false;
+        const createOk = await this._createRecord();
+        if (createOk) saved = true;
+        else saved = false;
       } else {
-        const updateOk = await ctor._callbackChain.runCallbacks("update", this, async () => {
-          this._performUpdate();
-          if (this._pendingOperation) {
-            await this._pendingOperation;
-            this._pendingOperation = null;
-          }
-          this._previouslyNewRecord = false;
-          this.changesApplied();
-          saved = true;
-        });
-        if (!updateOk) saved = false;
+        const updateOk = await this._updateRecord();
+        if (updateOk) saved = true;
+        else saved = false;
       }
 
       if (saved) {
@@ -2654,7 +2641,7 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
 
     let didDelete = false;
-    const destroyResult = await ctor._callbackChain.runCallbacks("destroy", this, async () => {
+    const destroyResult = await cbRunAll(ctor.prototype, "destroy", this, async () => {
       const table = ctor.arelTable;
       const pk = this.id;
       if (!(Array.isArray(pk) ? pk.every((v) => v == null) : pk == null)) {
@@ -3131,6 +3118,8 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   hasTransactionalCallbacks(): boolean;
   /** @internal */
   _createRecord(): Promise<boolean>;
+  /** @internal */
+  _updateRecord(): Promise<boolean>;
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): void;

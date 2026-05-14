@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
-import { CallbackChain } from "./callbacks.js";
+import {
+  _registerCallbackOnProto,
+  runAllCallbacks,
+  runBeforeCallbacksOnProto,
+  runAfterCallbacksOnProto,
+} from "./callbacks.js";
 
 describe("CallbacksTest", () => {
   it("after callbacks are not executed if the block returns false", () => {
@@ -66,7 +71,7 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    (p.constructor as typeof Model)._callbackChain.runAfter("create", p);
+    runAfterCallbacksOnProto((p.constructor as typeof Model).prototype, "create", p);
     expect(log).toEqual(["first", "second"]);
   });
 
@@ -313,12 +318,12 @@ describe("CallbacksTest", () => {
 
 describe("CallbackChain.run", () => {
   it("runs after callbacks only after the block completes", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    chain.runCallbacks("save", {}, () => {
+    runAllCallbacks(proto, "save", {}, () => {
       log.push("block:start");
       log.push("block:end");
     });
@@ -326,16 +331,16 @@ describe("CallbackChain.run", () => {
   });
 
   it("returns false and skips block when before callback halts", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", () => {
+    _registerCallbackOnProto(proto, "before", "save", () => {
       log.push("before");
       return false;
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = chain.runCallbacks("save", {}, () => {
+    const result = runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(result).toBe(false);
@@ -343,33 +348,33 @@ describe("CallbackChain.run", () => {
   });
 
   it("around callbacks wrap the block", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("around", "save", (_record: any, proceed: () => void) => {
+    _registerCallbackOnProto(proto, "around", "save", (_record: any, proceed: () => void) => {
       log.push("around:before");
       proceed();
       log.push("around:after");
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    chain.runCallbacks("save", {}, () => {
+    runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(log).toEqual(["around:before", "block", "around:after", "after"]);
   });
 
   it("before callback that returns false halts the chain", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", () => {
+    _registerCallbackOnProto(proto, "before", "save", () => {
       log.push("before");
       return false;
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = chain.runCallbacks("save", {}, () => {
+    const result = runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(result).toBe(false);
@@ -377,15 +382,15 @@ describe("CallbackChain.run", () => {
   });
 
   it("after callbacks run in registration order", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after1");
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after2");
     });
-    chain.runCallbacks("save", {}, () => {
+    runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(log).toEqual(["block", "after1", "after2"]);
@@ -507,17 +512,22 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
   it("CallbackChain.register rejects on: for non-commit/rollback events", () => {
     // Register-level gate — every path (setCallback, generated
-    // beforeX/afterX, plugin-direct chain.register) funnels here, so
-    // rejecting once at the chain catches `defineModelCallbacks`
-    // helpers too, not just setCallback.
-    const chain = new CallbackChain();
-    expect(() => chain.register("before", "save", () => {}, { on: "create" })).toThrow(/:on/);
+    // beforeX/afterX, plugin-direct _registerCallbackOnProto) funnels here, so
+    // rejecting once at the registration catches all entry points.
+    const proto = Object.create(null);
+    expect(() =>
+      _registerCallbackOnProto(proto, "before", "save", () => {}, { on: "create" }),
+    ).toThrow(/:on/);
   });
 
   it("CallbackChain.register accepts on: for commit/rollback events", () => {
-    const chain = new CallbackChain();
-    expect(() => chain.register("after", "commit", () => {}, { on: "create" })).not.toThrow();
-    expect(() => chain.register("after", "rollback", () => {}, { on: "update" })).not.toThrow();
+    const proto = Object.create(null);
+    expect(() =>
+      _registerCallbackOnProto(proto, "after", "commit", () => {}, { on: "create" }),
+    ).not.toThrow();
+    expect(() =>
+      _registerCallbackOnProto(proto, "after", "rollback", () => {}, { on: "update" }),
+    ).not.toThrow();
   });
 
   it("resetCallbacks clears CallbackObject-registered callbacks too", () => {
@@ -551,41 +561,41 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
 
 describe("unified sync/async runner", () => {
   it("returns a boolean synchronously when all callbacks and block are sync", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", () => {
+    _registerCallbackOnProto(proto, "before", "save", () => {
       log.push("before");
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = chain.runCallbacks("save", {}, () => log.push("block"));
+    const result = runAllCallbacks(proto, "save", {}, () => log.push("block"));
     expect(result).toBe(true);
     expect(log).toEqual(["before", "block", "after"]);
   });
 
   it("returns a Promise when a before callback is async", async () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", async () => {
+    _registerCallbackOnProto(proto, "before", "save", async () => {
       await Promise.resolve();
       log.push("before");
     });
-    chain.register("after", "save", () => {
+    _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = chain.runCallbacks("save", {}, () => log.push("block"));
+    const result = runAllCallbacks(proto, "save", {}, () => log.push("block"));
     expect(result).toBeInstanceOf(Promise);
     expect(await result).toBe(true);
     expect(log).toEqual(["before", "block", "after"]);
   });
 
   it("returns a Promise when the block is async", async () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", () => log.push("before"));
-    chain.register("after", "save", () => log.push("after"));
-    const result = chain.runCallbacks("save", {}, async () => {
+    _registerCallbackOnProto(proto, "before", "save", () => log.push("before"));
+    _registerCallbackOnProto(proto, "after", "save", () => log.push("after"));
+    const result = runAllCallbacks(proto, "save", {}, async () => {
       await Promise.resolve();
       log.push("block");
     });
@@ -595,45 +605,45 @@ describe("unified sync/async runner", () => {
   });
 
   it("awaits async callbacks in order", async () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", async () => {
+    _registerCallbackOnProto(proto, "before", "save", async () => {
       await Promise.resolve();
       log.push("b1");
     });
-    chain.register("before", "save", () => {
+    _registerCallbackOnProto(proto, "before", "save", () => {
       log.push("b2");
     });
-    chain.register("after", "save", async () => {
+    _registerCallbackOnProto(proto, "after", "save", async () => {
       await Promise.resolve();
       log.push("a1");
     });
-    await chain.runCallbacks("save", {}, () => log.push("block"));
+    await runAllCallbacks(proto, "save", {}, () => log.push("block"));
     expect(log).toEqual(["b1", "b2", "block", "a1"]);
   });
 
   it("async before halts chain when resolving to false", async () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "save", async () => false);
-    chain.register("after", "save", () => log.push("after"));
-    const ok = await chain.runCallbacks("save", {}, () => log.push("block"));
+    _registerCallbackOnProto(proto, "before", "save", async () => false);
+    _registerCallbackOnProto(proto, "after", "save", () => log.push("after"));
+    const ok = await runAllCallbacks(proto, "save", {}, () => log.push("block"));
     expect(ok).toBe(false);
     expect(log).toEqual([]);
   });
 
   it("strict: 'sync' throws when a before callback returns a Promise", () => {
-    const chain = new CallbackChain();
-    chain.register("before", "validation", async () => {});
-    expect(() => chain.runCallbacks("validation", {}, () => {}, { strict: "sync" })).toThrow(
+    const proto = Object.create(null);
+    _registerCallbackOnProto(proto, "before", "validation", async () => {});
+    expect(() => runAllCallbacks(proto, "validation", {}, () => {}, { strict: "sync" })).toThrow(
       /Async callback on sync chain "validation"/,
     );
   });
 
   it("strict: 'sync' throws when an after callback returns a Promise", () => {
-    const chain = new CallbackChain();
-    chain.register("after", "initialize", async () => {});
-    expect(() => chain.runAfter("initialize", {}, { strict: "sync" })).toThrow(
+    const proto = Object.create(null);
+    _registerCallbackOnProto(proto, "after", "initialize", async () => {});
+    expect(() => runAfterCallbacksOnProto(proto, "initialize", {}, { strict: "sync" })).toThrow(
       /Async callback on sync chain "initialize"/,
     );
   });
@@ -682,11 +692,11 @@ describe("unified sync/async runner", () => {
   });
 
   it("strict: 'sync' allows fully-sync chains", () => {
-    const chain = new CallbackChain();
+    const proto = Object.create(null);
     const log: string[] = [];
-    chain.register("before", "validation", () => log.push("before"));
-    chain.register("after", "validation", () => log.push("after"));
-    const result = chain.runCallbacks("validation", {}, () => log.push("block"), {
+    _registerCallbackOnProto(proto, "before", "validation", () => log.push("before"));
+    _registerCallbackOnProto(proto, "after", "validation", () => log.push("after"));
+    const result = runAllCallbacks(proto, "validation", {}, () => log.push("block"), {
       strict: "sync",
     });
     expect(result).toBe(true);
@@ -938,8 +948,8 @@ describe("defineModelCallbacks()", () => {
 
     const p = new Payment({ amount: 100 });
     // Run callbacks manually
-    (Payment as any)._callbackChain.runBefore("process", p);
-    (Payment as any)._callbackChain.runAfter("process", p);
+    runBeforeCallbacksOnProto(Payment.prototype, "process", p);
+    runAfterCallbacksOnProto(Payment.prototype, "process", p);
     expect(log).toEqual(["before_process", "after_process"]);
   });
 
@@ -974,7 +984,7 @@ describe("callbacks with prepend option", () => {
     );
 
     const u = new User({ name: "Alice" });
-    (User as any)._callbackChain.runBefore("save", u);
+    runBeforeCallbacksOnProto(User.prototype, "save", u);
     expect(order).toEqual(["prepended", "first"]);
   });
 });
