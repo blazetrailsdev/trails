@@ -11,6 +11,7 @@ export const PACKAGES = [
   "activesupport",
   "actiondispatch",
   "actioncontroller",
+  "abstractcontroller",
   "actionview",
   "trailties",
 ];
@@ -19,6 +20,7 @@ export const PACKAGES = [
 export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
   actioncontroller: "actionpack",
+  abstractcontroller: "actionpack",
 };
 
 /**
@@ -38,6 +40,7 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actiondispatch: "actiondispatch",
   actioncontroller: "actioncontroller",
+  abstractcontroller: "abstractcontroller",
 };
 
 export function packageSrcDir(pkg: string): string {

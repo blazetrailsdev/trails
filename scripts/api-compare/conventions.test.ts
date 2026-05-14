@@ -109,4 +109,21 @@ describe("rubyFileToTs", () => {
       "connection-adapters/postgresql-adapter.ts",
     );
   });
+
+  it("maps action_controller/railties/... to trailties/... via DIR_PREFIX_OVERRIDES", () => {
+    expect(rubyFileToTs("railties/helpers.rb", "actioncontroller")).toBe("trailties/helpers.ts");
+    expect(rubyFileToTs("railties/asset_paths.rb", "actioncontroller")).toBe(
+      "trailties/asset-paths.ts",
+    );
+  });
+
+  it("FILE_OVERRIDES takes precedence over DIR_PREFIX_OVERRIDES", () => {
+    // activerecord:railtie.rb → trailtie.ts is a FILE_OVERRIDES entry; it must
+    // win even if a hypothetical DIR_PREFIX_OVERRIDES entry would also match.
+    expect(rubyFileToTs("railtie.rb", "activerecord")).toBe("trailtie.ts");
+  });
+
+  it("does not rewrite railties paths for other packages", () => {
+    expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("railties/some-file.ts");
+  });
 });
