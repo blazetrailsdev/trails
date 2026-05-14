@@ -52,6 +52,7 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
+import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -544,23 +545,47 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     type: string,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    void tableName;
-    void columnName;
-    void type;
-    void options;
+    const sql = `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnForAlter(tableName, columnName, type, options)}`;
+    await this._execMutation(sql);
   }
 
-  buildChangeColumnDefinition(
+  async buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): Record<string, unknown> {
-    void tableName;
-    void columnName;
-    void type;
-    void options;
-    return {};
+  ): Promise<ChangeColumnDefinition> {
+    const column = await this.columnFor(tableName, columnName);
+    const resolvedType = type || column.sqlType || "";
+
+    const opts = { ...options };
+
+    if (!Object.prototype.hasOwnProperty.call(opts, "default")) {
+      opts["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
+    }
+    if (!Object.prototype.hasOwnProperty.call(opts, "null")) {
+      opts["null"] = column.null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(opts, "comment")) {
+      opts["comment"] = column.comment ?? undefined;
+    }
+
+    if (opts["collation"] === null) {
+      delete opts["collation"];
+    } else if (
+      !Object.prototype.hasOwnProperty.call(opts, "collation") &&
+      this.isTextType(resolvedType)
+    ) {
+      opts["collation"] = column.collation ?? undefined;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(opts, "autoIncrement")) {
+      opts["autoIncrement"] = (column as any).autoIncrement ?? false;
+    }
+
+    const td = new MysqlTableDefinition(tableName, { id: false });
+    const colDef = td.newColumnDefinition(column.name, resolvedType as any, opts as any);
+    return new ChangeColumnDefinition(colDef, column.name);
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
@@ -601,6 +626,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   addSqlCommentBang(sql: string, comment: string): string {
     if (comment) return `${sql} COMMENT ${this.quote(comment)}`;
     return sql;
+  }
+
+  /** @internal Mirrors: AbstractMysqlAdapter#text_type? */
+  isTextType(type: string): boolean {
+    const t = this.nativeTypeMap.lookup(type.toLowerCase().trim());
+    return t instanceof StringType || t instanceof TextType;
   }
 
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -1191,14 +1222,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  changeColumnForAlter(
+  async changeColumnForAlter(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): string {
-    const colDef = new ColumnDefinition(columnName, type, options);
-    const cd = new ChangeColumnDefinition(colDef, columnName);
+  ): Promise<string> {
+    const cd = await this.buildChangeColumnDefinition(tableName, columnName, type, options);
     return new MysqlSchemaCreation().accept(cd);
   }
 
