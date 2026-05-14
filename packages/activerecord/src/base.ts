@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp as _getGlobalIdApp } from "@blazetrails/globalid";
+import { getApp as _getGlobalIdApp, SignedGlobalID } from "@blazetrails/globalid";
 import {
   Model,
   type Type,
@@ -2782,6 +2782,29 @@ export class Base extends Model {
       return `gid://${app}/${ctor.name}/${this.id}`;
     }
     return `gid://${ctor.name}/${this.id}`;
+  }
+
+  /**
+   * Return a cryptographically signed GlobalID for this record.
+   * Uses the model's `signedIdVerifier` (same secret as signed IDs).
+   *
+   * Mirrors: ActiveRecord::Base#to_sgid
+   */
+  async toSgid(options?: {
+    app?: string;
+    purpose?: string;
+    expiresIn?: number;
+    expiresAt?: Temporal.Instant;
+  }): Promise<string> {
+    const SignedIdModule = await loadSignedId();
+    const verifier = SignedIdModule.signedIdVerifier(this.constructor as typeof Base);
+    return SignedGlobalID.create(
+      this as unknown as { id: unknown; constructor: { name: string } },
+      {
+        ...options,
+        verifier,
+      },
+    ).toString();
   }
 
   // valuesAt / assignAttributes extracted to persistence.ts.
