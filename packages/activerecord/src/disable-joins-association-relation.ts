@@ -391,9 +391,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * loading) — except we skip the materialization since count
    * doesn't need it. Net: same result, fewer rows hydrated.
    */
-  // @ts-expect-error Relation defines `count` as a property (from
-  //   the calculations mixin); DJAR overrides as an async method
-  //   that runs the deferred chain walk before counting.
   async count(column?: string): Promise<number | Record<string, number>> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();

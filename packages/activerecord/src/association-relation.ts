@@ -190,8 +190,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   // reads; with CP now extending Relation, chained AR methods need the
   // same gate.
 
-  // @ts-expect-error — Relation defines `count` as a property; override
-  //   as a method so we can gate strict-loading before dispatching.
   async count(column?: string): Promise<number | Record<string, number>> {
     this._checkStrictLoading();
     return (
@@ -201,9 +199,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).count.call(this, column);
   }
 
-  // @ts-expect-error — sum/average/minimum/maximum are also property-
-  //   assigned on Relation (from the Calculations mixin); override as
-  //   methods to gate strict-loading before each SQL entry point.
   async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
     this._checkStrictLoading();
     return (
@@ -213,7 +208,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).sum.call(this, column);
   }
 
-  // @ts-expect-error — see `sum`.
   async average(column: string): Promise<number | null | Record<string, number>> {
     this._checkStrictLoading();
     return (
@@ -223,7 +217,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).average.call(this, column);
   }
 
-  // @ts-expect-error — see `sum`.
   async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     return (
@@ -233,7 +226,6 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).minimum.call(this, column);
   }
 
-  // @ts-expect-error — see `sum`.
   async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     return (

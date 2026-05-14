@@ -66,6 +66,7 @@ import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
 import {
   Calculations,
+  type CalculationMethods,
   groupColumnToArel,
   aggregateColumn as _aggregateColumn,
   isAllAttributes as _isAllAttributes,
@@ -5067,11 +5068,14 @@ export interface Relation<T extends Base> {
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
-// QueryMethodBangs and Calculations don't involve T — Included<> works fine.
+// QueryMethodBangs doesn't involve T — Included<> works fine.
+// Calculations uses the explicit CalculationMethods interface (method-syntax)
+// so subclasses (CollectionProxy, AssociationRelation, DJAR) can override
+// count/sum/etc. with narrower signatures.
 // FinderMethods and SpawnMethods return T-typed values — explicit signatures needed.
 
 export interface Relation<T extends Base>
-  extends Included<typeof QueryMethodBangs>, Included<typeof Calculations> {
+  extends Included<typeof QueryMethodBangs>, CalculationMethods {
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;

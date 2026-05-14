@@ -420,9 +420,15 @@ export async function performMaximum(
 }
 
 /**
- * Interface for the calculation methods mixed into Relation.
- * Used with interface merging so the methods appear as proper
- * method signatures in .d.ts output.
+ * Interface for the calculation methods mixed into Relation. Declared as
+ * **method-syntax** (not property-syntax) so subclasses — CollectionProxy,
+ * AssociationRelation, DisableJoinsAssociationRelation — can override
+ * `count` / `sum` / `average` / `minimum` / `maximum` with narrower
+ * signatures and added behavior (loaded-target fast path, strict-loading
+ * gating, DJAR chain-walker). Do NOT replace this with
+ * `Included<typeof Calculations>` on the `Relation` interface:
+ * `Included<>` emits property-syntax members, and TS's strict variance
+ * rules then reject every subclass override.
  */
 export interface CalculationMethods {
   count(column?: string): Promise<number | Record<string, number>>;

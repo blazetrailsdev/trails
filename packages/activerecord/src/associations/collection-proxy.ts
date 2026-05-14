@@ -756,10 +756,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Count associated records.
    */
-  // @ts-expect-error Relation defines `count` as a property (from the
-  //   calculations mixin); CP declares it as a method with association
-  //   semantics (loaded-target fast path). PR B will delete CP's count
-  //   and let Relation's win.
   async count(): Promise<number> {
     // Rails' CollectionAssociation#count: if the target is already
     // loaded, count the loaded array (no query). Otherwise issue a
@@ -849,8 +845,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // treatment as pluck/pick/count. Without overriding, cp.sum('x') /
   // cp.whereBang({...}); cp.average('y') would both bypass the gate
   // and drop in-place mutations.
-  // @ts-expect-error sum is a property on Relation (Calculations mixin);
-  //   method override is intentional to gate + honor divergence.
   async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
     this._checkStrictLoading();
     const fn = (
@@ -867,7 +861,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ).sum(column);
   }
 
-  // @ts-expect-error see `sum`.
   async average(column: string): Promise<number | null | Record<string, number>> {
     this._checkStrictLoading();
     const fn = (
@@ -882,7 +875,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ).average(column);
   }
 
-  // @ts-expect-error see `sum`.
   async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     const fn = (
@@ -899,7 +891,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ).minimum(column);
   }
 
-  // @ts-expect-error see `sum`.
   async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     const fn = (
