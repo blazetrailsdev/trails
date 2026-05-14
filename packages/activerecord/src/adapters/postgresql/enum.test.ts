@@ -267,14 +267,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("schema dump renamed enum", async () => {
       await adapter.renameEnum("mood", "feeling");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
-      expect(output).toContain('create_enum "feeling", ["sad","ok","happy"]');
+      expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
       expect(output).toContain('enum_type: "feeling"');
     });
 
     it("schema dump renamed enum with to option", async () => {
       await adapter.renameEnum("mood", { to: "feeling" });
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
-      expect(output).toContain('create_enum "feeling", ["sad","ok","happy"]');
+      expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
       expect(output).toContain('enum_type: "feeling"');
     });
 
@@ -286,14 +286,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addEnumValue("mood", "curious", { ifNotExists: true });
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain(
-        'create_enum "mood", ["sad","angry","ok","nervous","happy","glad","curious"]',
+        'await ctx.createEnum("mood", ["sad","angry","ok","nervous","happy","glad","curious"]);',
       );
     });
 
     it("schema dump renamed enum value", async () => {
       await adapter.renameEnumValue("mood", { from: "ok", to: "okay" });
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
-      expect(output).toContain('create_enum "mood", ["sad","okay","happy"]');
+      expect(output).toContain('await ctx.createEnum("mood", ["sad","okay","happy"]);');
     });
 
     // Needs ORM layer (ActiveRecord enum DSL)
