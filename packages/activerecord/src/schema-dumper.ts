@@ -43,6 +43,8 @@ export interface ColumnInfo {
   scale?: number | null;
   collation?: string | null;
   array?: boolean;
+  /** True when the column's OID-resolved type is a PostgreSQL enum (not a domain or other custom type). */
+  isEnum?: boolean;
 }
 
 export interface IndexInfo {
@@ -374,6 +376,7 @@ class AdapterSchemaSource implements SchemaSource {
       scale: col.scale ?? undefined,
       collation: col.collation ?? undefined,
       array: (col as any).array === true ? true : undefined,
+      isEnum: col.type === "enum" ? true : undefined,
     }));
   }
 
@@ -918,14 +921,18 @@ export class SchemaDumper {
 
       if (DSL_HELPER_METHODS.has(dslType)) {
         lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
-      } else if (dslType === "enum" && typeof extraOpts?.enum_type === "string") {
+      } else if (col.isEnum && dslType === "enum" && typeof extraOpts?.enum_type === "string") {
         // PG enum columns: emit t.enum("col", { enum_type: "typename", ... })
+        // Only when column.isEnum is set (OID-resolved type is "enum") to avoid
+        // misclassifying domains and other unmapped custom types.
         const enumSpec = { ...colspec, enum_type: extraOpts.enum_type };
         const enumOptsStr = `, { ${this.formatColspec(enumSpec)} }`;
         lines.push(`    t.enum(${JSON.stringify(col.name)}${enumOptsStr});`);
       } else {
+        // Generic fallback: pass arbitrary SQL type through verbatim via t.column.
+        const columnType = dslType === "enum" ? (extraOpts?.enum_type ?? dslType) : dslType;
         lines.push(
-          `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(dslType)}${optionsStr});`,
+          `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(columnType)}${optionsStr});`,
         );
       }
     }
