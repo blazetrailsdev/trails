@@ -1,17 +1,28 @@
+/**
+ * Thin wrapper over @blazetrails/activesupport's callback engine.
+ *
+ * Mirrors: ActiveModel::Callbacks
+ * (activemodel/lib/active_model/callbacks.rb)
+ */
+
 import { ArgumentError } from "./attribute-assignment.js";
+import {
+  Callback,
+  CallbackChain as ASCallbackChain,
+  type BeforeCallback,
+  type AfterCallback,
+  type AroundCallback,
+  type CallbackKind,
+  type CallbackObject as ASCallbackObject,
+  type RunCallbacksOptions as ASRunCallbacksOptions,
+  defineCallbacks as asDefineCallbacks,
+} from "@blazetrails/activesupport";
+
+type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
 /** Minimum shape required of a record object threaded through a callback chain. */
 export type CallbackRecord = object;
 
-/**
- * Callbacks mixin contract — defines model callback registration.
- *
- * Mirrors: ActiveModel::Callbacks
- *
- * In Rails, including ActiveModel::Callbacks gives the class
- * define_model_callbacks which creates before/after/around hooks.
- * Model already implements this via defineModelCallbacks().
- */
 export interface DefineModelCallbacksOptions {
   only?: CallbackTiming[];
 }
@@ -23,6 +34,24 @@ export interface CallbacksClassMethods {
 }
 
 export type Callbacks = CallbacksClassMethods;
+
+export type CallbackTiming = CallbackKind;
+export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;
+export type AroundCallbackFn = (
+  record: CallbackRecord,
+  proceed: () => void | Promise<void>,
+) => void | Promise<void>;
+/** Rails supports passing an object with callback-named methods. */
+export type CallbackObject = object;
+export interface RunCallbacksOptions {
+  strict?: "sync";
+}
+export interface CallbackConditions<TRecord = CallbackRecord> {
+  if?(record: TRecord): boolean;
+  unless?(record: TRecord): boolean;
+  prepend?: boolean;
+  on?: string | string[];
+}
 
 /**
  * Core implementation of define_model_callbacks.
@@ -57,9 +86,7 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
       options = arg as DefineModelCallbacksOptions;
       const knownKeys = new Set(["only"]);
       for (const key of Object.keys(options)) {
-        if (!knownKeys.has(key)) {
-          throw new ArgumentError(`Unknown option: ${key}`);
-        }
+        if (!knownKeys.has(key)) throw new ArgumentError(`Unknown option: ${key}`);
       }
       if (options.only) {
         for (const t of options.only) {
@@ -80,15 +107,12 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   }
 
   const timings: CallbackTiming[] = options.only ?? ["before", "after", "around"];
+  const klass = this as { prototype?: object } & Record<string, unknown>;
 
-  // NB: each `_defineXxxModelCallback` passes `fnOrObject` directly to
-  // `register`; `register` already handles `resolveCallback` internally
-  // AND stores the original filter for identity-based removal via
-  // `skip()`. Pre-resolving here would make the stored filter the
-  // wrapper function, breaking `Model.skipCallback(event, timing,
-  // originalObject)` for entries registered through the generated
-  // `beforeX`/`afterX`/`aroundX` helpers.
   for (const event of eventNames) {
+    // Register the chain on the prototype for activesupport API surface parity.
+    // Mirrors: ActiveModel::Callbacks → define_callbacks (activesupport)
+    if (klass.prototype) asDefineCallbacks(klass.prototype, event);
     if (timings.includes("before")) _defineBeforeModelCallback(this, event);
     if (timings.includes("after")) _defineAfterModelCallback(this, event);
     if (timings.includes("around")) _defineAroundModelCallback(this, event);
@@ -98,10 +122,6 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
 type CallbackHost = object;
 
 /**
- * Define a `before<Event>` class method that registers a before callback.
- *
- * Mirrors: ActiveModel::Callbacks#_define_before_model_callback
- *
  * @internal Rails-private helper.
  */
 export function _defineBeforeModelCallback(klass: CallbackHost, event: string): void {
@@ -119,10 +139,6 @@ export function _defineBeforeModelCallback(klass: CallbackHost, event: string): 
 }
 
 /**
- * Define an `around<Event>` class method that registers an around callback.
- *
- * Mirrors: ActiveModel::Callbacks#_define_around_model_callback
- *
  * @internal Rails-private helper.
  */
 export function _defineAroundModelCallback(klass: CallbackHost, event: string): void {
@@ -143,10 +159,6 @@ export function _defineAroundModelCallback(klass: CallbackHost, event: string): 
 }
 
 /**
- * Define an `after<Event>` class method that registers an after callback.
- *
- * Mirrors: ActiveModel::Callbacks#_define_after_model_callback
- *
  * @internal Rails-private helper.
  */
 export function _defineAfterModelCallback(klass: CallbackHost, event: string): void {
@@ -163,128 +175,56 @@ export function _defineAfterModelCallback(klass: CallbackHost, event: string): v
   });
 }
 
-/**
- * Class-based callback object. Rails supports passing an object with
- * a method matching the callback (e.g., `beforeSave(record)`).
- */
-export type CallbackObject = object;
-
-function resolveCallback(
-  fnOrObject: CallbackFn | AroundCallbackFn | CallbackObject,
+function _resolveCallbackObject(
+  obj: ASCallbackObject,
   timing: CallbackTiming,
   event: string,
-): CallbackFn | AroundCallbackFn {
-  if (typeof fnOrObject === "function") return fnOrObject as CallbackFn | AroundCallbackFn;
-  const obj = fnOrObject as Record<string, unknown>;
-  const methodName = `${timing}_${event}`;
+): AnyCallback {
+  const rec = obj as Record<string, unknown>;
   const camelMethod = `${timing}${event.charAt(0).toUpperCase()}${event.slice(1)}`;
-  const method = obj[methodName] ?? obj[camelMethod];
+  const snakeMethod = `${timing}_${event}`;
+  const method = rec[camelMethod] ?? rec[snakeMethod];
   if (typeof method !== "function") {
-    throw new ArgumentError(`Callback object must implement ${methodName} or ${camelMethod}`);
+    throw new ArgumentError(`Callback object must implement ${camelMethod} or ${snakeMethod}`);
   }
   if (timing === "around") {
     return ((record: CallbackRecord, proceed: () => void | Promise<void>) =>
-      method.call(fnOrObject, record, proceed)) as AroundCallbackFn;
+      (method as (r: CallbackRecord, p: () => void | Promise<void>) => void).call(
+        obj,
+        record,
+        proceed,
+      )) as AnyCallback;
   }
-  return ((record: CallbackRecord) => method.call(fnOrObject, record)) as CallbackFn;
+  return ((record: CallbackRecord) =>
+    (method as (r: CallbackRecord) => unknown).call(obj, record)) as AnyCallback;
 }
 
 /**
- * Callback types.
+ * Lifecycle callback chain backed by activesupport's Callback engine.
  *
- * CallbackFn allows Promise returns. The unified runner
- * (runCallbacks/runBefore/runAfter) returns synchronously when every
- * registered callback and block is synchronous, and returns a Promise
- * as soon as any callback or block returns a thenable. Pass
- * `{ strict: "sync" }` on events that must remain synchronous
- * (validation, validate, initialize, find); the runner throws if any callback
- * returns a Promise on such events.
- *
- * AroundCallbackFn's proceed() returns void | Promise<void> because the
- * wrapped block may be async (e.g., DB operations in persistence). Around
- * callbacks that wrap async blocks should await proceed().
- */
-export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;
-export type AroundCallbackFn = (
-  record: CallbackRecord,
-  proceed: () => void | Promise<void>,
-) => void | Promise<void>;
-
-export interface RunCallbacksOptions {
-  /** If "sync", throw when any callback returns a Promise. */
-  strict?: "sync";
-}
-
-function isThenable(v: unknown): v is PromiseLike<unknown> {
-  return (
-    v !== null &&
-    (typeof v === "object" || typeof v === "function") &&
-    typeof (v as { then?: unknown }).then === "function"
-  );
-}
-
-/**
- * Consume a thenable's rejection before throwing in strict-sync mode,
- * so the error we throw isn't accompanied by an unhandled-rejection
- * warning (or process termination under `--unhandled-rejections=strict`).
- */
-function swallowRejection(v: unknown): void {
-  if (isThenable(v)) {
-    void Promise.resolve(v).catch(() => {});
-  }
-}
-
-export type CallbackTiming = "before" | "after" | "around";
-export type CallbackEvent = string;
-
-export interface CallbackConditions<TRecord = CallbackRecord> {
-  if?(record: TRecord): boolean;
-  unless?(record: TRecord): boolean;
-  prepend?: boolean;
-  on?: string | string[];
-}
-
-interface CallbackEntry {
-  timing: CallbackTiming;
-  event: CallbackEvent;
-  /** Resolved callable used at run time. */
-  fn: CallbackFn | AroundCallbackFn;
-  /**
-   * Original filter the caller passed — may be a function (same as `fn`
-   * after resolution) or a `CallbackObject` (before resolution via
-   * `resolveCallback`). `skip(event, timing, filter)` matches on this so
-   * removing a `CallbackObject` works with the same reference the caller
-   * registered.
-   */
-  filter: CallbackFn | AroundCallbackFn | CallbackObject;
-  conditions?: CallbackConditions;
-}
-
-/**
- * Callbacks — lifecycle hooks on models.
- *
- * Mirrors: ActiveModel::Callbacks
- *
- * `runCallbacks`, `runBefore`, and `runAfter` return `T | Promise<T>`:
- * synchronously when every callback and block is synchronous, as a Promise
- * as soon as any callback or block returns a thenable. Async call sites
- * (save/destroy/touch/commit) simply `await` the result. Sync call sites
- * (validation/validate/initialize/find) pass `{ strict: "sync" }` so that a
- * registered async callback throws loudly instead of being silently
- * awaited or dropped.
+ * Mirrors: ActiveModel::Callbacks / ActiveSupport::Callbacks
  */
 export class CallbackChain {
-  private callbacks: CallbackEntry[] = [];
+  /** Map from event name to an activesupport CallbackChain for that event. */
+  private readonly _chains = new Map<string, ASCallbackChain>();
+
+  private _chain(event: string): ASCallbackChain {
+    let chain = this._chains.get(event);
+    if (!chain) {
+      chain = new ASCallbackChain(event, { skipAfterCallbacksIfTerminated: true });
+      this._chains.set(event, chain);
+    }
+    return chain;
+  }
 
   register(
     timing: CallbackTiming,
-    event: CallbackEvent,
+    event: string,
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
     conditions?: CallbackConditions,
   ): void {
     // `on:` is synthesized into `if:` by the AR layer (transactions.ts)
-    // before reaching this chain. Reject it here only for non-commit/rollback
-    // events where it can never be meaningful.
+    // before reaching this chain. Reject it here for non-commit/rollback events.
     if (conditions && "on" in conditions) {
       if (event !== "commit" && event !== "rollback") {
         throw new ArgumentError(
@@ -292,294 +232,151 @@ export class CallbackChain {
         );
       }
     }
-    const resolved: CallbackFn | AroundCallbackFn =
-      typeof fn === "function"
-        ? (fn as CallbackFn | AroundCallbackFn)
-        : resolveCallback(fn, timing, event);
-    const entry: CallbackEntry = { timing, event, fn: resolved, filter: fn, conditions };
-    if (conditions?.prepend) {
-      this.callbacks.unshift(entry);
-    } else {
-      this.callbacks.push(entry);
-    }
+    const chain = this._chain(event);
+    const isObj = typeof fn === "object" && fn !== null;
+    const asObj = isObj ? (fn as unknown as ASCallbackObject) : undefined;
+    const resolved: AnyCallback = isObj
+      ? _resolveCallbackObject(asObj!, timing, event)
+      : (fn as AnyCallback);
+    const entry = new Callback(
+      event,
+      resolved,
+      timing as CallbackKind,
+      { if: conditions?.if, unless: conditions?.unless } as {
+        if?: (t: object) => boolean;
+        unless?: (t: object) => boolean;
+      },
+      chain.config,
+      asObj,
+    );
+    // After callbacks are stored with prepend so that activesupport's reverse
+    // iteration in _runAfters (LIFO) produces FIFO execution order — the same
+    // as Rails' _define_after_model_callback which passes prepend: true.
+    const usePrepend = conditions?.prepend || timing === "after";
+    if (usePrepend) chain.prepend(entry);
+    else chain.append(entry);
   }
 
-  private _shouldRun(entry: CallbackEntry, record: CallbackRecord): boolean {
-    if (entry.conditions?.if && !entry.conditions.if(record)) return false;
-    if (entry.conditions?.unless && entry.conditions.unless(record)) return false;
-    return true;
-  }
-
-  clearEvent(event: CallbackEvent): void {
-    this.callbacks = this.callbacks.filter((c) => c.event !== event);
-  }
-
-  /**
-   * Remove the first registered entry matching `event + timing + filter`.
-   * Identity-matches on the caller's original filter (function OR
-   * `CallbackObject`), not on the resolved runtime `fn` — so an object
-   * registered via `register(..., obj)` can be removed with the same
-   * object reference even though the chain internally resolves it to
-   * a bound method.
-   *
-   * Mirrors Rails `CallbackChain#delete` used internally by
-   * `skip_callback` (activesupport/lib/active_support/callbacks.rb:786-808).
-   * Returns `true` if a matching entry was found and removed, `false`
-   * otherwise — callers decide whether a miss is an error (Rails'
-   * default raises unless `raise: false` is passed).
-   */
   skip(
-    event: CallbackEvent,
+    event: string,
     timing: CallbackTiming,
     filter: CallbackFn | AroundCallbackFn | CallbackObject,
   ): boolean {
-    // Identity-match on the original filter the caller registered with
-    // (not the resolved `fn`), so `CallbackObject` removals work with
-    // the same reference that was passed to `register`.
-    const idx = this.callbacks.findIndex(
-      (c) => c.event === event && c.timing === timing && c.filter === filter,
-    );
-    if (idx === -1) return false;
-    this.callbacks.splice(idx, 1);
+    const chain = this._chains.get(event);
+    if (!chain) return false;
+    const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
+    const entry = chain.entries.find((e) => e.matches(timing as CallbackKind, asFilter));
+    if (!entry) return false;
+    chain.delete(entry);
     return true;
   }
 
-  /** Does this chain contain a matching entry? Non-mutating. */
   has(
-    event: CallbackEvent,
+    event: string,
     timing: CallbackTiming,
     filter: CallbackFn | AroundCallbackFn | CallbackObject,
   ): boolean {
-    return this.callbacks.some(
-      (c) => c.event === event && c.timing === timing && c.filter === filter,
+    const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
+    return (
+      this._chains.get(event)?.entries.some((e) => e.matches(timing as CallbackKind, asFilter)) ??
+      false
     );
+  }
+
+  clearEvent(event: string): void {
+    this._chains.delete(event);
   }
 
   clone(): CallbackChain {
     const copy = new CallbackChain();
-    copy.callbacks = [...this.callbacks];
+    for (const [ev, ch] of this._chains) {
+      const dup = new ASCallbackChain(ch.name, ch.config);
+      for (const e of ch.entries) {
+        dup.append(
+          new Callback(
+            e.name,
+            e.filter as AnyCallback,
+            e.kind,
+            e.options,
+            ch.config,
+            e.originalObject,
+          ),
+        );
+      }
+      copy._chains.set(ev, dup);
+    }
     return copy;
   }
 
-  /**
-   * Run before callbacks. Returns `false` if any callback returns `false`
-   * (halting the chain). Returns a Promise if any callback returns a
-   * thenable; otherwise returns synchronously.
-   *
-   * Mirrors: ActiveSupport::Callbacks — before filter chain
-   */
   runBefore(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): boolean;
   runBefore(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean>;
   runBefore(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const befores = this.callbacks.filter((c) => c.timing === "before" && c.event === event);
-    for (let i = 0; i < befores.length; i++) {
-      const cb = befores[i];
-      if (!this._shouldRun(cb, record)) continue;
-      const result = (cb.fn as CallbackFn)(record);
-      if (isThenable(result)) {
-        if (opts?.strict === "sync") {
-          swallowRejection(result);
-          throw new Error(
-            `Async callback registered on sync event '${event}' — before callback returned a Promise`,
-          );
-        }
-        const rest = befores.slice(i + 1);
-        return (async () => {
-          const awaited = await result;
-          if (awaited === false) return false;
-          for (const cb2 of rest) {
-            if (!this._shouldRun(cb2, record)) continue;
-            const r = await (cb2.fn as CallbackFn)(record);
-            if (r === false) return false;
-          }
-          return true;
-        })();
-      }
-      if (result === false) return false;
+    const chain = this._chains.get(event);
+    if (!chain) return true;
+    const tmp = new ASCallbackChain(event, chain.config);
+    for (const e of chain.entries) {
+      if (e.kind === "before") tmp.append(e);
     }
-    return true;
+    return tmp.compile().invoke(record, undefined, opts as ASRunCallbacksOptions);
   }
 
-  /**
-   * Run after callbacks. Returns a Promise if any callback returns a
-   * thenable; otherwise returns synchronously.
-   *
-   * Mirrors: ActiveSupport::Callbacks — after filter chain
-   */
   runAfter(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): void;
+  runAfter(event: string, record: CallbackRecord, opts?: RunCallbacksOptions): void | Promise<void>;
   runAfter(
-    event: CallbackEvent,
-    record: CallbackRecord,
-    opts?: RunCallbacksOptions,
-  ): void | Promise<void>;
-  runAfter(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): void | Promise<void> {
-    const afters = this.callbacks.filter((c) => c.timing === "after" && c.event === event);
-    for (let i = 0; i < afters.length; i++) {
-      const cb = afters[i];
-      if (!this._shouldRun(cb, record)) continue;
-      const result = (cb.fn as CallbackFn)(record);
-      if (isThenable(result)) {
-        if (opts?.strict === "sync") {
-          swallowRejection(result);
-          throw new Error(
-            `Async callback registered on sync event '${event}' — after callback returned a Promise`,
-          );
-        }
-        const rest = afters.slice(i + 1);
-        return (async () => {
-          await result;
-          for (const cb2 of rest) {
-            if (!this._shouldRun(cb2, record)) continue;
-            await (cb2.fn as CallbackFn)(record);
-          }
-        })();
-      }
+    const chain = this._chains.get(event);
+    if (!chain) return;
+    const tmp = new ASCallbackChain(event, chain.config);
+    for (const e of chain.entries) {
+      if (e.kind === "after") tmp.append(e);
     }
+    const result = tmp.compile().invoke(record, undefined, opts as ASRunCallbacksOptions);
+    if (result instanceof Promise) return result.then(() => undefined);
   }
 
-  /**
-   * Run callbacks around a block. Returns `false` if a before callback
-   * halts the chain or an around callback does not call `proceed()`.
-   * Returns a Promise as soon as any callback or the block itself returns
-   * a thenable; otherwise returns synchronously.
-   *
-   * Mirrors: ActiveSupport::Callbacks#run_callbacks
-   */
   runCallbacks(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     block: () => unknown,
     opts: RunCallbacksOptions & { strict: "sync" },
   ): boolean;
   runCallbacks(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean>;
   runCallbacks(
-    event: CallbackEvent,
+    event: string,
     record: CallbackRecord,
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const beforeResult = this.runBefore(event, record, opts);
-    if (isThenable(beforeResult)) {
-      return Promise.resolve(beforeResult).then((ok) =>
-        ok ? this._runAroundBlockAndAfter(event, record, block, opts) : false,
-      );
-    }
-    if (!beforeResult) return false;
-    return this._runAroundBlockAndAfter(event, record, block, opts);
-  }
-
-  private _runAroundBlockAndAfter(
-    event: CallbackEvent,
-    record: CallbackRecord,
-    block: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
-    const arounds = this.callbacks.filter(
-      (c) => c.timing === "around" && c.event === event && this._shouldRun(c, record),
-    );
-
-    let blockExecuted = false;
-    const trackedBlock = (): void | Promise<void> => {
-      const r = block();
-      if (isThenable(r)) {
-        return Promise.resolve(r).then(() => {
-          blockExecuted = true;
-        });
-      }
-      blockExecuted = true;
-    };
-
-    let chain: () => void | Promise<void> = trackedBlock;
-    for (const cb of [...arounds].reverse()) {
-      const prev = chain;
-      chain = () => {
-        let pendingProceed: Promise<void> | undefined;
-        const wrappedProceed = () => {
-          const result = prev();
-          // Normalize to a real Promise so .catch() below is always safe;
-          // `isThenable` accepts any A+ thenable, which may lack `.catch`.
-          if (isThenable(result)) pendingProceed = Promise.resolve(result) as Promise<void>;
-          return result;
-        };
-        let cbResult: void | Promise<void>;
-        try {
-          cbResult = (cb.fn as AroundCallbackFn)(record, wrappedProceed);
-        } catch (aroundError) {
-          // Sync throw from an around callback after it already kicked off an
-          // async proceed(). Consume the pending rejection so the caller sees
-          // only the thrown error, not a stray unhandled rejection.
-          if (pendingProceed) {
-            return (async () => {
-              await pendingProceed!.catch(() => {});
-              throw aroundError;
-            })();
-          }
-          throw aroundError;
-        }
-        if (isThenable(cbResult) || pendingProceed) {
-          if (opts?.strict === "sync") {
-            swallowRejection(cbResult);
-            swallowRejection(pendingProceed);
-            throw new Error(
-              `Async callback registered on sync event '${event}' — around callback or block returned a Promise`,
-            );
-          }
-          return (async () => {
-            try {
-              await cbResult;
-              if (pendingProceed) await pendingProceed;
-            } catch (aroundError) {
-              if (pendingProceed) await pendingProceed.catch(() => {});
-              throw aroundError;
-            }
-          })();
-        }
-      };
-    }
-
-    const chainResult = chain();
-
-    const finish = (): boolean | Promise<boolean> => {
-      if (!blockExecuted) return false;
-      const afterResult = this.runAfter(event, record, opts);
-      if (isThenable(afterResult)) return Promise.resolve(afterResult).then(() => true);
+    const chain = this._chains.get(event);
+    if (!chain) {
+      const r = block?.();
+      if (r instanceof Promise) return r.then(() => true);
       return true;
-    };
-
-    if (isThenable(chainResult)) {
-      if (opts?.strict === "sync") {
-        swallowRejection(chainResult);
-        throw new Error(
-          `Async callback registered on sync event '${event}' — around callback or block returned a Promise`,
-        );
-      }
-      return Promise.resolve(chainResult).then(finish);
     }
-    return finish();
+    return chain.compile().invoke(record, block, opts as ASRunCallbacksOptions);
   }
 }

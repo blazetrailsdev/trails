@@ -626,7 +626,7 @@ describe("unified sync/async runner", () => {
     const chain = new CallbackChain();
     chain.register("before", "validation", async () => {});
     expect(() => chain.runCallbacks("validation", {}, () => {}, { strict: "sync" })).toThrow(
-      /Async callback registered on sync event 'validation'/,
+      /Async callback on sync chain "validation"/,
     );
   });
 
@@ -634,7 +634,7 @@ describe("unified sync/async runner", () => {
     const chain = new CallbackChain();
     chain.register("after", "initialize", async () => {});
     expect(() => chain.runAfter("initialize", {}, { strict: "sync" })).toThrow(
-      /Async callback registered on sync event 'initialize'/,
+      /Async callback on sync chain "initialize"/,
     );
   });
 
@@ -648,7 +648,7 @@ describe("unified sync/async runner", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback registered on sync event 'validate'/);
+    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
   });
 
   it("async validator method registered via Model.validate is caught at runtime", () => {
@@ -662,7 +662,7 @@ describe("unified sync/async runner", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback registered on sync event 'validate'/);
+    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
   });
 
   it("async validator registered via validatesWith is caught at runtime", () => {
@@ -678,7 +678,7 @@ describe("unified sync/async runner", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback registered on sync event 'validate'/);
+    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
   });
 
   it("strict: 'sync' allows fully-sync chains", () => {
