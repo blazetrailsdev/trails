@@ -22,6 +22,19 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   return { adapter, ctx };
 }
 
+/** Build a minimal mock adapter that participates in advisory lock negotiation. */
+function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}): DatabaseAdapter {
+  const { acquires = true, releases = true } = opts;
+  return {
+    adapterName: "sqlite" as const,
+    supportsAdvisoryLocks: () => true,
+    getAdvisoryLock: async (_id: number | bigint | string) => acquires,
+    releaseAdvisoryLock: async (_id: number | bigint | string) => releases,
+    currentDatabase: async () => "test_db",
+    isNoDatabaseError: () => false,
+  } as unknown as DatabaseAdapter;
+}
+
 // ==========================================================================
 // MigrationTest
 // ==========================================================================
@@ -1702,6 +1715,7 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType === "sqlite")("generate migrator advisory lock id", async () => {
+    // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
     const testAdapter = createTestAdapter();
     const migrator = new Migrator(testAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
@@ -1722,15 +1736,7 @@ describe("MigrationTest", () => {
         down: async () => {},
       }),
     };
-    // Adapter that reports advisory lock support but always fails to acquire
-    const lockAdapter = {
-      adapterName: "sqlite" as const,
-      supportsAdvisoryLocks: () => true,
-      getAdvisoryLock: async (_id: unknown) => false,
-      releaseAdvisoryLock: async (_id: unknown) => true,
-      currentDatabase: async () => "test_db",
-      isNoDatabaseError: () => false,
-    } as unknown as DatabaseAdapter;
+    const lockAdapter = makeLockAdapter({ acquires: false });
     const migrator = new Migrator(lockAdapter, [proxy]);
     await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
     expect(ran).toEqual([]);
@@ -1748,45 +1754,44 @@ describe("MigrationTest", () => {
         down: async () => {},
       }),
     };
-    const lockAdapter = {
-      adapterName: "sqlite" as const,
-      supportsAdvisoryLocks: () => true,
-      getAdvisoryLock: async (_id: unknown) => false,
-      releaseAdvisoryLock: async (_id: unknown) => true,
-      currentDatabase: async () => "test_db",
-      isNoDatabaseError: () => false,
-    } as unknown as DatabaseAdapter;
+    const lockAdapter = makeLockAdapter({ acquires: false });
     const migrator = new Migrator(lockAdapter, [proxy]);
     await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
     expect(ran).toEqual([]);
   });
 
   it.skipIf(adapterType !== "postgres")("with advisory lock closes connection", async () => {
-    // PG-specific: verify the advisory lock query does not linger in pg_stat_activity.
-    // In JS there is no persistent lock connection to close, so we verify the lock
-    // is acquired and released around a no-op migration without leaving idle queries.
+    // PG-specific: verify the advisory lock is acquired and released around the migration.
+    // Rails checks pg_stat_activity for lingering lock queries; in JS we verify the
+    // lock calls happen symmetrically via spies on the real adapter.
     const testAdapter = createTestAdapter();
+    const inner = testAdapter.innerAdapter as any;
+    const acquired: bigint[] = [];
+    const released: bigint[] = [];
+    const origGet = inner.getAdvisoryLock.bind(inner);
+    const origRelease = inner.releaseAdvisoryLock.bind(inner);
+    inner.getAdvisoryLock = async (id: bigint) => {
+      acquired.push(id);
+      return origGet(id);
+    };
+    inner.releaseAdvisoryLock = async (id: bigint) => {
+      released.push(id);
+      return origRelease(id);
+    };
     const proxy: MigrationProxy = {
       version: "200",
       name: "NoOp",
       migration: () => ({ up: async () => {}, down: async () => {} }),
     };
     const migrator = new Migrator(testAdapter, [proxy]);
-    // Should complete without error — the advisory lock was acquired and released
     await migrator.migrate();
+    expect(acquired).toHaveLength(1);
+    expect(released).toEqual(acquired);
     expect(await migrator.getAllVersions()).toContain("200");
   });
 
   it("with advisory lock raises the right error when it fails to release lock", async () => {
-    // Adapter that acquires the lock but refuses to release it (simulates stale lock)
-    const lockAdapter = {
-      adapterName: "sqlite" as const,
-      supportsAdvisoryLocks: () => true,
-      getAdvisoryLock: async (_id: unknown) => true,
-      releaseAdvisoryLock: async (_id: unknown) => false,
-      currentDatabase: async () => "test_db",
-      isNoDatabaseError: () => false,
-    } as unknown as DatabaseAdapter;
+    const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
     const migrator = new Migrator(lockAdapter, []);
     const error = await migrator.withAdvisoryLock(async () => {}).catch((e) => e);
     expect(error).toBeInstanceOf(ConcurrentMigrationError);
