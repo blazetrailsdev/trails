@@ -421,12 +421,18 @@ export async function performSum(
 export async function performAverage(
   this: CalculationRelation,
   column: string,
-): Promise<number | null | Record<string, number>> {
+): Promise<unknown | null | Record<string, unknown>> {
+  // Returns `unknown` (not just number) because non-numeric column types
+  // — interval (Duration), money, time — route through the column type's
+  // deserialize and yield a domain object. Rails' AVG return type is
+  // similarly polymorphic (BigDecimal for integer/decimal, Duration for
+  // interval, etc.). Numeric averages still narrow to JS number at the
+  // call site.
   if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "average", column, true) as Promise<Record<string, number>>;
+    return groupedAggregate(this, "average", column, true);
   }
-  return singleAggregate(this, "average", column, true) as Promise<number | null>;
+  return singleAggregate(this, "average", column, true);
 }
 
 export async function performMinimum(
@@ -465,7 +471,7 @@ export async function performMaximum(
 export interface CalculationMethods {
   count(column?: string): Promise<number | Record<string, number>>;
   sum(column?: string): Promise<number | bigint | Record<string, number | bigint>>;
-  average(column: string): Promise<number | null | Record<string, number>>;
+  average(column: string): Promise<unknown | null | Record<string, unknown>>;
   minimum(column: string): Promise<unknown | null | Record<string, unknown>>;
   maximum(column: string): Promise<unknown | null | Record<string, unknown>>;
 }

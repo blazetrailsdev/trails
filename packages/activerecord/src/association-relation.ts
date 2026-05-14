@@ -208,11 +208,11 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     ).sum.call(this, column);
   }
 
-  async average(column: string): Promise<number | null | Record<string, number>> {
+  async average(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     return (
       Relation.prototype as unknown as {
-        average: (col: string) => Promise<number | null | Record<string, number>>;
+        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
       }
     ).average.call(this, column);
   }

@@ -19,7 +19,12 @@ export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execInsert(sql: string, name?: string | null, binds?: unknown[], pk?: string): Promise<unknown>;
+  execInsert(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    pk?: string | false | null,
+  ): Promise<unknown>;
   explain(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
   lastInsertedId(result: unknown): number;
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
