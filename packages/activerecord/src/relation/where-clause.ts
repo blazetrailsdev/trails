@@ -222,7 +222,13 @@ function exceptPredicates(
   const colStrings = new Set<string>();
   for (const c of columns) {
     if (typeof c === "string") colStrings.add(c);
-    else if (c instanceof Nodes.Attribute) attrNodes.push(c);
+    else if (c instanceof Nodes.Attribute) {
+      attrNodes.push(c);
+      // Also register as qualified "table.column" so cross-model merges work
+      // even when two Table instances for the same table have different klass/
+      // typeCaster (and thus different stableSerialize outputs, breaking eql).
+      colStrings.add(`${c.relation.name}.${c.name}`);
+    }
   }
   return predicates.filter((node) => {
     const attr = fetchAttributeNode(node);

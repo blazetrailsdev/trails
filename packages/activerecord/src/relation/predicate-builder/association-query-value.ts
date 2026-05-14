@@ -16,13 +16,28 @@
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
   joinPrimaryKey: string | string[] | null;
+  joinPrimaryType?: string | null;
+  polymorphicNameAssociation?: string | null;
 }
 
 export class AssociationQueryValue {
-  constructor(
-    private associatedTable: AssocTableMeta,
-    private value: unknown,
-  ) {}
+  private readonly _associatedTable: AssocTableMeta;
+  private readonly _value: unknown;
+
+  constructor(associatedTable: AssocTableMeta, value: unknown) {
+    this._associatedTable = associatedTable;
+    this._value = value;
+  }
+
+  /** @internal */
+  private get associatedTable() {
+    return this._associatedTable;
+  }
+
+  /** @internal */
+  private get value() {
+    return this._value;
+  }
 
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
@@ -70,10 +85,14 @@ export class AssociationQueryValue {
     const value = this.value;
     if (this.isRelation(value)) {
       const pk = this.primaryKey();
-      if (!Array.isArray(pk) && this.isSelectClause(value)) {
-        return (value as any).select(pk);
+      let relation = value as any;
+      if (!Array.isArray(pk) && this.isSelectClause(relation)) {
+        relation = relation.select(pk);
       }
-      return value;
+      if (this.isPolymorphicClause(relation)) {
+        relation = relation.where({ [this.primaryType()!]: this.polymorphicName() });
+      }
+      return relation;
     }
     if (Array.isArray(value)) {
       return value.map((v) => this.convertToId(v));
@@ -81,8 +100,27 @@ export class AssociationQueryValue {
     return [this.convertToId(value)];
   }
 
+  /** @internal */
   private primaryKey(): string | string[] {
     return this.associatedTable.joinPrimaryKey ?? "id";
+  }
+
+  /** @internal */
+  private primaryType(): string | null {
+    return this.associatedTable.joinPrimaryType ?? null;
+  }
+
+  /** @internal */
+  private polymorphicName(): string | null {
+    return this.associatedTable.polymorphicNameAssociation ?? null;
+  }
+
+  /** @internal */
+  private isPolymorphicClause(relation: unknown): boolean {
+    const type = this.primaryType();
+    if (!type) return false;
+    const hash = (relation as any).whereValuesHash?.();
+    return !(hash && type in hash);
   }
 
   private isSelectClause(relation: unknown): boolean {

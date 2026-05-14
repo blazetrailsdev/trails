@@ -10,14 +10,34 @@
  *        OR (commentable_type = 'Image' AND commentable_id = 2)
  */
 export class PolymorphicArrayValue {
+  private readonly _associatedTable: {
+    joinForeignKey: string;
+    joinForeignType: string;
+    joinPrimaryKey(klass?: unknown): string;
+  };
+  private readonly _values: unknown[];
+
   constructor(
-    private readonly associatedTable: {
+    associatedTable: {
       joinForeignKey: string;
       joinForeignType: string;
       joinPrimaryKey(klass?: unknown): string;
     },
-    private readonly values: unknown[],
-  ) {}
+    values: unknown[],
+  ) {
+    this._associatedTable = associatedTable;
+    this._values = values;
+  }
+
+  /** @internal */
+  private get associatedTable() {
+    return this._associatedTable;
+  }
+
+  /** @internal */
+  private get values() {
+    return this._values;
+  }
 
   queries(): Record<string, unknown>[] {
     if (this.values.length === 0) {

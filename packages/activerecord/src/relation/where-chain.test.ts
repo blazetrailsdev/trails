@@ -38,49 +38,78 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("author_id");
     expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
   });
-  it.skip("associated merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs cross-model merge with automatic JOIN */
+  it("associated merged with scope on association", () => {
+    const sql = Post.all()
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
+    expect(sql).toContain('"authors"');
   });
 
-  it.skip("associated unscoped merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs unscope support */
+  it("associated unscoped merged with scope on association", () => {
+    const sql = Post.all()
+      .unscope("where")
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
   });
-  it.skip("associated unscoped merged joined with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs unscope support */
+  it("associated unscoped merged joined with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .unscope("where")
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
   });
-  it.skip("associated unscoped merged joined extended early with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs extending support */
+  it("associated unscoped merged joined extended early with scope on association", () => {
+    const sql = Post.all()
+      .extending({ noop: () => 1 })
+      .joins("author")
+      .unscope("where")
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
   });
-  it.skip("associated unscoped merged joined extended late with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs extending support */
+  it("associated unscoped merged joined extended late with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .unscope("where")
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .extending({ noop: () => 1 })
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
   });
 
-  it.skip("associated ordered merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs cross-model merge with automatic JOIN */
+  it("associated ordered merged with scope on association", () => {
+    const sql = Post.all()
+      .order({ author_id: "desc" })
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
+    expect(sql).toContain("ORDER BY");
   });
-  it.skip("associated ordered merged joined with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs cross-model merge with automatic JOIN */
+  it("associated ordered merged joined with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .order({ author_id: "desc" })
+      .whereAssociated("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("INNER JOIN");
+    expect(sql).not.toMatch(/IS NOT NULL/);
+    expect(sql).toContain("ORDER BY");
   });
   it.skip("associated with enum", () => {
     // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
@@ -249,61 +278,78 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("author_id");
     expect(sql).toContain("IS NULL");
   });
-  it.skip("missing merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs cross-model merge with automatic JOIN */
+  it("missing merged with scope on association", () => {
+    const sql = Post.all()
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toMatch(/LEFT.*JOIN/);
+    expect(sql).not.toMatch(/IS NULL/);
+    expect(sql).toContain('"authors"');
   });
 
-  it.skip("missing unscoped merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
+  it("missing unscoped merged with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .unscope("where")
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("JOIN");
+    expect(sql).not.toMatch(/IS NULL/);
   });
-  it.skip("missing unscoped merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
+  it("missing unscoped merged joined with scope on association", () => {
+    const sql = Post.all()
+      .unscope("where")
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toMatch(/LEFT.*JOIN/);
+    expect(sql).not.toMatch(/IS NULL/);
   });
-  it.skip("missing unscoped merged joined with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("missing ordered merged with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs cross-model merge with automatic JOIN */
+  it("missing ordered merged with scope on association", () => {
+    const sql = Post.all()
+      .order({ author_id: "desc" })
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toMatch(/LEFT.*JOIN/);
+    expect(sql).not.toMatch(/IS NULL/);
+    expect(sql).toContain("ORDER BY");
   });
 
-  it.skip("missing ordered merged joined with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
+  it("missing ordered merged joined with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .order({ author_id: "desc" })
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("JOIN");
+    expect(sql).not.toMatch(/IS NULL/);
+    expect(sql).toContain("ORDER BY");
   });
-  it.skip("missing ordered merged joined with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
+  it("missing unscoped merged joined extended early with scope on association", () => {
+    const sql = Post.all()
+      .extending({ noop: () => 1 })
+      .joins("author")
+      .unscope("where")
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .toSql();
+    expect(sql).toContain("JOIN");
+    expect(sql).not.toMatch(/IS NULL/);
   });
-  it.skip("missing unscoped merged joined extended early with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
-  });
-  it.skip("missing unscoped merged joined extended late with scope on association", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* fixture-dependent */
+  it("missing unscoped merged joined extended late with scope on association", () => {
+    const sql = Post.all()
+      .joins("author")
+      .unscope("where")
+      .whereMissing("author")
+      .merge(Author.where({ id: 1 }))
+      .extending({ noop: () => 1 })
+      .toSql();
+    expect(sql).toContain("JOIN");
+    expect(sql).not.toMatch(/IS NULL/);
   });
   it.skip("missing with enum", () => {
     // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
