@@ -336,21 +336,20 @@ churn across the monorepo as one-time cost.
   `actiondispatch/testing/assertions/{response,routing}.ts`.
 - Add `actiondispatch/testing/assertions.ts` aggregator + index.
 
-### Wave 5 — DROPPED
+### Wave 5 — conventions.ts mapping for the trailties exception (~10 LOC)
 
 The original audit prescribed renaming `actioncontroller/trailties/` →
-`actioncontroller/railties/`. **This was a mistake.** `trailties` is a
-deliberate project-wide naming convention: trails railties are not
-`Rails::Railtie` subclasses (different lifecycle, different surface),
-and `scripts/api-compare/conventions.ts` already encodes the precedent
-(`activerecord:railtie.rb` → `trailtie.ts`). Extend conventions.ts
-with a directory-level entry for `actioncontroller/trailties/` rather
-than renaming.
+`actioncontroller/railties/`. **Reversed (2026-05-14).** `trailties`
+is a deliberate project-wide naming convention: trails railties are
+not `Rails::Railtie` subclasses (different lifecycle, different
+surface), and `scripts/api-compare/conventions.ts:32` already encodes
+the precedent (`activerecord:railtie.rb` → `trailtie.ts`).
 
-Action: add an entry to `scripts/api-compare/conventions.ts` so that
-Rails' `action_controller/railties/...` paths map to our
-`actioncontroller/trailties/...`. ~10 LOC mechanical edit; bundle into
-Wave 6 or open standalone.
+Action: add a directory-level entry to
+`scripts/api-compare/conventions.ts` so Rails'
+`action_controller/railties/...` paths resolve to our
+`actioncontroller/trailties/...`. Mechanical edit; bundle into Wave 6
+or open standalone.
 
 ### Wave 6 — new infra stubs (P3) (1 PR, ~150 LOC)
 
@@ -366,25 +365,41 @@ Do **not** add empty stubs for `system_testing/` — it's intentionally
 not ported (see Known divergences). `journey/` gets its own wave; do
 not stub here.
 
-### Wave 7 — journey/ routing engine port (5+ PRs, multi-stage)
+### Wave 7 — journey/ routing engine port
 
-**Decision (2026-05-14): port now.** 17 Rails files under
-`action_dispatch/journey/` — `routes.rb`, `route.rb`, `router.rb`,
-`gtg/builder.rb`, `gtg/transition_table.rb`, `nfa/builder.rb`,
-`nfa/transition_table.rb`, `nodes/node.rb`, `path/pattern.rb`,
-`scanner.rb`, `parser.rb`, `visitors.rb`, etc. The routing engine is
-a tightly-coupled module; expect 5–7 PRs:
+**Decision (2026-05-14): port now. Sizing pass needed before slots are
+spawned.** 14 Rails files under
+`scripts/api-compare/.rails-source/actionpack/lib/action_dispatch/journey/`:
 
-1. `journey/scanner.ts` + `journey/parser.ts` + nodes (~250 LOC)
-2. `journey/nfa/{builder,transition-table,simulator}.ts` (~280 LOC)
-3. `journey/gtg/{builder,transition-table,simulator}.ts` (~280 LOC)
-4. `journey/path/pattern.ts` + `journey/route.ts` (~250 LOC)
-5. `journey/routes.ts` + `journey/router.ts` + format/parser/visitor glue (~280 LOC)
-6. Wire-up: `actiondispatch/routing/route-set.ts` switches its router to journey-backed (~200 LOC)
-7. Tail + tests (~200 LOC)
+```
+formatter.rb
+gtg/{builder,simulator,transition_table}.rb           (3 files)
+nfa/dot.rb                                            (1 file — visualization helper)
+nodes/node.rb
+parser.rb
+path/pattern.rb
+route.rb
+router.rb
+router/utils.rb
+routes.rb
+scanner.rb
+visitors.rb
+```
 
-Total ~1700 LOC across 7 PRs. Real work — needs its own scoping pass
-before spawning slots; this is a placeholder sizing.
+The routing engine is tightly coupled (parser → nodes → path/pattern →
+gtg automaton → router). PR slicing must be done by an audit pass with
+full source-graph context — guessing here would produce
+`<base>`/`<base>b`/`<base>c` splits that fight the import graph.
+
+**Action:** before opening any journey PRs, run a sizing audit (similar
+in shape to the actionpack restructure audit you're reading) that:
+(a) lists each file's LOC + imports, (b) groups by tight-coupling
+clusters, (c) proposes ≤300-LOC PR sketches with explicit dependency
+order.
+
+Rough order-of-magnitude expectation: **~6–8 PRs, ~1500–2000 LOC
+total**, plus a wire-up PR that switches `routing/route-set.ts` to the
+journey-backed router. Confirm with the sizing audit.
 
 ### Wave 8+ — selective fill-in (open-ended)
 
@@ -392,7 +407,9 @@ Per-file ports for missing `middleware/*` files and `http/*` files.
 Sequenced by what unblocks `actioncontroller-100-percent.md` cleanup.
 Drives independently of this audit.
 
-**Total restructure PRs: 10 mechanical waves (1–6) + ~7 journey port PRs (Wave 7) + open-ended fill-in (Wave 8+).**
+**Total restructure work: 9 mechanical waves (1–6, Wave 5 is now a
+~10 LOC conventions.ts edit) + Wave 7 journey port (sized separately,
+~6–8 PRs) + open-ended fill-in (Wave 8+).**
 
 ## Known divergences from Rails
 
