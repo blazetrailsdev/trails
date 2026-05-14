@@ -591,7 +591,10 @@ export class TableDefinition {
     };
     // Composite primaryKey implies id: false — Rails requires this and emitting both
     // an auto-id column AND a composite PK constraint is invalid DDL.
-    const hasCompositePk = Array.isArray(tdOptions.primaryKey);
+    const hasCompositePk = Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length > 0;
+    if (Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length === 0) {
+      throw new ArgumentError("primaryKey array must not be empty");
+    }
     this._id = hasCompositePk ? false : (tdOptions.id ?? true);
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
