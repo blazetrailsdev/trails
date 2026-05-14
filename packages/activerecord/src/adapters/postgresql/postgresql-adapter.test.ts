@@ -31,7 +31,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     try {
       await adapter.exec(`DROP TABLE IF EXISTS "Items" CASCADE`);
       const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'ex_insert_ret', 'ex_insert_ret2', 'ex_insert_ret3', 'ex_insert_ret4'))`,
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'ex_insert_ret', 'ex_insert_ret2', 'ex_insert_ret3', 'ex_insert_ret4', 'ex_insert_ret5'))`,
       );
       for (const t of tables) {
         await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
@@ -709,6 +709,24 @@ describeIfPg("PostgreSQLAdapter", () => {
           "id",
         );
         const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret3"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect((result as any).rows[0][0]).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
+    });
+
+    it("exec insert with returning disabled and no pk or sequence name given", async () => {
+      await adapter.exec(`CREATE TABLE "ex_insert_ret5" ("id" SERIAL PRIMARY KEY, "number" INT)`);
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "ex_insert_ret5" ("number") VALUES (1)`,
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret5"`);
         const maxId = Number(rows[0]["max_id"]);
         expect((result as any).rows[0][0]).toBe(maxId);
       } finally {
