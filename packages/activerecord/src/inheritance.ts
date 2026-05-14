@@ -199,7 +199,7 @@ export function getInheritanceColumn(modelClass: typeof Base): string | null {
 /**
  * Check if a model class is an STI subclass (not the base STI class).
  */
-export function isStiSubclass(modelClass: typeof Base): boolean {
+export function isStiSubclass(modelClass: object): boolean {
   // Walk up the prototype chain to find if any parent has _inheritanceColumn
   let current = Object.getPrototypeOf(modelClass);
   while (current && current !== Function.prototype) {
@@ -251,9 +251,9 @@ export function abstractClass(this: typeof Base, value?: boolean): boolean {
 /**
  * Get the STI base class for a model.
  */
-export function getStiBase(modelClass: typeof Base): typeof Base {
-  let current = modelClass;
-  let base = modelClass;
+export function getStiBase(modelClass: object): typeof Base {
+  let current = modelClass as typeof Base;
+  let base = current;
   while (current && current !== Function.prototype) {
     if ((current as any)._inheritanceColumn) {
       base = current;

@@ -1,4 +1,5 @@
 import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
+import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { resolveModel, modelRegistry } from "../../associations.js";
@@ -333,13 +334,13 @@ export class BelongsTo extends SingularAssociation {
     for (const [methodName, impl] of [
       [
         `${name}Changed`,
-        function (this: any) {
+        function (this: AssociationInstanceHost) {
           return this.association(name).isTargetChanged();
         },
       ],
       [
         `${name}PreviouslyChanged`,
-        function (this: any) {
+        function (this: AssociationInstanceHost) {
           return this.association(name).isTargetPreviouslyChanged();
         },
       ],

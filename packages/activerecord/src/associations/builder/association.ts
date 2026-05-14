@@ -8,6 +8,29 @@
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
 
+/**
+ * Minimal instance shape for model instances that host association accessors.
+ * @internal
+ */
+export interface AssociationInstanceHost {
+  association(name: string): AssociationProxyLike;
+}
+
+/** @internal */
+export interface AssociationProxyLike {
+  reader: unknown;
+  writer(value: unknown): void;
+  idsReader(): unknown;
+  idsWriter(ids: unknown): void;
+  forceReloadReader(): unknown;
+  reset(): unknown;
+  build(...args: unknown[]): unknown;
+  create(...args: unknown[]): unknown;
+  createBang(...args: unknown[]): unknown;
+  isTargetChanged(): boolean;
+  isTargetPreviouslyChanged(): boolean;
+}
+
 type ExtensionModule = {
   validOptions?: () => string[];
   build?: (model: any, reflection: any) => void;
@@ -140,7 +163,7 @@ export class Association {
       // Rails: proc { instance_exec(&scope) }
       // When scopeFor calls scope.call(relation, owner), `this` is the relation.
       // 0-arity scopes ignore the owner arg and execute with relation as context.
-      return function (this: any) {
+      return function (this: unknown) {
         return orig.call(this);
       };
     }
@@ -200,7 +223,7 @@ export class Association {
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, name, {
-      get(this: any) {
+      get(this: AssociationInstanceHost) {
         return this.association(name).reader;
       },
       set: existing?.set,
@@ -214,7 +237,7 @@ export class Association {
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, name, {
       get: existing?.get,
-      set(this: any, value: any) {
+      set(this: AssociationInstanceHost, value: unknown) {
         this.association(name).writer(value);
       },
       configurable: true,
