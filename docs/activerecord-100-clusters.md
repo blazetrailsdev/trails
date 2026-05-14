@@ -19,47 +19,47 @@ When picking a slot to spawn:
 3. **Slot E** (~220 LOC) — CPK / queryConstraints / polymorphic-inverse / custom-context.
 4. **Slot F** (~210 LOC) — Reflection introspection + per-class non-cyclic guard.
 
-## Associations-reflection cluster (~780 LOC across 4 remaining slots, from audit-associations-reflection)
+## Associations-reflection cluster (~700 LOC across 3 remaining slots, from audit-associations-reflection)
 
 31 empty-stub tests with generic boilerplate annotation. **Impl is fundamentally complete**; gaps are fixture plumbing + test-body writing + 3 fixture-model gaps.
 
-1. **Slot A** (~80 LOC) — Error-type parity (`UnknownPrimaryKey`, `ConfigurationError` from plain `Error`).
-2. **Slot C** (~250 LOC) — Polymorphic HMT fixture (Hotel/Department/Chef/CakeDesigner/DrinkDesigner) + scope-chain tests.
-3. **Slot D** (~250 LOC) — Author/Organization essay fixture + dependent tests.
-4. **Slot E** (~200 LOC) — Namespace resolution (`MacroReflection#_klass`) + `sourceType`-as-class guard.
+1. **Slot C** (~250 LOC) — Polymorphic HMT fixture (Hotel/Department/Chef/CakeDesigner/DrinkDesigner) + scope-chain tests.
+2. **Slot D** (~250 LOC) — Author/Organization essay fixture + dependent tests.
+3. **Slot E** (~200 LOC) — Namespace resolution (`MacroReflection#_klass`) + `sourceType`-as-class guard.
 
 3 const_missing/NameError tests → unported-list candidates (Ruby-only language semantics).
 
-## MySQL schema cluster (~400 LOC across 3 slots, from audit-mysql-schema)
+## MySQL schema cluster (~200 LOC, Slot C remaining)
 
-8 tests. One real behavior gap + one option drop + 6 fixture/test-helper gaps.
+Slots A+B (#1468) closed. Real behavior gaps + one option drop covered; fixture/test-helper gaps remain.
 
-1. **Slot A** (~120 LOC) — `t.float :foo, limit: N` → `FLOAT(N)` MySQL DDL + `indexes()` retains `using` / `type`.
-2. **Slot B** (~80 LOC) — `temporary:` option propagation on `dropTable` + annotation rewrite.
-3. **Slot C** (~200 LOC) — MySQL fixture/test-helper infrastructure: `posts`, `key_tests`, `lessons_students`/`topics`/`students` fixtures + subclassing `Base` with qualified `db.table` table_name.
+- **Slot C** (~200 LOC) — MySQL fixture/test-helper infrastructure: `posts`, `key_tests`, `lessons_students`/`topics`/`students` fixtures + subclassing `Base` with qualified `db.table` table_name. Uses the TS-native fixture infra (`defineFixtures`/`useFixtures`).
 
-## PG connection cluster (~130 LOC across 3 remaining slots, from audit-pg-connection)
+## PG connection cluster — **closed** ✅
 
-1. **Slot C** (~50 LOC) — PG `resetBang()` override + un-skip 2 reset tests.
-2. **Slot D** (~60 LOC) — `verify!` server-side-disconnect recovery + 1 test.
-3. **Slot E** (~20 LOC) — `connection options` test rewrite (driver supports `-c geqo=off`; just need adapter constructed with that config).
+Slots A (#1439) + B (#1446) + C (#1462) + D (#1464) + E (#1463) all shipped. Small followups in fidelity list.
 
 ## PG interval cluster (~180 LOC, Slot B remaining)
 
 - **Slot B** (~180 LOC) — Interval schema-default extraction + AVG aggregate typecast.
 
-## PG long-tail cluster (~1760 LOC across 8 slots, from audit-pg-long-tail)
+## PG long-tail cluster (~1510 LOC across 7 remaining slots, from audit-pg-long-tail)
 
-**73 skipped tests** across 12 PG long-tail files (citext, money, ltree, tsquery, bit-string, geometric, enum, cidr, composite, change-schema-timestamptz, …). **Annotation drift on all 73** — identical generic template points at fictional per-feature OID files. Real gaps live in `schema-statements` / `schema-dumper` / `schema-creation` / adapter helpers / `type-map-init` / schema-definitions DSL. A few features (composite, geometric beyond Point, tsquery serialize) have no source counterpart at all.
+Slots A (#1498 citext), B (#1508 money), and C (#1515 ltree+tsvector+bit-string) closed. Remaining slots — annotation drift on the 73 PG long-tail BLOCKED tests still points at fictional per-feature OID files; real gaps live in `schema-statements` / `schema-dumper` / `schema-creation` / adapter helpers / `type-map-init`. A few features (composite, geometric beyond Point, tsquery serialize) have no source counterpart at all.
 
-1. **Slot A** (~250 LOC) — citext end-to-end.
-2. **Slot B** (~200 LOC) — money column metadata + serialize.
-3. **Slot C** (~250 LOC) — ltree + tsquery + bit-string write/cast.
-4. **Slot D** (~280 LOC) — geometric long-tail OIDs.
-5. **Slot E** (~280 LOC) — enum schema-dump round-trip.
-6. **Slot F** (~150 LOC) — composite Identity fallback.
-7. **Slot G** (~200 LOC) — cidr IPAddr value + prefix-aware changed?
-8. **Slot H** (~150 LOC) — change-schema timestamptz default.
+Money slot left 3 BLOCKED tests pointing at generic Relation gaps (not money-specific): `sum`/`pluck` typecast on SQL expressions + `updateAll` BigDecimal serialize. Fold into Relation Slot H or Slot G.
+
+Slot C followups (~50 LOC, bundle with Slot D):
+
+- ~30 LOC — Add tsvector schema-dump test (`test_schema_dump_with_shorthand` in Rails `full_text_test.rb` has no stub).
+- ~20 LOC — Split `cleanDefault` raw-PG-expression path from already-deserialized-ORM-value path; the leading-zero `/^-?0\d/` guard added in #1515 is a point fix.
+- Note: several bit-string/full-text/ltree test names in #1515 are best-fit fabrications — Rails has no exact counterpart. Acceptable but worth knowing if test:compare drifts.
+
+1. **Slot D** (~280 LOC) — geometric long-tail OIDs.
+2. **Slot E** (~280 LOC) — enum schema-dump round-trip.
+3. **Slot F** (~150 LOC) — composite Identity fallback.
+4. **Slot G** (~200 LOC) — cidr IPAddr value + prefix-aware changed?
+5. **Slot H** (~150 LOC) — change-schema timestamptz default.
 
 ## PG UUID residual cluster (~250 LOC, Slot B remaining)
 
@@ -122,14 +122,9 @@ Plus: MySQL `SchemaDumper.tableCollationCache` is never populated; base `createT
 
 Note: audit worktree didn't have `.rails-source/` populated → slots sized by test-name-family inference rather than line-by-line Rails read. Workers picking these up should re-validate against `.rails-source` once spawned.
 
-## Associations has-one cluster (~480 LOC across 4 slots, from audit-associations-has-one)
+## Associations has-one cluster — **closed** ✅
 
-51 skipped (prompt said ~28; actual count is 51 across 3 files). **Most aren't has_one-specific** — downstream of Marshal/I18n/query-cache/scope-unscope/etc. **One real structural gap:** `HasOneThroughAssociation` inherits `replace` from has_one but the through helpers (`createThroughRecord`, `throughAssociation`, `transaction`) in `has-one-through-association.ts` are **never called** — dead code wiring.
-
-1. **Slot A** (~80 LOC) — Wire `HasOneThroughAssociation.replace` through `createThroughRecord`. **Biggest single payoff** (closes ~5–6 skips with one wiring fix). Spawn first.
-2. **Slot B** (~120 LOC) — has_one validation surface.
-3. **Slot C** (~250 LOC) — Through-loader filters: `source_type` + many + default_scope-on-join.
-4. **Slot D** (~30 LOC) — Re-annotate BLOCKED comments away from has_one to their real root causes.
+All 4 slots shipped: A (#1457), B (#1461), C+D (#1478). 16 remaining skipped tests now have accurate annotations pointing at general associations gaps (`targetScope` chain merge, non-preload JOIN eager-loading, fixture models, scoped associations) — see fidelity followups.
 
 ## Associations-HABTM cluster (~1690 LOC across 9 slots, from audit-associations-habtm)
 
@@ -147,14 +142,22 @@ Note: audit worktree didn't have `.rails-source/` populated → slots sized by t
 
 **Annotation drift sweep needed first** — ~160 of these are mis-tagged as `BLOCKED: habtm` when the real cause is general-associations machinery.
 
-## Migration cluster (~1210 LOC across 6 remaining slots, from audit-migration)
+## Migration cluster (~850 LOC + ~115 LOC followup across 4 remaining slots, from audit-migration)
 
-1. **Slot B** (~220 LOC) — `tableNamePrefix`/`tableNameSuffix` on `MigrationContext`/`Migration` + CTAS + `InvalidMigrationTimestampError`. 6 un-skips.
-2. **Slot C** (~200 LOC) — Advisory-lock seams + `Migrator#runWithoutLock` filtering + migration-detection-without-schema-table. 8 un-skips.
-3. **Slot D** (~250 LOC) — Multi-DB `MigrationContext` factory. 7 un-skips.
-4. **Slot E** (~220 LOC) — Filesystem migration discovery + internal-metadata enable/disable toggle + schema-cache invalidation hooks. 8 un-skips.
-5. **Slot F** (~180 LOC) — Bulk-alter recorder round-trip + `change-column` test reorg. 6 un-skips.
-6. **Slot G** (~140 LOC) — MySQL utf8mb4 init + renameIndex-on-FK adapter parity. 3 un-skips.
+Slot B closed (#1505 tableNamePrefix/Suffix + CTAS + InvalidMigrationTimestampError, 6 un-skips). Followups bundled below.
+
+- **Slot B followup** (~115 LOC bundled, fold into next migration PR):
+  - ~30 LOC — CTAS `_introspectColumns` returns name-only; `_columnMeta` stored with `{type:"string"}` for any CREATE TABLE AS column. Wrong type metadata downstream of any CTAS (schema-dump, `MigrationContext.columns()`).
+  - ~20 LOC — Unify `MigrationContext.tableNamePrefix`/`tableNameSuffix` instance fields with the `_arConfig` registry. Currently two sources of truth: instance fields used by `renameTable`, `_arConfig`/`_pt` used by the new `Migration.*` flow.
+  - ~10 LOC — Forward `currentDatabase()` (+ advisory-lock helpers) from `SchemaAdapter` to its inner adapter in test-adapter.ts. Unblocks the advisory-lock test from bypassing the wrapper.
+  - ~50 LOC — Extend prefix/suffix regression coverage to `removeColumn`, `add/removeIndex`, `add/removeForeignKey`, `add/removeCheckConstraint`, `add/removeReference`, `create/dropJoinTable`, `changeColumn*`, `renameIndex`, inspection helpers, comment helpers.
+  - ~5 LOC — `TableDefinition.toSql()` default switch case silently passes unknown column types through. Reject empty/whitespace upfront.
+  - Bundle concern: base.ts now has a top-level side-effect import of migration.ts via `registerMigrationArConfig`. Tree-shaking impact for browser bundles is probably nil (Base loads most of migration.ts transitively) but worth re-verifying when the BC plan revisits eager imports.
+
+1. **Slot C** (~200 LOC) — Advisory-lock seams + `Migrator#runWithoutLock` filtering + migration-detection-without-schema-table. 8 un-skips.
+2. **Slot D** (~250 LOC) — Multi-DB `MigrationContext` factory. 7 un-skips.
+3. **Slot E** (~220 LOC) — Filesystem migration discovery + internal-metadata enable/disable toggle + schema-cache invalidation hooks. 8 un-skips.
+4. **Slot F** (~180 LOC) — Bulk-alter recorder round-trip + `change-column` test reorg. 6 un-skips.
 
 ## Connection-pool cluster (~640 LOC across 3 remaining slots, from audit-connection-pool)
 
@@ -180,9 +183,9 @@ Note: audit worktree didn't have `.rails-source/` populated → slots sized by t
 2. **Slot B — Translate-exception depth: timeout + statement-timeout** (~200 LOC). `read_timeout` → `AdapterTimeout`, `ER_FILSORT_ABORT` / `ER_QUERY_TIMEOUT` → `StatementTimeout`.
 3. **Slot C — Timezone re-sync + db_warnings_action + test-helper infra** (~280 LOC). `query_options[:database_timezone]` plumbing + `with_db_warnings_action`.
 
-## SQLite adapter cluster (~50 LOC, Slot B remaining)
+## SQLite adapter cluster — **closed** ✅
 
-- **Slot B — `assertLogged` SCHEMA-event parity** (~50 LOC). 2 test-infra gap tests.
+Slot A (#1443) + Slot B (#1459) shipped. Small followups in fidelity list.
 
 ## PG virtual-column cluster (~250 LOC, Slot B remaining)
 
@@ -190,15 +193,13 @@ Note: audit worktree didn't have `.rails-source/` populated → slots sized by t
 
 ---
 
-## PG-schema audit cluster (~530 LOC across 3 slots, from audit-pg-schema)
+## PG-schema audit cluster (~50 LOC followup remaining)
 
-26 skips. **Partially overlaps Schema-cluster Slot E** (PG type-specific dump) — sequencing TBD when either is picked up.
+Slots A (#1504 indexes() opclass + nulls order), B (#1458 INHERITS + #1469 comment/partition), and C (#1469 schema-qualified createJoinTable) closed.
 
-1. **Slot A** (~260 LOC) — `indexes()` introspection extensions (opclass / nulls order / nulls-not-distinct / INCLUDE columns) + dumper emit.
-2. **Slot B** (~150 LOC) — `SchemaDumper.emitTable` consults `tableOptions()` (so `options: "PARTITION BY …"` / `"INHERITS (…)"` reach the dump) + `dump_table_schema` test helper.
-3. **Slot C** (~120 LOC) — `createJoinTable` schema-qualified-name aware.
+- **Slot A followup** (~50 LOC) — `indexes()` `columns` array includes INCLUDE column names (PG11+ stores them in `indkey`); switch to `ix.indnkeyatts` to limit subquery to key columns, fetch INCLUDE separately. Plus the 3 `SchemaIndexNullsNotDistinctTest` tests still skipped because they need the same try/finally + dumpTable scaffolding the un-skipped tests in #1504 got.
 
-Plus: `setSchemaSearchPath` unquoted-`$user` rejection + 5 fixture-model gaps (`Thing1..5`, `Song`/`Album` habtm) — small enough to fold into Slot A or B.
+Plus: `setSchemaSearchPath` unquoted-`$user` rejection + 5 fixture-model gaps (`Thing1..5`, `Song`/`Album` habtm) — small enough to bundle with the followup.
 
 ## Unknown-triage cluster (~640 LOC, from audit-unknown-triage)
 
@@ -214,16 +215,16 @@ Re-categorization of all 89 `BLOCKED: unknown` annotations. **Single foundationa
 
 audit-STI found **no STI implementation gap**. All 6 `BLOCKED: STI` tests are mis-labeled — real causes are missing fixture scopes, UUID PK + touch on polymorphic delegated_type, and PG `CREATE TABLE … INHERITS` schema-dump . Single tests-only PR re-annotates the 6 tests under correct categories.
 
-## Schema cluster (~1390 LOC across 7 remaining slots + annotation sweep, from audit-schema)
+## Schema cluster (~1050 LOC across 5 remaining slots + annotation sweep, from audit-schema)
 
-1. **Slot C** (~80–120 LOC) — Index dump metadata (partial `where:`, `order:`, `nulls_not_distinct`, expression indices). ~7 un-skips.
-2. **Slot D** (~220 LOC) — Check / exclusion / unique constraints in dumper. 5 un-skips.
-3. **Slot E** (~200 LOC) — PG type-specific dump + extensions dumping. 11 un-skips.
-4. **Slot F** (~200 LOC) — PG `change_column` type/precision/scale/limit + null/default round-trip + timestamptz. 11 un-skips.
-5. **Slot H** (~280 LOC) — PG schema authorization + qualified-schema (search_path). 22 un-skips.
-6. **Slot I** (~250 LOC, exploratory) — PG partitioning + inheritance introspection in dumper. 6 un-skips.
-7. **Slot J** (~120 LOC) — `Schema.define` with `tableNamePrefix` + bulk-change timestamps default + SchemaCache portable bits. 5 un-skips.
-8. **Slot K** — Annotation normalization across all 128 BLOCKED annotations. Lands AFTER C–J.
+Slot D (#1467 check/exclusion/unique constraints) closed.
+
+1. **Slot E** (~200 LOC) — PG type-specific dump + extensions dumping. 11 un-skips.
+2. **Slot F** (~200 LOC) — PG `change_column` type/precision/scale/limit + null/default round-trip + timestamptz. 11 un-skips.
+3. **Slot H** (~280 LOC) — PG schema authorization + qualified-schema (search_path). 22 un-skips.
+4. **Slot I** (~250 LOC, exploratory) — PG partitioning + inheritance introspection in dumper. 6 un-skips.
+5. **Slot J** (~120 LOC) — `Schema.define` with `tableNamePrefix` + bulk-change timestamps default + SchemaCache portable bits. 5 un-skips.
+6. **Slot K** — Annotation normalization across all 128 BLOCKED annotations. Lands AFTER E–J.
 
 ## PG-adapter cluster (~340 LOC across 2 remaining slots)
 
