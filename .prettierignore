@@ -10,7 +10,5 @@ coverage
 package-lock.json
 pnpm-lock.yaml
 .claude
-**/.rails-source
-**/.rack-source
 vendor/*/
 

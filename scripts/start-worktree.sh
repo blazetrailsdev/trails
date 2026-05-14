@@ -138,9 +138,8 @@ link_source() {
       # otherwise fail to overwrite the dangling link with a directory.
       echo "      rm -rf $(printf %q "$src") && cp -r $(printf %q "$donor") $(printf %q "$src")" >&2
     else
-      echo "      No sibling worktree has $rel either. Re-run the appropriate fetch" >&2
-      echo "      script (e.g. scripts/api-compare/fetch-rails.sh for .rails-source)" >&2
-      echo "      or copy from a backup." >&2
+      echo "      No sibling worktree has $rel either. Re-run \`pnpm vendor:fetch\`" >&2
+      echo "      from the main worktree or copy from a backup." >&2
     fi
     exit 1
   fi
@@ -150,9 +149,14 @@ link_source() {
   echo "    linked $rel -> $src"
 }
 
-echo "==> Linking Rails and Rack source from main worktree"
-link_source "scripts/api-compare/.rails-source"
-link_source "scripts/api-compare/.rack-source" optional
+echo "==> Linking upstream Ruby sources from main worktree"
+# vendor/<name>/ entries are populated by `pnpm vendor:fetch` on the main
+# worktree. Each new worktree symlinks them to avoid re-cloning ~53 MiB
+# per worktree. Source names come from vendor/sources.ts via --print-paths.
+while IFS= read -r src; do
+  rel="vendor/$(basename "$src")"
+  link_source "$rel"
+done < <(cd "$MAIN_REPO" && pnpm -s tsx vendor/fetch.ts --print-paths)
 
 echo "==> Linking .claude config from main worktree (skills + per-machine permissions)"
 link_source ".claude/skills"
