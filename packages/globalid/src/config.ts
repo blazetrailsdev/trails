@@ -12,3 +12,8 @@ export function setApp(name: string): void {
 export function getApp(): string | undefined {
   return _app;
 }
+
+/** @internal — test use only */
+export function _resetApp(): void {
+  _app = undefined;
+}

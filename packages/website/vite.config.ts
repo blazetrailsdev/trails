@@ -28,6 +28,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/actionpack", "../actionpack/src/index.ts"),
       pkgAlias("@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"),
       pkgAlias("@blazetrails/globalid/wire", "../globalid/src/wire.ts"),
+      pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"),
       pkgAlias("@blazetrails/globalid", "../globalid/src/index.ts"),
     ],
   },

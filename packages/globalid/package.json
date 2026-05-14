@@ -13,6 +13,10 @@
     "./wire": {
       "types": "./dist/wire.d.ts",
       "default": "./dist/wire.js"
+    },
+    "./signed-global-id": {
+      "types": "./dist/signed-global-id.d.ts",
+      "default": "./dist/signed-global-id.js"
     }
   },
   "scripts": {

@@ -1,5 +1,9 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp as _getGlobalIdApp } from "@blazetrails/globalid";
+import type {
+  GlobalIDModel,
+  SignedGlobalID as SignedGlobalIDType,
+} from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
   type Type,
@@ -89,6 +93,24 @@ import {
   runAfterCallbacksOnProto as cbRunAfter,
 } from "@blazetrails/activemodel";
 // Lazy-loaded to avoid pulling node:crypto into browser bundles
+let _sgidModule: typeof import("@blazetrails/globalid/signed-global-id") | null = null;
+let _sgidModulePromise: Promise<typeof import("@blazetrails/globalid/signed-global-id")> | null =
+  null;
+const loadSgid = async () => {
+  if (_sgidModule) return _sgidModule;
+  if (!_sgidModulePromise) {
+    _sgidModulePromise = import("@blazetrails/globalid/signed-global-id")
+      .then((mod) => {
+        _sgidModule = mod;
+        return mod;
+      })
+      .catch((error) => {
+        _sgidModulePromise = null;
+        throw error;
+      });
+  }
+  return _sgidModulePromise;
+};
 let _signedIdModule: typeof import("./signed-id.js") | null = null;
 let _signedIdModulePromise: Promise<typeof import("./signed-id.js")> | null = null;
 const loadSignedId = async () => {
@@ -2788,6 +2810,37 @@ export class Base extends Model {
       return `gid://${app}/${ctor.name}/${this.id}`;
     }
     return `gid://${ctor.name}/${this.id}`;
+  }
+
+  /**
+   * Return a SignedGlobalID for this record.
+   * Uses the model's `signedIdVerifier` (same secret as signed IDs).
+   *
+   * Mirrors: ActiveRecord::Base#to_sgid
+   */
+  async toSgid(options?: {
+    app?: string;
+    purpose?: string;
+    expiresIn?: number;
+    expiresAt?: Temporal.Instant;
+  }): Promise<SignedGlobalIDType> {
+    const [SgidMod, SignedIdModule] = await Promise.all([loadSgid(), loadSignedId()]);
+    const verifier = SignedIdModule.signedIdVerifier(this.constructor as typeof Base);
+    return SgidMod.SignedGlobalID.create(this as GlobalIDModel, { ...options, verifier });
+  }
+
+  /**
+   * Return the signed GlobalID token string for this record.
+   *
+   * Mirrors: ActiveRecord::Base#to_sgid_param
+   */
+  async toSgidParam(options?: {
+    app?: string;
+    purpose?: string;
+    expiresIn?: number;
+    expiresAt?: Temporal.Instant;
+  }): Promise<string> {
+    return (await this.toSgid(options)).toParam();
   }
 
   // valuesAt / assignAttributes extracted to persistence.ts.
