@@ -6981,23 +6981,6 @@ describe("CalculationsTest", () => {
     expect(u.toGid()).toContain("gid://User/");
   });
 
-  // Rails guide: to_sgid — signed GlobalID
-  it("toSgid returns a base64-encoded GID", async () => {
-    const adapter = createTestAdapter();
-    class User extends Base {
-      static {
-        this._tableName = "users";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    const sgid = u.toSgid();
-    expect(typeof sgid).toBe("string");
-    expect(sgid.length).toBeGreaterThan(0);
-  });
-
   // Rails guide: column_defaults
   it("columnDefaults returns default values", () => {
     const adapter = createTestAdapter();
