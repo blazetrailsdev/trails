@@ -755,11 +755,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
         const lines: string[] = [];
         await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
-        const indexLine = lines
-          .join("\n")
-          .split("\n")
-          .find((l) => l.includes("company_include_index"))
-          ?.trim();
+        const indexLine = lines.find((l) => l.includes("company_include_index"))?.trim();
         expect(indexLine).toBeDefined();
         if (adapter.supportsIndexInclude()) {
           expect(indexLine).toContain(`include: ["name","account_id"]`);
