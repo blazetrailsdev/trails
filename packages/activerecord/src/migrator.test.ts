@@ -22,6 +22,7 @@ import { ExecutionStrategy, type MigrationLike } from "./migration/execution-str
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { SchemaMigration } from "./schema-migration.js";
 
 function makeMigration(
   version: string,
@@ -233,12 +234,11 @@ describe("MigratorTest", () => {
         })
         .filter(Boolean) as ReturnType<typeof makeMigration>[];
 
+      const sm = new SchemaMigration(adapter);
+      await sm.createTable();
+      await sm.createVersion("2");
+
       const m = new Migrator(adapter, proxies);
-      // Mark version 2 as applied
-      await adapter.executeMutation(
-        `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
-      );
-      await adapter.executeMutation(`INSERT INTO "schema_migrations" ("version") VALUES ('2')`);
 
       const status = await m.migrationsStatus();
       expect(status).toHaveLength(3);
@@ -270,13 +270,10 @@ describe("MigratorTest", () => {
         .filter(Boolean) as ReturnType<typeof makeMigration>[];
 
       // Simulate Schema.define(version: 3) by marking all versions up to 3 as applied
-      await adapter.executeMutation(
-        `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
-      );
+      const sm = new SchemaMigration(adapter);
+      await sm.createTable();
       for (const p of proxies) {
-        await adapter.executeMutation(
-          `INSERT INTO "schema_migrations" ("version") VALUES ('${p.version}')`,
-        );
+        await sm.createVersion(p.version);
       }
 
       const m = new Migrator(adapter, proxies);

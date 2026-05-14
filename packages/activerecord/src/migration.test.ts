@@ -1575,10 +1575,14 @@ describe("MigrationTest", () => {
     // im.get() short-circuits to null when disabled, so use a catalog query to
     // verify the table was physically not created (catalog tables always exist,
     // so this doesn't trigger the test-adapter's auto-schema).
-    const catalogSql =
-      adapterType === "sqlite"
-        ? `SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='ar_internal_metadata'`
-        : `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_name='ar_internal_metadata'`;
+    let catalogSql: string;
+    if (adapterType === "sqlite") {
+      catalogSql = `SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='ar_internal_metadata'`;
+    } else if (adapterType === "postgres") {
+      catalogSql = `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ar_internal_metadata'`;
+    } else {
+      catalogSql = `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'ar_internal_metadata'`;
+    }
     const rows = await adapter.execute(catalogSql);
     expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
   });
