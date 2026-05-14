@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import { fireAdapterSetHook } from "./_adapter-set-hook.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
@@ -121,6 +122,21 @@ export interface AssociationDefinition {
   type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
   name: string;
   options: AssociationOptions & { joinTable?: string };
+}
+
+/**
+ * Structural view of the reflection fields consumed within associations.ts.
+ * Avoids importing the concrete `AssociationReflection`/`ThroughReflection`
+ * types so the dep arrow stays one-way (this file already imports the
+ * Reflection namespace for HABTM registration, but that's value-side only).
+ * @internal
+ */
+interface ReflectionLike {
+  joinForeignKey: string | string[];
+  throughReflection?: { joinForeignKey: string | string[] } | null;
+  scope?: ((...args: any[]) => any) | null;
+  klass: typeof Base;
+  activeRecordPrimaryKey?: string | string[];
 }
 
 /**
@@ -425,6 +441,22 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
 }
 
 /**
+ * Rails' `klass.scope_for_association` — returns the association-aware base
+ * relation for the target model, merging any current scope.
+ * `scopeForAssociation` is wired onto Base via `extend()` but its `this:
+ * NamedHost` constraint doesn't fully overlap `typeof Base` statically, so
+ * the call site needs a structural cast. Centralising it here avoids
+ * repeating the cast at every loader.
+ * @internal
+ */
+function _scopeForAssociation(model: typeof Base): Relation<Base> {
+  return (
+    (model as unknown as { scopeForAssociation?(): Relation<Base> }).scopeForAssociation?.() ??
+    model.all()
+  );
+}
+
+/**
  * Build (or return cached) base AssociationScope. When the owner has
  * a registered `Association` instance for this name, route through
  * its `associationScope()` so calls hit Rails' `@association_scope`-
@@ -443,9 +475,9 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
 function _builtAssociationScope(
   record: Base,
   assocName: string,
-  reflection: unknown,
+  reflection: ReflectionLike,
   targetModel: typeof Base,
-): unknown {
+): Relation<Base> {
   // Materialize the Association instance if missing — proxy paths
   // (CollectionProxy, AssociationProxy) call loaders directly without
   // first going through `record.association(name)`, so an instance-
@@ -472,13 +504,13 @@ function _builtAssociationScope(
     }
   }
   if (instance && !instance.disableJoins && typeof instance.associationScope === "function") {
-    return instance.associationScope();
+    return instance.associationScope() as Relation<Base>;
   }
   return AssociationScope.scope({
     owner: record,
     reflection: reflection as never,
     klass: targetModel,
-  });
+  }) as Relation<Base>;
 }
 
 /**
@@ -497,10 +529,12 @@ function _builtAssociationScope(
  * PK-null check covers the defensive edge where a saved record
  * somehow has a null composite-PK component.
  */
-export function ownerHasUnresolvedThroughKey(record: Base, reflection: unknown): boolean {
+export function ownerHasUnresolvedThroughKey(
+  record: Base,
+  reflection: ReflectionLike | null | undefined,
+): boolean {
   if (record.isNewRecord()) return true;
-  const activeRecordPk = (reflection as { activeRecordPrimaryKey?: string | string[] })
-    .activeRecordPrimaryKey;
+  const activeRecordPk = reflection?.activeRecordPrimaryKey;
   const ownerPkCols =
     activeRecordPk == null ? [] : Array.isArray(activeRecordPk) ? activeRecordPk : [activeRecordPk];
   return ownerPkCols.some((col) => {
@@ -511,28 +545,28 @@ export function ownerHasUnresolvedThroughKey(record: Base, reflection: unknown):
 
 async function _loadThroughViaDisableJoinsScope(
   record: Base,
-  reflection: unknown,
+  reflection: ReflectionLike | null | undefined,
   options?: AssociationOptions,
 ): Promise<Base[]> {
-  if (ownerHasUnresolvedThroughKey(record, reflection)) return [];
+  if (!reflection || ownerHasUnresolvedThroughKey(record, reflection)) return [];
   // Lazy-import to avoid an eager cycle: DJAS imports
   // DisableJoinsAssociationRelation → relation.ts → associations.ts.
   const { DisableJoinsAssociationScope } =
     await import("./associations/disable-joins-association-scope.js");
-  const klass = (reflection as { klass: typeof Base }).klass;
+  const klass = reflection.klass;
   // DJAS.scope() now returns a sync deferred-chain Relation — the
   // async chain walk runs on first toArray(). No more Promise<{relation}>
   // boxing to unwrap.
   let rel: unknown = DisableJoinsAssociationScope.INSTANCE.scope({
     owner: record,
-    reflection: reflection as any,
+    reflection: reflection as never,
     klass,
   });
   // Apply caller-supplied `options.scope` when it differs from the
   // reflection's own scope — same rule the JOIN-based loaders use
   // (line 488 etc.). Skipping when equal avoids double-application
   // since DJAS already consumed the reflection's scope via constraints.
-  const reflScope = (reflection as { scope?: unknown }).scope;
+  const reflScope = reflection.scope;
   if (options?.scope && options.scope !== reflScope) {
     rel = options.scope(rel as never);
   }
@@ -640,9 +674,9 @@ export async function loadBelongsTo(
   // column would silently return null while a real query would have
   // found the row (or vice versa).
   const fkColsForCheck = reflection
-    ? Array.isArray((reflection as any).joinForeignKey)
-      ? ((reflection as any).joinForeignKey as string[])
-      : [(reflection as any).joinForeignKey as string]
+    ? Array.isArray(reflection.joinForeignKey)
+      ? reflection.joinForeignKey
+      : [reflection.joinForeignKey]
     : Array.isArray(foreignKey)
       ? foreignKey
       : [foreignKey as string];
@@ -653,10 +687,10 @@ export async function loadBelongsTo(
 
   let result: Base | null;
   if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel) as any;
-    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== (reflection as any).scope) {
+    if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
     }
     result = await rel.first();
@@ -766,12 +800,7 @@ export async function loadHasOne(
   // joinForeignKey delegates to the SOURCE reflection (whose FK is on
   // the through table, not the owner). The relevant owner-side
   // column is on the through_reflection.
-  const reflForOwnerFk =
-    reflection && (reflection as any).throughReflection
-      ? ((reflection as any).throughReflection as { joinForeignKey: string | string[] })
-      : reflection
-        ? (reflection as { joinForeignKey: string | string[] })
-        : null;
+  const reflForOwnerFk = reflection?.throughReflection ?? reflection ?? null;
   const pkCheckCols = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -786,10 +815,10 @@ export async function loadHasOne(
 
   let result: Base | null;
   if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel) as any;
-    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== (reflection as any).scope) {
+    if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
     }
     result = await rel.first();
@@ -812,7 +841,7 @@ export async function loadHasOne(
         [typeCol]: ctor.name,
       });
     } else if (options.scope) {
-      let rel = (targetModel as any)
+      let rel = targetModel
         .all()
         .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
       rel = options.scope(rel);
@@ -974,12 +1003,7 @@ export async function loadHasMany(
   // the through table, not the owner) — wrong column. The relevant
   // owner-side column is on the through_reflection (chain.last in the
   // chain ordering).
-  const reflForOwnerFk =
-    reflection && (reflection as any).throughReflection
-      ? ((reflection as any).throughReflection as { joinForeignKey: string | string[] })
-      : reflection
-        ? (reflection as { joinForeignKey: string | string[] })
-        : null;
+  const reflForOwnerFk = reflection?.throughReflection ?? reflection ?? null;
   const fkCheckPks = reflForOwnerFk
     ? Array.isArray(reflForOwnerFk.joinForeignKey)
       ? reflForOwnerFk.joinForeignKey
@@ -1004,10 +1028,10 @@ export async function loadHasMany(
     // function. Callers like `loadHasManyThrough` synthesize a NEW
     // `options.scope` (wrapping with `sourceType` filtering) — those
     // must still run.
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel) as any;
-    const baseRelation = (targetModel as any).scopeForAssociation?.() ?? (targetModel as any).all();
+    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
+    const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== (reflection as any).scope) {
+    if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
     }
   } else {
@@ -1021,15 +1045,15 @@ export async function loadHasMany(
       for (let i = 0; i < foreignKey.length; i++) {
         conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
       }
-      rel = (targetModel as any).all().where(conditions);
+      rel = targetModel.all().where(conditions);
     } else if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
-      rel = (targetModel as any).all().where({
+      rel = targetModel.all().where({
         [foreignKey as string]: record._readAttribute(primaryKey as string),
         [typeCol]: ctor.name,
       });
     } else {
-      rel = (targetModel as any)
+      rel = targetModel
         .all()
         .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
     }
@@ -1126,7 +1150,7 @@ export function buildHasManyRelation(
   if (conditions === null) return null;
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveModel(className);
-  let rel = (targetModel as any).all().where(conditions);
+  let rel = targetModel.all().where(conditions);
   if (options.scope) rel = options.scope(rel);
   return rel;
 }
@@ -1242,7 +1266,7 @@ export async function loadHasManyThrough(
       .map((r) => r._readAttribute(targetFk as string))
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
-    let rel = (targetModel as any).all().where({ [targetModel.primaryKey as string]: targetIds });
+    let rel = targetModel.all().where({ [targetModel.primaryKey as string]: targetIds });
     if (options.scope) rel = options.scope(rel);
     return rel.toArray();
   } else {
@@ -1259,7 +1283,7 @@ export async function loadHasManyThrough(
     if (throughIds.length === 0) return [];
     const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
     if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
-    let rel2 = (targetModel as any).all().where(whereConditions);
+    let rel2 = targetModel.all().where(whereConditions);
     if (options.scope) rel2 = options.scope(rel2);
     return rel2.toArray();
   }
@@ -1475,7 +1499,7 @@ export async function loadHabtm(
   const targetArelTable = new ArelTable(targetModel.tableName);
   const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
 
-  return (targetModel as any).all().where(inNode).toArray();
+  return targetModel.all().where(inNode).toArray();
 }
 
 /**
@@ -2120,10 +2144,10 @@ export async function setHasMany(
   const targetModel = resolveModel(className);
   const findConditions: Record<string, unknown> = { [foreignKey as string]: pkValue };
   if (typeCol) findConditions[typeCol] = ctor.name;
-  const existing = await (targetModel as any).where(findConditions).toArray();
+  const existing = await targetModel.where(findConditions).toArray();
   for (const old of existing) {
     if (!targets.includes(old)) {
-      old._writeAttribute(foreignKey, null);
+      old._writeAttribute(foreignKey as string, null);
       if (typeCol) old._writeAttribute(typeCol, null);
       await old.save();
     }
