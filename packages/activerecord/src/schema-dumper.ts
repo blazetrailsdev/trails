@@ -195,6 +195,7 @@ const DSL_HELPER_METHODS = new Set([
   "json",
   "jsonb",
   "citext",
+  "money",
   "int4range",
   "int8range",
   "numrange",
