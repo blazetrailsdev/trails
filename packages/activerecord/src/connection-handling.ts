@@ -54,8 +54,8 @@ function isBaseClass(klass: typeof Base): boolean {
 export function connectsTo(
   this: typeof Base,
   options: {
-    database?: Record<string, string>;
-    shards?: Record<string, Record<string, string>>;
+    database?: Record<string, string | Record<string, unknown>>;
+    shards?: Record<string, Record<string, string | Record<string, unknown>>>;
   },
 ): ConnectionPool[] {
   if (!isBaseClass(this) && !this.abstractClass) {
@@ -80,13 +80,25 @@ export function connectsTo(
   (this as any)._shardKeys = Object.keys(shardEntries);
   (this as any).connectionClass = true;
 
-  const configs = DatabaseConfigurations.fromEnv((this as any).configurations?.toH?.() ?? {});
+  const rawConfigs = (this as any).configurations;
+  let configs: DatabaseConfigurations;
+  if (rawConfigs instanceof DatabaseConfigurations) {
+    configs = rawConfigs;
+  } else if (rawConfigs && typeof (rawConfigs as any).toH === "function") {
+    configs = DatabaseConfigurations.fromEnv((rawConfigs as any).toH());
+  } else if (
+    rawConfigs &&
+    typeof rawConfigs === "object" &&
+    Object.keys(rawConfigs as object).length > 0
+  ) {
+    configs = DatabaseConfigurations.fromEnv(rawConfigs);
+  } else {
+    configs = new DatabaseConfigurations([]);
+  }
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
-      const env = getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DatabaseConfigurations.defaultEnv;
-      const found = configs.configsFor({ envName: env, name: dbKey });
-      const dbConfig = found[0] ?? new HashConfig(env, dbKey, {});
+      const dbConfig = configs.resolve(dbKey);
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,

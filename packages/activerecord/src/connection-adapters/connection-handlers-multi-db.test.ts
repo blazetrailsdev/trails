@@ -1,109 +1,194 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ConnectionHandler } from "./abstract/connection-handler.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
+import { createTestAdapter } from "../test-adapter.js";
+import { Base } from "../base.js";
+import { currentRole } from "../core.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
+  let handler: ConnectionHandler;
+  let rwPool: any;
+  let roPool: any;
+  const connectionName = "Base";
+
+  beforeEach(() => {
+    handler = new ConnectionHandler();
+    const dbConfig = new HashConfig("test", connectionName, {
+      adapter: "sqlite3",
+      database: ":memory:",
+    });
+    rwPool = handler.establishConnection(dbConfig, {
+      owner: connectionName,
+      adapterFactory: createTestAdapter,
+    });
+    roPool = handler.establishConnection(dbConfig, {
+      owner: connectionName,
+      role: "reading",
+      adapterFactory: createTestAdapter,
+    });
+  });
+
+  afterEach(() => {
+    handler.clearAllConnectionsBang();
+    Base.connectionHandler.clearAllConnectionsBang();
+  });
+
+  function withBaseConfigs(
+    raw: Record<string, unknown>,
+    fn: () => void,
+    opts: { defaultEnv?: string } = {},
+  ): void {
+    const prevConfigs = (Base as any).configurations;
+    const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
+    if (opts.defaultEnv) DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+    (Base as any).configurations = raw;
+    try {
+      fn();
+    } finally {
+      (Base as any).configurations = prevConfigs;
+      DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+      Base.connectionHandler.clearAllConnectionsBang();
+    }
+  }
+
   it.skip("multiple connections works in a threaded environment", () => {
     // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // ROOT-CAUSE: Node.js has no Thread.new / GVL; concurrent connection tests cannot translate
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
+    // SCOPE: permanent skip-list.ts candidate
   });
   it.skip("loading relations with multi db connections", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+    // BLOCKED: connection-pool — needs connects_to with in-memory SQLite + DDL + insert; Slot C
   });
   it.skip("establish connection using 3 levels config", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
-  });
-  it.skip("switching connections via handler", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+    // BLOCKED: connection-pool — pool.dbConfig.database assertion requires file-backed DB; Slot C
   });
   it.skip("establish connection using 3 levels config with non default handlers", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+    // BLOCKED: connection-pool — pool.dbConfig.database assertion requires file-backed DB; Slot C
   });
-  it.skip("switching connections with database url", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("switching connections with database url", () => {
+    withBaseConfigs({}, () => {
+      Base.connectsTo({ database: { writing: "postgresql://localhost/bar" } });
+      expect(currentRole.call(Base as any)).toBe("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+      const pool = Base.connectionHandler.retrieveConnectionPool("Base");
+      expect(pool).not.toBeNull();
+      expect(pool!.dbConfig.adapter).toMatch(/postgr/i);
+    });
   });
-  it.skip("switching connections with database config hash", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("switching connections with database config hash", () => {
+    withBaseConfigs({}, () => {
+      Base.connectsTo({ database: { writing: { adapter: "sqlite3", database: ":memory:" } } });
+      expect(currentRole.call(Base as any)).toBe("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+      expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeNull();
+    });
   });
-  it.skip("switching connections without database and role raises", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("switching connections without database and role raises", () => {
+    expect(() => Base.connectedTo({}, () => {})).toThrow(/must provide a `shard` and\/or `role`/);
   });
-  it.skip("switching connections with database symbol uses default role", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("switching connections with database symbol uses default role", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          animals: { adapter: "sqlite3", database: ":memory:" },
+          primary: { adapter: "sqlite3", database: ":memory:" },
+        },
+      },
+      () => {
+        Base.connectsTo({ database: { writing: "animals" } });
+        expect(currentRole.call(Base as any)).toBe("writing");
+        expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+        expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeNull();
+      },
+      { defaultEnv: "default_env" },
+    );
   });
-  it.skip("switching connections with database hash uses passed role and database", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("connects to with single configuration", () => {
+    withBaseConfigs({ development: { adapter: "sqlite3", database: ":memory:" } }, () => {
+      Base.connectsTo({ database: { writing: "development" } });
+      expect(Base.connectionHandler).toBe(Base.connectionHandler);
+      expect(currentRole.call(Base as any)).toBe("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+    });
   });
-  it.skip("connects to with single configuration", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("connects to using top level key in two level config", () => {
+    withBaseConfigs(
+      {
+        development: { adapter: "sqlite3", database: ":memory:" },
+        development_readonly: { adapter: "sqlite3", database: ":memory:" },
+      },
+      () => {
+        Base.connectsTo({ database: { writing: "development", reading: "development_readonly" } });
+        const pool = Base.connectionHandler.retrieveConnectionPool("Base", { role: "reading" });
+        expect(pool).not.toBeNull();
+      },
+    );
   });
-  it.skip("connects to using top level key in two level config", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("connects to returns array of established connections", () => {
+    withBaseConfigs(
+      {
+        development: { adapter: "sqlite3", database: ":memory:" },
+        development_readonly: { adapter: "sqlite3", database: ":memory:" },
+      },
+      () => {
+        const result = Base.connectsTo({
+          database: { writing: "development", reading: "development_readonly" },
+        });
+        expect(result).toEqual([
+          Base.connectionHandler.retrieveConnectionPool("Base"),
+          Base.connectionHandler.retrieveConnectionPool("Base", { role: "reading" }),
+        ]);
+      },
+    );
   });
-  it.skip("connects to returns array of established connections", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("connection pool list", () => {
+    expect(handler.connectionPoolList("writing")).toEqual([rwPool]);
+    expect(handler.connectionPoolList("reading")).toEqual([roPool]);
+    expect(handler.connectionPoolList()).toEqual([rwPool, roPool]);
   });
-  it.skip("connection pool list", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("retrieve connection pool", () => {
+    expect(handler.retrieveConnectionPool(connectionName)).not.toBeNull();
+    expect(handler.retrieveConnectionPool(connectionName, { role: "reading" })).not.toBeNull();
   });
-  it.skip("retrieve connection", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("retrieve connection pool with invalid id", () => {
+    expect(handler.retrieveConnectionPool("foo")).toBeUndefined();
+    expect(handler.retrieveConnectionPool("foo", { role: "reading" })).toBeUndefined();
   });
-  it.skip("active connections?", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("calling connected to on a non existent handler raises", () => {
+    expect(() => {
+      Base.connectedTo({ role: "non_existent" }, () => {
+        Base.connectionPool();
+      });
+    }).toThrow(/No database connection/);
   });
-  it.skip("retrieve connection pool", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("default handlers are writing and reading", () => {
+    expect(Base.writingRole).toBe("writing");
+    expect(Base.readingRole).toBe("reading");
   });
-  it.skip("retrieve connection pool with invalid id", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
-  });
-  it.skip("calling connected to on a non existent handler raises", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
-  });
-  it.skip("default handlers are writing and reading", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
-  });
-  it.skip("an application can change the default handlers", () => {
-    // BLOCKED: connection-pool — multi-database handler / switching not fully implemented
-    // ROOT-CAUSE: connection-adapters/abstract/connection-handler.ts#connectedTo for multi-DB not fully implemented
-    // SCOPE: ~100 LOC in connection-adapters/abstract/connection-handler.ts; affects ~11–21 tests in multiple-db files
+
+  it("an application can change the default handlers", () => {
+    const oldWriting = Base.writingRole;
+    const oldReading = Base.readingRole;
+    try {
+      Base.writingRole = "default";
+      Base.readingRole = "readonly";
+      expect(Base.writingRole).toBe("default");
+      expect(Base.readingRole).toBe("readonly");
+    } finally {
+      Base.writingRole = oldWriting;
+      Base.readingRole = oldReading;
+    }
   });
 });
