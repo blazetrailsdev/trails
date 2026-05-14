@@ -167,10 +167,20 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
+    // Apply the per-owner reflection scope to source record loading so
+    // instance-dependent scopes filter the final target (e.g. only comments
+    // mentioning the owner). Merge the user-supplied preload scope on top so
+    // it is not silently dropped when _reflectionScope is set.
+    let sourceScope = this._reflectionScope ?? null;
+    if (sourceScope != null && this._preloadScope != null) {
+      sourceScope = (sourceScope as any).merge(this._preloadScope);
+    } else if (sourceScope == null) {
+      sourceScope = this._preloadScope;
+    }
     const preloader = new Preloader({
       records: middleRecords,
       associations: [sourceRefl.name],
-      scope: this.scope,
+      scope: sourceScope,
       associateByDefault: false,
     });
     this._sourcePreloaders = preloader.loaders;

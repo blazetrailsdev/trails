@@ -144,6 +144,12 @@ export class JoinDependency {
     const assocDef = associations.find((a: any) => a.name === assocName);
     if (!assocDef) return null;
 
+    const reflection = reflectOnAssociation(modelClass, assocName);
+    if (reflection) {
+      // Mirrors: ActiveRecord::Associations::JoinDependency#build (join_dependency.rb:232)
+      (reflection as any).checkEagerLoadableBang?.();
+    }
+
     const sourceAlias = options?.fromAlias ?? this._baseAlias;
     const sourcePk = modelClass.primaryKey ?? "id";
     if (Array.isArray(sourcePk)) return null;
