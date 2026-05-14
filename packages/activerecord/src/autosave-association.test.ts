@@ -8,6 +8,7 @@ import {
   registerModel,
   acceptsNestedAttributesFor,
   assignNestedAttributes,
+  RecordInvalid,
 } from "./index.js";
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
@@ -1241,11 +1242,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* deep nesting not tested */
   });
-  it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* save! not fully implemented */
+  it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
+    const { Pirate, Ship } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = new Ship({ name: "" }); // invalid — presence required
+    cacheAssoc(pirate, "ship", ship);
+    await expect(pirate.saveBang()).rejects.toThrow(RecordInvalid);
   });
   it("should not save and return false if a callback cancelled saving", async () => {
     class CcPirate extends Base {
@@ -1598,11 +1600,13 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* save! not fully implemented */
+  it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
+    const { Pirate, Ship } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    pirate.catchphrase = ""; // invalid — presence required
+    cacheAssoc(ship, "pirate", pirate);
+    await expect(ship.saveBang()).rejects.toThrow(RecordInvalid);
   });
   it("should not save and return false if a callback cancelled saving", async () => {
     class CcShip extends Base {
@@ -3309,11 +3313,36 @@ describe("should update children when autosave is true and parent is new but chi
     expect(tags.length).toBeLessThanOrEqual(1);
   });
 
-  it.skip("should still raise an ActiveRecordRecord Invalid exception if we want that", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* TODO: needs RecordInvalid import */
+  it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
+    const adapter = freshAdapter();
+    class RITag extends Base {
+      static {
+        this._tableName = "ri_tags";
+        this.attribute("name", "string");
+        this.attribute("ri_article_id", "integer");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
+    }
+    class RIArticle extends Base {
+      static {
+        this._tableName = "ri_articles";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(RIArticle, "riTags", {
+      className: "RITag",
+      foreignKey: "ri_article_id",
+      autosave: true,
+    });
+    registerModel(RITag);
+    registerModel(RIArticle);
+    const article = await RIArticle.create({ title: "test" });
+    const tag = await RITag.create({ name: "valid", ri_article_id: article.id });
+    tag.name = ""; // invalid — presence required
+    cacheAssoc(article, "riTags", [tag]);
+    await expect(article.saveBang()).rejects.toThrow(RecordInvalid);
   });
 });
 
