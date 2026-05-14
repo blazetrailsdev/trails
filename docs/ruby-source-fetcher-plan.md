@@ -61,7 +61,7 @@ scripts/test-compare/extract-ruby-tests.rb:18 RAILS_DIR = File.join(SCRIPT_DIR, 
 scripts/test-compare/extract-ruby-tests.rb:19 RACK_DIR  = File.join(SCRIPT_DIR, "..", "api-compare", ".rack-source")
 scripts/start-worktree.sh:154                 link_source "scripts/api-compare/.rails-source"
 scripts/start-worktree.sh:155                 link_source "scripts/api-compare/.rack-source" optional
-scripts/parity/schema/ruby/Gemfile:5          # version pinned by COMMENT — drifts silently from RAILS_TAG
+scripts/parity/schema/ruby/Gemfile:5          gem "activerecord", "8.0.2"   # manually kept in sync with RAILS_TAG — drift risk
 ```
 
 The Ruby extractors will need a small env-var or stdin contract to receive resolved paths from a TS caller (the extractors themselves stay in Ruby — they shell out from Node anyway).
@@ -112,14 +112,40 @@ export const SOURCES: UpstreamSource[] = [
   {
     name: "rails",
     origin: { type: "git", url: "https://github.com/rails/rails.git", ref: "v8.0.2" },
+    // Package names mirror scripts/api-compare/config.ts PACKAGES exactly, including
+    // the trails-side rename trailties (← railties) and the actionpack split into
+    // actiondispatch / actioncontroller / abstractcontroller — each pointing at a
+    // distinct lib subdir so derived PACKAGES doesn't need an alias table.
     packages: [
-      { name: "activerecord", libPath: "activerecord/lib", testPath: "activerecord/test" },
-      { name: "activemodel", libPath: "activemodel/lib", testPath: "activemodel/test" },
-      { name: "activesupport", libPath: "activesupport/lib", testPath: "activesupport/test" },
-      { name: "actionpack", libPath: "actionpack/lib", testPath: "actionpack/test" },
-      { name: "actionview", libPath: "actionview/lib", testPath: "actionview/test" },
-      { name: "actionmailer", libPath: "actionmailer/lib", testPath: "actionmailer/test" },
-      { name: "railties", libPath: "railties/lib", testPath: "railties/test" },
+      { name: "arel", libPath: "activerecord/lib/arel", testPath: "activerecord/test/cases/arel" },
+      {
+        name: "activerecord",
+        libPath: "activerecord/lib/active_record",
+        testPath: "activerecord/test/cases",
+      },
+      {
+        name: "activemodel",
+        libPath: "activemodel/lib/active_model",
+        testPath: "activemodel/test/cases",
+      },
+      {
+        name: "activesupport",
+        libPath: "activesupport/lib/active_support",
+        testPath: "activesupport/test",
+      },
+      {
+        name: "actiondispatch",
+        libPath: "actionpack/lib/action_dispatch",
+        testPath: "actionpack/test/dispatch",
+      },
+      {
+        name: "actioncontroller",
+        libPath: "actionpack/lib/action_controller",
+        testPath: "actionpack/test/controller",
+      },
+      { name: "abstractcontroller", libPath: "actionpack/lib/abstract_controller" },
+      { name: "actionview", libPath: "actionview/lib/action_view", testPath: "actionview/test" },
+      { name: "trailties", libPath: "railties/lib/rails", testPath: "railties/test" },
     ],
   },
   {
@@ -191,7 +217,7 @@ export function resolvePath(packageName: string, kind: "lib" | "test" = "lib"): 
 
 Consumers migrate as follows:
 
-- `scripts/api-compare/config.ts` — drops `PACKAGES` literal; derives it from `SOURCES.flatMap(s => s.packages.map(p => p.name))` filtered against the TS packages that exist under `packages/`. `PACKAGE_DIR_OVERRIDES` stays (it's a TS-side concern).
+- `scripts/api-compare/config.ts` — drops the literal `PACKAGES` array; derives it from `SOURCES.flatMap(s => s.packages.map(p => p.name))`. Because §2.2 declares each Ruby-side key (including `actiondispatch`/`actioncontroller`/`abstractcontroller` as siblings under the `rails` origin and the trails-side `trailties` rename), no alias step is needed for derivation. `PACKAGE_DIR_OVERRIDES` and `PACKAGE_SRC_SUBDIR` continue to govern _TS-side_ directory resolution under `packages/`; only `PACKAGES` itself becomes derived.
 - `scripts/api-compare/extract-ruby-api.rb` — receives `RAILS_DIR` via env var set by its TS caller (`compare.ts`), which calls `resolvePath("activerecord", "lib")` etc. Removes the hardcoded `File.join(SCRIPT_DIR, ".rails-source")`.
 - `scripts/test-compare/extract-ruby-tests.rb` — same env-var contract. Iterates over a JSON-encoded source manifest passed by the caller.
 - `scripts/start-worktree.sh` — replaces per-source `link_source "scripts/api-compare/.rails-source"` calls with one loop over `tsx vendor/fetch.ts --print-paths`. That flag emits one absolute path per line (one per source name, e.g. `/.../vendor/rails`), and the shell loop symlinks each into the new worktree's `vendor/<name>`.
@@ -219,7 +245,7 @@ Each wave ≤300 LOC. Order chosen so each wave is independently shippable and r
 | 1   | Define `vendor/sources.ts` schema + the list (Rails only).                                                                     | ~100     | `vendor/sources.ts`, `vendor/README.md`                                                                          |
 | 2   | Unified fetcher with `git` origin; migrate Rails + Rack.                                                                       | ~200     | `vendor/fetch.ts`; delete `fetch-rails.sh`, rack half of `fetch-rails-tests.sh`; update CI + `start-worktree.sh` |
 | 3   | Add `rubygems` origin; migrate globalid.                                                                                       | ~150     | extend `fetch.ts`; delete `fetch-globalid.sh` + `scripts/globalid-source/`                                       |
-| 4   | `api-compare` reads from `resolvePath`; derive `PACKAGES`; thread Rails tag into extractor cache key.                          | ~150     | `config.ts`, `compare.ts`, `extract-ruby-api.rb` env contract + cache-gate (line 17)                             |
+| 4   | `api-compare` reads from `resolvePath`; derive `PACKAGES` from `SOURCES`; pass RAILS_DIR env to extractor.                     | ~150     | `config.ts`, `compare.ts`, `extract-ruby-api.rb` (env-var RAILS_DIR; mtime-vs-HEAD cache gate stays)             |
 | 5   | `test-compare` reads from `resolvePath`; verify replaces required-dir block.                                                   | ~150     | `test-compare.ts`, `extract-ruby-tests.rb`, delete rest of `fetch-rails-tests.sh`                                |
 | 6   | Globalid wiring: confirms PACKAGES auto-pickup; quote test count.                                                              | ~50      | `vendor/sources.ts` (no change), `globalid` parity baseline added                                                |
 | 7   | Doc + memory + Gemfile cleanup; update `reference_rails_source_path.md`; align `parity/schema/ruby/Gemfile` version to schema. | ~100     | docs, memory, `parity/schema/ruby/Gemfile`                                                                       |
@@ -231,7 +257,7 @@ Waves 4 and 5 can land in either order; they are independent.
 - **CI cache invalidation**: cache key must be `hash(vendor/sources.ts)`, not a dir hash — otherwise a pinned-ref bump won't invalidate.
 - **Bundler in CI**: globalid (and any future rubygems-origin source) requires `ruby` + `bundler` on the CI image. `api:compare` and `test:compare` already use Ruby for the extractors, so no new dep — but it does mean a TS-only contributor cannot run `pnpm vendor:fetch` without Ruby installed. Mitigation: `fetch.ts` should print an actionable error ("install ruby + bundler") rather than letting `bundle install` fail.
 - **In-flight worktrees during migration**: per §2.3, wave 2 lands the path move in one PR with no compat symlink. Active agents must be paused at merge time and re-linked on next `start-worktree.sh` run. The master clone is moved with `git mv scripts/api-compare/.rails-source vendor/rails` (and same for rack), avoiding a ~53 MiB re-clone.
-- **Extractor cache gate**: `scripts/api-compare/extract-ruby-api.rb:17` already caches extraction output keyed by Rails tag. Once the tag moves into `vendor/sources.ts`, the extractor must read it from the manifest (env var passed by `compare.ts`) or the cache key drifts silently. Wave 4 owns this.
+- **Extractor cache gate**: `scripts/api-compare/extract-ruby-api.rb:25-28` caches by comparing `output_path` mtime against `<RAILS_DIR>/.git/HEAD` mtime — not the tag string. After wave 4 moves `RAILS_DIR` to `vendor/rails/`, the gate still works (the path moves but the `.git/HEAD` mtime semantics are identical). The risk to plan for is rubygems-origin sources, which have no `.git/HEAD`: when wave 3 adds bundler origins, the gate needs a fallback signal (e.g., mtime of `vendor/sources.lock.json` for those packages).
 - **Cross-doc coordination**: the parallel `docs/rails-file-structure-mirror-plan.md` (in progress on agent %396) is designing a Ruby-aware mirror tool that **must** consume the same `SOURCES` list. Both plans should converge on `vendor/sources.ts` as the single registry. Action item: cross-link this doc from the mirror plan when it lands.
 - **`parity/schema/ruby/Gemfile` drift**: resolved per §2.3 — wave 7 generates the Gemfile from `SOURCES` at parity-run time.
 - **Symlink semantics for rubygems origin**: the `vendor/globalid/lib → vendor/globalid/vendor/bundle/.../lib` symlink approach assumes POSIX. Windows is unsupported by the repo today (Ruby + pnpm + symlinks), so this is acceptable but worth flagging.
