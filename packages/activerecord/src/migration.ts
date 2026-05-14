@@ -1500,11 +1500,12 @@ export class MigrationContext {
   /** @internal Query catalog for column names — used after CTAS where columns derive from the SELECT. */
   private async _introspectColumns(name: string): Promise<string[]> {
     const a = this._adapterName;
+    const e = name.replace(/'/g, "''"); // defense-in-depth for catalog string literals
     const sql =
       a === "sqlite"
         ? `PRAGMA table_info(${this.adapter.quoteTableName(name)})`
         : a === "postgres"
-          ? `SELECT column_name FROM information_schema.columns WHERE table_name = '${name}'`
+          ? `SELECT column_name FROM information_schema.columns WHERE table_name = '${e}'`
           : `SHOW COLUMNS FROM ${this.adapter.quoteTableName(name)}`;
     const rows = await this.adapter.execute(sql);
     return rows.map((r) => {
@@ -1568,9 +1569,12 @@ export class MigrationContext {
     }
     this._tables.add(name);
     const cols = new Set<string>();
-    for (const col of td.columns) {
+    // CTAS ignores td.columns — actual columns come from the SELECT (introspected below).
+    const tdCols = options?.as != null ? [] : td.columns;
+    for (const col of tdCols) {
       cols.add(col.name);
     }
+
     // Store column metadata
     const meta = new Map<
       string,
@@ -1588,7 +1592,7 @@ export class MigrationContext {
       const idType = typeof options?.id === "string" ? options.id : "integer";
       meta.set("id", { type: idType, primaryKey: true });
     }
-    for (const col of td.columns) {
+    for (const col of tdCols) {
       if (col.name === "id" && meta.has("id")) continue;
       meta.set(col.name, {
         type: col.type,
@@ -1600,11 +1604,10 @@ export class MigrationContext {
         scale: col.options.scale,
       });
     }
-    // CTAS columns come from the SELECT list — introspect from the DB.
     if (options?.as != null) {
       for (const c of await this._introspectColumns(name)) {
         cols.add(c);
-        if (!meta.has(c)) meta.set(c, { type: "string" });
+        meta.set(c, { type: "string" });
       }
     }
     this._columns.set(name, cols);
