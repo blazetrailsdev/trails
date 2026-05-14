@@ -218,7 +218,7 @@ describe("ModuleTest", () => {
   });
 
   it("moduleParentName — returns parent namespace for namespaced class", () => {
-    const Inner = { name: "Outer::Inner" } as unknown as Function;
+    const Inner = { name: "Outer::Inner" };
     expect(moduleParentName(Inner)).toBe("Outer");
   });
 

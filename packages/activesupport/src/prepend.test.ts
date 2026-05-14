@@ -9,7 +9,7 @@ describe("prepend", () => {
       }
     }
     prepend(Relation.prototype, {
-      where(super_: Function, n: number) {
+      where(super_: (...args: unknown[]) => unknown, n: number) {
         return `wrapped(${super_.call(this, n * 2)})`;
       },
     });
@@ -24,7 +24,7 @@ describe("prepend", () => {
       }
     }
     prepend(Box.prototype, {
-      identify(super_: Function) {
+      identify(super_: (...args: unknown[]) => unknown) {
         return `outer:${super_.call(this)}`;
       },
     });
@@ -40,7 +40,7 @@ describe("prepend", () => {
       }
     }
     prepend(Toggle.prototype, {
-      value(_super_: Function) {
+      value(_super_: (...args: unknown[]) => unknown) {
         return 42;
       },
     });
@@ -49,9 +49,9 @@ describe("prepend", () => {
 
   it("throws when wrapping a method that doesn't exist on the target", () => {
     class Empty {}
-    expect(() => prepend(Empty.prototype, { ghost: (s: Function) => s })).toThrow(
-      /no method with that name/,
-    );
+    expect(() =>
+      prepend(Empty.prototype, { ghost: (s: (...args: unknown[]) => unknown) => s }),
+    ).toThrow(/no method with that name/);
   });
 
   it("throws when the target isn't an object or function", () => {
@@ -66,7 +66,7 @@ describe("prepend", () => {
       }
     }
     prepend(Factory as unknown as Record<string, unknown>, {
-      make(super_: Function, x: number) {
+      make(super_: (...args: unknown[]) => unknown, x: number) {
         return (super_.call(this, x) as number) + 1;
       },
     });
@@ -81,7 +81,7 @@ describe("prepend", () => {
     }
     const before = Object.getOwnPropertyDescriptor(Widget.prototype, "spin");
     prepend(Widget.prototype, {
-      spin(super_: Function) {
+      spin(super_: (...args: unknown[]) => unknown) {
         return `wrapped-${super_.call(this)}`;
       },
     });
@@ -107,7 +107,7 @@ describe("prepend", () => {
     const origA = Frozen.prototype.a;
     expect(() =>
       prepend(Frozen.prototype, {
-        a: (s: Function) => `wrapped-${s.call(undefined)}`,
+        a: (s: (...args: unknown[]) => unknown) => `wrapped-${s.call(undefined)}`,
       }),
     ).toThrow(TypeError);
     expect(Frozen.prototype.a).toBe(origA);
@@ -131,8 +131,8 @@ describe("prepend", () => {
     const origLoose = target.loose;
     expect(() =>
       prepend(target, {
-        loose: (s: Function) => `w-${s.call(undefined)}`,
-        reader: (s: Function) => `w-${s.call(undefined)}`,
+        loose: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
+        reader: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
       }),
     ).toThrow(/non-configurable accessor/);
     // `loose` must NOT have been wrapped — atomicity guarantee.
@@ -156,8 +156,8 @@ describe("prepend", () => {
     const origLoose = target.loose;
     expect(() =>
       prepend(target, {
-        loose: (s: Function) => `w-${s.call(undefined)}`,
-        locked: (s: Function) => `w-${s.call(undefined)}`,
+        loose: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
+        locked: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
       }),
     ).toThrow(/non-configurable and non-writable/);
     // `loose` must NOT have been wrapped — atomicity guarantee.
@@ -173,8 +173,8 @@ describe("prepend", () => {
     const originalGood = Partial.prototype.good;
     expect(() =>
       prepend(Partial.prototype, {
-        good: (s: Function) => `wrapped-${s.call(undefined)}`,
-        missing: (s: Function) => s,
+        good: (s: (...args: unknown[]) => unknown) => `wrapped-${s.call(undefined)}`,
+        missing: (s: (...args: unknown[]) => unknown) => s,
       }),
     ).toThrow(/missing/);
     // `good` must NOT have been wrapped — atomicity guarantee.
@@ -188,12 +188,12 @@ describe("prepend", () => {
       }
     }
     prepend(Greeter.prototype, {
-      hi(super_: Function) {
+      hi(super_: (...args: unknown[]) => unknown) {
         return `a-${super_.call(this)}`;
       },
     });
     prepend(Greeter.prototype, {
-      hi(super_: Function) {
+      hi(super_: (...args: unknown[]) => unknown) {
         return `b-${super_.call(this)}`;
       },
     });

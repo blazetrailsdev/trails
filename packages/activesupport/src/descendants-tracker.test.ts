@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { DescendantsTracker } from "./descendants-tracker.js";
 
 describe("DescendantsTrackerTest", () => {
-  let Parent: Function;
-  let Child1: Function;
-  let Child2: Function;
-  let Grandchild1: Function;
-  let Grandchild2: Function;
+  let Parent: abstract new (...args: unknown[]) => unknown;
+  let Child1: abstract new (...args: unknown[]) => unknown;
+  let Child2: abstract new (...args: unknown[]) => unknown;
+  let Grandchild1: abstract new (...args: unknown[]) => unknown;
+  let Grandchild2: abstract new (...args: unknown[]) => unknown;
 
   beforeEach(() => {
     Parent = class Parent {};

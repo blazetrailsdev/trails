@@ -1,4 +1,4 @@
-import { DescendantsTracker } from "./descendants-tracker.js";
+import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 
 /**
  * Module extensions mirroring Rails ActiveSupport module/class extensions.
@@ -275,7 +275,7 @@ export function attrInternal(target: object, ...names: string[]): void {
  * isAnonymous — returns true if a class/function has no name.
  * Mirrors Ruby's Module#anonymous?.
  */
-export function isAnonymous(klass: Function): boolean {
+export function isAnonymous(klass: { name: string }): boolean {
   return !klass.name || klass.name === "";
 }
 
@@ -283,7 +283,7 @@ export function isAnonymous(klass: Function): boolean {
  * moduleParentName — returns the parent namespace name of a class (best-effort in JS).
  * In Ruby this would parse the constant path. In JS/TS we can only go by convention.
  */
-export function moduleParentName(klass: Function): string | null {
+export function moduleParentName(klass: { name: string }): string | null {
   const name = klass.name ?? "";
   const parts = name.split("::");
   if (parts.length <= 1) return null;
@@ -308,15 +308,15 @@ export function suppress<T>(
 
 // ── Descendants tracking ──────────────────────────────────────────────────────
 
-export function registerSubclass(parent: Function, child: Function): void {
+export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   DescendantsTracker.registerSubclass(parent, child);
 }
 
-export function subclasses(klass: Function): Function[] {
+export function subclasses(klass: AnyClass): AnyClass[] {
   return DescendantsTracker.subclasses(klass);
 }
 
-export function descendants(klass: Function): Function[] {
+export function descendants(klass: AnyClass): AnyClass[] {
   return DescendantsTracker.descendants(klass);
 }
 
