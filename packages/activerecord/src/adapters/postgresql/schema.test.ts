@@ -738,28 +738,75 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaIndexIncludeColumnsTest", () => {
-    it.skip("schema dumps index included columns", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("schema dumps index included columns", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, firm_id integer, type varchar(50), name varchar(50), account_id integer)`,
+        );
+        if (adapter.supportsIndexInclude()) {
+          await adapter.exec(
+            `CREATE INDEX company_include_index ON trains USING btree(firm_id, type) INCLUDE (name, account_id)`,
+          );
+        } else {
+          await adapter.exec(
+            `CREATE INDEX company_include_index ON trains USING btree(firm_id, type)`,
+          );
+        }
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        const indexLine = lines
+          .join("\n")
+          .split("\n")
+          .find((l) => l.includes("company_include_index"))
+          ?.trim();
+        if (adapter.supportsIndexInclude()) {
+          expect(indexLine).toContain(`include: ["name","account_id"]`);
+        } else {
+          expect(indexLine).not.toContain("include:");
+        }
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
   });
 
   describe("SchemaIndexNullsNotDistinctTest", () => {
-    it.skip("nulls not distinct is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("nulls not distinct is dumped", async () => {
+      try {
+        await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
+        if (!adapter.supportsNullsNotDistinct()) return;
+        await adapter.exec(
+          `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain("nullsNotDistinct: true");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
-    it.skip("nulls distinct is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("nulls distinct is dumped", async () => {
+      try {
+        await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
+        if (!adapter.supportsNullsNotDistinct()) return;
+        await adapter.exec(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).not.toContain("nullsNotDistinct");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
-    it.skip("nulls not set is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("nulls not set is dumped", async () => {
+      try {
+        await adapter.exec(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
+        await adapter.exec(`CREATE INDEX trains_name ON trains USING btree(name)`);
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).not.toContain("nullsNotDistinct");
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
   });
 
