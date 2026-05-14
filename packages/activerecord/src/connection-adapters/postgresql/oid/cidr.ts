@@ -5,7 +5,7 @@
  *
  * Rails: `class Cidr < Type::Value`. cast_value parses a String into an
  * IPAddr; serialize renders it back as "addr/prefix". TypeScript has no
- * stdlib IPAddr, so we provide IpAddr as a lightweight equivalent.
+ * stdlib IPAddr, so we provide IPAddr as a lightweight equivalent.
  */
 
 import { ValueType } from "@blazetrails/activemodel";
@@ -14,7 +14,7 @@ import { ValueType } from "@blazetrails/activemodel";
  * Lightweight equivalent of Ruby's IPAddr, carrying address + prefix length.
  * Mirrors the Rails IPAddr shape used by Cidr#serialize and Cidr#changed?.
  */
-export class IpAddr {
+export class IPAddr {
   constructor(
     readonly address: string,
     readonly prefixLength: number,
@@ -31,18 +31,18 @@ export class IpAddr {
   }
 }
 
-export class Cidr extends ValueType<IpAddr> {
+export class Cidr extends ValueType<IPAddr> {
   readonly name: string = "cidr";
 
   override type(): string {
     return "cidr";
   }
 
-  cast(value: unknown): IpAddr | null {
+  cast(value: unknown): IPAddr | null {
     return this.castValue(value);
   }
 
-  override deserialize(value: unknown): IpAddr | null {
+  override deserialize(value: unknown): IPAddr | null {
     return this.castValue(value);
   }
 
@@ -50,11 +50,11 @@ export class Cidr extends ValueType<IpAddr> {
    * Rails Cidr#serialize:
    *   if IPAddr === value then "#{value}/#{value.prefix}" else value
    * "#{value}" calls IPAddr#to_s (address only); we mirror that via toString().
-   * Non-IpAddr values are coerced to string via String() (Rails returns them
+   * Non-IPAddr values are coerced to string via String() (Rails returns them
    * as-is, but our return type is string | null so coercion is required).
    */
   override serialize(value: unknown): string | null {
-    if (value instanceof IpAddr) return `${value}/${value.prefixLength}`;
+    if (value instanceof IPAddr) return `${value}/${value.prefixLength}`;
     if (value == null) return null;
     return String(value);
   }
@@ -66,7 +66,7 @@ export class Cidr extends ValueType<IpAddr> {
    * Ruby's IPAddr#eql? compares only the address bits (not the prefix), hence
    * the explicit prefix guard. We normalise both sides to { address, prefix }
    * so the comparison is always prefix-aware regardless of whether the caller
-   * supplies strings or IpAddr instances.
+   * supplies strings or IPAddr instances.
    */
   override isChanged(
     oldValue: unknown,
@@ -86,9 +86,9 @@ export class Cidr extends ValueType<IpAddr> {
    *   String → IPAddr.new(value) or nil on ArgumentError
    *   else → value (pass-through for existing IPAddr instances)
    */
-  castValue(value: unknown): IpAddr | null {
+  castValue(value: unknown): IPAddr | null {
     if (value == null) return null;
-    if (value instanceof IpAddr) return value;
+    if (value instanceof IPAddr) return value;
     if (typeof value !== "string") return null;
     return parseIpAddr(value);
   }
@@ -97,12 +97,12 @@ export class Cidr extends ValueType<IpAddr> {
    * Rails Cidr#type_cast_for_schema:
    *   if value.prefix == 32 then "\"#{value}\"" else "\"#{value}/#{value.prefix}\""
    *
-   * Rails omits the prefix for any IpAddr with prefix == 32, regardless of
+   * Rails omits the prefix for any IPAddr with prefix == 32, regardless of
    * IP version (this means IPv6 /32 is also elided — Rails does not special-case it).
    * "#{value}" calls IPAddr#to_s which returns just the address string.
    */
   override typeCastForSchema(value: unknown): string {
-    if (value instanceof IpAddr) {
+    if (value instanceof IPAddr) {
       if (value.prefixLength === 32) return JSON.stringify(value.address);
       return JSON.stringify(`${value.address}/${value.prefixLength}`);
     }
@@ -112,7 +112,7 @@ export class Cidr extends ValueType<IpAddr> {
 
 function toComparable(value: unknown): { address: string; prefix: number } | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof IpAddr) return { address: value.address, prefix: value.prefixLength };
+  if (value instanceof IPAddr) return { address: value.address, prefix: value.prefixLength };
   if (typeof value === "string") {
     const ip = parseIpAddr(value);
     if (ip === null) return null;
@@ -122,25 +122,25 @@ function toComparable(value: unknown): { address: string; prefix: number } | nul
 }
 
 /**
- * Parses a CIDR/inet string into an IpAddr. Mirrors IPAddr.new(str): returns
+ * Parses a CIDR/inet string into an IPAddr. Mirrors IPAddr.new(str): returns
  * null for invalid input (Rails raises ArgumentError, which cast_value rescues).
  * Defaults to /32 for IPv4 and /128 for IPv6 when no prefix is specified.
  */
-function parseIpAddr(value: string): IpAddr | null {
+function parseIpAddr(value: string): IPAddr | null {
   if (value === "") return null;
   const slash = value.indexOf("/");
   const address = slash === -1 ? value : value.slice(0, slash);
   const prefixStr = slash === -1 ? null : value.slice(slash + 1);
 
   if (isIpv4(address)) {
-    if (prefixStr == null) return new IpAddr(address, 32);
+    if (prefixStr == null) return new IPAddr(address, 32);
     if (!isValidPrefix(prefixStr, 32)) return null;
-    return new IpAddr(address, Number(prefixStr));
+    return new IPAddr(address, Number(prefixStr));
   }
   if (isIpv6(address)) {
-    if (prefixStr == null) return new IpAddr(address, 128);
+    if (prefixStr == null) return new IPAddr(address, 128);
     if (!isValidPrefix(prefixStr, 128)) return null;
-    return new IpAddr(address, Number(prefixStr));
+    return new IPAddr(address, Number(prefixStr));
   }
   return null;
 }

@@ -160,14 +160,14 @@ describe("PostgresqlNetworkTest", () => {
 
   it("invalid network address", () => {
     // Rails: test_invalid_network_address — IPAddr.new raises on garbage,
-    // so Cidr#cast_value returns nil. cast returns IpAddr on valid input.
+    // so Cidr#cast_value returns nil. cast returns IPAddr on valid input.
     const type = new Cidr();
     expect(type.cast("invalid addr")).toBeNull();
     expect(type.cast("not-an-ip")).toBeNull();
     expect(type.cast(42)).toBeNull();
     // Out-of-range prefixes are rejected too.
     expect(type.cast("192.168.1.0/999")).toBeNull();
-    // Valid inputs produce IpAddr with correct address + prefixLength.
+    // Valid inputs produce IPAddr with correct address + prefixLength.
     expect(type.cast("192.168.1.1")).toMatchObject({ address: "192.168.1.1", prefixLength: 32 });
     expect(type.cast("192.168.1.0/24")).toMatchObject({ address: "192.168.1.0", prefixLength: 24 });
     expect(type.cast("::1")).toMatchObject({ address: "::1", prefixLength: 128 });
