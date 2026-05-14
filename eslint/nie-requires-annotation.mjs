@@ -82,10 +82,7 @@ const rule = {
             fix(fixer) {
               const lineText = sourceCode.lines[node.loc.start.line - 1] ?? "";
               const indent = (lineText.match(/^(\s*)/) || ["", ""])[1];
-              return fixer.insertTextBeforeRange(
-                node.range,
-                `// @nie disposition=TODO\n${indent}`,
-              );
+              return fixer.insertTextBeforeRange(node.range, `// @nie disposition=TODO\n${indent}`);
             },
           });
           return;
