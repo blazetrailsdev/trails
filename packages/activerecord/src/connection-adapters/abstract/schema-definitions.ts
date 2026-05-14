@@ -994,6 +994,10 @@ export class TableDefinition {
         case "char":
           parts.push(`CHAR(${col.options.limit ?? 1})`);
           break;
+        default:
+          // Pass arbitrary type strings through verbatim (case matters for PG enums).
+          parts.push(col.type);
+          break;
       }
 
       // For types that don't handle PRIMARY KEY internally, append it if requested

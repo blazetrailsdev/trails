@@ -1583,33 +1583,113 @@ describe("MigrationTest", () => {
     // Requires schema cache implementation
   });
 
-  it.skip("add drop table with prefix and suffix", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    /* needs prefix/suffix auto-applied by MigrationContext.createTable/dropTable */
+  it("add drop table with prefix and suffix", async () => {
+    const adapter = freshAdapter();
+    const savedPrefix = Base.tableNamePrefix;
+    const savedSuffix = Base.tableNameSuffix;
+    Base.tableNamePrefix = "prefix_";
+    Base.tableNameSuffix = "_suffix";
+    try {
+      class WeNeedReminders extends Migration {
+        async up() {
+          await this.createTable("reminders", (t) => {
+            t.text("content");
+          });
+        }
+        async down() {
+          await this.dropTable("reminders");
+        }
+      }
+
+      const m = new WeNeedReminders();
+      await m.run(adapter, "up");
+      // Use adapter quoting so MySQL (no ANSI_QUOTES) works alongside PG/SQLite.
+      const qt = adapter.quoteTableName("prefix_reminders_suffix");
+      const qc = adapter.quoteIdentifier("content");
+      await adapter.executeMutation(`INSERT INTO ${qt} (${qc}) VALUES ('hello')`);
+      const rows = await adapter.execute(`SELECT * FROM ${qt}`);
+      expect(rows).toHaveLength(1);
+
+      await m.run(adapter, "down");
+      expect(await m.tableExists("reminders")).toBe(false);
+
+      // Exercises addColumn + renameTable (both args prefixed per Rails method_missing)
+      // and change()-based reversal without double-applying prefix/suffix.
+      class ChangeBased extends Migration {
+        async change() {
+          await this.createTable("widgets", (t) => t.string("name"));
+          await this.addColumn("widgets", "price", "integer");
+          await this.renameTable("widgets", "gadgets");
+        }
+      }
+      const cb = new ChangeBased();
+      await cb.run(adapter, "up");
+      expect(await cb.tableExists("gadgets")).toBe(true);
+      expect(await cb.columnExists("gadgets", "price")).toBe(true);
+      await cb.run(adapter, "down");
+      expect(await cb.tableExists("gadgets")).toBe(false);
+      expect(await cb.tableExists("widgets")).toBe(false);
+    } finally {
+      Base.tableNamePrefix = savedPrefix;
+      Base.tableNameSuffix = savedSuffix;
+    }
   });
 
-  it.skip("create table with query", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires DDL migration runner
+  it.skipIf(adapterType === "mysql")("create table with query", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("people_src", {}, (t) => {
+      t.integer("person_id");
+    });
+    await adapter.executeMutation(`INSERT INTO "people_src" ("person_id") VALUES (1)`);
+
+    await ctx.createTable("table_from_query_testings", {
+      as: `SELECT person_id FROM people_src WHERE person_id = 1`,
+    });
+    const rows = await adapter.execute(`SELECT * FROM "table_from_query_testings"`);
+    expect(rows).toHaveLength(1);
+    expect(ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
+
+    await ctx.dropTable("table_from_query_testings");
+    await ctx.dropTable("people_src");
   });
 
-  it.skip("create table with query from relation", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires DDL migration runner
+  it.skipIf(adapterType === "mysql")("create table with query from relation", async () => {
+    const adapter = freshAdapter();
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("people_src2", {}, (t) => {
+      t.integer("person_id");
+    });
+    await adapter.executeMutation(`INSERT INTO "people_src2" ("person_id") VALUES (1)`);
+
+    // Build a relation SQL string directly (mirrors Rails `Person.select(:id).where(id: 1).to_sql`)
+    const sql = `SELECT "people_src2"."person_id" FROM "people_src2" WHERE "people_src2"."person_id" = 1`;
+    await ctx.createTable("table_from_query_testings2", { as: sql });
+    const rows = await adapter.execute(`SELECT * FROM "table_from_query_testings2"`);
+    expect(rows).toHaveLength(1);
+
+    await ctx.dropTable("table_from_query_testings2");
+    await ctx.dropTable("people_src2");
   });
 
-  it.skip("allows sqlite3 rollback on invalid column type", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires real database adapter
-  });
+  it.skipIf(adapterType !== "sqlite")(
+    "allows sqlite3 rollback on invalid column type",
+    async () => {
+      const adapter = freshAdapter();
+      const ctx = new MigrationContext(adapter);
+      await ctx.createTable("something", { force: true }, (t) => {
+        t.integer("number");
+        t.string("name");
+        t.column("foo", "bar" as any);
+      });
+      expect(ctx.columnExists("something", "foo")).toBe(true);
+      await ctx.removeColumn("something", "foo");
+      expect(ctx.columnExists("something", "foo")).toBe(false);
+      expect(ctx.columnExists("something", "name")).toBe(true);
+      expect(ctx.columnExists("something", "number")).toBe(true);
+      await ctx.dropTable("something");
+    },
+  );
 
   it.skip("migrator generates valid lock id", () => {
     // BLOCKED: migration — migration runner gap in migration
@@ -1618,11 +1698,16 @@ describe("MigrationTest", () => {
     // Requires migration runner
   });
 
-  it.skip("generate migrator advisory lock id", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it.skipIf(adapterType === "sqlite")("generate migrator advisory lock id", async () => {
+    // Bypass the SchemaAdapter wrapper — generateMigratorAdvisoryLockId needs
+    // currentDatabase(), which lives on the real adapter (pg/mysql), not the wrapper.
+    const testAdapter = createTestAdapter();
+    const realAdapter = testAdapter.innerAdapter;
+    const migrator = new Migrator(realAdapter, []);
+    const lockId = await migrator.generateMigratorAdvisoryLockId();
+    // Must fit in a signed 63-bit integer
+    expect(lockId).toBeGreaterThanOrEqual(0n);
+    expect(lockId.toString(2).length).toBeLessThanOrEqual(63);
   });
 
   it.skip("migrator one up with unavailable lock", () => {
@@ -2113,11 +2198,25 @@ describe("MigrationTest", () => {
         expect(new LongV().version).toBe("123456789012345");
       });
 
-      it.skip("migration raises if timestamp is future date", () => {
-        // BLOCKED: migration — migration runner gap in migration
-        // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-        // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-        /* timestamp validation not implemented */
+      it("migration raises if timestamp is future date", () => {
+        const savedValidate = Migrator.validateMigrationTimestamps;
+        try {
+          Migrator.validateMigrationTimestamps = true;
+          // A timestamp far in the future (year 9999) is definitely > tomorrow
+          const ts = "99991231235959";
+          class FutureM extends Migration {
+            static version = ts;
+            async change() {}
+          }
+          expect(
+            () =>
+              new Migrator(createTestAdapter(), [
+                { name: "test_migration", version: ts, migration: () => new FutureM() },
+              ]),
+          ).toThrow(/Invalid timestamp/);
+        } finally {
+          Migrator.validateMigrationTimestamps = savedValidate;
+        }
       });
 
       it("migration succeeds if timestamp is less than one day in the future", () => {

@@ -100,6 +100,7 @@ const loadSignedId = async () => {
   }
   return _signedIdModulePromise;
 };
+import { registerMigrationArConfig } from "./migration.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import { hookAttributeType as tzHookAttributeType } from "./attribute-methods/time-zone-conversion.js";
@@ -3427,3 +3428,12 @@ _setSuperValidates(Model.validates);
     });
   }
 }
+
+registerMigrationArConfig({
+  get tableNamePrefix() {
+    return Base._tableNamePrefix;
+  },
+  get tableNameSuffix() {
+    return Base._tableNameSuffix;
+  },
+});
