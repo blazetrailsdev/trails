@@ -28,7 +28,8 @@
     "stats:sync": "pnpm tsx scripts/sync-stats/sync.ts",
     "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
     "parity:schema": "pnpm tsx scripts/parity/run.ts --type=schema",
-    "parity:query": "pnpm tsx scripts/parity/run.ts --type=query"
+    "parity:query": "pnpm tsx scripts/parity/run.ts --type=query",
+    "vendor:fetch": "pnpm tsx vendor/fetch.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
