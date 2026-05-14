@@ -31,7 +31,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     try {
       await adapter.exec(`DROP TABLE IF EXISTS "Items" CASCADE`);
       const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items'))`,
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND (tablename LIKE 'ex_%' OR tablename IN ('pk_test', 'no_pk_test', 'exec_test', 'items', 'ex_insert_ret', 'ex_insert_ret2', 'ex_insert_ret3', 'ex_insert_ret4', 'ex_insert_ret5'))`,
       );
       for (const t of tables) {
         await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
@@ -651,14 +651,87 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(pk).toBe("custom_id");
     });
 
-    it.skip("exec insert with returning disabled and no sequence name given", async () => {
-      // BLOCKED: execInsert() with sequence-name fallback not yet ported to TS.
+    it("exec insert with returning disabled and no sequence name given", async () => {
+      await adapter.exec(`CREATE TABLE "ex_insert_ret" ("id" SERIAL PRIMARY KEY, "number" INT)`);
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "ex_insert_ret" ("number") VALUES (1)`,
+          null,
+          [],
+          "id",
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect(Number((result as any).rows[0][0])).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
     });
-    it.skip("exec insert default values with returning disabled and no sequence name given", async () => {
-      // BLOCKED: Same as above.
+    it("exec insert default values with returning disabled and no sequence name given", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_insert_ret2" ("id" SERIAL PRIMARY KEY, "number" INT DEFAULT 0)`,
+      );
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "ex_insert_ret2" DEFAULT VALUES`,
+          null,
+          [],
+          "id",
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret2"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect(Number((result as any).rows[0][0])).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
     });
-    it.skip("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {
-      // BLOCKED: Same as above; schema-qualified parsing also required.
+    it("exec insert default values quoted schema with returning disabled and no sequence name given", async () => {
+      await adapter.exec(
+        `CREATE TABLE "ex_insert_ret3" ("id" SERIAL PRIMARY KEY, "number" INT DEFAULT 0)`,
+      );
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "public"."ex_insert_ret3" DEFAULT VALUES`,
+          null,
+          [],
+          "id",
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret3"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect(Number((result as any).rows[0][0])).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
+    });
+
+    it("exec insert with returning disabled and no pk or sequence name given", async () => {
+      await adapter.exec(`CREATE TABLE "ex_insert_ret5" ("id" SERIAL PRIMARY KEY, "number" INT)`);
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "ex_insert_ret5" ("number") VALUES (1)`,
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret5"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect(Number((result as any).rows[0][0])).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
     });
 
     it("serial sequence", async () => {
@@ -1105,8 +1178,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       const exists = await adapter.databaseExists("nonexistent_db_xyz_12345");
       expect(exists).toBe(false);
     });
-    it.skip("exec insert with returning disabled", () => {
-      // BLOCKED: Same as "exec insert with returning disabled and no sequence name given".
+    it("exec insert with returning disabled", async () => {
+      await adapter.exec(`CREATE TABLE "ex_insert_ret4" ("id" SERIAL PRIMARY KEY, "number" INT)`);
+      const noReturn = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        insertReturning: false,
+      });
+      try {
+        const result = await noReturn.execInsert(
+          `INSERT INTO "ex_insert_ret4" ("number") VALUES (1)`,
+          null,
+          [],
+          "id",
+          "ex_insert_ret4_id_seq",
+        );
+        const rows = await noReturn.execute(`SELECT max(id) AS max_id FROM "ex_insert_ret4"`);
+        const maxId = Number(rows[0]["max_id"]);
+        expect(Number((result as any).rows[0][0])).toBe(maxId);
+      } finally {
+        await noReturn.close();
+      }
     });
 
     it("pk and sequence for", async () => {

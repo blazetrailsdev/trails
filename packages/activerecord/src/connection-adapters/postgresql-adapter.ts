@@ -65,12 +65,18 @@ import {
   transactionIsolationLevels,
   typeCastedBinds,
   temporalToBindString,
+  extractTableRefFromInsertSql,
 } from "./abstract/database-statements.js";
 import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-type-parsers.js";
 
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
-import { READ_QUERY, executeBatch as pgExecuteBatch } from "./postgresql/database-statements.js";
+import {
+  READ_QUERY,
+  executeBatch as pgExecuteBatch,
+  suppressCompositePrimaryKey,
+  castResult,
+} from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions, PgIndexDefinition } from "./postgresql/schema-statements.js";
 import {
   ExclusionConstraintDefinition,
@@ -1065,6 +1071,47 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * (postgresql_adapter.rb:901-906).
    */
   /** @internal Mirrors: PostgreSQL::DatabaseStatements#handle_warnings */
+  /**
+   * Run a single query on an already-acquired client with the same
+   * instrumentation, exception translation, and warning flushing that
+   * execQuery/executeMutation use. Used when two queries must share a
+   * session (e.g. INSERT + SELECT currval in the returning-disabled path).
+   * @internal
+   */
+  private async _instrumentedQueryOnClient(
+    client: pg.PoolClient,
+    sql: string,
+    name: string,
+    binds: unknown[],
+  ): Promise<Result> {
+    const castBinds = typeCastedBinds(binds);
+    const bindArray = castBinds.map((v) => temporalToBindString(v, "postgres"));
+    const rewritten = this.rewriteBinds(sql, bindArray);
+    this._noticeReceiverSqlWarnings = [];
+    const payload: Record<string, unknown> = {
+      sql: rewritten,
+      name,
+      binds,
+      type_casted_binds: bindArray,
+      connection: this,
+      row_count: 0,
+    };
+    const pgResult = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        const r = await this._runQuery(client, rewritten, bindArray, { rowMode: "array" });
+        payload.row_count = (r as pg.QueryResult).rowCount ?? 0;
+        return r as pg.QueryResult;
+      } catch (e: any) {
+        const translated = this._translateException(e, rewritten, bindArray);
+        payload.exception = translated;
+        payload.exception_object = translated;
+        throw translated;
+      }
+    });
+    this._flushWarnings(rewritten);
+    return castResult.call(this, pgResult);
+  }
+
   private _flushWarnings(sql?: string): void {
     const actionable = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
     const ctor = this.constructor as typeof PostgreSQLAdapter;
@@ -1698,6 +1745,45 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Mirrors: PostgreSQLAdapter#use_insert_returning? (postgresql_adapter.rb:630)
   isUseInsertReturning(): boolean {
     return this._useInsertReturning;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#exec_insert
+   * @internal
+   */
+  override async execInsert(
+    sql: string,
+    name?: string | null,
+    binds: unknown[] = [],
+    pk?: string | null,
+    sequenceName?: string | null,
+    returning?: string[] | null,
+  ): Promise<Result | number> {
+    if (this._useInsertReturning) {
+      return super.execInsert(sql, name, binds, pk as string | null, sequenceName, returning);
+    }
+    // Resolve sequence name before acquiring the INSERT client so the
+    // metadata queries (primaryKey, defaultSequenceName) don't consume
+    // an extra connection while the INSERT client is held.
+    if (!sequenceName) {
+      const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
+      if (tableRef) {
+        if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
+        const resolvedPk = suppressCompositePrimaryKey(pk ?? undefined);
+        sequenceName = resolvedPk ? await this.defaultSequenceName(tableRef, resolvedPk) : null;
+      }
+    }
+    this.checkIfWriteQuery(sql);
+    await this.materializeTransactions();
+    // currval() is session-scoped: INSERT and SELECT currval(...) must
+    // run on the same connection. withClient() pins both to one client.
+    return this.withClient(async (client) => {
+      this.dirtyCurrentTransaction();
+      const insertResult = await this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
+      if (!sequenceName) return insertResult;
+      const currvalSql = `SELECT currval(${this.quote(sequenceName)})`;
+      return this._instrumentedQueryOnClient(client, currvalSql, "SQL", []);
+    });
   }
 
   /** Returns true for raw pg errors that indicate the database doesn't exist (SQLSTATE 3D000). */
