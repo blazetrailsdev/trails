@@ -8,7 +8,7 @@
   - `scripts/api-compare/.rack-source/` — full git clone of `rack/rack` @ `v3.1.14` (created by `fetch-rails-tests.sh`, not `fetch-rails.sh` — surprising)
   - `scripts/globalid-source/vendor/bundle/ruby/*/gems/globalid-*/` — bundler-vendored gem
   - `scripts/parity/schema/ruby/` — independent `Gemfile` re-pinning `activerecord 8.0.2` (cross-script version drift risk)
-- **3 places hardcode source paths** (5 lines total): `scripts/api-compare/extract-ruby-api.rb:14`, `scripts/test-compare/extract-ruby-tests.rb:18-19`, `scripts/start-worktree.sh:154-155`. A 4th, separate concern is `scripts/parity/schema/ruby/Gemfile:5` — a version pin, not a path, manually kept in sync with `RAILS_TAG`.
+- **3 script-level path hardcoders** (5 lines): `scripts/api-compare/extract-ruby-api.rb:14`, `scripts/test-compare/extract-ruby-tests.rb:18-19`, `scripts/start-worktree.sh:154-155`. Additionally, `scripts/parity/schema/ruby/Gemfile:5` pins the activerecord version (not a path). Several docs also reference the old paths in prose (`docs/actionpack-restructure-audit.md`, `docs/actioncontroller-100-percent.md`, `docs/globalid-plan.md`); wave 7 includes a doc sweep so prose references migrate alongside the scripts.
 - **GlobalID is fetched but not wired**: `PACKAGES` in `scripts/api-compare/config.ts:7` lists no `globalid`; nothing in `scripts/test-compare/` references it. The fetcher exists in isolation.
 - **Rack is wired into test-compare but bundled inside the rails-tests fetcher** — another precedent for a per-script ad-hoc origin, hidden from the api-compare path.
 
@@ -38,7 +38,7 @@ The fix is one source list, one fetcher, one layout. This doc designs it; implem
 - Origin: `bundle install` against a 2-line `Gemfile` pinning `globalid 1.3.0`.
 - Dest: `scripts/globalid-source/vendor/bundle/ruby/<ruby-version>/gems/globalid-<version>/`.
 - Idempotency: skips when `vendor/bundle` exists.
-- Consumers: **none today.** Not referenced in `api-compare/`, `test-compare/`, or `start-worktree.sh`. It is dead infrastructure.
+- Consumers: **no automated consumers** (`api-compare/`, `test-compare/`, `start-worktree.sh` all ignore it). `docs/globalid-plan.md` instructs running it by hand and points at the vendored path, so it has prose consumers but is effectively dead from a tooling perspective.
 
 ### 1.4 Duplication tally
 
@@ -227,13 +227,13 @@ Consumers migrate as follows:
 
 ## 5. GlobalID as proof
 
-State today: GlobalID has a fetcher but **zero downstream wiring**. Grep confirms no references in `scripts/api-compare/` or `scripts/test-compare/`. The TS package `@blazetrails/globalid` would need to land in `PACKAGES` (it isn't there as of `config.ts:7-17`).
+State today: GlobalID has a fetcher but **zero downstream tooling wiring**. The TS package already exists at `packages/globalid/`; the missing piece is its entry in `scripts/api-compare/config.ts`'s `PACKAGES` array (lines 7-17, no `globalid` key). Grep also confirms no references in `scripts/test-compare/`.
 
 Validation flow once the design lands:
 
 1. Add globalid to `SOURCES` (already in §2.2).
 2. Add `globalid` to the TS package list, or rely on `PACKAGES` being derived from `SOURCES` (preferred — that's the whole point).
-3. Run `pnpm vendor:fetch --source globalid`; the fetcher symlinks the gem's `lib/` and `test/` under `vendor/globalid/`.
+3. Run `pnpm vendor:fetch --source globalid`; the fetcher does a shallow clone of `rails/globalid @ v1.3.0` to `vendor/globalid/` (per §2.1, git-only — no bundler/symlink).
 4. `pnpm api:compare` and `pnpm test:compare` pick it up automatically.
 
 Test count: deferred. Wave 3 clones `rails/globalid` at `v1.3.0`; wave 6 quotes whatever `find vendor/globalid/test -name "*_test.rb" | wc -l` reports.
@@ -330,7 +330,7 @@ If all three caches hit, the `ruby-extract` job becomes a pure download step (~3
 - **Bundler in CI**: not needed for the unified fetcher (git-only origins). The parity-rails job (§7.5 wave 7) still uses bundler against a generated Gemfile, but that's localized to the schema-parity ruby workload and uses the bundle cache already set up at `.github/workflows/ci.yml:432-437`. TS-only contributors can run `pnpm vendor:fetch` with just `git`.
 - **In-flight worktrees during migration**: per §2.3, wave 2 lands the path move in one PR with no compat symlink. Active agents must be paused at merge time and re-linked on next `start-worktree.sh` run. The master clone is relocated by a plain filesystem `mv` (the dir is gitignored, so this is _not_ a tracked rename); `fetch.ts` re-clones if the old path is absent. Avoids a ~53 MiB re-clone when the existing dir is present.
 - **Extractor cache gate**: `scripts/api-compare/extract-ruby-api.rb:25-28` caches by comparing `output_path` mtime against `<RAILS_DIR>/.git/HEAD` mtime — not the tag string. After wave 4 moves `RAILS_DIR` to `vendor/rails/`, the gate still works (the path moves but the `.git/HEAD` mtime semantics are identical). Since all origins are git (per §2.1), every vendored source has a `.git/HEAD` and the existing mechanism applies uniformly.
-- **Cross-doc coordination**: the parallel `docs/rails-file-structure-mirror-plan.md` (planned, not yet in repo) is designing a Ruby-aware mirror tool that **must** consume the same `SOURCES` list. Both plans should converge on `vendor/sources.ts` as the single registry. Action item: cross-link this doc from the mirror plan when it lands.
+- **Cross-doc coordination**: the parallel `docs/rails-file-structure-mirror-plan.md` (PR #1551, open) designs a Ruby-aware mirror lint that reads Rails source through the same `vendor/rails/` path this plan creates. #1551's preamble already commits to migrating its path references from `scripts/api-compare/.rails-source/` to `vendor/rails/` once this PR merges, so both orderings work — but **the recommended sequence is #1552 → #1551**, since #1551's wave 1 ("Ruby analyzer pass") wants to read from the new location directly rather than write code against the old path and rewrite it. If #1551 lands first, its implementing waves take a follow-up commit to retarget paths.
 - **`parity/schema/ruby/Gemfile` drift**: resolved per §2.3 — wave 7 generates the Gemfile from `SOURCES` at parity-run time.
 - **Future non-git gems**: if a future upstream isn't on GitHub or isn't tagged, the schema gains a bundler-origin variant — but with a _separate_ fetcher path that copies `lib/` _and_ clones `test/` from any available repo, since rubygems alone won't have tests. Defer until needed.
 
@@ -345,7 +345,7 @@ If all three caches hit, the `ruby-extract` job becomes a pure download step (~3
 
 ## 10. Cross-references
 
-- `docs/rails-file-structure-mirror-plan.md` (planned, not yet in repo) — parallel plan; must consume the same `vendor/sources.ts`.
+- `docs/rails-file-structure-mirror-plan.md` (PR #1551, open) — parallel plan; consumes `vendor/rails/` from this design. Recommended merge order: this PR (#1552) first, then #1551.
 - `scripts/api-compare/conventions.ts` — naming-exception registry; unaffected by this work but consulted by downstream tools that _do_ change.
 - PR #1483 — full clone replaced sparse-checkout in `fetch-rails.sh`; the new fetcher inherits the same full-clone policy.
 - Memory: `reference_rails_source_path.md` — must be updated in wave 7.
