@@ -862,17 +862,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ).sum(column);
   }
 
-  async average(column: string): Promise<number | null | Record<string, number>> {
+  async average(column: string): Promise<unknown | null | Record<string, unknown>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        average: (col: string) => Promise<number | null | Record<string, number>>;
+        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
       }
     ).average;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
-      s as unknown as { average: (col: string) => Promise<number | null | Record<string, number>> }
+      s as unknown as {
+        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+      }
     ).average(column);
   }
 
@@ -1968,7 +1970,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async calculate(
     operation: "average",
     column: string,
-  ): Promise<number | null | Record<string, number>>;
+  ): Promise<unknown | null | Record<string, unknown>>;
   async calculate(
     operation: "minimum" | "maximum",
     column: string,

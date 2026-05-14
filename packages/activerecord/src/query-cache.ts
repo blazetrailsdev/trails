@@ -510,7 +510,7 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    pk?: string | null,
+    pk?: string | false | null,
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {

@@ -392,7 +392,7 @@ export function execInsert(
   sql: string,
   name?: string | null,
   binds: unknown[] = [],
-  pk?: string | null,
+  pk?: string | false | null,
   _sequenceName?: string | null,
   returning?: string[] | null,
 ): Promise<Result> {
@@ -1377,7 +1377,7 @@ export const DatabaseStatements = {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    _pk?: string | null,
+    _pk?: string | false | null,
     _sequenceName?: string | null,
   ): Promise<number> {
     return this.executeMutation(sql, binds, name ?? "SQL");
@@ -1789,13 +1789,16 @@ export async function select(
 export function sqlForInsert(
   this: DatabaseStatementsHost,
   sql: string,
-  pk: string | null | undefined,
+  pk: string | false | null | undefined,
   binds: unknown[],
   returning: string[] | null | undefined,
 ): [string, unknown[]] {
   if (this.supportsInsertReturning?.()) {
-    let resolvedPk = pk;
-    if (resolvedPk == null) {
+    // Mirrors Rails: `pk == false` is the explicit caller opt-out — skip
+    // any pk-derived RETURNING column (caller may still pass `returning:`
+    // for an alternate column list).
+    let resolvedPk: string | null | undefined = pk === false ? null : pk;
+    if (pk !== false && resolvedPk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
       if (tableRef) resolvedPk = this.primaryKey?.(tableRef) ?? null;
     }

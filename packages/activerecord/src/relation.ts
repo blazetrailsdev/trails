@@ -2602,7 +2602,7 @@ export class Relation<T extends Base> {
   async calculate(
     operation: "average",
     column: string,
-  ): Promise<number | null | Record<string, number>>;
+  ): Promise<unknown | null | Record<string, unknown>>;
   async calculate(
     operation: "minimum" | "maximum",
     column: string,

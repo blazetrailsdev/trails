@@ -502,6 +502,36 @@ describe("sqlForInsert", () => {
     );
     expect(sql).toContain('RETURNING "id", "created_at"');
   });
+
+  it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", () => {
+    // Mirrors Rails sql_for_insert: pk=false signals the caller does not
+    // want any pk-derived RETURNING column. extractTableRefFromInsertSql /
+    // primaryKey lookup must be skipped too.
+    const host: DatabaseStatementsHost = {
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+      primaryKey: () => {
+        throw new Error("primaryKey() must not be called when pk=false");
+      },
+    };
+    const [sql] = sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
+    expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
+  });
+
+  it("still honours explicit returning list when pk=false", () => {
+    const host: DatabaseStatementsHost = {
+      supportsInsertReturning: () => true,
+      quoteColumnName: (c) => `"${c}"`,
+    };
+    const [sql] = sqlForInsert.call(
+      host,
+      "INSERT INTO t (x) VALUES (1)",
+      false,
+      [],
+      ["created_at"],
+    );
+    expect(sql).toBe(`INSERT INTO t (x) VALUES (1) RETURNING "created_at"`);
+  });
 });
 
 describe("arelFromRelation", () => {

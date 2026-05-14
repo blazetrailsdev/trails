@@ -1758,12 +1758,35 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds: unknown[] = [],
-    pk?: string | null,
+    pk?: string | false | null,
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
+    // Mirrors Rails: `if use_insert_returning? || pk == false`.
+    if (pk === false) {
+      // Explicit caller opt-out: skip the pk-derived RETURNING column.
+      // Cannot delegate to super here — our mixed-in DatabaseStatements
+      // default routes through executeMutation, which auto-appends
+      // `RETURNING id` for bare INSERTs when use_insert_returning is on
+      // (postgresql-adapter.ts:1238-1243). That would defeat the opt-out.
+      // Cannot use execQuery either — it intentionally skips
+      // materializeTransactions / dirtyCurrentTransaction (read-path
+      // optimisation), so an INSERT inside a lazy transaction would
+      // escape rollback. Use the same write-path scaffolding the
+      // pk-non-false branch below uses, just without the currval probe.
+      if (returning && returning.length > 0) {
+        const cols = returning.map((c) => this.quoteColumnName(c)).join(", ");
+        sql = `${sql} RETURNING ${cols}`;
+      }
+      this.checkIfWriteQuery(sql);
+      await this.materializeTransactions();
+      return this.withClient(async (client) => {
+        this.dirtyCurrentTransaction();
+        return this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
+      });
+    }
     if (this._useInsertReturning) {
-      return super.execInsert(sql, name, binds, pk as string | null, sequenceName, returning);
+      return super.execInsert(sql, name, binds, pk, sequenceName, returning);
     }
     // Resolve sequence name before acquiring the INSERT client so the
     // metadata queries (primaryKey, defaultSequenceName) don't consume
@@ -1772,7 +1795,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        const resolvedPk = suppressCompositePrimaryKey(pk ?? undefined);
+        const pkStr = typeof pk === "string" ? pk : null;
+        const resolvedPk = suppressCompositePrimaryKey(pkStr ?? undefined);
         sequenceName = resolvedPk ? await this.defaultSequenceName(tableRef, resolvedPk) : null;
       }
     }

@@ -100,22 +100,34 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(i.legacy_term).toBe("P1DT1H");
     });
 
-    it.skip("average interval type", async () => {
-      // BLOCKED: calculations — AVG(interval) aggregate not type-cast through Interval OID
-      // ROOT-CAUSE: calculations.ts average() does not consult the column's cast type
-      //   for aggregate results; AVG of interval returns a raw string instead of Duration.
-      // SCOPE: ~30 LOC — wire typeForAttribute through aggregate result coercion in calculations.ts.
-      // Rails behavior: assert_equal 3.years + 2.months, IntervalDataType.average(:maximum_term)
+    it("average interval type", async () => {
+      // Mirrors Rails test_average_interval_type. Averages 6.years and
+      // 4.months → 3.years + 2.months. PG sets `intervalstyle = iso_8601`
+      // per session (configureConnection), so AVG(interval) returns an
+      // ISO 8601 string that the Interval OID parses cleanly.
+      await IntervalDataType.createBang({ maximum_term: "P6Y" });
+      await IntervalDataType.createBang({ maximum_term: "P4M" });
+      const avg = await IntervalDataType.average("maximum_term");
+      expect(avg).toBeInstanceOf(Duration);
+      // PG averages 6 years + 4 months → "3 years 2 mons" → "P3Y2M".
+      // Assert the actual averaged value rather than just the type to
+      // catch regressions where AVG falls through to wrong deserialization.
+      expect((avg as Duration).iso8601()).toBe("P3Y2M");
     });
 
     it.skip("schema dump with default value", async () => {
-      // BLOCKED: schema-dumper renders interval default as numeric seconds (e.g. 94670856)
-      //   instead of the ISO8601 string "P3Y".
-      // ROOT-CAUSE: postgresql/schema-statements.ts extractValueFromDefault does not handle
-      //   interval typed defaults; schema-dumper then prints the raw default through Number
-      //   inspection rather than calling Interval.typeCastForSchema.
-      // SCOPE: ~20 LOC — route interval defaults through the OID type's typeCastForSchema
-      //   in extract_value_from_default + schema-dumper column-default rendering.
+      // BLOCKED: pg_get_expr returns the interval default as a bare numeric
+      //   (e.g. "94670856") even with `intervalstyle = iso_8601` set on the
+      //   session — the SET only affects SELECT/aggregate output, not the
+      //   pg_attrdef-stored expression text reconstructed by pg_get_expr.
+      // ROOT-CAUSE: splitPgDefault matches the bare numeric branch and
+      //   passes "94670856" to Interval.deserialize, which Duration.parse
+      //   rejects (not ISO 8601). The Column ends up with literal=null but
+      //   the dumper falls back to the raw value and emits `default: 94670856`.
+      // SCOPE: needs a coordinated fix in splitPgDefault (cast-aware
+      //   numeric→Duration conversion for interval columns) plus matching
+      //   adjustments in Interval.castValue/serialize so the seconds form
+      //   round-trips. ~50 LOC, deferred to a focused follow-up.
     });
   });
 });

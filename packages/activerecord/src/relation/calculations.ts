@@ -105,8 +105,40 @@ function castAggValue(val: unknown, fn: AggFn, colType: unknown, coerceNumeric: 
     return Number(val ?? 0);
   }
 
-  // count / average: always a JS number.
+  // Mirrors Rails ActiveRecord::Calculations#type_cast_calculated_value:
+  //   when "average"
+  //     case type.type
+  //     when :integer, :decimal then value&.to_d   # Rails: BigDecimal
+  //     else                          type.deserialize(value)
+  //     end
+  // We coerce integer/decimal averages to a JS number (documented Rails-→JS
+  // limitation). For other types — interval, time, money — route through
+  // the column type's deserialize so callers get a domain object (Duration,
+  // Time, …) rather than the raw driver string.
+  if (fn === "average" && colType != null) {
+    const typeName = (colType as { type?(): string }).type?.();
+    if (!isCoerceNumericTypeName(typeName)) {
+      const ct = colType as { deserialize?(v: unknown): unknown };
+      if (typeof ct.deserialize === "function") return ct.deserialize(val);
+    }
+  }
+  // count / average over numeric columns: JS number.
   return Number(val);
+}
+
+function isCoerceNumericTypeName(name: string | undefined): boolean {
+  if (!name) return true;
+  // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
+  // Integer.type → :integer in Rails; our BigIntegerType.name === "big_integer"
+  // so list it explicitly. UnsignedInteger / Float are also numeric-coerce.
+  return (
+    name === "integer" ||
+    name === "big_integer" ||
+    name === "decimal" ||
+    name === "float" ||
+    name === "unsigned_integer" ||
+    name === "boolean"
+  );
 }
 
 function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean): any {
@@ -389,12 +421,18 @@ export async function performSum(
 export async function performAverage(
   this: CalculationRelation,
   column: string,
-): Promise<number | null | Record<string, number>> {
+): Promise<unknown | null | Record<string, unknown>> {
+  // Returns `unknown` (not just number) because non-numeric column types
+  // — interval (Duration), money, time — route through the column type's
+  // deserialize and yield a domain object. Rails' AVG return type is
+  // similarly polymorphic (BigDecimal for integer/decimal, Duration for
+  // interval, etc.). Numeric averages still narrow to JS number at the
+  // call site.
   if (this._isNone) return this._groupColumns.length > 0 ? {} : null;
   if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "average", column, true) as Promise<Record<string, number>>;
+    return groupedAggregate(this, "average", column, true);
   }
-  return singleAggregate(this, "average", column, true) as Promise<number | null>;
+  return singleAggregate(this, "average", column, true);
 }
 
 export async function performMinimum(
@@ -433,7 +471,7 @@ export async function performMaximum(
 export interface CalculationMethods {
   count(column?: string): Promise<number | Record<string, number>>;
   sum(column?: string): Promise<number | bigint | Record<string, number | bigint>>;
-  average(column: string): Promise<number | null | Record<string, number>>;
+  average(column: string): Promise<unknown | null | Record<string, unknown>>;
   minimum(column: string): Promise<unknown | null | Record<string, unknown>>;
   maximum(column: string): Promise<unknown | null | Record<string, unknown>>;
 }
