@@ -1503,11 +1503,44 @@ describe("MigrationTest", () => {
     expect(versions).not.toContain("100");
   });
 
-  it.skip("migration without transaction", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it("migration without transaction", async () => {
+    const adapter = freshAdapter();
+    let columnAdded = false;
+
+    class MigWithoutTx extends Migration {
+      static {
+        this.disableDdlTransactionBang();
+      }
+      async up() {
+        await this.createTable("wtx_test", (t) => {
+          t.string("name");
+        });
+        columnAdded = true;
+        throw new Error("Something broke");
+      }
+      async down() {
+        await this.dropTable("wtx_test");
+      }
+    }
+
+    const proxy: MigrationProxy = {
+      version: "101",
+      name: "MigWithoutTx",
+      migration: () => new MigWithoutTx(),
+    };
+    const migrator = new Migrator(adapter, [proxy]);
+    let err!: Error;
+    try {
+      await migrator.migrate();
+    } catch (e) {
+      err = e as Error;
+    }
+    expect(err).toBeInstanceOf(Error);
+    // Without a DDL transaction, the column is not rolled back
+    expect(columnAdded).toBe(true);
+    // Error message matches Rails format (no "this and" because no transaction)
+    expect(err.message).toMatch(/An error has occurred, all later migrations canceled/);
+    expect(err.message).not.toContain("this and");
   });
 
   it("internal metadata table name", async () => {
