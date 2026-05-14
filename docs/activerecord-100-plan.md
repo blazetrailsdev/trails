@@ -31,6 +31,11 @@ Small Rails-fidelity polish from PR reviews. Subsections group items by topic.
 
 - **~20 LOC** — `reconnect after bad connection on check version` test: pg-npm pool has no single-connection version-stub hook. Needs `_databaseVersionForTest()` setter or injectable version-check hook. (`translate no connection exception to not established` is now confirmed redundant — 57P01 covered by `reconnection_error` fake-pool injection.)
 
+- **~100–150 LOC (multi-DB test infra)** — Second named connection pool equivalent to Rails' `ARUnit2Model` in the test suite. Unblocks:
+  - `MultiDbMigratorTest` ×7 in `multi-db-migrator.test.ts` (all currently BLOCKED on multi-DB infra, not impl) (#1531)
+  - `PrimaryClassTest` ×2 (`application record shares a connection with active record by default` and `application record shares a connection with the primary abstract class if set`) — need `connects_to` with named config (arunit/arunit2 equivalents) (#1531)
+  - Test-infra story; AR `primaryClassQ` / `applicationRecordClassQ` impl is complete.
+
 ### Transactions
 
 - **~50 LOC** — Dirty-tracking for new-record rollback: `topic.changes["title"]` returns `undefined` instead of `[null, "Jeff"]` after rollback. Root cause deeper than sweep A's guard fix — `state.attributes` snapshot in `rememberTransactionRecordState` captures user-written values, so `redetectChanges` produces no diff. Fix: snapshot _DB-original_ values (null for unsaved new records), or add separate DB-original tracking.

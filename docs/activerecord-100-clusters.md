@@ -41,17 +41,11 @@ Slots A+B (#1468) closed. Real behavior gaps + one option drop covered; fixture/
 
 ## PG long-tail cluster (~1510 LOC across 7 remaining slots, from audit-pg-long-tail)
 
-Slots A (#1498 citext), B (#1508 money), and C (#1515 ltree+tsvector+bit-string) closed. Remaining slots — annotation drift on the 73 PG long-tail BLOCKED tests still points at fictional per-feature OID files; real gaps live in `schema-statements` / `schema-dumper` / `schema-creation` / adapter helpers / `type-map-init`. A few features (composite, geometric beyond Point, tsquery serialize) have no source counterpart at all.
+Slots A (#1498 citext), B (#1508 money), C (#1515 ltree+tsvector+bit-string) closed. Slot C followups closed by #1534 (cleanDefault split + schema-dumper renames + 2 fabricated stubs deleted; brought `schema_dumper.rb` and `postgresql/schema_dumper.rb` both to 100%).
 
 Money slot left 3 BLOCKED tests pointing at generic Relation gaps (not money-specific): `sum`/`pluck` typecast on SQL expressions + `updateAll` BigDecimal serialize. Fold into Relation Slot H or Slot G.
 
-Slot C followups (~50 LOC, bundle with Slot D):
-
-- ~30 LOC — Add tsvector schema-dump test (`test_schema_dump_with_shorthand` in Rails `full_text_test.rb` has no stub).
-- ~20 LOC — Split `cleanDefault` raw-PG-expression path from already-deserialized-ORM-value path; the leading-zero `/^-?0\d/` guard added in #1515 is a point fix.
-- Note: several bit-string/full-text/ltree test names in #1515 are best-fit fabrications — Rails has no exact counterpart. Acceptable but worth knowing if test:compare drifts.
-
-1. **Slot D** (~280 LOC) — geometric long-tail OIDs.
+1. **Slot D** (likely no-op per #1534) — geometric long-tail OIDs. **Discovery:** Rails' box, circle, line, lseg, path, polygon types are all `SpecializedString` — no separate OID files exist in Rails source. The geometric pass-through helpers in `packages/activerecord/src/connection-adapters/postgresql/geometric.ts` already cover the full surface; all tests pass. If this slot still appears to have work after re-checking, it's likely test-bodies-only or `BLOCKED` annotation hygiene.
 2. **Slot E** (~280 LOC) — enum schema-dump round-trip.
 3. **Slot F** (~150 LOC) — composite Identity fallback.
 4. **Slot G** (~200 LOC) — cidr IPAddr value + prefix-aware changed?
