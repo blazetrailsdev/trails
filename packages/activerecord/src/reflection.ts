@@ -1227,6 +1227,10 @@ export class ThroughReflection extends AbstractReflection {
     return this.sourceReflection?.joinForeignKey ?? this._delegate.joinForeignKey;
   }
 
+  scopeFor(relation: any, owner?: any): any {
+    return this.delegateReflection.scopeFor(relation, owner);
+  }
+
   joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     const sourceScopes =
       this.sourceReflection?.joinScopes(table, predicateBuilder, klass, record) ?? [];
