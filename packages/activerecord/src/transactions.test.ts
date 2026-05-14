@@ -978,6 +978,11 @@ describe("TransactionTest", () => {
     const repliesCount = (await Reply.all().count()) as number;
     expect(repliesCount).toBeGreaterThan(0);
 
+    // Mirrors Rails: author.update!(name: nil, post_ids: [])
+    // post_ids=[] marks the collection for deletion via autosave (flushPendingReplaces).
+    // Validation on title fails first, so the transaction rolls back before
+    // flushPendingReplaces runs — replies must still be present in the DB.
+    (topic as any).replyIds = [];
     await expect((topic as any).updateBang({ title: null })).rejects.toThrow();
     expect(await Reply.all().count()).toBe(repliesCount);
   });
@@ -1107,8 +1112,8 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect((reply as any).isFrozen?.() ?? false).toBe(false);
-    expect((topic as any).isFrozen?.() ?? false).toBe(false);
+    expect(reply.isFrozen()).toBe(false);
+    expect(topic.isFrozen()).toBe(false);
   });
 
   it.skip("restore previously new record after double save", () => {
