@@ -899,7 +899,7 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 }
 
 /** @internal */
-function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any): void {
+export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any): void {
   if (typeof klass.prototype?.[name] === "function") return;
   if (klass.prototype) {
     klass.prototype[name] = function (this: any) {

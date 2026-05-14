@@ -189,7 +189,6 @@ Small Rails-fidelity polish from PR reviews. Subsections group items by topic.
 
 ### Callbacks convergence aftermath (#1492–#1526)
 
-- **~30 LOC** — Move `autosaveBelongsTo` inside the `around_save` chain rather than running it as an explicit pre-save check. Rails-fidelity improvement (current ordering diverges when autosave fails); behavior risk for `after_save` firing. (#1526)
 - **~20 LOC** — Targeted test for a model with only `beforeCommit` callbacks to pin the `hasTransactionalCallbacks` path. PR 7 simplified this to check only `commit`/`rollback` chains (before_commit entries live in the `commit` chain as "before"-kind callbacks); prevent future regression. (#1526)
 
 ### Callbacks PR 1+2 aftermath (#1492 / #1497)
