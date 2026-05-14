@@ -1741,7 +1741,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // Returns a Promise so callers can await the SET SESSION AUTHORIZATION round-trip.
   async sessionAuth(user: string): Promise<void> {
     this.clearCacheBang();
-    const quoted = user === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
+    const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
     await this.execute(`SET SESSION AUTHORIZATION ${quoted}`);
   }
 
