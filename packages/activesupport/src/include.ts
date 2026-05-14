@@ -20,7 +20,7 @@
  */
 
 type AnyClass = new (...args: any[]) => any;
-type Module = Record<string, Function>;
+type Module = Record<string, any>;
 
 /**
  * Symbol keys for Ruby's Module#included and Module#extended callbacks.
@@ -35,7 +35,7 @@ export const extended = Symbol.for("@blazetrails/activesupport:extended");
  * each signature.
  *
  * Implementation note: `M` is constrained to `object` rather than the
- * runtime `Module = Record<string, Function>`. The runtime shape forces
+ * runtime `Module = Record<string, any>`. The runtime shape forces
  * a string index signature into every result, which propagates into
  * any merging class — and every subclass — and demands every property
  * be assignable to `(...args: unknown[]) => unknown`. That breaks
@@ -100,10 +100,14 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
     }
   } else {
     for (const key of Object.keys(mod as Module)) {
+      const value = (mod as Module)[key];
+      // Ruby's include copies only instance methods — skip non-function values
+      // and Ruby-style constants (uppercase first char mirrors Ruby constant naming).
+      if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
       // Ruby's include doesn't replace methods already defined on the class
       if (Object.prototype.hasOwnProperty.call(klass.prototype, key)) continue;
       descriptors[key] = {
-        value: (mod as Module)[key],
+        value,
         writable: true,
         configurable: true,
         enumerable: false,
@@ -146,8 +150,11 @@ export type Extended<M extends object> = CallableMethods<M>;
  */
 export function extend(klass: AnyClass | object, mod: Module): void {
   for (const key of Object.keys(mod)) {
+    const value = mod[key];
+    // Ruby's extend copies only methods — skip non-functions and constants.
+    if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
     Object.defineProperty(klass, key, {
-      value: mod[key],
+      value,
       writable: true,
       configurable: true,
       enumerable: false,

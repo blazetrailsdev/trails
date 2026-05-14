@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 describe("MethodWrappersTest", () => {
   function deprecateMethod(obj: Record<string, unknown>, name: string, message?: string) {
-    const original = obj[name] as Function;
+    const original = obj[name] as (...args: unknown[]) => unknown;
     obj[name] = function (...args: unknown[]) {
       console.warn(message ?? `${name} is deprecated`);
       return original.apply(this, args);
@@ -45,7 +45,7 @@ describe("MethodWrappersTest", () => {
         return 2;
       },
     };
-    const original = obj.bar as Function;
+    const original = obj.bar as (...args: unknown[]) => unknown;
     obj.bar = function () {
       collected.push("bar is deprecated, use baz");
       return original.call(this);
@@ -61,7 +61,7 @@ describe("MethodWrappersTest", () => {
       }
     }
     const proto = MyClass.prototype as unknown as Record<string, unknown>;
-    const orig = proto.protected_method as Function;
+    const orig = proto.protected_method as (...args: unknown[]) => unknown;
     const warnings: string[] = [];
     proto.protected_method = function () {
       warnings.push("protected_method deprecated");

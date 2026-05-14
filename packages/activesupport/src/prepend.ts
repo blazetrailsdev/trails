@@ -22,12 +22,16 @@
  *   import { prepend } from "@blazetrails/activesupport";
  *
  *   prepend(Relation.prototype, {
- *     where(super_: Function, ...args: unknown[]) {
+ *     where(super_: (...args: unknown[]) => unknown, ...args: unknown[]) {
  *       return super_.call(this, ...processed(args));
  *     },
  *   });
  */
-export type PrependMethod = (this: any, super_: Function, ...args: any[]) => unknown;
+export type PrependMethod = (
+  this: any,
+  super_: (...args: unknown[]) => unknown,
+  ...args: any[]
+) => unknown;
 
 export interface PrependModule {
   readonly [methodName: string]: PrependMethod;
@@ -82,7 +86,7 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
 
   for (const name of names) {
     const descriptor = findPropertyDescriptor(target, name);
-    const original = (target as Record<string, unknown>)[name] as Function;
+    const original = (target as Record<string, unknown>)[name] as (...args: unknown[]) => unknown;
     const wrapper = mod[name] as PrependMethod;
     const wrapped = function (this: unknown, ...args: unknown[]) {
       return wrapper.call(this, original, ...args);

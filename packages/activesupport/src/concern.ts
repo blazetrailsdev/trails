@@ -18,8 +18,8 @@ export interface ConcernDefinition {
   dependencies?: ConcernMixin[];
   included?: (base: any) => void;
   prepended?: (base: any) => void;
-  classMethods?: Record<string, Function>;
-  instanceMethods?: Record<string, Function>;
+  classMethods?: Record<string, (...args: any[]) => any>;
+  instanceMethods?: Record<string, (...args: any[]) => any>;
   prepend?: boolean;
 }
 
@@ -38,7 +38,7 @@ const PREPENDED_BLOCK = Symbol("prependedBlock");
  * This is the one path Concern handles directly — Ruby's prepend
  * semantics have no equivalent in the plain include() helper.
  */
-function prependMethods(klass: any, methods: Record<string, Function>): void {
+function prependMethods(klass: any, methods: Record<string, (...args: any[]) => any>): void {
   const descriptor = {
     value: undefined as any,
     writable: true,

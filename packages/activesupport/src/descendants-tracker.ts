@@ -1,10 +1,12 @@
-const _subclassMap = new globalThis.WeakMap<Function, DescendantsTracker.WeakSet<Function>>();
-const _excludedDescendants = new globalThis.WeakSet<Function>();
+export type AnyClass = abstract new (...args: unknown[]) => unknown;
+
+const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
+const _excludedDescendants = new globalThis.WeakSet<AnyClass>();
 let _clearDisabled = false;
 
 export interface ReloadedClassesFiltering {
-  subclasses(): Function[];
-  descendants(): Function[];
+  subclasses(): AnyClass[];
+  descendants(): AnyClass[];
 }
 
 export namespace DescendantsTracker {
@@ -56,17 +58,17 @@ export namespace DescendantsTracker {
     }
   }
 
-  export function registerSubclass(parent: Function, child: Function): void {
-    if (!_subclassMap.has(parent)) _subclassMap.set(parent, new WeakSet<Function>());
+  export function registerSubclass(parent: AnyClass, child: AnyClass): void {
+    if (!_subclassMap.has(parent)) _subclassMap.set(parent, new WeakSet<AnyClass>());
     _subclassMap.get(parent)!.add(child);
   }
 
-  export function subclasses(klass: Function): Function[] {
+  export function subclasses(klass: AnyClass): AnyClass[] {
     const subs = _subclassMap.get(klass)?.toArray() ?? [];
     return reject(subs);
   }
 
-  export function descendants(klass: Function): Function[] {
+  export function descendants(klass: AnyClass): AnyClass[] {
     const subs = subclasses(klass);
     return [...subs, ...subs.flatMap((s) => descendants(s))];
   }
@@ -75,7 +77,7 @@ export namespace DescendantsTracker {
     _clearDisabled = true;
   }
 
-  export function clear(classes: Function[]): void {
+  export function clear(classes: AnyClass[]): void {
     if (_clearDisabled) {
       throw new Error(
         "DescendantsTracker.clear was disabled because config.enable_reloading is false",
@@ -89,7 +91,7 @@ export namespace DescendantsTracker {
     }
   }
 
-  export function reject(classes: Function[]): Function[] {
+  export function reject(classes: AnyClass[]): AnyClass[] {
     return classes.filter((d) => !_excludedDescendants.has(d));
   }
 }

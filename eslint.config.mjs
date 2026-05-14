@@ -227,7 +227,6 @@ export default defineConfig(
     files: ["packages/activesupport/src/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unsafe-function-type": "off",
       "@typescript-eslint/no-this-alias": "off",
       "@typescript-eslint/no-namespace": "off",
       "unused-imports/no-unused-vars": "off",
