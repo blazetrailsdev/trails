@@ -1210,8 +1210,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 return result.rowCount ?? result.rows.length;
               }
               if (result.rows.length > 0) {
-                const firstCol = Object.keys(result.rows[0])[0];
-                return Number(result.rows[0][firstCol]);
+                return result.rows[0][Object.keys(result.rows[0])[0]] as number;
               }
               return result.rowCount ?? 0;
             } catch (err) {
@@ -1239,8 +1238,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             const result = await this._runQuery(client, pgSql, binds);
             payload.row_count = result.rowCount ?? 0;
             if (result.rows.length > 0) {
-              const firstCol = Object.keys(result.rows[0])[0];
-              return Number(result.rows[0][firstCol]);
+              return result.rows[0][Object.keys(result.rows[0])[0]] as number;
             }
             return result.rowCount ?? 0;
           }

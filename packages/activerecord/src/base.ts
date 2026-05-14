@@ -2542,13 +2542,20 @@ export class Base extends Model {
       const imVisitor = ctor.adapter.arelVisitor;
       sql = imVisitor ? imVisitor.compile(im.ast) : im.toSql();
     }
-    this._pendingOperation = ctor.adapter
-      .execInsert(sql, `${ctor.name} Create`)
-      .then((insertedId) => {
-        if (!Array.isArray(ctor.primaryKey) && this.id === null) {
-          this._attributes.set(ctor.primaryKey, insertedId);
-        }
-      });
+    this._pendingOperation = ctor.adapter.execInsert(sql, `${ctor.name} Create`).then((rawId) => {
+      // Adapters with RETURNING support (PG) may return a Result-like object
+      // instead of the bare id — extract via adapter.lastInsertedId when available.
+      const insertedId =
+        rawId !== null &&
+        typeof rawId === "object" &&
+        "rows" in rawId &&
+        typeof (ctor.adapter as any).lastInsertedId === "function"
+          ? (ctor.adapter as any).lastInsertedId(rawId)
+          : rawId;
+      if (!Array.isArray(ctor.primaryKey) && this.id === null) {
+        this._attributes.set(ctor.primaryKey, insertedId);
+      }
+    });
   }
 
   private _performUpdate(): void {

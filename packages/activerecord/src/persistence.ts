@@ -198,7 +198,7 @@ export async function _insertRecord(
     emptyInsertStatementValue?(): string;
   },
   values: Record<string, unknown>,
-): Promise<number> {
+): Promise<unknown> {
   const table: ArelTable = (this as any).arelTable;
   const im = new InsertManager(table);
 
@@ -208,8 +208,7 @@ export async function _insertRecord(
   }
 
   if (typeof connection.insert === "function") {
-    const result = await connection.insert(im);
-    return typeof result === "number" ? result : 0;
+    return connection.insert(im);
   }
 
   // Fallback for simple adapters without insert()
