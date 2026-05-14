@@ -160,8 +160,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("legacy schema dumping", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_points");
       expect(output).toMatch(/t\.point\("x"\)/);
-      expect(output).toMatch(/t\.point\("y"/);
-      expect(output).toMatch(/t\.point\("z"/);
+      expect(output).toMatch(/t\.point\("y",/);
+      expect(output).toMatch(/t\.point\("z",/);
     });
 
     it("legacy roundtrip", async () => {
