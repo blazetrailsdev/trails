@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import {
   _registerCallbackOnProto,
+  skipCallbackOnProto,
   runAllCallbacks,
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
@@ -256,10 +257,11 @@ describe("CallbacksTest", () => {
   });
 
   it("class-based callback object with snake_case method", () => {
+    // camelCase only — method name is beforeValidation (not before_validation)
     const log: string[] = [];
     const auditor = {
-      before_validation(record: any) {
-        log.push("snake_case called");
+      beforeValidation(record: any) {
+        log.push("camelCase called");
       },
     };
     class Person extends Model {
@@ -269,7 +271,7 @@ describe("CallbacksTest", () => {
       }
     }
     new Person({ name: "test" }).isValid();
-    expect(log).toContain("snake_case called");
+    expect(log).toContain("camelCase called");
   });
 
   it("class-based around callback object with proceed", () => {
@@ -1010,5 +1012,22 @@ describe("withOptions()", () => {
     expect(user.isValid("create")).toBe(false);
     expect(user.errors.on("name")).toContain("can't be blank");
     expect(user.errors.on("email")).toContain("can't be blank");
+  });
+});
+
+describe("skipCallbackOnProto with CallbackObject (mixin-level)", () => {
+  it("removes a CallbackObject from the chain by reference", () => {
+    const log: string[] = [];
+    const proto = Object.create(null);
+    const obj = {
+      beforeSave() {
+        log.push("obj");
+      },
+    };
+    _registerCallbackOnProto(proto, "before", "save", obj);
+    _registerCallbackOnProto(proto, "before", "save", () => log.push("fn"));
+    expect(skipCallbackOnProto(proto, "save", "before", obj)).toBe(true);
+    runBeforeCallbacksOnProto(proto, "save", {});
+    expect(log).toEqual(["fn"]);
   });
 });

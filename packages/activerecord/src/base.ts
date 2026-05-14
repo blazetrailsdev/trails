@@ -5,7 +5,7 @@ import {
   type Type,
   typeRegistry,
   pushPendingDecorator,
-  type CallbackConditions,
+  type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
 import {
@@ -2980,11 +2980,11 @@ export class Base extends Model {
   static override afterCommit<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
     super.afterCommit(
       fn,
-      _synthOnCondition(conditions as Record<string, unknown>) as CallbackConditions<
+      _synthOnCondition(conditions as Record<string, unknown>) as TransactionalCallbackConditions<
         InstanceType<T>
       >,
     );
@@ -2998,11 +2998,11 @@ export class Base extends Model {
   static override afterRollback<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | object,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
     super.afterRollback(
       fn,
-      _synthOnCondition(conditions as Record<string, unknown>) as CallbackConditions<
+      _synthOnCondition(conditions as Record<string, unknown>) as TransactionalCallbackConditions<
         InstanceType<T>
       >,
     );

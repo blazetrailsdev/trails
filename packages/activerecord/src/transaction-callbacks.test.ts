@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect } from "vitest";
-import { Base, transaction } from "./index.js";
+import { Base, transaction, beforeCommit } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -1075,4 +1075,19 @@ describe("TransactionCallbacksTest", () => {
       expect(log).toContain("before_save");
     });
   }); // SetCallbackTest
+}); // TransactionCallbacksTest
+
+describe("hasTransactionalCallbacks regression", () => {
+  it("returns true for a model with only beforeCommit callbacks", () => {
+    const adp = createTestAdapter();
+    class Widget extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    beforeCommit(Widget, () => {});
+    const w = new Widget({});
+    expect(w.hasTransactionalCallbacks()).toBe(true);
+  });
 });

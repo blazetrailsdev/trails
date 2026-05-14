@@ -67,7 +67,7 @@ export {
   runBeforeCallbacksOnProto,
   runAfterCallbacksOnProto,
 } from "./callbacks.js";
-export type { CallbackConditions } from "./callbacks.js";
+export type { CallbackConditions, TransactionalCallbackConditions } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";
 export type { SerializeOptions } from "./serialization.js";
 // Aliased to avoid clobbering the global `JSON` namespace; consumers

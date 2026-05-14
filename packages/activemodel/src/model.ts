@@ -30,6 +30,7 @@ import {
   AroundCallbackFn,
   type CallbackObject,
   CallbackConditions,
+  TransactionalCallbackConditions,
   type RunCallbacksOptions,
   defineModelCallbacks,
   _registerCallbackOnProto,
@@ -932,7 +933,7 @@ export class Model {
   static afterCommit<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
@@ -981,7 +982,7 @@ export class Model {
   static afterRollback<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
+    conditions?: TransactionalCallbackConditions<InstanceType<T>>,
   ): void {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
