@@ -182,7 +182,12 @@ Small Rails-fidelity polish from PR reviews. Subsections group items by topic.
 - **~5 LOC** — `CallbackChain.register` accepts `on:` for commit/rollback events without validating the value (validation moved upstream to AR). Direct `chain.register("after", "commit", fn, { on: "bogus" })` silently stores bogus value. Low risk; PR 4 cleanup. (#1499)
 - **Architectural note** — `Model.afterSaveCommit` / `afterCreateCommit` / `afterUpdateCommit` / `afterDestroyCommit` call `this.afterCommit(fn, { on: ... })` which routes through `Base.afterCommit`. These methods arguably belong in AR's `Base`, not `Model` — PR 4 territory. (#1499)
 
-### Callbacks convergence aftermath (#1492 / #1497)
+### Callbacks convergence aftermath (#1492–#1526)
+
+- **~30 LOC** — Move `autosaveBelongsTo` inside the `around_save` chain rather than running it as an explicit pre-save check. Rails-fidelity improvement (current ordering diverges when autosave fails); behavior risk for `after_save` firing. (#1526)
+- **~20 LOC** — Targeted test for a model with only `beforeCommit` callbacks to pin the `hasTransactionalCallbacks` path. PR 7 simplified this to check only `commit`/`rollback` chains (before_commit entries live in the `commit` chain as "before"-kind callbacks); prevent future regression. (#1526)
+
+### Callbacks PR 1+2 aftermath (#1492 / #1497)
 
 - **~5 LOC** — `skipCallback` with `CallbackObject` on `ClassMethods` interface accepted but no dedicated mixin test was added — covered implicitly by the inheritance-clone test. Add a direct mixin-level test for parity. (#1497)
 - **Architectural note** — `resolveCallback` in `activemodel/src/callbacks.ts:172` currently checks both `before_save` snake-case AND `beforeSave` camelCase. PR 3 should decide whether to drop snake-case (camelCase-only per CLAUDE.md) or keep a compatibility shim. (#1497)

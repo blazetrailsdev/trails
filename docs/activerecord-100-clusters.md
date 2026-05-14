@@ -83,18 +83,19 @@ Plus: MySQL `SchemaDumper.tableCollationCache` is never populated; base `createT
 2. **Slot B** (~150–220 LOC) — MySQL `changeColumn` + `buildChangeColumnDefinition` stubs (both empty today). Includes "preserve existing collation for text→text/string" + `:no_collation` sentinel semantics. Unblocks tests 4–7.
 3. **Slot C** (~15 LOC, optional) — BLOCKED annotation cleanup.
 
-## Relation cluster (~1660 LOC across 7 slots, from audit-relation)
+## Relation cluster (~1400 LOC across 6 slots + 1 followup, from audit-relation)
 
-302 skipped tests across ~14 relation-area files; sub-clusters orthogonal.
+302 skipped tests across ~14 relation-area files; sub-clusters orthogonal. Slot A closed (#1511 WhereClause association predicates core — 6 un-skips).
 
-1. **Slot A** (~260 LOC) — WhereClause association predicates (core).
-2. **Slot B** (~250 LOC) — Polymorphic + CPK predicates in WhereClause.
-3. **Slot C** (~220 LOC) — WhereChain `associated` / `missing` branches.
-4. **Slot D** (~250 LOC) — Default scope / `all_queries` / unscoped caching invariants.
-5. **Slot E** (~220 LOC) — Batches with composite-PK + ordering edge cases.
-6. ~~**Slot F** — load_async scheduling~~ **DROPPED.** Auditor missed Step 0; would have built sources unported. 28 affected tests already permanent-skipped.
-7. **Slot G** (~240 LOC) — `PredicateBuilder.registerHandler` + field-ordered-values + calc grouping.
-8. **Slot H** (~220 LOC) — Relation misc small-surface bundle.
+- **Slot A-b followup** (~100 LOC, bundle with Slot B): un-skip 4 remaining custom-PK variants — `where on association with custom primary key with relation`, `with array of base`, `with array of ids`, `performs subselect not two queries`. Wired; just need test bodies. Also delete the dead `setAssociationMap` / `AssociationMapping` / `expandAssociationCondition` early-attempt code in `predicate-builder.ts`. Also note pre-existing gap: `PredicateBuilder.build()` doesn't coerce records to their `.id` like Rails does — `where(author_id: someRecord)` won't work for direct-FK columns.
+
+1. **Slot B** (~250 LOC) — Polymorphic + CPK predicates in WhereClause (`PolymorphicArrayValue` path imported but not wired; CPK `AssociationQueryValue` branch currently throws — needs pluck path for Relations + tuple zip for non-Relation values).
+2. **Slot C** (~220 LOC) — WhereChain `associated` / `missing` branches.
+3. **Slot D** (~250 LOC) — Default scope / `all_queries` / unscoped caching invariants.
+4. **Slot E** (~220 LOC) — Batches with composite-PK + ordering edge cases.
+5. ~~**Slot F** — load_async scheduling~~ **DROPPED.** Auditor missed Step 0; would have built sources unported. 28 affected tests already permanent-skipped.
+6. **Slot G** (~240 LOC) — `PredicateBuilder.registerHandler` + field-ordered-values + calc grouping.
+7. **Slot H** (~220 LOC) — Relation misc small-surface bundle.
 
 ## Associations-core cluster (~910 LOC across 5 slots, from audit-associations-core)
 
@@ -226,27 +227,23 @@ Slot D (#1467 check/exclusion/unique constraints) closed.
 3. **Slot D** — Wire isolation tests through PG-adapter Slot D's `secondConnection` helper. 4–6 un-skips.
 4. **Slot E** (deferred) — Autosave + nested_attributes (depends on `accepts_nested_attributes_for`).
 
-## `NotImplementedError` elimination initiative (~610 LOC across 7 sweeps)
+## `NotImplementedError` elimination initiative — guardrail shipped (#1523)
 
-**Goal: zero unjustified `NotImplementedError` throws when AR is "done."** Phase 1 audit (delivered 2026-05-11) found **38 throw sites** across 14 files. Disposition tally:
+**Goal: zero unjustified `NotImplementedError` throws when AR is "done."** PR #1523 annotated every throw site with `// @nie disposition=... rails=... cluster=...` and added the `blazetrails/nie-requires-annotation` ESLint rule. The annotations are now the **source of truth**; the 2026-05-11 audit numbers are superseded.
 
-- **port-real**: 24 (most 1–15 LOC; `buildDefaultScope` is the largest)
-- **keep-as-strategy-hook**: 8 (Rails also raises; verify message form matches)
-- **remove-from-class**: 7
-- **empty-default**: 0 (no Rails `def foo; end` bodies found)
-- **delete-stub-and-add-to-unported**: 0 (no throw sites in `UNPORTED_FILES`)
+**Corrected disposition tally (per #1523 per-site verification):** 34 sites total.
 
-**Phase 2 sweep PRs:**
+- **port-real**: 23 — Rails has a real implementation; ours is a stub.
+- **keep-as-strategy-hook**: 11 — Rails also raises (abstract method); we match its behavior. (Up from the original 8; #1523 found Rails has real impls for `rawExecute`, `appendCallbacks`, `lookupCastType`, SQLite3 `arelVisitor`.)
+- **remove-from-class**: 0 — none. (Was 7 in the original audit; reclassified after Rails-source verification.)
 
-1. **Sweep A — TableDefinition privates (mysql + postgresql)** (~80 LOC). 6 throws across `connection-adapters/{mysql,postgresql}/schema-definitions.ts`.
-2. **Sweep B — Abstract adapter `rawExecute` body + generic-Error normalize** (~120 LOC). Includes the 3 generic `Error("Not implemented")` strings → typed `NotImplementedError`.
-3. **Sweep C — Scoping/Default port** (~80 LOC). 3 throws in `scoping/default.ts` including `buildDefaultScope`.
-4. **Sweep D — Per-adapter small ports + dead-stub cleanup** (~150 LOC, split if needed).
-5. **Sweep E — Mysql2 adapter heavy ports** (~150 LOC).
-6. **Sweep F — Remove-from-class stubs** (~30 LOC delete).
-7. **Sweep G — Strategy-hooks verification** (0 LOC). 8 throws kept; verify error message matches Rails. No-code change.
+**Sweeps A–G obsoleted.** The 23 port-real sites are concentrated in clusters that have their own slots — `mysql-mysql2-adapter` (4), `mysql-charset-collation` (3), `pg-long-tail` (3), `relation` (3), plus 10 in abstract/non-cluster files. The port-real work folds into existing cluster slots; no dedicated Sweep PRs needed. Track via `grep "@nie disposition=port-real" packages/activerecord/src/` — the count should decrease as cluster work lands.
 
-**Phase 3 — ESLint rule** banning `throw new NotImplementedError` outside the Sweep G allowlist. Permanent guardrail.
+**Followups from #1523:**
+
+- ~30 LOC — `rails=file:line` annotations on the 30 sites that carry only file paths (the 4 corrected during verification have line numbers; the rest don't). Mechanical follow-up; speeds eventual port-real work.
+- ~5 LOC — Extend the ESLint rule to other Rails-mirroring packages (actionpack, actionview, activemodel, activesupport, arel). None currently has NIE throws; deferred until one shows up.
+- Optional — companion warn-rule on `disposition=TODO` so unclassified throws can't sit indefinitely.
 
 ## Single-slot items
 

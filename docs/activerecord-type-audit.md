@@ -189,7 +189,7 @@ Order matters: do the mechanical/low-risk work first, then the structural refact
 
 - **W1a** (#1500 ✅): `: Function` → callable signatures + `Record<string, any>` → `Record<string, unknown>` sweep + enable `no-unsafe-function-type` lint.
 - **W1b**: Variadic rest overloads (P5) — start with relation.ts hot paths. (~100 LOC.)
-- **W1c**: `@ts-expect-error` audit (P9). CP PR B (#1519) eliminated 11 Calculations-shape directives. Remaining directives are tracked in the CP PR C entry under "Open follow-ups" — 8 in collection-proxy.ts plus the residual `Document` cases from the activesupport audit (#1510). Run W1c after CP PR C closes the structural ones.
+- **W1c**: `@ts-expect-error` audit (P9). CP PR B (#1519) eliminated 11 directives; CP PR C (#1522) closed 3 more and confirmed 5 as permanent suppressions with sharper rationales (load × 2, isNone × 1, delete/destroy × 2 — all genuine CP-vs-Relation semantic divergences that can't be typed away). The residual `@ts-expect-error` count is now small enough that a W1c audit pass is low-leverage — defer indefinitely unless directives multiply.
 
 ### Wave 2 — host typing sweep (P1, P4 — biggest count drops)
 
@@ -202,9 +202,8 @@ After Wave 2: `this: any` count should drop from 131 → ~0; `as unknown` from 2
 
 ### Wave 3 — private state declaration (P3)
 
-- **W3a**: declare `_associations`, `_registryKeys`, `_associationInstances` as typed internal fields on `Base`. Update all readers. (~200 LOC.)
-- **W3b**: same for `_cachedAssociations`. (~100 LOC.)
-- **W3c**: same for `_attributesBuilder`, `currentScope`. (~150 LOC.)
+- **W3a** (#1518 ✅): declared `_associations`, `_registryKeys`, `_associationInstances` as typed internal fields on `Base`. Update all readers.
+- **W3b+W3c** (#1524 ✅, bundled): `ReflectionLike` structural interface in `associations.ts` (eliminated 12 `(reflection as any).X` casts) + `scopeForAssociation` declared on `typeof Base` static surface (eliminated 10 `(targetModel as any).X` casts). `associations.ts` `as any` count: 30 → ~4. The remaining 4 are HABTM `Reflection.create` discriminated-union gaps + `errors`-not-on-static-Base casts (sized below).
 
 After Wave 3: `as any` in associations.ts should drop from 90 → ~20.
 
@@ -239,10 +238,9 @@ Final non-zero counts are the legitimate P6 boundary casts + P2 reflection casts
 - `Validations` mixin interface tightening (~10 LOC) + `runValidationsBang` parameterization. Fold into W2c.
 - activemodel parallel callback types alignment with activesupport's generic callback chain (~30 LOC). Outside AR scope.
 - **CP PR B (#1519 ✅)**: Relation Calculations restructured to method-syntax. Actual count was **11 Calculations-shape directives** (5 CP + 5 AR + 1 DJAR), not the "17 of 22" the brief estimated (that count came from a stale doc/grep). All 11 eliminated. Architectural insight: `Included<>` (CallableMethods) in activesupport is structurally tied to property-syntax output — subclass override-as-method always hits the variance trap. Other mixin sites using `Included<>` (e.g., `QueryMethodBangs` on Relation) will hit this if anyone tries to narrow a signature. A future activesupport slot could add an `Included<>`-variant that emits method-syntax.
-- **CP PR C** (~80–100 LOC, follow-up to PR B): 8 `@ts-expect-error` directives remain in `collection-proxy.ts` — orthogonal to Calculations, each is a real CP-vs-Relation signature divergence:
-  - ~15 LOC — `load()` divergence (lines 50, 499): CP returns `T[]`, Relation returns `LoadedRelation<this>`. Decide: narrow CP interface or permanent-suppress.
-  - ~20 LOC — `delete(id)` / `destroy(id)` (lines 1078, 1240): different semantics (by-PK vs by-record) — likely permanent suppression with sharper rationale.
-  - ~10 LOC — `isNone` (line 1376): CP is async, Relation sync. Investigate making CP sync.
-  - ~30 LOC — `destroyAll` / `deleteAll` (lines 1475, 1888): real Rails fidelity gap — Rails `CollectionProxy#destroy_all` returns the destroyed records.
-  - ~25 LOC — `calculate` (line 1961): add Relation's overload set to CP to eliminate.
+- **CP PR C (#1522 ✅)**: closed 3 of 8 remaining CP directives (`destroyAll`/`deleteAll` aligned to Rails return-shape, `calculate` overloads added). 5 remain as **permanent suppressions** with sharpened rationales: `load()` ×2 (thenable `T[]` await contract — structural), `isNone` ×1 (CP async count-query vs Relation sync NullRelation-flag — genuine semantic divergence; sync attempt regressed CI), `delete`/`destroy` ×2 (by-record vs by-PK semantics on Rails-shaped names — irreducible). Surfaced a pre-existing gap: `Relation#isNone()` checks only `_isNone` flag while Rails `Relation#none?` is `Enumerable#none?` (fires a query). Worth a follow-up audit of call sites; low priority, internal usage.
 - ~5 LOC — Restructure `BiasableQueue` in `packages/activerecord/src/connection-adapters/abstract/connection-pool/queue.ts` so the module passed to `include()` only contains instance methods. Export `BiasedConditionVariable` as a standalone named export instead of bundling it. The `/^[A-Z]/` constant-detection guard added in #1510 currently skips it correctly, but the module shape is a smell.
+- ~20 LOC — Type `_canRouteThroughViaAssociationScope` and `_canRouteThroughViaDisableJoinsAssociationScope` with `ReflectionLike | null | undefined`. They use `reflection: unknown` with inline `as { isThroughReflection?: () => boolean }` casts — not `as any` but consistency win. Requires adding `isThroughReflection?`, `isNested?`, `sourceReflection?` to `ReflectionLike`.
+- ~15 LOC — `collection-proxy.ts` line ~739: `(ctor as any)._reflectOnAssociation?.()` can drop `as any` now that `Base._reflectOnAssociation` is declared (#1524).
+- ~20 LOC — `assocDef.type as any` + `ref as any` in HABTM `Reflection.create`/`addReflection`. Caller synthesizes a macro tag from a string; needs a discriminated-union overload on `Reflection.create` or a typed factory helper.
+- ~10 LOC — `(record as any).errors?.add(...)` ×2 in `processDependentAssociations`. `errors` not declared on `Base` static surface; add `ErrorsLike` interface or declare `errors` on Base.
