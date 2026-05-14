@@ -29,6 +29,7 @@ import {
   descendants as inheritanceDescendants,
   isFinderNeedsTypeCondition,
   primaryAbstractClass,
+  applicationRecordClassQ as _applicationRecordClassQ,
   stiClassFor,
   polymorphicClassFor,
   initializeInternalsCallback as inheritanceInitializeInternalsCallback,
@@ -677,13 +678,14 @@ export class Base extends Model {
   }
 
   /**
-   * Returns true when this class's connection class resolves to Base —
-   * i.e. no ancestor between this class and Base has connectionClass set.
+   * Returns true if this class is `Base` itself or the designated
+   * application-record class (set via `primaryAbstractClass()` or implicitly
+   * via a `globalThis.ApplicationRecord` constant).
    *
    * Mirrors: ActiveRecord::Base.primary_class?
    */
   static primaryClassQ(): boolean {
-    return this.connectionClassForSelf() === Base;
+    return this === Base || this.applicationRecordClassQ();
   }
 
   static currentPreventingWrites(): boolean {
@@ -1122,6 +1124,14 @@ export class Base extends Model {
 
   static primaryAbstractClass(): void {
     primaryAbstractClass(this);
+  }
+
+  /**
+   * @internal
+   * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
+   */
+  static applicationRecordClassQ(): boolean {
+    return _applicationRecordClassQ(this);
   }
 
   static stiClassFor(typeName: string): typeof Base {
