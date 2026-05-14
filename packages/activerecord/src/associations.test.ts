@@ -5,7 +5,7 @@
  * polymorphic, dependent, counterCache, touch, CollectionProxy, reflection,
  * strict loading, inverse_of, and scoped associations.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import {
   loadHabtm,
   Base,
@@ -6751,6 +6751,8 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("preload with scope", async () => {
     const adapter = freshAdapter();
     class PwsPost extends Base {
@@ -6955,17 +6957,13 @@ describe("PreloaderTest", () => {
     await GQSPost.create({ title: "P1", gqs_author_id: a1.id });
     await GQSPost.create({ title: "P2", gqs_author_id: a2.id });
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    try {
-      const p1 = new Preloader({ records: [a1], associations: ["gqsPosts"] });
-      const p2 = new Preloader({ records: [a2], associations: ["gqsPosts"] });
-      await new Batch([p1, p2]).call();
-      // Both loaders share the same scope/key → coalesced into 1 loadRecordsInBatch call
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect((a1 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P1");
-      expect((a2 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P2");
-    } finally {
-      spy.mockRestore();
-    }
+    const p1 = new Preloader({ records: [a1], associations: ["gqsPosts"] });
+    const p2 = new Preloader({ records: [a2], associations: ["gqsPosts"] });
+    await new Batch([p1, p2]).call();
+    // Both loaders share the same scope/key → coalesced into 1 loadRecordsInBatch call
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect((a1 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P1");
+    expect((a2 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P2");
   });
   it("preload grouped queries with already loaded records", async () => {
     const adapter = freshAdapter();
@@ -6997,16 +6995,12 @@ describe("PreloaderTest", () => {
     const p1Loaded = (await GQLPost.where({ title: "P1" }).includes("gqlAuthor").toArray())[0]!;
     const p2Fresh = (await GQLPost.where({ title: "P2" }).toArray())[0]!;
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    try {
-      await new Preloader({ records: [p1Loaded, p2Fresh], associations: ["gqlAuthor"] }).call();
-      // P1's key was already loaded → only P2's author_id goes to the DB
-      const calledWith = spy.mock.calls[0]?.[0] as unknown[];
-      expect(calledWith).toHaveLength(1);
-      expect((p1Loaded as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth1");
-      expect((p2Fresh as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth2");
-    } finally {
-      spy.mockRestore();
-    }
+    await new Preloader({ records: [p1Loaded, p2Fresh], associations: ["gqlAuthor"] }).call();
+    // P1's key was already loaded → only P2's author_id goes to the DB
+    const calledWith = spy.mock.calls[0]?.[0] as unknown[];
+    expect(calledWith).toHaveLength(1);
+    expect((p1Loaded as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth1");
+    expect((p2Fresh as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth2");
   });
   it("preload grouped queries of middle records", async () => {
     const adapter = freshAdapter();
@@ -7054,21 +7048,17 @@ describe("PreloaderTest", () => {
     // Two separate preloaders for a through association — middle-record (gmmTaggings) loaders
     // from both branches share the same scope/key and are coalesced into 1 batch call
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    try {
-      const p1 = new Preloader({ records: [post1], associations: ["gmmTags"] });
-      const p2 = new Preloader({ records: [post2], associations: ["gmmTags"] });
-      await new Batch([p1, p2]).call();
-      // 2 batch calls: 1 for grouped gmmTaggings loaders, 1 for grouped gmmTag loaders
-      expect(spy).toHaveBeenCalledTimes(2);
-      expect((post1 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
-        "ruby",
-      ]);
-      expect((post2 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
-        "rails",
-      ]);
-    } finally {
-      spy.mockRestore();
-    }
+    const p1 = new Preloader({ records: [post1], associations: ["gmmTags"] });
+    const p2 = new Preloader({ records: [post2], associations: ["gmmTags"] });
+    await new Batch([p1, p2]).call();
+    // 2 batch calls: 1 for grouped gmmTaggings loaders, 1 for grouped gmmTag loaders
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect((post1 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
+      "ruby",
+    ]);
+    expect((post2 as any)._preloadedAssociations.get("gmmTags").map((t: any) => t.name)).toEqual([
+      "rails",
+    ]);
   });
   it("preload grouped queries of through records", async () => {
     const adapter = freshAdapter();
@@ -7116,20 +7106,16 @@ describe("PreloaderTest", () => {
     // includes() creates one Preloader; source (ggtTag) loaders for both posts share the
     // same scope and are coalesced — 2 batch calls total (taggings + tags), not 4
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    try {
-      const posts = await GGTPost.includes("ggtTags").toArray();
-      expect(spy).toHaveBeenCalledTimes(2);
-      const p1tags = (posts.find((p: any) => p.title === "P1") as any)._preloadedAssociations.get(
-        "ggtTags",
-      );
-      const p2tags = (posts.find((p: any) => p.title === "P2") as any)._preloadedAssociations.get(
-        "ggtTags",
-      );
-      expect(p1tags[0].name).toBe("ruby");
-      expect(p2tags[0].name).toBe("rails");
-    } finally {
-      spy.mockRestore();
-    }
+    const posts = await GGTPost.includes("ggtTags").toArray();
+    expect(spy).toHaveBeenCalledTimes(2);
+    const p1tags = (posts.find((p: any) => p.title === "P1") as any)._preloadedAssociations.get(
+      "ggtTags",
+    );
+    const p2tags = (posts.find((p: any) => p.title === "P2") as any)._preloadedAssociations.get(
+      "ggtTags",
+    );
+    expect(p1tags[0].name).toBe("ruby");
+    expect(p2tags[0].name).toBe("rails");
   });
   it("preload through records with already loaded middle record", async () => {
     const adapter = freshAdapter();
@@ -7180,20 +7166,16 @@ describe("PreloaderTest", () => {
     // Preload gatTags for both posts. The through-preloader's tagging loader finds p1's key
     // already loaded (LoaderRecords merge path) and only queries DB for p2's taggings
     const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
-    try {
-      await new Preloader({ records: [p1, p2], associations: ["gatTags"] }).call();
-      // First call is for taggings: only p2's key goes to DB (p1's already loaded)
-      const taggingKeys = spy.mock.calls[0]?.[0] as unknown[];
-      expect(taggingKeys).toHaveLength(1);
-      expect((p1 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
-        "ruby",
-      ]);
-      expect((p2 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
-        "rails",
-      ]);
-    } finally {
-      spy.mockRestore();
-    }
+    await new Preloader({ records: [p1, p2], associations: ["gatTags"] }).call();
+    // First call is for taggings: only p2's key goes to DB (p1's already loaded)
+    const taggingKeys = spy.mock.calls[0]?.[0] as unknown[];
+    expect(taggingKeys).toHaveLength(1);
+    expect((p1 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
+      "ruby",
+    ]);
+    expect((p2 as any)._preloadedAssociations.get("gatTags").map((t: any) => t.name)).toEqual([
+      "rails",
+    ]);
   });
   it.skip("preload with instance dependent scope", () => {
     // BLOCKED: associations — collection/singular feature gap
