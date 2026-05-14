@@ -15,6 +15,7 @@ export {
   MultiRange,
   MultiRangeType,
 } from "./connection-adapters/postgresql/oid/range.js";
+export { IPAddr } from "./connection-adapters/postgresql/oid/cidr.js";
 export type { LoadedRelation } from "./relation.js";
 export { QueryAttribute } from "./relation/query-attribute.js";
 export { InsertAll, Builder as InsertAllBuilder } from "./insert-all.js";
