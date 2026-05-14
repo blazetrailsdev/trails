@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Notifications } from "@blazetrails/activesupport";
-import { ArgumentError, StringType } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { DatabaseAdapter, ExplainOption, MysqlAdapterOptions } from "../adapter.js";
 import {
   AbstractMysqlAdapter,
@@ -20,7 +20,6 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
-import { Text as TextType } from "../type/text.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
@@ -1287,12 +1286,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       );
     }
     return results;
-  }
-
-  /** @internal */
-  private isTextType(type: string): boolean {
-    const t = this.nativeTypeMap.lookup(type.toLowerCase().trim());
-    return t instanceof StringType || t instanceof TextType;
   }
 
   /** @internal */

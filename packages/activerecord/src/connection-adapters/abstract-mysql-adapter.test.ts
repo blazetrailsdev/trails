@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Column } from "./mysql/column.js";
+import { ChangeColumnDefinition } from "./abstract/schema-definitions.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column("id", null, { sqlType: "bigint" }, false, {
@@ -151,6 +152,93 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
     expect(sql).toContain("DEFAULT (json_array())");
     expect(sql).not.toContain("DEFAULT 'json_array()'");
+  });
+});
+
+describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
+  function makeTextColumn(
+    opts: { collation?: string | null; defaultFunction?: string | null } = {},
+  ) {
+    return new Column("body", "hello", { sqlType: "varchar(255)", type: "string" }, true, {
+      collation: opts.collation ?? "utf8mb4_unicode_ci",
+      defaultFunction: opts.defaultFunction ?? null,
+    });
+  }
+
+  async function makeAdapter(column: Column) {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as any;
+    adapter.columnFor = async (_t: string, _c: string) => column;
+    return adapter;
+  }
+
+  it("returns a ChangeColumnDefinition with the column name", async () => {
+    const col = makeTextColumn();
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+    expect(cd).toBeInstanceOf(ChangeColumnDefinition);
+    expect(cd.name).toBe("body");
+  });
+
+  it("inherits collation from existing column when changing to a text type", async () => {
+    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+    expect(cd.column.options.collation).toBe("utf8mb4_unicode_ci");
+  });
+
+  it("does not inherit collation when changing to a non-text type", async () => {
+    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "integer");
+    expect(cd.column.options.collation).toBeUndefined();
+  });
+
+  it("collation: null sentinel drops collation (no_collation)", async () => {
+    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
+      collation: null,
+    });
+    expect(cd.column.options.collation).toBeUndefined();
+  });
+
+  it("explicit collation option overrides column collation", async () => {
+    const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
+      collation: "ascii_bin",
+    });
+    expect(cd.column.options.collation).toBe("ascii_bin");
+  });
+
+  it("inherits null from existing column when not specified", async () => {
+    const col = makeTextColumn();
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+    expect(cd.column.options.null).toBe(true);
+  });
+
+  it("inherits default from existing column when not specified", async () => {
+    const col = makeTextColumn();
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+    expect(cd.column.options.default).toBe("hello");
+  });
+
+  it("uses defaultFunction as lambda when column has a function default", async () => {
+    const col = makeTextColumn({ defaultFunction: "uuid()" });
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "text");
+    expect(typeof cd.column.options.default).toBe("function");
+    expect((cd.column.options.default as () => string)()).toBe("uuid()");
+  });
+
+  it("falls back to column.sqlType when type argument is empty", async () => {
+    const col = makeTextColumn();
+    const adapter = await makeAdapter(col);
+    const cd = await adapter.buildChangeColumnDefinition("users", "body", "");
+    expect(cd.column.type).toBe("varchar(255)");
   });
 });
 
