@@ -26,14 +26,15 @@
 // synthesize.ts).
 
 const T = `import("@blazetrails/activesupport/temporal").Temporal`;
+const IPADDR = `import("@blazetrails/activerecord").IPAddr`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   string: "string",
   text: "string",
   immutable_string: "string",
   uuid: "string",
-  inet: "string",
-  cidr: "string",
+  inet: IPADDR,
+  cidr: IPADDR,
   citext: "string",
   integer: "number",
   big_integer: "bigint",
