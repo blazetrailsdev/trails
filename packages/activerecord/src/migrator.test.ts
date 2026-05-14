@@ -847,11 +847,16 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("throws when adapter supports advisory locks but lacks currentDatabase()", async () => {
-    const adapter = createTestAdapter();
-    adapter.supportsAdvisoryLocks = () => true;
-    adapter.getAdvisoryLock = async () => true;
-    adapter.releaseAdvisoryLock = async () => true;
-    const migrator = new Migrator(adapter, []);
+    // Use a raw mock (not SchemaAdapter) that omits currentDatabase()
+    const rawAdapter = {
+      adapterName: "sqlite" as const,
+      supportsAdvisoryLocks: () => true,
+      getAdvisoryLock: async (_id: unknown) => true,
+      releaseAdvisoryLock: async (_id: unknown) => true,
+      isNoDatabaseError: () => false,
+      // currentDatabase intentionally absent
+    } as unknown as import("./adapter.js").DatabaseAdapter;
+    const migrator = new Migrator(rawAdapter, []);
     await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });
 });
