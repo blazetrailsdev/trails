@@ -880,6 +880,70 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(NoPkOwner, "targets") as AssociationReflection;
     expect(() => ref.activeRecordPrimaryKey).toThrow(UnknownPrimaryKey);
   });
+  it("association primary key with essay author custom primary key", () => {
+    // Rails test_association_primary_key: Author#essay uses primary_key: :name on the AR side
+    // Essay#writer is a polymorphic belongsTo with primary_key: :name on the association side
+    class EssayCat extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EssayModel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("writer_id", "integer");
+        this.attribute("writer_type", "string");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class EssayAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("EssayCat", EssayCat);
+    registerModel("EssayModel", EssayModel);
+    registerModel("EssayAuthor", EssayAuthor);
+
+    Associations.belongsTo.call(EssayModel, "category", {
+      className: "EssayCat",
+      primaryKey: "name",
+    });
+    Associations.belongsTo.call(EssayModel, "writer", { primaryKey: "name", polymorphic: true });
+
+    Associations.hasOne.call(EssayAuthor, "essay", {
+      className: "EssayModel",
+      primaryKey: "name",
+      as: "writer",
+    });
+    Associations.hasMany.call(EssayAuthor, "essays", {
+      className: "EssayModel",
+      primaryKey: "name",
+      as: "writer",
+    });
+    Associations.hasMany.call(EssayAuthor, "essayCategories", {
+      through: "essays",
+      source: "category",
+    });
+
+    // Author.reflect_on_association(:essay).association_primary_key → "id" (Essay's PK)
+    const essayRef = reflectOnAssociation(EssayAuthor, "essay") as AssociationReflection;
+    expect(essayRef.associationPrimaryKey).toBe("id");
+
+    // Essay.reflect_on_association(:writer).association_primary_key → "name" (primary_key option)
+    const writerRef = reflectOnAssociation(EssayModel, "writer") as AssociationReflection;
+    expect(writerRef.associationPrimaryKey).toBe("name");
+
+    // Author.reflect_on_association(:essay_category).association_primary_key → "name" (from source)
+    const essayCatRef = reflectOnAssociation(EssayAuthor, "essayCategories") as ThroughReflection;
+    expect(essayCatRef.associationPrimaryKey).toBe("name");
+
+    // Author.reflect_on_association(:essay).active_record_primary_key → "name" (primaryKey option)
+    expect(essayRef.activeRecordPrimaryKey).toBe("name");
+  });
   it("foreign type", () => {
     class Sponsor extends Base {
       static {
@@ -1778,18 +1842,146 @@ describe("ReflectionTest", () => {
     expect(ref!.macro).toBe("hasAndBelongsToMany");
   });
 
-  it.skip("chain", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    // Requires through-chain reflection
+  it("chain", () => {
+    class ReflCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ReflEssay extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("writer_id", "integer");
+        this.attribute("writer_type", "string");
+        this.attribute("category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ReflAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ReflOrganization extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ReflCategory", ReflCategory);
+    registerModel("ReflEssay", ReflEssay);
+    registerModel("ReflAuthor", ReflAuthor);
+    registerModel("ReflOrganization", ReflOrganization);
+
+    Associations.belongsTo.call(ReflEssay, "category", {
+      className: "ReflCategory",
+      primaryKey: "name",
+    });
+    Associations.belongsTo.call(ReflEssay, "writer", { primaryKey: "name", polymorphic: true });
+
+    Associations.hasMany.call(ReflAuthor, "essays", {
+      className: "ReflEssay",
+      primaryKey: "name",
+      as: "writer",
+    });
+    Associations.hasMany.call(ReflAuthor, "essayCategories", {
+      through: "essays",
+      source: "category",
+    });
+
+    Associations.hasMany.call(ReflOrganization, "authors", {
+      className: "ReflAuthor",
+      primaryKey: "name",
+    });
+    Associations.hasMany.call(ReflOrganization, "authorEssayCategories", {
+      through: "authors",
+      source: "essayCategories",
+    });
+
+    const authorEssayCatRef = reflectOnAssociation(ReflOrganization, "authorEssayCategories");
+    expect(authorEssayCatRef).toBeInstanceOf(ThroughReflection);
+
+    const chain = (authorEssayCatRef as ThroughReflection).chain;
+    expect(chain).toHaveLength(3);
+    expect(chain[0]).toBe(authorEssayCatRef);
+    expect(chain[1]).toBe(reflectOnAssociation(ReflAuthor, "essays"));
+    expect(chain[2]).toBe(reflectOnAssociation(ReflOrganization, "authors"));
   });
 
-  it.skip("nested?", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    // Requires nested through reflection
+  it("nested?", () => {
+    class NPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NComment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NTagging extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class NTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NPost", NPost);
+    registerModel("NComment", NComment);
+    registerModel("NTagging", NTagging);
+    registerModel("NTag", NTag);
+    registerModel("NAuthor", NAuthor);
+    registerModel("NCategory", NCategory);
+
+    Associations.belongsTo.call(NTagging, "post", { className: "NPost" });
+    Associations.belongsTo.call(NTagging, "tag", { className: "NTag" });
+    Associations.belongsTo.call(NComment, "post", { className: "NPost" });
+
+    Associations.hasMany.call(NPost, "comments", { className: "NComment" });
+    Associations.hasMany.call(NPost, "taggings", { className: "NTagging" });
+    Associations.hasMany.call(NPost, "tags", { through: "taggings", className: "NTag" });
+
+    Associations.hasMany.call(NAuthor, "posts", { className: "NPost" });
+    Associations.hasMany.call(NAuthor, "comments", { through: "posts", source: "comments" });
+    Associations.hasMany.call(NAuthor, "tags", { through: "posts", source: "tags" });
+
+    Associations.hasAndBelongsToMany.call(NCategory, "posts", { className: "NPost" });
+    Associations.hasMany.call(NCategory, "postComments", {
+      through: "posts",
+      source: "comments",
+      className: "NComment",
+    });
+
+    const commentsRef = reflectOnAssociation(NAuthor, "comments") as ThroughReflection;
+    expect(commentsRef.isNested()).toBe(false);
+
+    const tagsRef = reflectOnAssociation(NAuthor, "tags") as ThroughReflection;
+    expect(tagsRef.isNested()).toBe(true);
+
+    const postCommentsRef = reflectOnAssociation(NCategory, "postComments") as ThroughReflection;
+    expect(postCommentsRef.isNested()).toBe(true);
   });
 
   it.skip("join table", () => {
