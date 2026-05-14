@@ -1497,8 +1497,8 @@ export class MigrationContext {
     return this.adapter.adapterName;
   }
 
-  /** @internal Query catalog for column names — used after CTAS where columns derive from the SELECT. */
-  private async _introspectColumns(name: string): Promise<string[]> {
+  /** @internal Query catalog for column names+types — used after CTAS where columns derive from the SELECT. */
+  private async _introspectColumns(name: string): Promise<{ name: string; type: string }[]> {
     const a = this._adapterName;
     const qt = this.adapter.quoteTableName(name);
     let sql: string;
@@ -1507,14 +1507,17 @@ export class MigrationContext {
     } else if (a === "postgres") {
       const [s, t] = name.includes(".") ? name.split(".", 2) : ["public", name];
       const e = (x: string) => x.replace(/'/g, "''");
-      sql = `SELECT column_name FROM information_schema.columns WHERE table_schema = '${e(s)}' AND table_name = '${e(t)}' ORDER BY ordinal_position`;
+      sql = `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '${e(s)}' AND table_name = '${e(t)}' ORDER BY ordinal_position`;
     } else {
       sql = `SHOW COLUMNS FROM ${qt}`;
     }
     const rows = await this.adapter.execute(sql);
     return rows.map((r) => {
       const x = r as Record<string, unknown>;
-      return (x.name ?? x.column_name ?? x.Field) as string;
+      const colName = (x.name ?? x.column_name ?? x.Field) as string;
+      // SQLite: type field; PG: data_type; MySQL: Type
+      const colType = ((x.type ?? x.data_type ?? x.Type) as string | undefined) ?? "string";
+      return { name: colName, type: colType };
     });
   }
 
@@ -1609,9 +1612,9 @@ export class MigrationContext {
       });
     }
     if (options?.as != null) {
-      for (const c of await this._introspectColumns(name)) {
+      for (const { name: c, type } of await this._introspectColumns(name)) {
         cols.add(c);
-        meta.set(c, { type: "string" });
+        meta.set(c, { type });
       }
     }
     this._columns.set(name, cols);
@@ -2007,6 +2010,10 @@ export interface MigrationProxy {
   name: string;
   filename?: string;
   migration: () => MigrationLike | Promise<MigrationLike>;
+  /** @internal Mirrors: ActiveRecord::MigrationProxy#basename */
+  basename?(): string;
+  /** @internal Mirrors: ActiveRecord::MigrationProxy#load_migration */
+  loadMigration?(): Promise<MigrationLike>;
 }
 
 export class Migrator {
@@ -2568,17 +2575,24 @@ export class Migrator {
     // stamping inside the same ddl_transaction so they commit/rollback
     // atomically. Without this, a committed migration + failed stamp
     // would leave schema_migrations out of sync.
-    await this._ddlTransaction(migration, async () => {
-      await this._strategy.exec(direction, migration, this._adapter);
-      if (direction === "up") {
-        await this._schemaMigration.recordVersion(proxy.version);
-        if (this._internalMetadata.enabled) {
-          await this._internalMetadata.set("environment", this._environment);
+    try {
+      await this._ddlTransaction(migration, async () => {
+        await this._strategy.exec(direction, migration, this._adapter);
+        if (direction === "up") {
+          await this._schemaMigration.recordVersion(proxy.version);
+          if (this._internalMetadata.enabled) {
+            await this._internalMetadata.set("environment", this._environment);
+          }
+        } else {
+          await this._schemaMigration.deleteVersion(proxy.version);
         }
-      } else {
-        await this._schemaMigration.deleteVersion(proxy.version);
-      }
-    });
+      });
+    } catch (e) {
+      // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
+      const useTx = this._useTransaction(migration);
+      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e}`;
+      throw Object.assign(new Error(msg), { cause: e });
+    }
 
     if (this.verbose) {
       const action = direction === "up" ? "migrated" : "reverted";

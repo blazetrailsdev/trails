@@ -885,6 +885,9 @@ export function synthOnCondition(
   };
 }
 
+/** @internal Mirrors: ActiveRecord::Transactions::ClassMethods#set_options_for_callbacks! */
+export const setOptionsForCallbacksBang = synthOnCondition;
+
 // Mirrors: ActiveRecord::Transactions::ClassMethods#assert_valid_transaction_action
 /** @internal */
 function assertValidTransactionAction(actions: string[]): void {
