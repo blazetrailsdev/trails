@@ -447,8 +447,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async tableComment(tableName: string): Promise<string | null> {
-    void tableName;
-    return null;
+    const rows = await this.schemaQuery(
+      `SELECT table_comment FROM information_schema.tables` +
+        ` WHERE table_schema = database() AND table_name = ${this.quote(tableName)}`,
+    );
+    const val = rows[0]?.["table_comment"] as string | null | undefined;
+    return val || null;
   }
 
   async changeTableComment(
