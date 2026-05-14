@@ -312,10 +312,62 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows).toHaveLength(2);
     });
 
-    it.skip("uuid association", async () => {
-      // BLOCKED: Slot B — associations + UUID FK binding. The associations framework
-      // exists but doesn't route FK values through the Uuid OID type when building queries.
-      // SCOPE: ~20 LOC in association query builder (Uuid#cast for FK values).
+    it("uuid association", async () => {
+      const { Base, registerModel } = await import("../../index.js");
+      await adapter.exec(`DROP TABLE IF EXISTS uuid_assoc_comments`);
+      await adapter.exec(`DROP TABLE IF EXISTS uuid_assoc_posts`);
+      await adapter.exec(`
+        CREATE TABLE uuid_assoc_posts (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          title text
+        )
+      `);
+      await adapter.exec(`
+        CREATE TABLE uuid_assoc_comments (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          uuid_assoc_post_id uuid REFERENCES uuid_assoc_posts(id),
+          body text
+        )
+      `);
+      try {
+        class UuidAssocPost extends Base {
+          static tableName = "uuid_assoc_posts";
+          static {
+            this.adapter = adapter;
+            this.hasMany("uuidAssocComments", {
+              className: "UuidAssocComment",
+              foreignKey: "uuid_assoc_post_id",
+            });
+          }
+        }
+        class UuidAssocComment extends Base {
+          static tableName = "uuid_assoc_comments";
+          static {
+            this.adapter = adapter;
+            this.belongsTo("uuidAssocPost", {
+              className: "UuidAssocPost",
+              foreignKey: "uuid_assoc_post_id",
+            });
+          }
+        }
+        registerModel("UuidAssocPost", UuidAssocPost);
+        registerModel("UuidAssocComment", UuidAssocComment);
+        await UuidAssocPost.loadSchema();
+        await UuidAssocComment.loadSchema();
+
+        const post = await UuidAssocPost.createBang({});
+        expect(isValidUuid(post.id as string)).toBe(true);
+
+        const comment = await (post as any).uuidAssocComments.createBang({ body: "hello" });
+        expect(isValidUuid(comment.id as string)).toBe(true);
+        expect(comment.uuid_assoc_post_id).toBe(post.id);
+
+        const found = await (post as any).uuidAssocComments.find(comment.id);
+        expect(found.id).toBe(comment.id);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS uuid_assoc_comments`);
+        await adapter.exec(`DROP TABLE IF EXISTS uuid_assoc_posts`);
+      }
     });
 
     it("uuid foreign key", async () => {
@@ -803,17 +855,75 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {
-    it.skip("collection association with uuid", () => {
-      // BLOCKED: Slot B — has_many UUID FK binding + inverse_of. Needs association
-      // loading to route FK values through Uuid#cast and an inverse_of reflection path.
+    let UuidPost: any;
+
+    beforeEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuid_comments`);
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuid_posts`);
+      await adapter.exec(`
+        CREATE TABLE pg_uuid_posts (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          title text
+        )
+      `);
+      await adapter.exec(`
+        CREATE TABLE pg_uuid_comments (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          uuid_post_id uuid REFERENCES pg_uuid_posts(id),
+          content text
+        )
+      `);
+      const { Base, registerModel } = await import("../../index.js");
+      class UuidPostCls extends Base {
+        static tableName = "pg_uuid_posts";
+        static {
+          this.adapter = adapter;
+          this.hasMany("uuidComments", {
+            className: "UuidCommentInverse",
+            foreignKey: "uuid_post_id",
+            inverseOf: "uuidPost",
+          });
+        }
+      }
+      class UuidCommentCls extends Base {
+        static tableName = "pg_uuid_comments";
+        static {
+          this.adapter = adapter;
+          this.belongsTo("uuidPost", {
+            className: "UuidPostInverse",
+            foreignKey: "uuid_post_id",
+          });
+        }
+      }
+      registerModel("UuidPostInverse", UuidPostCls);
+      registerModel("UuidCommentInverse", UuidCommentCls);
+      await UuidPostCls.loadSchema();
+      await UuidCommentCls.loadSchema();
+      UuidPost = UuidPostCls;
     });
-    it.skip("find with uuid", () => {
-      // BLOCKED: Slot B — has_many UUID FK binding (same root cause as
-      // "collection association with uuid").
+
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuid_comments`);
+      await adapter.exec(`DROP TABLE IF EXISTS pg_uuid_posts`);
     });
-    it.skip("find by with uuid", () => {
-      // BLOCKED: Slot B — has_many UUID FK binding (same root cause as
-      // "collection association with uuid").
+
+    it("collection association with uuid", async () => {
+      const post = await UuidPost.createBang({});
+      const comment = await (post as any).uuidComments.createBang({});
+      const found = await (post as any).uuidComments.find(comment.id);
+      expect(found).toBeTruthy();
+      expect(found.id).toBe(comment.id);
+    });
+
+    it("find with uuid", async () => {
+      await UuidPost.createBang({});
+      await expect(UuidPost.find(123456)).rejects.toThrow(/Couldn't find/);
+    });
+
+    it("find by with uuid", async () => {
+      await UuidPost.createBang({});
+      const result = await UuidPost.findBy({ id: 789 });
+      expect(result).toBeNull();
     });
   });
 
