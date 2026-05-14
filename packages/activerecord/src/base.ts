@@ -640,7 +640,7 @@ export class Base extends Model {
 
   static _requireConcreteClass(): void {
     if (this.abstractClass && !this._suppressAbstractCheck) {
-      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/core.rb
+      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
       throw new NotImplementedError(
         `${this.name} is an abstract class and cannot be instantiated.`,
       );

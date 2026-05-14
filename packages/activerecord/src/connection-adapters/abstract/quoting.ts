@@ -501,7 +501,7 @@ function typeCastedBinds(
 
 /** @internal */
 function lookupCastType(sqlType: any): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:234
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type is not implemented",
   );

@@ -1534,7 +1534,7 @@ export function rawExecute(
   materializeTransactions?: any,
   batch?: any,
 ): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:552
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute is not implemented",
   );

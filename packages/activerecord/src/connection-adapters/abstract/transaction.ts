@@ -1055,7 +1055,7 @@ export class TransactionManager {
 
 /** @internal */
 function appendCallbacks(callbacks: any): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/transaction.rb cluster=transactions
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/transaction.rb:331 cluster=transactions
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Transaction#append_callbacks is not implemented",
   );
