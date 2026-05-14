@@ -1,8 +1,15 @@
 import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import {
+  beforeValidation,
+  beforeSave,
+  afterCreate,
+  afterUpdate,
+  afterDestroy,
+} from "../../callbacks.js";
 import { resolveModel, modelRegistry } from "../../associations.js";
+import { saveBelongsToAssociation } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 
 /**
@@ -51,6 +58,19 @@ export class BelongsTo extends SingularAssociation {
     if (options.default != null) {
       this.addDefaultCallbacks(model, reflection);
     }
+    if (options.autosave) {
+      this.addAutosaveCallbacks(model, reflection);
+    }
+  }
+
+  static addAutosaveCallbacks(model: any, reflection: any): void {
+    // Runtime: resolved false halts the chain (activesupport callbacks asyncHalted check).
+    // Type cast needed because beforeSave's fn type doesn't expose Promise<false>.
+    const cb = (record: any): Promise<void> =>
+      saveBelongsToAssociation.call(record, reflection).then((ok) => {
+        if (!ok) return false as unknown as void;
+      });
+    beforeSave(model, cb);
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {
