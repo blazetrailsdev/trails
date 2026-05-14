@@ -1,6 +1,6 @@
 # ActiveRecord API Parity Plan: 100% closed → post-100% Rails-fidelity stories
 
-**Snapshot 2026-05-12:** `activerecord 4969/4969 methods (100%) | files: 275/275 | inheritance: 209/209 (100%) | activemodel 625/625 (100%)`.
+**Snapshot 2026-05-14:** `activerecord 4950/4958 methods (99.8%) | files: 275/275 | inheritance: 210/210 (100%) | activemodel 621/621 (100%)`. Public surface is closed (100%); the 8 outstanding methods are residual privates.
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. Each PR targets ~250 LOC (CLAUDE.md hard ceiling 300; range 220–280).
 
