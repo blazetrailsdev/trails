@@ -1,6 +1,7 @@
 import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { association } from "../../associations.js";
+import type { Base } from "../../base.js";
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
 
@@ -101,7 +102,7 @@ export class CollectionAssociation extends Association {
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
     if (!existing || existing.configurable) {
       Object.defineProperty(mixin, name, {
-        get(this: any) {
+        get(this: Base) {
           return association(this, name);
         },
         set: existing?.set,

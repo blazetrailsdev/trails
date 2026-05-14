@@ -17,7 +17,6 @@ import {
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
 import { isStiSubclass, getStiBase } from "./inheritance.js";
-import type { Base } from "./base.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
 
@@ -68,8 +67,8 @@ export function defineAttribute(
 ): void {
   // STI subclasses share the base's _attributeDefinitions — route to the
   // base to avoid forking a subclass-local map that drifts from the base.
-  if (isStiSubclass(this as typeof Base)) {
-    const stiBase = getStiBase(this as typeof Base);
+  if (isStiSubclass(this)) {
+    const stiBase = getStiBase(this);
     (stiBase as AnyClass).defineAttribute(name, castType, options);
     return;
   }
@@ -135,9 +134,7 @@ export function defineAttribute(
 export function _defaultAttributes(this: AnyClass): AttributeSet {
   // For STI subclasses, delegate to the STI base so cache invalidation
   // from Base.attribute/defineAttribute (always routed to the base) is coherent.
-  const cacheHost = isStiSubclass(this as typeof Base)
-    ? (getStiBase(this as typeof Base) as AnyClass)
-    : this;
+  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as AnyClass) : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
     // Register cacheHost with its superclass so resetDefaultAttributes()

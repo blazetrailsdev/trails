@@ -138,9 +138,9 @@ export function registerModel(nameOrModel: string | typeof Base, model?: typeof 
     if (!model) throw new Error("registerModel(name, model) requires a model class");
     modelRegistry.set(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
-    const keys: string[] = (model as any)._registryKeys ?? [];
+    const keys: string[] = model._registryKeys ?? [];
     if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
-    (model as any)._registryKeys = keys;
+    model._registryKeys = keys;
     flushPendingCounterCacheColumns(model);
   } else {
     modelRegistry.set(nameOrModel.name, nameOrModel);
@@ -164,7 +164,7 @@ export function resolveModel(name: string): typeof Base {
  * Throws InverseOfAssociationNotFoundError if not found.
  */
 function validateInverseOf(targetModel: typeof Base, assocName: string, inverseOf: string): void {
-  const targetAssocs: AssociationDefinition[] = (targetModel as any)._associations ?? [];
+  const targetAssocs: AssociationDefinition[] = targetModel._associations ?? [];
   if (targetAssocs.length === 0) return;
   if (targetAssocs.some((a) => a.name === inverseOf)) return;
 
@@ -212,9 +212,7 @@ export function resolveCounterColumn(
     return `${assoc.name}_count`;
   }
   const childModel = resolveModel(childClassName);
-  const childAssocs = (childModel as any)._associations as
-    | Array<{ type: string; name: string; options: any }>
-    | undefined;
+  const childAssocs = childModel._associations as AssociationDefinition[] | undefined;
   if (childAssocs) {
     // Check against parent name and STI base class name
     const parentNames = new Set([parentModel.name]);
@@ -227,7 +225,7 @@ export function resolveCounterColumn(
       (a) =>
         a.type === "belongsTo" &&
         a.options.counterCache &&
-        (parentNames.has(a.options.className) || parentNames.has(camelize(a.name))),
+        (parentNames.has(a.options.className ?? "") || parentNames.has(camelize(a.name))),
     );
     if (belongsTo) {
       if (typeof belongsTo.options.counterCache === "string") {
@@ -545,10 +543,7 @@ async function _loadThroughViaDisableJoinsScope(
  * Sync loaded result to the association instance if one exists.
  */
 function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
-  const instances = (record as any)._associationInstances as Map<string, any> | undefined;
-  if (instances?.has(assocName)) {
-    instances.get(assocName)!.setTarget(result);
-  }
+  record._associationInstances.get(assocName)?.setTarget(result as Base | Base[] | null);
 }
 
 /**
@@ -566,8 +561,8 @@ export async function loadBelongsTo(
   // the value is null: an invalid name must throw even when the cached value is
   // null (e.g. preloader stored null for a missing row), consistent with the
   // cache-miss path that validates before the FK/null short-circuit.
-  if ((record as any)._cachedAssociations?.has(assocName)) {
-    const cached = (record as any)._cachedAssociations.get(assocName) as Base | null;
+  if (record._cachedAssociations?.has(assocName)) {
+    const cached = record._cachedAssociations.get(assocName) as Base | null;
     if (options.inverseOf && !options.polymorphic) {
       // Resolve target class from instance if available, otherwise from options.
       const targetModel =
@@ -576,13 +571,13 @@ export async function loadBelongsTo(
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && cached) {
-      (cached as any)._cachedAssociations = (cached as any)._cachedAssociations ?? new Map();
-      (cached as any)._cachedAssociations.set(options.inverseOf, record);
+      cached._cachedAssociations = cached._cachedAssociations ?? new Map();
+      cached._cachedAssociations.set(options.inverseOf, record);
     }
     return cached;
   }
-  if ((record as any)._preloadedAssociations?.has(assocName)) {
-    const preloaded = (record as any)._preloadedAssociations.get(assocName) as Base | null;
+  if (record._preloadedAssociations?.has(assocName)) {
+    const preloaded = record._preloadedAssociations.get(assocName) as Base | null;
     if (options.inverseOf && !options.polymorphic) {
       const targetModel =
         (preloaded?.constructor as typeof Base | undefined) ??
@@ -590,14 +585,14 @@ export async function loadBelongsTo(
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && preloaded) {
-      (preloaded as any)._cachedAssociations = (preloaded as any)._cachedAssociations ?? new Map();
-      (preloaded as any)._cachedAssociations.set(options.inverseOf, record);
+      preloaded._cachedAssociations = preloaded._cachedAssociations ?? new Map();
+      preloaded._cachedAssociations.set(options.inverseOf, record);
     }
     return preloaded;
   }
 
   // Strict loading check: this is a lazy load
-  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
+  if (record._strictLoading && !record._strictLoadingBypassCount) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -686,8 +681,8 @@ export async function loadBelongsTo(
 
   // Set inverse_of: store reference back to the owner
   if (result && options.inverseOf) {
-    (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
-    (result as any)._cachedAssociations.set(options.inverseOf, record);
+    result._cachedAssociations = result._cachedAssociations ?? new Map();
+    result._cachedAssociations.set(options.inverseOf, record);
   }
 
   syncToAssociationInstance(record, assocName, result);
@@ -706,15 +701,15 @@ export async function loadHasOne(
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
   // Check cached (inverse_of) first, then preloaded
-  if ((record as any)._cachedAssociations?.has(assocName)) {
-    return (record as any)._cachedAssociations.get(assocName) as Base | null;
+  if (record._cachedAssociations?.has(assocName)) {
+    return record._cachedAssociations.get(assocName) as Base | null;
   }
-  if ((record as any)._preloadedAssociations?.has(assocName)) {
-    return (record as any)._preloadedAssociations.get(assocName) as Base | null;
+  if (record._preloadedAssociations?.has(assocName)) {
+    return record._preloadedAssociations.get(assocName) as Base | null;
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
+  if (record._strictLoading && !record._strictLoadingBypassCount) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -831,8 +826,8 @@ export async function loadHasOne(
 
   // Set inverse_of: store reference back to the owner
   if (result && options.inverseOf) {
-    (result as any)._cachedAssociations = (result as any)._cachedAssociations ?? new Map();
-    (result as any)._cachedAssociations.set(options.inverseOf, record);
+    result._cachedAssociations = result._cachedAssociations ?? new Map();
+    result._cachedAssociations.set(options.inverseOf, record);
   }
 
   syncToAssociationInstance(record, assocName, result);
@@ -910,15 +905,15 @@ export async function loadHasMany(
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
   // Check cached (inverse_of) first, then preloaded
-  if ((record as any)._cachedAssociations?.has(assocName)) {
-    return (record as any)._cachedAssociations.get(assocName) as Base[];
+  if (record._cachedAssociations?.has(assocName)) {
+    return record._cachedAssociations.get(assocName) as Base[];
   }
-  if ((record as any)._preloadedAssociations?.has(assocName)) {
-    return (record as any)._preloadedAssociations.get(assocName) as Base[];
+  if (record._preloadedAssociations?.has(assocName)) {
+    return record._preloadedAssociations.get(assocName) as Base[];
   }
 
   // Strict loading check
-  if ((record as any)._strictLoading && !(record as any)._strictLoadingBypassCount) {
+  if (record._strictLoading && !record._strictLoadingBypassCount) {
     throw StrictLoadingViolationError.forAssociation(record, assocName);
   }
 
@@ -1045,8 +1040,8 @@ export async function loadHasMany(
   // Set inverse_of on each loaded child
   if (options.inverseOf) {
     for (const child of results) {
-      (child as any)._cachedAssociations = (child as any)._cachedAssociations ?? new Map();
-      (child as any)._cachedAssociations.set(options.inverseOf, record);
+      child._cachedAssociations = child._cachedAssociations ?? new Map();
+      child._cachedAssociations.set(options.inverseOf, record);
     }
   }
 
@@ -1148,12 +1143,12 @@ export async function countHasMany(
 ): Promise<number> {
   if (options.through) {
     // Temporarily disable strict loading so through-association loading works
-    (record as any)._strictLoadingBypassCount++;
+    record._strictLoadingBypassCount++;
     try {
       const records = await loadHasManyThrough(record, assocName, options);
       return records.length;
     } finally {
-      (record as any)._strictLoadingBypassCount--;
+      record._strictLoadingBypassCount--;
     }
   }
   const rel = buildHasManyRelation(record, assocName, options);
@@ -1177,7 +1172,7 @@ export async function loadHasManyThrough(
   options: AssociationOptions,
 ): Promise<Base[]> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
     throw new ConfigurationError(
@@ -1197,7 +1192,7 @@ export async function loadHasManyThrough(
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
   const throughModel = resolveModel(throughClassName);
-  const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
+  const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
   const sourceAssoc =
     throughModelAssocs.find((a) => a.name === sourceName) ??
     throughModelAssocs.find((a) => a.name === pluralize(sourceName));
@@ -1279,7 +1274,7 @@ export async function loadHasOneThrough(
   options: AssociationOptions,
 ): Promise<Base | null> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
     throw new ConfigurationError(
@@ -1305,7 +1300,7 @@ export async function loadHasOneThrough(
   // Now load the source from the through record
   const sourceName = options.source ?? assocName;
   const throughCtor = throughRecord.constructor as typeof Base;
-  const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const throughAssociations: AssociationDefinition[] = throughCtor._associations ?? [];
   const sourceAssoc = throughAssociations.find((a) => a.name === sourceName);
 
   if (sourceAssoc) {
@@ -1395,7 +1390,7 @@ function createHabtmJoinModel(
     name: sourceName,
     options: { className: targetClassName, foreignKey: targetFk },
   });
-  (JoinModel as any)._associations = joinAssocs;
+  JoinModel._associations = joinAssocs;
 
   for (const assocDef of joinAssocs) {
     const ref = Reflection.create(
@@ -1451,8 +1446,8 @@ export async function loadHabtm(
   options: AssociationOptions & { joinTable?: string },
 ): Promise<Base[]> {
   // Check preloaded cache first
-  if ((record as any)._preloadedAssociations?.has(assocName)) {
-    return (record as any)._preloadedAssociations.get(assocName) as Base[];
+  if (record._preloadedAssociations?.has(assocName)) {
+    return record._preloadedAssociations.get(assocName) as Base[];
   }
 
   const ctor = record.constructor as typeof Base;
@@ -1488,7 +1483,7 @@ export async function loadHabtm(
  */
 export async function processDependentAssociations(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
 
   for (const assoc of associations) {
     // HABTM with through: handled by the middle hasMany's dependent: "delete"
@@ -1607,7 +1602,7 @@ export function buildThroughAssociation(
   attrs: Record<string, unknown> = {},
 ): { target: Base; through: Base } {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName);
   if (!assocDef || !assocDef.options.through) {
     throw new ConfigurationError(
@@ -1699,12 +1694,12 @@ export async function createThroughAssociation(
   const { target, through } = buildThroughAssociation(record, assocName, attrs);
 
   // Resolve source type before any saves to determine save ordering
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName)!;
   const sourceName = assocDef.options.source ?? assocName;
 
   const throughCtor = through.constructor as typeof Base;
-  const throughAssociations: AssociationDefinition[] = (throughCtor as any)._associations ?? [];
+  const throughAssociations: AssociationDefinition[] = throughCtor._associations ?? [];
   const sourceAssocDef =
     throughAssociations.find((a) => a.name === sourceName) ??
     throughAssociations.find((a) => a.name === pluralize(sourceName));
@@ -1777,8 +1772,8 @@ export async function createThroughAssociation(
   });
 
   if (success) {
-    (record as any)._cachedAssociations = (record as any)._cachedAssociations ?? new Map();
-    (record as any)._cachedAssociations.set(assocName, target);
+    record._cachedAssociations = record._cachedAssociations ?? new Map();
+    record._cachedAssociations.set(assocName, target);
   } else {
     // Transaction rolled back — reset in-memory persisted state and PKs
     for (const rec of [target, through]) {
@@ -1815,7 +1810,7 @@ export function association<T extends Base = Base>(
   }
 
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
   const assocDef = associations.find((a) => a.name === assocName);
   if (!assocDef) {
     throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
@@ -1910,7 +1905,7 @@ export async function updateCounterCaches(
   direction: "increment" | "decrement",
 ): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
 
   for (const assoc of associations) {
     if (assoc.type !== "belongsTo" || !assoc.options.counterCache) continue;
@@ -2035,13 +2030,13 @@ export function setBelongsTo(
   }
 
   // Cache the association
-  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-  (record as any)._cachedAssociations.set(assocName, target);
+  if (!record._cachedAssociations) record._cachedAssociations = new Map();
+  record._cachedAssociations.set(assocName, target);
 
   // Set inverse on target
   if (target && options.inverseOf) {
-    if (!(target as any)._cachedAssociations) (target as any)._cachedAssociations = new Map();
-    (target as any)._cachedAssociations.set(options.inverseOf, record);
+    if (!target._cachedAssociations) target._cachedAssociations = new Map();
+    target._cachedAssociations.set(options.inverseOf, record);
   }
 }
 
@@ -2087,13 +2082,13 @@ export async function setHasOne(
   }
 
   // Cache
-  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-  (record as any)._cachedAssociations.set(assocName, target);
+  if (!record._cachedAssociations) record._cachedAssociations = new Map();
+  record._cachedAssociations.set(assocName, target);
 
   // Set inverse
   if (target && options.inverseOf) {
-    if (!(target as any)._cachedAssociations) (target as any)._cachedAssociations = new Map();
-    (target as any)._cachedAssociations.set(options.inverseOf, record);
+    if (!target._cachedAssociations) target._cachedAssociations = new Map();
+    target._cachedAssociations.set(options.inverseOf, record);
   }
 }
 
@@ -2142,19 +2137,19 @@ export async function setHasMany(
 
     // Set inverse
     if (options.inverseOf) {
-      if (!(t as any)._cachedAssociations) (t as any)._cachedAssociations = new Map();
-      (t as any)._cachedAssociations.set(options.inverseOf, record);
+      if (!t._cachedAssociations) t._cachedAssociations = new Map();
+      t._cachedAssociations.set(options.inverseOf, record);
     }
   }
 
   // Cache the collection
-  if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
-  (record as any)._cachedAssociations.set(assocName, targets);
+  if (!record._cachedAssociations) record._cachedAssociations = new Map();
+  record._cachedAssociations.set(assocName, targets);
 }
 
 export async function touchBelongsToParents(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
 
   for (const assoc of associations) {
     if (assoc.type !== "belongsTo" || !assoc.options.touch) continue;

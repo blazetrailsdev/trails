@@ -604,7 +604,7 @@ export async function save<T extends SaveRecord>(
   }
 
   self._skipTouch = options?.touch === false;
-  const ctor = this.constructor as unknown as Parameters<typeof isStiSubclass>[0];
+  const ctor = this.constructor;
 
   // Auto-set STI type column on new records
   if (this._newRecord && isStiSubclass(ctor)) {
