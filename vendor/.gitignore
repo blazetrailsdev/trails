@@ -1,0 +1,8 @@
+# Vendored sources are fetched on demand by the unified fetcher (wave 2).
+# Everything under vendor/ is gitignored except the registry, this file,
+# the README, and the lockfile (added in wave 2).
+*
+!.gitignore
+!README.md
+!sources.ts
+!sources.lock.json

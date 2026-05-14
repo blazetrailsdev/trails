@@ -103,7 +103,9 @@ Pro: one origin = one fetch = one cache invalidation. Versioning is monorepo-awa
 
 **Decision**: Shape B, **git-only**. Rubygems origins were considered and rejected: gem tarballs ship `lib/` only (gemspecs typically exclude `test/`), so test-compare integration silently breaks for bundler-fetched sources. globalid 1.3.0 ships from `rails/globalid` with a `v1.3.0` tag; rack from `rack/rack`. Going git-only also drops the bundlerFetcher, the ephemeral Gemfile, the lib/test symlink dance, and the runtime ruby/bundler dependency for fetching. If a future gem isn't on GitHub or isn't tagged, we'll add a bundler origin then.
 
-### 2.2 Concrete list (initial migration target)
+### 2.2 Concrete list (end-state)
+
+This is the _final_ list after all waves ship. Wave 1 lands the rails entry only; wave 2 adds rack alongside its fetcher; wave 3 adds globalid. The live `vendor/sources.ts` reflects the current wave's subset.
 
 ```ts
 export const SOURCES: UpstreamSource[] = [
