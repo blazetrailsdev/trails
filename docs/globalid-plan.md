@@ -1,15 +1,23 @@
 # GlobalID plan
 
-## Status (2026-05-06)
+## Status (2026-05-14)
 
-| PR        | Title                                                | Status         |
-| --------- | ---------------------------------------------------- | -------------- |
-| **GID-0** | Vendor globalid gem source for cross-reference       | ✅ this commit |
-| **GID-1** | Delete the lie: remove or rename fake `toSgid`       | ⏳ next        |
-| **GID-2** | `SignedGlobalID` over existing `signedId` infra      | ⏳             |
-| **GID-3** | `URI::GID` parser + `GlobalID` class                 | ⏳             |
-| **GID-4** | `GlobalID::Locator` + `findGlobalId` class methods   | ⏳             |
-| **GID-5** | `Identification` mixin polish + `expires_in`/purpose | ⏳             |
+| PR        | Title                                                          | Status     |
+| --------- | -------------------------------------------------------------- | ---------- |
+| **GID-0** | Vendor globalid gem source for cross-reference                 | ✅ shipped |
+| **GID-1** | Create `packages/globalid` skeleton + delete the lie in AR     | ⏳ next    |
+| **GID-2** | `SignedGlobalID` in the new package (over `signedId` verifier) | ⏳         |
+| **GID-3** | `URI::GID` parser + `GlobalID` class                           | ⏳         |
+| **GID-4** | `GlobalID::Locator` + `findGlobalId` class methods on AR Base  | ⏳         |
+| **GID-5** | `Identification` mixin polish + `expiresIn`/purpose            | ⏳         |
+
+**Packaging decision (2026-05-14):** GlobalID ships as a **separate package**
+`packages/globalid/`, matching Rails' gem boundary. AR depends on globalid
+(one-way); the `Identification` mixin is included onto `Base` from the
+globalid side via a side-effect import (same pattern as
+`registerMigrationArConfig`). This keeps `Base#findGlobalId` /
+`findSignedGlobalId` working without bloating `base.ts`, and unblocks future
+ActionCable / ActiveJob ports that need GIDs without an AR dependency.
 
 Rails source root: `scripts/globalid-source/vendor/bundle/ruby/*/gems/globalid-1.3.0/lib/`
 (abbreviated as `$GID/` below). Pinned to globalid 1.3.0 via `scripts/globalid-source/Gemfile`.
@@ -90,36 +98,56 @@ infrastructure already exists in our packages.
 - Add `scripts/globalid-source/fetch-globalid.sh` (mirrors `scripts/api-compare/fetch-rails.sh`)
 - Add this plan doc
 
-### GID-1 — Delete the lie (~80 LOC)
+### GID-1 — Create `packages/globalid` skeleton + delete the lie in AR (~150 LOC)
 
-Drop the fake `toSgid` from `Base`. Two options, in order of preference:
+Stand up the new package and remove the dishonest `toSgid` from AR in a
+single shot — this gives every subsequent PR a real home and avoids a brief
+intermediate state where AR has bogus methods.
 
-1. **Rename and redocument.** Rename `Base#toSgid` → `Base#toGidParam` (matches
-   Rails' `to_gid_param` shape: base64-of-gid, used as a URL-friendly param
-   identifier). Drop the "signed" implication entirely. This frees the `toSgid`
-   name for GID-2 to add the real signed version.
-2. **Just delete.** Remove `Base#toSgid` outright, deprecate `Base#toGidParam` =
-   `btoa(toGid())` for callers who genuinely want the unsigned base64 form.
+**New package skeleton:**
 
-Either way: the `Buffer.from(...).toString("base64")` fallback goes — `btoa` is
-global on Node ≥18 (which we already require) and on every browser.
+- `packages/globalid/package.json` — name `@blazetrails/globalid`, deps on
+  `@blazetrails/activesupport` (for MessageVerifier), peer-dep on
+  `@blazetrails/activerecord` (only used by the Identification mixin and
+  Locator; declared peer to avoid the cycle).
+- `packages/globalid/tsconfig.json` — same `trails-tsc` setup as siblings.
+- `packages/globalid/src/index.ts` — barrel; empty for now (PRs 2–5 fill it).
+- `packages/globalid/src/config.ts` — `setApp(name)` / `getApp()` singletons
+  (mirrors `GlobalID.app=`). Validates app name against `^[a-zA-Z0-9-]+$`.
+- `packages/globalid/dx-tests/` directory placeholder for type-level tests.
 
-Add `setGlobalIdApp(name: string)` config (mirrors `GlobalID.app=`). Update
-`Base#toGid` to include the app: `gid://${app}/${ctor.name}/${this.id}`. Keep
-the old `gid://${ctor.name}/${this.id}` shape working when no app is set, for
-backward compat with the existing tests in `signed-id.test.ts:289` — but flip
-those tests to set an app and assert the namespaced form.
+**AR-side changes:**
 
-- Files touched: `base.ts`, `signed-id.test.ts`
-- Tests: assert no app → `gid://Model/1`; with app → `gid://my-app/Model/1`;
-  invalid app names rejected
-- Risk: existing callers depending on the old `toSgid` need migration. None in
-  this repo today (grep confirms it's only referenced in tests).
+- Delete `Base#toSgid` outright. The base64 fallback was a lie; no callers in
+  this repo depend on it (grep confirms it's only referenced in tests).
+- Update `Base#toGid` to read app from `@blazetrails/globalid`'s `getApp()`
+  via a runtime import. When app is unset, fall back to the existing
+  `gid://${ctor.name}/${this.id}` shape — keeps `signed-id.test.ts:289`
+  green until GID-5 lands the namespaced form.
+- Add the side-effect-import pattern at the bottom of `base.ts`:
+  `import "@blazetrails/globalid/wire";` (the wire module is added in later
+  PRs as it gets richer — GID-1 just creates an empty stub so the import
+  resolves).
 
-### GID-2 — `SignedGlobalID` over existing `signedId` infra (~150 LOC)
+**Files touched:** `packages/globalid/*` (new), `packages/activerecord/src/base.ts`,
+`packages/activerecord/src/signed-id.test.ts`, root `pnpm-workspace.yaml` if
+needed, `tsconfig.references.json` chains.
 
-New file `packages/activerecord/src/signed-global-id.ts`. Mirrors
+**Tests:** `packages/globalid/src/config.test.ts` round-trips app
+get/set; invalid app names rejected. AR tests stay green.
+
+**Risk:** workspace plumbing — new package needs to land in `pnpm-workspace`,
+turbo pipelines if any, and the CI test matrix.
+
+### GID-2 — `SignedGlobalID` in the new package (~150 LOC)
+
+New file `packages/globalid/src/signed-global-id.ts`. Mirrors
 `$GID/global_id/signed_global_id.rb`.
+
+The verifier comes from AR's existing `signedIdVerifier(klass)` — globalid
+takes it as a parameter rather than importing AR directly. Caller (typically
+AR via the wire module) supplies the verifier; globalid stays AR-agnostic
+in its own source.
 
 - Reuse `signedIdVerifier(klass)` from `signed-id.ts` — no new secret config,
   no new crypto.
@@ -149,9 +177,9 @@ path.
 
 ### GID-3 — `URI::GID` parser + `GlobalID` class (~120 LOC)
 
-New file `packages/activerecord/src/global-id.ts` (or a `global-id/`
-subdirectory if it grows). Mirrors `$GID/global_id/uri/gid.rb` +
-`$GID/global_id/global_id.rb`.
+New files `packages/globalid/src/uri-gid.ts` and `packages/globalid/src/global-id.ts`,
+mirroring `$GID/global_id/uri/gid.rb` + `$GID/global_id/global_id.rb` —
+keep the file split so api:compare picks up Rails-mirroring layout.
 
 - Pure-JS URI parser: extract `app`, `modelName`, `modelId`, `params`. We don't
   need a full `URI::Generic` subclass — a small `parseGid(str)` function
@@ -174,8 +202,17 @@ subdirectory if it grows). Mirrors `$GID/global_id/uri/gid.rb` +
 
 ### GID-4 — `GlobalID::Locator` + `findGlobalId` class methods (~100 LOC)
 
-New file `packages/activerecord/src/global-id-locator.ts`. Mirrors
-`$GID/global_id/locator.rb`.
+New file `packages/globalid/src/locator.ts`. Mirrors `$GID/global_id/locator.rb`.
+
+The locator needs to find a model class from a name. Globalid declares the
+locator interface (`{ locate(gid): Promise<T | null>; locateMany(gids): Promise<T[]> }`)
+and provides a default implementation that asks a registered model-finder.
+AR registers its finder from the wire module — it walks `Base.descendants()`
+and builds a name → class map keyed by `ctor.name`.
+
+The `Base.findGlobalId` / `findSignedGlobalId` class methods live in AR
+(`packages/activerecord/src/base.ts`), delegating to the globalid locator
+they registered with at boot.
 
 The crux: how does the locator find `User` from `gid://app/User/1`?
 
@@ -212,8 +249,10 @@ Recommendation: option 1 with a cache. The cache invalidation hook plugs into
 
 ### GID-5 — `Identification` mixin polish + ergonomics (~80 LOC)
 
-Mirrors `$GID/global_id/identification.rb`. Most of this is method aliases and
-options threading. Net new on `Base`:
+New file `packages/globalid/src/identification.ts`, mirrors
+`$GID/global_id/identification.rb`. Methods are exported as `this`-typed
+functions and mixed onto `Base` in the wire module. Most of this is method
+aliases and options threading. Net new (on the host that includes the mixin):
 
 - `toGlobalId(options?)` (alias of `toGid`)
 - `toSignedGlobalId(options?)` (alias of `toSgid`)

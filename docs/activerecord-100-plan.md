@@ -1,6 +1,6 @@
 # ActiveRecord API Parity Plan: 100% closed → post-100% Rails-fidelity stories
 
-**Snapshot 2026-05-12:** `activerecord 4969/4969 methods (100%) | files: 275/275 | inheritance: 209/209 (100%) | activemodel 625/625 (100%)`.
+**Snapshot 2026-05-14:** `activerecord 4950/4958 methods (99.8%) | files: 275/275 | inheritance: 210/210 (100%) | activemodel 621/621 (100%)`. Public surface is closed (100%); the 8 outstanding methods are residual privates.
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. Each PR targets ~250 LOC (CLAUDE.md hard ceiling 300; range 220–280).
 
@@ -10,7 +10,7 @@ Closed work lives in `git log` — `git log --grep "audit Slot\|fidelity\|un-ski
 
 ---
 
-## Post-merge fidelity followups (~1675 LOC)
+## Post-merge fidelity followups (~2880 LOC)
 
 Small Rails-fidelity polish from PR reviews. Subsections group items by topic.
 
@@ -168,6 +168,172 @@ Small Rails-fidelity polish from PR reviews. Subsections group items by topic.
 - **~20 LOC** — better-sqlite3 DQS toggle: when upstream exposes `sqlite3_db_config`, pass `strict` through `Database.Options` in `sqlite-drivers/better-sqlite3.ts:openDatabase`. Then the `configureConnection` pragma block (currently silently ignored) can be removed.
 - **Known limitation** — `strict_strings_by_default` is a no-op in current driver: better-sqlite3 compiles with `SQLITE_DQS=0`, so DQS is always off and `assert_nothing_raised` (non-strict accepts index on missing column) cannot be exercised. Documented inline.
 
+### PG citext aftermath (#1498)
+
+- **~5 LOC each** — `hstore`, `ltree`, `tsvector`, `inet`, `macaddr`, `xml` are in `SQL_TYPE_MAP` but not in `DSL_HELPER_METHODS`. Same `t.<type>(...)` shorthand gap as citext had. Audit + add each. `hstore.test.ts > schema dump with shorthand` is already BLOCKED on this. (#1498)
+- **~30 LOC** — `case insensitive uniqueness` test for citext — no impl gap, just a missing test. Verify `validatesUniqueness({ caseSensitive: false })` + citext column skips `LOWER()`. (#1498)
+- **~15 LOC** — `SchemaCache.columns(null, tableName)` null-pool guard. The "case insensitiveness" test had to pre-warm via `adapter.schemaCache.setColumns()` to avoid crashing on null pool. Any future test calling `caseInsensitiveComparison` on a raw adapter hits the same crash. (#1498)
+- **Note** — `test_schema_dump_with_shorthand` regex assertion form differs: Rails `%r[t\.citext "cival"]` (no parens) vs our `/t\.citext\("cival"\)/` (TS parens). Functionally equivalent; the regex was updated in the test, not the dumper. (#1498)
+
+### Callbacks PR 3 aftermath (#1499)
+
+- **~5 LOC** — Remove `on?` from `CallbackConditions` in activemodel once PR 4 moves `afterCommit`/`afterRollback`/`afterSaveCommit`/etc. out of `Model`. These methods are the only reason `on?` stays in the interface. (#1499)
+- **~10 LOC (PR 4 territory)** — `resolveCallback` in `activemodel/src/callbacks.ts:172` still checks both `before_save` (snake_case) and `beforeSave` (camelCase). Snake_case branch is dead code per CLAUDE.md. Scoped to PR 4 per convergence plan. (#1499)
+- **~5 LOC** — `CallbackChain.register` accepts `on:` for commit/rollback events without validating the value (validation moved upstream to AR). Direct `chain.register("after", "commit", fn, { on: "bogus" })` silently stores bogus value. Low risk; PR 4 cleanup. (#1499)
+- **Architectural note** — `Model.afterSaveCommit` / `afterCreateCommit` / `afterUpdateCommit` / `afterDestroyCommit` call `this.afterCommit(fn, { on: ... })` which routes through `Base.afterCommit`. These methods arguably belong in AR's `Base`, not `Model` — PR 4 territory. (#1499)
+
+### Callbacks convergence aftermath (#1492 / #1497)
+
+- **~5 LOC** — `skipCallback` with `CallbackObject` on `ClassMethods` interface accepted but no dedicated mixin test was added — covered implicitly by the inheritance-clone test. Add a direct mixin-level test for parity. (#1497)
+- **Architectural note** — `resolveCallback` in `activemodel/src/callbacks.ts:172` currently checks both `before_save` snake-case AND `beforeSave` camelCase. PR 3 should decide whether to drop snake-case (camelCase-only per CLAUDE.md) or keep a compatibility shim. (#1497)
+- **Hyphenated chain names** — `beforeMy-save` isn't a valid JS identifier so the object form silently won't dispatch. Same limitation in Rails (Ruby `before_my-save` not valid). Document; `HyphenatedKeyTest` doesn't use the object form. (#1497)
+
+### Type-audit W1a aftermath (#1500)
+
+- **~30 LOC** — activesupport W1a equivalent: `Function` + `Record<string, any>` sweep + enable `no-unsafe-function-type`. `prepend.ts:PrependMethod = (this: any, super_: Function, ...)` is the high-leverage fix — currently forces `super_ as (...args: any[]) => unknown` casts in `extended-deterministic-queries.ts` and elsewhere. (#1500)
+- **~10 LOC cosmetic** — `type AnyClass = abstract new (...args: any[]) => any` duplicated in `suppressor.ts`, `no-touching.ts`, `delegation.ts`. Centralize in a shared internal types file. (#1500)
+- **~30 LOC** — `reflection.ts:normalizedReflections` `rawRef as any` cast is the roughest remaining cast. Define a `RawReflection` interface capturing `parentReflection?` to replace. (#1500)
+
+### Schema-dumper recent batch (Sweep D + #1467/#1468/#1469/#1472)
+
+- **~30 LOC** — `MigrationContext.createTable` passes abstract `TableDefinition` to the callback; `t.exclusionConstraint`/`t.uniqueConstraint` aren't callable from schema-file blocks. Rails emits them inline. Fix: instantiate `PgTableDefinition` when `adapterName === "postgres"`, then exclusion/unique constraints can move inline. Closes the Sweep D Item 1 partial-ship. (#1472)
+- **~50 LOC** — Harmonize `PostgreSQLAdapter.createTable` to abstract base's `(name, optionsOrFn?, fn?)` signature. Eliminates `SimpleTableBuilder` limitations + `createJoinTable` `schemaStatements()` detour + `@ts-expect-error TS2416`. Touches `range.test.ts:297` + `invertible-migration.test.ts:41` callers. (#1469)
+- **~30 LOC** — Verify `partitions.test.ts` bodies against Rails `partitions_test.rb` once source is available; "partition table" test may be missing the `tables()` does-not-return-partition-child assertion. (#1469)
+
+### MySQL schema (#1468 / #1477)
+
+- **~5 LOC** — `MigrationContext.dropTable` doesn't accept `temporary`. Sweep E wired it on `MysqlSchemaStatements.dropTable`, but `MigrationContext.dropTable` (migration.ts:~570) only accepts `{ ifExists? }` — never forwards `temporary`. End-to-end Migration path still incomplete. (#1477)
+- **~30 LOC** — `MysqlSchemaDumper.createSchemaDumper` sets `dumper.connection = this` but doesn't populate `tableCollationCache` or `virtualExpressionCache`. Rails populates these via `information_schema` queries before column iteration. Documented in `mysql/schema-dumper.ts` as gap. (#1477)
+- **Generalization note** — `mysql/schema-dumper.ts` `schemaLimit()` hardcodes `limit === 24` for float suppression. If another native default appears, generalize via `nativeDatabaseTypes()[column.type]?.limit` pattern. (#1468)
+
+### Has-one Slots C+D (#1478)
+
+- **~100 LOC** — `ThroughAssociation#target_scope` chain merge. Rails' override merges each intermediate reflection's `scope_for_association` (i.e., the join model's `default_scope`); our base returns `klass.all()`. Unblocks "has one through with default scope on join model" + 2 custom-select default_scope tests. Annotation already points here. (#1478)
+- **~50 LOC** — Non-preload (JOIN-based) eager loading. Three tests carry `BLOCKED: associations — non-preload (JOIN-based) eager loading not implemented`. Rails falls back from preload to a single JOIN query when `order:` references joined tables. General gap, not has_one_through-specific. (#1478)
+- **~80 LOC** — Scoped has_one_through: WHERE on through model or source via lambda scope. "has one through with conditions eager loading" uses `favorite_club` / `hairy_club`. Requires lambda-scope support on through/source reflection + fixture models. (#1478)
+- **~30 LOC** — Scope-based association-scope cache invalidation: `_cachedAssociationScope` never invalidated on through-model default-scope change. Rails resets via `reset_scope`. (#1478)
+- **Process note** — `assertQueriesMatch` in `testing/query-assertions.ts` works in tests today; future BLOCKED annotations citing "query count assertions not available" should be revisited rather than accepted at face value. (#1478)
+
+### Fixtures Phase 3a (#1481)
+
+- **~5 LOC** — Wire `executeBatch` from `sqlite3/database-statements.ts` into `SQLite3Adapter` (static assignment pattern). Enables live-adapter integration tests for `defineFixtures`; smoke test in #1481 had to use a mock adapter. (#1481)
+- **~5 LOC** — `topics.third` and `topics.fourth` missing `author_name`. Likely `David` per Rails YAML. Low impact today; verify when Phase 2 wiring lands. (#1481)
+- **Counter-cache verify** — `topics.first` has `replies_count: 1` hardcoded but 3 Reply-type topics parent to it. Verify against Rails source when Phase 2 wiring exposes `replies_count`-asserting tests. (#1481)
+- **Phase 3 scope note** — only 3 posts (`welcome`/`thinking`/`sti_comments`) and 3 comments (`greetings`/`more_greetings`/`does_it_hurt`) shipped. Rails has more for eager-loading/STI tests; absorbed into Phase 3b/5 cluster work. (#1481)
+- **Datetime/TZ gap** — `topics` fixtures omit `written_on`/`bonus_time`/`last_read` datetime columns. 2 remaining BLOCKED tests in `base.test.ts:2019,2305` also need `with_env_tz`. Stays BLOCKED. (#1481)
+
+### Fixtures Phase 3c (#1489)
+
+- **~5 LOC** — Add `shared_computers` (string) attribute to `Developer` test model; add `joined_on` (date) attribute to `DevelopersProject` join model. Schema-gap comments in place. (#1489)
+- **Note** — Phase 1b HABTM auto-detection (string-label form for join tables matching `a_b` pattern) is implemented but not exercised by Phase 3c data; #1489 used explicit `ref()` calls which are correct but more verbose. Future fixture sets may exercise the auto-form. (#1489)
+
+### Fixtures Phase 3d (#1487)
+
+- **~10 LOC** — Add `rating` (bigint), `description` (string), `account_id` (integer), `status` (integer enum) attributes to `Company` test model when downstream tests need them. Schema gaps documented inline. (#1487)
+- **~5 LOC** — Add `transactions_count` (counter cache) + `updated_at` attributes to `Account` test model. (#1487)
+
+### Fixtures audit sweep (#1488)
+
+- **~30 LOC** — `legacy_comments_count` and `tags_count` are schema-gap columns noted in `posts.ts`. Once those attributes are declared in the test Post model, extend fixture data with Rails YAML values (e.g. `welcome.legacy_comments_count: 2`). (#1488)
+- **~5 LOC** — `recursive_association_comment` missing `company_id` — schema gap. When Comment model gains the column, wire it. (#1488)
+- **Test rename** — `fixtures.test.ts` description `"does_it_hurt is a SpecialComment on sti_comments post"` is stale after #1488 corrected the `post_id` to `thinking`. Custom fixture test (not Rails-mirrored), so renaming is OK. (#1488)
+
+### Connection-pool sync (#1473, external)
+
+- **~50 LOC** — Audit + fix connection-leak patterns in test suite. `establish-connection.test.ts` and similar call `pool.checkout()` without `pool.checkin()`, leaking connections that saturate pools. This was the root cause of the OOM that delayed #1473. Fixing unlocks the next item. (#1473)
+- **~10 LOC** — Remove the `options.checkoutTimeout !== undefined` opt-in guard once test-suite leaks are fixed; always use `checkoutAsync`. This is the Rails-correct behavior (always waits up to `checkout_timeout`); current opt-in is a temporary backwards-compat measure for the leaked-pool test suite. (#1473)
+- **~20 LOC** — Pattern duplication in `withConnection`: then-detect + cleanup inlined three times (pre-leased, `runWithConn`, async continuation). Shared helper would parameterize the per-path differences. (#1473)
+- **~5 LOC** — `buildAsyncExecutor` returns `null` (connection-pool.ts:~986); should be a Promise-bounded semaphore. (#1473)
+- **~20 LOC** — `ExecutorHooks.complete()` resolver not wired to `Base.connectionHandler` yet (pending ConnectionHandler PR 6). (#1473)
+
+### Fixtures Phase 3b (#1484)
+
+- **~5 LOC** — Extend `test-fixtures.ts` Author model with `author_address_extra_id` and `owned_essay_id` `attribute()` declarations when Phase 2 integration tests need them. Fixture data is faithful to Rails YAML; the model schema is what's missing. (#1484)
+- **~30 LOC** — Extend `bookFixtureData` with enum columns (status, last_read, language, author_visibility, illustrator_visibility, font_size, difficulty, boolean_status, cover) once Book test model gains those `attribute()` declarations. Currently omitted because Book only declares name/author_id/format. (#1484)
+- **Note** — Explicit `id` fields from Rails YAML are intentionally omitted because `defineFixtures` always overwrites the PK with `fixtureId(label)`. Cross-refs work via `ref()` so FK resolution is unaffected. (#1484)
+
+### Fixtures Phase 2 (#1480)
+
+- **~5 LOC** — `isTableMissingError` in `use-fixtures.ts` matches `"does not exist"` broadly — could swallow errors about missing functions or sequences. Narrow to relation/table-only matches, following `test-adapter.ts:835-838` pattern. (#1480)
+- **Cleanup mode upgrade (~100 LOC Phase 4)** — `useFixtures` `afterEach` uses `DELETE FROM` per-table. Rails uses `disable_referential_integrity` + truncate + restore. Sufficient today; revisit for large fixture sets or speed. (#1480)
+- **Note** — `FixtureSet.createFixtures` ts API diverges from Rails (`adapter, Model, fixtures` vs Rails' `(fixtures_directory, fixture_set_names, ...)`). Intentional Phase 2 scope; production-fidelity directory-loading API is N/A in our TS-native model. (#1480)
+
+### Fixtures Phase 1b (#1471)
+
+- **~5 LOC** — Consider exporting `clearTableRegistry` (or per-adapter flush) for test suites reusing an adapter across files. (#1471)
+- **Edge note** — `detectHabtmParts` splits on `_` and tries all prefix/suffix splits; `line_items_orders` matches both `line` (not real) and `line_items` (real). Registry check picks the first match — correct, but worth documenting. (#1471)
+
+### Arel + activemodel type cleanup (#1476, unrelated)
+
+- **~30 LOC** — Tighten `normalizes()` overload from rest-param `[...string[], fn | Record]` to a discriminated union. Eliminates remaining `as unknown as string[]` casts and rejects invalid runtime calls at compile time. (#1476)
+- **~50 LOC** — Extract `ArelConnection` to a dedicated `packages/arel/src/visitors/connection.ts` so `node.ts` can import directly. Replaces the `connection?: never` contravariant workaround in `ToSqlCtor`. Safe but surprising; cleaner with the extraction. (#1476)
+
+### Sweep C aftermath
+
+- **~30 LOC (deferred, needs Rails audit)** — `AssociationReflection.isPolymorphic()` returning true when `options.as` is set was DROPPED from Sweep C — implementation broke the `HasOneAssociationPolymorphicThroughError` guard at `reflection.ts:1344`. The semantics differ: `options.as` means "this model plays a polymorphic role as the target" (affects FK columns), while `options.polymorphic` on `belongs_to` means "the target type varies." Audit Rails' actual `polymorphic?` implementation for `has_one :as` and identify which guards need updating before re-applying. (#1465)
+- **~10 LOC (pre-existing gap discovered)** — `saveBang` in `persistence.ts` calls `this.save()` with **no arguments**, silently ignoring `{ validate: false }` or any options passed to it. Sweep C's `insertRecord` fix worked around this via `save({ validate }) + raiseValidationError`, but `saveBang`'s option-blindness affects other callers too. (#1465)
+- **Convention note** — `inverseName()` `@internal`-public visibility pattern survived 5 Copilot review cycles. Per CLAUDE.md this is the correct access-control mechanism for Rails-private methods. Document for future reflection.ts changes. (#1465)
+
+### Migration Slot G
+
+- **~20 LOC** — Implement `AbstractMysqlAdapter#charset()` and `#collation()` (currently return `""`). Should call `showVariable("character_set_database")` / `showVariable("collation_database")`. Needed for `internalStringOptionsForPrimaryKey` and for any code reading `connection.charset` / `connection.collation` directly. (#1466)
+- **~30 LOC** — `SchemaMigration.createTable` and `InternalMetadata.createTable` use hardcoded SQL that bypasses `internalStringOptionsForPrimaryKey`. Route through the adapter's `create_table` DSL for full Rails parity. Affects schema-migrations table creation on old MySQL with utf8mb4. (#1466)
+- **~15 LOC (Rails divergence)** — `AbstractMysqlAdapter#renameIndex` throws when `supportsRenameIndex()` is false. Rails calls `super` (drops + recreates via `AbstractAdapter`). Modern MySQL ≥ 5.7.6 / MariaDB ≥ 10.5.2 supports rename so this is mostly moot, but Trilogy on older servers would hit it. (#1466)
+- **Test gap, not a bug** — no test exercises prefix-length index creation (`length: { col: N }`). Would need live MySQL test. (#1466)
+
+### Fixture replacement Phase 1
+
+- **~5 LOC** — Add validation that `ref(tableName, fixtureName)` resolves to a known fixtureId at call time (helpful error message instead of silent wrong ID). Phase 2 candidate. (#1470)
+- **~5 LOC** — Narrow direct-instance detection in `define-fixtures.ts:95` to `val instanceof Base` (currently false-positives on any plain object with an `id` key). Requires changing `import type { Base }` to a value import. (#1470)
+- **Architectural note (Phase 2 work)** — Rails loads all fixture sets in a single `insert_fixtures_set` call (one transaction for all tables); our `defineFixtures` issues one call per model class. Phase 2's `useFixtures` wrapper should batch multiple sets into a single transaction. (#1470)
+- **Documented divergence** — `fixtureId` uses `charCodeAt(i) & 0xff` instead of Rails' `Zlib.crc32`. Matches for ASCII labels (always the case for fixture identifiers); diverges for non-ASCII. Documented in code. (#1470)
+
+### Reflection Slot A
+
+- **~5 LOC (Rails divergence)** — `getPrimaryKeyAttr` returns `_primaryKey ?? "id"`, blocking a truly null PK. Rails supports `self.primary_key = nil`. The two #1456 unskips currently use `_primaryKey = ""` as a hack; aligning the fallback would let them use the Rails-mirrored setup.
+- **~5 LOC** — `UnknownPrimaryKey` message format and no-arg constructor: Rails appends description with `"\n #{description}"`; we join with `". "`. Rails supports `UnknownPrimaryKey.new` with no args (`"Unknown primary key."`); our constructor requires a model. No current call sites need either form, but Rails surface parity.
+- **~10 LOC (architectural-ish)** — `AbstractReflection#checkValidityOfInverseBang` uses `(this as any).inverseName?.()` to reach into `AssociationReflection`. A protected accessor would be cleaner long-term. Same `as any` pattern audited elsewhere — fold into the `as any` legacy-cast sweep.
+- **~3 LOC** — `joinScope` in `AbstractReflection` still throws plain `Error` for mismatched joinPrimaryKey/joinForeignKey lengths. No typed Rails counterpart found; either invent (`MismatchedForeignKeyError` or similar) or leave as-is and document.
+
+### Has-one Slot A
+
+- **~5 LOC (Rails divergence, destroyed-record reload)** — `createThroughRecord` omits Rails' `if through_record && through_record.destroyed?` guard that reloads the through proxy before continuing. Harmless in most cases but could cause a stale-proxy issue if the through record was destroyed and a new assignment follows immediately without explicit reload. (#1457)
+- **~10 LOC (Rails divergence, in-memory build path unreachable)** — When `owner.isNewRecord()` or `!save`, Rails calls `through_proxy.build(attributes)` for in-memory creation. Our `createThroughRecord` mirrors that, but `persistReplace` only invokes it post-save with `save=true`, and our `replace` override skips storing `_pendingReplace` for `save=false`. Net: `member = new Member; member.club = club` (explicit `save=false`) won't build the membership in memory. Practical impact low — rare explicit opt-out. (#1457)
+- **~10 LOC** — `ThroughReflection.isPolymorphic()` returns `!!options.polymorphic` but misses the `options.as` path. `has_one :sponsor, as: :sponsorable` is not recognized as polymorphic, so `HasOneAssociationPolymorphicThroughError` never raises for the polymorphic-through guard. (#1457)
+- **~5 LOC cleanup** — `throughAssociation()` helper in `has-one-through-association.ts` is unused dead code (only appears in a JSDoc comment). Pre-existing; safe to delete. (#1457)
+
+### PG schema dump (post-#1458)
+
+- **~30 LOC** — PG table comment schema dump: forward `adapterTableOpts.comment` in `emitTable`; add `COMMENT ON TABLE` emission after `createTable` in the PG schema dumper (mirroring Rails' `exec_migration` comment hook). `tableOptions()` already queries it; just not forwarded. (#1458)
+- **~20 LOC** — PARTITION BY schema dump: 2 `BLOCKED: adapter-pg` partition tests in `SchemaCreateTableOptionsTest` flow through the same `fetchTableOptions → options:` path; need `tablePartitionDefinition` wired correctly + test bodies. (#1458)
+- **~10 LOC** — `delegatedType` accessor naming gap: current implementation generates `entry.message` (returns FK value); Rails generates `entry.message_id` / `entry.uuid_message_uuid` (type-snake + pk-name). The "accessor" test locks in the wrong behavior; fixing requires a separate PR that also updates that test body. (#1458)
+- **Note for code archaeology** — `schema-dumper.ts:fetchTableOptions` introduced a sync/async union type novel to this codebase; the `void adapterTableOpts.catch(() => {})` swallow in the sync guard may surprise readers. PG `tableOptions()` queries `tableComment()` on every dumped table even when unused — low overhead, worth noting if dump perf becomes a concern. (#1458)
+
+### Has-one Slot B
+
+- **~20 LOC (latent bug)** — `readAttributeForValidation` fix (`assoc.target != null` guard) added in #1461 applies broadly to ALL association types, not just `has_one`. The same false-positive could affect `belongs_to required: true` and `has_many validate: true` after eager loading via `preloader/association.ts:206 associateRecordsFromUnscoped`. Worth a dedicated test proving `required: true` does NOT spuriously fail post-preload. (#1461)
+- **~5 LOC cleanup** — `else if (typeof model.validates === "function")` branch in `HasOne#defineValidations` is dead code (`validatesPresenceOf` is always available on AR models). (#1461)
+- **~10 LOC cleanup** — `addAutosaveAssociationCallbacks` in `autosave-association.ts:~901` is defined but never called. `validateAssociations` bulk loop replaces it functionally. Safe to delete. (#1461)
+
+### SQLite Slot B
+
+- **~15 LOC (Rails divergence)** — `dataSourceExists()` in `sqlite3-adapter.ts` still uses the old `sqlite_master`-based query (via `_sqliteMasterFor`), while `tableExists()` was updated to `pragma_table_list` in #1459. Rails' `data_source_exists?` also uses the `data_source_sql` (same `pragma_table_list` path). Align `dataSourceExists()` to match. (#1459)
+- **~10 LOC** — Extract `assertLogged` from `sqlite3-adapter.test.ts` to a shared `packages/activerecord/src/adapters/sqlite3/test-helper.ts` (mirroring how PG `test-helper.ts` houses `SQLSubscriber`). Rails defines `assert_logged` on `ActiveRecord::TestCase` so it's available to all adapter tests. (#1459)
+- **Known behavior (not a followup)** — `tableExists("sqlite_sequence")` returns false but `tableExists("main.sqlite_sequence")` returns true post-#1459 (different code paths). Acceptable; Rails doesn't support schema-qualified names at all. (#1459)
+
+### Schema Slot C (#1460)
+
+- **~30 LOC (Rails divergence)** — PG `NULLS FIRST`/`NULLS LAST` not parsed by `indexes()`; Rails parses these and includes them in the orders string (`"desc NULLS LAST"`). Pre-existing gap surfaced during #1460.
+- **~20 LOC** — PG `INCLUDE (...)` clause (covering indexes) not parsed or emitted. Rails emits `include: [...]`. Pre-existing gap.
+- **~40 LOC** — `MigrationContext.createTable()` inline index SQL ignores `where`/`order`/`nullsNotDistinct`/`using` options from `td.indexes` — Copilot raised this 4× in #1460, deferred each time. `_indexes` store reflects options, executed SQL doesn't. Fix: reuse `addIndex` internally or extract the SQL builder.
+- **~50 LOC** — Live PG adapter test confirming `idx.where` and `idx.nullsNotDistinct` populated from `indexes()` on a real DB. Per Copilot review #4.
+- **Known limitation** — `nullsNotDistinct` SQL only emitted on PG (`adapterName === "postgres"`). SQLite silently ignores. Acceptable.
+
+### PG connection Slot D (#1464)
+
+- **~20 LOC (latent issue)** — `connection-pool.ts:449,505,522` call `connection.verifyBang()` without `await`. Post-#1464 the PG override is async; fixture-connection checkout paths now fire-and-forget the liveness check. Fix: widen `TransactionAwareConnection.verifyBang` to `Promise<void>` and await call sites. Requires `checkout()` / `checkoutAsync()` to absorb the await (broader connection-pool change).
+- **Architectural note (pre-existing)** — Rails `verify!` calls `reconnect!(restore_transactions: true)` which replays open transactions. Our `reconnect()` calls `resetTransaction()` but does not restore transaction state. Documented for the eventual transaction-state-restore work.
+
 ### api:compare regression guard
 
 - **Process improvement** — `_`-prefix renames on Rails-named methods silently drop them from `api:compare` surface. Consider extending the `rails-private-jsdoc` ESLint rule to flag `_`-prefixed methods whose Rails counterpart is non-underscored. Permanent guardrail against the regression class.
@@ -215,39 +381,35 @@ Cluster details in [`activerecord-100-clusters.md`](activerecord-100-clusters.md
 | Associations-core cluster                 | 5    | ~910     |
 | Associations-HABTM cluster                | 9    | ~1690    |
 | Associations has-many-through cluster     | 5    | ~1280    |
-| Associations has-one cluster              | 4    | ~480     |
-| Migration cluster                         | 6    | ~1210    |
+| Migration cluster                         | 5    | ~1070    |
 | Connection-pool cluster                   | 3    | ~640     |
 | MySQL active-schema cluster               | 3    | ~680     |
 | MySQL mysql2-adapter cluster              | 3    | ~700     |
-| MySQL schema cluster                      | 3    | ~400     |
+| MySQL schema cluster                      | 1    | ~200     |
 | MySQL table-options cluster               | 2    | ~480     |
 | MySQL charset-collation cluster           | 3    | ~315     |
 | MySQL onUpdate followups                  | 2    | ~30      |
-| SQLite adapter cluster                    | 1    | ~50      |
 | PG-adapter cluster                        | 2    | ~340     |
-| PG-schema audit cluster                   | 3    | ~530     |
+| PG-schema audit cluster                   | 1    | ~260     |
 | PG virtual-column cluster                 | 1    | ~250     |
 | PG interval cluster                       | 1    | ~180     |
 | PG UUID residual cluster                  | 2    | ~330     |
-| PG connection cluster                     | 3    | ~130     |
-| PG long-tail cluster                      | 8    | ~1760    |
-| Schema cluster                            | 7    | ~1390    |
+| PG long-tail cluster                      | 7    | ~1510    |
+| Schema cluster                            | 5    | ~1050    |
 | Transactions cluster                      | 3    | ~350     |
 | Unknown-triage cluster                    | 4    | ~640     |
 | STI annotation-drift                      | 1    | ~20      |
 | Associations-autosave cluster             | 4    | ~940     |
-| Associations-reflection cluster           | 4    | ~780     |
+| Associations-reflection cluster           | 3    | ~700     |
 | NotImplementedError elimination (Phase 2) | 7    | ~610     |
-| `as any` legacy-cast cleanup sweep        | 1    | ~250     |
-| Post-merge fidelity followups             | 78   | ~1675    |
+| Post-merge fidelity followups             | 151  | ~2880    |
 | Doc-hygiene + infra followups             | 3    | ~30      |
 | Architectural deferred                    | 3    | ~410     |
 | Infra-blocked                             | 6    | n/a      |
 
-**~107 actionable work-PR slots + 0 queued audits**, ~19.5k LOC across the clusters above.
+**~90 actionable work-PR slots + 0 queued audits**, ~18.2k LOC across the clusters above.
 
-The two `as any` audits (delivered 2026-05-12) found **zero new critical bugs** — the optional-chain audit returned `0 bug-suspected` and the method-call audit returned `2 bug-suspected` (folded into post-merge fidelity followups above for surgical verification). The high-leverage opportunity is **Sweep B from audit-as-any-method-calls**: ~250 LOC mechanical removal of 52 legacy-cast-removable instance-method casts on `Base` (`(record as any)._readAttribute`, `.save`, `.destroy`, etc. — TS types already declare these). The optional-chain audit's ~110 `legacy-removable` sites are dependent on the same `Base` host-interface tightening; can be folded into the same sweep or land second.
+The `as any` legacy-cast cleanup sweep that previously lived in this table has been **superseded by `docs/activerecord-type-audit.md`** — the type-audit's 4-wave plan covers the same `(record as any)._readAttribute` / `.save` / `.destroy` removals more precisely (Wave 2 host typing + Wave 3 private-state declarations). The 2 `bug-suspected` candidates from the as-any audits remain as fidelity followups above for surgical verification regardless of which sweep ships them.
 
 ---
 
