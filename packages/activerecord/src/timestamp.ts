@@ -3,6 +3,7 @@ import type { Base } from "./base.js";
 import { ReadOnlyRecord, StaleObjectError } from "./errors.js";
 import { UpdateManager, Nodes } from "@blazetrails/arel";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
+import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
 /**
  * Timestamp handling for ActiveRecord models.
@@ -112,7 +113,7 @@ export async function touch(
 
   this.changesApplied();
 
-  await ctor._callbackChain.runAfter("touch", this);
+  await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
   return true;
 }
 

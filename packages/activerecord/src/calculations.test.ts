@@ -23,6 +23,7 @@ import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -6528,8 +6529,8 @@ describe("CalculationsTest", () => {
     (Order as any).beforeShip(() => log.push("before_ship"));
     (Order as any).afterDeliver(() => log.push("after_deliver"));
     const o = new Order({});
-    (Order as any)._callbackChain.runBefore("ship", o);
-    (Order as any)._callbackChain.runAfter("deliver", o);
+    runBeforeCallbacksOnProto(Order.prototype, "ship", o);
+    runAfterCallbacksOnProto(Order.prototype, "deliver", o);
     expect(log).toEqual(["before_ship", "after_deliver"]);
   });
 
@@ -6572,7 +6573,7 @@ describe("CalculationsTest", () => {
       { prepend: true },
     );
     const u = new User({});
-    (User as any)._callbackChain.runBefore("destroy", u);
+    runBeforeCallbacksOnProto(User.prototype, "destroy", u);
     expect(order[0]).toBe("prepended");
   });
 

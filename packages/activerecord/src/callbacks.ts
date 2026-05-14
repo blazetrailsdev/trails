@@ -2,13 +2,14 @@
  * Callback lifecycle hooks for ActiveRecord persistence operations.
  *
  * In Rails, Callbacks wraps destroy/touch/increment! to fire
- * before/after hooks. Our Base class uses _callbackChain directly;
- * this module exports the callback registration helpers.
+ * before/after hooks. Registration and run-path call through activesupport's
+ * callback engine via the helpers in @blazetrails/activemodel.
  *
  * Mirrors: ActiveRecord::Callbacks
  */
 
 import type { Base } from "./base.js";
+import { _registerCallbackOnProto, runAllCallbacks } from "@blazetrails/activemodel";
 import {
   allTimestampAttributesInModel,
   currentTimeFromProperTimezone,
@@ -196,23 +197,6 @@ function registerCallback(
   fn: (...args: any[]) => unknown,
   options?: AnyCallbackOptions,
 ): void {
-  const klass = modelClass as unknown as {
-    _callbackChain?: {
-      clone(): unknown;
-      register(
-        timing: "before" | "after",
-        event: string,
-        fn: (...args: any[]) => unknown,
-        conditions: Record<string, unknown>,
-      ): void;
-    };
-  };
-  if (!klass._callbackChain) return;
-  // Clone the chain if it's inherited from a parent, so we don't
-  // register callbacks on sibling subclasses
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_callbackChain")) {
-    klass._callbackChain = klass._callbackChain.clone() as typeof klass._callbackChain;
-  }
   const conditions: Record<string, unknown> = {};
   if (options?.if) conditions.if = options.if;
   if (options?.unless) conditions.unless = options.unless;
@@ -220,7 +204,13 @@ function registerCallback(
   if (event === "validation" && "on" in (options ?? {})) {
     conditions.on = (options as ValidationCallbackOptions<never>).on;
   }
-  klass._callbackChain!.register(timing, event, fn, conditions);
+  _registerCallbackOnProto(
+    (modelClass as unknown as { prototype: object }).prototype,
+    timing,
+    event,
+    fn,
+    conditions,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -241,10 +231,10 @@ export function createOrUpdate(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export function _createRecord(this: any): Promise<boolean> {
+export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor as any;
-  return ctor._callbackChain.runCallbacks("create", this, async () => {
+  return runAllCallbacks(ctor.prototype, "create", this, async () => {
     if (ctor.recordTimestamps !== false) {
       const time = currentTimeFromProperTimezone();
       for (const col of allTimestampAttributesInModel.call(ctor)) {
@@ -266,12 +256,12 @@ export function _createRecord(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export function _updateRecord(this: any): Promise<boolean> {
+export async function _updateRecord(this: any): Promise<boolean> {
   // Rails: _run_update_callbacks { record_update_timestamps { super } } — returns boolean.
   // record_update_timestamps writes updated_at/updated_on when @_touch_record
   // and should_record_timestamps? are true, then yields to the actual update.
   const ctor = this.constructor as any;
-  return ctor._callbackChain.runCallbacks("update", this, async () => {
+  return runAllCallbacks(ctor.prototype, "update", this, async () => {
     // Mirror record_update_timestamps: write timestamp columns before the update
     // when the model has record_timestamps enabled and has changes to save.
     // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)

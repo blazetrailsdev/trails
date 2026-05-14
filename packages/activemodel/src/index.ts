@@ -59,7 +59,14 @@ export type { Mutable } from "./type/helpers/mutable.js";
 export { ModelName } from "./naming.js";
 export type { ModelLike } from "./naming.js";
 export { DirtyTracker } from "./dirty.js";
-export { CallbackChain } from "./callbacks.js";
+export {
+  _registerCallbackOnProto,
+  hasCallbackOnProto,
+  skipCallbackOnProto,
+  runAllCallbacks,
+  runBeforeCallbacksOnProto,
+  runAfterCallbacksOnProto,
+} from "./callbacks.js";
 export type { CallbackConditions } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";
 export type { SerializeOptions } from "./serialization.js";

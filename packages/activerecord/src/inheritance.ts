@@ -9,6 +9,7 @@ import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { Nodes } from "@blazetrails/arel";
 import { camelize, isPresent, underscore } from "@blazetrails/activesupport";
+import { runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 
 /**
  * Helper: cast inheritance column value through its attribute type.
@@ -313,8 +314,8 @@ function directInstantiate(klass: typeof Base, row: Record<string, unknown>): Ba
     (record as any)._strictLoading = true;
   }
   // Rails' init_with_attributes fires after_find then after_initialize
-  (klass as any)._callbackChain?.runAfter?.("find", record, { strict: "sync" });
-  (klass as any)._callbackChain?.runAfter?.("initialize", record, { strict: "sync" });
+  runAfterCallbacksOnProto((klass as any).prototype, "find", record, { strict: "sync" });
+  runAfterCallbacksOnProto((klass as any).prototype, "initialize", record, { strict: "sync" });
   return record;
 }
 
