@@ -97,6 +97,10 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("retrieve connection pool with invalid shard", () => {
+    Base.connectionHandler.establishConnection(
+      new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" }),
+      { owner: "Base" },
+    );
     expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeUndefined();
     expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
   });

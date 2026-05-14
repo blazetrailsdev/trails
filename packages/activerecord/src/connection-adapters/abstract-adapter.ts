@@ -712,10 +712,19 @@ export class AbstractAdapter implements Quoting {
     if (pool?.preventWrites === true) return true;
     if (pool?.dbConfig?.preventWrites === true) return true;
     if (this._config.preventWrites === true) return true;
-    // Mirror Rails: connection_descriptor.current_preventing_writes — read from stack
+    // Mirrors Rails: connection_descriptor.current_preventing_writes
+    // Filter by the pool's owner class name so an unrelated abstract-class
+    // connected_to block doesn't affect this adapter's connection scope.
+    const ownerName: string | undefined = pool?.poolConfig?.connectionDescriptor?.name;
     const stack = connectedToStack();
     for (let i = stack.length - 1; i >= 0; i--) {
-      if (stack[i].preventWrites !== undefined) return stack[i].preventWrites!;
+      const entry = stack[i];
+      if (entry.preventWrites === undefined) continue;
+      for (const k of entry.klasses) {
+        if (typeof k === "function" && (k.name === ownerName || k.name === "Base")) {
+          return entry.preventWrites;
+        }
+      }
     }
     return false;
   }
