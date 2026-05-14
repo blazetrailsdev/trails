@@ -100,22 +100,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(i.legacy_term).toBe("P1DT1H");
     });
 
-    it.skip("average interval type", async () => {
-      // BLOCKED: calculations — AVG(interval) aggregate not type-cast through Interval OID
-      // ROOT-CAUSE: calculations.ts average() does not consult the column's cast type
-      //   for aggregate results; AVG of interval returns a raw string instead of Duration.
-      // SCOPE: ~30 LOC — wire typeForAttribute through aggregate result coercion in calculations.ts.
-      // Rails behavior: assert_equal 3.years + 2.months, IntervalDataType.average(:maximum_term)
+    it("average interval type", async () => {
+      await IntervalDataType.createBang({ maximum_term: "P2Y" });
+      await IntervalDataType.createBang({ maximum_term: "P4Y" });
+      const avg = await IntervalDataType.average("maximum_term");
+      // PG averages "2 years" and "4 years" → "3 years". The verbose result
+      // round-trips through Interval.castValue → Duration.
+      expect(avg).toBeInstanceOf(Duration);
+      // 3 years ≈ 3 × 365.25 × 86400 = 94 672 800 seconds.
+      const seconds = (avg as Duration).inSeconds();
+      expect(Math.abs(seconds - 3 * 365.25 * 86400)).toBeLessThan(86400);
     });
 
-    it.skip("schema dump with default value", async () => {
-      // BLOCKED: schema-dumper renders interval default as numeric seconds (e.g. 94670856)
-      //   instead of the ISO8601 string "P3Y".
-      // ROOT-CAUSE: postgresql/schema-statements.ts extractValueFromDefault does not handle
-      //   interval typed defaults; schema-dumper then prints the raw default through Number
-      //   inspection rather than calling Interval.typeCastForSchema.
-      // SCOPE: ~20 LOC — route interval defaults through the OID type's typeCastForSchema
-      //   in extract_value_from_default + schema-dumper column-default rendering.
+    it("schema dump with default value", async () => {
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "interval_data_types");
+      const dumped = lines.join("\n");
+      // default_term column carries DEFAULT 'P3Y' which PG normalizes to
+      // "3 years" in pg_get_expr; the OID type re-serializes it back to
+      // ISO8601 for the schema dump.
+      expect(dumped).toMatch(/default_term.*default:\s*"P3Y"/);
     });
   });
 });

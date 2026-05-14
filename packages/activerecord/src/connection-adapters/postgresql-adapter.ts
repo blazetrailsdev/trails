@@ -1757,12 +1757,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     sql: string,
     name?: string | null,
     binds: unknown[] = [],
-    pk?: string | null,
+    pk?: string | boolean | null,
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    if (this._useInsertReturning) {
-      return super.execInsert(sql, name, binds, pk as string | null, sequenceName, returning);
+    // Mirrors Rails: `if use_insert_returning? || pk == false`. `pk === false`
+    // is the explicit caller opt-out for "this table has no PK / don't fetch
+    // the inserted id" (Rails passes false from InsertAll for skip-rows).
+    if (this._useInsertReturning || pk === false) {
+      return super.execInsert(
+        sql,
+        name,
+        binds,
+        pk === false ? null : ((pk as string | null | undefined) ?? null),
+        sequenceName,
+        returning,
+      );
     }
     // Resolve sequence name before acquiring the INSERT client so the
     // metadata queries (primaryKey, defaultSequenceName) don't consume
@@ -1771,7 +1781,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        const resolvedPk = suppressCompositePrimaryKey(pk ?? undefined);
+        const pkStr = typeof pk === "string" ? pk : null;
+        const resolvedPk = suppressCompositePrimaryKey(pkStr ?? undefined);
         sequenceName = resolvedPk ? await this.defaultSequenceName(tableRef, resolvedPk) : null;
       }
     }

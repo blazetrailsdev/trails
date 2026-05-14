@@ -105,8 +105,29 @@ function castAggValue(val: unknown, fn: AggFn, colType: unknown, coerceNumeric: 
     return Number(val ?? 0);
   }
 
-  // count / average: always a JS number.
+  // For average over non-numeric column types (e.g. PG interval), route the
+  // raw aggregate value through the column type's deserialize so callers
+  // get a domain object (Duration) rather than a stringified driver value.
+  if (fn === "average" && colType != null && !isNumericLikeType(colType)) {
+    const ct = colType as { deserialize?(v: unknown): unknown };
+    if (typeof ct.deserialize === "function") return ct.deserialize(val);
+  }
+  // count / average over numeric columns: JS number.
   return Number(val);
+}
+
+function isNumericLikeType(colType: unknown): boolean {
+  if (colType == null || typeof colType !== "object") return true;
+  const name = (colType as { type?(): string }).type?.();
+  if (!name) return true;
+  return (
+    name === "integer" ||
+    name === "bigint" ||
+    name === "float" ||
+    name === "decimal" ||
+    name === "numeric" ||
+    name === "boolean"
+  );
 }
 
 function buildAggNode(table: any, fn: AggFn, column: string, distinct: boolean): any {
