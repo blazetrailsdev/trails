@@ -921,11 +921,14 @@ export class SchemaDumper {
 
       if (DSL_HELPER_METHODS.has(dslType)) {
         lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
-      } else if (col.isEnum && dslType === "enum" && typeof extraOpts?.enum_type === "string") {
+      } else if (col.isEnum && dslType === "enum") {
         // PG enum columns: emit t.enum("col", { enum_type: "typename", ... })
         // Only when column.isEnum is set (OID-resolved type is "enum") to avoid
         // misclassifying domains and other unmapped custom types.
-        const enumSpec = { ...colspec, enum_type: extraOpts.enum_type };
+        // Prefer col.sqlType (raw adapter path: col.type="enum", col.sqlType="mood")
+        // over extraOpts.enum_type (AdapterSchemaSource path: col.type="mood").
+        const enumTypeName = (col as any).sqlType ?? extraOpts?.enum_type ?? col.type;
+        const enumSpec = { ...colspec, enum_type: enumTypeName };
         const enumOptsStr = `, { ${this.formatColspec(enumSpec)} }`;
         lines.push(`    t.enum(${JSON.stringify(col.name)}${enumOptsStr});`);
       } else {

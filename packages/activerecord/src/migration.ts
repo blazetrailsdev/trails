@@ -1652,7 +1652,6 @@ export class MigrationContext {
     this._indexes.delete(name);
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
     await (this.adapter as any).enableExtension?.(name, options);
   }
@@ -1669,6 +1668,7 @@ export class MigrationContext {
     await (this.adapter as any).createSchema?.(name, options);
   }
 
+  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#create_virtual_table
   async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
     if (typeof (this.adapter as any).createVirtualTable === "function") {
       await (this.adapter as any).createVirtualTable(name, moduleName, args);
