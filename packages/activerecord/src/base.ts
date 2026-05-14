@@ -1521,7 +1521,8 @@ export class Base extends Model {
 
   // -- Scopes registry (used by Relation) --
   static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
-  static _defaultScope: ((rel: any) => any) | null = null;
+  /** Accumulated default_scope declarations. @internal */
+  static defaultScopes: import("./scoping/default.js").DefaultScope[] = [];
 
   // --- Default scope (wired via extend() after class body) ---
   declare static defaultScope: typeof _defaultScope;
@@ -1546,10 +1547,11 @@ export class Base extends Model {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
-    let rel = DefaultScoping.buildDefaultScope(this, () => {
+    const buildBase = () => {
       const r = new _RelationCtor!(this);
       return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
-    });
+    };
+    let rel = DefaultScoping.buildDefaultScope(this, buildBase) ?? buildBase();
     if (isStiSubclass(this)) {
       const col = getInheritanceColumn(getStiBase(this));
       if (col) {

@@ -1907,4 +1907,74 @@ describe("DefaultScopingTest", () => {
     const first = await Article.all().first();
     expect(first!.title).toBe("A");
   });
+
+  it("multiple defaultScope calls compose in declaration order", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("visible", "boolean", { default: true });
+        this.attribute("category", "string");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ visible: true }));
+        this.defaultScope((rel: any) => rel.where({ category: "tech" }));
+      }
+    }
+
+    await Article.create({ title: "V-Tech", visible: true, category: "tech" });
+    await Article.create({ title: "H-Tech", visible: false, category: "tech" });
+    await Article.create({ title: "V-News", visible: true, category: "news" });
+
+    const results = await Article.all().toArray();
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("V-Tech");
+
+    const sql = Article.all().toSql();
+    const visibleIdx = sql.indexOf("visible");
+    const categoryIdx = sql.indexOf("category");
+    expect(visibleIdx).toBeGreaterThan(-1);
+    expect(categoryIdx).toBeGreaterThan(-1);
+    expect(visibleIdx).toBeLessThan(categoryIdx);
+  });
+
+  it("allQueries:true scope applies to normal read queries", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("blog_id", "integer");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ blog_id: 1 }), { allQueries: true });
+      }
+    }
+
+    await Article.create({ title: "Blog1", blog_id: 1 });
+    await Article.create({ title: "Blog2", blog_id: 2 });
+
+    const results = await Article.all().toArray();
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Blog1");
+  });
+
+  it("non-allQueries scope is excluded when allQueries filter is applied", async () => {
+    class Article extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("visible", "boolean", { default: true });
+        this.attribute("blog_id", "integer");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ visible: true }));
+        this.defaultScope((rel: any) => rel.where({ blog_id: 1 }), { allQueries: true });
+      }
+    }
+
+    // Normal all() applies both scopes
+    const allSql = Article.all().toSql();
+    expect(allSql).toContain("visible");
+    expect(allSql).toContain("blog_id");
+
+    // defaultScoped with allQueries:true applies only the allQueries scope
+    const base = Article.unscoped();
+    const allQueriesSql = (Article as any).defaultScoped(base, { allQueries: true }).toSql();
+    expect(allQueriesSql).not.toContain("visible");
+    expect(allQueriesSql).toContain("blog_id");
+  });
 });

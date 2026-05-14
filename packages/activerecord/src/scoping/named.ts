@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
+import { Default } from "./default.js";
 
 /**
  * Named scope handling — defines named scopes on model classes
@@ -43,7 +44,7 @@ export function scope<T extends typeof Base>(
 
 interface NamedHost {
   currentScope?: any;
-  _defaultScope?: (rel: any) => any;
+  defaultScopes?: import("./default.js").DefaultScope[];
   all?(): any;
   relation?(): any;
 }
@@ -60,14 +61,16 @@ export function scopeForAssociation(this: NamedHost, scope?: any): any {
 }
 
 /**
- * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_scoped
+ * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_scoped —
+ * `build_default_scope(scope, all_queries: all_queries) || scope`
  */
-export function defaultScoped(this: NamedHost, scope?: any): any {
+export function defaultScoped(
+  this: NamedHost,
+  scope?: any,
+  options?: { allQueries?: boolean | null },
+): any {
   const rel = scope ?? this.relation?.() ?? this.all?.();
-  if (this._defaultScope) {
-    return this._defaultScope(rel);
-  }
-  return rel;
+  return Default.buildDefaultScope(this as any, () => rel, options?.allQueries) ?? rel;
 }
 
 /**

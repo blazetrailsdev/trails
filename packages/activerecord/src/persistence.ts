@@ -1102,7 +1102,6 @@ interface PersistencePrivateHost {
   constructor: {
     name: string;
     primaryKey: string | string[];
-    _defaultScope?: unknown;
     currentScope?: unknown | (() => unknown);
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
     readonlyAttributeQ?(name: string): boolean;
@@ -1181,7 +1180,7 @@ export function isApplyScoping(
 ): boolean {
   if (options?.unscoped) return false;
   const ctor = this.constructor as any;
-  const hasDefaultScope = !!ctor._defaultScope;
+  const hasDefaultScope = !!ctor.defaultScopes?.length;
   const current = typeof ctor.currentScope === "function" ? ctor.currentScope() : ctor.currentScope;
   return !!(hasDefaultScope || current);
 }
@@ -1370,10 +1369,13 @@ function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown
 
 /** @internal */
 function buildDefaultConstraint(this: {
-  _defaultScope?: unknown;
-  defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
+  defaultScopes?: { allQueries: boolean; scope: (rel: any) => any }[];
+  defaultScoped(
+    scope?: any,
+    options?: { allQueries?: boolean | null },
+  ): { whereClause: { isEmpty(): boolean; ast: unknown } };
 }): unknown {
-  if (!this._defaultScope) return undefined;
-  const defaultWhereClause = this.defaultScoped().whereClause;
+  if (!this.defaultScopes?.some((s) => s.allQueries)) return undefined;
+  const defaultWhereClause = this.defaultScoped(undefined, { allQueries: true }).whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }

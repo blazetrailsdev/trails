@@ -1,6 +1,21 @@
-import { NotImplementedError } from "../errors.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
+import { ScopeRegistry } from "../scoping.js";
+
+/**
+ * Manages evaluating and applying default scopes.
+ *
+ * Mirrors: ActiveRecord::Scoping::Default::DefaultScope
+ */
+export class DefaultScope {
+  readonly scope: (rel: any) => any;
+  readonly allQueries: boolean;
+
+  constructor(scope: (rel: any) => any, allQueries = false) {
+    this.scope = scope;
+    this.allQueries = allQueries;
+  }
+}
 
 /**
  * Default scope handling — applies default_scope to all queries
@@ -9,50 +24,72 @@ import type { Relation } from "../relation.js";
  * Mirrors: ActiveRecord::Scoping::Default
  */
 export class Default {
-  /** @internal */
-  static buildDefaultScope(modelClass: any, buildRelation: () => any): any {
-    let rel = buildRelation();
-    const defaultScopeFn = modelClass._defaultScope;
-    if (defaultScopeFn) {
-      rel = defaultScopeFn(rel);
-    }
-    return rel;
+  /**
+   * Build the default scope for a model class, applying all accumulated
+   * default_scope declarations in order. Skips scopes that don't match
+   * the all_queries flag. Returns undefined when inside an evaluate_default_scope
+   * call (recursion guard), matching Rails' nil return from build_default_scope.
+   *
+   * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#build_default_scope
+   * @internal
+   */
+  static buildDefaultScope(
+    modelClass: any,
+    buildRelation: () => any,
+    allQueries?: boolean | null,
+  ): any {
+    if (modelClass.abstractClass) return undefined;
+
+    const scopes: DefaultScope[] = modelClass.defaultScopes ?? [];
+    if (scopes.length === 0) return undefined;
+
+    return evaluateDefaultScope(modelClass, () => {
+      let rel = buildRelation();
+      for (const scopeObj of scopes) {
+        if (isExecuteScope(allQueries, scopeObj)) {
+          const result = scopeObj.scope(rel);
+          if (result != null) rel = result;
+        }
+      }
+      return rel;
+    });
   }
 
+  /** @internal */
   static unscoped(modelClass: any, buildRelation: () => any): any {
     return buildRelation();
   }
 }
 
 /**
- * Manages evaluating and applying default scopes.
- *
- * Mirrors: ActiveRecord::Scoping::Default::DefaultScope
- */
-export class DefaultScope {
-  readonly modelClass: any;
-  readonly allQueries: boolean;
-
-  constructor(modelClass: any, allQueries = false) {
-    this.modelClass = modelClass;
-    this.allQueries = allQueries;
-  }
-
-  get scope(): ((rel: any) => any) | null {
-    return this.modelClass._defaultScope ?? null;
-  }
-}
-
-/**
- * Define a default scope applied to all queries for this model.
+ * Define a default scope applied to queries for this model.
+ * Multiple calls accumulate; all scopes are merged.
  *
  * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#default_scope
  */
 export function defaultScope<T extends typeof Base>(
   this: T,
   fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  options?: { allQueries?: boolean },
+): void;
+export function defaultScope<T extends typeof Base>(
+  this: T,
+  fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  allQueries?: boolean,
+): void;
+export function defaultScope<T extends typeof Base>(
+  this: T,
+  fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  optionsOrAllQueries?: { allQueries?: boolean } | boolean,
 ): void {
-  this._defaultScope = fn as (rel: any) => any;
+  const allQueries =
+    typeof optionsOrAllQueries === "boolean"
+      ? optionsOrAllQueries
+      : (optionsOrAllQueries?.allQueries ?? false);
+
+  const scopeObj = new DefaultScope(fn as (rel: any) => any, allQueries);
+  const existing: DefaultScope[] = (this as any).defaultScopes ?? [];
+  (this as any).defaultScopes = [...existing, scopeObj];
 }
 
 /**
@@ -96,14 +133,6 @@ export function isDefaultScopes(
   return scopes.length > 0;
 }
 
-/** @internal */
-function buildDefaultScope(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
-  throw new NotImplementedError(
-    "ActiveRecord::Scoping::Default#build_default_scope is not implemented",
-  );
-}
-
 /**
  * Mirrors: Scoping::Default#execute_scope?. Returns true when the default
  * scope should be applied, based on the all_queries flag.
@@ -117,33 +146,31 @@ function isExecuteScope(
 }
 
 /** @internal */
-function isIgnoreDefaultScope(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
-  throw new NotImplementedError(
-    "ActiveRecord::Scoping::Default#ignore_default_scope? is not implemented",
-  );
+function isIgnoreDefaultScope(modelClass: any): boolean {
+  return !!ScopeRegistry.ignoreDefaultScope(modelClass, true);
 }
 
 /** @internal */
-function ignoreDefaultScope(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
-  throw new NotImplementedError(
-    "ActiveRecord::Scoping::Default#ignore_default_scope= is not implemented",
-  );
+function setIgnoreDefaultScope(modelClass: any, value: boolean | null): void {
+  ScopeRegistry.setIgnoreDefaultScope(modelClass, value);
 }
 
 /**
  * Mirrors: Scoping::Default#evaluate_default_scope. Temporarily sets
  * ignore_default_scope to true while yielding so nested calls don't re-apply
- * the default scope recursively.
+ * the default scope recursively. Returns undefined when already ignoring
+ * (matches Rails' nil return from evaluate_default_scope). Saves and restores
+ * the prior ScopeRegistry value so nested calls from different classes compose
+ * correctly.
  * @internal
  */
-async function evaluateDefaultScope(modelClass: any, fn: () => unknown): Promise<unknown> {
-  if (modelClass._ignoreDefaultScope) return;
+function evaluateDefaultScope(modelClass: any, fn: () => unknown): unknown {
+  if (isIgnoreDefaultScope(modelClass)) return undefined;
+  const prior = ScopeRegistry.ignoreDefaultScope(modelClass, true);
   try {
-    modelClass._ignoreDefaultScope = true;
-    return await fn();
+    setIgnoreDefaultScope(modelClass, true);
+    return fn();
   } finally {
-    modelClass._ignoreDefaultScope = false;
+    setIgnoreDefaultScope(modelClass, prior);
   }
 }

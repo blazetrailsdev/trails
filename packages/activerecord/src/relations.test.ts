@@ -1091,7 +1091,7 @@ describe("RelationTest", () => {
     if (Object.prototype.hasOwnProperty.call(Article, "_scopes")) {
       Article._scopes = new Map();
     }
-    Article._defaultScope = null;
+    Article.defaultScopes = [];
 
     await Article.create({ title: "A1", status: "published", author: "alice", views: 100 });
     await Article.create({ title: "A2", status: "draft", author: "bob", views: 50 });
