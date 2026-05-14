@@ -248,8 +248,14 @@ Selected larger files that mash multiple Rails files together:
 
 ## Recommended re-org sequence
 
-All waves are documentation/move PRs — no behavior changes. Target
-~250 LOC, ceiling 300 per `CLAUDE.md`. Each wave is **mechanical
+Waves 1–6 are documentation/move PRs — no behavior changes. **Wave 7
+is a Rails port** (behavior-changing): it adds the journey routing
+engine and PR 10 switches `routing/route-set.ts` to the journey-backed
+router. Wave 8+ is open-ended fill-in (mixed). **LOC
+ceiling waived** (2026-05-14): for mechanical file moves and Rails
+ports, the CLAUDE.md 300-LOC ceiling does not apply — size by logical
+cluster instead. Splitting a cluster just to satisfy the ceiling
+produces churn without review-cost savings. Each wave is **mechanical
 file moves + index.ts re-exports**; method bodies untouched.
 
 ### Wave 1 — set up Rails-mirroring directory skeleton (1 PR, ~50 LOC)
@@ -269,59 +275,52 @@ top-level directory.** api:compare path matching is the primary signal;
 Rails splits the namespace; this PR sequence accepts the import-path
 churn across the monorepo as one-time cost.
 
-### Wave 2 — action_dispatch mechanical moves (P1) (3 PRs)
+### Wave 2 — action_dispatch mechanical moves (P1) (1 PR, ~500 LOC)
 
-**PR 2a (~200 LOC)** — move dispatch-root files into `http/`:
+All dispatch-root files relocated to their Rails-mirrored homes in
+one PR. Pure path moves; method bodies untouched.
 
-- `actiondispatch/request.ts` → `actiondispatch/http/request.ts`
-- `actiondispatch/response.ts` → `actiondispatch/http/response.ts`
-- `actiondispatch/mime-type.ts` → `actiondispatch/http/mime-type.ts`
-- `actiondispatch/uploaded-file.ts` → `actiondispatch/http/upload.ts`
-  (and rename class export internally — keep TS alias for backcompat
-  for one release).
-- `actiondispatch/dispatch/header.ts` → `actiondispatch/http/headers.ts`
-  (also rename to plural to match Rails)
+- Into `actiondispatch/http/`:
+  - `actiondispatch/request.ts` → `http/request.ts`
+  - `actiondispatch/response.ts` → `http/response.ts`
+  - `actiondispatch/mime-type.ts` → `http/mime-type.ts`
+  - `actiondispatch/uploaded-file.ts` → `http/upload.ts`
+    (rename class export internally — keep TS alias for one release).
+  - `actiondispatch/dispatch/header.ts` → `http/headers.ts`
+    (rename to plural to match Rails)
+  - `actiondispatch/content-security-policy.ts` →
+    `http/content-security-policy.ts`
+  - `actiondispatch/permissions-policy.ts` → `http/permissions-policy.ts`
+- Into `actiondispatch/middleware/`:
+  - `actiondispatch/cookies.ts` → `middleware/cookies.ts`
+  - `actiondispatch/flash.ts` → `middleware/flash.ts`
+  - `actiondispatch/exception-wrapper.ts` →
+    `middleware/exception-wrapper.ts`
+  - `actiondispatch/session/cookie-store.ts` →
+    `middleware/session/cookie-store.ts`
+- Into `actiondispatch/request/`:
+  - `actiondispatch/dispatch/request/session.ts` → `request/session.ts`
+- Audit + delete (or redirect) the actiondispatch duplicates of
+  `request-forgery-protection.ts` and `http-authentication.ts`
+  (Rails has these only under `action_controller/metal/`).
 - Delete the empty `actiondispatch/dispatch/` directory.
 
-**PR 2b (~150 LOC)** — move into `actiondispatch/middleware/`:
+### Wave 3 — AbstractController split (P2) (1 PR, ~450 LOC)
 
-- `actiondispatch/cookies.ts` → `actiondispatch/middleware/cookies.ts`
-- `actiondispatch/flash.ts` → `actiondispatch/middleware/flash.ts`
-- `actiondispatch/exception-wrapper.ts` →
-  `actiondispatch/middleware/exception-wrapper.ts`
-- `actiondispatch/session/cookie-store.ts` →
-  `actiondispatch/middleware/session/cookie-store.ts`
-
-**PR 2c (~150 LOC)** — move CSP / permissions-policy / etc:
-
-- `actiondispatch/content-security-policy.ts` →
-  `actiondispatch/http/content-security-policy.ts`
-- `actiondispatch/permissions-policy.ts` →
-  `actiondispatch/http/permissions-policy.ts`
-- `actiondispatch/request-forgery-protection.ts` — **import-graph audit + delete if dead** (decision 2026-05-14). Rails has this only under `action_controller/metal/`. The actiondispatch copy is a duplicate; if no in-repo importer references it, delete. If it has importers, those importers should switch to the `actioncontroller/metal/` version.
-- `actiondispatch/http-authentication.ts` — same treatment: import-graph audit, delete if dead, else redirect importers to `actioncontroller/metal/http-authentication.ts`.
-- `actiondispatch/dispatch/request/session.ts` →
-  `actiondispatch/request/session.ts`
-
-### Wave 3 — AbstractController split (P2) (2 PRs)
-
-**PR 3a (~250 LOC)** — create `abstractcontroller/` top-level dir:
+Single PR creates `abstractcontroller/` top-level dir and extracts the
+sub-files:
 
 - Move `actioncontroller/abstract-controller.ts` →
   `abstractcontroller/base.ts`.
-- Re-export from old path for backcompat (deprecate later).
-- Update `packages/actionpack/src/index.ts` to export both.
-
-**PR 3b (~200 LOC)** — extract callbacks/error/helpers:
-
-- Pull callback types and infra out of base.ts →
+- Pull callback types/infra out of base.ts →
   `abstractcontroller/callbacks.ts`.
 - Pull `ActionNotFound` → `abstractcontroller/error.ts`.
-- (Pure file splits — no logic changes.)
+- Re-export from old path for backcompat (deprecate later).
+- Update `packages/actionpack/src/index.ts` to export both.
+- Ship the tooling edits called out in the Tooling impact section
+  below (config.ts, compare.ts, test-compare entries).
 
-### Wave 4 — testing relocation (P1+P2) (2 PRs)
-
-**PR 4a (~250 LOC)** — move test infra to dispatch:
+### Wave 4 — testing relocation (P1+P2) (1 PR, ~450 LOC)
 
 - `actioncontroller/integration-test.ts` →
   `actiondispatch/testing/integration.ts`
@@ -329,9 +328,6 @@ churn across the monorepo as one-time cost.
   `actioncontroller/test-case.ts` →
   `actiondispatch/testing/{test-request,test-response,test-process}.ts`
 - Keep `actioncontroller/test-case.ts` for the TestCase class only.
-
-**PR 4b (~200 LOC)** — assertion infrastructure:
-
 - Split assertions out of `template-assertions.ts` into
   `actiondispatch/testing/assertions/{response,routing}.ts`.
 - Add `actiondispatch/testing/assertions.ts` aggregator + index.
@@ -365,41 +361,160 @@ Do **not** add empty stubs for `system_testing/` — it's intentionally
 not ported (see Known divergences). `journey/` gets its own wave; do
 not stub here.
 
-### Wave 7 — journey/ routing engine port
+### Wave 7 — journey/ routing engine port (10 PRs)
 
-**Decision (2026-05-14): port now. Sizing pass needed before slots are
-spawned.** 14 Rails files under
-`scripts/api-compare/.rails-source/actionpack/lib/action_dispatch/journey/`:
-
-```
-formatter.rb
-gtg/{builder,simulator,transition_table}.rb           (3 files)
-nfa/dot.rb                                            (1 file — visualization helper)
-nodes/node.rb
-parser.rb
-path/pattern.rb
-route.rb
-router.rb
-router/utils.rb
-routes.rb
-scanner.rb
-visitors.rb
-```
-
+**Decision (2026-05-14): port now.** Sizing audit done inline below.
 The routing engine is tightly coupled (parser → nodes → path/pattern →
-gtg automaton → router). PR slicing must be done by an audit pass with
-full source-graph context — guessing here would produce
-`<base>`/`<base>b`/`<base>c` splits that fight the import graph.
+gtg automaton → router); slicing must follow the import graph.
 
-**Action:** before opening any journey PRs, run a sizing audit (similar
-in shape to the actionpack restructure audit you're reading) that:
-(a) lists each file's LOC + imports, (b) groups by tight-coupling
-clusters, (c) proposes ≤300-LOC PR sketches with explicit dependency
-order.
+#### Headline numbers
 
-Rough order-of-magnitude expectation: **~6–8 PRs, ~1500–2000 LOC
-total**, plus a wire-up PR that switches `routing/route-set.ts` to the
-journey-backed router. Confirm with the sizing audit.
+| Metric                                                                           | Value                                 |
+| -------------------------------------------------------------------------------- | ------------------------------------- |
+| Rails `.rb` files under `action_dispatch/journey/`                               | **14**                                |
+| Total Ruby LOC                                                                   | **2062**                              |
+| Estimated TS LOC after porting (≈ Ruby × 1.3)                                    | **~2680**                             |
+| Existing TS counterparts under `packages/actionpack/src/actiondispatch/journey/` | **0** (subtree absent)                |
+| Rails journey test LOC (`test/journey/`)                                         | **1603** across 11 files              |
+| PR count (LOC ceiling waived; sized by logical cluster)                          | **9 port PRs + 1 wire-up = 10 total** |
+
+Per-file LOC (Ruby, `wc -l`):
+
+| File               | LOC | File                      | LOC      |
+| ------------------ | --- | ------------------------- | -------- |
+| `nfa/dot.rb`       | 27  | `router.rb`               | 151      |
+| `gtg/simulator.rb` | 50  | `route.rb`                | 189      |
+| `scanner.rb`       | 74  | `nodes/node.rb`           | 208      |
+| `routes.rb`        | 82  | `path/pattern.rb`         | 209      |
+| `parser.rb`        | 103 | `gtg/transition_table.rb` | 217      |
+| `router/utils.rb`  | 105 | `formatter.rb`            | 231      |
+| `gtg/builder.rb`   | 149 | `visitors.rb`             | 267      |
+|                    |     | **Total**                 | **2062** |
+
+#### Import graph + coupling clusters
+
+Outgoing deps (`require`/`require_relative` + class-level
+`Journey::*` references):
+
+| File                      | Internal deps                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `router/utils.rb`         | —                                                                             |
+| `scanner.rb`              | — (uses `strscan`)                                                            |
+| `nfa/dot.rb`              | —                                                                             |
+| `gtg/simulator.rb`        | duck-types `TransitionTable` (uses `strscan`)                                 |
+| `gtg/transition_table.rb` | `nfa/dot` (mixin)                                                             |
+| `gtg/builder.rb`          | `gtg/transition_table`; consumes parser AST                                   |
+| `nodes/node.rb`           | `visitors` (only for `accept` dispatch — can use a stub interface)            |
+| `parser.rb`               | `scanner`, `nodes/node`                                                       |
+| `visitors.rb`             | `router/utils` (escape lambdas); defines `Journey::Format`                    |
+| `path/pattern.rb`         | `visitors`, `parser`, `nodes/node`                                            |
+| `route.rb`                | `path/pattern`; `gtg/transition_table` via `Routes#simulator`                 |
+| `routes.rb`               | `route`, `gtg/{builder, simulator, transition_table}`                         |
+| `formatter.rb`            | `routes`, `visitors`, `route`; external: `action_controller/metal/exceptions` |
+| `router.rb`               | `router/utils`, `routes`, `formatter`, `parser`, `route`, `path/pattern`      |
+
+Clusters (topological order **L → S → V → P → G → R**; G and P can
+ship in parallel once L+S+V are in):
+
+1. **L — Leaf utilities.** `router/utils.rb`, `nfa/dot.rb`, `gtg/simulator.rb`.
+2. **S — Scanner+parser+nodes.** `scanner.rb`, `nodes/node.rb`, `parser.rb`.
+3. **V — Visitors + Format.** `visitors.rb`.
+4. **P — Path/pattern.** `path/pattern.rb` (subclasses `Visitors::Visitor`).
+5. **G — GTG automaton.** `gtg/transition_table.rb`, `gtg/builder.rb`.
+6. **R — Routing API.** `route.rb`, `routes.rb`, `formatter.rb`, `router.rb`.
+
+#### PR slicing (10 PRs)
+
+LOC ceiling waived per Wave 7's mechanical-port nature. TS LOC ≈
+Ruby × 1.3. Test LOC ports inline alongside the source PR.
+
+| PR  | Cluster | Files                                                              | Src LOC | Test LOC | Total | Deps |
+| --- | ------- | ------------------------------------------------------------------ | ------- | -------- | ----- | ---- |
+| 1   | L       | `router/utils.rb`, `nfa/dot.rb`, `gtg/simulator.rb` + index barrel | ~240    | ~80      | ~320  | —    |
+| 2   | S₁      | `scanner.rb`                                                       | ~100    | ~100     | ~200  | 1    |
+| 3   | S₂      | `nodes/node.rb` + `parser.rb`                                      | ~400    | ~260     | ~660  | 2    |
+| 4   | V       | `visitors.rb`                                                      | ~350    | —        | ~350  | 3, 1 |
+| 5   | P       | `path/pattern.rb`                                                  | ~270    | ~280     | ~550  | 3, 4 |
+| 6   | G       | `gtg/transition_table.rb` + `gtg/builder.rb`                       | ~480    | ~220     | ~700  | 3    |
+| 7   | R₁      | `route.rb` + `routes.rb`                                           | ~350    | ~190     | ~540  | 5, 6 |
+| 8   | R₂      | `formatter.rb`                                                     | ~300    | ~150     | ~450  | 4, 7 |
+| 9   | R₃      | `router.rb`                                                        | ~200    | ~500     | ~700  | 7, 8 |
+| 10  | wire-up | `actiondispatch/routing/route-set.ts` swap                         | ~200    | included | ~200  | 9    |
+
+**Total: 10 PRs, ~4670 TS LOC.** PRs 4 and 6 can ship in parallel once
+PR 3 lands; PR 5 follows PR 4 (Path/Pattern subclasses
+`Visitors::Visitor`).
+
+Per-PR notes:
+
+- **PR 1** ports `nfa/dot` (debug graphviz helper) for path-parity with
+  `api:compare`; skip its test (Rails has none).
+- **PR 2** ports Ruby `StringScanner` as a small TS class (mirrors what
+  `arel` did for similar token-stream needs).
+- **PR 3** ports `parser.rb` as a **hand-written recursive-descent
+  parser**. Rails' parser is generated from a Racc grammar; the
+  grammar is tiny (path segments, optionals, groups, slashes, dots,
+  stars). Do **not** port the Racc output table verbatim. Audit the
+  generated parser's accept states against
+  `route/definition/parser_test.rb` to verify no uncovered edge cases.
+- **PR 4** wires `Journey::Format` + Parameter struct + the
+  `FormatBuilder`/`Each`/`String`/`Dot`/`FunctionalVisitor` visitor
+  classes. No direct visitor tests in Rails — covered transitively by
+  pattern_test (PR 5).
+- **PR 5** ports `AnchoredRegexp` / `UnanchoredRegexp` (both inline
+  `Visitor` subclasses in pattern.rb). See Risks for regex semantics.
+- **PR 9** has the largest test surface (`router_test.rb` 538 LOC) —
+  if the port overshoots, split test fixtures into PR 9b.
+- **PR 10** is the only PR that touches code outside
+  `actiondispatch/journey/`. Open question: does the current
+  `routing/route-set.ts` already expose a router-swap seam? Audit
+  before opening PR 10; if absent, prepend a small seam-creation PR.
+
+#### Tooling impact
+
+Zero changes to `scripts/api-compare/conventions.ts` or `config.ts`:
+`actiondispatch/journey/` lives under the already-configured
+`actionpack` package, and journey's filenames (`gtg`, `nfa`, etc.)
+need no `FILE_OVERRIDES` entries. Test-compare picks up
+`**/*.test.ts` siblings automatically; Rails' `test/journey/` is
+already under `actionpack/test/`. This wave behaves like Wave 2
+(`http/`, `middleware/` moves), not Wave 3 (abstractcontroller — new
+package).
+
+#### Risks + open questions
+
+- **Regex semantics — Ruby Regexp vs JS RegExp.** `path/pattern.rb`
+  builds anchored/unanchored regexes from the AST. Named captures
+  (`(?<name>...)`), named backrefs (`\k<name>`), and absent default
+  multiline-dot are all OK in modern Node. Ruby's `\A`/`\z` anchors
+  need careful translation to `^`/`$` with `m`-flag awareness. Use the
+  `/d` flag everywhere journey compiles a regex (for `.indices`
+  parity with Ruby's `MatchData` offsets) and assert the Node floor
+  in `package.json#engines`.
+- **String performance — UTF-16 indexing.** `Simulator#simulate` is
+  the per-request hot path; Ruby strings are byte-arrays, JS strings
+  are UTF-16 code units. ASCII paths (the common case) are a wash;
+  non-BMP characters (e.g. emoji in URLs) differ. Risk: low — document
+  the divergence, don't chase.
+- **Routing perf.** Worth porting one or two Rails journey benchmarks
+  (look under `actionpack/test/dispatch/routing/` for `bench_*`
+  fixtures) so PR 10 can demonstrate no regression. Defer benchmark
+  fixtures to PR 10 unless an earlier PR exposes a hotspot.
+- **Memoization patterns.** `@x ||= compute` is pervasive in journey
+  (every accessor in `path/pattern.rb`, `routes.rb`, `route.rb`).
+  Standardize on the **private nullable field + getter** pattern used
+  in `relation.ts`: `get x(): T { return this._x ??= this.compute(); }`.
+- **`route-set.ts` seam.** Audit before opening PR 10.
+
+#### Out of scope (journey-specific)
+
+- test-compare BLOCKED vocabulary alignment for journey tests (see
+  [test-compare-100-plan.md](test-compare-100-plan.md)).
+- `actiondispatch/routing/mapper.rb` integration (constraints, scopes,
+  format DSLs) — tracked in
+  [actiondispatch-100-percent.md](actiondispatch-100-percent.md).
+- Custom router monkey-patch surfaces — trails won't expose them.
+- Benchmark parity against Rails routing as a hard requirement.
 
 ### Wave 8+ — selective fill-in (open-ended)
 
@@ -407,9 +522,11 @@ Per-file ports for missing `middleware/*` files and `http/*` files.
 Sequenced by what unblocks `actioncontroller-100-percent.md` cleanup.
 Drives independently of this audit.
 
-**Total restructure work: 9 mechanical waves (1–6, Wave 5 is now a
-~10 LOC conventions.ts edit) + Wave 7 journey port (sized separately,
-~6–8 PRs) + open-ended fill-in (Wave 8+).**
+**Total restructure work: 5 mechanical PRs (Waves 1–6: skeleton +
+dispatch moves + abstractcontroller split + testing relocation +
+conventions/infra; Wave 5 is bundled into Wave 6 as a ~10 LOC edit) +
+Wave 7 journey port (10 PRs per the inline section above) +
+open-ended fill-in (Wave 8+).**
 
 ## Known divergences from Rails
 
@@ -476,12 +593,12 @@ sibling means teaching the tooling about a new logical package:
   `"abstractcontroller" => File.join(RAILS_DIR, "actionpack", "test")`
   with include rules pointing at Rails' `actionpack/test/abstract/`.
 
-These script edits should ship in PR 3a alongside the directory
-creation, so the very first commit that moves files into
-`abstractcontroller/` is also the one that teaches the matchers to
-look there. ~20 LOC total — folds into Wave 3a's ~250 LOC budget.
+These script edits ship in the single Wave 3 PR alongside the
+directory creation, so the same commit that moves files into
+`abstractcontroller/` teaches the matchers to look there. ~20 LOC
+total — folds into Wave 3's ~450 LOC budget.
 
-### Waves 1, 2c, 6, 7+ — no tooling changes
+### Waves 1, 2, 6, 7, 8+ — no tooling changes
 
 Skeleton creation, CSP/PP moves, infrastructure-file additions, and
 selective fill-ins all stay within already-configured subtrees.
