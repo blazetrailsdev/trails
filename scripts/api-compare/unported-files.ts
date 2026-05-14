@@ -296,6 +296,11 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread semantics and Marshal binary serialization — both are Ruby-only; no Node.js equivalent.",
   },
   {
+    testFile: "has_and_belongs_to_many_associations_test.rb",
+    tests: ["marshal dump"],
+    reason: "Ruby Marshal binary serialization — no Node.js equivalent.",
+  },
+  {
     testFile: "reaper_test.rb",
     tests: ["connection pool starts reaper in fork"],
     reason: "GVL / Ruby fork() semantics — process forking has no Node.js equivalent.",
