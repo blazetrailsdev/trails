@@ -18,13 +18,8 @@ import { AssociationNotFoundError } from "./errors.js";
 import {
   loadBelongsTo as _loadBelongsToOnce,
   loadHasOne as _loadHasOneOnce,
+  type AssociationDefinition as AssocDef,
 } from "../associations.js";
-
-interface AssocDef {
-  name: string;
-  type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
-  options?: Record<string, unknown>;
-}
 
 function buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
@@ -51,10 +46,9 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
     instance.setTarget(proxy.target as any);
     return;
   }
-  const cached = (this as unknown as { _cachedAssociations?: Map<string, unknown> })
-    ._cachedAssociations;
+  const cached = this._cachedAssociations;
   if (cached && cached.has(name)) {
-    instance.setTarget(cached.get(name) as any);
+    instance.setTarget(cached.get(name) ?? null);
     return;
   }
   // Use `has()` so an eagerly-preloaded "nil association" (the preloader
@@ -72,7 +66,7 @@ function assertSingularAssociation(
   name: string,
   expected: "belongsTo" | "hasOne",
 ): AssocDef {
-  const ctor = this.constructor as typeof Base & { _associations?: AssocDef[] };
+  const ctor = this.constructor as typeof Base;
   const assocDef = ctor._associations?.find((a) => a.name === name);
   if (!assocDef) {
     throw new AssociationNotFoundError(this, name);
@@ -117,7 +111,7 @@ export function association(this: Base, name: string): AssociationInstance {
     return existing;
   }
 
-  const ctor = this.constructor as typeof Base & { _associations?: AssocDef[] };
+  const ctor = this.constructor as typeof Base;
   const assocDef = ctor._associations?.find((a) => a.name === name);
   if (!assocDef) {
     throw new AssociationNotFoundError(this, name);

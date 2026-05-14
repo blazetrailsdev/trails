@@ -237,6 +237,7 @@ import {
   isAssociationCached as _isAssociationCached,
   associationInstanceGet as _associationInstanceGet,
   associationInstanceSet as _associationInstanceSet,
+  type AssociationDefinition,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
@@ -556,6 +557,11 @@ export class Base extends Model {
   static _tableName: string | null = null;
   static _primaryKey: string | string[] = "id";
   static readonly _isActiveRecordBase = true;
+
+  /** @internal */
+  declare static _associations: AssociationDefinition[];
+  /** @internal */
+  declare static _registryKeys: string[];
 
   /** Mirrors: ActiveRecord.writing_role */
   static writingRole = WRITING_ROLE;
@@ -2208,6 +2214,8 @@ export class Base extends Model {
   _preloadedAssociations: Map<string, unknown> = new Map();
   _collectionProxies: Map<string, unknown> = new Map();
   _associationInstances: Map<string, AssociationInstance> = new Map();
+  /** @internal */
+  _cachedAssociations?: Map<string, Base | Base[] | null>;
 
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
