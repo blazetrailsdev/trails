@@ -2770,6 +2770,10 @@ export class Base extends Model {
    * Return a GlobalID URI for this record.
    *
    * Mirrors: ActiveRecord::Base#to_gid
+   *
+   * When no app is configured the fallback URI has the form
+   * `gid://ClassName/id` (non-standard; GID-3 will require setApp before
+   * producing a parseable URI::GID).
    */
   toGid(): string {
     const ctor = this.constructor as typeof Base;
@@ -3453,4 +3457,6 @@ registerMigrationArConfig({
   },
 });
 
+// Triggers globalid's registration side-effects (currently a no-op stub;
+// filled in GID-4). Kept at the bottom for readability — ESM hoists it.
 import "@blazetrails/globalid/wire";
