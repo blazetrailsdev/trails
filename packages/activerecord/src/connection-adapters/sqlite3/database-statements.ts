@@ -28,7 +28,12 @@ export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null): Promise<Result>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execInsert(sql: string, name?: string | null, binds?: unknown[], pk?: string): Promise<unknown>;
+  execInsert(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    pk?: string | false | null,
+  ): Promise<unknown>;
   explain(sql: string, binds?: unknown[]): Promise<string>;
   lastInsertedId(result: unknown): number;
 }

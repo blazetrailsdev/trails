@@ -32,7 +32,7 @@ export interface DatabaseStatements {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    pk?: string,
+    pk?: string | false | null,
     sequenceName?: string,
   ): Promise<unknown>;
   // Mirrors: database_statements.rb:7

@@ -734,6 +734,33 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    it("exec insert with pk=false opt-out skips RETURNING and currval fallback", async () => {
+      // Mirrors Rails: `if use_insert_returning? || pk == false`. With
+      // pk === false PG must NOT auto-append `RETURNING id` (the path
+      // executeMutation would otherwise take). Advance the SERIAL sequence
+      // so the inserted id (101) can't be confused with a row-count of 1
+      // — if the opt-out leaked, the result would be the id 101.
+      await adapter.exec(`CREATE TABLE "ex_insert_pkfalse" ("id" SERIAL PRIMARY KEY, "n" INT)`);
+      await adapter.exec(`SELECT setval(pg_get_serial_sequence('ex_insert_pkfalse', 'id'), 100)`);
+      try {
+        const result = await adapter.execInsert(
+          `INSERT INTO "ex_insert_pkfalse" ("n") VALUES (42)`,
+          null,
+          [],
+          false,
+        );
+        // execQuery returns a Result whose toArray() is empty when no
+        // RETURNING is present (no rows projected back). If RETURNING
+        // had leaked, the Result's first row first column would be 101.
+        expect((result as { toArray(): unknown[] }).toArray?.()).toEqual([]);
+        const rows = await adapter.execute(`SELECT id, n FROM "ex_insert_pkfalse"`);
+        expect(rows[0].id).toBe(101);
+        expect(rows[0].n).toBe(42);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS "ex_insert_pkfalse"`);
+      }
+    });
+
     it("serial sequence", async () => {
       await adapter.exec(`CREATE TABLE "ex_serial_seq" ("id" SERIAL PRIMARY KEY)`);
       const result = await adapter.pkAndSequenceFor("ex_serial_seq");
