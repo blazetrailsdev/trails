@@ -141,7 +141,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   if (this.abstractClass) {
     throw new Error(`Cannot call columnsHash on abstract class ${this.name}`);
   }
-  loadSchema.call(this as unknown as SchemaHost);
+  loadSchema.call(this as SchemaHost);
 
   // STI-aware adapter + table resolution: adapter may live on the base
   // OR the concrete subclass. Use the same candidate-list logic the
@@ -153,13 +153,13 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   let adapter: DatabaseAdapterLike | null = null;
   for (const cand of candidates) {
     try {
-      adapter = (cand as typeof Base).adapter as unknown as DatabaseAdapterLike;
+      adapter = cand.adapter as DatabaseAdapterLike;
     } catch {
       adapter = null;
     }
     if (adapter) break;
   }
-  const cache = (adapter as unknown as { schemaCache?: unknown } | null)?.schemaCache as
+  const cache = adapter?.schemaCache as
     | {
         isCached?: (t: string) => boolean;
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
@@ -362,7 +362,7 @@ interface SchemaHost {
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   adapter: any;
-  prototype: any;
+  prototype: Record<string, unknown>;
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: Type): Type;
 }
@@ -451,20 +451,15 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
 
   // STI: write cache to the base so subclasses inherit via prototype
   // chain, and a base reset propagates automatically.
-  const cacheHost = isStiSubclass(this as unknown as typeof Base)
-    ? (getStiBase(this as unknown as typeof Base) as unknown as SchemaHost)
-    : this;
+  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
   cacheHost._attributesBuilder = new AttributeSetBuilder(types, defaults);
   // If we are an STI subclass, resetDefaultAttributes() may have placed an
   // own-property shadow of `undefined` on `this` to block stale inheritance.
   // Now that cacheHost has a fresh builder, remove the shadow so subsequent
   // calls on this STI subclass find cacheHost's builder via prototype chain
   // instead of rebuilding on every access.
-  if (
-    cacheHost !== (this as unknown) &&
-    Object.prototype.hasOwnProperty.call(this, "_attributesBuilder")
-  ) {
-    delete (this as unknown as Record<string, unknown>)._attributesBuilder;
+  if (cacheHost !== this && Object.prototype.hasOwnProperty.call(this, "_attributesBuilder")) {
+    delete this._attributesBuilder;
   }
   return cacheHost._attributesBuilder;
 }
@@ -476,9 +471,7 @@ export function columns(this: SchemaHost): any[] {
   if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
-  const cacheHost = isStiSubclass(this as unknown as typeof Base)
-    ? (getStiBase(this as unknown as typeof Base) as unknown as SchemaHost)
-    : this;
+  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
   cacheHost._columns = Object.values(hash);
   return cacheHost._columns!;
 }
@@ -516,12 +509,10 @@ export function resetColumnInformation(this: SchemaHost): void {
   // STI subclasses share the base's defs. Redirect the reset to the base
   // so schema-sourced defs and accessors are actually cleared; clear the
   // subclass-local caches too so any forked metadata is dropped.
-  if (isStiSubclass(this as unknown as typeof Base)) {
-    const subCaches = this as SchemaHost & { _cachedDefaultAttributes?: unknown };
+  if (isStiSubclass(this)) {
     // Delete own properties rather than assigning undefined/false, so
     // the subclass inherits the base's freshly-rebuilt caches via the
     // prototype chain instead of shadowing them.
-    const sub = subCaches as unknown as Record<string, unknown>;
     for (const key of [
       "_columnsHash",
       "_columns",
@@ -529,7 +520,7 @@ export function resetColumnInformation(this: SchemaHost): void {
       "_schemaLoaded",
       "_cachedDefaultAttributes",
     ]) {
-      if (Object.prototype.hasOwnProperty.call(sub, key)) delete sub[key];
+      if (Object.prototype.hasOwnProperty.call(this, key)) Reflect.deleteProperty(this, key);
     }
     // Scrub schema-sourced entries from any subclass-forked
     // _attributeDefinitions too (from a prior attribute() /
@@ -539,16 +530,13 @@ export function resetColumnInformation(this: SchemaHost): void {
       for (const [name, def] of Array.from(this._attributeDefinitions)) {
         if ((def.userProvided ?? true) === false || def.source === "schema") {
           this._attributeDefinitions.delete(name);
-          const proto = (this as unknown as { prototype: object }).prototype;
-          if (Object.prototype.hasOwnProperty.call(proto, name)) {
-            delete (proto as Record<string, unknown>)[name];
+          if (Object.prototype.hasOwnProperty.call(this.prototype, name)) {
+            delete this.prototype[name];
           }
         }
       }
     }
-    resetColumnInformation.call(
-      getStiBase(this as unknown as typeof Base) as unknown as SchemaHost,
-    );
+    resetColumnInformation.call(getStiBase(this) as SchemaHost);
     return;
   }
   this._columnsHash = undefined;
@@ -560,9 +548,8 @@ export function resetColumnInformation(this: SchemaHost): void {
   for (const [name, def] of Array.from(this._attributeDefinitions)) {
     if ((def.userProvided ?? true) === false || def.source === "schema") {
       this._attributeDefinitions.delete(name);
-      const proto = (this as unknown as { prototype: object }).prototype;
-      if (Object.prototype.hasOwnProperty.call(proto, name)) {
-        delete (proto as Record<string, unknown>)[name];
+      if (Object.prototype.hasOwnProperty.call(this.prototype, name)) {
+        delete this.prototype[name];
       }
     }
   }
@@ -588,11 +575,9 @@ export function loadSchema(this: SchemaHost): void {
   // so subclasses inherit the flag via the prototype chain. Assigning
   // on the subclass would shadow the base flag and prevent re-reflection
   // when the base is reset. Delete any stale own-flag on the subclass.
-  const workHost = isStiSubclass(this as unknown as typeof Base)
-    ? (getStiBase(this as unknown as typeof Base) as unknown as SchemaHost)
-    : this;
+  const workHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
   if (workHost !== this && Object.prototype.hasOwnProperty.call(this, "_schemaLoaded")) {
-    delete (this as unknown as Record<string, unknown>)._schemaLoaded;
+    delete this._schemaLoaded;
   }
 
   const reflected = loadSchemaFromCacheSync(this);
@@ -669,17 +654,15 @@ function applyColumnsHash(
       // respects the ignore. Only drop the attribute def when it's
       // schema-sourced — user-declared defs survive `ignoredColumns`
       // per base.test.ts semantics.
-      const proto = (host as unknown as { prototype: object }).prototype;
-      if (Object.prototype.hasOwnProperty.call(proto, name)) {
-        delete (proto as Record<string, unknown>)[name];
+      if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
+        delete host.prototype[name];
       }
       // STI: also strip a subclass-owned accessor if the originating
       // host declared the attribute on itself, or `"col" in record` on
       // the subclass would still return true.
       if (originatingHost && originatingHost !== host) {
-        const subProto = (originatingHost as unknown as { prototype: object }).prototype;
-        if (Object.prototype.hasOwnProperty.call(subProto, name)) {
-          delete (subProto as Record<string, unknown>)[name];
+        if (Object.prototype.hasOwnProperty.call(originatingHost.prototype, name)) {
+          delete originatingHost.prototype[name];
         }
       }
       const existing = host._attributeDefinitions.get(name);
@@ -721,13 +704,12 @@ function applyColumnsHash(
     });
 
     if (name === "id") {
-      const proto = (host as unknown as { prototype: object }).prototype;
-      if (Object.prototype.hasOwnProperty.call(proto, "id")) {
-        delete (proto as Record<string, unknown>).id;
+      if (Object.prototype.hasOwnProperty.call(host.prototype, "id")) {
+        delete host.prototype.id;
       }
       continue;
     }
-    const proto = (host as unknown as { prototype: object }).prototype;
+    const proto = host.prototype;
     // Skip if this class or any parent prototype already has a custom accessor —
     // prevents schema reflection from overwriting an ignore_case (or other)
     // override that was installed on a parent class.
@@ -753,7 +735,6 @@ function applyColumnsHash(
     _columns?: unknown;
   };
   const invalidate = (h: SchemaHost, { deleteOwn }: { deleteOwn: boolean }) => {
-    const c = h as unknown as Record<string, unknown>;
     if (deleteOwn) {
       // Delete own properties so `h` inherits freshly-rebuilt caches
       // from its prototype chain (used for the STI subclass case).
@@ -763,11 +744,11 @@ function applyColumnsHash(
         "_columnsHash",
         "_columns",
       ]) {
-        if (Object.prototype.hasOwnProperty.call(c, key)) delete c[key];
+        if (Object.prototype.hasOwnProperty.call(h, key)) Reflect.deleteProperty(h, key);
       }
       return;
     }
-    const bag = c as CacheBag;
+    const bag = h as CacheBag;
     bag._attributesBuilder = undefined;
     bag._cachedDefaultAttributes = null;
     bag._columnsHash = undefined;
@@ -826,8 +807,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // STI base without forking. Use whichever class has the adapter
   // configured (base in normal Rails setup, but tolerate subclass-only
   // configuration).
-  const klass = this as unknown as typeof Base;
-  const schemaHost = isStiSubclass(klass) ? (getStiBase(klass) as unknown as SchemaHost) : this;
+  const schemaHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
 
   let startingAdapter: SchemaHost["adapter"] | undefined;
   let adapterOwner: SchemaHost | undefined;
@@ -846,7 +826,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (!startingAdapter || !adapterOwner) return;
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
-  const table = (schemaHost as unknown as typeof Base).tableName;
+  const table = schemaHost.tableName;
   const pool = startingAdapter.pool ?? startingAdapter;
 
   if (typeof cache.dataSourceExists === "function") {
@@ -887,9 +867,7 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   // STI subclasses share the base's table and attribute defs. Reflecting
   // on a subclass would fork _attributeDefinitions; instead, apply
   // reflection to the STI base so subclasses inherit it.
-  const schemaHost = isStiSubclass(host as unknown as typeof Base)
-    ? (getStiBase(host as unknown as typeof Base) as unknown as SchemaHost)
-    : host;
+  const schemaHost = isStiSubclass(host) ? (getStiBase(host) as SchemaHost) : host;
   // Adapter may be configured on the base OR on the subclass. Try base
   // first (Rails-normal), fall back to the originating host. Access can
   // throw when no pool is configured; treat as "no adapter".
@@ -906,7 +884,7 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   if (!adapter) return false;
   const cache = adapter.schemaCache;
   if (!cache || typeof cache.isCached !== "function") return false;
-  const table = (schemaHost as unknown as typeof Base).tableName;
+  const table = schemaHost.tableName;
   if (!cache.isCached(table)) return false;
   const hash =
     typeof cache.getCachedColumnsHash === "function"

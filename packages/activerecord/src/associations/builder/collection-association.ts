@@ -1,5 +1,6 @@
 import { singularize } from "@blazetrails/activesupport";
 import { Association } from "./association.js";
+import type { AssociationInstanceHost } from "./association.js";
 import { association } from "../../associations.js";
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
@@ -114,7 +115,7 @@ export class CollectionAssociation extends Association {
     const idsName = `${singularize(name)}Ids`;
     if (!(idsName in mixin)) {
       Object.defineProperty(mixin, idsName, {
-        get(this: any) {
+        get(this: AssociationInstanceHost) {
           return this.association(name).idsReader();
         },
         configurable: true,
@@ -130,7 +131,7 @@ export class CollectionAssociation extends Association {
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, idsName, {
       get: existing?.get,
-      set(this: any, ids: any) {
+      set(this: AssociationInstanceHost, ids: unknown) {
         this.association(name).idsWriter(ids);
       },
       configurable: true,

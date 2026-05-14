@@ -1,4 +1,5 @@
 import { Association } from "./association.js";
+import type { AssociationInstanceHost } from "./association.js";
 
 function defineMethod(mixin: any, methodName: string, fn: (...args: any[]) => any): void {
   if (!mixin || typeof mixin !== "object") return;
@@ -31,24 +32,36 @@ export class SingularAssociation extends Association {
       this.defineConstructors(mixin, name);
     }
 
-    defineMethod(mixin, `reload${cap}`, function (this: any) {
+    defineMethod(mixin, `reload${cap}`, function (this: AssociationInstanceHost) {
       return this.association(name).forceReloadReader();
     });
-    defineMethod(mixin, `reset${cap}`, function (this: any) {
+    defineMethod(mixin, `reset${cap}`, function (this: AssociationInstanceHost) {
       return this.association(name).reset();
     });
   }
 
   static defineConstructors(mixin: any, name: string): void {
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    defineMethod(mixin, `build${cap}`, function (this: any, ...args: any[]) {
-      return this.association(name).build(...args);
-    });
-    defineMethod(mixin, `create${cap}`, function (this: any, ...args: any[]) {
-      return this.association(name).create(...args);
-    });
-    defineMethod(mixin, `create${cap}Bang`, function (this: any, ...args: any[]) {
-      return this.association(name).createBang(...args);
-    });
+    defineMethod(
+      mixin,
+      `build${cap}`,
+      function (this: AssociationInstanceHost, ...args: unknown[]) {
+        return this.association(name).build(...args);
+      },
+    );
+    defineMethod(
+      mixin,
+      `create${cap}`,
+      function (this: AssociationInstanceHost, ...args: unknown[]) {
+        return this.association(name).create(...args);
+      },
+    );
+    defineMethod(
+      mixin,
+      `create${cap}Bang`,
+      function (this: AssociationInstanceHost, ...args: unknown[]) {
+        return this.association(name).createBang(...args);
+      },
+    );
   }
 }
