@@ -947,38 +947,6 @@ export class Model {
     );
   }
 
-  static afterSaveCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    this.afterCommit(fn, { ...conditions, on: ["create", "update"] });
-  }
-
-  static afterCreateCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    this.afterCommit(fn, { ...conditions, on: "create" });
-  }
-
-  static afterUpdateCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    this.afterCommit(fn, { ...conditions, on: "update" });
-  }
-
-  static afterDestroyCommit<T extends typeof Model>(
-    this: T,
-    fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ): void {
-    this.afterCommit(fn, { ...conditions, on: "destroy" });
-  }
-
   static afterRollback<T extends typeof Model>(
     this: T,
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,

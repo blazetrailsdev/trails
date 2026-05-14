@@ -567,6 +567,77 @@ describe("TransactionCallbacksTest", () => {
     expect(history).toEqual(["commit_on_create"]);
   });
 
+  it("afterSaveCommit fires on create and update but not destroy", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterSaveCommit(() => {
+          history.push("save_commit");
+        });
+      }
+    }
+    const t = new Topic({ title: "New topic" });
+    await t.save();
+    expect(history).toEqual(["save_commit"]);
+    history.length = 0;
+
+    t.title = "Updated topic";
+    await t.save();
+    expect(history).toEqual(["save_commit"]);
+    history.length = 0;
+
+    await t.destroy();
+    expect(history).toEqual([]);
+  });
+
+  it("afterUpdateCommit fires on update but not create", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterUpdateCommit(() => {
+          history.push("update_commit");
+        });
+      }
+    }
+    const t = new Topic({ title: "New topic" });
+    await t.save();
+    expect(history).toEqual([]);
+
+    t.title = "Updated topic";
+    await t.save();
+    expect(history).toEqual(["update_commit"]);
+  });
+
+  it("afterDestroyCommit fires on destroy but not create or update", async () => {
+    const adp = freshAdapter();
+    const history: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.afterDestroyCommit(() => {
+          history.push("destroy_commit");
+        });
+      }
+    }
+    const t = new Topic({ title: "New topic" });
+    await t.save();
+    expect(history).toEqual([]);
+
+    t.title = "Updated topic";
+    await t.save();
+    expect(history).toEqual([]);
+
+    await t.destroy();
+    expect(history).toEqual(["destroy_commit"]);
+  });
+
   it.skip("save in after create commit wont invoke extra after create commit", () => {
     // BLOCKED: transactions — transaction / savepoint / isolation gap
     // ROOT-CAUSE: transactions.ts#withTransaction or savepoint semantics not fully implemented
