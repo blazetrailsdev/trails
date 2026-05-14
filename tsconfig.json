@@ -25,7 +25,8 @@
     { "path": "packages/rack" },
     { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
-    { "path": "packages/trailties" }
+    { "path": "packages/trailties" },
+    { "path": "packages/globalid" }
   ],
   "exclude": ["node_modules", "dist"]
 }

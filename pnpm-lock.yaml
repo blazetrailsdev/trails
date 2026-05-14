@@ -120,6 +120,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../arel
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -156,6 +159,15 @@ importers:
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+
+  packages/globalid:
+    dependencies:
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
@@ -264,6 +276,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../../packages/arel
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../../packages/globalid
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack

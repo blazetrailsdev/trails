@@ -1,0 +1,32 @@
+{
+  "name": "@blazetrails/globalid",
+  "version": "0.1.0",
+  "description": "GlobalID support for Trails, mirroring the globalid gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./wire": {
+      "types": "./dist/wire.d.ts",
+      "default": "./dist/wire.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*"
+  },
+  "peerDependencies": {
+    "@blazetrails/activerecord": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@blazetrails/activerecord": {
+      "optional": true
+    }
+  }
+}

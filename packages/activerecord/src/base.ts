@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { getApp as _getGlobalIdApp } from "@blazetrails/globalid";
 import {
   Model,
   type Type,
@@ -2766,27 +2767,21 @@ export class Base extends Model {
   // slice extracted to persistence.ts.
 
   /**
-   * Return a GlobalID-like URI for this record.
+   * Return a GlobalID URI for this record.
    *
-   * Mirrors: ActiveRecord::Base#to_gid (simplified, no app name)
+   * Mirrors: ActiveRecord::Base#to_gid
+   *
+   * When no app is configured the fallback URI has the form
+   * `gid://ClassName/id` (non-standard; GID-3 will require setApp before
+   * producing a parseable URI::GID).
    */
   toGid(): string {
     const ctor = this.constructor as typeof Base;
-    return `gid://${ctor.name}/${this.id}`;
-  }
-
-  /**
-   * Return a signed GlobalID-like URI for this record.
-   * Uses a simple base64 encoding (not cryptographically signed).
-   *
-   * Mirrors: ActiveRecord::Base#to_sgid (simplified)
-   */
-  toSgid(): string {
-    const gid = this.toGid();
-    if (typeof btoa === "function") {
-      return btoa(gid);
+    const app = _getGlobalIdApp();
+    if (app) {
+      return `gid://${app}/${ctor.name}/${this.id}`;
     }
-    return Buffer.from(gid).toString("base64");
+    return `gid://${ctor.name}/${this.id}`;
   }
 
   // valuesAt / assignAttributes extracted to persistence.ts.
@@ -3461,3 +3456,7 @@ registerMigrationArConfig({
     return Base._tableNameSuffix;
   },
 });
+
+// Triggers globalid's registration side-effects (currently a no-op stub;
+// filled in GID-4). Kept at the bottom for readability — ESM hoists it.
+import "@blazetrails/globalid/wire";

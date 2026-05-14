@@ -50,7 +50,8 @@
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
-    "@blazetrails/activemodel": "workspace:*"
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/globalid": "workspace:*"
   },
   "peerDependencies": {
     "better-sqlite3": "^12.6.2",
