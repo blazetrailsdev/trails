@@ -133,7 +133,7 @@ interface ReflectionLike {
   joinForeignKey: string | string[];
   throughReflection?: { joinForeignKey: string | string[] } | null;
   scope?: ((...args: any[]) => any) | null;
-  klass?: typeof Base;
+  klass: typeof Base;
   activeRecordPrimaryKey?: string | string[];
 }
 
@@ -454,6 +454,22 @@ function _canRouteThroughViaDisableJoinsAssociationScope(
  * `AssociationScope.scope(...)` here only matters if a future caller
  * stretches the contract.
  */
+/**
+ * Rails' `klass.scope_for_association` — returns the association-aware base
+ * relation for the target model, merging any current scope.
+ * `scopeForAssociation` is wired onto Base via `extend()` but its `this:
+ * NamedHost` constraint doesn't fully overlap `typeof Base` statically, so
+ * the call site needs a structural cast. Centralising it here avoids
+ * repeating the cast at every loader.
+ * @internal
+ */
+function _scopeForAssociation(model: typeof Base): Relation<Base> {
+  return (
+    (model as unknown as { scopeForAssociation?(): Relation<Base> }).scopeForAssociation?.() ??
+    model.all()
+  );
+}
+
 function _builtAssociationScope(
   record: Base,
   assocName: string,
@@ -535,7 +551,7 @@ async function _loadThroughViaDisableJoinsScope(
   // DisableJoinsAssociationRelation → relation.ts → associations.ts.
   const { DisableJoinsAssociationScope } =
     await import("./associations/disable-joins-association-scope.js");
-  const klass = reflection.klass!;
+  const klass = reflection.klass;
   // DJAS.scope() now returns a sync deferred-chain Relation — the
   // async chain walk runs on first toArray(). No more Promise<{relation}>
   // boxing to unwrap.
@@ -670,10 +686,7 @@ export async function loadBelongsTo(
   let result: Base | null;
   if (reflection) {
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation =
-      (
-        targetModel as unknown as { scopeForAssociation?(): Relation<Base> }
-      ).scopeForAssociation?.() ?? targetModel.all();
+    const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
@@ -801,10 +814,7 @@ export async function loadHasOne(
   let result: Base | null;
   if (reflection) {
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation =
-      (
-        targetModel as unknown as { scopeForAssociation?(): Relation<Base> }
-      ).scopeForAssociation?.() ?? targetModel.all();
+    const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
     if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
@@ -1017,10 +1027,7 @@ export async function loadHasMany(
     // `options.scope` (wrapping with `sourceType` filtering) — those
     // must still run.
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation =
-      (
-        targetModel as unknown as { scopeForAssociation?(): Relation<Base> }
-      ).scopeForAssociation?.() ?? targetModel.all();
+    const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
     if (options.scope && options.scope !== reflection.scope) {
       rel = options.scope(rel);
