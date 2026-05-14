@@ -229,6 +229,10 @@ import {
   restoreTransactionRecordState as _restoreTransactionRecordState,
   isTransactionIncludeAnyAction as _isTransactionIncludeAnyAction,
   synthOnCondition as _synthOnCondition,
+  afterSaveCommitMethod as _afterSaveCommitMethod,
+  afterCreateCommitMethod as _afterCreateCommitMethod,
+  afterUpdateCommitMethod as _afterUpdateCommitMethod,
+  afterDestroyCommitMethod as _afterDestroyCommitMethod,
 } from "./transactions.js";
 
 import {
@@ -3009,6 +3013,11 @@ export class Base extends Model {
       >,
     );
   }
+
+  static afterSaveCommit = _afterSaveCommitMethod;
+  static afterCreateCommit = _afterCreateCommitMethod;
+  static afterUpdateCommit = _afterUpdateCommitMethod;
+  static afterDestroyCommit = _afterDestroyCommitMethod;
 
   /**
    * Run validations and return self.
