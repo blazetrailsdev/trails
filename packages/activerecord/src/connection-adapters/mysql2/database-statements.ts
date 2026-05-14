@@ -72,6 +72,7 @@ export async function executeBatch(
 
 /** @internal */
 function lastInsertedId(result: any): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2/database_statements.rb cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#last_inserted_id is not implemented",
   );

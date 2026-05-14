@@ -2315,6 +2315,7 @@ function translateException(
 
 /** @internal */
 function arelVisitor(): never {
+  // @nie disposition=remove-from-class rails=activerecord/lib/active_record/connection_adapters/sqlite3_adapter.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#arel_visitor is not implemented",
   );
@@ -2322,6 +2323,7 @@ function arelVisitor(): never {
 
 /** @internal */
 function reconnect(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/sqlite3_adapter.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::SQLite3Adapter#reconnect is not implemented",
   );

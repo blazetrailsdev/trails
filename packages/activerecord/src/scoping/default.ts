@@ -98,6 +98,7 @@ export function isDefaultScopes(
 
 /** @internal */
 function buildDefaultScope(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#build_default_scope is not implemented",
   );
@@ -117,6 +118,7 @@ function isExecuteScope(
 
 /** @internal */
 function isIgnoreDefaultScope(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#ignore_default_scope? is not implemented",
   );
@@ -124,6 +126,7 @@ function isIgnoreDefaultScope(): never {
 
 /** @internal */
 function ignoreDefaultScope(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/scoping/default.rb cluster=relation
   throw new NotImplementedError(
     "ActiveRecord::Scoping::Default#ignore_default_scope= is not implemented",
   );

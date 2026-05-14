@@ -109,6 +109,7 @@ export class ColumnSerializer {
 
 /** @internal */
 function checkArityOfConstructor(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/coders/column_serializer.rb
   throw new NotImplementedError(
     "ActiveRecord::Coders::ColumnSerializer#check_arity_of_constructor is not implemented",
   );

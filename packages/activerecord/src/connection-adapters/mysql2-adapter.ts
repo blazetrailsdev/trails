@@ -1558,6 +1558,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
 /** @internal */
 function reconnect(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
   );
@@ -1565,6 +1566,7 @@ function reconnect(): never {
 
 /** @internal */
 function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#translate_exception is not implemented",
   );
@@ -1572,6 +1574,7 @@ function translateException(exception: any, message?: any, sql?: any, binds?: an
 
 /** @internal */
 function initializeTypeMap(m: any): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",
   );

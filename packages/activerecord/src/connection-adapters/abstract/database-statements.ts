@@ -1534,6 +1534,7 @@ export function rawExecute(
   materializeTransactions?: any,
   batch?: any,
 ): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute is not implemented",
   );
@@ -1553,6 +1554,7 @@ export function performQuery(
   _typeCastedBinds: unknown[],
   _options?: { prepare?: boolean; notificationPayload?: unknown; batch?: boolean },
 ): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
   );
@@ -1560,6 +1562,7 @@ export function performQuery(
 
 /** @internal */
 function castResult(rawResult: any): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
   );
@@ -1567,6 +1570,7 @@ function castResult(rawResult: any): never {
 
 /** @internal */
 function affectedRows(rawResult: any): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#affected_rows is not implemented",
   );
