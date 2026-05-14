@@ -2192,22 +2192,19 @@ describe("MigrationTest", () => {
         expect(new LongV().version).toBe("123456789012345");
       });
 
-      it("migration raises if timestamp is future date", async () => {
+      it("migration raises if timestamp is future date", () => {
         const savedValidate = Migrator.validateMigrationTimestamps;
         try {
           Migrator.validateMigrationTimestamps = true;
-          const { Temporal } = await import("@blazetrails/activesupport/temporal");
-          const futureTs = Temporal.Now.plainDateTimeISO("UTC").add({ months: 1 });
-          const pad = (n: number, w = 2) => String(n).padStart(w, "0");
-          const ts = `${futureTs.year}${pad(futureTs.month)}${pad(futureTs.day)}${pad(futureTs.hour)}${pad(futureTs.minute)}${pad(futureTs.second)}`;
+          // A timestamp far in the future (year 9999) is definitely > tomorrow
+          const ts = "99991231235959";
           class FutureM extends Migration {
             static version = ts;
             async change() {}
           }
-          const adapter = createTestAdapter();
           expect(
             () =>
-              new Migrator(adapter, [
+              new Migrator(createTestAdapter(), [
                 { name: "test_migration", version: ts, migration: () => new FutureM() },
               ]),
           ).toThrow(/Invalid timestamp/);
