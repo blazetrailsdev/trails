@@ -21,7 +21,6 @@ import {
   isAnonymous,
   moduleParentName,
 } from "./module-ext.js";
-import type { AnyClass } from "./descendants-tracker.js";
 import {
   pluralize,
   singularize,
@@ -219,7 +218,7 @@ describe("ModuleTest", () => {
   });
 
   it("moduleParentName — returns parent namespace for namespaced class", () => {
-    const Inner = { name: "Outer::Inner" } as unknown as AnyClass;
+    const Inner = { name: "Outer::Inner" };
     expect(moduleParentName(Inner)).toBe("Outer");
   });
 

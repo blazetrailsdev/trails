@@ -275,17 +275,16 @@ export function attrInternal(target: object, ...names: string[]): void {
  * isAnonymous — returns true if a class/function has no name.
  * Mirrors Ruby's Module#anonymous?.
  */
-export function isAnonymous(klass: AnyClass): boolean {
-  const name = (klass as { name?: string }).name;
-  return !name || name === "";
+export function isAnonymous(klass: { name: string }): boolean {
+  return !klass.name || klass.name === "";
 }
 
 /**
  * moduleParentName — returns the parent namespace name of a class (best-effort in JS).
  * In Ruby this would parse the constant path. In JS/TS we can only go by convention.
  */
-export function moduleParentName(klass: AnyClass): string | null {
-  const name = (klass as { name?: string }).name ?? "";
+export function moduleParentName(klass: { name: string }): string | null {
+  const name = klass.name ?? "";
   const parts = name.split("::");
   if (parts.length <= 1) return null;
   return parts.slice(0, -1).join("::");

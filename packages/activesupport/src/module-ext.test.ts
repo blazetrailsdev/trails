@@ -9,7 +9,6 @@ import {
   moduleParentName,
   suppress,
 } from "./module-ext.js";
-import type { AnyClass } from "./descendants-tracker.js";
 
 describe("ModuleTest", () => {
   it("delegate — creates method that forwards to target property", () => {
@@ -142,7 +141,7 @@ describe("ModuleTest", () => {
 
   it("moduleParentName — returns parent namespace for namespaced class", () => {
     // We simulate a namespaced class by naming it "Outer::Inner"
-    const Inner = { name: "Outer::Inner" } as unknown as AnyClass;
+    const Inner = { name: "Outer::Inner" };
     expect(moduleParentName(Inner)).toBe("Outer");
   });
 });
