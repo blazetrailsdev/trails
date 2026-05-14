@@ -1484,11 +1484,44 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("composite primary key autosave", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* cpk not fully supported */
+  it("composite primary key autosave", async () => {
+    // Rails: test "composite primary key autosave" — creating a has_one child
+    // via autosave propagates composite FK columns from parent to child.
+    class CpkOrder2 extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkBook2 extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CpkOrder2", CpkOrder2);
+    registerModel("CpkBook2", CpkBook2);
+    Associations.hasOne.call(CpkOrder2, "cpkBook2", {
+      className: "CpkBook2",
+      autosave: true,
+      foreignKey: ["shop_id", "order_id"],
+    });
+    // Provide explicit composite PK values (Rails: Order.create!(id: [1, 2], ...))
+    const order = new CpkOrder2({ shop_id: 1, id: 2, status: "pending" });
+    const book = new CpkBook2({ title: "Composite Key Book" });
+    cacheAssoc(order, "cpkBook2", book);
+    const saved = await order.save();
+    expect(saved).toBe(true);
+    expect(order.isNewRecord()).toBe(false);
+    expect(book.isNewRecord()).toBe(false);
+    // autosave should have propagated composite FK from order PK to book
+    expect(book.shop_id).toBe(1);
+    expect(book.order_id).toBe(2);
   });
 
   it("should not load the associated model", async () => {

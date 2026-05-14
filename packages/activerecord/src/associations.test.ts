@@ -16,6 +16,7 @@ import {
   reflectOnAllAssociations,
   registerModel,
   DeleteRestrictionError,
+  ConfigurationError,
   touchBelongsToParents,
 } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
@@ -2422,17 +2423,71 @@ describe("AssociationsTest", () => {
     expect(posts).toHaveLength(2);
     expect(posts.map((p) => p.title).sort()).toEqual(["Post1", "Post2"]);
   });
-  it.skip("has many association from a model with query constraints different from the association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("has many association from a model with query constraints different from the association", async () => {
+    const adapter = freshAdapter();
+    class DqcBlogPost extends Base {
+      static {
+        this._tableName = "dqc_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("revision", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        // 3-column query_constraints, but association provides explicit FK/PK
+        (this as any)._queryConstraintsList = ["blog_id", "revision", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class DqcComment extends Base {
+      static {
+        this._tableName = "dqc_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("DqcBlogPost", DqcBlogPost);
+    registerModel("DqcComment", DqcComment);
+    Associations.hasMany.call(DqcBlogPost, "dqcComments", {
+      className: "DqcComment",
+      primaryKey: ["blog_id", "id"],
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    const post = await DqcBlogPost.create({ blog_id: 1, revision: 0, title: "Post" });
+    await DqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "A" });
+    await DqcComment.create({ blog_id: 1, blog_post_id: post.id, body: "B" });
+    await DqcComment.create({ blog_id: 2, blog_post_id: post.id, body: "Other" });
+    const comments = await loadHasMany(post, "dqcComments", {
+      className: "DqcComment",
+      primaryKey: ["blog_id", "id"],
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    expect(comments).toHaveLength(2);
+    expect(comments.map((c) => c.body).sort()).toEqual(["A", "B"]);
   });
-  it.skip("query constraints over three without defining explicit foreign key query constraints raises", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("query constraints over three without defining explicit foreign key query constraints raises", () => {
+    const adapter = freshAdapter();
+    class QcThreeBlogPost extends Base {
+      static {
+        this.attribute("blog_id", "integer");
+        this.attribute("revision", "integer");
+        this.adapter = adapter;
+        (this as any)._queryConstraintsList = ["blog_id", "revision", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class QcThreeComment extends Base {
+      static {
+        this.attribute("blog_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcThreeBlogPost", QcThreeBlogPost);
+    registerModel("QcThreeComment", QcThreeComment);
+    Associations.hasMany.call(QcThreeBlogPost, "qcThreeComments", { className: "QcThreeComment" });
+    const refl = reflectOnAssociation(QcThreeBlogPost, "qcThreeComments")!;
+    expect(() => refl.foreignKey).toThrow(ConfigurationError);
+    expect(() => refl.foreignKey).toThrow("more than 2 attributes");
   });
   it("model with composite query constraints has many association sql", async () => {
     const adapter = freshAdapter();
@@ -2467,11 +2522,52 @@ describe("AssociationsTest", () => {
     });
     expect(posts).toHaveLength(1);
   });
-  it.skip("belongs to association does not use parent query constraints if not configured to", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs single FK to CPK parent resolution */
+  it("belongs to association does not use parent query constraints if not configured to", async () => {
+    // Rails: test_belongs_to_association_does_not_use_parent_query_constraints_if_not_configured_to
+    // When belongs_to has explicit single FK/PK, it bypasses query_constraints derivation.
+    const adapter = freshAdapter();
+    class BtNqcBlogPost extends Base {
+      static {
+        this.attribute("blog_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BtNqcComment extends Base {
+      static {
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+        // Comment has query_constraints, but the belongs_to uses explicit single FK/PK
+        (this as any)._queryConstraintsList = ["blog_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    registerModel("BtNqcBlogPost", BtNqcBlogPost);
+    registerModel("BtNqcComment", BtNqcComment);
+    Associations.belongsTo.call(BtNqcComment, "btNqcBlogPostById", {
+      foreignKey: "blog_post_id",
+      primaryKey: "id",
+      className: "BtNqcBlogPost",
+    });
+    const post = await BtNqcBlogPost.create({ blog_id: 1, title: "Following best practices" });
+    const comment = await BtNqcComment.create({ blog_id: 1, body: "Hello" });
+    setBelongsTo(comment, "btNqcBlogPostById", post, {
+      foreignKey: "blog_post_id",
+      primaryKey: "id",
+      className: "BtNqcBlogPost",
+    });
+    // Only blog_post_id is set to post's scalar id; blog_id is unchanged
+    expect(comment.blog_post_id).toBe(post.id);
+    await comment.save();
+    const loaded = await loadBelongsTo(comment, "btNqcBlogPostById", {
+      foreignKey: "blog_post_id",
+      primaryKey: "id",
+      className: "BtNqcBlogPost",
+    });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.title).toBe("Following best practices");
   });
   it.skip("polymorphic belongs to uses parent query constraints", () => {
     // BLOCKED: associations — collection/singular feature gap
@@ -2714,17 +2810,58 @@ describe("AssociationsTest", () => {
     expect(child.inf_parent2_id).toBeNull();
   });
 
-  it.skip("query constraints that dont include the primary key raise with a single column", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("query constraints that dont include the primary key raise with a single column", () => {
+    const adapter = freshAdapter();
+    class QcSingleBlogPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        (this as any)._queryConstraintsList = ["title"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class QcSingleComment extends Base {
+      static {
+        this.attribute("blog_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcSingleBlogPost", QcSingleBlogPost);
+    registerModel("QcSingleComment", QcSingleComment);
+    Associations.hasMany.call(QcSingleBlogPost, "qcSingleComments", {
+      className: "QcSingleComment",
+      primaryKey: ["blog_id", "id"],
+    });
+    const refl = reflectOnAssociation(QcSingleBlogPost, "qcSingleComments")!;
+    expect(() => refl.foreignKey).toThrow(ConfigurationError);
+    expect(() => refl.foreignKey).toThrow("not include the primary key");
   });
-  it.skip("query constraints that dont include the primary key raise with multiple columns", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("query constraints that dont include the primary key raise with multiple columns", () => {
+    const adapter = freshAdapter();
+    class QcMultiBlogPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("revision", "integer");
+        this.adapter = adapter;
+        (this as any)._queryConstraintsList = ["title", "revision"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    class QcMultiComment extends Base {
+      static {
+        this.attribute("blog_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcMultiBlogPost", QcMultiBlogPost);
+    registerModel("QcMultiComment", QcMultiComment);
+    Associations.hasMany.call(QcMultiBlogPost, "qcMultiComments", {
+      className: "QcMultiComment",
+      primaryKey: ["blog_id", "id"],
+    });
+    const refl = reflectOnAssociation(QcMultiBlogPost, "qcMultiComments")!;
+    expect(() => refl.foreignKey).toThrow(ConfigurationError);
+    expect(() => refl.foreignKey).toThrow("not include the primary key");
   });
   it("assign belongs to cpk model by id attribute", async () => {
     const adapter = freshAdapter();
