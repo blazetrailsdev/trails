@@ -558,6 +558,10 @@ class SchemaAdapter implements DatabaseAdapter {
     return this.inner.isNoDatabaseError(error);
   }
 
+  isPreventingWrites(): boolean {
+    return this.inner.isPreventingWrites();
+  }
+
   private inner: DatabaseAdapter;
 
   constructor(inner: DatabaseAdapter) {

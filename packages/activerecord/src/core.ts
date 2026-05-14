@@ -363,7 +363,8 @@ export function currentShard(this: CoreHost): string {
       return entry.shard;
     }
   }
-  return "default";
+  // Mirrors Rails: default_shard (class_attribute, set by connects_to)
+  return (connClass as any)._defaultShard ?? "default";
 }
 
 export function currentPreventingWrites(this: CoreHost): boolean {

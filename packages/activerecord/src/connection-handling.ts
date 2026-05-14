@@ -78,6 +78,8 @@ export function connectsTo(
   // Mirrors: @shard_keys = shards.keys (before injecting :default for database: usage)
   (this as any)._shardKeys = Object.keys(shards);
   const shardEntries = Object.keys(shards).length > 0 ? shards : { default: database };
+  // Mirrors: self.default_shard = shards.keys.first
+  (this as any)._defaultShard = Object.keys(shardEntries)[0] ?? "default";
   (this as any).connectionClass = true;
 
   const rawConfigs = (this as any).configurations;
@@ -399,6 +401,11 @@ export function isSharded(this: typeof Base): boolean {
   return shardKeys.call(this).length > 0;
 }
 
+export function defaultShard(this: typeof Base): string {
+  const connClass = this.connectionClassForSelf();
+  return (connClass as any)._defaultShard ?? "default";
+}
+
 // --- Private helpers ---
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -493,13 +500,7 @@ export function appendToConnectedToStack(entry: {
   klasses: Set<any>;
 }): void {
   if (isShardSwappingProhibited() && entry.shard) {
-    // Check if the shard would actually change
-    for (const klass of entry.klasses) {
-      const current = coreCurrentShard.call(klass);
-      if (current !== entry.shard) {
-        throw new ArgumentError("cannot swap `shard` while shard swapping is prohibited.");
-      }
-    }
+    throw new ArgumentError("cannot swap `shard` while shard swapping is prohibited.");
   }
   connectedToStack().push(entry);
 }
@@ -820,6 +821,7 @@ export const ClassMethods = {
   clearCacheBang,
   shardKeys,
   isSharded,
+  defaultShard,
   withRoleAndShard,
   appendToConnectedToStack,
 };

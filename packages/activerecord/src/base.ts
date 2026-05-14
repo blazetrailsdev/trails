@@ -1081,6 +1081,7 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
+  declare static defaultShard: typeof ConnectionHandling.defaultShard;
   /** @internal */
   declare static withRoleAndShard: typeof ConnectionHandling.withRoleAndShard;
   /** @internal */
