@@ -1432,11 +1432,12 @@ export function parseTableOptions(
   tableComment: string | null,
 ): Record<string, string> {
   // Strip column definitions — everything up to and including the closing `)`.
-  // Also strip MySQL partition hints (`/*!50100 ... */` appended after options).
-  // Mirrors Rails: .sub(/\A.*\n\) ?/m, "").sub(/\n\/\*!.*\*\/\n\z/m, "").strip
+  // Strip partition hints only when followed by a trailing newline (mirrors Rails:
+  // .sub(/\n\/\*!.*\*\/\n\z/m, "")). Without trailing \n the hint stays in raw
+  // and ends up in opts["options"], which is what the schema-dump test expects.
   let raw = createInfo
     .replace(/[\s\S]*\n\) ?/, "")
-    .replace(/\n\/\*![\s\S]*\*\/\n?$/, "")
+    .replace(/\n\/\*![\s\S]*\*\/\n$/, "")
     .trim();
   if (!raw) return {};
 

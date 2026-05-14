@@ -853,18 +853,25 @@ export class SchemaDumper {
     adapterTableOpts: Record<string, unknown> = {},
     inlineConstraints: string[] = [],
   ): void {
-    const pkColumn = columns.find((c) => c.primaryKey);
-    const hasId = pkColumn?.name === "id";
+    const pkColumns = columns.filter((c) => c.primaryKey);
+    const hasCompositePk = pkColumns.length > 1;
+    const pkColumn = pkColumns[0];
+    const hasId = !hasCompositePk && pkColumn?.name === "id";
     const stripped = this.removePrefixAndSuffix(tableName);
 
     const tableOpts: Record<string, unknown> = {};
-    if (!hasId) {
+    if (hasCompositePk) {
+      tableOpts.primaryKey = pkColumns.map((c) => c.name);
+    } else if (!hasId) {
       tableOpts.id = false;
     } else if (pkColumn) {
       Object.assign(tableOpts, this.primaryKeyTableOptions(pkColumn));
     }
-    tableOpts.force = "cascade";
+    if (typeof adapterTableOpts.charset === "string") tableOpts.charset = adapterTableOpts.charset;
+    if (typeof adapterTableOpts.collation === "string")
+      tableOpts.collation = adapterTableOpts.collation;
     if (typeof adapterTableOpts.options === "string") tableOpts.options = adapterTableOpts.options;
+    tableOpts.force = "cascade";
     if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.length > 0)
       tableOpts.comment = adapterTableOpts.comment;
     const optStr = `{ ${this.formatOptions(tableOpts)} }`;

@@ -859,6 +859,44 @@ describe("SchemaDumperAdapterTest", () => {
     await (dumper as any).table("users", lines);
     expect(lines.join("\n")).toContain(`comment: "user accounts"`);
   });
+
+  it("emitTable emits charset and collation from adapterTableOpts before force", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["t"],
+      columns: () => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: () => [],
+    };
+    class MysqlDumper extends TopLevelDumper {
+      protected override fetchTableOptions(_t: string): Record<string, unknown> {
+        return { charset: "utf8mb4", collation: "utf8mb4_bin" };
+      }
+    }
+    const dumper = MysqlDumper.create(source as any);
+    const lines: string[] = [];
+    await (dumper as any).table("t", lines);
+    const header = lines[0];
+    expect(header).toContain(`charset: "utf8mb4"`);
+    expect(header).toContain(`collation: "utf8mb4_bin"`);
+    expect(header.indexOf("charset")).toBeLessThan(header.indexOf("force"));
+  });
+
+  it("emitTable emits primaryKey array for composite primary keys", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const source = {
+      tables: () => ["t"],
+      columns: () => [
+        { name: "id", type: "integer", primaryKey: true },
+        { name: "account_id", type: "integer", primaryKey: true },
+      ],
+      indexes: () => [],
+    };
+    const dumper = TopLevelDumper.create(source as any);
+    const lines: string[] = [];
+    await (dumper as any).table("t", lines);
+    expect(lines[0]).toContain(`primaryKey: ["id","account_id"]`);
+    expect(lines[0]).not.toContain(`id: false`);
+  });
 });
 
 describe("SchemaDumper async header ordering", () => {
