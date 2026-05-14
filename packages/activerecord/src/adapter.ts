@@ -183,6 +183,11 @@ export interface DatabaseAdapter {
   isNoDatabaseError(error: unknown): boolean;
 
   /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#preventing_writes?
+   */
+  isPreventingWrites(): boolean;
+
+  /**
    * Execute a SQL query and return rows.
    */
   execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]>;

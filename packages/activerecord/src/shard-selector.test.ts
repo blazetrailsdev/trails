@@ -1,24 +1,70 @@
-import { describe, it } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { Base } from "./base.js";
+import { ShardSelector } from "./middleware/shard-selector.js";
+import { createTestAdapter } from "./test-adapter.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
 
 describe("ShardSelectorTest", () => {
-  it.skip("middleware locks to shard by default", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+  afterEach(() => {
+    Base.connectionHandler.clearAllConnectionsBang();
   });
-  it.skip("middleware can turn off lock option", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+
+  function setupShards() {
+    const dbConfig = new HashConfig("test", "Base", { adapter: "sqlite3", database: ":memory:" });
+    Base.connectionHandler.establishConnection(dbConfig, {
+      owner: "Base",
+      role: "writing",
+      shard: "shard_one",
+      adapterFactory: createTestAdapter,
+    });
+  }
+
+  it("middleware locks to shard by default", async () => {
+    const middleware = new ShardSelector(
+      async () => {
+        expect(Base.isShardSwappingProhibited()).toBe(true);
+        return [200, {}, ["body"]];
+      },
+      () => "shard_one",
+    );
+    setupShards();
+    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
   });
-  it.skip("middleware can change shards", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+
+  it("middleware can turn off lock option", async () => {
+    const middleware = new ShardSelector(
+      async () => {
+        expect(Base.isShardSwappingProhibited()).toBe(false);
+        return [200, {}, ["body"]];
+      },
+      () => "shard_one",
+      { lock: false },
+    );
+    setupShards();
+    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
   });
-  it.skip("middleware can handle string shards", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+
+  it("middleware can change shards", async () => {
+    setupShards();
+    const middleware = new ShardSelector(
+      async () => {
+        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+        return [200, {}, ["body"]];
+      },
+      () => "shard_one",
+    );
+    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
+  });
+
+  it("middleware can handle string shards", async () => {
+    setupShards();
+    const middleware = new ShardSelector(
+      async () => {
+        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+        return [200, {}, ["body"]];
+      },
+      () => "shard_one",
+    );
+    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
   });
 });

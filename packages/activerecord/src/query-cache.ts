@@ -155,6 +155,10 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return this.inner.isNoDatabaseError(error);
   }
 
+  isPreventingWrites(): boolean {
+    return this.inner.isPreventingWrites();
+  }
+
   readonly inner: DatabaseAdapter;
   readonly cache: QueryCacheStore;
   private _queryCount = 0;

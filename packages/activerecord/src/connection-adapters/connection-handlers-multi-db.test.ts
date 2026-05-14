@@ -57,13 +57,59 @@ describe("ConnectionHandlersMultiDbTest", () => {
     // SCOPE: permanent skip-list.ts candidate
   });
   it.skip("loading relations with multi db connections", () => {
-    // BLOCKED: connection-pool — needs connects_to with in-memory SQLite + DDL + insert; Slot C
+    // BLOCKED: connection-pool — needs AR model + lazy Relation loading across roles; Slot C-b
   });
-  it.skip("establish connection using 3 levels config", () => {
-    // BLOCKED: connection-pool — pool.dbConfig.database assertion requires file-backed DB; Slot C
+
+  it("establish connection using 3 levels config", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          readonly: { adapter: "sqlite3", database: ":memory:", replica: true },
+          default: { adapter: "sqlite3", database: ":memory:" },
+        },
+      },
+      () => {
+        Base.connectsTo({ database: { writing: "default", reading: "readonly" } });
+
+        const writingPool = Base.connectionHandler.retrieveConnectionPool("Base");
+        expect(writingPool).not.toBeNull();
+        expect(writingPool!.dbConfig.name).toBe("default");
+
+        const readingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "reading",
+        });
+        expect(readingPool).not.toBeNull();
+        expect(readingPool!.dbConfig.name).toBe("readonly");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
-  it.skip("establish connection using 3 levels config with non default handlers", () => {
-    // BLOCKED: connection-pool — pool.dbConfig.database assertion requires file-backed DB; Slot C
+
+  it("establish connection using 3 levels config with non default handlers", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          readonly: { adapter: "sqlite3", database: ":memory:" },
+          primary: { adapter: "sqlite3", database: ":memory:" },
+        },
+      },
+      () => {
+        Base.connectsTo({ database: { default: "primary", readonly: "readonly" } });
+
+        const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "default",
+        });
+        expect(defaultPool).not.toBeNull();
+        expect(defaultPool!.dbConfig.name).toBe("primary");
+
+        const readonlyPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "readonly",
+        });
+        expect(readonlyPool).not.toBeNull();
+        expect(readonlyPool!.dbConfig.name).toBe("readonly");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("switching connections with database url", () => {
