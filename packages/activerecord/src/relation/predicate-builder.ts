@@ -129,6 +129,22 @@ export class PredicateBuilder {
           ? assocPb.buildNegatedFromHash(value as Record<string, unknown>)
           : assocPb.buildFromHash(value as Record<string, unknown>);
         nodes.push(...innerNodes);
+      } else if (
+        !isPlainObject(value) &&
+        this._tableContext &&
+        typeof this._tableContext.isAssociatedWith === "function" &&
+        typeof this._tableContext.associatedTable === "function" &&
+        this._tableContext.isAssociatedWith(key) &&
+        !this._tableContext.hasColumn?.(key)
+      ) {
+        const assocNodes = this.buildFromHashAssociation(
+          this._tableContext.associatedTable(key),
+          key,
+          value,
+          negated,
+          conditions,
+        );
+        nodes.push(...assocNodes);
       } else {
         const attr = this.resolveColumn(key);
         nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
@@ -145,7 +161,73 @@ export class PredicateBuilder {
       const arrayValue = Array.isArray(value) ? value : [value];
       return new PolymorphicArrayValue(assoc.foreignKey, assoc.foreignType, arrayValue).queries();
     }
-    return new AssociationQueryValue(assoc.foreignKey, value).queries();
+    return new AssociationQueryValue(
+      { joinForeignKey: assoc.foreignKey, joinPrimaryKey: "id" },
+      value,
+    ).queries();
+  }
+
+  /** @internal */
+  private buildFromHashAssociation(
+    associatedTable: any,
+    key: string,
+    value: unknown,
+    negated: boolean,
+    attributes: Record<string, unknown>,
+  ): Nodes.Node[] {
+    // Polymorphic — Slot B. Attempting to build on the association name (not a real column)
+    // produces incorrect SQL; throw a clear error instead.
+    if (associatedTable.isPolymorphicAssociation?.()) {
+      throw new Error(
+        `Polymorphic association '${key}' is not yet supported in where() (Slot B). ` +
+          "Use explicit _id and _type conditions instead.",
+      );
+    }
+    // Through: delegate with the associated model's primary key (Rails: through_association? path).
+    // Always build positively — negation is applied once at the group level below (mirrors Rails
+    // expand_from_hash which never recurses with negation).
+    if (associatedTable.isThroughAssociation?.()) {
+      const rawPk = associatedTable.klass?.primaryKey ?? "id";
+      if (Array.isArray(rawPk)) {
+        throw new Error(
+          "Through-association with composite primary key is not yet supported (Slot B). " +
+            "Use explicit FK conditions instead.",
+        );
+      }
+      // Normalize value through AssociationQueryValue so records are coerced to their PKs,
+      // arrays of records become id lists, and Relations become subqueries — matching Rails'
+      // build() which does `value = value.id if value.respond_to?(:id)` before dispatching.
+      const normalizedQueries = new AssociationQueryValue(
+        { joinForeignKey: rawPk, joinPrimaryKey: rawPk },
+        value,
+      ).queries();
+      const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
+      const inner = normalizedQueries.flatMap((q) => assocPb.buildFromHash(q));
+      if (inner.length === 0) return [];
+      const group = inner.length === 1 ? inner[0] : new Nodes.And(inner);
+      return negated ? [new Nodes.Not(new Nodes.Grouping(group))] : [group];
+    }
+    // Core non-polymorphic, non-through path.
+    // Rails expand_from_hash is always positive; negation is applied once at the group level.
+    const queries = new AssociationQueryValue(associatedTable, value).queries();
+    const groups: Nodes.Node[] = [];
+    for (const query of queries) {
+      // Cycle guard: prevents infinite recursion when FK name == association name.
+      if (isSameHash(query, attributes)) {
+        groups.push(this.build(this.resolveColumn(key), value));
+      } else {
+        const inner = this.buildFromHash(query);
+        if (inner.length === 0) continue;
+        groups.push(inner.length === 1 ? inner[0] : new Nodes.And(inner));
+      }
+    }
+    if (groups.length === 0) return [];
+    if (negated) return groups.map((g) => new Nodes.Not(new Nodes.Grouping(g)));
+    if (groups.length === 1) return groups;
+    const combined = groups.reduce((acc, g, i) =>
+      i === 0 ? g : new Nodes.Grouping(new Nodes.Or(acc, g)),
+    );
+    return [combined];
   }
 
   buildNegated(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
@@ -509,4 +591,25 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
+}
+
+function isSameHash(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (!(k in b) || !isSameValue(a[k], b[k])) return false;
+  }
+  return true;
+}
+
+// Value equality that matches Ruby hash equality: scalars by identity, arrays by element.
+// Needed so the FK-cycle guard catches cases like { author_id: [1] } == { author_id: [1] }
+// where AssociationQueryValue produces a new array each time (different reference, same content).
+function isSameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((v, i) => isSameValue(v, b[i]));
+  }
+  return false;
 }
