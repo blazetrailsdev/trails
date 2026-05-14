@@ -46,8 +46,9 @@ import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
 // diverges (CP returns T[], Relation returns LoadedRelation<this>)
-// and the conflict surfaces here too. Same PR B plan as on the class.
-// @ts-expect-error see block comment above — declaration-merge `load()` divergence
+// and the conflict surfaces here. Permanent divergence: CP is thenable
+// via load(), so T[] is the correct contract for await semantics.
+// @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
   // Thenable — makes CollectionProxy awaitable. Delegates to `load()`,
   // which both returns the loaded records AND hydrates `_target`, so
@@ -496,9 +497,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return results;
   }
 
-  // @ts-expect-error CP's load returns loaded records (association-hydrated
-  //   target), not a LoadedRelation<this>. Intentional divergence; PR B
-  //   will remove CP's load in favor of Relation's.
+  // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
+  //   Relation's returns LoadedRelation<this>. CP is thenable via load()
+  //   so T[] is the correct contract here. Permanent divergence.
   async load(): Promise<T[]> {
     if (this._targetLoaded) return this._target;
     // Same divergence gate as `toArray()` — if the inherited Relation
@@ -1075,9 +1076,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
    */
-  // @ts-expect-error Relation#delete(id) removes by PK; CP#delete removes
-  //   loaded records via the association. Distinct API. PR B: rename or
-  //   restructure.
+  // @ts-expect-error CP and Relation share the method name for genuinely
+  //   different operations: Relation#delete removes by PK; CP#delete removes
+  //   by record reference (association semantics). Intentional permanent
+  //   divergence — renaming either would break the Rails API surface.
   async delete(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
     // Through association (including HABTM): delete the join records
@@ -1172,11 +1174,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._removeFromTarget(removed);
   }
 
-  private async _deleteThroughAllSql(): Promise<void> {
+  private async _deleteThroughAllSql(): Promise<number> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) return;
+    if (!throughAssoc) return 0;
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
@@ -1188,7 +1190,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
     const pkValue = this._record._readAttribute(primaryKey);
-    if (pkValue == null) return;
+    if (pkValue == null) return 0;
     const throughAs = throughAssoc.options.as;
     const conditions: Record<string, unknown> = {};
     if (throughAs) {
@@ -1207,7 +1209,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
       conditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
     }
-    await (throughModel as any).where(conditions).deleteAll();
+    return (throughModel as any).where(conditions).deleteAll();
   }
 
   private _buildNullifyUpdates(): Record<string, null> {
@@ -1237,8 +1239,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
    */
-  // @ts-expect-error Relation#destroy(id) destroys by PK; CP#destroy
-  //   destroys loaded records. Same divergence as `delete`.
+  // @ts-expect-error CP and Relation share the method name for genuinely
+  //   different operations: Relation#destroy removes by PK; CP#destroy
+  //   destroys by record reference (association semantics). Intentional
+  //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: T[]): Promise<void> {
     const destroyed: Base[] = [];
     for (const record of records) {
@@ -1373,9 +1377,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#none?
    */
-  // @ts-expect-error Relation#isNone is sync (`_isNone` flag check). CP's
-  //   isNone fires a query/loaded-target empty check. PR B will rename
-  //   CP's to something like `isEmpty()` or drop it.
+  // @ts-expect-error Rails Relation#none? fires a query (Enumerable#none?
+  //   via each); our Relation#isNone only checks the NullRelation flag.
+  //   CP must fire a count query to check actual emptiness. Permanent.
   async isNone(): Promise<boolean> {
     return (await this.count()) === 0;
   }
@@ -1472,12 +1476,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy_all
    */
-  // @ts-expect-error Relation#destroyAll returns the destroyed T[]; CP's
-  //   returns void (fires association callbacks + mutates target).
-  //   PR B: align to return T[] or drop.
-  async destroyAll(): Promise<void> {
+  async destroyAll(): Promise<T[]> {
     const records = await this.toArray();
     await this.destroy(...records);
+    return records;
   }
 
   /**
@@ -1885,9 +1887,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete_all
    */
-  // @ts-expect-error Relation#deleteAll returns affected-rows count; CP's
-  //   returns void (dependent-strategy routing). PR B: align.
-  async deleteAll(dependent?: string): Promise<void> {
+  async deleteAll(dependent?: string): Promise<number> {
     this._ensureThroughWritable();
     // Rails normalizes dependent: :destroy → :delete_all for deleteAll,
     // because deleteAll should never run destroy callbacks (use destroyAll for that).
@@ -1926,31 +1926,33 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isThrough || diverged) {
       this._checkStrictLoading();
     }
+    let count: number;
     if (strategy === "delete_all") {
       if (this._isThrough) {
         // For through associations, delete join rows via SQL — not the target records
-        await this._deleteThroughAllSql();
+        count = await this._deleteThroughAllSql();
       } else if (diverged) {
-        await super.deleteAll();
+        count = await super.deleteAll();
       } else {
-        await this.scope().deleteAll();
+        count = await this.scope().deleteAll();
       }
     } else {
       // Nullify: set-based SQL update to null FKs (no per-record callbacks)
       if (this._isThrough) {
-        await this._deleteThroughAllSql();
+        count = await this._deleteThroughAllSql();
       } else {
         const nullUpdates = this._buildNullifyUpdates();
         if (diverged) {
-          await super.updateAll(nullUpdates);
+          count = await super.updateAll(nullUpdates);
         } else {
-          await this.scope().updateAll(nullUpdates);
+          count = await this.scope().updateAll(nullUpdates);
         }
       }
     }
     this._target = [];
     this._targetLoaded = true;
     this.resetScope();
+    return count;
   }
 
   /**
@@ -1958,8 +1960,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#calculate
    */
-  // @ts-expect-error Relation#calculate is strongly typed per operation.
-  //   CP's is looser (string-typed op). PR B: tighten CP's overloads.
+  async calculate(operation: "count", column?: string): Promise<number | Record<string, number>>;
+  async calculate(
+    operation: "sum",
+    column: string,
+  ): Promise<number | bigint | Record<string, number | bigint>>;
+  async calculate(
+    operation: "average",
+    column: string,
+  ): Promise<number | null | Record<string, number>>;
+  async calculate(
+    operation: "minimum" | "maximum",
+    column: string,
+  ): Promise<unknown | null | Record<string, unknown>>;
   async calculate(operation: string, columnName?: string): Promise<unknown> {
     const op =
       operation === "avg"
