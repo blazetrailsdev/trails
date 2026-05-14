@@ -52,7 +52,6 @@ import {
 } from "./errors.js";
 import {
   AutosaveAssociation,
-  autosaveBelongsTo,
   autosaveChildren,
   flushPendingReplaces,
   computePrimaryKey as _computePrimaryKey,
@@ -2461,14 +2460,6 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     let saved = false;
     let wasNewRecord = false;
-
-    // autosaveBelongsTo is an explicit pre-save check (not a registered callback); keep it
-    // outside the save block so that after_save does not fire when it fails.
-    const belongsToOk = await autosaveBelongsTo(this);
-    if (!belongsToOk) {
-      this._skipTouch = false;
-      return false;
-    }
 
     // Rails: Callbacks#create_or_update wraps super in run_callbacks(:save) { ... }.
     // Around_save callbacks correctly wrap the _createRecord/_updateRecord calls which
