@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 import pg from "pg";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { getTypeParser } from "./temporal-type-parsers.js";
+import { makeGetTypeParser } from "./temporal-type-parsers.js";
+
+const getTypeParser = makeGetTypeParser(pg.types);
 
 const OID_DATE = 1082;
 const OID_TIME = 1083;

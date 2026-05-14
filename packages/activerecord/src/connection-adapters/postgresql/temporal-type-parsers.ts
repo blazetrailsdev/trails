@@ -11,8 +11,6 @@
  * etc. Per-connection tables, not global mutation.
  */
 
-// Not imported by the top-level activerecord barrel; only pulled in when the PostgreSQL adapter is loaded.
-import pg from "pg";
 import {
   parsePostgresInstant,
   parsePostgresTimestampAsInstant,
@@ -40,20 +38,28 @@ const TEMPORAL_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser
 ]);
 
 /**
- * Drop-in replacement for `pg.types.getTypeParser`.
- * Pass as `{ types: { getTypeParser } }` in the pg.Pool / pg.Client config.
+ * Returns a drop-in replacement for `pg.types.getTypeParser`.
+ * Pass the returned function as `{ types: { getTypeParser } }` in the pg.Pool / pg.Client config.
  *
  * Intercepts text-format for the five temporal OIDs and returns our Temporal
- * wire parsers. All other OIDs delegate to `pg.types.getTypeParser` so the
+ * wire parsers. All other OIDs delegate to `pgTypes.getTypeParser` so the
  * built-in parsers (int, bool, numeric, etc.) remain active. Returning `null`
  * is NOT correct — pg stores the return value directly in its `_parsers` array
  * and calls it; a non-function crashes query processing.
+ *
+ * Accepts `pgTypes` rather than importing `pg` directly so this module carries
+ * no eager native-package import — keeping it loadable in browser bundles even
+ * though PostgreSQL itself is server-only.
  */
-export function getTypeParser(oid: number, format?: string): PgParser {
-  const fmt = format || "text";
-  if (fmt === "text") {
-    const parser = TEMPORAL_PARSERS.get(oid);
-    if (parser) return parser;
-  }
-  return pg.types.getTypeParser(oid, fmt as "text" | "binary") as PgParser;
+export function makeGetTypeParser(pgTypes: {
+  getTypeParser: (oid: number, format: "text" | "binary") => unknown;
+}): (oid: number, format?: string) => PgParser {
+  return function getTypeParser(oid: number, format?: string): PgParser {
+    const fmt = format || "text";
+    if (fmt === "text") {
+      const parser = TEMPORAL_PARSERS.get(oid);
+      if (parser) return parser;
+    }
+    return pgTypes.getTypeParser(oid, fmt as "text" | "binary") as PgParser;
+  };
 }

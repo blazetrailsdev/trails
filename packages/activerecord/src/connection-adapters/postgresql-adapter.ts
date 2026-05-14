@@ -67,8 +67,9 @@ import {
   temporalToBindString,
   extractTableRefFromInsertSql,
 } from "./abstract/database-statements.js";
-import { getTypeParser as getTemporalTypeParser } from "./postgresql/temporal-type-parsers.js";
+import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
+const getTemporalTypeParser = makeGetTypeParser(pg.types);
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
 import {
