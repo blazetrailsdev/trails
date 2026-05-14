@@ -534,7 +534,7 @@ export class AssociationReflection extends MacroReflection {
 
     if (ownerPkStr && !primaryQueryConstraints.includes(ownerPkStr)) {
       throw new ConfigurationError(
-        `The query constraints on the \`${this.activeRecord.name}\` model do not include the primary ` +
+        `The query constraints on the \`${this.activeRecord.name}\` model does not include the primary ` +
           `key so Active Record is unable to derive the foreign key constraints for ` +
           `the association. You need to explicitly define the query constraints for this ` +
           `association.`,
