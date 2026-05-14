@@ -9,7 +9,7 @@ import {
   afterDestroy,
 } from "../../callbacks.js";
 import { resolveModel, modelRegistry } from "../../associations.js";
-import { saveBelongsToAssociation } from "../../autosave-association.js";
+import { saveBelongsToAssociation, defineNonCyclicMethod } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 
 /**
@@ -64,13 +64,20 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static addAutosaveCallbacks(model: any, reflection: any): void {
-    // Runtime: resolved false halts the chain (activesupport callbacks asyncHalted check).
+    // Mirrors add_autosave_association_callbacks belongs_to branch:
+    //   define_non_cyclic_method(save_method) { throw(:abort) if save_belongs_to_association == false }
+    //   before_save save_method
+    const saveMethod = `autosaveAssociatedRecordsFor_${reflection.name}`;
+    defineNonCyclicMethod(model, saveMethod, function (this: any) {
+      return saveBelongsToAssociation.call(this, reflection);
+    });
+    // Runtime: resolved false halts the chain (activesupport asyncHalted check).
     // Type cast needed because beforeSave's fn type doesn't expose Promise<false>.
-    const cb = (record: any): Promise<void> =>
-      saveBelongsToAssociation.call(record, reflection).then((ok) => {
-        if (!ok) return false as unknown as void;
-      });
-    beforeSave(model, cb);
+    beforeSave(
+      model,
+      (record: any): Promise<void> =>
+        record[saveMethod]().then((ok: boolean) => (ok ? undefined : (false as unknown as void))),
+    );
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {
