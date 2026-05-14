@@ -25,7 +25,9 @@ Source TS files in Rails-mirroring packages (excluding `*.test.ts`,
 | arel          |      89 |                                                                                                                                                   |
 | actionpack    |      89 | 50 actioncontroller + 37 actiondispatch + 1 abstractcontroller + index; restructure in progress ([`*-audit.md`](actionpack-restructure-audit.md)) |
 | activemodel   |      72 |                                                                                                                                                   |
-| **total**     | **777** |                                                                                                                                                   |
+| trailties     |      23 | Rails source: `railties/lib/rails/`                                                                                                               |
+| actionview    |      13 |                                                                                                                                                   |
+| **total**     | **813** |                                                                                                                                                   |
 
 The actionpack split matters for §3.1 path mapping — the package is itself a
 union of Rails directories, so `conventions.ts` already disambiguates by
@@ -178,10 +180,16 @@ on both sides.
 ### 2.3 Cache location, regeneration, CI
 
 - **Location**: `scripts/rails-structure/output/rails-structure.json`.
-- **Committed**: yes. Same rationale as `output/rails-api.json` —
-  `.rails-source/` is pinned to a Rails tag by
-  `scripts/api-compare/fetch-rails.sh`, and we want lint to work without
-  Ruby on every dev box. The file is ~1–3 MB compressed.
+- **Committed**: yes — **new precedent**. `scripts/api-compare/output/` is
+  gitignored (see `scripts/api-compare/.gitignore`); `rails-api.json` is
+  regenerated locally, not committed. That works for api-compare because
+  it's invoked as a single explicit script. The lint rule runs on every
+  dev box during `pnpm lint` / editor save, and requiring Ruby on every
+  machine is a regression. So this plan commits the structure JSON to a
+  **new, non-gitignored path** (e.g. `eslint/rails-structure.json` next to
+  `eslint/rails-private-methods.json`, which _is_ committed) and treats
+  Ruby as a generator-only dependency, matching the rails-private-methods
+  precedent. The file is ~1–3 MB compressed.
 - **Refresh trigger**: same gate as
   [`extract-ruby-api.rb`](../scripts/api-compare/extract-ruby-api.rb) lines
   16–28 — compare cache mtime to `.rails-source/.git/HEAD`, honour
@@ -488,10 +496,11 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
   (`moves.ts`). The rule consults `moves.ts` and validates each chunk's
   internal order, but does not enforce inter-chunk ordering — chunk
   groupings stay as authors place them.
-- **Ripper limitations.** Ruby's `private def foo …` one-liner sets
-  visibility differently from a `private` block; the current
-  `extract-ruby-api.rb` handles the block form. PR 1 must verify the
-  one-liner is handled or document the gap.
+- **Ripper limitations.** Originally flagged here as a risk; verified
+  resolved — `extract-ruby-api.rb` already handles `private(def foo)` in
+  `process_method_add_arg` (line 491) by temporarily switching visibility
+  and recursing into the nested `def`. No action needed; structure
+  extractor inherits the behaviour by reusing `process_method_add_arg`.
 
 ## 8. Out of scope
 
