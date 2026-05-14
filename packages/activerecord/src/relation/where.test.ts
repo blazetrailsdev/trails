@@ -1012,40 +1012,22 @@ describe("WhereTest", () => {
     /* needs belongs_to association with automatic JOIN */
   });
   it.skip("polymorphic shallow where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* polymorphic predicate building implemented (PolymorphicArrayValue); needs test fixture body */
   });
   it.skip("where not polymorphic id and type as nand", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* needs polymorphic DB fixtures */
   });
   it.skip("where not association as nand", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* needs joins + polymorphic DB fixtures */
   });
   it.skip("polymorphic nested array where not", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* needs polymorphic DB fixtures */
   });
   it.skip("polymorphic array where multiple types", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* polymorphic predicate building implemented; needs multi-type fixture body */
   });
   it.skip("polymorphic nested relation where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs polymorphic association setup */
+    /* polymorphic predicate building implemented; needs relation fixture body */
   });
   it.skip("polymorphic sti shallow where", () => {
     // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
@@ -1134,29 +1116,62 @@ describe("WhereTest", () => {
     const sql = Post.where({ data: "hello" }).toSql();
     expect(sql).toContain("hello");
   });
-  it.skip("where on association with custom primary key with relation", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped subquery */
+  function makeWoaModels(ad: DatabaseAdapter, suffix: string) {
+    class Author extends Base {
+      static {
+        this._tableName = `woa_${suffix}_authors`;
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class Essay extends Base {
+      static {
+        this._tableName = `woa_${suffix}_essays`;
+        this.attribute("id", "integer");
+        this.attribute("writer_id", "string");
+        this.adapter = ad;
+      }
+    }
+    const aName = `Woa${suffix}Author`;
+    registerModel(aName, Author);
+    Associations.belongsTo.call(Essay, "writer", {
+      className: aName,
+      foreignKey: "writer_id",
+      primaryKey: "name",
+    });
+    return { Author, Essay };
+  }
+  it("where on association with custom primary key with relation", async () => {
+    const { Author, Essay } = makeWoaModels(adapter, "cr");
+    const author = await Author.create({ name: "David" });
+    await Essay.create({ writer_id: "David" });
+    const essay = await Essay.where({ writer: Author.where({ id: author.id }) }).first();
+    expect(essay).not.toBeNull();
+    expect(essay!.writer_id).toBe("David");
   });
-  it.skip("where on association with relation performs subselect not two queries", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped subquery */
+  it("where on association with relation performs subselect not two queries", async () => {
+    const { Author, Essay } = makeWoaModels(adapter, "sp");
+    const author = await Author.create({ name: "Alice" });
+    await Essay.create({ writer_id: "Alice" });
+    const sql = Essay.where({ writer: Author.where({ name: "Alice" }) }).toSql();
+    expect(sql).toContain("IN");
+    expect(sql).toContain("SELECT");
+    const result = await Essay.where({ writer: Author.where({ id: author.id }) }).toArray();
+    expect(result).toHaveLength(1);
   });
-  it.skip("where on association with custom primary key with array of base", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped subquery */
+  it("where on association with custom primary key with array of base", async () => {
+    const { Author, Essay } = makeWoaModels(adapter, "ab");
+    const author = await Author.create({ name: "David" });
+    await Essay.create({ writer_id: "David" });
+    expect(await Essay.where({ writer: [author] }).first()).not.toBeNull();
   });
-  it.skip("where on association with custom primary key with array of ids", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped subquery */
+  it("where on association with custom primary key with array of ids", async () => {
+    const { Author, Essay } = makeWoaModels(adapter, "ai");
+    await Author.create({ name: "David" });
+    await Essay.create({ writer_id: "David" });
+    const essay = await Essay.where({ writer: ["David"] }).first();
+    expect(essay!.writer_id).toBe("David");
   });
   it.skip("where with relation on has many association", () => {
     // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)

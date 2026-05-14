@@ -10,91 +10,71 @@
  *        OR (commentable_type = 'Image' AND commentable_id = 2)
  */
 export class PolymorphicArrayValue {
-  private foreignKey: string;
-  private foreignType: string;
-  private values: unknown[];
-  private _associatedTable: {
-    joinForeignKey: string;
-    joinForeignType?: string;
-    joinPrimaryKey(klass?: unknown): string;
-  } | null = null;
-
-  constructor(foreignKey: string, foreignType: string, values: unknown[]) {
-    this.foreignKey = foreignKey;
-    this.foreignType = foreignType;
-    this.values = values;
-  }
+  constructor(
+    private readonly associatedTable: {
+      joinForeignKey: string;
+      joinForeignType: string;
+      joinPrimaryKey(klass?: unknown): string;
+    },
+    private readonly values: unknown[],
+  ) {}
 
   queries(): Record<string, unknown>[] {
     if (this.values.length === 0) {
-      return [{ [this.foreignKey]: this.values }];
+      return [{ [this.associatedTable.joinForeignKey]: this.values }];
     }
-
-    const typeToIds = new Map<string | null, unknown[]>();
-
-    for (const value of this.values) {
-      const typeName = this.klassName(value);
-      const id = this.convertToId(value);
-      if (!typeToIds.has(typeName)) {
-        typeToIds.set(typeName, []);
-      }
-      typeToIds.get(typeName)!.push(id);
-    }
-
     const result: Record<string, unknown>[] = [];
-    for (const [type, ids] of typeToIds) {
-      const query: Record<string, unknown> = {};
-      query[this.foreignType] = type;
-      query[this.foreignKey] = ids.length === 1 ? ids[0] : ids;
-      result.push(query);
+    for (const [type, ids] of this.typeToIdsMapping()) {
+      const q: Record<string, unknown> = {};
+      if (type) q[this.associatedTable.joinForeignType] = type;
+      q[this.associatedTable.joinForeignKey] = ids.length === 1 ? ids[0] : ids;
+      result.push(q);
     }
     return result;
   }
 
-  private get associatedTable() {
-    return this._associatedTable;
-  }
-
+  /** @internal */
   private typeToIdsMapping(): Map<string | null, unknown[]> {
-    const result = new Map<string | null, unknown[]>();
-    for (const value of this.values) {
-      const typeName = this.klassName(value);
-      const id = this.convertToId(value);
-      if (!result.has(typeName)) result.set(typeName, []);
-      result.get(typeName)!.push(id);
+    const map = new Map<string | null, unknown[]>();
+    for (const v of this.values) {
+      const k = this.klass(v);
+      const type = k ? (this.polymorphicName(k) ?? null) : null;
+      const id = this.convertToId(v);
+      if (!map.has(type)) map.set(type, []);
+      map.get(type)!.push(id);
     }
-    return result;
+    return map;
   }
 
+  /** @internal */
   private primaryKey(value: unknown): string {
-    return this._associatedTable?.joinPrimaryKey(this.klass(value)) ?? "id";
+    return this.associatedTable.joinPrimaryKey(this.klass(value));
   }
 
+  /** @internal */
   private klass(value: unknown): unknown {
-    if (value !== null && value !== undefined && typeof value === "object") {
-      return (value as any).constructor ?? null;
-    }
-    return null;
+    if (typeof value !== "object" || value === null) return null;
+    if ("_modelClass" in value && "toArel" in value) return (value as any)._modelClass;
+    return (value as any).constructor ?? null;
   }
 
-  private klassName(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "object" && value !== null) {
-      const ctor = (value as any).constructor;
-      if (!ctor) return null;
-      // For STI, use baseClass name (Rails stores the base class in the type column)
-      const baseClass = (ctor as any).baseClass;
-      if (baseClass?.name) return baseClass.name;
-      if (ctor.name) return ctor.name;
-    }
-    return null;
-  }
-
+  /** @internal */
   private convertToId(value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    if (typeof value === "object" && value !== null && "id" in value) {
-      return (value as any).id;
+    if (typeof value === "object" && value !== null) {
+      if ("_modelClass" in value && "toArel" in value) {
+        return (value as any).select(this.primaryKey(value));
+      }
+      const pk = this.primaryKey(value);
+      if (pk in (value as object)) return (value as any)[pk];
     }
     return value;
+  }
+
+  /** @internal */
+  private polymorphicName(klass: unknown): string | null {
+    const base = (klass as any).baseClass;
+    if (base?.name) return base.name;
+    return (klass as any).name ?? null;
   }
 }

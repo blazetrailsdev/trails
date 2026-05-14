@@ -122,39 +122,6 @@ describe("PredicateBuilderTest", () => {
     });
   });
 
-  describe("association expansion", () => {
-    const table = new Table("posts");
-    const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
-
-    it("expands belongsTo association to foreign key", () => {
-      const builder = new PredicateBuilder(table);
-      builder.setAssociationMap(new Map([["author", { foreignKey: "author_id" }]]));
-      const fakeAuthor = { id: 42, constructor: { name: "Author" } };
-      const [node] = builder.buildFromHash({ author: fakeAuthor });
-      const sql = compile(node);
-      expect(sql).toContain('"posts"."author_id"');
-      expect(sql).toContain("42");
-    });
-
-    it("expands null association to IS NULL on foreign key", () => {
-      const builder = new PredicateBuilder(table);
-      builder.setAssociationMap(new Map([["author", { foreignKey: "author_id" }]]));
-      const [node] = builder.buildFromHash({ author: null });
-      const sql = compile(node);
-      expect(sql).toContain('"posts"."author_id"');
-      expect(sql).toMatch(/IS NULL/);
-    });
-
-    it("expands scalar id through association mapping", () => {
-      const builder = new PredicateBuilder(table);
-      builder.setAssociationMap(new Map([["author", { foreignKey: "author_id" }]]));
-      const [node] = builder.buildFromHash({ author: 7 });
-      const sql = compile(node);
-      expect(sql).toContain('"posts"."author_id"');
-      expect(sql).toContain("7");
-    });
-  });
-
   describe("QueryAttribute bind handling", () => {
     it("buildBindAttribute creates a QueryAttribute", () => {
       const table = new Table("users");
