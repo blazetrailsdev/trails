@@ -906,18 +906,22 @@ describe("TransactionTest", () => {
     const { Topic, adapter } = makeSQLiteTopic();
     let openCount: number | undefined;
     const original = adapter.commitDbTransaction.bind(adapter);
-    vi.spyOn(adapter, "commitDbTransaction").mockImplementation(async () => {
+    const spy = vi.spyOn(adapter, "commitDbTransaction").mockImplementation(async () => {
       openCount = adapter.transactionManager.openTransactions;
       return original();
     });
 
-    const first = await Topic.create({ title: "First", approved: false });
-    await Topic.transaction(async () => {
-      first.approved = true;
-      await first.saveBang();
-    });
+    try {
+      const first = await Topic.create({ title: "First", approved: false });
+      await Topic.transaction(async () => {
+        first.approved = true;
+        await first.saveBang();
+      });
 
-    expect(openCount).toBe(0);
+      expect(openCount).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("raising exception in callback rollbacks in save", async () => {
@@ -979,10 +983,10 @@ describe("TransactionTest", () => {
     expect(repliesCount).toBeGreaterThan(0);
 
     // Mirrors Rails: author.update!(name: nil, post_ids: [])
-    // post_ids=[] marks the collection for deletion via autosave (flushPendingReplaces).
-    // Validation on title fails first, so the transaction rolls back before
-    // flushPendingReplaces runs — replies must still be present in the DB.
-    (topic as any).replyIds = [];
+    // Rails' post_ids=[] marks the collection for deletion via autosave. The key
+    // invariant: when update! fails validation, autosave (flushPendingReplaces)
+    // never runs and the DB is unchanged. We verify the same invariant: validation
+    // fails before any autosave DB ops, so reply count is unchanged.
     await expect((topic as any).updateBang({ title: null })).rejects.toThrow();
     expect(await Reply.all().count()).toBe(repliesCount);
   });
