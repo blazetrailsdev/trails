@@ -30,10 +30,23 @@ describe("vendor/sources.ts", () => {
     );
   });
 
-  it("matches scripts/api-compare/config.ts PACKAGES keys (parity with wave 4 derivation)", async () => {
+  it("declares the rack source (wave 2)", () => {
+    const rack = SOURCES.find((s) => s.name === "rack");
+    expect(rack).toBeDefined();
+    expect(rack!.origin.ref).toBe("v3.1.14");
+    expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib", testPath: "test" }]);
+  });
+
+  it("contains every scripts/api-compare/config.ts PACKAGES key (parity for wave 4 derivation)", async () => {
+    // Wave 4 will derive PACKAGES from SOURCES. SOURCES may legitimately
+    // contain extras not in PACKAGES (e.g. "rack" — vendored for test-compare
+    // but not api-compared today). The invariant we need is the other
+    // direction: every PACKAGES key must exist in SOURCES.
     const { PACKAGES } = await import("../scripts/api-compare/config.js");
-    const sourcePackageNames = SOURCES.flatMap((s) => s.packages.map((p) => p.name)).sort();
-    expect(sourcePackageNames).toEqual([...PACKAGES].sort());
+    const sourcePackageNames = new Set(SOURCES.flatMap((s) => s.packages.map((p) => p.name)));
+    for (const pkg of PACKAGES) {
+      expect(sourcePackageNames.has(pkg)).toBe(true);
+    }
   });
 
   it("validateSources rejects duplicate source names", () => {

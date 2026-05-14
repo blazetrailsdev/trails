@@ -32,7 +32,7 @@ export interface UpstreamSource {
 }
 
 /**
- * Wave-1 state: rails only. Rack lands in wave 2, globalid in wave 3.
+ * Wave-2 state: rails + rack. Globalid lands in wave 3.
  * The end-state list (all three sources) is enumerated in
  * docs/ruby-source-fetcher-plan.md §2.2.
  *
@@ -96,6 +96,15 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "railties/test",
       },
     ],
+  },
+  {
+    name: "rack",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rack.git",
+      ref: "v3.1.14",
+    },
+    packages: [{ name: "rack", libPath: "lib", testPath: "test" }],
   },
 ];
 
