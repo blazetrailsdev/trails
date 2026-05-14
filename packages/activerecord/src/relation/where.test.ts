@@ -368,11 +368,34 @@ describe("WhereTest", () => {
     const result = await Post.where({ views: new Range(1, 10, true) }).toArray();
     expect(result).toHaveLength(2);
   });
-  it.skip("where on association with custom primary key", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped WHERE with automatic JOIN */
+  it("where on association with custom primary key", async () => {
+    class WoaAuthor extends Base {
+      static {
+        this._tableName = "woa_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class WoaEssay extends Base {
+      static {
+        this._tableName = "woa_essays";
+        this.attribute("id", "integer");
+        this.attribute("writer_id", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("WoaAuthor", WoaAuthor);
+    Associations.belongsTo.call(WoaEssay, "writer", {
+      className: "WoaAuthor",
+      foreignKey: "writer_id",
+      primaryKey: "name",
+    });
+    const author = await WoaAuthor.create({ name: "David" });
+    await WoaEssay.create({ writer_id: "David" });
+    const essay = await WoaEssay.where({ writer: author }).first();
+    expect(essay).not.toBeNull();
+    expect(essay!.writer_id).toBe("David");
   });
   it.skip("where with association polymorphic", () => {
     // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
@@ -392,11 +415,34 @@ describe("WhereTest", () => {
     // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* Arel.star as hash key raises ArgumentError in Rails; behavior not yet validated */
   });
-  it.skip("where on association with relation", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs association-scoped subquery */
+  it("where on association with relation", async () => {
+    class WoarAuthor extends Base {
+      static {
+        this._tableName = "woar_authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class WoarPost extends Base {
+      static {
+        this._tableName = "woar_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("WoarAuthor", WoarAuthor);
+    Associations.belongsTo.call(WoarPost, "author", {
+      className: "WoarAuthor",
+      foreignKey: "author_id",
+    });
+    const author = await WoarAuthor.create({ name: "Alice" });
+    await WoarPost.create({ author_id: author.id });
+    await WoarPost.create({ author_id: null });
+    const result = await WoarPost.where({ author: WoarAuthor.where({ name: "Alice" }) }).toArray();
+    expect(result).toHaveLength(1);
+    expect(result[0].author_id).toBe(author.id);
   });
   it("where with numeric comparison", () => {
     class Post extends Base {
@@ -851,17 +897,107 @@ describe("WhereTest", () => {
     // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
     /* needs belongs_to with composite primary key — association infrastructure gap */
   });
-  it.skip("belongs to shallow where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs belongs_to association with automatic JOIN */
+  it("belongs to shallow where", () => {
+    class BtsAuthor extends Base {
+      static {
+        this._tableName = "bts_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class BtsPost extends Base {
+      static {
+        this._tableName = "bts_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtsAuthor", BtsAuthor);
+    Associations.belongsTo.call(BtsPost, "author", {
+      className: "BtsAuthor",
+      foreignKey: "author_id",
+    });
+    const author = new BtsAuthor();
+    author.id = 1;
+    expect(BtsPost.where({ author_id: 1 }).toSql()).toEqual(
+      BtsPost.where({ author: author }).toSql(),
+    );
   });
-  it.skip("belongs to nested relation where", () => {
-    // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
-    // ROOT-CAUSE: relation/where-clause.ts#whereClauseFor missing association / polymorphic join
-    // SCOPE: ~100 LOC in relation/where-clause.ts + associations/; affects ~39 tests in where.test.ts
-    /* needs belongs_to association with automatic JOIN */
+  it("belongs to nil where", () => {
+    class BtnAuthor extends Base {
+      static {
+        this._tableName = "btn_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class BtnPost extends Base {
+      static {
+        this._tableName = "btn_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtnAuthor", BtnAuthor);
+    Associations.belongsTo.call(BtnPost, "author", {
+      className: "BtnAuthor",
+      foreignKey: "author_id",
+    });
+    expect(BtnPost.where({ author_id: null }).toSql()).toEqual(
+      BtnPost.where({ author: null }).toSql(),
+    );
+  });
+  it("belongs to array value where", () => {
+    class BtavAuthor extends Base {
+      static {
+        this._tableName = "btav_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class BtavPost extends Base {
+      static {
+        this._tableName = "btav_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtavAuthor", BtavAuthor);
+    Associations.belongsTo.call(BtavPost, "author", {
+      className: "BtavAuthor",
+      foreignKey: "author_id",
+    });
+    expect(BtavPost.where({ author_id: [1, 2] }).toSql()).toEqual(
+      BtavPost.where({ author: [1, 2] }).toSql(),
+    );
+  });
+  it("belongs to nested relation where", () => {
+    class BtnrAuthor extends Base {
+      static {
+        this._tableName = "btnr_authors";
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class BtnrPost extends Base {
+      static {
+        this._tableName = "btnr_posts";
+        this.attribute("id", "integer");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("BtnrAuthor", BtnrAuthor);
+    Associations.belongsTo.call(BtnrPost, "author", {
+      className: "BtnrAuthor",
+      foreignKey: "author_id",
+    });
+    const expected = BtnrPost.where({ author_id: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
+    const actual = BtnrPost.where({ author: BtnrAuthor.where({ id: [1, 2] }) }).toSql();
+    expect(actual).toEqual(expected);
   });
   it.skip("belongs to nested where", () => {
     // BLOCKED: relation — WHERE clause feature gap (polymorphic / association / composite-PK)
