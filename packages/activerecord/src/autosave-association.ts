@@ -11,6 +11,7 @@ import {
   AssociationNotFoundError,
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
+import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import type { AssociationDefinition } from "./associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
@@ -352,13 +353,12 @@ export function validateAssociations(record: Base, context?: ValidationContextAr
           if (parentErrors) {
             if (assoc.options.autosave) {
               const childErrors = (child as any).errors;
-              if (childErrors) {
-                const msgs = (
-                  Array.isArray(childErrors.fullMessages) ? childErrors.fullMessages : []
-                ) as string[];
-                for (const msg of msgs) {
-                  parentErrors.add("base", "invalid", { message: msg });
-                }
+              const errorObjects: any[] = childErrors?.objects ?? [];
+              // Wrap each child error as Associations::NestedError so the
+              // parent's error attribute reads `assoc.attr` (or
+              // `assoc[i].attr` when index_errors is set / global flag).
+              for (const err of errorObjects) {
+                parentErrors.objects.push(new AssociationsNestedError(inst, err));
               }
             } else {
               parentErrors.add(assoc.name, "invalid");
@@ -711,7 +711,7 @@ export function validateHasOneAssociation(this: AutosaveAssociationHost, reflect
     )
       return;
   }
-  isAssociationValid(reflection, record, this);
+  isAssociationValid(reflection, record, this, inst);
 }
 
 /** @internal */
@@ -722,7 +722,7 @@ export function validateBelongsToAssociation(this: AutosaveAssociationHost, refl
   if (!(record.changedForAutosave?.() ?? false)) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
-    isAssociationValid(reflection, record, this);
+    isAssociationValid(reflection, record, this, inst);
   } finally {
     _setValidatingBelongsToFor(this, reflection, false);
   }
@@ -744,30 +744,43 @@ export function validateCollectionAssociation(
   );
   if (!records) return;
   for (const record of records) {
-    isAssociationValid(reflection, record, this);
+    isAssociationValid(reflection, record, this, association);
   }
 }
 
 /** @internal */
-export function isAssociationValid(reflection: any, record: any, owner: any): boolean {
+export function isAssociationValid(
+  reflection: any,
+  record: any,
+  owner: any,
+  association: any,
+): boolean {
+  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398).
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
-  // Mirror Rails: only forward a custom (non-:create/:update) validation context.
   const context: ValidationContextArg | undefined =
     typeof owner?.customValidationContext === "function" && owner.customValidationContext()
       ? owner._validationContext
       : undefined;
   const isChildValid = typeof record.isValid === "function" ? record.isValid(context) : true;
-  if (!isChildValid) {
-    const parentErrors = owner?.errors;
-    if (parentErrors && reflection.options?.autosave) {
-      const msgs = (
-        Array.isArray(record.errors?.fullMessages) ? record.errors.fullMessages : []
-      ) as string[];
-      for (const msg of msgs) parentErrors.add("base", "invalid", { message: msg });
-    } else if (parentErrors) {
-      parentErrors.add(reflection.name ?? "base", "invalid");
+  if (isChildValid) return true;
+
+  const childErrors: any[] = record.errors?.objects ?? [];
+  const associatedErrors =
+    record.isNewRecord?.() || record.changed || context
+      ? childErrors
+      : childErrors.filter((e: any) => e instanceof AssociationsNestedError);
+
+  const parentErrors = owner?.errors;
+  if (!parentErrors) return isChildValid;
+
+  if (reflection.options?.autosave) {
+    if (owner === record) return isChildValid; // Rails: `return if equal?(record)`
+    for (const error of associatedErrors) {
+      parentErrors.objects.push(new AssociationsNestedError(association, error));
     }
+  } else if (associatedErrors.length > 0) {
+    parentErrors.add(reflection.name);
   }
   return isChildValid;
 }

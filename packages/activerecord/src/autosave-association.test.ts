@@ -9,6 +9,8 @@ import {
   acceptsNestedAttributesFor,
   assignNestedAttributes,
   RecordInvalid,
+  indexNestedAttributeErrors,
+  setIndexNestedAttributeErrors,
 } from "./index.js";
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
@@ -1769,41 +1771,132 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     expect(birds.some((b: any) => b.name === "Valid")).toBe(true);
   });
 
-  it.skip("errors should be indexed when global flag is set", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires global indexed errors config */
+  function makeIndexedHasMany(opts: { indexErrors?: boolean } = {}) {
+    const seed = `Idx${Math.random().toString(36).slice(2, 8)}`;
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Child extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("parent_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    Parent.adapter = adapter;
+    Child.adapter = adapter;
+    registerModel(`${seed}Parent`, Parent);
+    registerModel(`${seed}Child`, Child);
+    Associations.hasMany.call(Parent, "children", {
+      autosave: true,
+      className: `${seed}Child`,
+      ...(opts.indexErrors ? { indexErrors: true as const } : {}),
+    });
+    return { Parent, Child };
+  }
+  it("errors should be indexed when global flag is set", () => {
+    const old = indexNestedAttributeErrors;
+    setIndexNestedAttributeErrors(true);
+    try {
+      const { Parent, Child } = makeIndexedHasMany();
+      const parent = new Parent({ name: "p" });
+      cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
+      expect(parent.isValid()).toBe(false);
+      expect(parent.errors.where("children[1].name")).toHaveLength(1);
+      expect(parent.errors.where("children.name")).toHaveLength(0);
+    } finally {
+      setIndexNestedAttributeErrors(old);
+    }
   });
-  it.skip("errors details should be indexed when passed as array", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires indexed error details */
+  it("errors details should be indexed when passed as array", () => {
+    const { Parent, Child } = makeIndexedHasMany({ indexErrors: true });
+    const parent = new Parent({ name: "p" });
+    cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
+    expect(parent.isValid()).toBe(false);
+    expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
+    expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
   });
-  it.skip("errors details with error on base should be indexed when passed as array", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires base error indexing */
+  it("errors details with error on base should be indexed when passed as array", () => {
+    class P extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class C extends Base {
+      static {
+        this.attribute("favorite", "boolean");
+        this.attribute("p_id", "integer");
+      }
+      override isValid(): boolean {
+        this.errors.clear();
+        if (!(this as any).favorite) this.errors.add("base", "should be favorite");
+        return this.errors.empty;
+      }
+    }
+    P.adapter = adapter;
+    C.adapter = adapter;
+    registerModel("BaseErrP", P);
+    registerModel("BaseErrC", C);
+    Associations.hasMany.call(P, "kids", {
+      autosave: true,
+      indexErrors: true,
+      className: "BaseErrC",
+    });
+    const parent = new P({ name: "p" });
+    cacheAssoc(parent, "kids", [new C({ favorite: true }), new C({ favorite: false })]);
+    expect(parent.isValid()).toBe(false);
+    expect(parent.errors.details.get("kids[1].base")?.length ?? 0).toBeGreaterThan(0);
   });
-  it.skip("indexed errors should be properly translated", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires i18n */
+  it("indexed errors should be properly translated", () => {
+    const { Parent, Child } = makeIndexedHasMany({ indexErrors: true });
+    const parent = new Parent({ name: "p" });
+    cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
+    expect(parent.isValid()).toBe(false);
+    expect(parent.errors.where("children[1].name")).toHaveLength(1);
+    expect(parent.errors.where("children.name")).toHaveLength(0);
   });
-  it.skip("indexed errors on base attribute should be properly translated", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires i18n */
+  it("indexed errors on base attribute should be properly translated", () => {
+    class O extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class Pt extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("o_id", "integer");
+        this.validates("name", { presence: true });
+      }
+    }
+    O.adapter = adapter;
+    Pt.adapter = adapter;
+    registerModel("OwnerHO", O);
+    registerModel("PetHO", Pt);
+    Associations.hasOne.call(O, "pet", {
+      autosave: true,
+      foreignKey: "o_id",
+      className: "PetHO",
+    });
+    const owner = new O({ name: "Alice" });
+    cacheAssoc(owner, "pet", new Pt({ name: "" }));
+    expect(owner.isValid()).toBe(false);
+    expect(owner.errors.include("pet.name")).toBe(true);
   });
-  it.skip("errors details should be indexed when global flag is set", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires global indexed errors config */
+  it("errors details should be indexed when global flag is set", () => {
+    const old = indexNestedAttributeErrors;
+    setIndexNestedAttributeErrors(true);
+    try {
+      const { Parent, Child } = makeIndexedHasMany();
+      const parent = new Parent({ name: "p" });
+      cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
+      expect(parent.isValid()).toBe(false);
+      expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
+      expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
+    } finally {
+      setIndexNestedAttributeErrors(old);
+    }
   });
 });
 
