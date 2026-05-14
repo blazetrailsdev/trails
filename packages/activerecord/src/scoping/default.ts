@@ -1,5 +1,6 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
+import { ScopeRegistry } from "../scoping.js";
 
 /**
  * Manages evaluating and applying default scopes.
@@ -37,7 +38,7 @@ export class Default {
     buildRelation: () => any,
     allQueries?: boolean | null,
   ): any {
-    if (modelClass.isAbstractClass) return undefined;
+    if (modelClass.abstractClass) return undefined;
 
     const scopes: DefaultScope[] = modelClass.defaultScopes ?? [];
     if (scopes.length === 0) return undefined;
@@ -146,27 +147,30 @@ function isExecuteScope(
 
 /** @internal */
 function isIgnoreDefaultScope(modelClass: any): boolean {
-  return !!modelClass._ignoreDefaultScope;
+  return !!ScopeRegistry.ignoreDefaultScope(modelClass, true);
 }
 
 /** @internal */
-function setIgnoreDefaultScope(modelClass: any, value: boolean): void {
-  modelClass._ignoreDefaultScope = value;
+function setIgnoreDefaultScope(modelClass: any, value: boolean | null): void {
+  ScopeRegistry.setIgnoreDefaultScope(modelClass, value);
 }
 
 /**
  * Mirrors: Scoping::Default#evaluate_default_scope. Temporarily sets
  * ignore_default_scope to true while yielding so nested calls don't re-apply
  * the default scope recursively. Returns undefined when already ignoring
- * (matches Rails' nil return from evaluate_default_scope).
+ * (matches Rails' nil return from evaluate_default_scope). Saves and restores
+ * the prior ScopeRegistry value so nested calls from different classes compose
+ * correctly.
  * @internal
  */
 function evaluateDefaultScope(modelClass: any, fn: () => unknown): unknown {
   if (isIgnoreDefaultScope(modelClass)) return undefined;
+  const prior = ScopeRegistry.ignoreDefaultScope(modelClass, true);
   try {
     setIgnoreDefaultScope(modelClass, true);
     return fn();
   } finally {
-    setIgnoreDefaultScope(modelClass, false);
+    setIgnoreDefaultScope(modelClass, prior);
   }
 }
