@@ -4073,7 +4073,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       decimal: "numeric",
       boolean: "boolean",
       date: "date",
-      datetime: "timestamp without time zone",
+      datetime:
+        pgDatetimeConfig.datetimeType === "timestamptz"
+          ? "timestamp with time zone"
+          : "timestamp without time zone",
       timestamp: "timestamp without time zone",
       timestamptz: "timestamp with time zone",
       time: "time without time zone",
