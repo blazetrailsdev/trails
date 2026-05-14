@@ -2408,50 +2408,54 @@ export class Base extends Model {
   private async _createOrUpdate(): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
     let saved = false;
-    if (!(await ctor._callbackChain.runBefore("save", this))) return false;
+    let wasNewRecord = false;
 
-    const belongsToOk = await autosaveBelongsTo(this);
-    if (!belongsToOk) {
-      this._skipTouch = false;
-      return false;
-    }
+    // Rails: Callbacks#create_or_update wraps super in run_callbacks(:save) { ... }.
+    // Unifying before/after into a single runCallbacks so that around_save callbacks
+    // correctly wrap the DB write (the old split runBefore+runAfter was a no-op for around).
+    const saveOk = await ctor._callbackChain.runCallbacks("save", this, async () => {
+      const belongsToOk = await autosaveBelongsTo(this);
+      if (!belongsToOk) return;
 
-    const wasNewRecord = this._newRecord;
-    if (this._newRecord) {
-      const createResult = await ctor._callbackChain.runCallbacks("create", this, async () => {
-        this._performInsert();
-        if (this._pendingOperation) {
-          await this._pendingOperation;
-          this._pendingOperation = null;
-        }
-        this._previouslyNewRecord = true;
-        this._newRecord = false;
-        this.changesApplied();
-        saved = true;
-      });
-      if (!createResult) saved = false;
-    } else {
-      const updateResult = await ctor._callbackChain.runCallbacks("update", this, async () => {
-        this._performUpdate();
-        if (this._pendingOperation) {
-          await this._pendingOperation;
-          this._pendingOperation = null;
-        }
-        this._previouslyNewRecord = false;
-        this.changesApplied();
-        saved = true;
-      });
-      if (!updateResult) saved = false;
-    }
+      wasNewRecord = this._newRecord;
+      if (wasNewRecord) {
+        const createOk = await ctor._callbackChain.runCallbacks("create", this, async () => {
+          this._performInsert();
+          if (this._pendingOperation) {
+            await this._pendingOperation;
+            this._pendingOperation = null;
+          }
+          this._previouslyNewRecord = true;
+          this._newRecord = false;
+          this.changesApplied();
+          saved = true;
+        });
+        if (!createOk) saved = false;
+      } else {
+        const updateOk = await ctor._callbackChain.runCallbacks("update", this, async () => {
+          this._performUpdate();
+          if (this._pendingOperation) {
+            await this._pendingOperation;
+            this._pendingOperation = null;
+          }
+          this._previouslyNewRecord = false;
+          this.changesApplied();
+          saved = true;
+        });
+        if (!updateOk) saved = false;
+      }
+
+      if (saved) {
+        this._transactionAction = wasNewRecord ? "create" : "update";
+        (this as any)._newRecordBeforeLastCommit = wasNewRecord;
+        (this as any)._triggerUpdateCallback = !wasNewRecord;
+      }
+    });
+
     this._skipTouch = false;
+    if (!saveOk) return false;
 
     if (saved) {
-      this._transactionAction = wasNewRecord ? "create" : "update";
-      (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-      (this as any)._triggerUpdateCallback = !wasNewRecord;
-
-      await ctor._callbackChain.runAfter("save", this);
-
       if (wasNewRecord) {
         await updateCounterCaches(this, "increment");
       }

@@ -1367,10 +1367,12 @@ describe("CallbacksTest", () => {
     const result = await g.save();
     expect(result).toBe(false);
     expect(g.isNewRecord()).toBe(true);
-    // before_save ran, before_create halted, after_save did not run
+    // before_save ran, before_create halted the insert, but after_save still runs
+    // (Rails: _run_save_callbacks { _run_create_callbacks { ... } } — after_save fires
+    // once the save block finishes, regardless of whether create callbacks halted)
     expect(log).toContain("before_save");
     expect(log).toContain("before_create");
-    expect(log).not.toContain("after_save");
+    expect(log).toContain("after_save");
   });
 
   it("before_destroy returning false halts destruction", async () => {
@@ -1935,5 +1937,32 @@ describe("CallbacksTest", () => {
     record.locked = true;
     const result = await record.save();
     expect(result).toBe(false);
+  });
+
+  // Regression: around_save must wrap the actual DB insert/update, not a no-op.
+  // The old split runBefore("save") + runAfter("save") gave around_save callbacks
+  // nothing to wrap — they yielded to a no-op block, not the DB write.
+  // After the unification into runCallbacks("save", block), the around callback
+  // correctly wraps the create/update transaction.
+  it("around_save wraps the actual DB insert (not a no-op)", async () => {
+    const events: string[] = [];
+    class Widget extends Base {
+      static {
+        this._tableName = "widgets";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.aroundSave(async (r: any, proceed: () => Promise<void>) => {
+          const countBefore = await Widget.count();
+          events.push(`[BEFORE_INSERT:count=${countBefore}]`);
+          await proceed();
+          const countAfter = await Widget.count();
+          events.push(`[AFTER_INSERT:count=${countAfter}]`);
+        });
+      }
+    }
+    await Widget.create({ name: "gadget" });
+    expect(events[0]).toMatch(/BEFORE_INSERT:count=0/);
+    expect(events[1]).toMatch(/AFTER_INSERT:count=1/);
   });
 });
