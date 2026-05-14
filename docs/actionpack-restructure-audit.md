@@ -616,6 +616,28 @@ selective fill-ins all stay within already-configured subtrees.
   The Wave 3 split aligns paths instead, which keeps `api:compare`'s
   output legible (one Ruby file ↔ one TS file).
 
+## CI integration plan
+
+The waves above grow the actionpack test footprint substantially —
+Wave 7 (journey port) alone adds 1500–2000 LOC, and Wave 3 promotes
+`abstractcontroller/` to a logical top-level package. The full plan
+for splitting actionpack out of the shared `unit-tests` job into a
+dedicated no-DB `actionpack-tests` job (recommended sequencing,
+risks, cross-package integration test handling, open questions) lives
+in [ci-improvement-plan.md](ci-improvement-plan.md).
+
+Headline:
+
+- **Where today:** actionpack tests run inside the batched
+  `unit-tests` job alongside arel/activemodel/activesupport/rack/
+  actionview/trailties (the `unit-tests` job's `pnpm vitest run`
+  step in `.github/workflows/ci.yml`).
+- **Recommended split:** dedicated `actionpack-tests` job, no DB,
+  parallel-safe.
+- **When:** Wave 1.5 PR — after Wave 1 (skeleton) and before Wave 7
+  (journey port).
+- **Size:** ~50 LOC of workflow YAML.
+
 ## Out of scope
 
 - **Method-level surface gaps:** tracked in
