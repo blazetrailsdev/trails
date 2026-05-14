@@ -43,6 +43,8 @@ export interface ColumnInfo {
   scale?: number | null;
   collation?: string | null;
   array?: boolean;
+  /** True when the column's OID-resolved type is a PostgreSQL enum (not a domain or other custom type). */
+  isEnum?: boolean;
 }
 
 export interface IndexInfo {
@@ -374,6 +376,7 @@ class AdapterSchemaSource implements SchemaSource {
       scale: col.scale ?? undefined,
       collation: col.collation ?? undefined,
       array: (col as any).array === true ? true : undefined,
+      isEnum: col.type === "enum" ? true : undefined,
     }));
   }
 
@@ -534,6 +537,9 @@ export class SchemaDumper {
       dumper = this.create(wrappedSource);
     }
     const lines: string[] = [];
+    await dumper.schemas(lines);
+    await dumper.extensions(lines);
+    await dumper.types(lines);
     await dumper.dumpTable(lines, tableName);
     return lines.join("\n");
   }
@@ -915,15 +921,19 @@ export class SchemaDumper {
 
       if (DSL_HELPER_METHODS.has(dslType)) {
         lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
+      } else if (col.isEnum && dslType === "enum") {
+        // PG enum columns: emit t.enum("col", { enum_type: "typename", ... })
+        // Only when column.isEnum is set (OID-resolved type is "enum") to avoid
+        // misclassifying domains and other unmapped custom types.
+        // Prefer col.sqlType (raw adapter path: col.type="enum", col.sqlType="mood")
+        // over extraOpts.enum_type (AdapterSchemaSource path: col.type="mood").
+        const enumTypeName = (col as any).sqlType ?? extraOpts?.enum_type ?? col.type;
+        const enumSpec = { ...colspec, enum_type: enumTypeName };
+        const enumOptsStr = `, { ${this.formatColspec(enumSpec)} }`;
+        lines.push(`    t.enum(${JSON.stringify(col.name)}${enumOptsStr});`);
       } else {
-        // No helper on TableDefinition for this type — emit the
-        // generic `column(name, type, options)` form so the dumped
-        // schema loads cleanly. `enum_type` carries the user-defined
-        // PG enum name; use it as the column type when set.
-        const columnType =
-          dslType === "enum" && typeof extraOpts?.enum_type === "string"
-            ? extraOpts.enum_type
-            : dslType;
+        // Generic fallback: pass arbitrary SQL type through verbatim via t.column.
+        const columnType = dslType === "enum" ? (extraOpts?.enum_type ?? dslType) : dslType;
         lines.push(
           `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(columnType)}${optionsStr});`,
         );

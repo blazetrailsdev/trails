@@ -83,9 +83,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (!adapter?.extensions) return;
     const exts: string[] = await adapter.extensions();
     if (exts.length === 0) return;
-    lines.push("  # These are extensions that must be enabled in order to support this database");
+    lines.push("  // These are extensions that must be enabled in order to support this database");
     for (const ext of exts.sort()) {
-      lines.push(`  enable_extension ${JSON.stringify(ext)}`);
+      lines.push(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
     }
     lines.push("");
   }
@@ -96,12 +96,12 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (!adapter?.enumTypes) return;
     const enumTypes: [string, string[]][] = await adapter.enumTypes();
     if (enumTypes.length === 0) return;
-    lines.push("  # Custom types defined in this database.");
+    lines.push("  // Custom types defined in this database.");
     lines.push(
-      "  # Note that some types may not work with other database engines. Be careful if changing database.",
+      "  // Note that some types may not work with other database engines. Be careful if changing database.",
     );
     for (const [name, values] of enumTypes.sort((a, b) => a[0].localeCompare(b[0]))) {
-      lines.push(`  create_enum ${JSON.stringify(name)}, ${JSON.stringify(values)}`);
+      lines.push(`  await ctx.createEnum(${JSON.stringify(name)}, ${JSON.stringify(values)});`);
     }
     lines.push("");
   }
@@ -114,7 +114,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const names = allNames.filter((n) => n !== "public").sort();
     if (names.length === 0) return;
     for (const name of names) {
-      lines.push(`  create_schema ${JSON.stringify(name)}`);
+      lines.push(`  await ctx.createSchema(${JSON.stringify(name)});`);
     }
     lines.push("");
   }

@@ -1703,7 +1703,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         type.typname AS name,
         type.OID AS oid,
         n.nspname AS schema,
-        array_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
+        json_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
       FROM pg_enum AS enum
       JOIN pg_type AS type ON (type.oid = enum.enumtypid)
       JOIN pg_namespace n ON type.typnamespace = n.oid
@@ -1719,7 +1719,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return rows.map((row) => {
       const schema = row.schema === currentSchema ? null : row.schema;
       const fullName = [schema, row.name].filter(Boolean).join(".");
-      return [fullName, row.value] as [string, string[]];
+      const values: string[] = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      return [fullName, values] as [string, string[]];
     });
   }
 

@@ -225,8 +225,8 @@ describe("PostgreSQL::SchemaDumper", () => {
       const lines: string[] = [];
       await dumper.extensions(lines);
       expect(lines[0]).toContain("extensions that must be enabled");
-      expect(lines[1]).toBe(`  enable_extension "hstore"`);
-      expect(lines[2]).toBe(`  enable_extension "plpgsql"`);
+      expect(lines[1]).toBe(`  await ctx.enableExtension("hstore");`);
+      expect(lines[2]).toBe(`  await ctx.enableExtension("plpgsql");`);
       expect(lines[3]).toBe("");
     });
 
@@ -252,9 +252,9 @@ describe("PostgreSQL::SchemaDumper", () => {
       const dumper = new (SchemaDumper as any)(adapter) as any;
       const lines: string[] = [];
       await dumper.types(lines);
-      expect(lines[0]).toBe("  # Custom types defined in this database.");
-      expect(lines[2]).toBe(`  create_enum "mood", ["happy","sad"]`);
-      expect(lines[3]).toBe(`  create_enum "status", ["active","inactive"]`);
+      expect(lines[0]).toBe("  // Custom types defined in this database.");
+      expect(lines[2]).toBe(`  await ctx.createEnum("mood", ["happy","sad"]);`);
+      expect(lines[3]).toBe(`  await ctx.createEnum("status", ["active","inactive"]);`);
       expect(lines[4]).toBe("");
     });
 
@@ -276,7 +276,11 @@ describe("PostgreSQL::SchemaDumper", () => {
       const dumper = new (SchemaDumper as any)(adapter) as any;
       const lines: string[] = [];
       await dumper.schemas(lines);
-      expect(lines).toEqual([`  create_schema "analytics"`, `  create_schema "myschema"`, ""]);
+      expect(lines).toEqual([
+        `  await ctx.createSchema("analytics");`,
+        `  await ctx.createSchema("myschema");`,
+        "",
+      ]);
     });
   });
 

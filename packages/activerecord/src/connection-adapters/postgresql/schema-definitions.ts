@@ -59,6 +59,7 @@ export interface ColumnMethods {
   uuid(name: string, options?: ColumnOptions): unknown;
   xml(name: string, options?: ColumnOptions): unknown;
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
+  enum(name: string, options: ColumnOptions & { enum_type: string }): unknown;
 }
 
 export interface ExclusionConstraintOptions {

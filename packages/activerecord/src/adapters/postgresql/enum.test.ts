@@ -132,7 +132,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("enum schema dump", async () => {
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain("postgresql_enums");
-      expect(output).toContain('t.column("current_mood", "mood"');
+      expect(output).toContain('t.enum("current_mood"');
     });
 
     it("enum where", async () => {
@@ -264,26 +264,36 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].current_mood).toBeNull();
     });
 
-    // Needs schema dumper with enum type output
-    it.skip("schema dump renamed enum", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+    it("schema dump renamed enum", async () => {
+      await adapter.renameEnum("mood", "feeling");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
+      expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
+      expect(output).toContain('enum_type: "feeling"');
     });
-    it.skip("schema dump renamed enum with to option", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+
+    it("schema dump renamed enum with to option", async () => {
+      await adapter.renameEnum("mood", { to: "feeling" });
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
+      expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
+      expect(output).toContain('enum_type: "feeling"');
     });
-    it.skip("schema dump added enum value", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+
+    it("schema dump added enum value", async () => {
+      await adapter.addEnumValue("mood", "angry", { before: "ok" });
+      await adapter.addEnumValue("mood", "nervous", { after: "ok" });
+      await adapter.addEnumValue("mood", "glad");
+      await adapter.addEnumValue("mood", "glad", { ifNotExists: true });
+      await adapter.addEnumValue("mood", "curious", { ifNotExists: true });
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
+      expect(output).toContain(
+        'await ctx.createEnum("mood", ["sad","angry","ok","nervous","happy","glad","curious"]);',
+      );
     });
-    it.skip("schema dump renamed enum value", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in enum
-      // ROOT-CAUSE: connection-adapters/postgresql/enum.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/enum.ts; affects ~10–47 tests in enum.test.ts
+
+    it("schema dump renamed enum value", async () => {
+      await adapter.renameEnumValue("mood", { from: "ok", to: "okay" });
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
+      expect(output).toContain('await ctx.createEnum("mood", ["sad","okay","happy"]);');
     });
 
     // Needs ORM layer (ActiveRecord enum DSL)
