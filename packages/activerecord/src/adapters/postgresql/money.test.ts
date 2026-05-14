@@ -84,9 +84,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("money schema dump", async () => {
       const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
-      expect(output).toMatch(/t\.column\("wealth", "money"/);
-      expect(output).toMatch(/t\.column\("depth", "money"/);
+      expect(output).toMatch(/t\.money\("wealth"/);
+      expect(output).toMatch(/t\.money\("depth"/);
       expect(output).toContain("scale: 2");
+    });
+
+    it("schema dumping", async () => {
+      const { SchemaDumper } = await import("../../connection-adapters/abstract/schema-dumper.js");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_moneys");
+      expect(output).toMatch(/t\.money\("wealth",\s*\{[^}]*scale:\s*2/);
+      expect(output).toMatch(/t\.money\("depth",\s*\{[^}]*default:\s*150\.55[^}]*scale:\s*2/);
     });
 
     it("money where", async () => {
@@ -158,25 +165,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(negative[0].wealth)).toBeCloseTo(-567.89, 2);
     });
 
-    // Needs ActiveRecord type system
-    it.skip("money regex backtracking", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
-      // ROOT-CAUSE: connection-adapters/postgresql/money.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+    it("money regex backtracking", async () => {
+      // Rails: test_money_regex_backtracking — verifies no catastrophic backtracking (ReDoS)
+      // on long repeated-separator inputs by running within a Timeout.timeout(0.1).
+      // JS fix: replaced \D* with [^0-9,.] in castValue regex (money.ts).
+      const type = new Money();
+      const commas = ",".repeat(100000);
+      const dots = ".".repeat(100000);
+      expect(Number(type.cast("$" + commas + ".11!") ?? 0)).toBeCloseTo(0, 2);
+      expect(Number(type.cast("$" + dots + ",11!") ?? 0)).toBeCloseTo(0, 2);
     });
 
-    // Needs ORM layer (sum with expressions)
+    // Needs ORM layer (Relation#sum with type cast)
     it.skip("sum with type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
-      // ROOT-CAUSE: connection-adapters/postgresql/money.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+      // BLOCKED: relation
+      // ROOT-CAUSE: Relation#sum — no type-cast applied to SQL expressions (e.g. PostgresqlMoney.sum("id * wealth"))
+      // SCOPE: ~100 LOC in relation/calculations.ts; affects ~2 tests in money.test.ts
     });
 
-    // Needs ORM layer (pluck)
+    // Needs ORM layer (Relation#pluck with type cast)
     it.skip("pluck with type cast", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
-      // ROOT-CAUSE: connection-adapters/postgresql/money.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+      // BLOCKED: relation
+      // ROOT-CAUSE: Relation#pluck — no type-cast applied to Arel.sql expressions (e.g. PostgresqlMoney.pluck(Arel.sql("id * wealth")))
+      // SCOPE: ~100 LOC in relation/calculations.ts; affects ~2 tests in money.test.ts
     });
 
     it("create and update money", async () => {
@@ -211,11 +222,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number(rows[0].wealth)).toBeCloseTo(987.65, 2);
     });
 
-    // Needs ORM layer (BigDecimal handling)
+    // Needs ORM layer (Relation#update_all with BigDecimal cast)
     it.skip("update all with money big decimal", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in money
-      // ROOT-CAUSE: connection-adapters/postgresql/money.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/money.ts; affects ~10–47 tests in money.test.ts
+      // BLOCKED: relation
+      // ROOT-CAUSE: Relation#update_all — BigDecimal values not serialized via Money#serialize before SQL binding
+      // SCOPE: ~50 LOC in relation.ts or relation/query-methods.ts; affects ~1 test in money.test.ts
     });
 
     it("update all with money numeric", async () => {

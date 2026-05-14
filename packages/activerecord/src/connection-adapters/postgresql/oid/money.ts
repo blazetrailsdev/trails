@@ -57,10 +57,14 @@ export class Money extends DecimalType {
     // (4) (2.55) → -2.55
     let str = value.replace(/^\((.+)\)$/, "-$1");
 
-    if (/^-?\D*[\d,]+\.\d{2}$/.test(str)) {
+    // Use [^0-9,.] for the currency-symbol prefix instead of \D* to prevent
+    // catastrophic backtracking (ReDoS) — \D* overlaps with [\d,]+ and [\d.]+
+    // causing O(n²) backtracking on long repeated-separator inputs. Ruby avoids
+    // this with possessive quantifiers (\D*+); JS has no possessive quantifiers.
+    if (/^-?[^0-9,.]*[\d,]+\.\d{2}$/.test(str)) {
       // (1) US format: keep digits/minus/dot, drop everything else.
       str = str.replace(/[^\-0-9.]/g, "");
-    } else if (/^-?\D*[\d.]+,\d{2}$/.test(str)) {
+    } else if (/^-?[^0-9,.]*[\d.]+,\d{2}$/.test(str)) {
       // (2) EU format: drop non-digit/minus/comma, then comma → dot.
       str = str.replace(/[^\-0-9,]/g, "").replace(/,/g, ".");
     }
