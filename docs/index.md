@@ -67,9 +67,12 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 
 These docs are explicitly archived — diagnosis or strategy captured for future readers; not active plans. Don't add new work here.
 
-| Doc                                                          | Notes                                                                                                                                                                                |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`ar-test-parallelism-plan.md`](ar-test-parallelism-plan.md) | ✅ shipped 2026-05-05/06 (#1223–#1228). Self-labeled archived; kept as diagnosis postmortem.                                                                                         |
-| `activemodel-privates-100-plan.md` (deleted)                 | ✅ 621/621 (100%). Track A/B/C/D playbook lived here; removed 2026-05-14.                                                                                                            |
-| `private-api-parity-100-plan.md` (deleted)                   | ✅ 4950/4958 AR-all (99.8%); 8 outstanding methods are rounding error. Tier 1–7 playbook lived here; removed 2026-05-14.                                                             |
-| `fixture-replacement-plan.md` (deleted)                      | ✅ Phases 1, 1b, 2, 3a–3d all shipped (#1470, #1471, #1480, #1481, #1484, #1487, #1488, #1489). Phase 4 deferred until demand; Phase 5 folded into cluster work. Removed 2026-05-14. |
+| Doc                                                          | Notes                                                                                        |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [`ar-test-parallelism-plan.md`](ar-test-parallelism-plan.md) | ✅ shipped 2026-05-05/06 (#1223–#1228). Self-labeled archived; kept as diagnosis postmortem. |
+
+**Removed 2026-05-14** (completed; `git log` retains the playbooks):
+
+- `activemodel-privates-100-plan.md` — 621/621 (100%) reached; Track A/B/C/D playbook.
+- `private-api-parity-100-plan.md` — 4950/4958 AR-all (99.8%); Tier 1–7 playbook.
+- `fixture-replacement-plan.md` — Phases 1/1b/2/3a–3d shipped (#1470, #1471, #1480, #1481, #1484, #1487, #1488, #1489); Phase 4 deferred until demand, Phase 5 folded into cluster work.

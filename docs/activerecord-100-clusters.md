@@ -35,10 +35,6 @@ Slots A+B (#1468) closed. Real behavior gaps + one option drop covered; fixture/
 
 - **Slot C** (~200 LOC) — MySQL fixture/test-helper infrastructure: `posts`, `key_tests`, `lessons_students`/`topics`/`students` fixtures + subclassing `Base` with qualified `db.table` table_name. Uses the TS-native fixture infra (`defineFixtures`/`useFixtures`).
 
-## PG connection cluster — **closed** ✅
-
-Slots A (#1439) + B (#1446) + C (#1462) + D (#1464) + E (#1463) all shipped. Small followups in fidelity list.
-
 ## PG interval cluster (~180 LOC, Slot B remaining)
 
 - **Slot B** (~180 LOC) — Interval schema-default extraction + AVG aggregate typecast.
@@ -122,10 +118,6 @@ Plus: MySQL `SchemaDumper.tableCollationCache` is never populated; base `createT
 
 Note: audit worktree didn't have `.rails-source/` populated → slots sized by test-name-family inference rather than line-by-line Rails read. Workers picking these up should re-validate against `.rails-source` once spawned.
 
-## Associations has-one cluster — **closed** ✅
-
-All 4 slots shipped: A (#1457), B (#1461), C+D (#1478). 16 remaining skipped tests now have accurate annotations pointing at general associations gaps (`targetScope` chain merge, non-preload JOIN eager-loading, fixture models, scoped associations) — see fidelity followups.
-
 ## Associations-HABTM cluster (~1690 LOC across 9 slots, from audit-associations-habtm)
 
 **Important: ~160 of 168 BLOCKED tests are NOT HABTM-specific** — they exercise general associations machinery (`CollectionProxy` mutation, `*_ids` reader/writer, association scope chain composition, eager loading, polymorphic-through, STI-through, etc.). **Significant overlap with audit-associations-core cluster.** The HABTM builder itself is structurally complete.
@@ -182,10 +174,6 @@ Slot B closed (#1505 tableNamePrefix/Suffix + CTAS + InvalidMigrationTimestampEr
 1. **Slot A — `databaseExists` static + `exec_query(prepare:)` + DML-tolerant execQuery** (~220 LOC). Test-only "fake_connection" path that lets `Mysql2Adapter` instantiate without a live driver underpins several tests.
 2. **Slot B — Translate-exception depth: timeout + statement-timeout** (~200 LOC). `read_timeout` → `AdapterTimeout`, `ER_FILSORT_ABORT` / `ER_QUERY_TIMEOUT` → `StatementTimeout`.
 3. **Slot C — Timezone re-sync + db_warnings_action + test-helper infra** (~280 LOC). `query_options[:database_timezone]` plumbing + `with_db_warnings_action`.
-
-## SQLite adapter cluster — **closed** ✅
-
-Slot A (#1443) + Slot B (#1459) shipped. Small followups in fidelity list.
 
 ## PG virtual-column cluster (~250 LOC, Slot B remaining)
 
@@ -307,6 +295,12 @@ One gap tracked in [`scripts/parity/canonical/query-known-gaps.json`](../scripts
 **Risk:** Medium — touches every WHERE clause in the suite. Must keep INSERT microsecond precision and numeric/string predicates unchanged. Files touched (Option A): `predicate-builder/basic-object-handler.ts`, `predicate-builder/range-handler.ts`, `arel/src/visitors/to-sql.ts#visitBindParam`, plus `scripts/parity/fixtures/ar-01/`, `ar-52/`, `ar-65/`.
 
 ---
+
+## Closed clusters
+
+- **PG connection** — Slots A (#1439), B (#1446), C (#1462), D (#1464), E (#1463).
+- **Associations has-one** — Slots A (#1457), B (#1461), C+D (#1478). 16 remaining skipped tests have accurate annotations pointing at general associations gaps; see fidelity followups in the plan doc.
+- **SQLite adapter** — Slot A (#1443), Slot B (#1459).
 
 ## See also
 
