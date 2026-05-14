@@ -22,6 +22,7 @@ describe("PrimaryClassTest", () => {
   it("application record is used if no primary class is set", () => {
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
+    expect(ApplicationRecord.primaryClassQ()).toBe(true);
     expect(ApplicationRecord.applicationRecordClassQ()).toBe(true);
     expect(ApplicationRecord.abstractClass).toBe(true);
   });
@@ -52,7 +53,11 @@ describe("PrimaryClassTest", () => {
     PrimaryAppRecord.primaryAbstractClass();
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
+    expect(PrimaryAppRecord.primaryClassQ()).toBe(true);
     expect(PrimaryAppRecord.applicationRecordClassQ()).toBe(true);
+    expect(PrimaryAppRecord.abstractClass).toBe(true);
+
+    expect(ApplicationRecord.primaryClassQ()).toBe(false);
     expect(ApplicationRecord.applicationRecordClassQ()).toBe(false);
     expect(ApplicationRecord.abstractClass).toBe(true);
 
@@ -64,11 +69,17 @@ describe("PrimaryClassTest", () => {
   it("setting primary abstract class explicitly wins over application record set implicitly", () => {
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
+    expect(ApplicationRecord.primaryClassQ()).toBe(true);
     expect(ApplicationRecord.applicationRecordClassQ()).toBe(true);
+    expect(ApplicationRecord.abstractClass).toBe(true);
 
     PrimaryAppRecord.primaryAbstractClass();
 
+    expect(PrimaryAppRecord.primaryClassQ()).toBe(true);
     expect(PrimaryAppRecord.applicationRecordClassQ()).toBe(true);
+    expect(PrimaryAppRecord.abstractClass).toBe(true);
+
+    expect(ApplicationRecord.primaryClassQ()).toBe(false);
     expect(ApplicationRecord.applicationRecordClassQ()).toBe(false);
     expect(ApplicationRecord.abstractClass).toBe(true);
   });
