@@ -231,6 +231,23 @@ it("withConnection rejects with ConnectionTimeoutError when pool stays saturated
   }
 });
 
+it("withConnection waits using pool default timeout without explicit checkoutTimeout", async () => {
+  // Regression: previously withConnection threw immediately when the pool was
+  // saturated unless the caller passed { checkoutTimeout }. Now it always queues
+  // a waiter using checkoutAsync (matching Rails behaviour).
+  const pool = makePool(1);
+  const held = pool.checkout();
+
+  let connSeen: DatabaseAdapter | undefined;
+  const waiter = pool.withConnection((conn) => {
+    connSeen = conn;
+  });
+  pool.checkin(held);
+  await waiter;
+  expect(connSeen).toBe(held);
+  expect(pool.stat().busy).toBe(0);
+});
+
 it.skip("new connection no query", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
   // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
@@ -480,7 +497,7 @@ it("automatic reconnect can be disabled", async () => {
   pool.automaticReconnect = false;
 
   expect(() => pool.leaseConnection()).toThrow(/automatic_reconnect is disabled/);
-  expect(() => pool.withConnection(() => {})).toThrow(/automatic_reconnect is disabled/);
+  await expect(pool.withConnection(() => {})).rejects.toThrow(/automatic_reconnect is disabled/);
 });
 
 it("disconnect calls disconnectBang on each pooled connection", () => {
