@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -37,6 +38,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         `SELECT text_vector FROM tsvectors WHERE text_vector @@ to_tsquery('cat')`,
       );
       expect(rows).toHaveLength(1);
+    });
+
+    it("schema dump with shorthand", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "tsvectors");
+      expect(output).toMatch(/t\.tsvector\("text_vector"\)/);
     });
 
     it("update tsvector", async () => {

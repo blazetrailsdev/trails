@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { PgPoint, parsePoint, castPoint } from "./geometric.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -156,10 +157,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].column_default).toBeTruthy();
     });
 
-    it.skip("legacy schema dumping", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in geometric
-      // ROOT-CAUSE: connection-adapters/postgresql/geometric.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/geometric.ts; affects ~10–47 tests in geometric.test.ts
+    it("legacy schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_points");
+      expect(output).toMatch(/t\.point\("x"\)/);
+      expect(output).toMatch(/t\.point\("y",/);
+      expect(output).toMatch(/t\.point\("z",/);
     });
 
     it("legacy roundtrip", async () => {
@@ -440,11 +442,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].a_circle).toBeTruthy();
     });
 
-    it.skip("geometric schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in geometric
-      // ROOT-CAUSE: connection-adapters/postgresql/geometric.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/geometric.ts; affects ~10–47 tests in geometric.test.ts
-    });
     it.skip("geometric where", async () => {
       // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in geometric
       // ROOT-CAUSE: connection-adapters/postgresql/geometric.ts missing or incomplete Rails parity
@@ -621,6 +618,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       expect(closedRows[0].is_closed).toBe(true);
     });
+
+    it("schema dumping", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_geometric");
+      expect(output).toMatch(/t\.lseg\("a_lseg"\)/);
+      expect(output).toMatch(/t\.box\("a_box"\)/);
+      expect(output).toMatch(/t\.path\("a_path"\)/);
+      expect(output).toMatch(/t\.polygon\("a_polygon"\)/);
+      expect(output).toMatch(/t\.circle\("a_circle"\)/);
+    });
   });
 
   describe("PostgreSQLGeometricLineTest", () => {
@@ -652,11 +658,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping for line type", async () => {
-      const rows = await adapter.execute(`
-        SELECT udt_name FROM information_schema.columns
-        WHERE table_name = 'postgresql_lines' AND column_name = 'a_line'
-      `);
-      expect(rows[0].udt_name).toBe("line");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_lines");
+      expect(output).toMatch(/t\.line\("a_line"\)/);
     });
   });
 });
