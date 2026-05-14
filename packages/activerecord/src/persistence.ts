@@ -1113,12 +1113,6 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, val: unknown): void;
   _triggerUpdateCallback?: boolean | null;
-  idInDatabase?(): unknown;
-  attributeInDatabase?(col: string): unknown;
-  _associationInstances?: Map<
-    string,
-    { owner?: { _strictLoading?: boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
-  >;
   _attributes?: { keys?(): Iterable<string> };
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
@@ -1250,8 +1244,8 @@ function createOrUpdate(this: PersistenceInternalHost): Promise<boolean> {
   if (this._newRecord) {
     return _createRecord.call(this).then(() => true);
   }
-  const attrNames: string[] = Array.from((this as any)._attributes?.keys?.() ?? []);
-  const ctor = this.constructor as any;
+  const attrNames: string[] = Array.from(this._attributes?.keys?.() ?? []);
+  const ctor = this.constructor;
   const colNames: string[] = ctor.columnNames?.() ?? attrNames;
   const counterCacheCols: Set<string> = ctor._counterCacheColumns ?? new Set();
   const filteredNames = attrNames.filter((n: string) => {
@@ -1274,7 +1268,7 @@ function createOrUpdate(this: PersistenceInternalHost): Promise<boolean> {
 
 /** @internal */
 async function _createRecord(this: PersistenceInternalHost): Promise<unknown> {
-  const ctor = this.constructor as any;
+  const ctor = this.constructor;
   const allNames: string[] = Array.from(this._attributes?.keys?.() ?? []);
   const colNames: string[] = ctor.columnNames?.() ?? allNames;
   // Mirrors attributes_for_create: exclude PK columns whose value is nil.
@@ -1292,11 +1286,15 @@ async function _createRecord(this: PersistenceInternalHost): Promise<unknown> {
   }
 
   const doInsert = async (connection: unknown) => {
-    // _insertRecord returns the inserted row id (a number). Align with the existing
-    // class method contract — no returning-columns array; adapter sets PK via execInsert.
-    const insertedId = await _insertRecord.call(ctor, connection as any, values);
+    // _insertRecord takes PersistenceHost (requires new/instantiate); cast is
+    // unavoidable here — the constructor IS PersistenceHost at runtime.
+    const insertedId = await _insertRecord.call(
+      ctor as unknown as PersistenceHost,
+      connection as any,
+      values,
+    );
     if (!Array.isArray(ctor.primaryKey) && this._readAttribute(ctor.primaryKey) == null) {
-      this._writeAttribute(ctor.primaryKey, insertedId);
+      this._writeAttribute(ctor.primaryKey as string, insertedId);
     }
   };
 

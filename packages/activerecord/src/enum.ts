@@ -29,6 +29,16 @@ export function getEnumDefinitions(modelClass: typeof Base): Map<string, EnumDef
   return enumRegistry.get(modelClass)!;
 }
 
+/** Minimal instance-side surface for enum-generated prototype callbacks. */
+interface EnumInstanceHost {
+  readAttribute(name: string): unknown;
+  writeAttribute(name: string, val: unknown): void;
+  isPersisted(): boolean;
+  updateColumn(name: string, val: unknown): Promise<void>;
+  updateBang(attrs: Record<string, unknown>): Promise<true>;
+  readAttributeForDatabase?(name: string): unknown;
+}
+
 /**
  * Define an enum on a model class.
  *
@@ -234,16 +244,6 @@ export function defineEnum(
       });
     }
   }
-}
-
-/** Minimal instance-side surface for enum-generated prototype callbacks. */
-interface EnumInstanceHost {
-  readAttribute(name: string): unknown;
-  writeAttribute(name: string, val: unknown): void;
-  isPersisted(): boolean;
-  updateColumn(name: string, val: unknown): Promise<void>;
-  updateBang(attrs: Record<string, unknown>): Promise<true>;
-  readAttributeForDatabase?(name: string): unknown;
 }
 
 /**
