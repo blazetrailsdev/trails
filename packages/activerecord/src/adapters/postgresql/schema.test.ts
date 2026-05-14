@@ -529,33 +529,89 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaIndexOpclassTest", () => {
-    it.skip("string opclass is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("string opclass is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
+        );
+        await adapter.exec(
+          `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`opclass: "text_pattern_ops"`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
-    it.skip("non default opclass is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("non default opclass is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
+        );
+        await adapter.exec(
+          `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`opclass: { description: "text_pattern_ops" }`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
-    it.skip("opclass class parsing on non reserved and cannot be function or type keyword", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("opclass class parsing on non reserved and cannot be function or type keyword", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, name varchar(50), position varchar(50))`,
+        );
+        await adapter.exec(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+        await adapter.exec(
+          `CREATE INDEX trains_position ON trains USING gin(position gin_trgm_ops)`,
+        );
+        await adapter.exec(
+          `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        const output = lines.join("\n");
+        expect(output).toContain(`opclass: "gin_trgm_ops"`);
+        expect(output).toContain(`opclass: { position: "text_pattern_ops" }`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
   });
 
   describe("SchemaIndexNullsOrderTest", () => {
-    it.skip("nulls order is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("nulls order is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
+        );
+        await adapter.exec(
+          `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`order: { name: "NULLS FIRST" }`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
-    it.skip("non default order with nulls is dumped", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("non default order with nulls is dumped", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
+        );
+        await adapter.exec(
+          `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
+        );
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+        expect(lines.join("\n")).toContain(`order: { name: "DESC NULLS LAST" }`);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      }
     });
   });
 

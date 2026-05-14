@@ -1461,6 +1461,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQL::DatabaseStatements#execute_batch (database_statements.rb)
+  /** @internal */
   executeBatch = pgExecuteBatch;
 
   // Mirrors: DatabaseStatements#high_precision_current_timestamp (database_statements.rb:92)
@@ -2509,41 +2510,58 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       const columns = row.columns as string[];
       const def = row.definition as string;
 
-      let orders: Record<string, string> | string | undefined;
-      const descMatch = def.match(/\(([^)]+)\)/);
-      if (descMatch) {
-        const colDefs = descMatch[1].split(",").map((s) => s.trim());
-        const orderMap: Record<string, string> = {};
-        let hasOrder = false;
-        for (let ci = 0; ci < columns.length; ci++) {
-          const colDef = colDefs[ci] || "";
-          const descFlag = colDef.match(/\bDESC\b/i);
-          const nullsFlag = colDef.match(/\bNULLS\s+(FIRST|LAST)\b/i);
-          if (descFlag || nullsFlag) {
-            let order = descFlag ? "desc" : "asc";
-            if (nullsFlag) order += ` NULLS ${nullsFlag[1].toUpperCase()}`;
-            orderMap[columns[ci]] = order;
-            hasOrder = true;
-          }
-        }
-        if (hasOrder) {
-          if (columns.length === 1) {
-            orders = orderMap[columns[0]];
-          } else {
-            orders = orderMap;
-          }
+      // Extract the expressions, INCLUDE, NULLS NOT DISTINCT, and WHERE clauses.
+      // Mirrors Rails' regex: / USING (\w+?) \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?\z/m
+      const defMatch = def.match(
+        / USING \w+? \((.+?)\)(?: INCLUDE \((.+?)\))?( NULLS NOT DISTINCT)?(?: WHERE (.+))?$/s,
+      );
+      const expressions = defMatch?.[1] ?? "";
+      const includeStr = defMatch?.[2];
+      const nullsNotDistinctStr = defMatch?.[3];
+      const whereStr = defMatch?.[4];
+
+      const include = includeStr
+        ? includeStr.split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
+        : undefined;
+      const where = whereStr?.trim();
+      const nullsNotDistinct = nullsNotDistinctStr ? true : undefined;
+
+      // Parse opclasses and orders from the expressions string.
+      // Mirrors Rails regex: /(?<column>\w+)"?\s?(?<opclass>\w+_ops(_\w+)?)?\s?(?<desc>DESC)?\s?(?<nulls>NULLS (?:FIRST|LAST))?/
+      const opclassesMap: Record<string, string> = {};
+      const ordersMap: Record<string, string> = {};
+      const COL_RE = /(\w+)"?\s?(\w+_ops(?:_\w+)?)?\s?(DESC)?\s?(NULLS (?:FIRST|LAST))?/g;
+      for (const [, column, opclass, desc, nulls] of expressions.matchAll(COL_RE)) {
+        if (opclass) opclassesMap[column] = opclass;
+        if (nulls) {
+          ordersMap[column] = [desc, nulls].filter(Boolean).join(" ");
+        } else if (desc) {
+          ordersMap[column] = "desc";
         }
       }
 
-      // Parse INCLUDE (...) for covering indexes.
-      const includeMatch = def.match(/\bINCLUDE\s*\(([^)]+)\)/i);
-      const include = includeMatch
-        ? includeMatch[1].split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
-        : undefined;
+      // concise_options: collapse to a single scalar when all key columns share the same value.
+      const keyColumns = include ? columns.filter((c) => !include.includes(c)) : columns;
 
-      const whereMatch = def.match(/\bWHERE\s+(.+)$/i);
-      const where = whereMatch ? whereMatch[1].trim() : undefined;
-      const nullsNotDistinct = /\bNULLS NOT DISTINCT\b/i.test(def) ? true : undefined;
+      let opclasses: Record<string, string> | string | undefined;
+      const opclassVals = Object.values(opclassesMap);
+      if (opclassVals.length > 0) {
+        if (keyColumns.length === opclassVals.length && new Set(opclassVals).size === 1) {
+          opclasses = opclassVals[0];
+        } else {
+          opclasses = opclassesMap;
+        }
+      }
+
+      let orders: Record<string, string> | string | undefined;
+      const orderVals = Object.values(ordersMap);
+      if (orderVals.length > 0) {
+        if (keyColumns.length === orderVals.length && new Set(orderVals).size === 1) {
+          orders = orderVals[0];
+        } else {
+          orders = ordersMap;
+        }
+      }
 
       return {
         table: row.table_name as string,
@@ -2552,6 +2570,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         columns,
         using: row.using as string,
         orders,
+        opclasses,
         include,
         where,
         nullsNotDistinct,
