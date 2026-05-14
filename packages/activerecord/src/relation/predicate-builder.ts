@@ -15,11 +15,6 @@ import { argumentError } from "./query-methods.js";
  *
  * Mirrors: ActiveRecord::PredicateBuilder
  */
-export interface AssociationMapping {
-  foreignKey: string;
-  foreignType?: string;
-}
-
 export class PredicateBuilder {
   private _table: Table;
 
@@ -35,7 +30,6 @@ export class PredicateBuilder {
   private rangeHandler: RangeHandler;
   private basicObjectHandler: BasicObjectHandler;
   private relationHandler: RelationHandler;
-  private associationMap: Map<string, AssociationMapping> = new Map();
   private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
   private _tableContext: any = null;
 
@@ -66,14 +60,6 @@ export class PredicateBuilder {
     this.relationHandler = new RelationHandler();
   }
 
-  /**
-   * Register association mappings so that where({ author: record }) can
-   * be expanded to where({ author_id: record.id }).
-   */
-  setAssociationMap(map: Map<string, AssociationMapping>): void {
-    this.associationMap = map;
-  }
-
   buildFromHash(conditions: Record<string, unknown>): Nodes.Node[] {
     return this.buildFromHashInternal(conditions, false);
   }
@@ -88,37 +74,7 @@ export class PredicateBuilder {
   ): Nodes.Node[] {
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(conditions)) {
-      const assoc = this.associationMap.get(key);
-      if (assoc) {
-        const expandedConditions = this.expandAssociationCondition(assoc, value);
-        if (expandedConditions.length === 0) continue;
-
-        // Always build association groups positively; apply negation at group level
-        const groups: Nodes.Node[] = [];
-        for (const cond of expandedConditions) {
-          const groupNodes = this.buildFromHashInternal(cond, false);
-          if (groupNodes.length === 0) continue;
-          groups.push(groupNodes.length === 1 ? groupNodes[0] : new Nodes.And(groupNodes));
-        }
-        if (groups.length === 0) continue;
-
-        if (!negated) {
-          if (groups.length === 1) {
-            nodes.push(groups[0]);
-          } else {
-            let combined: Nodes.Node = groups[0];
-            for (let i = 1; i < groups.length; i++) {
-              combined = new Nodes.Grouping(new Nodes.Or(combined, groups[i]));
-            }
-            nodes.push(combined);
-          }
-        } else {
-          // NOT(g1 OR g2 OR ...) == NOT g1 AND NOT g2 AND ...
-          for (const g of groups) {
-            nodes.push(new Nodes.Not(new Nodes.Grouping(g)));
-          }
-        }
-      } else if (
+      if (
         isPlainObject(value) &&
         this._tableContext &&
         typeof this._tableContext.associatedTable === "function" &&
@@ -153,20 +109,6 @@ export class PredicateBuilder {
     return nodes;
   }
 
-  private expandAssociationCondition(
-    assoc: AssociationMapping,
-    value: unknown,
-  ): Record<string, unknown>[] {
-    if (assoc.foreignType) {
-      const arrayValue = Array.isArray(value) ? value : [value];
-      return new PolymorphicArrayValue(assoc.foreignKey, assoc.foreignType, arrayValue).queries();
-    }
-    return new AssociationQueryValue(
-      { joinForeignKey: assoc.foreignKey, joinPrimaryKey: "id" },
-      value,
-    ).queries();
-  }
-
   /** @internal */
   private buildFromHashAssociation(
     associatedTable: any,
@@ -175,13 +117,32 @@ export class PredicateBuilder {
     negated: boolean,
     attributes: Record<string, unknown>,
   ): Nodes.Node[] {
-    // Polymorphic — Slot B. Attempting to build on the association name (not a real column)
-    // produces incorrect SQL; throw a clear error instead.
     if (associatedTable.isPolymorphicAssociation?.()) {
-      throw new Error(
-        `Polymorphic association '${key}' is not yet supported in where() (Slot B). ` +
-          "Use explicit _id and _type conditions instead.",
+      const fk = associatedTable.joinForeignKey as string;
+      const ft = associatedTable.joinForeignType as string;
+      const refl = associatedTable.reflection;
+      const pkFor = (klass?: unknown): string =>
+        refl && typeof refl.joinPrimaryKeyFor === "function"
+          ? String(refl.joinPrimaryKeyFor(klass))
+          : String(associatedTable.joinPrimaryKey ?? "id");
+      const values = Array.isArray(value) ? value : [value];
+      const queries = new PolymorphicArrayValue(
+        { joinForeignKey: fk, joinForeignType: ft, joinPrimaryKey: pkFor },
+        values,
+      ).queries();
+      const groups: Nodes.Node[] = [];
+      for (const query of queries) {
+        const inner = this.buildFromHash(query);
+        if (inner.length === 0) continue;
+        groups.push(inner.length === 1 ? inner[0] : new Nodes.And(inner));
+      }
+      if (groups.length === 0) return [];
+      if (negated) return groups.map((g) => new Nodes.Not(new Nodes.Grouping(g)));
+      if (groups.length === 1) return groups;
+      const combined = groups.reduce((acc, g, i) =>
+        i === 0 ? g : new Nodes.Grouping(new Nodes.Or(acc, g)),
       );
+      return [combined];
     }
     // Through: delegate with the associated model's primary key (Rails: through_association? path).
     // Always build positively — negation is applied once at the group level below (mirrors Rails
@@ -459,7 +420,6 @@ export class PredicateBuilder {
   with(context: any): PredicateBuilder {
     const table = context?.arelTable ?? this.table;
     const builder = new PredicateBuilder(table);
-    builder.setAssociationMap(this.associationMap);
     builder.handlers = [...this.handlers];
     builder._tableContext = context;
     return builder;
