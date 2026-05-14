@@ -738,7 +738,8 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
         const sym =
           sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
 
-        // (b): const object literal → harvest directly.
+        // (b): const object literal → harvest directly, then fall through to
+        // also push the name onto extends for compare.ts resolution.
         const valDecl = sym?.valueDeclaration ?? sym?.declarations?.[0];
         if (valDecl && ts.isVariableDeclaration(valDecl) && valDecl.initializer) {
           // Strip `as const` / other type assertions to reach the raw literal.
@@ -748,7 +749,6 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           }
           if (ts.isObjectLiteralExpression(init)) {
             pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));
-            return;
           }
         }
 
@@ -869,7 +869,6 @@ export function extractFromProgram(program: ts.Program, srcDir: string): Package
           }
           if (ts.isObjectLiteralExpression(init)) {
             pushMethods(harvestObjectLiteralMethods(init, checker, hostInfo.file ?? ""));
-            return;
           }
         }
 
@@ -1211,11 +1210,6 @@ export function extractClass(
 
   for (const member of node.members) {
     const memberName = getMemberName(member);
-    // Skip #-prefixed private fields (TS private identifiers / backing fields).
-    // _-prefixed members are kept — Rails uses _snake_case for private helpers
-    // (e.g. _query_by_sql, _load_from_sql) and we mirror that convention.
-    if (memberName && ts.isPrivateIdentifier((member as ts.NamedDeclaration).name!)) continue;
-
     const visibility = memberVisibility(member);
     const internal = visibility !== "public";
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
