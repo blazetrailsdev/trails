@@ -99,30 +99,30 @@ Categories: `marshal`, `yaml`, `psych`, `gvl`, `fork`, `rake`, `pty`, `dbconsole
 
 ## Controlled vocabulary
 
-| Category                   | Meaning                                                                          |
-| -------------------------- | -------------------------------------------------------------------------------- |
-| `BLOCKED: STI`             | Single-table inheritance routing                                                 |
-| `BLOCKED: associations`    | Specific association feature (specify which: habtm / inverse / through / ...)    |
-| `BLOCKED: encryption`      | Encryption subsystem gap                                                         |
-| `BLOCKED: schema`          | Schema introspection / dumper / definition gap                                   |
-| `BLOCKED: transactions`    | Transaction / savepoint / isolation gap                                          |
-| `BLOCKED: query-cache`     | Query cache behavior                                                             |
-| `BLOCKED: load-async`      | Async query / future result — likely permanent → `unported-files.ts`             |
-| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent → `unported-files.ts`                       |
-| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent → `unported-files.ts`          |
-| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent → `unported-files.ts`              |
-| `BLOCKED: fixture`         | Fixture loader feature (whole subsystem already in `unported-files.ts`)          |
-| `BLOCKED: migration`       | Migration runner feature                                                         |
-| `BLOCKED: connection-pool` | Connection pool / handler / pool config gap                                      |
-| `BLOCKED: relation`        | Relation API gap (specify which: where / scope / batches / ...)                  |
-| `BLOCKED: i18n`            | I18n message / translation gap                                                   |
-| `BLOCKED: validation`      | Validator behavior gap (specify which: uniqueness / length / numericality / ...) |
-| `BLOCKED: type`            | Type cast / serialize / deserialize gap (specify which Type)                     |
-| `BLOCKED: adapter-pg`      | PostgreSQL-specific adapter gap                                                  |
-| `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                       |
-| `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                      |
-| `BLOCKED: range`           | pg/range type behavior                                                           |
-| `BLOCKED: unknown`         | Could not categorize from context; needs human triage                            |
+| Category                   | Meaning                                                                                                                                                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BLOCKED: STI`             | Single-table inheritance routing                                                                                                                                                                                                                                      |
+| `BLOCKED: associations`    | Specific association feature (specify which: habtm / inverse / through / ...)                                                                                                                                                                                         |
+| `BLOCKED: encryption`      | Encryption subsystem gap                                                                                                                                                                                                                                              |
+| `BLOCKED: schema`          | Schema introspection / dumper / definition gap                                                                                                                                                                                                                        |
+| `BLOCKED: transactions`    | Transaction / savepoint / isolation gap                                                                                                                                                                                                                               |
+| `BLOCKED: query-cache`     | Query cache behavior                                                                                                                                                                                                                                                  |
+| `BLOCKED: load-async`      | Async query / future result — likely permanent → `unported-files.ts`                                                                                                                                                                                                  |
+| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent → `unported-files.ts`                                                                                                                                                                                                            |
+| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent → `unported-files.ts`                                                                                                                                                                                               |
+| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent → `unported-files.ts`                                                                                                                                                                                                   |
+| `BLOCKED: fixture`         | Test needs a fixture set ported to TS. **Stays BLOCKED (not PERMANENT-SKIP).** TS-native fixture infrastructure shipped via `defineFixtures` / `useFixtures` (PRs #1470, #1471, #1480, #1481, #1484, #1487, #1489); per-cluster fixture data folds into cluster work. |
+| `BLOCKED: migration`       | Migration runner feature                                                                                                                                                                                                                                              |
+| `BLOCKED: connection-pool` | Connection pool / handler / pool config gap                                                                                                                                                                                                                           |
+| `BLOCKED: relation`        | Relation API gap (specify which: where / scope / batches / ...)                                                                                                                                                                                                       |
+| `BLOCKED: i18n`            | I18n message / translation gap                                                                                                                                                                                                                                        |
+| `BLOCKED: validation`      | Validator behavior gap (specify which: uniqueness / length / numericality / ...)                                                                                                                                                                                      |
+| `BLOCKED: type`            | Type cast / serialize / deserialize gap (specify which Type)                                                                                                                                                                                                          |
+| `BLOCKED: adapter-pg`      | PostgreSQL-specific adapter gap                                                                                                                                                                                                                                       |
+| `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                                                                                                                                                                                                            |
+| `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                                                                                                                                                                                                           |
+| `BLOCKED: range`           | pg/range type behavior                                                                                                                                                                                                                                                |
+| `BLOCKED: unknown`         | Could not categorize from context; needs human triage                                                                                                                                                                                                                 |
 
 Adding a new category: pick a kebab-case slug, document in this table.
 

@@ -38,7 +38,7 @@ and the recovery path never needs to fire.
 
 ## Known flaky tests (resolved)
 
-The flaky `AssociationsJoinModelTest` cases that motivated this work were not, in the end, caused by the dynamic test-adapter's recovery path. The real cause was diagnosed in [docs/ar-test-parallelism-plan.md](./ar-test-parallelism-plan.md): vitest's `--no-file-parallelism` flag had been silently dropped (PR #1092), workers monotonic-incrementing `VITEST_WORKER_ID` modulo-collided onto the same `rails_js_test_N` DB, and worker B's `dropAllTables` afterAll landed inside worker A's `defineSchema` sequence. Fixed by the PR-P1..P6 advisory-lock parallelism work (#1223–#1228); #1222 was a separate stop-gap that re-added `--no-file-parallelism` while the proper fix was being designed.
+The flaky `AssociationsJoinModelTest` cases that motivated this work were not, in the end, caused by the dynamic test-adapter's recovery path. The real cause was a parallelism bug: vitest's `--no-file-parallelism` flag had been silently dropped (PR #1092), workers monotonic-incrementing `VITEST_WORKER_ID` modulo-collided onto the same `rails_js_test_N` DB, and worker B's `dropAllTables` afterAll landed inside worker A's `defineSchema` sequence. Fixed by the PR-P1..P6 advisory-lock parallelism work (#1223–#1228); #1222 was a separate stop-gap that re-added `--no-file-parallelism` while the proper fix was being designed.
 
 The schema-migration plan still stands on its own merits — explicit schema is clearer, kills the recovery-path-masks-bugs problem, and lets `test-adapter.ts` shrink to ≤200 LOC. But the original "join-model PG flake" is no longer a TS-final blocker.
 
