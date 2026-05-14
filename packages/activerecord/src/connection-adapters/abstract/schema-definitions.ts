@@ -558,6 +558,9 @@ export class TableDefinition {
   readonly as?: string;
   readonly options?: string;
   readonly comment?: string;
+  readonly charset?: string;
+  readonly collation?: string;
+  readonly compositePrimaryKey?: string[];
   private _id: boolean | PrimaryKeyType;
   private _adapterName: "sqlite" | "postgres" | "mysql";
   protected _adapter: SchemaQuoter;
@@ -566,6 +569,7 @@ export class TableDefinition {
     tableName: string,
     tdOptions: {
       id?: boolean | PrimaryKeyType;
+      primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter?: SchemaQuoter;
       temporary?: boolean;
@@ -573,6 +577,8 @@ export class TableDefinition {
       as?: string;
       options?: string;
       comment?: string;
+      charset?: string;
+      collation?: string;
       default?: unknown;
     } = {},
   ) {
@@ -583,12 +589,23 @@ export class TableDefinition {
       quoteTableName: abstractQuoteTableName,
       quoteDefaultExpression: abstractQuoteDefaultExpression,
     };
-    this._id = tdOptions.id ?? true;
+    // Composite primaryKey implies id: false — Rails requires this and emitting both
+    // an auto-id column AND a composite PK constraint is invalid DDL.
+    const hasCompositePk = Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length > 0;
+    if (Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length === 0) {
+      throw new ArgumentError("primaryKey array must not be empty");
+    }
+    this._id = hasCompositePk ? false : (tdOptions.id ?? true);
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;
     this.options = tdOptions.options;
     this.comment = tdOptions.comment;
+    this.charset = tdOptions.charset;
+    this.collation = tdOptions.collation;
+    if (hasCompositePk) {
+      this.compositePrimaryKey = tdOptions.primaryKey as string[];
+    }
 
     if (this._id !== false) {
       const pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
@@ -1081,9 +1098,28 @@ export class TableDefinition {
         }
         tableElements.push(fkSql);
       }
+      if (this.compositePrimaryKey && this.compositePrimaryKey.length > 0) {
+        const quotedCols = this.compositePrimaryKey
+          .map((k) => this._adapter.quoteIdentifier(k))
+          .join(", ");
+        tableElements.push(`PRIMARY KEY (${quotedCols})`);
+      }
       sql += ` (${tableElements.join(", ")})`;
     }
 
+    if (this._adapterName === "mysql") {
+      const safeIdentRe = /^[A-Za-z0-9_]+$/;
+      if (this.charset) {
+        if (!safeIdentRe.test(this.charset))
+          throw new ArgumentError(`Invalid MySQL charset: ${JSON.stringify(this.charset)}`);
+        sql += ` DEFAULT CHARSET=${this.charset}`;
+      }
+      if (this.collation) {
+        if (!safeIdentRe.test(this.collation))
+          throw new ArgumentError(`Invalid MySQL collation: ${JSON.stringify(this.collation)}`);
+        sql += ` COLLATE=${this.collation}`;
+      }
+    }
     if (this.options) sql += ` ${this.options}`;
     if (this.comment && this._adapterName === "mysql") {
       const escaped = this.comment.replace(/'/g, "''");

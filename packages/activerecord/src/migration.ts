@@ -577,9 +577,14 @@ export abstract class Migration {
     optionsOrFn?:
       | {
           id?: boolean | "uuid";
+          primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
           default?: unknown;
+          options?: string;
+          comment?: string;
+          charset?: string;
+          collation?: string;
           as?: string;
         }
       | ((t: TableDefinition) => void),
@@ -1524,13 +1529,15 @@ export class MigrationContext {
   async createTable(
     name: string,
     options?: {
-      primaryKey?: string | false;
+      primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
       id?: boolean | "uuid";
       default?: unknown;
       options?: string;
       comment?: string;
+      charset?: string;
+      collation?: string;
       as?: string;
     },
     fn?: (t: TableDefinition) => void,
@@ -1551,9 +1558,12 @@ export class MigrationContext {
     }
     const td = new TableDefinition(name, {
       id: options?.as != null ? false : options?.id,
+      primaryKey: options?.primaryKey,
       default: options?.default,
       options: options?.options,
       comment: options?.comment,
+      charset: options?.charset,
+      collation: options?.collation,
       as: options?.as,
       adapterName: this._adapterName,
       adapter: this.adapter,
@@ -1595,7 +1605,7 @@ export class MigrationContext {
         scale?: number | null;
       }
     >();
-    if (options?.id !== false && options?.as == null) {
+    if (options?.id !== false && !Array.isArray(options?.primaryKey) && options?.as == null) {
       const idType = typeof options?.id === "string" ? options.id : "integer";
       meta.set("id", { type: idType, primaryKey: true });
     }

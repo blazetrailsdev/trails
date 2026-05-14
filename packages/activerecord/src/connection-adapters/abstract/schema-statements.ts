@@ -87,11 +87,14 @@ export class SchemaStatements {
     optionsOrFn?:
       | {
           id?: boolean | "uuid";
+          primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
           default?: unknown;
           options?: string;
           comment?: string;
+          charset?: string;
+          collation?: string;
           temporary?: boolean;
           as?: string;
         }
@@ -100,11 +103,14 @@ export class SchemaStatements {
   ): Promise<void> {
     let options: {
       id?: boolean | "uuid";
+      primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
       default?: unknown;
       options?: string;
       comment?: string;
+      charset?: string;
+      collation?: string;
       temporary?: boolean;
       as?: string;
     } = {};
@@ -1469,7 +1475,16 @@ export class SchemaStatements {
   }
 
   validTableDefinitionOptions(): string[] {
-    return ["temporary", "ifNotExists", "options", "as", "comment", "charset", "collation"];
+    return [
+      "temporary",
+      "ifNotExists",
+      "options",
+      "as",
+      "comment",
+      "charset",
+      "collation",
+      "primaryKey",
+    ];
   }
 
   validColumnDefinitionOptions(): string[] {

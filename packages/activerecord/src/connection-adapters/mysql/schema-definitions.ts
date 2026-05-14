@@ -40,9 +40,6 @@ export interface ColumnMethods {
 }
 
 export class TableDefinition extends AbstractTableDefinition {
-  readonly charset: string | null;
-  readonly collation: string | null;
-
   constructor(
     tableName: string,
     options: {
@@ -53,6 +50,8 @@ export class TableDefinition extends AbstractTableDefinition {
   ) {
     super(tableName, {
       ...options,
+      charset: options.charset ?? undefined,
+      collation: options.collation ?? undefined,
       adapterName: "mysql",
       adapter: {
         quoteIdentifier: quoteIdentifier,
@@ -60,8 +59,6 @@ export class TableDefinition extends AbstractTableDefinition {
         quoteDefaultExpression: quoteDefaultExpression,
       },
     });
-    this.charset = options.charset ?? null;
-    this.collation = options.collation ?? null;
   }
 
   blob(name: string, options: ColumnOptions & { limit?: number } = {}): this {
