@@ -1955,6 +1955,10 @@ describe("ReflectionTest", () => {
     registerModel("NAuthor", NAuthor);
     registerModel("NCategory", NCategory);
 
+    Associations.belongsTo.call(NTagging, "post", { className: "NPost" });
+    Associations.belongsTo.call(NTagging, "tag", { className: "NTag" });
+    Associations.belongsTo.call(NComment, "post", { className: "NPost" });
+
     Associations.hasMany.call(NPost, "comments", { className: "NComment" });
     Associations.hasMany.call(NPost, "taggings", { className: "NTagging" });
     Associations.hasMany.call(NPost, "tags", { through: "taggings", className: "NTag" });
