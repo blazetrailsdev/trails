@@ -388,6 +388,15 @@ jobs:
           ruby-version: "3.3"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Cache vendored upstream Ruby sources
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          # Invalidates when sources.ts (declared refs) or sources.lock.json
+          # (resolved SHAs) change. fetch.ts checksum keeps the cache fresh
+          # if the fetcher logic itself changes.
+          key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
+          restore-keys: vendor-sources-
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
       - name: Extract Ruby API
