@@ -33,7 +33,9 @@ The actionpack split matters for §3.1 path mapping — the package is itself a
 union of Rails directories, so `conventions.ts` already disambiguates by
 subdir.
 
-Largest TS files (LOC, source-only):
+Largest TS files (LOC, source-only — `wc -l` output on the checkout
+recorded in this PR's head commit; Copilot reviewers occasionally see
+off-by-one counts due to trailing-newline handling):
 
 | file                                                         |  LOC |
 | ------------------------------------------------------------ | ---: |
@@ -180,16 +182,21 @@ on both sides.
 ### 2.3 Cache location, regeneration, CI
 
 - **Location**: `scripts/rails-structure/output/rails-structure.json`.
-- **Committed**: yes — **new precedent**. `scripts/api-compare/output/` is
-  gitignored (see `scripts/api-compare/.gitignore`); `rails-api.json` is
-  regenerated locally, not committed. That works for api-compare because
-  it's invoked as a single explicit script. The lint rule runs on every
-  dev box during `pnpm lint` / editor save, and requiring Ruby on every
-  machine is a regression. So this plan commits the structure JSON to a
-  **new, non-gitignored path** (e.g. `eslint/rails-structure.json` next to
-  `eslint/rails-private-methods.json`, which _is_ committed) and treats
-  Ruby as a generator-only dependency, matching the rails-private-methods
-  precedent. The file is ~1–3 MB compressed.
+- **Committed**: **no** — generated locally, matching every existing
+  Rails-derived manifest in the repo. Verified after a second Copilot
+  pass: both `scripts/api-compare/output/rails-api.json` (gitignored at
+  `scripts/api-compare/.gitignore`) and `eslint/rails-private-methods.json`
+  (gitignored at `.gitignore:18`) are regenerated, not committed. There
+  is no committed-cache precedent in this repo. Implications:
+  - The ESLint rule must gracefully degrade when the cache is missing,
+    exactly like `blazetrails/rails-private-jsdoc` does today — it
+    consults `eslint/rails-private-methods.json` when present, otherwise
+    treats the allowlist as empty rather than firing on every file.
+  - First-run developers will see the structure rule as a no-op until
+    they run `pnpm api:compare`. CI runs `api:compare` already, so CI
+    enforces the real rule. The rule prints a one-time "cache missing —
+    run `pnpm api:compare`" diagnostic at startup.
+  - Ruby remains a dev/CI dependency only, same as today.
 - **Refresh trigger**: same gate as
   [`extract-ruby-api.rb`](../scripts/api-compare/extract-ruby-api.rb) lines
   16–28 — compare cache mtime to `.rails-source/.git/HEAD`, honour
@@ -220,18 +227,33 @@ module scope, then keys by TS path.
 
 ### 3.1 Path & symbol mapping
 
-Reuse [`scripts/api-compare/conventions.ts`](../scripts/api-compare/conventions.ts).
-That module already encodes:
+Reuse the data encoded in
+[`scripts/api-compare/conventions.ts`](../scripts/api-compare/conventions.ts):
 
 - TS↔Ruby filename mapping (kebab→snake, `trailtie`↔`railtie`, package-root
   conventions).
 - Method renames (`saveBang` ↔ `save!`, etc.).
 - Symbol normalization for the api:compare matcher.
 
-The rule imports the _same_ normalization functions so a single source of
-truth governs both "does this method exist" and "is it in the right
-position". When `conventions.ts` learns about a new rename, the structure
-rule benefits automatically.
+**Runtime constraint**: ESLint loads rules under Node without a TS loader,
+and the repo ships no built `scripts/api-compare/conventions.js` artifact —
+so the rule cannot `import` `conventions.ts` directly. Choose one of:
+
+- **(a) JSON sidecar** — `pnpm api:compare` writes a pure-data
+  `eslint/rails-conventions.json` (file map + rename map + package roots)
+  alongside `rails-private-methods.json`. The rule reads this at startup.
+  Pure data, zero runtime TS dependency. **Recommended.** Matches the
+  data-driven pattern used by `blazetrails/rails-private-jsdoc`.
+- (b) Move the helpers into a published package (e.g.
+  `@blazetrails/api-compare-conventions`) so ESLint can import compiled
+  JS. Heavier; only justified if other tooling needs the same logic.
+- (c) Emit a small generated `eslint/rails-conventions.generated.mjs`
+  alongside the cache. Same data, executable form. Slight runtime cost
+  vs (a); no clear benefit.
+
+Choosing (a). When `conventions.ts` gains a new rename, the next
+`pnpm api:compare` run regenerates the JSON and the rule picks it up —
+single source of truth preserved without runtime coupling.
 
 ### 3.2 TS analyzer — reuse `extract-ts-api.ts`
 
