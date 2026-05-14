@@ -33,6 +33,15 @@ const FILE_OVERRIDES: Record<string, string> = {
 };
 
 /**
+ * Directory-level path prefix overrides. Applied before FILE_OVERRIDES.
+ * Keyed by `pkg:rubyDirPrefix` — matched if the ruby file path starts with the prefix.
+ */
+const DIR_PREFIX_OVERRIDES: Record<string, string> = {
+  // Rails: action_controller/railties/... → our trailties convention
+  "actioncontroller:railties/": "trailties/",
+};
+
+/**
  * Ruby file path → expected TS file path (kebab-case, .ts extension).
  *
  * Uses `path.posix.*` so the mapping stays cross-platform stable —
@@ -44,6 +53,13 @@ export function rubyFileToTs(rubyFile: string, pkg?: string): string {
   if (pkg) {
     const override = FILE_OVERRIDES[`${pkg}:${rubyFile}`];
     if (override) return override;
+    for (const [key, replacement] of Object.entries(DIR_PREFIX_OVERRIDES)) {
+      const [keyPkg, prefix] = key.split(":");
+      if (keyPkg === pkg && rubyFile.startsWith(prefix)) {
+        rubyFile = replacement + rubyFile.slice(prefix.length);
+        break;
+      }
+    }
   }
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");

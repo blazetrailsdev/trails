@@ -35,9 +35,16 @@ function getPackageTestFiles(): Record<string, string[]> {
   const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", {
     cwd: ROOT_DIR,
   }).sort();
+  const abstractControllerFiles = globSync(
+    "packages/actionpack/src/abstractcontroller/**/*.test.ts",
+    {
+      cwd: ROOT_DIR,
+    },
+  ).sort();
   result["actiondispatch"] = actionDispatchFiles;
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
+  result["abstractcontroller"] = abstractControllerFiles;
 
   // Aliased packages (trailties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {
