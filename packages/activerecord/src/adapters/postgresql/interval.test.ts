@@ -109,6 +109,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await IntervalDataType.createBang({ maximum_term: "P4M" });
       const avg = await IntervalDataType.average("maximum_term");
       expect(avg).toBeInstanceOf(Duration);
+      // PG averages 6 years + 4 months → "3 years 2 mons" → "P3Y2M".
+      // Assert the actual averaged value rather than just the type to
+      // catch regressions where AVG falls through to wrong deserialization.
+      expect((avg as Duration).iso8601()).toBe("P3Y2M");
     });
 
     it.skip("schema dump with default value", async () => {
