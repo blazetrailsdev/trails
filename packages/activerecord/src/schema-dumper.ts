@@ -278,38 +278,51 @@ function sqlTypeToDsl(sqlType: string): DslMapping {
 }
 
 /**
- * Clean up a PG default expression to a human-readable literal value.
- * E.g. "'happy'::mood" -> "happy", "'192.168.1.1'::inet" -> "192.168.1.1"
+ * Strip a raw PG catalog default expression to a plain value.
+ * E.g. `'happy'::mood` → `"happy"`, `'192.168.1.1'::inet` → `"192.168.1.1"`,
+ * `nextval(...)` → kept as-is (expression default).
  *
- * Two distinct inputs flow through here:
- *  1. Raw PG catalog expressions (e.g. `'happy'::mood`, `'(12.2,13.3)'::point`)
- *     — SQL strings from `column_default` in information_schema/pg_attrdef.
- *     The cast-stripping branches and the expression-default branch (parens
- *     not starting with `'`) handle this path.
- *  2. Already-deserialized scalar literals — plain strings like `"00000011"`
- *     (bit-string), `"true"`, or `"42"` that reach the trailing
- *     boolean/numeric branches. The `/^-?0\d/` guard added in #1515 lives
- *     here to prevent bit-string patterns from being coerced to `Number`.
+ * Only call this with raw SQL strings from `column_default` /
+ * `pg_attrdef.adbin`. For already-deserialized ORM values (e.g. bit-strings
+ * like `"00000011"`) use `cleanDefault` instead.
  */
-export function cleanDefault(raw: unknown): unknown {
-  if (raw === null || raw === undefined) return raw;
-  const str = String(raw);
-
-  // Strip type casts (supports chained casts like 'value'::type::type2)
-  const castMatch = str.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
+export function cleanRawPgExpression(raw: string): unknown {
+  const castMatch = raw.match(/^'((?:[^']|'')*)'(::[\w\s."[\](),]+)+$/);
   if (castMatch) {
     return castMatch[1].replace(/''/g, "'");
   }
 
-  // Numeric defaults: 150.55::type, (150.55)::type, with chained casts
-  const numericCastMatch = str.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
+  const numericCastMatch = raw.match(/^\(?(-?\d+(?:\.\d+)?)\)?(::[\w\s."[\](),]+)+$/);
   if (numericCastMatch) {
     return Number(numericCastMatch[1]);
   }
 
   // Expression defaults like nextval(...) — keep as-is
-  if (str.includes("(") && !str.startsWith("'")) {
-    return str;
+  if (raw.includes("(") && !raw.startsWith("'")) {
+    return raw;
+  }
+
+  return raw;
+}
+
+/**
+ * Clean up a default value — either a raw PG catalog expression or an
+ * already-deserialized ORM scalar — to the JS literal used in schema dumps.
+ *
+ * Two distinct inputs flow through here:
+ *  1. Raw PG catalog expressions (e.g. `'happy'::mood`, `'(12.2,13.3)'::point`)
+ *     — dispatched to `cleanRawPgExpression`.
+ *  2. Already-deserialized scalar literals — plain strings like `"00000011"`
+ *     (bit-string), `"true"`, or `"42"`. The `/^-?0\d/` guard prevents
+ *     bit-string patterns from being coerced to `Number`.
+ */
+export function cleanDefault(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return raw;
+  const str = String(raw);
+
+  // Delegate raw PG expressions (contain a type cast or are expression defaults)
+  if (str.includes("::") || (str.includes("(") && !str.startsWith("'"))) {
+    return cleanRawPgExpression(str);
   }
 
   if (str === "true") return true;
@@ -757,6 +770,15 @@ export class SchemaDumper {
    * @internal
    */
   protected async gatherInlineConstraints(tableName: string, lines: string[]): Promise<void> {
+    await this.checkConstraintsInCreate(tableName, lines);
+  }
+
+  /**
+   * Emit inline check-constraint `t.checkConstraint(...)` lines inside the
+   * createTable block. Mirrors Rails' `SchemaDumper#check_constraints_in_create`.
+   * @internal
+   */
+  protected async checkConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
     const host = this._hookHost("checkConstraints");
     if (!host) return;
     const fn = (host as { checkConstraints: (t: string) => Promise<unknown[]> }).checkConstraints;
