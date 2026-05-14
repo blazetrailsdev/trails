@@ -167,10 +167,13 @@ export interface AbstractAdapter {
     optionsOrFn?:
       | {
           id?: boolean | "uuid";
+          primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
           options?: string;
           comment?: string;
+          charset?: string;
+          collation?: string;
           temporary?: boolean;
           as?: string;
         }
