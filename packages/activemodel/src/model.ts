@@ -125,7 +125,15 @@ export class Model {
   // `static { this.validates(...) }` blocks at class-definition time);
   // only the "defined but never written to" window diverges from Rails.
   static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
-  static _callbackChain: CallbackChain = new CallbackChain();
+  /** @internal */
+  static get _callbackChain(): CallbackChain {
+    return new CallbackChain(this.prototype);
+  }
+  /** @internal */
+  static set _callbackChain(_: CallbackChain) {
+    // no-op: subclass isolation is handled automatically by activesupport's
+    // copy-on-write in getCallbackChains when register/setCallback is first called.
+  }
   private static _modelName: ModelName | null = null;
 
   // -- Attributes (Phase 1000) --
@@ -443,7 +451,6 @@ export class Model {
   static clearValidatorsBang(): void {
     // Rails: `_validators.clear` (activemodel/lib/active_model/validations.rb:248).
     this._validators = new Map();
-    this._ensureOwnCallbacks();
     this._callbackChain.clearEvent("validate");
   }
 
@@ -466,7 +473,6 @@ export class Model {
         return (r[methodOrFn] as () => void)();
       }
     };
-    this._ensureOwnCallbacks();
     this._callbackChain.register("before", "validate", fn, this._buildValidateConditions(options));
   }
 
@@ -485,7 +491,6 @@ export class Model {
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
     );
     this._registerValidator(validator);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "before",
       "validate",
@@ -568,7 +573,6 @@ export class Model {
         callbackFn = (record: object) => validator.validate(record as ValidatableRecord);
       }
 
-      this._ensureOwnCallbacks();
       this._callbackChain.register("before", "validate", callbackFn, conditions);
     }
   }
@@ -707,7 +711,6 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "before",
       "validation",
@@ -721,7 +724,6 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "after",
       "validation",
@@ -736,7 +738,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("before", "save", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -746,7 +747,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "save", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -756,7 +756,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("before", "create", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -766,7 +765,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "create", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -776,7 +774,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("before", "update", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -786,7 +783,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "update", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -796,7 +792,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "before",
       "destroy",
@@ -811,7 +806,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "destroy", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -823,7 +817,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "around",
       "save",
@@ -840,7 +833,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "around",
       "create",
@@ -857,7 +849,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "around",
       "update",
@@ -874,7 +865,6 @@ export class Model {
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
     _rejectOnOption(conditions);
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "around",
       "destroy",
@@ -891,7 +881,6 @@ export class Model {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "commit", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -935,7 +924,6 @@ export class Model {
     if (conditions?.on !== undefined) {
       _validateOnCondition(conditions.on);
     }
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "after",
       "rollback",
@@ -949,7 +937,6 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       "after",
       "initialize",
@@ -963,7 +950,6 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "find", fn as CallbackFn | CallbackObject, conditions);
   }
 
@@ -972,14 +958,7 @@ export class Model {
     fn: ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>) | CallbackObject,
     conditions?: CallbackConditions<InstanceType<T>>,
   ): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.register("after", "touch", fn as CallbackFn | CallbackObject, conditions);
-  }
-
-  private static _ensureOwnCallbacks(): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-      this._callbackChain = this._callbackChain.clone();
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1030,7 +1009,6 @@ export class Model {
     // entry point — setCallback, defineModelCallbacks helpers, direct
     // chain.register — shares the same gate. No extra guard needed
     // here.
-    this._ensureOwnCallbacks();
     this._callbackChain.register(
       timing,
       event,
@@ -1080,7 +1058,6 @@ export class Model {
     // inherited chain first; only clone when we're actually going to
     // mutate (match found).
     if (!this._callbackChain.has(event, timing, fn)) return false;
-    this._ensureOwnCallbacks();
     return this._callbackChain.skip(event, timing, fn);
   }
 
@@ -1090,7 +1067,6 @@ export class Model {
    * (activesupport/lib/active_support/callbacks.rb:811-821).
    */
   static resetCallbacks<T extends typeof Model>(this: T, event: string): void {
-    this._ensureOwnCallbacks();
     this._callbackChain.clearEvent(event);
   }
 

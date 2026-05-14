@@ -16,6 +16,10 @@ import {
   type CallbackObject as ASCallbackObject,
   type RunCallbacksOptions as ASRunCallbacksOptions,
   defineCallbacks as asDefineCallbacks,
+  skipCallback as asSkipCallback,
+  resetCallbacks as asResetCallbacks,
+  getCallbackChains as asGetCallbackChains,
+  peekCallbackChain as asPeekCallbackChain,
 } from "@blazetrails/activesupport";
 
 type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
@@ -143,10 +147,7 @@ export function _defineBeforeModelCallback(klass: CallbackHost, event: string): 
   const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
   Object.defineProperty(klass, `before${capitalizedEvent}`, {
     value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
-      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-        this._callbackChain = this._callbackChain.clone();
-      }
-      this._callbackChain.register("before", event, fnOrObject, conditions);
+      _registerCallbackOnProto(this.prototype, "before", event, fnOrObject, conditions);
     },
     writable: true,
     configurable: true,
@@ -164,10 +165,7 @@ export function _defineAroundModelCallback(klass: CallbackHost, event: string): 
       fnOrObject: AroundCallbackFn | CallbackObject,
       conditions?: CallbackConditions,
     ) {
-      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-        this._callbackChain = this._callbackChain.clone();
-      }
-      this._callbackChain.register("around", event, fnOrObject, conditions);
+      _registerCallbackOnProto(this.prototype, "around", event, fnOrObject, conditions);
     },
     writable: true,
     configurable: true,
@@ -182,10 +180,7 @@ export function _defineAfterModelCallback(klass: CallbackHost, event: string): v
   const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
   Object.defineProperty(klass, `after${capitalizedEvent}`, {
     value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
-      if (!Object.prototype.hasOwnProperty.call(this, "_callbackChain")) {
-        this._callbackChain = this._callbackChain.clone();
-      }
-      this._callbackChain.register("after", event, fnOrObject, conditions);
+      _registerCallbackOnProto(this.prototype, "after", event, fnOrObject, conditions);
     },
     writable: true,
     configurable: true,
@@ -217,22 +212,85 @@ function _resolveCallbackObject(
 }
 
 /**
- * Lifecycle callback chain backed by activesupport's Callback engine.
+ * Register a callback directly in activesupport's Symbol-keyed chain storage
+ * on `proto`. Called by the generated `beforeX`/`afterX`/`aroundX` methods
+ * from `defineModelCallbacks` and by `CallbackChain.register`.
+ *
+ * Resolves `CallbackObject` instances using our own resolver (which supports
+ * both camelCase and snake_case method names) before inserting into the chain,
+ * while still storing the original object as `originalObject` so
+ * `skip`-by-reference works.
+ *
+ * After callbacks are stored with `prepend: true` so activesupport's LIFO
+ * reverse-iteration in `_runAfters` produces FIFO execution order — same as
+ * Rails' `_define_after_model_callback prepend: true`.
+ */
+function _registerCallbackOnProto(
+  proto: object,
+  timing: CallbackTiming,
+  event: string,
+  fn: CallbackFn | AroundCallbackFn | CallbackObject,
+  conditions?: CallbackConditions,
+): void {
+  if (conditions && "on" in conditions) {
+    if (event !== "commit" && event !== "rollback") {
+      throw new ArgumentError(
+        `Unknown key: :on. The :on option is only supported for :commit and :rollback callbacks (got :${event})`,
+      );
+    }
+  }
+  asDefineCallbacks(proto, event, { skipAfterCallbacksIfTerminated: true });
+  const chains = asGetCallbackChains(proto);
+  const chain = chains.get(event)!;
+  const isObj = typeof fn === "object" && fn !== null;
+  const resolved: AnyCallback = isObj
+    ? _resolveCallbackObject(fn as unknown as ASCallbackObject, timing, event)
+    : (fn as AnyCallback);
+  const entry = new Callback(
+    event,
+    resolved,
+    timing as CallbackKind,
+    {
+      if: conditions?.if as ((t: object) => boolean) | undefined,
+      unless: conditions?.unless as ((t: object) => boolean) | undefined,
+    },
+    chain.config,
+    isObj ? (fn as unknown as ASCallbackObject) : undefined,
+  );
+  const prepend = !!conditions?.prepend || timing === "after";
+  if (prepend) chain.prepend(entry);
+  else chain.append(entry);
+}
+
+/**
+ * Get the activesupport chain for `event` on `proto`. Triggers COW via
+ * `asGetCallbackChains` (acceptable for prototype-level lookups; COW happens
+ * once per class, never per instance). Used in the run paths.
+ */
+function _getChain(proto: object, event: string): ASCallbackChain | null {
+  return asGetCallbackChains(proto).get(event) ?? null;
+}
+
+/**
+ * Read-only lookup — no COW. Used by `has()` so a skipCallback miss never
+ * isolates a subclass from future parent registrations.
+ */
+function _peekChain(proto: object, event: string): ASCallbackChain | undefined {
+  return asPeekCallbackChain(proto, event);
+}
+
+/**
+ * Lifecycle callback chain backed by activesupport's Symbol-keyed chain storage.
+ *
+ * Rather than maintaining its own `Map<string, ASCallbackChain>`, this bridge
+ * stores all chains in activesupport's per-prototype storage (same storage
+ * accessed by `setCallback` / `runCallbacks`). Subclass isolation is handled
+ * automatically by activesupport's copy-on-write in `getCallbackChains`.
  *
  * Mirrors: ActiveModel::Callbacks / ActiveSupport::Callbacks
  */
 export class CallbackChain {
-  /** Map from event name to an activesupport CallbackChain for that event. */
-  private readonly _chains = new Map<string, ASCallbackChain>();
-
-  private _chain(event: string): ASCallbackChain {
-    let chain = this._chains.get(event);
-    if (!chain) {
-      chain = new ASCallbackChain(event, { skipAfterCallbacksIfTerminated: true });
-      this._chains.set(event, chain);
-    }
-    return chain;
-  }
+  constructor(private readonly _proto: object = Object.create(null)) {}
 
   register(
     timing: CallbackTiming,
@@ -240,38 +298,7 @@ export class CallbackChain {
     fn: CallbackFn | AroundCallbackFn | CallbackObject,
     conditions?: CallbackConditions,
   ): void {
-    // `on:` is synthesized into `if:` by the AR layer (transactions.ts)
-    // before reaching this chain. Reject it here for non-commit/rollback events.
-    if (conditions && "on" in conditions) {
-      if (event !== "commit" && event !== "rollback") {
-        throw new ArgumentError(
-          `Unknown key: :on. The :on option is only supported for :commit and :rollback callbacks (got :${event})`,
-        );
-      }
-    }
-    const chain = this._chain(event);
-    const isObj = typeof fn === "object" && fn !== null;
-    const asObj = isObj ? (fn as unknown as ASCallbackObject) : undefined;
-    const resolved: AnyCallback = isObj
-      ? _resolveCallbackObject(asObj!, timing, event)
-      : (fn as AnyCallback);
-    const entry = new Callback(
-      event,
-      resolved,
-      timing as CallbackKind,
-      { if: conditions?.if, unless: conditions?.unless } as {
-        if?: (t: object) => boolean;
-        unless?: (t: object) => boolean;
-      },
-      chain.config,
-      asObj,
-    );
-    // After callbacks are stored with prepend so that activesupport's reverse
-    // iteration in _runAfters (LIFO) produces FIFO execution order — the same
-    // as Rails' _define_after_model_callback which passes prepend: true.
-    const usePrepend = conditions?.prepend || timing === "after";
-    if (usePrepend) chain.prepend(entry);
-    else chain.append(entry);
+    _registerCallbackOnProto(this._proto, timing, event, fn, conditions);
   }
 
   skip(
@@ -279,12 +306,14 @@ export class CallbackChain {
     timing: CallbackTiming,
     filter: CallbackFn | AroundCallbackFn | CallbackObject,
   ): boolean {
-    const chain = this._chains.get(event);
+    // Peek first (no COW) to avoid isolating a subclass on a miss.
+    const chain = _peekChain(this._proto, event);
     if (!chain) return false;
     const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-    const entry = chain.entries.find((e) => e.matches(timing as CallbackKind, asFilter));
-    if (!entry) return false;
-    chain.delete(entry);
+    const found = chain.entries.some((e) => e.matches(timing as CallbackKind, asFilter));
+    if (!found) return false;
+    // Found — now trigger COW (via asGetCallbackChains) to get the mutable own chain.
+    asSkipCallback(this._proto, event, timing as CallbackKind, asFilter as AnyCallback);
     return true;
   }
 
@@ -293,36 +322,22 @@ export class CallbackChain {
     timing: CallbackTiming,
     filter: CallbackFn | AroundCallbackFn | CallbackObject,
   ): boolean {
+    // Peek without COW — a miss must not isolate this proto from future parent registrations.
+    const chain = _peekChain(this._proto, event);
+    if (!chain) return false;
     const asFilter = filter as unknown as AnyCallback | ASCallbackObject;
-    return (
-      this._chains.get(event)?.entries.some((e) => e.matches(timing as CallbackKind, asFilter)) ??
-      false
-    );
+    return chain.entries.some((e) => e.matches(timing as CallbackKind, asFilter));
   }
 
   clearEvent(event: string): void {
-    this._chains.delete(event);
+    asResetCallbacks(this._proto, event);
   }
 
+  /** COW is automatic via activesupport's `getCallbackChains`. Returns a new
+   * bridge pointing to the same proto; callers that assign the clone trigger
+   * the automatic COW on their own proto when they first register. */
   clone(): CallbackChain {
-    const copy = new CallbackChain();
-    for (const [ev, ch] of this._chains) {
-      const dup = new ASCallbackChain(ch.name, ch.config);
-      for (const e of ch.entries) {
-        dup.append(
-          new Callback(
-            e.name,
-            e.filter as AnyCallback,
-            e.kind,
-            e.options,
-            ch.config,
-            e.originalObject,
-          ),
-        );
-      }
-      copy._chains.set(ev, dup);
-    }
-    return copy;
+    return new CallbackChain(this._proto);
   }
 
   runBefore(
@@ -340,7 +355,7 @@ export class CallbackChain {
     record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const chain = this._chains.get(event);
+    const chain = _getChain(this._proto, event);
     if (!chain) return true;
     const tmp = new ASCallbackChain(event, chain.config);
     for (const e of chain.entries) {
@@ -360,7 +375,7 @@ export class CallbackChain {
     record: CallbackRecord,
     opts?: RunCallbacksOptions,
   ): void | Promise<void> {
-    const chain = this._chains.get(event);
+    const chain = _getChain(this._proto, event);
     if (!chain) return;
     const tmp = new ASCallbackChain(event, chain.config);
     for (const e of chain.entries) {
@@ -388,7 +403,7 @@ export class CallbackChain {
     block: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const chain = this._chains.get(event);
+    const chain = _getChain(this._proto, event);
     if (!chain) {
       const r = block?.();
       if (isThenable(r)) return Promise.resolve(r).then(() => true);

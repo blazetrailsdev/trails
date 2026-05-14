@@ -1061,7 +1061,26 @@ export interface ClassMethods<T extends object = object> {
 
 const CALLBACKS = Symbol("callbacks");
 
-function getCallbackChains(target: object): Map<string, CallbackChain> {
+/**
+ * Read-only lookup of a single CallbackChain for `name` on `target` (or its
+ * prototype chain). Does NOT trigger copy-on-write — returns `undefined` if
+ * no chain is found rather than allocating a new Map on `target`.
+ *
+ * @internal
+ */
+export function peekCallbackChain(target: object, name: string): CallbackChain | undefined {
+  let t: object | null = target;
+  while (t !== null) {
+    if (Object.prototype.hasOwnProperty.call(t, CALLBACKS)) {
+      return (t as Record<symbol, Map<string, CallbackChain>>)[CALLBACKS].get(name);
+    }
+    t = Object.getPrototypeOf(t);
+  }
+  return undefined;
+}
+
+/** @internal */
+export function getCallbackChains(target: object): Map<string, CallbackChain> {
   const t = target as Record<symbol, unknown>;
   if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
     const parent = t[CALLBACKS] as Map<string, CallbackChain> | undefined;
