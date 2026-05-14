@@ -272,59 +272,52 @@ top-level directory.** api:compare path matching is the primary signal;
 Rails splits the namespace; this PR sequence accepts the import-path
 churn across the monorepo as one-time cost.
 
-### Wave 2 — action_dispatch mechanical moves (P1) (3 PRs)
+### Wave 2 — action_dispatch mechanical moves (P1) (1 PR, ~500 LOC)
 
-**PR 2a (~200 LOC)** — move dispatch-root files into `http/`:
+All dispatch-root files relocated to their Rails-mirrored homes in
+one PR. Pure path moves; method bodies untouched.
 
-- `actiondispatch/request.ts` → `actiondispatch/http/request.ts`
-- `actiondispatch/response.ts` → `actiondispatch/http/response.ts`
-- `actiondispatch/mime-type.ts` → `actiondispatch/http/mime-type.ts`
-- `actiondispatch/uploaded-file.ts` → `actiondispatch/http/upload.ts`
-  (and rename class export internally — keep TS alias for backcompat
-  for one release).
-- `actiondispatch/dispatch/header.ts` → `actiondispatch/http/headers.ts`
-  (also rename to plural to match Rails)
+- Into `actiondispatch/http/`:
+  - `actiondispatch/request.ts` → `http/request.ts`
+  - `actiondispatch/response.ts` → `http/response.ts`
+  - `actiondispatch/mime-type.ts` → `http/mime-type.ts`
+  - `actiondispatch/uploaded-file.ts` → `http/upload.ts`
+    (rename class export internally — keep TS alias for one release).
+  - `actiondispatch/dispatch/header.ts` → `http/headers.ts`
+    (rename to plural to match Rails)
+  - `actiondispatch/content-security-policy.ts` →
+    `http/content-security-policy.ts`
+  - `actiondispatch/permissions-policy.ts` → `http/permissions-policy.ts`
+- Into `actiondispatch/middleware/`:
+  - `actiondispatch/cookies.ts` → `middleware/cookies.ts`
+  - `actiondispatch/flash.ts` → `middleware/flash.ts`
+  - `actiondispatch/exception-wrapper.ts` →
+    `middleware/exception-wrapper.ts`
+  - `actiondispatch/session/cookie-store.ts` →
+    `middleware/session/cookie-store.ts`
+- Into `actiondispatch/request/`:
+  - `actiondispatch/dispatch/request/session.ts` → `request/session.ts`
+- Audit + delete (or redirect) the actiondispatch duplicates of
+  `request-forgery-protection.ts` and `http-authentication.ts`
+  (Rails has these only under `action_controller/metal/`).
 - Delete the empty `actiondispatch/dispatch/` directory.
 
-**PR 2b (~150 LOC)** — move into `actiondispatch/middleware/`:
+### Wave 3 — AbstractController split (P2) (1 PR, ~450 LOC)
 
-- `actiondispatch/cookies.ts` → `actiondispatch/middleware/cookies.ts`
-- `actiondispatch/flash.ts` → `actiondispatch/middleware/flash.ts`
-- `actiondispatch/exception-wrapper.ts` →
-  `actiondispatch/middleware/exception-wrapper.ts`
-- `actiondispatch/session/cookie-store.ts` →
-  `actiondispatch/middleware/session/cookie-store.ts`
-
-**PR 2c (~150 LOC)** — move CSP / permissions-policy / etc:
-
-- `actiondispatch/content-security-policy.ts` →
-  `actiondispatch/http/content-security-policy.ts`
-- `actiondispatch/permissions-policy.ts` →
-  `actiondispatch/http/permissions-policy.ts`
-- `actiondispatch/request-forgery-protection.ts` — **import-graph audit + delete if dead** (decision 2026-05-14). Rails has this only under `action_controller/metal/`. The actiondispatch copy is a duplicate; if no in-repo importer references it, delete. If it has importers, those importers should switch to the `actioncontroller/metal/` version.
-- `actiondispatch/http-authentication.ts` — same treatment: import-graph audit, delete if dead, else redirect importers to `actioncontroller/metal/http-authentication.ts`.
-- `actiondispatch/dispatch/request/session.ts` →
-  `actiondispatch/request/session.ts`
-
-### Wave 3 — AbstractController split (P2) (2 PRs)
-
-**PR 3a (~250 LOC)** — create `abstractcontroller/` top-level dir:
+Single PR creates `abstractcontroller/` top-level dir and extracts the
+sub-files:
 
 - Move `actioncontroller/abstract-controller.ts` →
   `abstractcontroller/base.ts`.
-- Re-export from old path for backcompat (deprecate later).
-- Update `packages/actionpack/src/index.ts` to export both.
-
-**PR 3b (~200 LOC)** — extract callbacks/error/helpers:
-
-- Pull callback types and infra out of base.ts →
+- Pull callback types/infra out of base.ts →
   `abstractcontroller/callbacks.ts`.
 - Pull `ActionNotFound` → `abstractcontroller/error.ts`.
-- (Pure file splits — no logic changes.)
+- Re-export from old path for backcompat (deprecate later).
+- Update `packages/actionpack/src/index.ts` to export both.
+- Ship the tooling edits called out in the Tooling impact section
+  below (config.ts, compare.ts, test-compare entries).
 
-### Wave 4 — testing relocation (P1+P2) (2 PRs)
-
-**PR 4a (~250 LOC)** — move test infra to dispatch:
+### Wave 4 — testing relocation (P1+P2) (1 PR, ~450 LOC)
 
 - `actioncontroller/integration-test.ts` →
   `actiondispatch/testing/integration.ts`
@@ -332,9 +325,6 @@ churn across the monorepo as one-time cost.
   `actioncontroller/test-case.ts` →
   `actiondispatch/testing/{test-request,test-response,test-process}.ts`
 - Keep `actioncontroller/test-case.ts` for the TestCase class only.
-
-**PR 4b (~200 LOC)** — assertion infrastructure:
-
 - Split assertions out of `template-assertions.ts` into
   `actiondispatch/testing/assertions/{response,routing}.ts`.
 - Add `actiondispatch/testing/assertions.ts` aggregator + index.
@@ -390,19 +380,11 @@ visitors.rb
 ```
 
 The routing engine is tightly coupled (parser → nodes → path/pattern →
-gtg automaton → router). PR slicing must be done by an audit pass with
-full source-graph context — guessing here would produce
-`<base>`/`<base>b`/`<base>c` splits that fight the import graph.
-
-**Action:** before opening any journey PRs, run a sizing audit (similar
-in shape to the actionpack restructure audit you're reading) that:
-(a) lists each file's LOC + imports, (b) groups by tight-coupling
-clusters, (c) proposes ≤300-LOC PR sketches with explicit dependency
-order.
-
-Rough order-of-magnitude expectation: **~6–8 PRs, ~1500–2000 LOC
-total**, plus a wire-up PR that switches `routing/route-set.ts` to the
-journey-backed router. Confirm with the sizing audit.
+gtg automaton → router). Sizing audit landed:
+**[actionpack-journey-port-plan.md](actionpack-journey-port-plan.md)**.
+10 PRs total (9 cluster + 1 wire-up): L → S₁ → S₂ → V → P → G → R₁ →
+R₂ → R₃ → wire-up. PRs 4, 5, 6 can ship in parallel once PR 3 lands.
+LOC ceiling waived per this wave's plan.
 
 ### Wave 8+ — selective fill-in (open-ended)
 
@@ -410,9 +392,12 @@ Per-file ports for missing `middleware/*` files and `http/*` files.
 Sequenced by what unblocks `actioncontroller-100-percent.md` cleanup.
 Drives independently of this audit.
 
-**Total restructure work: 9 mechanical waves (1–6, Wave 5 is now a
-~10 LOC conventions.ts edit) + Wave 7 journey port (sized separately,
-~6–8 PRs) + open-ended fill-in (Wave 8+).**
+**Total restructure work: 5 mechanical PRs (Waves 1–6: skeleton +
+dispatch moves + abstractcontroller split + testing relocation +
+conventions/infra; Wave 5 is bundled into Wave 6 as a ~10 LOC edit) +
+Wave 7 journey port (10 PRs per
+[actionpack-journey-port-plan.md](actionpack-journey-port-plan.md)) +
+open-ended fill-in (Wave 8+).**
 
 ## Known divergences from Rails
 
