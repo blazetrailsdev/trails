@@ -1,43 +1,57 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/ltree_test.rb
  */
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`DROP TABLE IF EXISTS ltrees`);
+    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS ltree`);
+    await adapter.exec(`CREATE TABLE ltrees (id serial primary key, path ltree)`);
+    await adapter.loadAdditionalTypes();
   });
   afterEach(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS ltrees`);
     await adapter.close();
   });
 
   describe("PostgresqlLtreeTest", () => {
-    it.skip("column", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in ltree
-      // ROOT-CAUSE: connection-adapters/postgresql/ltree.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/ltree.ts; affects ~10–47 tests in ltree.test.ts
+    it("column", async () => {
+      const cols = await adapter.columns("ltrees");
+      const col = cols.find((c) => c.name === "path")!;
+      expect(col).toBeDefined();
+      expect(col.type).toBe("ltree");
+      expect(col.sqlType).toBe("ltree");
+      expect((col as any).isArray()).toBe(false);
+      expect(col.type).not.toBe("binary");
     });
-    it.skip("default", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in ltree
-      // ROOT-CAUSE: connection-adapters/postgresql/ltree.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/ltree.ts; affects ~10–47 tests in ltree.test.ts
+
+    it("default", async () => {
+      const cols = await adapter.columns("ltrees");
+      const col = cols.find((c) => c.name === "path")!;
+      expect(col).toBeDefined();
+      expect(col.default).toBeNull();
     });
-    it.skip("ltree query", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in ltree
-      // ROOT-CAUSE: connection-adapters/postgresql/ltree.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/ltree.ts; affects ~10–47 tests in ltree.test.ts
+
+    it("ltree query", async () => {
+      await adapter.exec(`INSERT INTO ltrees (path) VALUES ('1.2.3')`);
+      const rows = await adapter.execute(`SELECT path FROM ltrees`);
+      expect(String(rows[0].path)).toBe("1.2.3");
     });
-    it.skip("ltree schema dump", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in ltree
-      // ROOT-CAUSE: connection-adapters/postgresql/ltree.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/ltree.ts; affects ~10–47 tests in ltree.test.ts
+
+    it("ltree schema dump", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "ltrees");
+      expect(output).toMatch(/t\.ltree\("path"\)/);
     });
-    it.skip("write", async () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in ltree
-      // ROOT-CAUSE: connection-adapters/postgresql/ltree.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/ltree.ts; affects ~10–47 tests in ltree.test.ts
+
+    it("write", async () => {
+      await adapter.exec(`INSERT INTO ltrees (path) VALUES ('1.2.3.4')`);
+      const rows = await adapter.execute(`SELECT path FROM ltrees`);
+      expect(String(rows[0].path)).toBe("1.2.3.4");
     });
   });
 });
