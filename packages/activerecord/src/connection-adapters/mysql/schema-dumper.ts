@@ -32,9 +32,13 @@ interface MysqlColumn extends ColumnInfo {
   extra?: string | null;
 }
 
+interface MysqlAdapterLike {
+  tableOptions(tableName: string): Promise<Record<string, string>>;
+}
+
 export class SchemaDumper extends AbstractSchemaDumper {
   /** Injected adapter; presence signals that caches have been (or will be) populated. */
-  connection?: object;
+  connection?: MysqlAdapterLike;
   /** table → table-default collation. Populated by adapter before column iteration. */
   tableCollationCache: Record<string, string | undefined> = Object.create(null);
   /**
@@ -43,6 +47,18 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * Populated by adapter before column iteration via `information_schema` query.
    */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
+
+  /** @internal */
+  protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
+    if (!this.connection) return {};
+    const opts = await this.connection.tableOptions(tableName);
+    // Populate tableCollationCache when the table has an explicit COLLATE clause so
+    // schemaCollation can suppress per-column collation that matches the table default.
+    if (Object.hasOwn(opts, "collation")) {
+      this.tableCollationCache[tableName] = opts["collation"];
+    }
+    return opts;
+  }
 
   defaultPrimaryKeyType(): string {
     return "bigint";

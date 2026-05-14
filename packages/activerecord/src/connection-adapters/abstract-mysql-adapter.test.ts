@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Column } from "./mysql/column.js";
 import { ChangeColumnDefinition } from "./abstract/schema-definitions.js";
+import { parseTableOptions } from "./abstract-mysql-adapter.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column("id", null, { sqlType: "bigint" }, false, {
@@ -297,5 +298,69 @@ describe("AbstractMysqlAdapter quoting consistency — quote vs quoteString", ()
     for (const s of ["it's", "back\\slash", "\0null\nbyte\rreturn\x1aeof", "'; DROP TABLE t; --"]) {
       expect(adapter.quote(s)).toBe(standaloneQuote(s));
     }
+  });
+});
+
+// Minimal SHOW CREATE TABLE wrapper for parseTableOptions tests.
+function showCreate(tableName: string, options: string): string {
+  return `CREATE TABLE \`${tableName}\` (\n  \`id\` bigint NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY (\`id\`)\n) ${options}`;
+}
+
+describe("parseTableOptions", () => {
+  it("returns empty object for ENGINE=InnoDB only (default — not emitted)", () => {
+    expect(parseTableOptions(showCreate("t", "ENGINE=InnoDB"), null)).toEqual({});
+  });
+
+  it("extracts charset without collation", () => {
+    const opts = parseTableOptions(showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=latin1"), null);
+    expect(opts).toEqual({ charset: "latin1" });
+  });
+
+  it("extracts charset and collation together", () => {
+    const opts = parseTableOptions(
+      showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"),
+      null,
+    );
+    expect(opts).toEqual({ charset: "utf8mb4", collation: "utf8mb4_bin" });
+  });
+
+  it("strips AUTO_INCREMENT from ENGINE clause", () => {
+    const opts = parseTableOptions(
+      showCreate("t", "ENGINE=MyISAM AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4"),
+      null,
+    );
+    expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=MyISAM" });
+  });
+
+  it("includes non-InnoDB engine in options", () => {
+    const opts = parseTableOptions(showCreate("t", "ENGINE=MyISAM DEFAULT CHARSET=utf8mb4"), null);
+    expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=MyISAM" });
+  });
+
+  it("includes row format in options", () => {
+    const opts = parseTableOptions(
+      showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=REDUNDANT"),
+      null,
+    );
+    expect(opts).toEqual({ charset: "utf8mb4", options: "ENGINE=InnoDB ROW_FORMAT=REDUNDANT" });
+  });
+
+  it("extracts comment via pre-fetched value", () => {
+    const opts = parseTableOptions(
+      showCreate("t", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='hello world'"),
+      "hello world",
+    );
+    expect(opts).toEqual({ charset: "utf8mb4", comment: "hello world" });
+  });
+
+  it("returns empty object when createInfo has no options (NO_TABLE_OPTIONS mode)", () => {
+    expect(parseTableOptions(showCreate("t", ""), null)).toEqual({});
+  });
+
+  it("strips partition hint from options", () => {
+    const createInfo =
+      "CREATE TABLE `t` (\n  `id` bigint NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4\n/*!50100 PARTITION BY HASH (`id`)\nPARTITIONS 4 */\n";
+    const opts = parseTableOptions(createInfo, null);
+    expect(opts).toEqual({ charset: "utf8mb4" });
   });
 });
