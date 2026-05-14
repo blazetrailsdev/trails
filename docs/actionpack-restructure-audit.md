@@ -630,7 +630,8 @@ Headline:
 
 - **Where today:** actionpack tests run inside the batched
   `unit-tests` job alongside arel/activemodel/activesupport/rack/
-  actionview/trailties (`.github/workflows/ci.yml` lines 219–244).
+  actionview/trailties (the `unit-tests` job's `pnpm vitest run`
+  step in `.github/workflows/ci.yml`).
 - **Recommended split:** dedicated `actionpack-tests` job, no DB,
   parallel-safe.
 - **When:** Wave 1.5 PR — after Wave 1 (skeleton) and before Wave 7

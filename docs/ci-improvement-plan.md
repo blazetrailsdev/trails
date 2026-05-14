@@ -22,7 +22,7 @@ alongside the restructure.
 ## Current state
 
 `.github/workflows/ci.yml` runs actionpack tests as part of the
-`unit-tests` job (lines 219–244):
+`unit-tests` job (its `pnpm vitest run` step):
 
 ```
 pnpm vitest run
@@ -61,8 +61,8 @@ Baseline counts (2026-05-14):
 > captured. Wave 1.5 PR should attach a "before" timing report
 > (one full CI run before the split) so the "after" improvement is
 > quantifiable. The `ci` aggregate already emits a per-job timing
-> table to `$GITHUB_STEP_SUMMARY` (`ci.yml` lines 727–761) — easy
-> to harvest.
+> table to `$GITHUB_STEP_SUMMARY` (the `ci` job's "Job timing report"
+> step in `ci.yml`) — easy to harvest.
 
 ## Recommended separation
 
