@@ -603,10 +603,10 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  withConnection<T>(
+  async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
-  ): T | Promise<T> {
+  ): Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
     const lease = this._connectionLease();
     const stickyWas = lease.sticky;
@@ -616,87 +616,27 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
-    // Common pre-leased path — mirrors the original exactly; no extra closures.
-    if (lease.connection) {
-      let result: T | Promise<T>;
-      try {
-        result = fn(lease.connection);
-      } catch (err) {
-        restoreSticky();
-        throw err;
-      }
-      if (result !== null && result !== undefined && typeof (result as any).then === "function") {
-        return Promise.resolve(result).then(
-          (v) => {
-            restoreSticky();
-            return v;
-          },
-          (e) => {
-            restoreSticky();
-            throw e;
-          },
-        );
-      }
-      restoreSticky();
-      return result;
-    }
-
-    // Acquire path — checkout a new connection, then run fn.
     const releaseOnDone = () => {
       restoreSticky();
       if (!lease.sticky) this.releaseConnection();
     };
 
-    const runWithConn = (): T | Promise<T> => {
-      let result: T | Promise<T>;
+    const needsCheckout = !lease.connection;
+    if (needsCheckout) {
       try {
-        result = fn(lease.connection!);
+        lease.connection = await this.checkoutAsync(options.checkoutTimeout);
       } catch (err) {
-        releaseOnDone();
+        restoreSticky();
         throw err;
       }
-      if (result !== null && result !== undefined && typeof (result as any).then === "function") {
-        return Promise.resolve(result).then(
-          (v) => {
-            releaseOnDone();
-            return v;
-          },
-          (e) => {
-            releaseOnDone();
-            throw e;
-          },
-        );
-      }
-      releaseOnDone();
-      return result;
-    };
+    }
 
-    let checkoutErr: unknown;
     try {
-      lease.connection = this.checkout();
-    } catch (err) {
-      checkoutErr = err;
+      return await fn(lease.connection!);
+    } finally {
+      if (needsCheckout) releaseOnDone();
+      else restoreSticky();
     }
-
-    if (checkoutErr === undefined) {
-      return runWithConn();
-    }
-
-    if (checkoutErr instanceof ConnectionTimeoutError && options.checkoutTimeout !== undefined) {
-      // Pool saturated and caller explicitly opted in — wait for a free connection.
-      return this.checkoutAsync(options.checkoutTimeout).then(
-        (conn) => {
-          lease.connection = conn;
-          return runWithConn();
-        },
-        (asyncErr) => {
-          restoreSticky();
-          throw asyncErr;
-        },
-      );
-    }
-    restoreSticky();
-    throw checkoutErr;
   }
 
   // --- Pool statistics ---
