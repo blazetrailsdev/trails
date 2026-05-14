@@ -133,6 +133,7 @@ export default defineConfig({
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
+            "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
           setupFiles: ["./packages/activerecord/src/test-setup.ts"],
