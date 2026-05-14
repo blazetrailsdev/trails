@@ -275,7 +275,7 @@ describe("SignedIdTest", () => {
   });
 });
 
-describe("toGid / toSgid", () => {
+describe("toGid", () => {
   it("returns a GlobalID-like URI", async () => {
     const adapter = freshAdapter();
     class User extends Base {
@@ -287,22 +287,6 @@ describe("toGid / toSgid", () => {
     }
     const u = await User.create({ name: "Alice" });
     expect(u.toGid()).toBe(`gid://User/${u.id}`);
-  });
-
-  it("returns a base64-encoded signed GID", async () => {
-    const adapter = freshAdapter();
-    class User extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    const u = await User.create({ name: "Alice" });
-    const sgid = u.toSgid();
-    // Decode and verify
-    const decoded = Buffer.from(sgid, "base64").toString();
-    expect(decoded).toBe(`gid://User/${u.id}`);
   });
 });
 

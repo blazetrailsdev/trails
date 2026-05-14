@@ -20,7 +20,9 @@
       "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
-      ]
+      ],
+      "@blazetrails/globalid": ["../../globalid/src/index.ts"],
+      "@blazetrails/globalid/wire": ["../../globalid/src/wire.ts"]
     }
   },
   "include": ["."]
