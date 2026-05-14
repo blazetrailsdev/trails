@@ -11,21 +11,22 @@ infrastructure files only**.
 
 ## Headline numbers
 
-| Subtree                                     | Rails files         | Our files                                          | Coverage (files)       | Notes                                                                                                                                                                                                                           |
-| ------------------------------------------- | ------------------- | -------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `abstract_controller/`                      | 14                  | 0 (mashed into 1 file)                             | **0%**                 | We have a single `actioncontroller/abstract-controller.ts` collapsing the whole Rails subtree.                                                                                                                                  |
-| `action_controller/` (non-metal)            | 13                  | 16                                                 | ≥100%                  | Naming/placement mostly aligned. 3 TS files map elsewhere (`abstract-controller.ts`, `integration-test.ts`, `params-wrapper.ts` — the last duplicates `metal/params-wrapper.ts`). Subdir divergence (`railties` → `trailties`). |
-| `action_controller/metal/`                  | 32                  | 33                                                 | ≥100%                  | Metal subtree is healthy. 1 extra TS file (`header-utils.ts`, no Rails counterpart).                                                                                                                                            |
-| `action_dispatch/` (root)                   | 7                   | 1 (`index.ts`) + 15 flat root files                | **mixed**              | We have files at the dispatch root that Rails places under `http/` or `middleware/`.                                                                                                                                            |
-| `action_dispatch/http/`                     | 19                  | 0 (`http/` dir missing)                            | **0%**                 | Equivalents live at our `actiondispatch/` root or `actiondispatch/dispatch/`.                                                                                                                                                   |
-| `action_dispatch/middleware/`               | 20 (+ `session/` 4) | 7 + `session/` 1                                   | **~30%**               | 15+ middleware files entirely missing.                                                                                                                                                                                          |
-| `action_dispatch/journey/`                  | 14                  | 0                                                  | **0%**                 | Entire routing engine subtree absent.                                                                                                                                                                                           |
-| `action_dispatch/routing/`                  | 8                   | 7                                                  | ~85%                   | Mostly there; `endpoint.rb`, `polymorphic_routes.rb`, `redirection.rb`, `routes_proxy.rb` missing.                                                                                                                              |
-| `action_dispatch/testing/`                  | 10                  | 0                                                  | **0%**                 | All test helpers live in `actioncontroller/test-case.ts` instead.                                                                                                                                                               |
-| `action_dispatch/system_testing/`           | 5                   | 0                                                  | **0%**                 | Likely intentionally deferred — flag for triage.                                                                                                                                                                                |
-| `action_dispatch/request/`                  | 2                   | 0 (have `dispatch/request/session.ts`)             | misnested              | We placed `session.ts` under a non-Rails `dispatch/` directory.                                                                                                                                                                 |
-| `action_pack/` (version)                    | 2                   | 0 (`VERSION` const in `actioncontroller/index.ts`) | n/a                    | Trivial — version constant inlined.                                                                                                                                                                                             |
-| **Total Rails .rb under `actionpack/lib/`** | **154**             | **84 TS files**                                    | **~55% files present** | ~45% of Rails source files have **no corresponding TS file**.                                                                                                                                                                   |
+| Subtree                                                                                                      | Rails files         | Our files                                          | Coverage (files)       | Notes                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | ------------------- | -------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `abstract_controller/`                                                                                       | 14                  | 0 (mashed into 1 file)                             | **0%**                 | We have a single `actioncontroller/abstract-controller.ts` collapsing the whole Rails subtree.                                                                                                                                  |
+| `action_controller/` (non-metal)                                                                             | 13                  | 16                                                 | ≥100%                  | Naming/placement mostly aligned. 3 TS files map elsewhere (`abstract-controller.ts`, `integration-test.ts`, `params-wrapper.ts` — the last duplicates `metal/params-wrapper.ts`). Subdir divergence (`railties` → `trailties`). |
+| `action_controller/metal/`                                                                                   | 32                  | 33                                                 | ≥100%                  | Metal subtree is healthy. 1 extra TS file (`header-utils.ts`, no Rails counterpart).                                                                                                                                            |
+| `action_dispatch/` (root)                                                                                    | 7                   | 1 (`index.ts`) + 15 flat root files                | **mixed**              | We have files at the dispatch root that Rails places under `http/` or `middleware/`.                                                                                                                                            |
+| `action_dispatch/http/`                                                                                      | 19                  | 0 (`http/` dir missing)                            | **0%**                 | Equivalents live at our `actiondispatch/` root or `actiondispatch/dispatch/`.                                                                                                                                                   |
+| `action_dispatch/middleware/`                                                                                | 20 (+ `session/` 4) | 7 + `session/` 1                                   | **~30%**               | 15+ middleware files entirely missing.                                                                                                                                                                                          |
+| `action_dispatch/journey/`                                                                                   | 14                  | 0                                                  | **0%**                 | Entire routing engine subtree absent.                                                                                                                                                                                           |
+| `action_dispatch/routing/`                                                                                   | 8                   | 7                                                  | ~85%                   | Mostly there; `endpoint.rb`, `polymorphic_routes.rb`, `redirection.rb`, `routes_proxy.rb` missing.                                                                                                                              |
+| `action_dispatch/testing/`                                                                                   | 10                  | 0                                                  | **0%**                 | All test helpers live in `actioncontroller/test-case.ts` instead.                                                                                                                                                               |
+| `action_dispatch/system_testing/`                                                                            | 5                   | 0                                                  | **0%**                 | Likely intentionally deferred — flag for triage.                                                                                                                                                                                |
+| `action_dispatch/request/`                                                                                   | 2                   | 0 (have `dispatch/request/session.ts`)             | misnested              | We placed `session.ts` under a non-Rails `dispatch/` directory.                                                                                                                                                                 |
+| `action_pack/` (version)                                                                                     | 2                   | 0 (`VERSION` const in `actioncontroller/index.ts`) | n/a                    | Trivial — version constant inlined.                                                                                                                                                                                             |
+| top-level loaders (`abstract_controller.rb`, `action_controller.rb`, `action_dispatch.rb`, `action_pack.rb`) | 4                   | 0 (re-exports via `index.ts` files)                | n/a                    | Rails `lib/<name>.rb` requires; we use `index.ts` barrels per dir.                                                                                                                                                              |
+| **Total Rails .rb under `actionpack/lib/`**                                                                  | **154**             | **84 TS files**                                    | **~55% files present** | ~45% of Rails source files have **no corresponding TS file**.                                                                                                                                                                   |
 
 Source: `find scripts/api-compare/.rails-source/actionpack/lib -name '*.rb'`
 (154 files), `find packages/actionpack/src -name '*.ts' ! -name '*.test.ts'`
@@ -191,10 +192,11 @@ Selected larger files that mash multiple Rails files together:
   across at least `base.rb`, `callbacks.rb`, `error.rb`. → P2 split into
   `abstractcontroller/{base,callbacks,error}.ts`.
 - **`actioncontroller/test-case.ts`**: exports `TestCase`, `TestRequest`,
-  `LiveTestResponse`, `TestSession`. Rails splits into
-  `action_controller/test_case.rb` + `action_dispatch/testing/test_request.rb`
-  - `action_dispatch/testing/test_response.rb`. → P2 split, plus P1
-    for the dispatch-side test request/response.
+  `LiveTestResponse`, `TestSession`. Rails splits this across three files:
+  `action_controller/test_case.rb`,
+  `action_dispatch/testing/test_request.rb`, and
+  `action_dispatch/testing/test_response.rb`. → P2 split, plus P1 for
+  the dispatch-side test request/response.
 - **`actioncontroller/integration-test.ts`**: equivalent to Rails
   `action_dispatch/testing/integration.rb`. → P1 move + rename.
 - **`actioncontroller/template-assertions.ts`**: corresponds to Rails
@@ -283,19 +285,21 @@ the namespace.
   (also rename to plural to match Rails)
 - Delete the empty `actiondispatch/dispatch/` directory.
 
-**PR 2b (~150 LOC)** — move into `middleware/`:
+**PR 2b (~150 LOC)** — move into `actiondispatch/middleware/`:
 
-- `actiondispatch/cookies.ts` → `middleware/cookies.ts`
-- `actiondispatch/flash.ts` → `middleware/flash.ts`
-- `actiondispatch/exception-wrapper.ts` → `middleware/exception-wrapper.ts`
+- `actiondispatch/cookies.ts` → `actiondispatch/middleware/cookies.ts`
+- `actiondispatch/flash.ts` → `actiondispatch/middleware/flash.ts`
+- `actiondispatch/exception-wrapper.ts` →
+  `actiondispatch/middleware/exception-wrapper.ts`
 - `actiondispatch/session/cookie-store.ts` →
-  `middleware/session/cookie-store.ts`
+  `actiondispatch/middleware/session/cookie-store.ts`
 
 **PR 2c (~150 LOC)** — move CSP / permissions-policy / etc:
 
 - `actiondispatch/content-security-policy.ts` →
-  `http/content-security-policy.ts`
-- `actiondispatch/permissions-policy.ts` → `http/permissions-policy.ts`
+  `actiondispatch/http/content-security-policy.ts`
+- `actiondispatch/permissions-policy.ts` →
+  `actiondispatch/http/permissions-policy.ts`
 - `actiondispatch/request-forgery-protection.ts` → confirm Rails
   location (it is split across actioncontroller and not under
   actiondispatch — drop the file if duplicate, else clarify).
@@ -303,7 +307,7 @@ the namespace.
   (Rails puts this in `action_controller/metal/http_authentication.rb`
   only; our actiondispatch copy may be dead).
 - `actiondispatch/dispatch/request/session.ts` →
-  `request/session.ts`
+  `actiondispatch/request/session.ts`
 
 ### Wave 3 — AbstractController split (P2) (2 PRs)
 
@@ -371,8 +375,12 @@ Drives independently of this audit.
 1. **`abstractcontroller/` as a separate top-level directory?** Recommend yes; needs parent sign-off because it affects import paths across the monorepo.
 2. **`journey/` deferral.** Is the routing engine an intentional non-port, or just not done? If non-port, add a "Known divergences" entry. If just not done, add a journey/ wave to this doc.
 3. **`system_testing/` deferral.** Capybara/Selenium dependency — likely won't port. Confirm and add to "Known divergences".
-4. **Subdir name `trailties/` inside `actioncontroller/`.** Rename to `railties/` for api:compare path parity? (The package itself remains `@blazetrails/trailties`.)
-5. **`actiondispatch/http-authentication.ts` and `actiondispatch/request-forgery-protection.ts`.** Both have actioncontroller `metal/` counterparts; verify our actiondispatch copies aren't dead code before Wave 2c.
+4. **`actiondispatch/http-authentication.ts` and `actiondispatch/request-forgery-protection.ts`.** Both have actioncontroller `metal/` counterparts; verify our actiondispatch copies aren't dead code before Wave 2c.
+
+(The `actioncontroller/trailties/` → `railties/` subdir rename is
+prescribed in Wave 5 — Rails source path parity wins over the
+project-wide `trailties` package name, since `api:compare` matches by
+path. Not listed as open.)
 
 ## Out of scope
 
