@@ -2,8 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/cidr_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Cidr } from "../../connection-adapters/postgresql/oid/cidr.js";
-import { IpAddr } from "../../connection-adapters/postgresql/oid/cidr.js";
+import { Cidr, IpAddr } from "../../connection-adapters/postgresql/oid/cidr.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
