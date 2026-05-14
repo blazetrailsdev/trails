@@ -2,13 +2,13 @@
 
 ## Headline
 
-- **3 fetch scripts** today (`fetch-rails.sh`, `fetch-rails-tests.sh`, `fetch-globalid.sh`) totalling **125 LOC**, of which ~50 LOC is near-identical clone/idempotency plumbing.
+- **3 fetch scripts** today (`fetch-rails.sh`, `fetch-rails-tests.sh`, `fetch-globalid.sh`) totalling **~125 LOC** (38 + 70 + 17 by `wc -l`; 128 if you count trailing newlines), of which ~50 LOC is near-identical clone/idempotency plumbing.
 - **4 distinct on-disk source layouts** already present, with no unifying schema:
   - `scripts/api-compare/.rails-source/` — full git clone of `rails/rails` @ `v8.0.2`
   - `scripts/api-compare/.rack-source/` — full git clone of `rack/rack` @ `v3.1.14` (created by `fetch-rails-tests.sh`, not `fetch-rails.sh` — surprising)
   - `scripts/globalid-source/vendor/bundle/ruby/*/gems/globalid-*/` — bundler-vendored gem
   - `scripts/parity/schema/ruby/` — independent `Gemfile` re-pinning `activerecord 8.0.2` (cross-script version drift risk)
-- **3 places hardcode source paths**: `scripts/api-compare/extract-ruby-api.rb:14`, `scripts/test-compare/extract-ruby-tests.rb:18-19`, `scripts/start-worktree.sh:154-155`.
+- **3 places hardcode source paths** (5 lines total): `scripts/api-compare/extract-ruby-api.rb:14`, `scripts/test-compare/extract-ruby-tests.rb:18-19`, `scripts/start-worktree.sh:154-155`. A 4th, separate concern is `scripts/parity/schema/ruby/Gemfile:5` — a version pin, not a path, manually kept in sync with `RAILS_TAG`.
 - **Globalid is fetched but not wired**: `PACKAGES` in `scripts/api-compare/config.ts:7` lists no `globalid`; nothing in `scripts/test-compare/` references it. The fetcher exists in isolation.
 - **Rack is wired into test-compare but bundled inside the rails-tests fetcher** — another precedent for a per-script ad-hoc origin, hidden from the api-compare path.
 
@@ -64,11 +64,11 @@ scripts/start-worktree.sh:155                 link_source "scripts/api-compare/.
 scripts/parity/schema/ruby/Gemfile:5          gem "activerecord", "8.0.2"   # manually kept in sync with RAILS_TAG — drift risk
 ```
 
-The Ruby extractors will need a small env-var or stdin contract to receive resolved paths from a TS caller (the extractors themselves stay in Ruby — they shell out from Node anyway).
+The Ruby extractors will need a small env-var contract to receive resolved paths from their caller. Today they're invoked via `bash scripts/api-compare/run.sh` (which calls `ruby extract-ruby-api.rb`) and `bash scripts/test-compare/run.sh` for the test side; the simplest migration is to have those shell entrypoints `export RAILS_DIR=$(tsx vendor/print-path.ts rails)` (and similar) before invoking ruby, no new Node wrapper needed.
 
 ## 2. Source-list schema design
 
-User chose **`vendor/`** at repo root as the layout, **TypeScript (tsx)** as the fetcher language. Schema lives at `vendor/sources.ts`; resolved sources land under `vendor/<name>/<package>/...`.
+User chose **`vendor/`** at repo root as the layout, **TypeScript (tsx)** as the fetcher language. Schema lives at `vendor/sources.ts`; each entry's vendored root lands at `vendor/<source-name>/` (e.g. `vendor/rails/`, `vendor/rack/`, `vendor/globalid/`), and `libPath` / `testPath` in the schema are relative paths _inside_ that root — for monorepo origins they reach into the gem subdir (e.g. `vendor/rails/actionpack/lib/action_dispatch/`).
 
 ### 2.1 Three shapes considered
 
@@ -166,7 +166,7 @@ export const SOURCES: UpstreamSource[] = [
 - **Vendored sources are gitignored; a lockfile is committed.** `vendor/sources.lock.json` records the resolved git SHA per git origin and the gem-checksum per rubygems origin. The fetcher writes this file after every successful fetch and refuses to fetch when the tag-or-version in `sources.ts` doesn't resolve to the lock SHA (unless `--refresh` is passed). This gives reproducibility without bloating the repo and lets CI verify "we built against what we said we did" even when GitHub re-tags.
 - **`vendor/sources.ts` is the only source of truth for the Rails tag.** `scripts/parity/schema/ruby/Gemfile` is generated at parity-run time from `SOURCES.find(s => s.name === "rails").origin.ref`. Wave 7 implements the generator; until then the comment-pinned version remains.
 - **`--refresh` does a hard reset.** `rm -rf <dest> && fetch`. Users with in-flight edits to a vendored source are expected to copy them out first; the fetcher prints a warning if `<dest>` has uncommitted changes (per `git -C <dest> status --porcelain`).
-- **No compat symlink during wave 2.** Wave 2 moves `scripts/api-compare/.rails-source` → `vendor/rails` via `git mv`, deletes the old fetch script, and updates every hardcoder in the same PR. In-flight agents must re-link on next `start-worktree.sh`. Wave 2 should be merged during a spawn pause.
+- **No compat symlink during wave 2.** Wave 2 relocates `scripts/api-compare/.rails-source` → `vendor/rails` via a filesystem `mv` (the directory is gitignored, so this is not a tracked rename — just an untracked dir move done either by hand on the master worktree or by `fetch.ts --migrate` on first run). The PR updates every path-hardcoder in the same commit and deletes the old fetch script. If the old directory isn't present (fresh checkout, fresh CI runner), `fetch.ts` falls back to a normal clone. In-flight agents must re-link on next `start-worktree.sh`; wave 2 should be merged during a spawn pause.
 
 ## 3. Unified fetcher
 
@@ -183,7 +183,7 @@ Internals:
 
 - `loadSources()` — imports `vendor/sources.ts`, validates with a tiny zod-free runtime check.
 - `gitFetcher({ url, ref, dest })` — `git clone --depth=1 --branch <ref> <url> <dest>` if `<dest>/.git` missing; tags refs as pinned, no `git pull`.
-- `bundlerFetcher({ gem, version, dest })` — writes an ephemeral `Gemfile` in `<dest>`, `bundle config set --local path vendor/bundle`, `bundle install`, then **symlinks** `<dest>/lib` → the deepest `vendor/bundle/ruby/*/gems/<gem>-*/lib` so the on-disk shape matches git origins. (Without this, `libPath: "lib"` lies for rubygems sources.)
+- `bundlerFetcher({ gem, version, dest })` — writes an ephemeral `Gemfile` in `<dest>`, `bundle config set --local path vendor/bundle`, `bundle install`, then **symlinks every declared `libPath`/`testPath`** (`<dest>/lib`, `<dest>/test`, etc.) to the corresponding directory under `vendor/bundle/ruby/*/gems/<gem>-*/` so the on-disk shape matches git origins. Without this the schema's `libPath: "lib"` would lie for rubygems sources, and `testPath: "test"` would resolve to a missing dir.
 - `verifyPackages(source)` — for each declared `package`, asserts `libPath` and (if set) `testPath` exist under the resolved root; counts test files for the human-readable summary.
 
 Normalized layout after fetch:
@@ -326,7 +326,7 @@ If all three caches hit, the `ruby-extract` job becomes a pure download step (~3
 
 - **CI cache invalidation**: cache key must be `hash(vendor/sources.ts)`, not a dir hash — otherwise a pinned-ref bump won't invalidate.
 - **Bundler in CI**: globalid (and any future rubygems-origin source) requires `ruby` + `bundler` on the CI image. `api:compare` and `test:compare` already use Ruby for the extractors, so no new dep — but it does mean a TS-only contributor cannot run `pnpm vendor:fetch` without Ruby installed. Mitigation: `fetch.ts` should print an actionable error ("install ruby + bundler") rather than letting `bundle install` fail.
-- **In-flight worktrees during migration**: per §2.3, wave 2 lands the path move in one PR with no compat symlink. Active agents must be paused at merge time and re-linked on next `start-worktree.sh` run. The master clone is moved with `git mv scripts/api-compare/.rails-source vendor/rails` (and same for rack), avoiding a ~53 MiB re-clone.
+- **In-flight worktrees during migration**: per §2.3, wave 2 lands the path move in one PR with no compat symlink. Active agents must be paused at merge time and re-linked on next `start-worktree.sh` run. The master clone is relocated by a plain filesystem `mv` (the dir is gitignored, so this is _not_ a tracked rename); `fetch.ts` re-clones if the old path is absent. Avoids a ~53 MiB re-clone when the existing dir is present.
 - **Extractor cache gate**: `scripts/api-compare/extract-ruby-api.rb:25-28` caches by comparing `output_path` mtime against `<RAILS_DIR>/.git/HEAD` mtime — not the tag string. After wave 4 moves `RAILS_DIR` to `vendor/rails/`, the gate still works (the path moves but the `.git/HEAD` mtime semantics are identical). The risk to plan for is rubygems-origin sources, which have no `.git/HEAD`: when wave 3 adds bundler origins, the gate needs a fallback signal (e.g., mtime of `vendor/sources.lock.json` for those packages).
 - **Cross-doc coordination**: the parallel `docs/rails-file-structure-mirror-plan.md` (in progress on agent %396) is designing a Ruby-aware mirror tool that **must** consume the same `SOURCES` list. Both plans should converge on `vendor/sources.ts` as the single registry. Action item: cross-link this doc from the mirror plan when it lands.
 - **`parity/schema/ruby/Gemfile` drift**: resolved per §2.3 — wave 7 generates the Gemfile from `SOURCES` at parity-run time.
