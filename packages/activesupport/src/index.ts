@@ -265,6 +265,8 @@ export {
   skipCallback,
   resetCallbacks,
   runCallbacks,
+  getCallbackChains,
+  peekCallbackChain,
   CallbacksMixin,
 } from "./callbacks.js";
 export type {

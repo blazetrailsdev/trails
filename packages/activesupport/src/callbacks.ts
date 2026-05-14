@@ -1061,7 +1061,31 @@ export interface ClassMethods<T extends object = object> {
 
 const CALLBACKS = Symbol("callbacks");
 
-function getCallbackChains(target: object): Map<string, CallbackChain> {
+/**
+ * Read-only lookup of a single CallbackChain for `name`. Walks the prototype
+ * chain of `target` looking for the **first** object that owns a CALLBACKS
+ * map, then returns `map.get(name)` — which may be `undefined` if that map
+ * does not contain `name`. The walk stops at the first own CALLBACKS map; it
+ * does not continue up to find `name` in a higher ancestor. This is
+ * intentional COW semantics: once a class owns its CALLBACKS map (because it
+ * registered at least one callback), all chains it knows about are inside that
+ * map. Does NOT trigger copy-on-write.
+ *
+ * @internal
+ */
+export function peekCallbackChain(target: object, name: string): CallbackChain | undefined {
+  let t: object | null = target;
+  while (t !== null) {
+    if (Object.prototype.hasOwnProperty.call(t, CALLBACKS)) {
+      return (t as Record<symbol, Map<string, CallbackChain>>)[CALLBACKS].get(name);
+    }
+    t = Object.getPrototypeOf(t);
+  }
+  return undefined;
+}
+
+/** @internal */
+export function getCallbackChains(target: object): Map<string, CallbackChain> {
   const t = target as Record<symbol, unknown>;
   if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
     const parent = t[CALLBACKS] as Map<string, CallbackChain> | undefined;
