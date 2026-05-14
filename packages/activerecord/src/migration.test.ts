@@ -1557,11 +1557,26 @@ describe("MigrationTest", () => {
     expect(await im.get("custom_key")).toBe("custom_value");
   });
 
-  it.skip("internal metadata not used when not enabled", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires enable/disable config for internal metadata
+  it("internal metadata not used when not enabled", async () => {
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+
+    const im = new InternalMetadata(adapter, { enabled: false });
+    await im.dropTable();
+
+    expect(im.enabled).toBe(false);
+    expect(await im.tableExists()).toBe(false);
+
+    const proxy: MigrationProxy = {
+      version: "1",
+      name: "TestMigration",
+      migration: () => ({ up: async () => {}, down: async () => {} }),
+    };
+    const migrator = new Migrator(adapter, [proxy], { internalMetadataEnabled: false });
+    await migrator.up();
+
+    expect(await im.get("environment")).toBeNull();
+    expect(await im.tableExists()).toBe(false);
   });
 
   it("inserting a new entry into internal metadata", async () => {
@@ -1583,18 +1598,58 @@ describe("MigrationTest", () => {
     expect(await im.get("foo")).toBe("baz");
   });
 
-  it.skip("internal metadata create table wont be affected by schema cache", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires schema cache implementation
+  it("internal metadata create table wont be affected by schema cache", async () => {
+    // tableExists() queries live (no schema cache), so create_table is always
+    // re-entrant across transactions. Verify that successive createTable() +
+    // write pairs work correctly — the IF NOT EXISTS guard is idempotent.
+    const { adapter } = freshContext();
+    const { InternalMetadata } = await import("./internal-metadata.js");
+    const im = new InternalMetadata(adapter);
+
+    // First transaction: create + write + commit
+    await adapter.beginTransaction();
+    await im.createTable();
+    expect(await im.tableExists()).toBe(true);
+    await im.set("environment", "foo");
+    expect(await im.get("environment")).toBe("foo");
+    await adapter.commit();
+
+    // Second transaction: createTable is idempotent (IF NOT EXISTS), write again
+    await adapter.beginTransaction();
+    await im.createTable();
+    expect(await im.tableExists()).toBe(true);
+    await im.set("environment", "bar");
+    expect(await im.get("environment")).toBe("bar");
+    await adapter.commit();
   });
 
-  it.skip("schema migration create table wont be affected by schema cache", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires schema cache implementation
+  it("schema migration create table wont be affected by schema cache", async () => {
+    // tableExists() queries live (no schema cache), so create_table is always
+    // re-entrant across transactions. Verify that successive createTable() +
+    // createVersion() pairs work correctly — the IF NOT EXISTS guard is idempotent.
+    const { adapter } = freshContext();
+    const sm = new SchemaMigration(adapter);
+
+    // First transaction: create + write + commit
+    await adapter.beginTransaction();
+    await sm.createTable();
+    expect(await sm.tableExists()).toBe(true);
+    await sm.createVersion("foo");
+    await adapter.commit();
+
+    const versionsAfterFirst = await sm.allVersions();
+    expect(versionsAfterFirst).toContain("foo");
+
+    // Second transaction: createTable is idempotent (IF NOT EXISTS), write again
+    await adapter.beginTransaction();
+    await sm.createTable();
+    expect(await sm.tableExists()).toBe(true);
+    await sm.createVersion("bar");
+    await adapter.commit();
+
+    const versionsAfterSecond = await sm.allVersions();
+    expect(versionsAfterSecond).toContain("foo");
+    expect(versionsAfterSecond).toContain("bar");
   });
 
   it("add drop table with prefix and suffix", async () => {

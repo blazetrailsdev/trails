@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { Logger } from "@blazetrails/activesupport";
 import {
   Migrator,
@@ -77,11 +80,32 @@ describe("MigratorTest", () => {
     expect(migrator.migrations).toHaveLength(2);
   });
 
-  it.skip("finds migrations in subdirectories", () => {
-    // BLOCKED: migration — Migrator feature gap
-    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
-    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
-    /* needs filesystem discovery */
+  it("finds migrations in subdirectories", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-migrator-"));
+    try {
+      await mkdir(join(root, "sub"), { recursive: true });
+      await writeFile(join(root, "1_valid_people_have_last_names.ts"), "");
+      await writeFile(join(root, "sub", "2_we_need_reminders.ts"), "");
+      await writeFile(join(root, "sub", "3_innocent_jointable.ts"), "");
+
+      const migrator = new Migrator(adapter, []);
+      const files = migrator.migrationFiles([root]);
+      const parsed = files.map((f) => migrator.parseMigrationFilename(f)).filter(Boolean) as [
+        string,
+        string,
+        string,
+      ][];
+
+      expect(parsed).toHaveLength(3);
+      expect(parsed[0]![0]).toBe("1");
+      expect(parsed[0]![1]).toBe("valid_people_have_last_names");
+      expect(parsed[1]![0]).toBe("2");
+      expect(parsed[1]![1]).toBe("we_need_reminders");
+      expect(parsed[2]![0]).toBe("3");
+      expect(parsed[2]![1]).toBe("innocent_jointable");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("finds migrations from two directories", () => {
@@ -91,18 +115,52 @@ describe("MigratorTest", () => {
     expect(migrator.migrations).toHaveLength(2);
   });
 
-  it.skip("finds migrations in numbered directory", () => {
-    // BLOCKED: migration — Migrator feature gap
-    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
-    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
-    /* needs filesystem discovery */
+  it("finds migrations in numbered directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-migrator-"));
+    const numberedDir = join(root, "10_urban");
+    try {
+      await mkdir(numberedDir, { recursive: true });
+      await writeFile(join(numberedDir, "9_add_expressions.ts"), "");
+
+      const migrator = new Migrator(adapter, []);
+      const files = migrator.migrationFiles([numberedDir]);
+      const parsed = files.map((f) => migrator.parseMigrationFilename(f)).filter(Boolean) as [
+        string,
+        string,
+        string,
+      ][];
+
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0]![0]).toBe("9");
+      expect(parsed[0]![1]).toBe("add_expressions");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
-  it.skip("relative migrations", () => {
-    // BLOCKED: migration — Migrator feature gap
-    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
-    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
-    /* needs filesystem discovery */
+  it("relative migrations", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-migrator-"));
+    const migrationsDir = join(root, "valid");
+    const originalCwd = process.cwd();
+    try {
+      await mkdir(migrationsDir, { recursive: true });
+      await writeFile(join(migrationsDir, "1_valid_people_have_last_names.ts"), "");
+
+      process.chdir(root);
+      const migrator = new Migrator(adapter, []);
+      const files = migrator.migrationFiles(["valid"]);
+      const parsed = files.map((f) => migrator.parseMigrationFilename(f)).filter(Boolean) as [
+        string,
+        string,
+        string,
+      ][];
+
+      const found = parsed.find(([, name]) => name === "valid_people_have_last_names");
+      expect(found).toBeTruthy();
+    } finally {
+      process.chdir(originalCwd);
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("finds pending migrations", async () => {
@@ -156,18 +214,80 @@ describe("MigratorTest", () => {
     expect(status[1]).toEqual({ status: "up", version: "20240101000000", name: "NewMigration" });
   });
 
-  it.skip("migrations status in subdirectories", () => {
-    // BLOCKED: migration — Migrator feature gap
-    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
-    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
-    /* needs filesystem discovery */
+  it("migrations status in subdirectories", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-migrator-"));
+    try {
+      await mkdir(join(root, "sub"), { recursive: true });
+      await writeFile(join(root, "1_valid_people_have_last_names.ts"), "");
+      await writeFile(join(root, "sub", "2_we_need_reminders.ts"), "");
+      await writeFile(join(root, "sub", "3_innocent_jointable.ts"), "");
+
+      const migrator = new Migrator(adapter, []);
+      const files = migrator.migrationFiles([root]);
+      const proxies = files
+        .map((f) => {
+          const parsed = migrator.parseMigrationFilename(f);
+          if (!parsed) return null;
+          const [version, name] = parsed;
+          return makeMigration(version!, name!);
+        })
+        .filter(Boolean) as ReturnType<typeof makeMigration>[];
+
+      const m = new Migrator(adapter, proxies);
+      // Mark version 2 as applied
+      await adapter.executeMutation(
+        `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
+      );
+      await adapter.executeMutation(`INSERT INTO "schema_migrations" ("version") VALUES ('2')`);
+
+      const status = await m.migrationsStatus();
+      expect(status).toHaveLength(3);
+      expect(status[0]).toMatchObject({ status: "down", version: "1" });
+      expect(status[1]).toMatchObject({ status: "up", version: "2" });
+      expect(status[2]).toMatchObject({ status: "down", version: "3" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
-  it.skip("migrations status with schema define in subdirectories", () => {
-    // BLOCKED: migration — Migrator feature gap
-    // ROOT-CAUSE: migration.ts#Migrator lifecycle (runMigrations/rollback/migrate) not fully implemented
-    // SCOPE: ~50 LOC fix in migration.ts; affects ~5 tests in migrator.test.ts
-    /* needs filesystem discovery */
+  it("migrations status with schema define in subdirectories", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-migrator-"));
+    try {
+      await mkdir(join(root, "sub"), { recursive: true });
+      await writeFile(join(root, "1_valid_people_have_last_names.ts"), "");
+      await writeFile(join(root, "sub", "2_we_need_reminders.ts"), "");
+      await writeFile(join(root, "sub", "3_innocent_jointable.ts"), "");
+
+      const migrator = new Migrator(adapter, []);
+      const files = migrator.migrationFiles([root]);
+      const proxies = files
+        .map((f) => {
+          const parsed = migrator.parseMigrationFilename(f);
+          if (!parsed) return null;
+          const [version, name] = parsed;
+          return makeMigration(version!, name!);
+        })
+        .filter(Boolean) as ReturnType<typeof makeMigration>[];
+
+      // Simulate Schema.define(version: 3) by marking all versions up to 3 as applied
+      await adapter.executeMutation(
+        `CREATE TABLE IF NOT EXISTS "schema_migrations" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
+      );
+      for (const p of proxies) {
+        await adapter.executeMutation(
+          `INSERT INTO "schema_migrations" ("version") VALUES ('${p.version}')`,
+        );
+      }
+
+      const m = new Migrator(adapter, proxies);
+      const status = await m.migrationsStatus();
+      expect(status).toHaveLength(3);
+      expect(status[0]).toMatchObject({ status: "up", version: "1" });
+      expect(status[1]).toMatchObject({ status: "up", version: "2" });
+      expect(status[2]).toMatchObject({ status: "up", version: "3" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("migrations status from two directories", async () => {
