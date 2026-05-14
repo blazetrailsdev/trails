@@ -75,6 +75,8 @@ function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: 
         console.log(`[${source.name}] migrating ${legacyRel} → vendor/${source.name}/`);
         mkdirSync(VENDOR_DIR, { recursive: true });
         renameSync(legacyAbs, dest);
+      } else {
+        console.log(`[${source.name}] --migrate: no legacy clone at ${legacyRel}; will clone`);
       }
     }
   }
@@ -110,9 +112,11 @@ function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: 
   const sha = git(["rev-parse", "HEAD"], dest);
 
   if (lockEntry && lockEntry.sha !== sha) {
+    rmSync(dest, { recursive: true, force: true });
     throw new Error(
       `[${source.name}] clone resolved ${sha} but lockfile pins ${lockEntry.sha}. ` +
-        `Upstream may have re-tagged ${source.origin.ref}; investigate before --refresh.`,
+        `Upstream may have re-tagged ${source.origin.ref}; investigate before --refresh. ` +
+        `Partial clone removed.`,
     );
   }
   lock.sources[source.name] = { ref: source.origin.ref, sha };
@@ -127,34 +131,49 @@ function printPaths(filter: string | undefined): void {
   }
 }
 
-function main(argv: string[]): void {
-  let sourceFilter: string | undefined;
-  let refresh = false;
-  let migrate = false;
-  let printPathsArg: { active: boolean; name?: string } = { active: false };
+export interface ParsedArgs {
+  sourceFilter?: string;
+  refresh: boolean;
+  migrate: boolean;
+  printPaths: { active: boolean; name?: string };
+}
 
+export function parseArgs(argv: string[]): ParsedArgs {
+  const out: ParsedArgs = { refresh: false, migrate: false, printPaths: { active: false } };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--source") sourceFilter = argv[++i];
-    else if (a === "--refresh") refresh = true;
-    else if (a === "--migrate") migrate = true;
+    if (a === "--source") out.sourceFilter = argv[++i];
+    else if (a === "--refresh") out.refresh = true;
+    else if (a === "--migrate") out.migrate = true;
     else if (a === "--print-paths") {
-      printPathsArg = { active: true, name: argv[i + 1]?.startsWith("--") ? undefined : argv[++i] };
+      const next = argv[i + 1];
+      out.printPaths = {
+        active: true,
+        name: next && !next.startsWith("--") ? argv[++i] : undefined,
+      };
     } else throw new Error(`unknown flag: ${a}`);
   }
+  return out;
+}
 
-  if (printPathsArg.active) {
-    printPaths(printPathsArg.name);
+function main(argv: string[]): void {
+  const args = parseArgs(argv);
+
+  if (args.printPaths.active) {
+    printPaths(args.printPaths.name);
     return;
   }
 
-  const targets = sourceFilter ? SOURCES.filter((s) => s.name === sourceFilter) : SOURCES;
-  if (sourceFilter && targets.length === 0) {
-    throw new Error(`--source: no entry named "${sourceFilter}" in vendor/sources.ts`);
+  const targets = args.sourceFilter ? SOURCES.filter((s) => s.name === args.sourceFilter) : SOURCES;
+  if (args.sourceFilter && targets.length === 0) {
+    throw new Error(`--source: no entry named "${args.sourceFilter}" in vendor/sources.ts`);
   }
   for (const source of targets) {
-    fetchSource(source, { refresh, migrate });
+    fetchSource(source, { refresh: args.refresh, migrate: args.migrate });
   }
 }
 
-main(process.argv.slice(2));
+// Only run main() when invoked as a script, not when imported by tests.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main(process.argv.slice(2));
+}
