@@ -1063,6 +1063,34 @@ class SchemaAdapter implements DatabaseAdapter {
     return (this.inner as any).lookupCastTypeFromColumn?.(column);
   }
 
+  async currentDatabase(): Promise<string> {
+    const inner = this.inner as { currentDatabase?: () => Promise<string> };
+    if (typeof inner.currentDatabase === "function") return inner.currentDatabase();
+    throw new Error(
+      `${this.inner.adapterName} adapter must implement currentDatabase() to support advisory-locked migrations`,
+    );
+  }
+
+  supportsAdvisoryLocks(): boolean {
+    return (
+      (this.inner as { supportsAdvisoryLocks?: () => boolean }).supportsAdvisoryLocks?.() ?? false
+    );
+  }
+
+  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
+    const inner = this.inner as {
+      getAdvisoryLock?: (id: number | bigint | string) => Promise<boolean>;
+    };
+    return inner.getAdvisoryLock?.(lockId) ?? false;
+  }
+
+  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
+    const inner = this.inner as {
+      releaseAdvisoryLock?: (id: number | bigint | string) => Promise<boolean>;
+    };
+    return inner.releaseAdvisoryLock?.(lockId) ?? false;
+  }
+
   async cleanup(): Promise<void> {
     await dropTrackedTables(this.inner);
   }

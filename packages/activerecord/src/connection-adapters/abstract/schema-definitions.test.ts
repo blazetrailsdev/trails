@@ -86,6 +86,20 @@ describe("ReferenceDefinition helpers", () => {
   });
 });
 
+describe("TableDefinition#toSql blank type guard", () => {
+  it("throws a descriptive error for an empty custom type", () => {
+    const td = new TableDefinition("t", { id: false });
+    td.column("bad", "" as any);
+    expect(() => td.toSql()).toThrow(/Column "bad" has an empty or blank type/);
+  });
+
+  it("throws a descriptive error for a whitespace-only custom type", () => {
+    const td = new TableDefinition("t", { id: false });
+    td.column("bad", "   " as any);
+    expect(() => td.toSql()).toThrow(/Column "bad" has an empty or blank type/);
+  });
+});
+
 describe("TableDefinition#raise_on_duplicate_column", () => {
   it("raises when adding a duplicate non-pk column", () => {
     const td = new TableDefinition("t", { id: false });

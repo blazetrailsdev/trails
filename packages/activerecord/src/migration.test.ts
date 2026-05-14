@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vites
 import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
+import { ConcurrentMigrationError } from "./migration.js";
 import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -19,6 +20,19 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   const adapter = createTestAdapter();
   const ctx = new MigrationContext(adapter);
   return { adapter, ctx };
+}
+
+/** Build a minimal mock adapter that participates in advisory lock negotiation. */
+function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}): DatabaseAdapter {
+  const { acquires = true, releases = true } = opts;
+  return {
+    adapterName: "sqlite" as const,
+    supportsAdvisoryLocks: () => true,
+    getAdvisoryLock: async (_id: number | bigint | string) => acquires,
+    releaseAdvisoryLock: async (_id: number | bigint | string) => releases,
+    currentDatabase: async () => "test_db",
+    isNoDatabaseError: () => false,
+  } as unknown as DatabaseAdapter;
 }
 
 // ==========================================================================
@@ -1691,51 +1705,105 @@ describe("MigrationTest", () => {
     },
   );
 
-  it.skip("migrator generates valid lock id", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
-  });
-
-  it.skipIf(adapterType === "sqlite")("generate migrator advisory lock id", async () => {
-    // Bypass the SchemaAdapter wrapper — generateMigratorAdvisoryLockId needs
-    // currentDatabase(), which lives on the real adapter (pg/mysql), not the wrapper.
+  it.skipIf(adapterType === "sqlite")("migrator generates valid lock id", async () => {
     const testAdapter = createTestAdapter();
     const realAdapter = testAdapter.innerAdapter;
     const migrator = new Migrator(realAdapter, []);
+    const lockId = await migrator.generateMigratorAdvisoryLockId();
+    const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
+    try {
+      expect(acquired).toBe(true);
+    } finally {
+      if (acquired) {
+        const released = await (realAdapter as any).releaseAdvisoryLock(lockId);
+        expect(released).toBe(true);
+      }
+    }
+  });
+
+  it.skipIf(adapterType === "sqlite")("generate migrator advisory lock id", async () => {
+    // SchemaAdapter now forwards currentDatabase() — no need to bypass the wrapper
+    const testAdapter = createTestAdapter();
+    const migrator = new Migrator(testAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     // Must fit in a signed 63-bit integer
     expect(lockId).toBeGreaterThanOrEqual(0n);
     expect(lockId.toString(2).length).toBeLessThanOrEqual(63);
   });
 
-  it.skip("migrator one up with unavailable lock", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it("migrator one up with unavailable lock", async () => {
+    const ran: string[] = [];
+    const proxy: MigrationProxy = {
+      version: "100",
+      name: "Broken",
+      migration: () => ({
+        up: async () => {
+          ran.push("ran");
+        },
+        down: async () => {},
+      }),
+    };
+    const lockAdapter = makeLockAdapter({ acquires: false });
+    const migrator = new Migrator(lockAdapter, [proxy]);
+    await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
+    expect(ran).toEqual([]);
   });
 
-  it.skip("migrator one up with unavailable lock using run", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it("migrator one up with unavailable lock using run", async () => {
+    const ran: string[] = [];
+    const proxy: MigrationProxy = {
+      version: "100",
+      name: "Broken",
+      migration: () => ({
+        up: async () => {
+          ran.push("ran");
+        },
+        down: async () => {},
+      }),
+    };
+    const lockAdapter = makeLockAdapter({ acquires: false });
+    const migrator = new Migrator(lockAdapter, [proxy]);
+    await expect(migrator.run("up", 100)).rejects.toThrow(ConcurrentMigrationError);
+    expect(ran).toEqual([]);
   });
 
-  it.skip("with advisory lock closes connection", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it.skipIf(adapterType !== "postgres")("with advisory lock closes connection", async () => {
+    // PG-specific: mirrors Rails test_with_advisory_lock_closes_connection.
+    // Rails queries pg_stat_activity for lingering lock queries; in JS we check:
+    //   (1) acquire/release are called symmetrically, and
+    //   (2) _advisoryLockClient is null after migration — the pinned pool client
+    //       was actually returned (not just nulled without release).
+    const testAdapter = createTestAdapter();
+    const inner = testAdapter.innerAdapter as any;
+    const getSpy = vi.spyOn(inner, "getAdvisoryLock");
+    const releaseSpy = vi.spyOn(inner, "releaseAdvisoryLock");
+    try {
+      const proxy: MigrationProxy = {
+        version: "200",
+        name: "NoOp",
+        migration: () => ({ up: async () => {}, down: async () => {} }),
+      };
+      const migrator = new Migrator(testAdapter, [proxy]);
+      await migrator.migrate();
+      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
+      // The pinned advisory-lock client must be released back to the pool.
+      // A null _advisoryLockClient after migration means the pool client was
+      // not leaked — the connection was closed as Rails expects.
+      expect(inner._advisoryLockClient).toBeNull();
+      expect(await migrator.getAllVersions()).toContain("200");
+    } finally {
+      getSpy.mockRestore();
+      releaseSpy.mockRestore();
+    }
   });
 
-  it.skip("with advisory lock raises the right error when it fails to release lock", () => {
-    // BLOCKED: migration — migration runner gap in migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-    // Requires migration runner
+  it("with advisory lock raises the right error when it fails to release lock", async () => {
+    const lockAdapter = makeLockAdapter({ acquires: true, releases: false });
+    const migrator = new Migrator(lockAdapter, []);
+    const error = await migrator.withAdvisoryLock(async () => {}).catch((e) => e);
+    expect(error).toBeInstanceOf(ConcurrentMigrationError);
+    expect(error.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
   });
 
   it("out of range text limit should raise", () => {

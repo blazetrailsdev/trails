@@ -995,6 +995,11 @@ export class TableDefinition {
           parts.push(`CHAR(${col.options.limit ?? 1})`);
           break;
         default:
+          if (!col.type || !col.type.trim()) {
+            throw new Error(
+              `Column ${JSON.stringify(col.name)} has an empty or blank type — specify a valid SQL type`,
+            );
+          }
           // Pass arbitrary type strings through verbatim (case matters for PG enums).
           parts.push(col.type);
           break;
