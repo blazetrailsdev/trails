@@ -8,6 +8,7 @@ import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
+import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 
@@ -105,6 +106,7 @@ export default defineConfig(
           "rails-private-jsdoc": railsPrivateJsdoc,
           "no-native-date": noNativeDate,
           "sqlite-driver-await": sqliteDriverAwait,
+          "nie-requires-annotation": nieRequiresAnnotation,
         },
       },
     },
@@ -176,6 +178,17 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-private-jsdoc": "error",
+    },
+  },
+
+  // ── nie-requires-annotation: every `throw new NotImplementedError` must
+  // carry a `// @nie disposition=…` comment. Tracks the elimination
+  // initiative (docs/activerecord-100-clusters.md).
+  {
+    files: ["packages/activerecord/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/nie-requires-annotation": "error",
     },
   },
 

@@ -118,19 +118,23 @@ export function defaultPrimaryKey(): string {
 }
 
 function name(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/schema_definitions.rb
   throw new NotImplementedError("ActiveRecord::ConnectionAdapters#name is not implemented");
 }
 
 function isValidate(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/schema_definitions.rb
   throw new NotImplementedError("ActiveRecord::ConnectionAdapters#validate? is not implemented");
 }
 
 function isExportNameOnSchemaDump(): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/schema_definitions.rb
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters#export_name_on_schema_dump? is not implemented",
   );
 }
 
 function isDefinedFor(toTable?: any, validate?: any, options?: any): never {
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/schema_definitions.rb
   throw new NotImplementedError("ActiveRecord::ConnectionAdapters#defined_for? is not implemented");
 }

@@ -59,6 +59,7 @@ export function connectsTo(
   },
 ): ConnectionPool[] {
   if (!isBaseClass(this) && !this.abstractClass) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb cluster=connection-pool
     throw new NotImplementedError(
       "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
     );
@@ -104,12 +105,14 @@ export function connectedTo<T>(
   fn: () => T,
 ): T {
   if (!isBaseClass(this) && !this.abstractClass) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb cluster=connection-pool
     throw new NotImplementedError(
       "calling `connected_to` is only allowed on ActiveRecord::Base or abstract classes.",
     );
   }
 
   if (!this.connectionClassQ() && !isPrimaryClass.call(this)) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb cluster=connection-pool
     throw new NotImplementedError(
       "calling `connected_to` is only allowed on the abstract class that established the connection.",
     );
@@ -159,10 +162,12 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   }
 
   if (!isBaseClass(this)) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb cluster=connection-pool
     throw new NotImplementedError("connected_to_many can only be called on ActiveRecord::Base.");
   }
 
   if (normalized.some((klass) => isBaseClass(klass))) {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb cluster=connection-pool
     throw new NotImplementedError("connected_to_many cannot include ActiveRecord::Base.");
   }
 
