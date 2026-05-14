@@ -141,23 +141,46 @@ function _nestedRecordsChangedForAutosave(record: any): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Host interface — what `this` must provide for all this-typed functions
+// ---------------------------------------------------------------------------
+
+interface AutosaveAssociationHost {
+  [key: symbol]: unknown;
+  isNewRecord(): boolean;
+  hasChangesToSave?: unknown;
+  changed?: unknown;
+  destroyedByAssociation?: unknown;
+  changedForAutosave(): boolean;
+  isChangedForAutosave(): boolean;
+  isValidatingBelongsToFor(association: unknown): boolean;
+  isAutosavingBelongsToFor(association: unknown): boolean;
+  _alreadyCalled?: Record<string, boolean> | null;
+  _newRecordBeforeSave?: boolean;
+  errors?: {
+    add(attr: string, type: string, opts?: Record<string, unknown>): void;
+    uniqBang?(): void;
+  };
+  constructor: { primaryKey?: string | string[]; name: string };
+}
+
+// ---------------------------------------------------------------------------
 // Module object — included into Base via include(Base, AutosaveAssociation)
 // ---------------------------------------------------------------------------
 
 export const AutosaveAssociation = {
-  markForDestruction(this: any): void {
+  markForDestruction(this: AutosaveAssociationHost): void {
     this[MARKED_FOR_DESTRUCTION] = true;
   },
 
-  markedForDestruction(this: any): boolean {
+  markedForDestruction(this: AutosaveAssociationHost): boolean {
     return !!this[MARKED_FOR_DESTRUCTION];
   },
 
-  setDestroyedByAssociation(this: any, reflection: unknown): void {
+  setDestroyedByAssociation(this: AutosaveAssociationHost, reflection: unknown): void {
     this.destroyedByAssociation = reflection;
   },
 
-  changedForAutosave(this: any): boolean {
+  changedForAutosave(this: AutosaveAssociationHost): boolean {
     return (
       this.isNewRecord() ||
       !!this.hasChangesToSave ||
@@ -167,16 +190,16 @@ export const AutosaveAssociation = {
     );
   },
 
-  isChangedForAutosave(this: any): boolean {
+  isChangedForAutosave(this: AutosaveAssociationHost): boolean {
     return this.changedForAutosave();
   },
 
-  isValidatingBelongsToFor(this: any, association: unknown): boolean {
+  isValidatingBelongsToFor(this: AutosaveAssociationHost, association: unknown): boolean {
     const map = this[VALIDATING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
     return map?.get(_guardKey(association)) ?? false;
   },
 
-  isAutosavingBelongsToFor(this: any, association: unknown): boolean {
+  isAutosavingBelongsToFor(this: AutosaveAssociationHost, association: unknown): boolean {
     const map = this[AUTOSAVING_BELONGS_TO_FOR] as Map<string, boolean> | undefined;
     return map?.get(_guardKey(association)) ?? false;
   },
@@ -645,7 +668,7 @@ function propagateErrors(parent: Base, child: Base, assocName: string): void {
 }
 
 /** @internal */
-function initInternals(this: any): void {
+function initInternals(this: AutosaveAssociationHost): void {
   this._alreadyCalled = null;
 }
 
@@ -664,12 +687,12 @@ export function associatedRecordsToValidateOrSave(
 }
 
 /** @internal */
-export function isNestedRecordsChangedForAutosave(this: any): boolean {
+export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost): boolean {
   return _nestedRecordsChangedForAutosave(this);
 }
 
 /** @internal */
-export function validateHasOneAssociation(this: any, reflection: any): void {
+export function validateHasOneAssociation(this: AutosaveAssociationHost, reflection: any): void {
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
@@ -692,7 +715,7 @@ export function validateHasOneAssociation(this: any, reflection: any): void {
 }
 
 /** @internal */
-export function validateBelongsToAssociation(this: any, reflection: any): void {
+export function validateBelongsToAssociation(this: AutosaveAssociationHost, reflection: any): void {
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
@@ -706,7 +729,10 @@ export function validateBelongsToAssociation(this: any, reflection: any): void {
 }
 
 /** @internal */
-export function validateCollectionAssociation(this: any, reflection: any): void {
+export function validateCollectionAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): void {
   // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
   // Pass the real Association instance so downstream readers can reach
   // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
@@ -748,7 +774,7 @@ export function isAssociationValid(reflection: any, record: any, owner: any): bo
 
 /** @internal */
 export function aroundSaveCollectionAssociation(
-  this: any,
+  this: AutosaveAssociationHost,
   fn: () => void | Promise<any>,
 ): void | Promise<any> {
   const prev = this._newRecordBeforeSave ?? false;
@@ -781,8 +807,11 @@ export function aroundSaveCollectionAssociation(
 }
 
 /** @internal */
-export async function saveCollectionAssociation(this: any, reflection: any): Promise<boolean> {
-  return autosaveHasMany(this, {
+export async function saveCollectionAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<boolean> {
+  return autosaveHasMany(this as unknown as Base, {
     name: reflection.name,
     type: "hasMany",
     options: reflection.options ?? {},
@@ -790,8 +819,11 @@ export async function saveCollectionAssociation(this: any, reflection: any): Pro
 }
 
 /** @internal */
-export async function saveHasOneAssociation(this: any, reflection: any): Promise<boolean> {
-  return autosaveHasOne(this, {
+export async function saveHasOneAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<boolean> {
+  return autosaveHasOne(this as unknown as Base, {
     name: reflection.name,
     type: "hasOne",
     options: reflection.options ?? {},
@@ -836,8 +868,11 @@ export function isInversePolymorphicAssociationChanged(reflection: any, record: 
 }
 
 /** @internal */
-export async function saveBelongsToAssociation(this: any, reflection: any): Promise<boolean> {
-  return _autosaveBelongsTo(this, {
+export async function saveBelongsToAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<boolean> {
+  return _autosaveBelongsTo(this as unknown as Base, {
     name: reflection.name,
     type: "belongsTo",
     options: reflection.options ?? {},
@@ -845,18 +880,21 @@ export async function saveBelongsToAssociation(this: any, reflection: any): Prom
 }
 
 /** @internal */
-export function computePrimaryKey(this: any, reflection: any): string | string[] {
+export function computePrimaryKey(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): string | string[] {
   if (reflection.options?.primaryKey) return reflection.options.primaryKey;
-  const ctor = this?.constructor as any;
-  if (Array.isArray(ctor?.primaryKey)) {
+  const ctor = this.constructor;
+  if (Array.isArray(ctor.primaryKey)) {
     const pk: string[] = ctor.primaryKey;
     return pk.includes("id") ? "id" : pk;
   }
-  return ctor?.primaryKey ?? "id";
+  return ctor.primaryKey ?? "id";
 }
 
 /** @internal */
-export function _ensureNoDuplicateErrors(this: any): void {
+export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
   if (typeof this.errors?.uniqBang === "function") this.errors.uniqBang();
 }
 
