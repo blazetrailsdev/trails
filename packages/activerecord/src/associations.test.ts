@@ -7314,23 +7314,182 @@ describe("PreloaderTest", () => {
       "rails",
     ]);
   });
-  it.skip("preload with instance dependent scope", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs instance-dependent scopes */
+  it("preload with instance dependent scope", async () => {
+    const adapter = freshAdapter();
+    class PIDSAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PIDSPost extends Base {
+      static {
+        this.attribute("pids_author_id", "integer");
+        this.attribute("mention", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PIDSAuthor", PIDSAuthor);
+    registerModel("PIDSPost", PIDSPost);
+    Associations.hasMany.call(PIDSAuthor, "pidsPostsMentioning", {
+      className: "PIDSPost",
+      foreignKey: "pids_author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+    });
+
+    const david = await PIDSAuthor.create({ name: "David" });
+    const david2 = await PIDSAuthor.create({ name: "David" });
+    const bob = await PIDSAuthor.create({ name: "Bob" });
+    const post1 = await PIDSPost.create({ pids_author_id: david.id, mention: "david" });
+    const post2 = await PIDSPost.create({ pids_author_id: david.id, mention: "david" });
+
+    await new Preloader({
+      records: [david, david2, bob],
+      associations: ["pidsPostsMentioning"],
+    }).call();
+
+    const davidPosts = (david as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
+    const david2Posts = (david2 as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
+    const bobPosts = (bob as any)._preloadedAssociations.get("pidsPostsMentioning") as any[];
+
+    expect(davidPosts.map((p: any) => p.id).sort()).toEqual([post1.id, post2.id].sort());
+    expect(david2Posts).toEqual([]);
+    expect(bobPosts).toEqual([]);
   });
-  it.skip("preload with instance dependent through scope", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs instance-dependent scopes */
+  it("preload with instance dependent through scope", async () => {
+    const adapter = freshAdapter();
+    class PWITSAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PWITSPost extends Base {
+      static {
+        this.attribute("pwits_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class PWITSComment extends Base {
+      static {
+        this.attribute("pwits_post_id", "integer");
+        this.attribute("mention", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PWITSAuthor", PWITSAuthor);
+    registerModel("PWITSPost", PWITSPost);
+    registerModel("PWITSComment", PWITSComment);
+    Associations.hasMany.call(PWITSAuthor, "pwitsAuthorPosts", {
+      className: "PWITSPost",
+      foreignKey: "pwits_author_id",
+    });
+    Associations.hasMany.call(PWITSPost, "pwitsPostComments", {
+      className: "PWITSComment",
+      foreignKey: "pwits_post_id",
+    });
+    // Instance-dependent scope on through association: filter comments by mention == owner.name
+    Associations.hasMany.call(PWITSAuthor, "pwitsCommentsMentioning", {
+      className: "PWITSComment",
+      through: "pwitsAuthorPosts",
+      source: "pwitsPostComments",
+      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+    });
+
+    const david = await PWITSAuthor.create({ name: "David" });
+    const david2 = await PWITSAuthor.create({ name: "David" });
+    const bob = await PWITSAuthor.create({ name: "Bob" });
+    const davidPost = await PWITSPost.create({ pwits_author_id: david.id });
+    const comment1 = await PWITSComment.create({ pwits_post_id: davidPost.id, mention: "david" });
+    await PWITSComment.create({ pwits_post_id: davidPost.id, mention: "other" });
+
+    await new Preloader({
+      records: [david, david2, bob],
+      associations: ["pwitsCommentsMentioning"],
+    }).call();
+
+    const davidComments = (david as any)._preloadedAssociations.get(
+      "pwitsCommentsMentioning",
+    ) as any[];
+    const david2Comments = (david2 as any)._preloadedAssociations.get(
+      "pwitsCommentsMentioning",
+    ) as any[];
+    const bobComments = (bob as any)._preloadedAssociations.get("pwitsCommentsMentioning") as any[];
+
+    expect(davidComments.map((c: any) => c.id)).toEqual([comment1.id]);
+    expect(david2Comments).toEqual([]);
+    expect(bobComments).toEqual([]);
   });
-  it.skip("preload with through instance dependent scope", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs instance-dependent scopes */
+  it("preload with through instance dependent scope", async () => {
+    const adapter = freshAdapter();
+    class PWTISSAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PWTISSPost extends Base {
+      static {
+        this.attribute("pwtiss_author_id", "integer");
+        this.attribute("mention", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PWTISSComment extends Base {
+      static {
+        this.attribute("pwtiss_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PWTISSAuthor", PWTISSAuthor);
+    registerModel("PWTISSPost", PWTISSPost);
+    registerModel("PWTISSComment", PWTISSComment);
+    // posts_mentioning_author: instance-dependent — filter posts where mention == owner.name
+    Associations.hasMany.call(PWTISSAuthor, "pwtissPostsMentioning", {
+      className: "PWTISSPost",
+      foreignKey: "pwtiss_author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+    });
+    Associations.hasMany.call(PWTISSPost, "pwtissPostComments", {
+      className: "PWTISSComment",
+      foreignKey: "pwtiss_post_id",
+    });
+    // through the instance-dependent pwtissPostsMentioning
+    Associations.hasMany.call(PWTISSAuthor, "pwtissCommentsOnPostsMentioning", {
+      className: "PWTISSComment",
+      through: "pwtissPostsMentioning",
+      source: "pwtissPostComments",
+    });
+
+    const david = await PWTISSAuthor.create({ name: "David" });
+    const david2 = await PWTISSAuthor.create({ name: "David" });
+    const bob = await PWTISSAuthor.create({ name: "Bob" });
+    const davidPost = await PWTISSPost.create({ pwtiss_author_id: david.id, mention: "david" });
+    const bobPost = await PWTISSPost.create({ pwtiss_author_id: bob.id, mention: "bob" });
+    // Non-mentioning post by david — should NOT be in through since filtered
+    await PWTISSPost.create({ pwtiss_author_id: david.id, mention: "other" });
+    const comment1 = await PWTISSComment.create({ pwtiss_post_id: davidPost.id });
+    const comment2 = await PWTISSComment.create({ pwtiss_post_id: davidPost.id });
+    const comment3 = await PWTISSComment.create({ pwtiss_post_id: bobPost.id });
+
+    await new Preloader({
+      records: [david, david2, bob],
+      associations: ["pwtissCommentsOnPostsMentioning"],
+    }).call();
+
+    const davidComments = (david as any)._preloadedAssociations.get(
+      "pwtissCommentsOnPostsMentioning",
+    ) as any[];
+    const david2Comments = (david2 as any)._preloadedAssociations.get(
+      "pwtissCommentsOnPostsMentioning",
+    ) as any[];
+    const bobComments = (bob as any)._preloadedAssociations.get(
+      "pwtissCommentsOnPostsMentioning",
+    ) as any[];
+
+    expect(davidComments.map((c: any) => c.id).sort()).toEqual([comment1.id, comment2.id].sort());
+    expect(david2Comments).toEqual([]);
+    expect(bobComments.map((c: any) => c.id)).toEqual([comment3.id]);
   });
 
   it("some already loaded associations", async () => {

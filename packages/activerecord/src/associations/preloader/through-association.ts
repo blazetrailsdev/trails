@@ -167,10 +167,14 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
+    // Mirrors: Rails ThroughAssociation#source_preloaders passes reflection_scope
+    // so instance-dependent scopes on the through association are applied to
+    // the source (final target) query.
+    const sourceScope = this._reflectionScope ?? this.scope;
     const preloader = new Preloader({
       records: middleRecords,
       associations: [sourceRefl.name],
-      scope: this.scope,
+      scope: sourceScope,
       associateByDefault: false,
     });
     this._sourcePreloaders = preloader.loaders;

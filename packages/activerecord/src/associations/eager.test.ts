@@ -4152,25 +4152,113 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preloading of instance dependent associations is supported", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading of instance dependent associations is supported", async () => {
+    class PIDASAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PIDASPost extends Base {
+      static {
+        this.attribute("pidas_author_id", "integer");
+        this.attribute("mention", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PIDASAuthor", PIDASAuthor);
+    registerModel("PIDASPost", PIDASPost);
+    Associations.hasMany.call(PIDASAuthor, "pidasPostsWithSignature", {
+      className: "PIDASPost",
+      foreignKey: "pidas_author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ mention: owner.name.toLowerCase() }),
+    });
+    const author1 = await PIDASAuthor.create({ name: "Alice" });
+    await PIDASPost.create({ pidas_author_id: author1.id, mention: "alice" });
+    const authors = await (PIDASAuthor as any).preload("pidasPostsWithSignature").toArray();
+    expect(authors).not.toHaveLength(0);
+    for (const author of authors) {
+      expect((author as any)._preloadedAssociations?.has("pidasPostsWithSignature")).toBe(true);
+    }
   });
-  it.skip("eager loading of instance dependent associations is not supported", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager loading of instance dependent associations is not supported", async () => {
+    class ELIDASAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ELIDASPost extends Base {
+      static {
+        this.attribute("elidas_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ELIDASAuthor", ELIDASAuthor);
+    registerModel("ELIDASPost", ELIDASPost);
+    Associations.hasMany.call(ELIDASAuthor, "elidasPostsWithSignature", {
+      className: "ELIDASPost",
+      foreignKey: "elidas_author_id",
+      scope: (_rel: any, owner: any) => _rel.where({ mention: (owner as any).name }),
+    });
+    await expect(
+      (ELIDASAuthor as any).eagerLoad("elidasPostsWithSignature").toArray(),
+    ).rejects.toThrow("association scope 'elidasPostsWithSignature' is instance dependent");
   });
-  it.skip("preloading of optional instance dependent associations is supported", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading of optional instance dependent associations is supported", async () => {
+    class POIDASAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class POIDASPost extends Base {
+      static {
+        this.attribute("poidas_author_id", "integer");
+        this.attribute("mention", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("POIDASAuthor", POIDASAuthor);
+    registerModel("POIDASPost", POIDASPost);
+    Associations.hasMany.call(POIDASAuthor, "poidasPostsMentioning", {
+      className: "POIDASPost",
+      foreignKey: "poidas_author_id",
+      scope: (_rel: any, owner?: any) =>
+        owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
+    });
+    const author1 = await POIDASAuthor.create({ name: "Bob" });
+    await POIDASPost.create({ poidas_author_id: author1.id, mention: "bob" });
+    const authors = await (POIDASAuthor as any).includes("poidasPostsMentioning").toArray();
+    expect(authors).not.toHaveLength(0);
+    for (const author of authors) {
+      expect((author as any)._preloadedAssociations?.has("poidasPostsMentioning")).toBe(true);
+    }
   });
-  it.skip("eager loading of optional instance dependent associations is not supported", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager loading of optional instance dependent associations is not supported", async () => {
+    class EOIDASAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EOIDASPost extends Base {
+      static {
+        this.attribute("eoidas_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("EOIDASAuthor", EOIDASAuthor);
+    registerModel("EOIDASPost", EOIDASPost);
+    Associations.hasMany.call(EOIDASAuthor, "eoidasPostsMentioning", {
+      className: "EOIDASPost",
+      foreignKey: "eoidas_author_id",
+      scope: (_rel: any, owner?: any) =>
+        owner ? _rel.where({ mention: (owner as any).name }) : _rel,
+    });
+    await expect(
+      (EOIDASAuthor as any).eagerLoad("eoidasPostsMentioning").toArray(),
+    ).rejects.toThrow("association scope 'eoidasPostsMentioning' is instance dependent");
   });
   it("preload with invalid argument", async () => {
     class PiaWidget extends Base {
@@ -4186,14 +4274,11 @@ describe("EagerAssociationTest", () => {
     expect(widgets).toHaveLength(1);
   });
   it.skip("associations with extensions are not instance dependent", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+    // extensions (do...end block) do NOT make a scope instance-dependent;
+    // only a scope lambda with arity>1 does. Deferred to follow-up sweep.
   });
   it.skip("including associations with extensions and an instance dependent scope is supported", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+    // Deferred — same infra as "preloading of instance dependent"; follow-up sweep.
   });
   it("preloading readonly association", async () => {
     class PraAuthor extends Base {

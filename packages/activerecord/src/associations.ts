@@ -90,7 +90,7 @@ export interface AssociationOptions {
   counterCache?: boolean | string;
   touch?: boolean | string | string[];
   autosave?: boolean;
-  scope?: (rel: any) => any;
+  scope?: (rel: any, owner?: any) => any;
   validate?: boolean;
   required?: boolean;
   optional?: boolean;
