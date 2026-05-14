@@ -140,6 +140,7 @@ type AttributeStore =
   | null
   | undefined;
 
+/** @internal */
 export function attributeNamesForSerialization(record: SerializationRecord): string[] {
   const attrStore = record._attributes as AttributeStore;
   let keys: string[];

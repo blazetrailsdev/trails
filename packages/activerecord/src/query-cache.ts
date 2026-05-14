@@ -506,8 +506,17 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     return Result.fromRowHashes(rows);
   }
 
-  async execInsert(sql: string, name?: string | null, binds?: unknown[]): Promise<number> {
-    return this.executeMutation(sql, binds, name ?? undefined);
+  async execInsert(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    pk?: string | null,
+    sequenceName?: string | null,
+    returning?: string[] | null,
+  ): Promise<Result | number> {
+    this._queryCount++;
+    if (this.cache.dirties) this.cache.clear();
+    return this.inner.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 
   async execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number> {
