@@ -1744,7 +1744,7 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(Orphan, "ghosts");
     expect(ref).not.toBeNull();
     // "Ghost" is not registered, so accessing klass should throw
-    expect(() => ref!.klass).toThrow(/Could not find model 'Ghost'/);
+    expect(() => ref!.klass).toThrow(/not found in registry/);
   });
 
   it("reflection klass not found with pointer to non existent class name", () => {
@@ -1757,7 +1757,7 @@ describe("ReflectionTest", () => {
     Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
     const ref = reflectOnAssociation(Orphan2, "items");
     expect(ref).not.toBeNull();
-    expect(() => ref!.klass).toThrow(/Could not find model 'NonExistentModel'/);
+    expect(() => ref!.klass).toThrow(/not found in registry/);
   });
 
   it("reflection klass requires ar subclass", () => {

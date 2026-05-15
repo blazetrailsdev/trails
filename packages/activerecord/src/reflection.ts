@@ -392,7 +392,7 @@ export class MacroReflection extends AbstractReflection {
     const resolved = modelRegistry.get(lookupName);
     if (!resolved) {
       throw new Error(
-        `Could not find model '${lookupName}' in model registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${lookupName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
       );
     }
     return resolved;
@@ -658,7 +658,11 @@ export class AssociationReflection extends MacroReflection {
     } catch (e: unknown) {
       // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
       // Only swallow model-not-found errors from computeClass, re-raise anything else
-      if (e instanceof Error && e.message.startsWith("Could not find model")) {
+      if (
+        e instanceof Error &&
+        e.message.startsWith("Model ") &&
+        e.message.includes("not found in registry")
+      ) {
         reflection = false;
       } else {
         throw e;
@@ -943,7 +947,7 @@ export class AssociationReflection extends MacroReflection {
     const resolved = modelRegistry.get(simpleName);
     if (!resolved) {
       throw new Error(
-        `Could not find model '${simpleName}' in model registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${simpleName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
       );
     }
     if (!(resolved as any)._isActiveRecordBase) {

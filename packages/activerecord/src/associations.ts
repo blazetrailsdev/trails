@@ -188,13 +188,16 @@ export function resolveModel(name: string): typeof Base {
  */
 export function resolveAssocClass(record: Base, assocName: string, className: string): typeof Base {
   const ctor = record.constructor as typeof Base & {
-    _reflectOnAssociation?: (name: string) => { klass?: typeof Base } | null;
+    _reflectOnAssociation?: (
+      name: string,
+    ) => { klass?: typeof Base; isPolymorphic?: () => boolean } | null;
   };
-  try {
-    const richKlass = ctor._reflectOnAssociation?.(assocName)?.klass;
+  const refl = ctor._reflectOnAssociation?.(assocName);
+  // Skip .klass for polymorphic associations — it throws by design.
+  // All other errors (e.g. not-an-AR-subclass) must propagate.
+  if (refl && !refl.isPolymorphic?.()) {
+    const richKlass = refl.klass;
     if (richKlass) return richKlass;
-  } catch {
-    // polymorphic associations throw on .klass — fall through to flat lookup
   }
   return resolveModel(className);
 }
@@ -625,7 +628,7 @@ export async function loadBelongsTo(
       // Resolve target class from instance if available, otherwise from options.
       const targetModel =
         (cached?.constructor as typeof Base | undefined) ??
-        resolveModel(options.className ?? camelize(assocName));
+        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && cached) {
@@ -639,7 +642,7 @@ export async function loadBelongsTo(
     if (options.inverseOf && !options.polymorphic) {
       const targetModel =
         (preloaded?.constructor as typeof Base | undefined) ??
-        resolveModel(options.className ?? camelize(assocName));
+        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && preloaded) {

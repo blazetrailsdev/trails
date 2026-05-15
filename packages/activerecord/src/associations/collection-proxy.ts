@@ -638,7 +638,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildRaw(attrs: Record<string, unknown> = {}): Base {
     const ctor = this._record.constructor as typeof Base;
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
 
     // Polymorphic "as" option
@@ -668,7 +667,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     let targetModel = this.model as typeof Base;
 
     const inheritanceCol = getInheritanceColumn(targetModel);
@@ -1412,7 +1410,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const entries = Object.entries(conditions as Record<string, unknown>);
         return records.some((r) => entries.every(([k, v]) => r.readAttribute(k) === v));
       }
-      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
       const targetModel = this.model as typeof Base;
       const pk = targetModel.primaryKey;
       if (Array.isArray(pk)) {
@@ -1596,7 +1593,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#ids=
    */
   async setIds(ids: (number | string)[]): Promise<void> {
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const targetModel = this.model as typeof Base;
     const cleanIds = ids.filter((id) => id !== null && id !== undefined && id !== "");
     const records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
@@ -1677,7 +1673,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
     if (rel === null) {
-      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
       const targetModel = this.model as typeof Base;
       let emptyRel = (targetModel as any).all();
       if (this._assocDef.options.scope) {
@@ -1724,7 +1719,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
 
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const targetModel = this.model as typeof Base;
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
 
