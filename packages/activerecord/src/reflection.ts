@@ -900,13 +900,13 @@ export class AssociationReflection extends MacroReflection {
 
     if (!isAbsolute) {
       // Namespace-relative walk: mirrors Ruby's compute_type candidate list.
-      // For activeRecord registered as "A::B::C", tries "A::B::Name", "A::Name"
-      // before falling through to top-level "Name".
+      // For activeRecord registered as "A::B::C", tries "A::B::C::Name",
+      // "A::B::Name", "A::Name" before falling through to top-level "Name".
       const registryKeys = (this.activeRecord as any)._registryKeys as string[] | undefined;
       const arName = registryKeys?.[0] ?? this.activeRecord.name;
       if (arName.includes("::")) {
         const segments = arName.split("::");
-        for (let i = segments.length - 1; i > 0; i--) {
+        for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");
           const resolved = modelRegistry.get(candidate);
           if (resolved) return resolved;
@@ -918,6 +918,11 @@ export class AssociationReflection extends MacroReflection {
     if (!resolved) {
       throw new Error(
         `Could not find model '${simpleName}' in model registry (for '${this.name}' on ${this.activeRecord.name})`,
+      );
+    }
+    if (!(resolved as any)._isActiveRecordBase) {
+      throw new ArgumentError(
+        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
       );
     }
     return resolved;

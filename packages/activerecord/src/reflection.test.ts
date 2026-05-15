@@ -20,6 +20,7 @@ import {
   AggregateReflection,
   AssociationReflection,
   registerModel,
+  modelRegistry,
   composedOf,
 } from "./index.js";
 import { Associations } from "./associations.js";
@@ -1778,6 +1779,15 @@ describe("ReflectionTest", () => {
     expect(ref).not.toBeNull();
     // klass should return a class that extends Base
     expect(ref!.klass).toBe(Child);
+
+    // Non-AR subclass registered under a different name raises ArgumentError
+    class NotAModel {}
+    modelRegistry.set("NotAModel", NotAModel as unknown as typeof Base);
+    Associations.hasMany.call(Parent, "notModels", { className: "NotAModel" });
+    const badRef = reflectOnAssociation(Parent, "notModels");
+    expect(() => badRef!.klass).toThrow(ArgumentError);
+    expect(() => badRef!.klass).toThrow(/not an ActiveRecord::Base subclass/);
+    modelRegistry.delete("NotAModel");
   });
 
   it("reflection klass with same demodularized name", () => {
