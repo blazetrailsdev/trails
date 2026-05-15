@@ -102,7 +102,10 @@ import {
   type ReferentialAction,
 } from "./abstract/schema-definitions.js";
 import { joinTableName as deriveJoinTableName } from "../migration/join-table.js";
-import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
+import {
+  SchemaCreation as PgSchemaCreation,
+  _pgGeneratedClause,
+} from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
@@ -3061,7 +3064,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<void> {
     const opts = typeof options === "function" ? {} : options;
     const callback = typeof options === "function" ? options : fn;
-    const table = new SimpleTableBuilder();
+    const table = new SimpleTableBuilder(this);
     if (opts.id !== false) {
       if (typeof opts.id === "string" && opts.id === "uuid") {
         table.column("id", "uuid default gen_random_uuid() primary key");
@@ -3092,15 +3095,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<void> {
     const quotedTable = this.quoteTableName(tableName);
     const quotedCol = this.quoteIdentifier(columnName);
+
+    // Mirrors Rails PG `new_column_definition`: when `type == :virtual`,
+    // resolve the real type from `options[:type]` and pass `as`/`stored`
+    // through to `add_column_options!`. All other options (`null`,
+    // `default`, `comment`) flow through the standard pipeline.
+    let effectiveType = type;
+    let generatedClause = "";
+    if (type === "virtual") {
+      const opts = options as Record<string, unknown>;
+      effectiveType = (opts["type"] as string | undefined) ?? "string";
+      generatedClause = _pgGeneratedClause(
+        columnName,
+        opts["as"] as string | undefined,
+        opts["stored"] as boolean | undefined,
+      );
+    }
+
     const resolvedPrecision =
-      type === "datetime" && options.precision === undefined ? 6 : (options.precision ?? undefined);
-    const pgType = this.typeToSql(type, {
+      effectiveType === "datetime" && options.precision === undefined
+        ? 6
+        : (options.precision ?? undefined);
+    const pgType = this.typeToSql(effectiveType, {
       ...options,
       precision: resolvedPrecision,
       limit: options.limit ?? undefined,
       scale: options.scale ?? undefined,
     });
-    let colSql = `${quotedCol} ${pgType}`;
+    let colSql = `${quotedCol} ${pgType}${generatedClause}`;
     if (options.default !== undefined) {
       const defaultClause = pgQuoteDefaultExpression(
         options.default,
@@ -5150,6 +5172,8 @@ export type IndexDefinition = PgIndexDefinition;
 class SimpleTableBuilder {
   private _columns: { name: string; type: string }[] = [];
 
+  constructor(private _adapter: PostgreSQLAdapter) {}
+
   column(name: string, type: string): void {
     this._columns.push({ name, type });
   }
@@ -5205,6 +5229,15 @@ class SimpleTableBuilder {
     let type = "timestamp without time zone";
     if (options.null === false) type += " NOT NULL";
     this._columns.push({ name, type });
+  }
+
+  virtual(name: string, options: { type?: string; as?: string; stored?: boolean } = {}): void {
+    // Mirrors Rails PG `new_column_definition`: resolve `:virtual` → real type,
+    // append the GENERATED clause via the shared helper. When `as` is absent
+    // the helper returns "" (Rails: a plain column).
+    const pgType = this._adapter.typeToSql(options.type ?? "string", {});
+    const generatedClause = _pgGeneratedClause(name, options.as, options.stored);
+    this._columns.push({ name, type: `${pgType}${generatedClause}` });
   }
 
   getColumns(): { name: string; type: string }[] {

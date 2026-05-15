@@ -386,6 +386,10 @@ export interface ColumnMethods {
   timestamp(name: string, options?: ColumnOptions): unknown;
   binary(name: string, options?: ColumnOptions): unknown;
   json(name: string, options?: ColumnOptions): unknown;
+  virtual(
+    name: string,
+    options?: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
+  ): unknown;
 }
 
 /**
@@ -908,6 +912,13 @@ export class TableDefinition {
     return this.column(name, "json", options);
   }
 
+  virtual(
+    name: string,
+    options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean } = {},
+  ): this {
+    return this.column(name, "virtual" as ColumnType, options);
+  }
+
   jsonb(name: string, options: ColumnOptions = {}): this {
     return this.column(name, "jsonb", options);
   }
@@ -1234,6 +1245,12 @@ export class Table {
   }
   async char(name: string, options: ColumnOptions = {}): Promise<void> {
     await this.column(name, "char", options);
+  }
+  async virtual(
+    name: string,
+    options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean } = {},
+  ): Promise<void> {
+    await this.column(name, "virtual" as ColumnType, options);
   }
   async array(name: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     await this.column(name, type, { ...options, array: true });

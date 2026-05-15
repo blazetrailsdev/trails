@@ -5,18 +5,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 
-const CREATE_TABLE_SQL = `
-  CREATE TABLE virtual_columns (
-    id bigserial PRIMARY KEY,
-    name character varying,
-    upper_name character varying GENERATED ALWAYS AS (UPPER(name)) STORED,
-    name_length integer GENERATED ALWAYS AS (LENGTH(name)) STORED,
-    name_octet_length integer GENERATED ALWAYS AS (OCTET_LENGTH(name)) STORED,
-    column1 integer,
-    column2 integer GENERATED ALWAYS AS (column1 + 1) STORED
-  )
-`;
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let VirtualColumn: any;
@@ -24,7 +12,14 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
-    await adapter.exec(CREATE_TABLE_SQL);
+    await adapter.createTable("virtual_columns", (t) => {
+      t.string("name");
+      t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });
+      t.virtual("name_length", { type: "integer", as: "LENGTH(name)", stored: true });
+      t.virtual("name_octet_length", { type: "integer", as: "OCTET_LENGTH(name)", stored: true });
+      t.integer("column1");
+      t.virtual("column2", { type: "integer", as: "column1 + 1", stored: true });
+    });
     const { Base } = await import("../../index.js");
     class VirtualColumnCls extends Base {
       static tableName = "virtual_columns";
@@ -73,26 +68,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change table", async () => {
-      await adapter.exec(
-        `ALTER TABLE virtual_columns ADD COLUMN lower_name character varying GENERATED ALWAYS AS (LOWER(name)) STORED`,
-      );
+      await adapter.changeTable("virtual_columns", async (t) => {
+        await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
+      });
       adapter.schemaCache?.clear();
+      VirtualColumn.resetColumnInformation();
+      await VirtualColumn.loadSchema();
       const column = await findColumn("lower_name");
       expect(column!.isVirtual()).toBe(true);
-      const rows = await adapter.execute(`SELECT lower_name FROM virtual_columns LIMIT 1`);
-      expect(rows[0].lower_name).toBe("rails");
+      const row = await VirtualColumn.take();
+      expect(row.lower_name).toBe("rails");
     });
 
-    it("non persisted column", () => {
-      // Rails routes change_table → schema-creation → addColumnOptionsBang. Our
-      // adapter's high-level addColumn path doesn't reach addColumnOptionsBang
-      // for generated columns, so we exercise the visitor directly — same fixture
-      // shape that connection-adapters/postgresql/schema-creation.test.ts uses.
-      const sc: any = adapter.schemaCreation;
-      const col = { name: "invalid_definition" };
-      expect(() =>
-        sc.addColumnOptionsBang("n", { as: "LOWER(name)", stored: false, column: col }),
-      ).toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
+    it("non persisted column", async () => {
+      await expect(
+        adapter.changeTable("virtual_columns", async (t) => {
+          await t.virtual("invalid_definition", { type: "string", as: "LOWER(name)" });
+        }),
+      ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
     });
 
     it.skip("schema dumping", () => {

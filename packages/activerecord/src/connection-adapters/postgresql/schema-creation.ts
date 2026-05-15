@@ -21,6 +21,32 @@ import type {
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
 
+/**
+ * Build the `GENERATED ALWAYS AS (...) STORED` suffix for a PostgreSQL
+ * column. Returns `""` when no `as` expression is provided. Throws the
+ * Rails VIRTUAL-unsupported error when `stored` is falsy.
+ *
+ * Mirrors the `as` / `stored` branch of `PostgreSQL::SchemaCreation#add_column_options!`.
+ * Single source of truth shared by the visitor, `PostgreSQLAdapter#addColumn`,
+ * and `SimpleTableBuilder#virtual`.
+ *
+ * @internal
+ */
+export function _pgGeneratedClause(
+  columnName: string,
+  as: string | undefined,
+  stored: boolean | undefined,
+): string {
+  if (!as) return "";
+  if (!stored) {
+    throw new Error(
+      `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
+        `Specify 'stored: true' option for '${columnName}'`,
+    );
+  }
+  return ` GENERATED ALWAYS AS (${as}) STORED`;
+}
+
 export class SchemaCreation extends AbstractSchemaCreation {
   constructor(adapter?: SchemaQuoter) {
     super("postgres", adapter);
@@ -212,18 +238,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (opts["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;
     }
-    if (opts["as"]) {
-      sql += ` GENERATED ALWAYS AS (${opts["as"]})`;
-      if (opts["stored"]) {
-        sql += " STORED";
-      } else {
-        const colName = opts["column"] ? (opts["column"] as any).name : "unknown";
-        throw new Error(
-          `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
-            `Specify 'stored: true' option for '${colName}'`,
-        );
-      }
-    }
+    const colName = opts["column"] ? ((opts["column"] as any).name as string) : "unknown";
+    sql += _pgGeneratedClause(
+      colName,
+      opts["as"] as string | undefined,
+      opts["stored"] as boolean | undefined,
+    );
     return super.addColumnOptionsBang(sql, options);
   }
 

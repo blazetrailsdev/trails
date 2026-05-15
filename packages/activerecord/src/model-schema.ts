@@ -544,6 +544,7 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
+  (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) return;
   for (const [name, def] of Array.from(this._attributeDefinitions)) {
     if ((def.userProvided ?? true) === false || def.source === "schema") {

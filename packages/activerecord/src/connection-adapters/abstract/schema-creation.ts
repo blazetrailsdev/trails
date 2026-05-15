@@ -99,7 +99,7 @@ export class SchemaCreation {
     const sqlType = o.sqlType ?? this.typeToSql(o.type, o.options);
     let sql = `${this.adapter.quoteIdentifier(o.name)} ${sqlType}`;
     if (o.type !== "primary_key") {
-      sql = this.addColumnOptions(sql, o.options);
+      sql = this.addColumnOptionsBang(sql, o.options);
     }
     return sql;
   }
@@ -288,6 +288,13 @@ export class SchemaCreation {
         else if (this.adapterName === "mysql") sql = "BIGINT AUTO_INCREMENT PRIMARY KEY";
         else sql = "INTEGER PRIMARY KEY AUTOINCREMENT";
         break;
+      case "virtual": {
+        // Resolve to the real column type declared via options.type (Rails pattern:
+        // newColumnDefinition maps :virtual → options[:type] before SQL generation).
+        const realType =
+          ((options as Record<string, unknown>)["type"] as ColumnType | undefined) ?? "string";
+        return this.typeToSql(realType, options);
+      }
       default:
         // Pass-through for adapter-specific type strings (e.g.
         // "timestamptz", "inet", "hstore", custom PG enum names).
