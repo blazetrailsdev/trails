@@ -7,7 +7,7 @@
  *
  * Usage with Vitest:
  *
- *   import { IntegrationTest } from "@blazetrails/actionpack/action-controller/integration-test";
+ *   import { IntegrationTest } from "@blazetrails/actionpack/action-dispatch/testing/integration";
  *
  *   describe("Posts API", () => {
  *     const app = new IntegrationTest();
@@ -31,12 +31,12 @@
  *   });
  */
 
-import { Request } from "../action-dispatch/http/request.js";
-import { Response } from "../action-dispatch/http/response.js";
-import { Parameters } from "./metal/strong-parameters.js";
-import { FlashHash } from "../action-dispatch/middleware/flash.js";
-import { RouteSet } from "../action-dispatch/routing/route-set.js";
-import type { Metal } from "./metal.js";
+import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
+import { Parameters } from "../../action-controller/metal/strong-parameters.js";
+import { FlashHash } from "../middleware/flash.js";
+import { RouteSet } from "../routing/route-set.js";
+import type { Metal } from "../../action-controller/metal.js";
 
 type ControllerClass = new () => Metal;
 

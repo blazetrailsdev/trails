@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { IntegrationTest } from "./integration-test.js";
-import { Base } from "./base.js";
+import { IntegrationTest } from "./integration.js";
+import { Base } from "../../action-controller/base.js";
 
 // ==========================================================================
 // Test controllers

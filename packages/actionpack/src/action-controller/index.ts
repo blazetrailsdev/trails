@@ -12,7 +12,10 @@ export { Base, DoubleRenderError, type RenderOptions, type RescueHandler } from 
 export { API } from "./api.js";
 
 export { TestCase, type RequestOptions } from "./test-case.js";
-export { IntegrationTest, type IntegrationRequestOptions } from "./integration-test.js";
+export {
+  IntegrationTest,
+  type IntegrationRequestOptions,
+} from "../action-dispatch/testing/integration.js";
 export {
   wrapParameters,
   applyParamsWrapper,
@@ -60,7 +63,8 @@ export { SSE, ClientDisconnected } from "./metal/live.js";
 export { BasicAuth, TokenAuth, DigestAuth } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator } from "./deprecator.js";
-export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
+export { TestRequest } from "../action-dispatch/testing/test-request.js";
+export { LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export {
   setDefaultFormBuilder,
