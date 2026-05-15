@@ -71,7 +71,7 @@ export {
   getDefaultFormBuilder,
   resolveFormBuilder,
 } from "./form-builder.js";
-export { Railtie } from "./railtie.js";
+export { Railtie } from "./trailtie.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { renderForApi } from "./api/api-rendering.js";

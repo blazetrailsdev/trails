@@ -29,7 +29,12 @@ export function snakeToCamel(name: string): string {
  * have their own `railtie.rb`.
  */
 const FILE_OVERRIDES: Record<string, string> = {
+  // Trails railties are not Rails::Railtie subclasses (different lifecycle,
+  // different surface). The .ts file is named trailtie.ts to signal that.
+  // Same convention is also applied directory-wide for the `railties/`
+  // subdir below (see DIR_PREFIX_OVERRIDES).
   "activerecord:railtie.rb": "trailtie.ts",
+  "actioncontroller:railtie.rb": "trailtie.ts",
 };
 
 /**
