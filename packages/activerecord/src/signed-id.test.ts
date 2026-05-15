@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Base, RecordNotFound } from "./index.js";
+import { Base, RecordNotFound, registerSubclass } from "./index.js";
 import { setSignedIdVerifierSecret, signedIdVerifier } from "./signed-id.js";
 import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
@@ -330,6 +330,114 @@ describe("Base.findGlobalId", () => {
     setApp("MyApp");
     const found = await Base.findGlobalId("gid://MyApp/NoSuchModel/1");
     expect(found).toBeNull();
+  });
+
+  it("resolves an inherited-adapter STI subclass via the descendants fallback", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class Animal extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Dog extends Animal {
+      static {
+        // STI subclass registers with its parent; does NOT set its own adapter.
+        registerSubclass(this);
+      }
+    }
+    const d = await Dog.create({ name: "Rex" });
+    const found = (await Base.findGlobalId(d.toGid())) as Dog;
+    expect(found).toBeInstanceOf(Dog);
+    expect(found.id).toBe(d.id);
+  });
+});
+
+describe("Base.toGlobalId / toGidParam", () => {
+  afterEach(() => _resetApp());
+
+  it("toGlobalId returns a GlobalID instance; toGidParam round-trips through findGlobalId", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Pat" });
+    const gid = u.toGlobalId();
+    expect(gid.uri).toBe(`gid://MyApp/User/${u.id}`);
+    expect(gid.modelName).toBe("User");
+    const found = (await Base.findGlobalId(u.toGidParam())) as User;
+    expect(found.id).toBe(u.id);
+  });
+});
+
+describe("Base.findSignedGlobalId", () => {
+  beforeEach(() => setSignedIdVerifierSecret("blazetrails-test-secret"));
+  afterEach(() => _resetApp());
+
+  it("locates a record by SignedGlobalID token", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Bob" });
+    const sgid = await u.toSgid();
+    const found = (await Base.findSignedGlobalId(sgid.toString())) as User;
+    expect(found).toBeInstanceOf(User);
+    expect(found.id).toBe(u.id);
+  });
+
+  it("findSignedGlobalIdBang throws RecordNotFound for invalid token", async () => {
+    setApp("MyApp");
+    await expect(Base.findSignedGlobalIdBang("invalid-token")).rejects.toThrow(RecordNotFound);
+  });
+
+  it("findSignedGlobalId honors for: purpose scoping", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ id: 3 });
+    const sgid = await u.toSgid({ for: "share" });
+    const token = sgid.toString();
+    // Matching for: locates the record.
+    const found = (await Base.findSignedGlobalId(token, { for: "share" })) as User;
+    expect(found.id).toBe(3);
+    // Mismatching for: returns null (purpose-scoped tokens are the SGID
+    // security boundary).
+    expect(await Base.findSignedGlobalId(token, { for: "other" })).toBeNull();
+  });
+
+  it("toSignedGlobalId is an alias of toSgid (same URI + purpose)", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ id: 7 });
+    const a = await u.toSignedGlobalId({ for: "login" });
+    const b = await u.toSgid({ for: "login" });
+    expect(a.uri).toBe(b.uri);
+    expect(a.purpose).toBe(b.purpose);
+    expect(a.purpose).toBe("login");
   });
 });
 

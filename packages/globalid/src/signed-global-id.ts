@@ -8,15 +8,26 @@ export type { GlobalIDModel };
 
 const DEFAULT_PURPOSE = "default";
 
+/** Option keys that are NOT forwarded as GID URI params. @internal */
+const KNOWN_SGID_KEYS = new Set(["app", "for", "purpose", "expiresIn", "expiresAt", "verifier"]);
+
 export interface SignedGlobalIDOptions {
   app?: string;
+  /** Rails-canonical purpose option. */
+  for?: string;
+  /** Alias of `for` kept for backward compatibility. */
   purpose?: string;
   expiresIn?: number;
   expiresAt?: Temporal.Instant;
   verifier: MessageVerifier;
+  /** Custom GID query params (any extra keys become URI params). */
+  [key: string]: unknown;
 }
 
 export interface ParseOptions {
+  /** Rails-canonical purpose option. */
+  for?: string;
+  /** Alias of `for` kept for backward compatibility. */
   purpose?: string;
   verifier: MessageVerifier;
 }
@@ -62,9 +73,19 @@ export class SignedGlobalID {
       );
     }
     const modelName = model.constructor.name;
-    const uri = buildGid(app, modelName, model.id);
+    // Rails: arbitrary options beyond the known SGID keys become GID URI params.
+    const filteredParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(options)) {
+      if (!KNOWN_SGID_KEYS.has(k) && v != null) filteredParams[k] = String(v);
+    }
+    const uri = buildGid(
+      app,
+      modelName,
+      model.id,
+      Object.keys(filteredParams).length ? filteredParams : null,
+    );
 
-    const purpose = options.purpose ?? DEFAULT_PURPOSE;
+    const purpose = options.for ?? options.purpose ?? DEFAULT_PURPOSE;
     const expiresAt = pickExpiration(options);
 
     return new SignedGlobalID(uri, purpose, expiresAt, options.verifier);
@@ -77,7 +98,7 @@ export class SignedGlobalID {
    * Mirrors: SignedGlobalID.parse (verify_with_verifier_validated_metadata path)
    */
   static parse(sgid: string, options: ParseOptions): SignedGlobalID | null {
-    const purpose = options.purpose ?? DEFAULT_PURPOSE;
+    const purpose = options.for ?? options.purpose ?? DEFAULT_PURPOSE;
     const result = verifyToken(sgid, purpose, options.verifier);
     if (result === null) return null;
     const { uri, expiresAt } = result;
