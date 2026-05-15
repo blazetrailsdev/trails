@@ -2584,6 +2584,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
+    // supportsIndexInclude() reads databaseVersion; ensure it's populated.
+    await this.getDatabaseVersion();
     const { schema, table } = this.parseSchemaQualifiedName(tableName);
 
     let tableCondition: string;
