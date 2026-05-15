@@ -669,6 +669,11 @@ export class CollectionAssociation extends Association {
 
 /** @internal */
 function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
+  // HABTM uses insertAll (no callbacks, no nested tx) so each join insert is
+  // already atomic; wrapping in an extra transaction creates a savepoint whose
+  // name can collide with the TM's own counter on MySQL/MariaDB, causing
+  // "SAVEPOINT active_record_N does not exist" when the TM releases it first.
+  if ((assoc.reflection as any).type === "hasAndBelongsToMany") return block();
   // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
   const klass = (assoc.reflection as any).klass ?? assoc.klass;
   if (klass && typeof (klass as any).transaction === "function") {
