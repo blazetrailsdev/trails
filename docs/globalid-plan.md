@@ -9,14 +9,14 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-6c)
+### Parity scoreboard (after GID-7)
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
 
 | Signal       | Current          | 100% target (pre-skip) | Gap          |
 | ------------ | ---------------- | ---------------------- | ------------ |
-| api:compare  | 19 / 59 (32.2%)  | 59 / 59                | 40 methods   |
+| api:compare  | 39 / 59 (66.1%)  | 59 / 59                | 20 methods   |
 | test:compare | 95 / 158 (60.1%) | 158 / 158              | 63 tests     |
 | files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
 | files (test) | 5 / 8            | 8 / 8                  | 3 test files |
@@ -26,9 +26,9 @@ Per-file api:compare:
 | Ruby file             | Match | Total | %    |
 | --------------------- | ----- | ----- | ---- |
 | `identification.rb`   | 4     | 4     | 100% |
+| `uri/gid.rb`          | 21    | 21    | 100% |
 | `signed_global_id.rb` | 8     | 16    | 50%  |
-| `locator.rb`          | 5     | 16    | 31%  |
-| `uri/gid.rb`          | 2     | 21    | 10%  |
+| `locator.rb`          | 6     | 16    | 38%  |
 | `verifier.rb`         | 0     | 2     | 0%   |
 
 Per-file test:compare:
@@ -91,26 +91,24 @@ tests, **GID-9**); `app locator is case insensitive` / `locator name
 cannot have underscore` (**GID-9**); `ScopedRecordLocatingTest`
 (model.unscoped block helper, **GID-9**).
 
-### GID-7 — `URI::GID` class wrapping (~120 LOC)
+### GID-7 — `URI::GID` class wrapping — **done**
 
-`uri/gid.rb` exposes 21 methods; we expose 2 (`parseGid`, `buildGid`). Wrap
-them into a `URI.GID` class that holds parsed components and exposes the
-Rails surface:
+Added `URI::GID` class to `packages/globalid/src/uri/gid.ts` wrapping the
+existing `parseGid`/`buildGid` standalone functions. Public surface:
+`GID.parse(uri)`, `GID.create(app, model, params)`, `GID.build(args)`,
+`GID.validateApp(app)` plus instance accessors `app` / `modelName` /
+`modelId` / `params` / `toString()` / `deconstructKeys()`. Internal
+URI::Generic subclass hooks (`setPath` / `setQuery` / `setParams` /
+`checkHost` / `checkPath` / `checkScheme` / `setModelComponents` /
+`validateComponent` / `validateModelIdSection` / `validateModelId` /
+`parseQueryParams`) implemented as protected nominal stubs that delegate
+to the existing functional helpers — kept for api:compare matching and
+to preserve the invariants in OO callers.
 
-- Public: `URI.GID.parse(uri)`, `URI.GID.create(app, model, params)`,
-  `URI.GID.build(args)`, instance: `modelName`, `modelId`, `params`,
-  `toString()`, `deconstructKeys()` (TS stub — no Ruby pattern-matching).
-- Protected/private (URI::Generic subclass hooks): `setPath`, `setQuery`,
-  `setParams`, `checkHost`, `checkPath`, `checkScheme`,
-  `setModelComponents`, `validateComponent`, `validateModelIdSection`,
-  `validateModelId`, `parseQueryParams`.
-
-Most private methods are RFC2396 parser hooks Rails inherits from
-`URI::Generic`. We don't subclass URI, so they're nominal-only — implement
-as `@internal` no-op stubs that exercise the same invariants.
-
-Keep `parseGid`/`buildGid` exports as the public functional API (used
-internally + by AR's `toGid`). The class wraps them.
+api:compare `uri/gid.rb`: 10% → **100% (21/21)**. Overall api:compare
+32.2% → **66.1%**. `parseGid` / `buildGid` exports remain the public
+functional API (used by SignedGlobalID and GlobalID internally + by AR's
+`toGid`); the class is the OO veneer on top.
 
 ### GID-8 — `SignedGlobalID` class-level config + verify split (~80 LOC)
 

@@ -177,3 +177,49 @@ describe("URI::GIDParamsTest", () => {
     expect(uri).toBe("gid://bcx/Person/5?hello=world");
   });
 });
+
+describe("URI::GID class wrapper", () => {
+  it("GID.parse exposes app / modelName / modelId / params", async () => {
+    const { GID } = await import("./uri/gid.js");
+    const gid = GID.parse("gid://bcx/Person/5?hello=world");
+    expect(gid.app).toBe("bcx");
+    expect(gid.modelName).toBe("Person");
+    expect(gid.modelId).toBe("5");
+    expect(gid.params).toEqual({ hello: "world" });
+    expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
+  });
+
+  it("GID.create builds from app + model instance", async () => {
+    const { GID } = await import("./uri/gid.js");
+    const gid = GID.create("bcx", { id: 5, constructor: { name: "Person" } });
+    expect(gid.toString()).toBe("gid://bcx/Person/5");
+  });
+
+  it("GID.build accepts a components-hash with composite primary key", async () => {
+    const { GID } = await import("./uri/gid.js");
+    const gid = GID.build({
+      app: "bcx",
+      modelName: "CompositePrimaryKeyModel",
+      modelId: ["tenant", "id"],
+      params: { db: "primary" },
+    });
+    expect(gid.toString()).toBe("gid://bcx/CompositePrimaryKeyModel/tenant/id?db=primary");
+    expect(gid.modelId).toEqual(["tenant", "id"]);
+  });
+
+  it("GID.validateApp rejects invalid app names", async () => {
+    const { GID } = await import("./uri/gid.js");
+    expect(() => GID.validateApp(null)).toThrow();
+    expect(() => GID.validateApp("foo_bar")).toThrow();
+    expect(GID.validateApp("foo-bar")).toBe("foo-bar");
+  });
+
+  it("GID#deconstructKeys returns the component hash", async () => {
+    const { GID } = await import("./uri/gid.js");
+    const gid = GID.parse("gid://bcx/Person/5");
+    const { app, modelName, modelId } = gid.deconstructKeys();
+    expect(app).toBe("bcx");
+    expect(modelName).toBe("Person");
+    expect(modelId).toBe("5");
+  });
+});

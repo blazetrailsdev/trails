@@ -149,3 +149,163 @@ function cgiEscape(s: string): string {
 function cgiUnescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, "%20"));
 }
+
+// ─── URI::GID class wrapper (Rails parity) ─────────────────────────────────
+
+/**
+ * Class form of the GID URI. Wraps {@link parseGid}/{@link buildGid} so the
+ * Rails `URI::GID` method surface (parse / create / build / validate_app on
+ * the class; modelName / modelId / params / toString / deconstructKeys on
+ * the instance) is reachable for api:compare matching and for callers who
+ * prefer an OO shape.
+ *
+ * Mirrors: URI::GID (vendor/globalid/lib/global_id/uri/gid.rb)
+ */
+export class GID {
+  /** The raw GID URI string. */
+  readonly uri: string;
+  private readonly _components: GidComponents;
+
+  /** @internal — callers should use {@link GID.parse} / {@link GID.create} / {@link GID.build}. */
+  constructor(uri: string, components?: GidComponents) {
+    this.uri = uri;
+    this._components = components ?? parseGid(uri);
+  }
+
+  /** Mirrors `alias :app :host`. */
+  get app(): string {
+    return this._components.app;
+  }
+  /** Mirrors `attr_reader :model_name`. */
+  get modelName(): string {
+    return this._components.modelName;
+  }
+  /** Mirrors `attr_reader :model_id`. */
+  get modelId(): string | string[] {
+    return this._components.modelId;
+  }
+  /** Mirrors `attr_reader :params`. */
+  get params(): Record<string, string> {
+    return this._components.params;
+  }
+
+  /** Mirrors: URI::GID#to_s */
+  toString(): string {
+    return this.uri;
+  }
+
+  /**
+   * Mirrors: URI::GID#deconstruct_keys. Ruby uses this for pattern
+   * matching; TS has no equivalent, so we expose the components hash.
+   */
+  deconstructKeys(_keys: readonly string[] | null = null): GidComponents {
+    return this._components;
+  }
+
+  // ─── Static factories ────────────────────────────────────────────────────
+
+  /** Mirrors: URI::GID.parse */
+  static parse(uri: string): GID {
+    return new GID(uri);
+  }
+
+  /** Mirrors: URI::GID.create(app, model, params) */
+  static create(
+    app: string,
+    model: { id: unknown; constructor: { name: string } },
+    params: Record<string, string> | null = null,
+  ): GID {
+    return GID.build({ app, modelName: model.constructor.name, modelId: model.id, params });
+  }
+
+  /** Mirrors: URI::GID.build({app:, model_name:, model_id:, params:}) */
+  static build(args: {
+    app: string;
+    modelName: string;
+    modelId: unknown;
+    params?: Record<string, string> | null;
+  }): GID {
+    const uri = buildGid(args.app, args.modelName, args.modelId, args.params);
+    return new GID(uri, parseGid(uri));
+  }
+
+  /** Mirrors: URI::GID.validate_app */
+  static validateApp(app: string | null | undefined): string {
+    return validateApp(app);
+  }
+
+  // ─── URI::Generic subclass hooks (nominal — kept for api:compare) ────────
+
+  /** @internal Mirrors URI::GID#set_path — re-parses model components from path. */
+  protected setPath(path: string): void {
+    this.setModelComponents(path, true);
+  }
+  /** @internal Mirrors URI::GID#query= — assigns parsed params via a setter. */
+  protected set query(value: string | undefined) {
+    this.setParams(this.parseQueryParams(value));
+  }
+  /** @internal Mirrors URI::GID#set_query (Ruby ≤ 2.1 alias of query=). */
+  protected setQuery(query: string | undefined): void {
+    this.query = query;
+  }
+  /** @internal Mirrors URI::GID#set_params. */
+  protected setParams(params: Record<string, string>): void {
+    (this._components as { params: Record<string, string> }).params = params;
+  }
+  /** @internal Mirrors URI::GID#check_host. */
+  protected checkHost(host: string): true {
+    this.validateComponent(host);
+    return true;
+  }
+  /** @internal Mirrors URI::GID#check_path. */
+  protected checkPath(path: string): true {
+    this.validateComponent(path);
+    this.setModelComponents(path, true);
+    return true;
+  }
+  /** @internal Mirrors URI::GID#check_scheme — only "gid" is valid. */
+  protected checkScheme(scheme: string): true {
+    if (scheme !== "gid") {
+      throw new BadURIError(`Not a gid:// URI scheme: ${scheme}`);
+    }
+    return true;
+  }
+  /** @internal Mirrors URI::GID#set_model_components — parses path → model_name + model_id. */
+  protected setModelComponents(path: string, validate = false): void {
+    const parts = path.split("/");
+    const modelName = parts[1];
+    const rawModelId = parts.slice(2).join("/");
+    if (validate) {
+      this.validateComponent(modelName);
+      this.validateModelIdSection(rawModelId, modelName);
+    }
+  }
+  /** @internal Mirrors URI::GID#validate_component — must be non-blank. */
+  protected validateComponent(component: string | null | undefined): string {
+    if (!component) {
+      throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234`);
+    }
+    return component;
+  }
+  /** @internal Mirrors URI::GID#validate_model_id_section. */
+  protected validateModelIdSection(modelId: string, modelName: string): string {
+    if (!modelId) {
+      throw new MissingModelIdError(
+        `Unable to create a Global ID for ${modelName} without a model id.`,
+      );
+    }
+    return modelId;
+  }
+  /** @internal Mirrors URI::GID#validate_model_id — composite parts cannot contain '/'. */
+  protected validateModelId(modelIdPart: string): void {
+    if (modelIdPart.includes("/")) {
+      throw new InvalidModelIdError(
+        `Unable to create a Global ID for ${this.modelName} with a malformed model id.`,
+      );
+    }
+  }
+  /** @internal Mirrors URI::GID#parse_query_params. */
+  protected parseQueryParams(query: string | undefined): Record<string, string> {
+    return parseQueryParams(query);
+  }
+}
