@@ -9,6 +9,11 @@ import { ToSql } from "./to-sql.js";
  * Mirrors: Arel::Visitors::SQLite
  */
 export class SQLite extends ToSql {
+  protected override visitArelNodesLock(_node: Nodes.Lock): SQLString {
+    // SQLite does not support locking — silently ignore.
+    return this.collector;
+  }
+
   protected override visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
     if (node.with) {
       this.visit(node.with);
@@ -43,11 +48,6 @@ export class SQLite extends ToSql {
     return this.collector;
   }
 
-  protected override visitArelNodesLock(_node: Nodes.Lock): SQLString {
-    // SQLite does not support locking — silently ignore.
-    return this.collector;
-  }
-
   protected override visitArelNodesTrue(_node: Nodes.True): SQLString {
     this.collector.append("1");
     return this.collector;
@@ -58,9 +58,8 @@ export class SQLite extends ToSql {
     return this.collector;
   }
 
-  protected override quote(value: unknown): string {
-    if (typeof value === "boolean") return value ? "1" : "0";
-    return super.quote(value);
+  protected override visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS");
   }
 
   /**
@@ -71,10 +70,6 @@ export class SQLite extends ToSql {
    */
   protected override visitArelNodesIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
     return this.visitBinaryOp(node, "IS NOT");
-  }
-
-  protected override visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
-    return this.visitBinaryOp(node, "IS");
   }
 
   /**
@@ -106,6 +101,11 @@ export class SQLite extends ToSql {
     }
     if (!suppressParens) this.collector.append(" )");
     return this.collector;
+  }
+
+  protected override quote(value: unknown): string {
+    if (typeof value === "boolean") return value ? "1" : "0";
+    return super.quote(value);
   }
 
   private unwrapGrouping(node: Node): Node {

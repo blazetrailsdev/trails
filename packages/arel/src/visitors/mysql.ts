@@ -11,8 +11,33 @@ import { mysqlDefaultQuoter } from "./default-quoter.js";
  * Mirrors: Arel::Visitors::MySQL
  */
 export class MySQL extends ToSql {
-  constructor(connection: ArelConnection = mysqlDefaultQuoter) {
-    super(connection);
+  // Mirrors Rails' MySQL visitor: `CAST(expr AS BINARY)` (the explicit
+  // cast form) rather than the prefix-`BINARY ` operator the previous
+  // Trails impl used. Both force binary comparison; this matches Rails'
+  // emitted SQL.
+  protected override visitArelNodesBin(node: Nodes.Bin): SQLString {
+    this.collector.append("CAST(");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
+    }
+    this.collector.append(" AS BINARY)");
+    return this.collector;
+  }
+
+  // MySQL renders an UnqualifiedColumn by visiting its inner expression
+  // (typically an Attribute). Rails delegates with `visit o.expr` —
+  // unlike the base ToSql which special-cases the bare name. The
+  // relation prefix this leaves on for an Attribute is fine: MySQL's
+  // `UPDATE t SET x = t.x + 1` is valid.
+  protected override visitArelNodesUnqualifiedColumn(node: Nodes.UnqualifiedColumn): SQLString {
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
+    }
+    return this.collector;
   }
 
   protected override visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
@@ -115,35 +140,6 @@ export class MySQL extends ToSql {
     return this.collector;
   }
 
-  // Mirrors Rails' MySQL visitor: `CAST(expr AS BINARY)` (the explicit
-  // cast form) rather than the prefix-`BINARY ` operator the previous
-  // Trails impl used. Both force binary comparison; this matches Rails'
-  // emitted SQL.
-  protected override visitArelNodesBin(node: Nodes.Bin): SQLString {
-    this.collector.append("CAST(");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null) {
-      this.collector.append(String(node.expr));
-    }
-    this.collector.append(" AS BINARY)");
-    return this.collector;
-  }
-
-  // MySQL renders an UnqualifiedColumn by visiting its inner expression
-  // (typically an Attribute). Rails delegates with `visit o.expr` —
-  // unlike the base ToSql which special-cases the bare name. The
-  // relation prefix this leaves on for an Attribute is fine: MySQL's
-  // `UPDATE t SET x = t.x + 1` is valid.
-  protected override visitArelNodesUnqualifiedColumn(node: Nodes.UnqualifiedColumn): SQLString {
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null) {
-      this.collector.append(String(node.expr));
-    }
-    return this.collector;
-  }
-
   // MySQL's null-safe equality is `<=>`. The standard `IS [NOT] DISTINCT
   // FROM` is supported only on MySQL 8.0.14+; the operator form works
   // on every MySQL version.
@@ -197,6 +193,26 @@ export class MySQL extends ToSql {
     return this.collector;
   }
 
+  protected override visitArelNodesCte(node: Nodes.Cte): SQLString {
+    // MySQL identifiers are backtick-quoted, not double-quoted, and the
+    // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
+    // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
+    // `quote_table_name` (which emits backticks on the MySQL adapter).
+    // Parens: Trails stores a SelectStatement in Cte.relation (not a
+    // SelectManager as Rails does), so we add them explicitly. But
+    // buildWithExpressionFromValue wraps SqlLiteral relations in a Grouping,
+    // which visits with its own parens — skip the explicit wrap in that case.
+    this.collector.append(`${this.connection.quoteTableName(node.name)} AS `);
+    if (node.relation instanceof Nodes.Grouping) {
+      this.visit(node.relation);
+    } else {
+      this.collector.append("(");
+      this.visit(node.relation);
+      this.collector.append(")");
+    }
+    return this.collector;
+  }
+
   // In the simple case, MySQL allows JOINs directly in UPDATE/DELETE
   // queries. LIMIT/OFFSET/ORDER need a subquery. Mirrors Rails MySQL's
   // `prepare_update_statement` / `prepare_delete_statement` (aliased).
@@ -207,17 +223,6 @@ export class MySQL extends ToSql {
       (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
     ) {
       return super.prepareUpdateStatement(o);
-    }
-    return o;
-  }
-
-  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (
-      o.offset ||
-      this.hasGroupByAndHaving(o) ||
-      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
-    ) {
-      return super.prepareDeleteStatement(o);
     }
     return o;
   }
@@ -253,23 +258,18 @@ export class MySQL extends ToSql {
     return stmt;
   }
 
-  protected override visitArelNodesCte(node: Nodes.Cte): SQLString {
-    // MySQL identifiers are backtick-quoted, not double-quoted, and the
-    // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
-    // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
-    // `quote_table_name` (which emits backticks on the MySQL adapter).
-    // Parens: Trails stores a SelectStatement in Cte.relation (not a
-    // SelectManager as Rails does), so we add them explicitly. But
-    // buildWithExpressionFromValue wraps SqlLiteral relations in a Grouping,
-    // which visits with its own parens — skip the explicit wrap in that case.
-    this.collector.append(`${this.connection.quoteTableName(node.name)} AS `);
-    if (node.relation instanceof Nodes.Grouping) {
-      this.visit(node.relation);
-    } else {
-      this.collector.append("(");
-      this.visit(node.relation);
-      this.collector.append(")");
+  constructor(connection: ArelConnection = mysqlDefaultQuoter) {
+    super(connection);
+  }
+
+  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (
+      o.offset ||
+      this.hasGroupByAndHaving(o) ||
+      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
+    ) {
+      return super.prepareDeleteStatement(o);
     }
-    return this.collector;
+    return o;
   }
 }

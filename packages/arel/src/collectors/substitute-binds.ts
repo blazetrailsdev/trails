@@ -24,11 +24,6 @@ export class SubstituteBinds {
     this.delegate = delegateCollector;
   }
 
-  append(str: string): this {
-    this.delegate.append(str);
-    return this;
-  }
-
   addBind(bind: unknown): this {
     return this.append(this.quoter.quote(extractValue(bind)));
   }
@@ -44,5 +39,10 @@ export class SubstituteBinds {
 
   get value(): string {
     return this.delegate.value;
+  }
+
+  append(str: string): this {
+    this.delegate.append(str);
+    return this;
   }
 }

@@ -68,93 +68,232 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector.value;
   }
 
-  compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
-    if (externalCollector) {
-      this.collector = externalCollector as SQLString;
-      this._extractBinds = true;
-      try {
-        this.visit(node);
-      } finally {
-        this._extractBinds = false;
-      }
-      return this.collector;
+  protected visitArelNodesDeleteStatement(o: Nodes.DeleteStatement): SQLString {
+    const node = this.prepareDeleteStatement(o);
+    this.collector.retryable = false;
+    const joinSourceLeft = this.hasJoinSources(node)
+      ? (node.relation as Nodes.JoinSource).left
+      : null;
+    if (joinSourceLeft) {
+      this.collector.append("DELETE ");
+      this.visit(joinSourceLeft);
+      this.collector.append(" FROM ");
+    } else {
+      this.collector.append("DELETE FROM ");
     }
-    this.collector = new SQLString();
-    this.visit(node);
+    if (node.relation) this.visit(node.relation);
+
+    if (node.wheres.length > 0) {
+      this.collector.append(" WHERE ");
+      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
+      this.visit(conditions);
+    }
+
+    if (node.orders.length > 0) {
+      this.collector.append(" ORDER BY ");
+      this.injectJoin(node.orders, ", ");
+    }
+
+    if (node.limit) {
+      this.collector.append(" ");
+      this.visit(node.limit);
+    }
+
     return this.collector;
   }
 
-  /**
-   * Compile an AST node and extract bind values separately.
-   * Returns [sql_with_placeholders, bind_values].
-   *
-   * Mirrors: Rails' compilation with Arel::Collectors::Composite
-   */
-  compileWithBinds(node: Node): [string, unknown[]] {
-    const sqlCollector = new SQLString();
-    const bindCollector = new Bind();
-    this.collector = new Composite(sqlCollector, bindCollector) as unknown as SQLString;
-    this._extractBinds = true;
-    try {
-      this.visit(node);
-    } finally {
-      this._extractBinds = false;
+  protected visitArelNodesUpdateStatement(o: Nodes.UpdateStatement): SQLString {
+    const node = this.prepareUpdateStatement(o);
+    this.collector.retryable = false;
+    this.collector.append("UPDATE ");
+    if (node.relation) this.visit(node.relation);
+
+    if (node.values.length > 0) {
+      this.collector.append(" SET ");
+      this.injectJoin(node.values, ", ");
     }
-    const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
-    return [sqlCollector.value, binds];
+
+    if (node.wheres.length > 0) {
+      this.collector.append(" WHERE ");
+      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
+      this.visit(conditions);
+    }
+
+    if (node.orders.length > 0) {
+      this.collector.append(" ORDER BY ");
+      this.injectJoin(node.orders, ", ");
+    }
+
+    if (node.limit) {
+      this.collector.append(" ");
+      this.visit(node.limit);
+    }
+
+    return this.collector;
   }
 
+  protected visitArelNodesInsertStatement(node: Nodes.InsertStatement): SQLString {
+    this.collector.retryable = false;
+    this.collector.append("INSERT INTO ");
+    if (node.relation) this.visit(node.relation);
+
+    if (node.columns.length > 0) {
+      this.collector.append(" (");
+      const colNames = node.columns.map((c) => {
+        if (c instanceof Nodes.SqlLiteral) return c.value;
+        const name =
+          c instanceof Nodes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
+        return this.quoteColumnName(name);
+      });
+      this.collector.append(colNames.join(", "));
+      this.collector.append(")");
+    }
+
+    // Mirrors Rails: prefer `node.values` when both are present
+    // (insert_statement.rb / to_sql.rb pattern). Routes through
+    // `visitNodeOrValue` so a SelectManager-shaped duck-type (the form
+    // `InsertManager#select` stores) lands in `visitArelSelectManager`.
+    if (node.values) {
+      this.collector.append(" ");
+      this.visit(node.values);
+    } else if (node.select) {
+      this.collector.append(" ");
+      this.visitNodeOrValue(node.select as Nodes.NodeOrValue);
+    }
+
+    return this.collector;
+  }
+
+  protected visitArelNodesExists(node: Nodes.Exists): SQLString {
+    this.collector.append("EXISTS (");
+    this.visit(node.expressions[0]);
+    this.collector.append(")");
+    if (node.alias) {
+      this.collector.append(" AS ");
+      this.visit(node.alias);
+    }
+    return this.collector;
+  }
+  protected visitArelNodesCasted(node: Nodes.Casted | Nodes.Quoted): SQLString {
+    // Mirrors AbstractAdapter#quote: resolve valueForDatabase on the wrapped
+    // value before quoting, so types that carry a valueForDatabase getter
+    // (e.g. encrypted AdditionalValue) surface the serialized form.
+    const value = resolveValueForDatabase(node.valueForDatabase());
+    if (this._extractBinds) {
+      this.collector.addBind(value, this.bindBlock());
+    } else {
+      this.collector.append(this.quote(value));
+    }
+    return this.collector;
+  }
+  protected visitArelNodesTrue(_node: Nodes.True): SQLString {
+    this.collector.append("TRUE");
+    return this.collector;
+  }
+  protected visitArelNodesFalse(_node: Nodes.False): SQLString {
+    this.collector.append("FALSE");
+    return this.collector;
+  }
+  private visitArelNodesValuesList(node: Nodes.ValuesList): SQLString {
+    this.collector.append("VALUES ");
+    for (let i = 0; i < node.rows.length; i++) {
+      if (i > 0) this.collector.append(", ");
+      this.collector.append("(");
+      for (let j = 0; j < node.rows[i].length; j++) {
+        if (j > 0) this.collector.append(", ");
+        this.visitNodeOrValue(node.rows[i][j] as Nodes.NodeOrValue);
+      }
+      this.collector.append(")");
+    }
+    return this.collector;
+  }
+  protected visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
+    if (node.with) {
+      this.visit(node.with);
+      this.collector.append(" ");
+    }
+
+    for (let i = 0; i < node.cores.length; i++) {
+      if (i > 0) this.collector.append(" ");
+      this.visit(node.cores[i]);
+    }
+
+    if (node.orders.length > 0) {
+      this.collector.append(" ORDER BY ");
+      this.injectJoin(node.orders, ", ");
+    }
+
+    if (node.limit) {
+      this.collector.append(" ");
+      this.visit(node.limit);
+    }
+
+    if (node.offset) {
+      this.collector.append(" ");
+      this.visit(node.offset);
+    }
+
+    if (node.lock) {
+      this.collector.append(" ");
+      this.visit(node.lock);
+    }
+
+    return this.collector;
+  }
   /**
-   * Rails passes the collector as a second arg through the visit chain;
-   * we route SQL through `this.collector` instance state instead, so the
-   * base's collector argument is unused here by design.
-   *
-   * @internal
+   * Mirrors Rails: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). Emits
+   * limit/offset/lock via `maybeVisit`. Trails' SelectStatement carries
+   * those fields directly, so this fires only when a caller constructs a
+   * `Nodes.SelectOptions` explicitly. Reachable through the dispatch table.
    */
-  visit(node: Node): SQLString {
-    return super.visit(node) as SQLString;
+  protected visitArelNodesSelectOptions(o: Nodes.SelectOptions): SQLString {
+    this.maybeVisit(o.limit);
+    this.maybeVisit(o.offset);
+    this.maybeVisit(o.lock);
+    return this.collector;
   }
+  // Mirrors Rails: visit_Arel_Nodes_SelectCore (to_sql.rb:149). Where Rails
+  // uses collect_nodes_for to emit `spacer` + injectJoin in one call, we do
+  // the same; wheres/havings collapse multiple predicates with " AND " via
+  // collect_nodes_for's connector arg.
+  protected visitArelNodesSelectCore(node: Nodes.SelectCore): SQLString {
+    this.collector.append("SELECT");
 
-  // Per-class dispatch wrappers for shared helpers — mirrors Rails' per-method
-  // form (each operator/aggregate has its own visit method).
-  protected visitArelNodesGreaterThan(node: Nodes.GreaterThan): SQLString {
-    const sign = this.unboundableSign(node.right);
-    if (sign === 1) return this.collector.append("1=0");
-    if (sign === -1) return this.collector.append("1=1");
-    return this.visitBinaryOp(node, ">");
+    this.collectOptimizerHints(node);
+    this.maybeVisit(node.setQuantifier ?? null);
+
+    this.collectNodesFor(node.projections, " ");
+
+    if (node.source.left) {
+      this.collector.append(" FROM ");
+      this.visit(node.source);
+    }
+
+    this.collectNodesFor(node.wheres, " WHERE ", " AND ");
+    this.collectNodesFor(node.groups, " GROUP BY ");
+    this.collectNodesFor(node.havings, " HAVING ", " AND ");
+    this.collectNodesFor(node.windows, " WINDOW ");
+
+    this.maybeVisit(node.comment ?? null);
+
+    return this.collector;
   }
-  protected visitArelNodesGreaterThanOrEqual(node: Nodes.GreaterThanOrEqual): SQLString {
-    const sign = this.unboundableSign(node.right);
-    if (sign === 1) return this.collector.append("1=0");
-    if (sign === -1) return this.collector.append("1=1");
-    return this.visitBinaryOp(node, ">=");
-  }
-  protected visitArelNodesLessThan(node: Nodes.LessThan): SQLString {
-    const sign = this.unboundableSign(node.right);
-    if (sign === 1) return this.collector.append("1=1");
-    if (sign === -1) return this.collector.append("1=0");
-    return this.visitBinaryOp(node, "<");
-  }
-  protected visitArelNodesLessThanOrEqual(node: Nodes.LessThanOrEqual): SQLString {
-    const sign = this.unboundableSign(node.right);
-    if (sign === 1) return this.collector.append("1=1");
-    if (sign === -1) return this.collector.append("1=0");
-    return this.visitBinaryOp(node, "<=");
-  }
-  protected visitArelNodesCount(node: Nodes.Count): SQLString {
-    return this.aggregate("COUNT", node);
-  }
-  protected visitArelNodesSum(node: Nodes.Sum): SQLString {
-    return this.aggregate("SUM", node);
-  }
-  protected visitArelNodesMax(node: Nodes.Max): SQLString {
-    return this.aggregate("MAX", node);
-  }
-  protected visitArelNodesMin(node: Nodes.Min): SQLString {
-    return this.aggregate("MIN", node);
-  }
-  protected visitArelNodesAvg(node: Nodes.Avg): SQLString {
-    return this.aggregate("AVG", node);
+  // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
+  // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
+  // an array); each hint is sanitized and the joined result wrapped in
+  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
+  // node and `emitOptimizerHints` delegates here.
+  protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
+    // Mirrors Rails: plain string hints are sanitized (newlines, comment
+    // delimiters, `--` line comments stripped) and empty results dropped.
+    // SqlLiteral hints are the explicit escape hatch and pass through
+    // unchanged — same contract as `sanitizeAsSqlComment`.
+    const sanitized = node.hints
+      .map((h) => (h instanceof Nodes.SqlLiteral ? h.value : this.sanitizeHint(h)))
+      .filter((h) => h.length > 0);
+    if (sanitized.length === 0) return this.collector;
+    this.collector.append(` /*+ ${sanitized.join(" ")} */`);
+    return this.collector;
   }
 
   static {
@@ -284,251 +423,402 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   // -- Statements --
 
-  protected visitArelNodesSelectStatement(node: Nodes.SelectStatement): SQLString {
-    if (node.with) {
-      this.visit(node.with);
-      this.collector.append(" ");
-    }
-
-    for (let i = 0; i < node.cores.length; i++) {
-      if (i > 0) this.collector.append(" ");
-      this.visit(node.cores[i]);
-    }
-
-    if (node.orders.length > 0) {
-      this.collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ");
-    }
-
-    if (node.limit) {
-      this.collector.append(" ");
-      this.visit(node.limit);
-    }
-
-    if (node.offset) {
-      this.collector.append(" ");
-      this.visit(node.offset);
-    }
-
-    if (node.lock) {
-      this.collector.append(" ");
-      this.visit(node.lock);
-    }
-
+  // Mirrors Rails: visit_Arel_Nodes_Comment (to_sql.rb:175) — emits the
+  // joined `/* ... */` blocks without a leading space. Callers add the
+  // leading separator (typically via `maybeVisit`).
+  protected visitArelNodesComment(node: Nodes.Comment): SQLString {
+    const blocks = node.values.map((v) => `/* ${this.sanitizeAsSqlComment(v)} */`);
+    this.collector.append(blocks.join(" "));
     return this.collector;
   }
 
-  protected emitOptimizerHints(node: Nodes.SelectCore): void {
-    // Mirrors Rails: `@ctx.optimizer_hints` is now an `OptimizerHints`
-    // node (or null); the visitor delegates to the dedicated visitor
-    // which sanitizes + wraps in `/*+ ... */`.
-    if (node.optimizerHints === null) return;
-    this.visit(node.optimizerHints);
-  }
-
-  // Mirrors Rails: visit_Arel_Nodes_SelectCore (to_sql.rb:149). Where Rails
-  // uses collect_nodes_for to emit `spacer` + injectJoin in one call, we do
-  // the same; wheres/havings collapse multiple predicates with " AND " via
-  // collect_nodes_for's connector arg.
-  protected visitArelNodesSelectCore(node: Nodes.SelectCore): SQLString {
-    this.collector.append("SELECT");
-
-    this.collectOptimizerHints(node);
-    this.maybeVisit(node.setQuantifier ?? null);
-
-    this.collectNodesFor(node.projections, " ");
-
-    if (node.source.left) {
-      this.collector.append(" FROM ");
-      this.visit(node.source);
-    }
-
-    this.collectNodesFor(node.wheres, " WHERE ", " AND ");
-    this.collectNodesFor(node.groups, " GROUP BY ");
-    this.collectNodesFor(node.havings, " HAVING ", " AND ");
-    this.collectNodesFor(node.windows, " WINDOW ");
-
-    this.maybeVisit(node.comment ?? null);
-
+  /**
+   * Mirrors `to_sql.rb#collect_nodes_for`. Emits `spacer` then visits each
+   * node separated by `connector` (default `", "`). No-op when empty.
+   */
+  protected collectNodesFor(nodes: Node[], spacer: string, connector = ", "): SQLString {
+    if (nodes.length === 0) return this.collector;
+    this.collector.append(spacer);
+    this.injectJoin(nodes, connector);
     return this.collector;
   }
 
-  protected visitArelNodesInsertStatement(node: Nodes.InsertStatement): SQLString {
-    this.collector.retryable = false;
-    this.collector.append("INSERT INTO ");
-    if (node.relation) this.visit(node.relation);
-
-    if (node.columns.length > 0) {
-      this.collector.append(" (");
-      const colNames = node.columns.map((c) => {
-        if (c instanceof Nodes.SqlLiteral) return c.value;
-        const name =
-          c instanceof Nodes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
-        return this.quoteColumnName(name);
-      });
-      this.collector.append(colNames.join(", "));
-      this.collector.append(")");
+  protected visitArelNodesBin(node: Nodes.Bin): SQLString {
+    // Generic visitor: just emit the inner expression.
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
     }
-
-    // Mirrors Rails: prefer `node.values` when both are present
-    // (insert_statement.rb / to_sql.rb pattern). Routes through
-    // `visitNodeOrValue` so a SelectManager-shaped duck-type (the form
-    // `InsertManager#select` stores) lands in `visitArelSelectManager`.
-    if (node.values) {
-      this.collector.append(" ");
-      this.visit(node.values);
-    } else if (node.select) {
-      this.collector.append(" ");
-      this.visitNodeOrValue(node.select as Nodes.NodeOrValue);
-    }
-
     return this.collector;
   }
 
-  protected visitArelNodesUpdateStatement(o: Nodes.UpdateStatement): SQLString {
-    const node = this.prepareUpdateStatement(o);
-    this.collector.retryable = false;
-    this.collector.append("UPDATE ");
-    if (node.relation) this.visit(node.relation);
-
-    if (node.values.length > 0) {
-      this.collector.append(" SET ");
-      this.injectJoin(node.values, ", ");
-    }
-
-    if (node.wheres.length > 0) {
-      this.collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
-      this.visit(conditions);
-    }
-
-    if (node.orders.length > 0) {
-      this.collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ");
-    }
-
-    if (node.limit) {
-      this.collector.append(" ");
-      this.visit(node.limit);
-    }
-
+  private visitArelNodesDistinct(_node: Nodes.Distinct): SQLString {
+    this.collector.append("DISTINCT");
     return this.collector;
   }
 
-  protected visitArelNodesDeleteStatement(o: Nodes.DeleteStatement): SQLString {
-    const node = this.prepareDeleteStatement(o);
-    this.collector.retryable = false;
-    const joinSourceLeft = this.hasJoinSources(node)
-      ? (node.relation as Nodes.JoinSource).left
-      : null;
-    if (joinSourceLeft) {
-      this.collector.append("DELETE ");
-      this.visit(joinSourceLeft);
-      this.collector.append(" FROM ");
-    } else {
-      this.collector.append("DELETE FROM ");
-    }
-    if (node.relation) this.visit(node.relation);
+  protected visitArelNodesDistinctOn(_node: Nodes.DistinctOn): SQLString {
+    throw new NotImplementedError(
+      "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
+    );
+  }
 
-    if (node.wheres.length > 0) {
-      this.collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
-      this.visit(conditions);
-    }
-
-    if (node.orders.length > 0) {
-      this.collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ");
-    }
-
-    if (node.limit) {
-      this.collector.append(" ");
-      this.visit(node.limit);
-    }
-
+  private visitArelNodesWith(node: Nodes.With): SQLString {
+    this.collector.append("WITH ");
+    this.injectJoin(node.children, ", ");
     return this.collector;
   }
 
-  protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
-    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
-      stmt.limit = null;
-      stmt.offset = null;
-      stmt.orders = [];
-      const key = this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
-      return stmt;
-    }
-    return o;
+  private visitArelNodesWithRecursive(node: Nodes.WithRecursive): SQLString {
+    this.collector.append("WITH RECURSIVE ");
+    this.injectJoin(node.children, ", ");
+    return this.collector;
   }
 
-  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
-      stmt.limit = null;
-      stmt.offset = null;
-      stmt.orders = [];
-      const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
-      const key = this.subselectKey(rawKey);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
-      return stmt;
-    }
-    return o;
+  protected visitArelNodesUnion(node: Nodes.Union): SQLString {
+    return this.infixValueWithParen(node, " UNION ");
   }
 
-  protected buildSubselect(
-    key: Node,
-    o: {
-      relation: Node | null;
-      wheres: Node[];
-      groups: Node[];
-      havings: Node[];
-      limit: Node | null;
-      offset: Node | null;
-      orders: Node[];
-    },
-  ): Nodes.SelectStatement {
-    const stmt = new Nodes.SelectStatement();
-    const core = stmt.cores[0];
-    if (o.relation) core.source = new Nodes.JoinSource(o.relation);
-    core.wheres = [...o.wheres];
-    core.projections = [key];
-    core.groups = [...o.groups];
-    core.havings = [...o.havings];
-    stmt.limit = o.limit;
-    stmt.offset = o.offset;
-    stmt.orders = [...o.orders];
-    return stmt;
+  protected visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
+    return this.infixValueWithParen(node, " UNION ALL ");
   }
 
-  private subselectKey(key: Node): Node {
-    if (key instanceof Nodes.Equality) {
-      return key.left as Node;
-    }
-    return key;
+  protected visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
+    this.collector.append("( ");
+    this.infixValue(node, " INTERSECT ");
+    this.collector.append(" )");
+    return this.collector;
   }
 
-  protected hasJoinSources(o: { relation: Node | null }): boolean {
-    return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
+  protected visitArelNodesExcept(node: Nodes.Except): SQLString {
+    this.collector.append("( ");
+    this.infixValue(node, " EXCEPT ");
+    this.collector.append(" )");
+    return this.collector;
   }
 
-  protected hasLimitOrOffsetOrOrders(o: {
-    limit: Node | null;
-    offset: Node | null;
-    orders: Node[];
-  }): boolean {
-    return !!(o.limit || o.offset || o.orders.length > 0);
+  private visitArelNodesNamedWindow(node: Nodes.NamedWindow): SQLString {
+    this.collector.append(`${this.quoteColumnName(node.name)} AS `);
+    return this.visitArelNodesWindow(node);
   }
 
   // -- Joins --
+
+  private visitArelNodesWindow(node: Nodes.Window): SQLString {
+    this.collector.append("(");
+    if (node.partitions.length > 0) {
+      this.collector.append("PARTITION BY ");
+      this.injectJoin(node.partitions, ", ");
+    }
+    if (node.orders.length > 0) {
+      if (node.partitions.length > 0) this.collector.append(" ");
+      this.collector.append("ORDER BY ");
+      this.injectJoin(node.orders, ", ");
+    }
+    if (node.framing) {
+      this.collector.append(" ");
+      this.visit(node.framing);
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private visitArelNodesFilter(node: Nodes.Filter): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" FILTER (WHERE ");
+    this.visitNodeOrValue(node.right);
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private visitArelNodesRows(node: Nodes.Rows): SQLString {
+    this.collector.append("ROWS");
+    if (node.expr) {
+      this.collector.append(" ");
+      this.visit(node.expr);
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesRange(node: Nodes.Range): SQLString {
+    this.collector.append("RANGE");
+    if (node.expr) {
+      this.collector.append(" ");
+      this.visit(node.expr);
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesPreceding(node: Nodes.Preceding): SQLString {
+    if (node.expr) {
+      this.visit(node.expr);
+      this.collector.append(" PRECEDING");
+    } else {
+      this.collector.append("UNBOUNDED PRECEDING");
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesFollowing(node: Nodes.Following): SQLString {
+    if (node.expr) {
+      this.visit(node.expr);
+      this.collector.append(" FOLLOWING");
+    } else {
+      this.collector.append("UNBOUNDED FOLLOWING");
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesCurrentRow(_node: Nodes.CurrentRow): SQLString {
+    this.collector.append("CURRENT ROW");
+    return this.collector;
+  }
+
+  private visitArelNodesOver(node: Nodes.Over): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" OVER ");
+    if (node.right) {
+      this.visitNodeOrValue(node.right);
+    } else {
+      this.collector.append("()");
+    }
+    return this.collector;
+  }
+
+  // -- Predicates --
+
+  protected visitArelNodesOffset(node: Nodes.Offset): SQLString {
+    this.collector.append("OFFSET ");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else {
+      this.collector.append(String(node.expr));
+    }
+    return this.collector;
+  }
+
+  protected visitArelNodesLimit(node: Nodes.Limit): SQLString {
+    this.collector.append("LIMIT ");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else {
+      this.collector.append(String(node.expr));
+    }
+    return this.collector;
+  }
+
+  protected visitArelNodesLock(node: Nodes.Lock): SQLString {
+    this.visit(node.expr as Node);
+    return this.collector;
+  }
+
+  private visitArelNodesGrouping(node: Nodes.Grouping): SQLString {
+    this.collector.append("(");
+    let inner = node.expr;
+    while (inner instanceof Nodes.Grouping) inner = inner.expr;
+    if (inner instanceof Node) {
+      this.visit(inner);
+    } else if (inner !== null && inner !== undefined) {
+      this.collector.append(String(inner));
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private visitArelNodesHomogeneousIn(node: Nodes.HomogeneousIn): SQLString {
+    this.collector.preparable = false;
+    if (node.values.length === 0) {
+      this.collector.append(node.type === "in" ? "1=0" : "1=1");
+      return this.collector;
+    }
+    this.visit(node.attribute);
+    this.collector.append(node.type === "in" ? " IN (" : " NOT IN (");
+    const values = node.right;
+    for (let i = 0; i < values.length; i++) {
+      if (i > 0) this.collector.append(", ");
+      this.visit(values[i]);
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  /**
+   * Mirrors Rails: `visit_Arel_SelectManager` — visits the manager's AST
+   * wrapped in parens so it can be embedded as a subquery.
+   */
+  protected visitArelSelectManager(o: { ast: Node }): SQLString {
+    this.collector.append("(");
+    this.visit(o.ast);
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private visitArelNodesAscending(node: Nodes.Ascending): SQLString {
+    if (node.expr instanceof Node) this.visit(node.expr);
+    this.collector.append(" ASC");
+    return this.collector;
+  }
+
+  private visitArelNodesDescending(node: Nodes.Descending): SQLString {
+    if (node.expr instanceof Node) this.visit(node.expr);
+    this.collector.append(" DESC");
+    return this.collector;
+  }
+
+  protected visitArelNodesNullsFirst(node: Nodes.NullsFirst): SQLString {
+    if (node.expr instanceof Node) this.visit(node.expr);
+    this.collector.append(" NULLS FIRST");
+    return this.collector;
+  }
+
+  protected visitArelNodesNullsLast(node: Nodes.NullsLast): SQLString {
+    if (node.expr instanceof Node) this.visit(node.expr);
+    this.collector.append(" NULLS LAST");
+    return this.collector;
+  }
+
+  private visitArelNodesGroup(node: Nodes.Group): SQLString {
+    if (node.expr instanceof Node) {
+      return this.visit(node.expr);
+    }
+    this.collector.append(String(node.expr));
+    return this.collector;
+  }
+
+  // -- Boolean --
+
+  private visitArelNodesNamedFunction(node: Nodes.NamedFunction): SQLString {
+    this.collector.retryable = false;
+    this.collector.append(node.name);
+    this.collector.append("(");
+    if (node.distinct) this.collector.append("DISTINCT ");
+    this.injectJoin(node.expressions, ", ");
+    this.collector.append(")");
+    if (node.alias) {
+      this.collector.append(" AS ");
+      this.visit(node.alias);
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesExtract(node: Nodes.Extract): SQLString {
+    this.collector.append(`EXTRACT(${String(node.field).toUpperCase()} FROM `);
+    if (Array.isArray(node.expr)) {
+      this.visitArray(node.expr);
+    } else if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null && node.expr !== undefined) {
+      this.collector.append(String(node.expr));
+    }
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  protected visitArelNodesCount(node: Nodes.Count): SQLString {
+    return this.aggregate("COUNT", node);
+  }
+
+  protected visitArelNodesSum(node: Nodes.Sum): SQLString {
+    return this.aggregate("SUM", node);
+  }
+
+  // -- Unary --
+
+  protected visitArelNodesMax(node: Nodes.Max): SQLString {
+    return this.aggregate("MAX", node);
+  }
+
+  protected visitArelNodesMin(node: Nodes.Min): SQLString {
+    return this.aggregate("MIN", node);
+  }
+
+  protected visitArelNodesAvg(node: Nodes.Avg): SQLString {
+    return this.aggregate("AVG", node);
+  }
+
+  private visitArelNodesTableAlias(node: Nodes.TableAlias): SQLString {
+    this.visit(node.relation);
+    // Rails: `SelectManager#as` wraps the alias name in a SqlLiteral,
+    // and `AbstractAdapter#quote_table_name` returns SqlLiterals
+    // unchanged — so subquery aliases render bare. We approximate the
+    // same outcome at the visitor layer by checking whether the
+    // relation is a Grouping (the shape `SelectManager#as` produces);
+    // plain `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
+    // construct a TableAlias on a Table with a SqlLiteral name
+    // wouldn't get the bare form here — Rails would. The runtime
+    // signature of `TableAlias.name` is `string`, so that path isn't
+    // currently reachable, but it's a Rails-fidelity divergence to
+    // revisit if the type widens.
+    if (node.relation instanceof Nodes.Grouping) {
+      this.collector.append(` ${node.name}`);
+    } else {
+      this.collector.append(` ${this.quoteTableName(node.name)}`);
+    }
+    return this.collector;
+  }
+
+  private visitArelNodesBetween(node: Nodes.Between): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" BETWEEN ");
+    if (node.right instanceof Nodes.And) {
+      const and = node.right;
+      this.visit(and.children[0]);
+      this.collector.append(" AND ");
+      this.visit(and.children[1]);
+    } else {
+      this.visitNodeOrValue(node.right);
+    }
+    return this.collector;
+  }
+
+  protected visitArelNodesGreaterThanOrEqual(node: Nodes.GreaterThanOrEqual): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=0");
+    if (sign === -1) return this.collector.append("1=1");
+    return this.visitBinaryOp(node, ">=");
+  }
+
+  // Per-class dispatch wrappers for shared helpers — mirrors Rails' per-method
+  // form (each operator/aggregate has its own visit method).
+  protected visitArelNodesGreaterThan(node: Nodes.GreaterThan): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=0");
+    if (sign === -1) return this.collector.append("1=1");
+    return this.visitBinaryOp(node, ">");
+  }
+
+  protected visitArelNodesLessThanOrEqual(node: Nodes.LessThanOrEqual): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=1");
+    if (sign === -1) return this.collector.append("1=0");
+    return this.visitBinaryOp(node, "<=");
+  }
+
+  protected visitArelNodesLessThan(node: Nodes.LessThan): SQLString {
+    const sign = this.unboundableSign(node.right);
+    if (sign === 1) return this.collector.append("1=1");
+    if (sign === -1) return this.collector.append("1=0");
+    return this.visitBinaryOp(node, "<");
+  }
+
+  protected visitArelNodesMatches(node: Nodes.Matches): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" LIKE ");
+    this.visitNodeOrValue(node.right);
+    this.appendEscape(node.escape);
+    return this.collector;
+  }
+
+  // -- Functions --
+
+  protected visitArelNodesDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" NOT LIKE ");
+    this.visitNodeOrValue(node.right);
+    this.appendEscape(node.escape);
+    return this.collector;
+  }
 
   private visitArelNodesJoinSource(node: Nodes.JoinSource): SQLString {
     if (node.left) this.visit(node.left);
@@ -539,13 +829,30 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesInnerJoin(node: Nodes.InnerJoin): SQLString {
-    this.collector.append("INNER JOIN ");
+  // -- Window --
+
+  protected visitArelNodesRegexp(_node: Nodes.Regexp): SQLString {
+    throw new NotImplementedError(
+      "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
+  }
+
+  protected visitArelNodesNotRegexp(_node: Nodes.NotRegexp): SQLString {
+    throw new NotImplementedError(
+      "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
+    );
+  }
+
+  private visitArelNodesStringJoin(node: Nodes.StringJoin): SQLString {
     this.visit(node.left);
-    if (node.right) {
-      this.collector.append(" ");
-      this.visit(node.right);
-    }
+    return this.collector;
+  }
+
+  private visitArelNodesFullOuterJoin(node: Nodes.FullOuterJoin): SQLString {
+    this.collector.append("FULL OUTER JOIN ");
+    this.visit(node.left);
+    this.collector.append(" ");
+    this.visit(node.right as Node);
     return this.collector;
   }
 
@@ -565,22 +872,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesFullOuterJoin(node: Nodes.FullOuterJoin): SQLString {
-    this.collector.append("FULL OUTER JOIN ");
+  private visitArelNodesInnerJoin(node: Nodes.InnerJoin): SQLString {
+    this.collector.append("INNER JOIN ");
     this.visit(node.left);
-    this.collector.append(" ");
-    this.visit(node.right as Node);
-    return this.collector;
-  }
-
-  private visitCrossJoin(node: Nodes.CrossJoin): SQLString {
-    this.collector.append("CROSS JOIN ");
-    this.visit(node.left);
-    return this.collector;
-  }
-
-  private visitArelNodesStringJoin(node: Nodes.StringJoin): SQLString {
-    this.visit(node.left);
+    if (node.right) {
+      this.collector.append(" ");
+      this.visit(node.right);
+    }
     return this.collector;
   }
 
@@ -592,51 +890,29 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  // -- Predicates --
+  // -- Case --
 
-  private visitArelNodesEquality(node: Nodes.Equality): SQLString {
-    if (this.unboundableSign(node.right) !== 0) {
-      return this.collector.append("1=0");
-    }
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      this.visitNodeOrValue(node.left);
-      this.collector.append(" IS NULL");
-      return this.collector;
-    }
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" = ");
-    this.visitNodeOrValue(node.right);
+  private visitArelNodesNot(node: Nodes.Not): SQLString {
+    this.collector.append("NOT (");
+    this.visit(node.expr);
+    this.collector.append(")");
     return this.collector;
   }
 
-  private visitArelNodesNotEqual(node: Nodes.NotEqual): SQLString {
-    if (this.unboundableSign(node.right) !== 0) {
-      return this.collector.append("1=1");
+  private visitArelTable(node: Table): SQLString {
+    // Mirrors Rails visit_Arel_Table (to_sql.rb): if name is a Node, visit
+    // it (subquery-as-table); else quote as identifier. Trails types
+    // `Table.name` as `string`; callers smuggling a Node in must cast.
+    const name = node.name as unknown;
+    if (name instanceof Node) {
+      this.visit(name);
+    } else {
+      this.collector.append(this.quoteTableName(node.name));
     }
-    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
-      this.visitNodeOrValue(node.left);
-      this.collector.append(" IS NOT NULL");
-      return this.collector;
+    if (node.tableAlias) {
+      this.collector.append(` ${this.quoteTableName(node.tableAlias)}`);
     }
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" != ");
-    this.visitNodeOrValue(node.right);
     return this.collector;
-  }
-
-  protected visitBinaryOp(node: Nodes.Binary, op: string): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(` ${op} `);
-    this.visitNodeOrValue(node.right);
-    return this.collector;
-  }
-
-  protected visitArelNodesIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
-    return this.visitBinaryOp(node, "IS DISTINCT FROM");
-  }
-
-  protected visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
-    return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
   }
 
   private visitArelNodesIn(node: Nodes.In): SQLString {
@@ -678,6 +954,8 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  // -- BindParam --
+
   private visitArelNodesNotIn(node: Nodes.NotIn): SQLString {
     let values = node.right;
     if (Array.isArray(values)) {
@@ -707,33 +985,20 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesHomogeneousIn(node: Nodes.HomogeneousIn): SQLString {
-    this.collector.preparable = false;
-    if (node.values.length === 0) {
-      this.collector.append(node.type === "in" ? "1=0" : "1=1");
-      return this.collector;
+  private visitArelNodesAnd(node: Nodes.And): SQLString {
+    for (let i = 0; i < node.children.length; i++) {
+      if (i > 0) this.collector.append(" AND ");
+      this.visit(node.children[i]);
     }
-    this.visit(node.attribute);
-    this.collector.append(node.type === "in" ? " IN (" : " NOT IN (");
-    const values = node.right;
-    for (let i = 0; i < values.length; i++) {
-      if (i > 0) this.collector.append(", ");
-      this.visit(values[i]);
-    }
-    this.collector.append(")");
     return this.collector;
   }
 
-  private visitArelNodesBetween(node: Nodes.Between): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" BETWEEN ");
-    if (node.right instanceof Nodes.And) {
-      const and = node.right;
-      this.visit(and.children[0]);
-      this.collector.append(" AND ");
-      this.visit(and.children[1]);
-    } else {
-      this.visitNodeOrValue(node.right);
+  // -- BoundSqlLiteral --
+
+  private visitArelNodesOr(node: Nodes.Or): SQLString {
+    for (let i = 0; i < node.children.length; i++) {
+      if (i > 0) this.collector.append(" OR ");
+      this.visit(node.children[i]);
     }
     return this.collector;
   }
@@ -748,236 +1013,58 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  // -- Concat --
+
+  private visitArelNodesEquality(node: Nodes.Equality): SQLString {
+    if (this.unboundableSign(node.right) !== 0) {
+      return this.collector.append("1=0");
+    }
+    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+      this.visitNodeOrValue(node.left);
+      this.collector.append(" IS NULL");
+      return this.collector;
+    }
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" = ");
+    this.visitNodeOrValue(node.right);
+    return this.collector;
+  }
+
+  protected visitArelNodesIsNotDistinctFrom(node: Nodes.IsNotDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS NOT DISTINCT FROM");
+  }
+
+  // -- Extract --
+
+  protected visitArelNodesIsDistinctFrom(node: Nodes.IsDistinctFrom): SQLString {
+    return this.visitBinaryOp(node, "IS DISTINCT FROM");
+  }
+
+  // -- InfixOperation --
+
+  private visitArelNodesNotEqual(node: Nodes.NotEqual): SQLString {
+    if (this.unboundableSign(node.right) !== 0) {
+      return this.collector.append("1=1");
+    }
+    if (node.right instanceof Nodes.Quoted && (node.right as Nodes.Quoted).value === null) {
+      this.visitNodeOrValue(node.left);
+      this.collector.append(" IS NOT NULL");
+      return this.collector;
+    }
+    this.visitNodeOrValue(node.left);
+    this.collector.append(" != ");
+    this.visitNodeOrValue(node.right);
+    return this.collector;
+  }
+
+  // -- Set operations --
+
   private visitArelNodesAs(node: Nodes.As): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" AS ");
     this.visitNodeOrValue(node.right);
     return this.collector;
   }
-
-  // -- Boolean --
-
-  private visitArelNodesAnd(node: Nodes.And): SQLString {
-    for (let i = 0; i < node.children.length; i++) {
-      if (i > 0) this.collector.append(" AND ");
-      this.visit(node.children[i]);
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesOr(node: Nodes.Or): SQLString {
-    for (let i = 0; i < node.children.length; i++) {
-      if (i > 0) this.collector.append(" OR ");
-      this.visit(node.children[i]);
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesNot(node: Nodes.Not): SQLString {
-    this.collector.append("NOT (");
-    this.visit(node.expr);
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  private visitArelNodesGrouping(node: Nodes.Grouping): SQLString {
-    this.collector.append("(");
-    let inner = node.expr;
-    while (inner instanceof Nodes.Grouping) inner = inner.expr;
-    if (inner instanceof Node) {
-      this.visit(inner);
-    } else if (inner !== null && inner !== undefined) {
-      this.collector.append(String(inner));
-    }
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  // -- Unary --
-
-  private visitArelNodesAscending(node: Nodes.Ascending): SQLString {
-    if (node.expr instanceof Node) this.visit(node.expr);
-    this.collector.append(" ASC");
-    return this.collector;
-  }
-
-  private visitArelNodesDescending(node: Nodes.Descending): SQLString {
-    if (node.expr instanceof Node) this.visit(node.expr);
-    this.collector.append(" DESC");
-    return this.collector;
-  }
-
-  protected visitArelNodesOffset(node: Nodes.Offset): SQLString {
-    this.collector.append("OFFSET ");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else {
-      this.collector.append(String(node.expr));
-    }
-    return this.collector;
-  }
-
-  protected visitArelNodesLimit(node: Nodes.Limit): SQLString {
-    this.collector.append("LIMIT ");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else {
-      this.collector.append(String(node.expr));
-    }
-    return this.collector;
-  }
-
-  protected visitTop(node: Nodes.Top): SQLString {
-    this.collector.append("TOP ");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else {
-      this.collector.append(String(node.expr));
-    }
-    return this.collector;
-  }
-
-  protected visitArelNodesLock(node: Nodes.Lock): SQLString {
-    this.visit(node.expr as Node);
-    return this.collector;
-  }
-
-  protected visitArelNodesDistinctOn(_node: Nodes.DistinctOn): SQLString {
-    throw new NotImplementedError(
-      "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
-    );
-  }
-
-  protected visitArelNodesRegexp(_node: Nodes.Regexp): SQLString {
-    throw new NotImplementedError(
-      "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
-    );
-  }
-
-  protected visitArelNodesNotRegexp(_node: Nodes.NotRegexp): SQLString {
-    throw new NotImplementedError(
-      "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
-    );
-  }
-
-  protected visitArelNodesBin(node: Nodes.Bin): SQLString {
-    // Generic visitor: just emit the inner expression.
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null) {
-      this.collector.append(String(node.expr));
-    }
-    return this.collector;
-  }
-
-  // -- Functions --
-
-  private visitArelNodesNamedFunction(node: Nodes.NamedFunction): SQLString {
-    this.collector.retryable = false;
-    this.collector.append(node.name);
-    this.collector.append("(");
-    if (node.distinct) this.collector.append("DISTINCT ");
-    this.injectJoin(node.expressions, ", ");
-    this.collector.append(")");
-    if (node.alias) {
-      this.collector.append(" AS ");
-      this.visit(node.alias);
-    }
-    return this.collector;
-  }
-
-  protected visitArelNodesExists(node: Nodes.Exists): SQLString {
-    this.collector.append("EXISTS (");
-    this.visit(node.expressions[0]);
-    this.collector.append(")");
-    if (node.alias) {
-      this.collector.append(" AS ");
-      this.visit(node.alias);
-    }
-    return this.collector;
-  }
-
-  // -- Window --
-
-  private visitArelNodesWindow(node: Nodes.Window): SQLString {
-    this.collector.append("(");
-    if (node.partitions.length > 0) {
-      this.collector.append("PARTITION BY ");
-      this.injectJoin(node.partitions, ", ");
-    }
-    if (node.orders.length > 0) {
-      if (node.partitions.length > 0) this.collector.append(" ");
-      this.collector.append("ORDER BY ");
-      this.injectJoin(node.orders, ", ");
-    }
-    if (node.framing) {
-      this.collector.append(" ");
-      this.visit(node.framing);
-    }
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  private visitArelNodesNamedWindow(node: Nodes.NamedWindow): SQLString {
-    this.collector.append(`${this.quoteColumnName(node.name)} AS `);
-    return this.visitArelNodesWindow(node);
-  }
-
-  private visitArelNodesOver(node: Nodes.Over): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" OVER ");
-    if (node.right) {
-      this.visitNodeOrValue(node.right);
-    } else {
-      this.collector.append("()");
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesPreceding(node: Nodes.Preceding): SQLString {
-    if (node.expr) {
-      this.visit(node.expr);
-      this.collector.append(" PRECEDING");
-    } else {
-      this.collector.append("UNBOUNDED PRECEDING");
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesFollowing(node: Nodes.Following): SQLString {
-    if (node.expr) {
-      this.visit(node.expr);
-      this.collector.append(" FOLLOWING");
-    } else {
-      this.collector.append("UNBOUNDED FOLLOWING");
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesCurrentRow(_node: Nodes.CurrentRow): SQLString {
-    this.collector.append("CURRENT ROW");
-    return this.collector;
-  }
-
-  private visitArelNodesRows(node: Nodes.Rows): SQLString {
-    this.collector.append("ROWS");
-    if (node.expr) {
-      this.collector.append(" ");
-      this.visit(node.expr);
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesRange(node: Nodes.Range): SQLString {
-    this.collector.append("RANGE");
-    if (node.expr) {
-      this.collector.append(" ");
-      this.visit(node.expr);
-    }
-    return this.collector;
-  }
-
-  // -- Case --
 
   private visitArelNodesCase(node: Nodes.Case): SQLString {
     this.collector.append("CASE");
@@ -1013,13 +1100,66 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  // -- BindParam --
+  // -- CTE --
 
-  // Overridable hook for date bind insertion so PostgreSQLWithBinds can
-  // emit $N placeholders instead of ?.
-  protected addDateBind(value: unknown): void {
-    this.collector.addBind(value, this.bindBlock());
+  protected visitArelNodesUnqualifiedColumn(node: Nodes.UnqualifiedColumn): SQLString {
+    // Mirrors Arel's visit_Arel_Nodes_UnqualifiedColumn — strips the table
+    // qualifier so `SET col = col + 1` works in UPDATE statements.
+    const attr = node.attribute as Partial<Nodes.Attribute> | undefined;
+    if (!attr || typeof attr.name !== "string") {
+      throw new UnsupportedVisitError("UnqualifiedColumn must wrap an Attribute node with a name");
+    }
+    this.collector.append(this.quoteColumnName(attr.name));
+    return this.collector;
   }
+
+  protected visitArelNodesCte(node: Nodes.Cte): SQLString {
+    this.collector.append(`${this.quoteTableName(node.name)} AS `);
+    if (node.materialized === true) {
+      this.collector.append("MATERIALIZED ");
+    } else if (node.materialized === false) {
+      this.collector.append("NOT MATERIALIZED ");
+    }
+    this.collector.append("(");
+    this.visit(node.relation);
+    this.collector.append(")");
+    return this.collector;
+  }
+
+  private visitArelAttributesAttribute(node: Nodes.Attribute): SQLString {
+    const tbl = node.relation.tableAlias || node.relation.name;
+    this.collector.append(`${this.quoteTableName(tbl)}.${this.quoteColumnName(node.name)}`);
+    return this.collector;
+  }
+
+  // -- Boolean literals --
+
+  /**
+   * Mirrors `to_sql.rb#bind_block` (which returns Rails' `BIND_BLOCK = proc { "?" }`).
+   * Returns the placeholder-rendering callback the SQLString collector calls
+   * for each unbound bind. Dialects override to emit numbered placeholders
+   * (e.g. `$1`, `$2` for Postgres-with-binds).
+   *
+   * The default callback is cached at module load (Rails caches it under
+   * `BIND_BLOCK`) so the hot bind path doesn't allocate a closure per call.
+   */
+  protected bindBlock(): (index: number) => string {
+    return DEFAULT_BIND_BLOCK;
+  }
+
+  /**
+   * Mirrors Rails: `visit_ActiveModel_Attribute` (to_sql.rb:756).
+   * Rails calls `collector.add_bind(o, &bind_block)` — always emits an
+   * unbound placeholder regardless of bind-extraction state. We do the
+   * same: the dispatch never delegates to the BindParam visitor (which
+   * would inline-quote when `_extractBinds` is false).
+   */
+  protected visitActiveModelAttribute(o: unknown): SQLString {
+    this.collector.addBind(o, this.bindBlock());
+    return this.collector;
+  }
+
+  // -- Advanced grouping --
 
   protected visitArelNodesBindParam(node: Nodes.BindParam): SQLString {
     if (this._extractBinds) {
@@ -1032,7 +1172,13 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  // -- BoundSqlLiteral --
+  private visitArelNodesSqlLiteral(node: Nodes.SqlLiteral): SQLString {
+    if (!(node as { retryableFlag?: boolean }).retryableFlag) {
+      this.collector.retryable = false;
+    }
+    this.collector.append(node.value);
+    return this.collector;
+  }
 
   private visitArelNodesBoundSqlLiteral(node: Nodes.BoundSqlLiteral): SQLString {
     this.collector.retryable = false;
@@ -1072,6 +1218,464 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
+  /** Mirrors Rails: `visit_Integer`. */
+  protected visitInteger(o: number): SQLString {
+    this.collector.append(String(o));
+    return this.collector;
+  }
+
+  /** Mirrors `to_sql.rb#unsupported`. */
+  protected unsupported(o: Node): never {
+    throw new UnsupportedVisitError(`Unknown node type: ${o.constructor.name}`);
+  }
+
+  private visitArelNodesInfixOperation(node: Nodes.InfixOperation): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(` ${node.operator} `);
+    this.visitNodeOrValue(node.right);
+    return this.collector;
+  }
+
+  private visitArelNodesUnaryOperation(node: Nodes.UnaryOperation): SQLString {
+    // Mirrors Rails: `collector << " #{o.operator} "` (visitors/to_sql.rb).
+    // The operator is emitted verbatim with a space on each side; callers
+    // are responsible for the operator's own whitespace.
+    this.collector.append(` ${node.operator} `);
+    this.visit(node.operand);
+    return this.collector;
+  }
+
+  /**
+   * Mirrors Rails: `visit_Array` (to_sql.rb:858). Rails delegates to
+   * `inject_join` which calls `visit` on each element; in Ruby `visit` of
+   * a primitive routes through `visit_Integer`/`visit_String`/etc. Trails
+   * doesn't dispatch on JS primitives — `visitNodeOrValue` is the
+   * equivalent path that handles both Node and non-Node entries.
+   */
+  protected visitArray(items: ReadonlyArray<Nodes.NodeOrValue>): SQLString {
+    items.forEach((item, i) => {
+      if (i > 0) this.collector.append(", ");
+      this.visitNodeOrValue(item);
+    });
+    return this.collector;
+  }
+
+  // -- Matches with ESCAPE --
+
+  protected visitArelNodesFragments(node: Nodes.Fragments): SQLString {
+    return this.injectJoin(node.values, " ");
+  }
+
+  protected quote(value: unknown): string {
+    if (value === null || value === undefined) return "NULL";
+    if (typeof value === "number") {
+      // Non-finite numbers (Float::INFINITY / NaN) must be string-quoted so
+      // PostgreSQL parses them as float literals rather than identifiers.
+      // SQLite/MySQL reject the values either way; delegate to connection.quote
+      // for adapter-specific handling.
+      if (!Number.isFinite(value)) return this.connection.quote(value);
+      return String(value);
+    }
+    if (typeof value === "boolean")
+      return value ? this.connection.quotedTrue() : this.connection.quotedFalse();
+    if (typeof value === "bigint") return value.toString();
+    // Normalise all typed-array views (ArrayBuffer, SharedArrayBuffer) to
+    // Uint8Array before handing off so adapters' quotedBinary can rely on a
+    // consistent shape. Uint8Array itself passes through unchanged.
+    if (ArrayBuffer.isView(value)) {
+      const bytes =
+        value instanceof Uint8Array
+          ? value
+          : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      return this.connection.quotedBinary(bytes);
+    }
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toISOString" in value &&
+      typeof (value as { toISOString: unknown }).toISOString === "function"
+    ) {
+      return this.quotedDate(value as { toISOString(): string });
+    }
+    if (typeof value === "object" && value !== null) {
+      const proto = Object.getPrototypeOf(value);
+      const hasCustomToString =
+        proto === Object.prototype && value.toString !== Object.prototype.toString;
+      if ((proto === Object.prototype || proto === null) && !hasCustomToString) {
+        try {
+          const json = JSON.stringify(value);
+          if (json !== undefined) {
+            return `'${json.replace(/'/g, "''")}'`;
+          }
+        } catch {
+          // circular references, BigInt, etc. — fall through
+        }
+      }
+    }
+    // Unknown object types (custom classes, Temporal types without toISOString,
+    // etc.) — delegate to the connection, which knows the adapter-specific rules.
+    return this.connection.quote(value);
+  }
+
+  /** @internal */
+  protected quoteTableName(name: string | Nodes.SqlLiteral): string {
+    if (name instanceof Nodes.SqlLiteral) return name.value;
+    return this.connection.quoteTableName(String(name));
+  }
+
+  // -- NullsFirst / NullsLast --
+
+  /** @internal */
+  protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
+    if (name instanceof Nodes.SqlLiteral) return name.value;
+    return this.connection.quoteColumnName(String(name));
+  }
+
+  /**
+   * Mirrors `to_sql.rb#sanitize_as_sql_comment`. SqlLiteral values pass
+   * through unchanged; otherwise strip newlines and `/*`/`* /` so the value
+   * is safe to embed inside a `/* … * /` SQL comment.
+   */
+  protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
+    if (value instanceof Nodes.SqlLiteral) return value.value;
+    return String(value)
+      .replace(/[\r\n]+/g, " ")
+      .replace(/\/\*/g, "")
+      .replace(/\*\//g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // -- Cte --
+
+  /**
+   * Mirrors `to_sql.rb#collect_optimizer_hints`. Rails delegates to
+   * `maybe_visit o.optimizer_hints`; Trails' SelectCore now stores an
+   * `OptimizerHints` node (or null), and `emitOptimizerHints` does the
+   * `maybe_visit` no-op-when-nil dispatch.
+   */
+  protected collectOptimizerHints(o: Nodes.SelectCore): SQLString {
+    this.emitOptimizerHints(o);
+    return this.collector;
+  }
+
+  // -- UnaryOperation --
+
+  /**
+   * Mirrors `to_sql.rb#maybe_visit`: if `thing` is non-null, emits a leading
+   * space and visits it; otherwise no-op. Used to thread optional clauses
+   * (limit/offset/lock/comment) through select-statement visitors.
+   */
+  protected maybeVisit(thing: Node | null | undefined): SQLString {
+    if (!thing) return this.collector;
+    this.collector.append(" ");
+    this.visit(thing);
+    return this.collector;
+  }
+
+  // -- Filter --
+
+  /**
+   * Mirrors `to_sql.rb#inject_join`: visits `list[0]`, then for each
+   * subsequent node emits `joinStr` and visits.
+   */
+  protected injectJoin(list: Node[], joinStr: string): SQLString {
+    list.forEach((n, i) => {
+      if (i > 0) this.collector.append(joinStr);
+      this.visit(n);
+    });
+    return this.collector;
+  }
+
+  // -- Leaf nodes --
+
+  /** Mirrors `to_sql.rb#unboundable?` as a truthy check. */
+  protected isUnboundable(value: unknown): boolean {
+    return this.unboundableSign(value) !== 0;
+  }
+
+  protected hasJoinSources(o: { relation: Node | null }): boolean {
+    return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
+  }
+
+  protected hasLimitOrOffsetOrOrders(o: {
+    limit: Node | null;
+    offset: Node | null;
+    orders: Node[];
+  }): boolean {
+    return !!(o.limit || o.offset || o.orders.length > 0);
+  }
+
+  /** Mirrors `to_sql.rb#has_group_by_and_having?`. */
+  protected hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean {
+    return o.groups.length > 0 && o.havings.length > 0;
+  }
+
+  protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
+      const stmt = o.clone();
+      stmt.limit = null;
+      stmt.offset = null;
+      stmt.orders = [];
+      const key = this.subselectKey(o.key);
+      const columns = new Nodes.Grouping(key);
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
+      if (this.hasJoinSources(o)) {
+        stmt.relation = (o.relation as Nodes.JoinSource).left;
+      }
+      return stmt;
+    }
+    return o;
+  }
+
+  protected buildSubselect(
+    key: Node,
+    o: {
+      relation: Node | null;
+      wheres: Node[];
+      groups: Node[];
+      havings: Node[];
+      limit: Node | null;
+      offset: Node | null;
+      orders: Node[];
+    },
+  ): Nodes.SelectStatement {
+    const stmt = new Nodes.SelectStatement();
+    const core = stmt.cores[0];
+    if (o.relation) core.source = new Nodes.JoinSource(o.relation);
+    core.wheres = [...o.wheres];
+    core.projections = [key];
+    core.groups = [...o.groups];
+    core.havings = [...o.havings];
+    stmt.limit = o.limit;
+    stmt.offset = o.offset;
+    stmt.orders = [...o.orders];
+    return stmt;
+  }
+
+  /** Mirrors `to_sql.rb#infix_value`. Visits left, emits literal, visits right. */
+  protected infixValue(o: { left: Node; right: Node }, value: string): SQLString {
+    this.visit(o.left);
+    this.collector.append(value);
+    this.visit(o.right);
+    return this.collector;
+  }
+
+  /**
+   * Mirrors `to_sql.rb#infix_value_with_paren`. Recursively wraps adjacent
+   * same-class infix nodes in `( ... )` per Rails' shape — Rails compares
+   * `o.left.class == o.class` to keep nested same-operator chains flat.
+   */
+  protected infixValueWithParen(
+    o: Node & { left: Node; right: Node },
+    value: string,
+    suppressParens = false,
+  ): SQLString {
+    const sameClass = (child: Node): child is typeof o =>
+      Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
+
+    if (!suppressParens) this.collector.append("( ");
+    if (sameClass(o.left)) {
+      this.infixValueWithParen(o.left, value, true);
+    } else {
+      this.groupingParentheses(o.left, false);
+    }
+    this.collector.append(value);
+    if (sameClass(o.right)) {
+      this.infixValueWithParen(o.right, value, true);
+    } else {
+      this.groupingParentheses(o.right, false);
+    }
+    if (!suppressParens) this.collector.append(" )");
+    return this.collector;
+  }
+
+  // -- Helpers --
+
+  /**
+   * Mirrors `to_sql.rb#grouping_parentheses`. Wraps a SelectStatement in
+   * parens when it would otherwise emit ambiguously; otherwise plain visit.
+   */
+  protected groupingParentheses(o: Node, alwaysWrapSelects = true): SQLString {
+    if (o instanceof Nodes.SelectStatement && (alwaysWrapSelects || this.isRequireParentheses(o))) {
+      this.collector.append("(");
+      this.visit(o);
+      this.collector.append(")");
+      return this.collector;
+    }
+    this.visit(o);
+    return this.collector;
+  }
+
+  /** Mirrors `to_sql.rb#require_parentheses?`. */
+  protected isRequireParentheses(o: Nodes.SelectStatement): boolean {
+    return o.orders.length > 0 || Boolean(o.limit) || Boolean(o.offset);
+  }
+
+  /**
+   * Mirrors `to_sql.rb#aggregate`. Renders `NAME(DISTINCT? expr, ...) AS alias?`.
+   */
+  protected aggregate(name: string, o: Nodes.Function): SQLString {
+    // Trails-specific: aggregate calls aren't safe to retry against a
+    // detached connection. Rails has no equivalent (the retryable flag is
+    // a Trails collector concern), so this is the one piece of behavior we
+    // carry alongside the Rails-shaped body.
+    this.collector.retryable = false;
+    this.collector.append(`${name}(`);
+    if (o.distinct) this.collector.append("DISTINCT ");
+    this.injectJoin(o.expressions, ", ");
+    this.collector.append(")");
+    if (o.alias) {
+      this.collector.append(" AS ");
+      this.visit(o.alias);
+    }
+    return this.collector;
+  }
+
+  /**
+   * Mirrors `to_sql.rb#is_distinct_from`. CASE-form fallback for adapters
+   * that lack native `IS [NOT] DISTINCT FROM`.
+   */
+  protected isDistinctFrom(o: { left: Node; right: Node }): SQLString {
+    this.collector.append("CASE WHEN ");
+    this.visit(o.left);
+    this.collector.append(" = ");
+    this.visit(o.right);
+    this.collector.append(" OR (");
+    this.visit(o.left);
+    this.collector.append(" IS NULL AND ");
+    this.visit(o.right);
+    this.collector.append(" IS NULL)");
+    this.collector.append(" THEN 0 ELSE 1 END");
+    return this.collector;
+  }
+
+  // ---------------------------------------------------------------------
+  // Rails-mirrored private helpers (to_sql.rb).
+  // ---------------------------------------------------------------------
+
+  /** Mirrors `to_sql.rb#collect_ctes`. Visits each CTE child joined by ", ". */
+  protected collectCtes(children: ReadonlyArray<{ toCte(): Node } | Node>): SQLString {
+    children.forEach((child, i) => {
+      if (i > 0) this.collector.append(", ");
+      const node =
+        typeof (child as { toCte?: () => Node }).toCte === "function"
+          ? (child as { toCte: () => Node }).toCte()
+          : (child as Node);
+      this.visit(node);
+    });
+    return this.collector;
+  }
+
+  compileWithCollector(node: Node, externalCollector?: unknown): SQLString {
+    if (externalCollector) {
+      this.collector = externalCollector as SQLString;
+      this._extractBinds = true;
+      try {
+        this.visit(node);
+      } finally {
+        this._extractBinds = false;
+      }
+      return this.collector;
+    }
+    this.collector = new SQLString();
+    this.visit(node);
+    return this.collector;
+  }
+
+  /**
+   * Compile an AST node and extract bind values separately.
+   * Returns [sql_with_placeholders, bind_values].
+   *
+   * Mirrors: Rails' compilation with Arel::Collectors::Composite
+   */
+  compileWithBinds(node: Node): [string, unknown[]] {
+    const sqlCollector = new SQLString();
+    const bindCollector = new Bind();
+    this.collector = new Composite(sqlCollector, bindCollector) as unknown as SQLString;
+    this._extractBinds = true;
+    try {
+      this.visit(node);
+    } finally {
+      this._extractBinds = false;
+    }
+    const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
+    return [sqlCollector.value, binds];
+  }
+
+  /**
+   * Rails passes the collector as a second arg through the visit chain;
+   * we route SQL through `this.collector` instance state instead, so the
+   * base's collector argument is unused here by design.
+   *
+   * @internal
+   */
+  visit(node: Node): SQLString {
+    return super.visit(node) as SQLString;
+  }
+
+  protected emitOptimizerHints(node: Nodes.SelectCore): void {
+    // Mirrors Rails: `@ctx.optimizer_hints` is now an `OptimizerHints`
+    // node (or null); the visitor delegates to the dedicated visitor
+    // which sanitizes + wraps in `/*+ ... */`.
+    if (node.optimizerHints === null) return;
+    this.visit(node.optimizerHints);
+  }
+
+  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
+      const stmt = o.clone();
+      stmt.limit = null;
+      stmt.offset = null;
+      stmt.orders = [];
+      const rawKey = Array.isArray(o.key) ? o.key[0] : o.key;
+      const key = this.subselectKey(rawKey);
+      const columns = new Nodes.Grouping(key);
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
+      if (this.hasJoinSources(o)) {
+        stmt.relation = (o.relation as Nodes.JoinSource).left;
+      }
+      return stmt;
+    }
+    return o;
+  }
+
+  private subselectKey(key: Node): Node {
+    if (key instanceof Nodes.Equality) {
+      return key.left as Node;
+    }
+    return key;
+  }
+
+  private visitCrossJoin(node: Nodes.CrossJoin): SQLString {
+    this.collector.append("CROSS JOIN ");
+    this.visit(node.left);
+    return this.collector;
+  }
+
+  protected visitBinaryOp(node: Nodes.Binary, op: string): SQLString {
+    this.visitNodeOrValue(node.left);
+    this.collector.append(` ${op} `);
+    this.visitNodeOrValue(node.right);
+    return this.collector;
+  }
+
+  protected visitTop(node: Nodes.Top): SQLString {
+    this.collector.append("TOP ");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else {
+      this.collector.append(String(node.expr));
+    }
+    return this.collector;
+  }
+
+  // Overridable hook for date bind insertion so PostgreSQLWithBinds can
+  // emit $N placeholders instead of ?.
+  protected addDateBind(value: unknown): void {
+    this.collector.addBind(value, this.bindBlock());
+  }
+
   private visitBindValue(value: unknown): void {
     if (value instanceof Node) {
       this.visit(value);
@@ -1085,115 +1689,12 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     }
   }
 
-  // -- Concat --
-
   protected visitArelNodesConcat(node: Nodes.Concat): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(" || ");
     this.visitNodeOrValue(node.right);
     return this.collector;
   }
-
-  protected visitArelNodesFragments(node: Nodes.Fragments): SQLString {
-    return this.injectJoin(node.values, " ");
-  }
-
-  // -- Extract --
-
-  private visitArelNodesExtract(node: Nodes.Extract): SQLString {
-    this.collector.append(`EXTRACT(${String(node.field).toUpperCase()} FROM `);
-    if (Array.isArray(node.expr)) {
-      this.visitArray(node.expr);
-    } else if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null && node.expr !== undefined) {
-      this.collector.append(String(node.expr));
-    }
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  // -- InfixOperation --
-
-  private visitArelNodesInfixOperation(node: Nodes.InfixOperation): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(` ${node.operator} `);
-    this.visitNodeOrValue(node.right);
-    return this.collector;
-  }
-
-  // -- Set operations --
-
-  protected visitArelNodesUnion(node: Nodes.Union): SQLString {
-    return this.infixValueWithParen(node, " UNION ");
-  }
-
-  protected visitArelNodesUnionAll(node: Nodes.UnionAll): SQLString {
-    return this.infixValueWithParen(node, " UNION ALL ");
-  }
-
-  protected visitArelNodesIntersect(node: Nodes.Intersect): SQLString {
-    this.collector.append("( ");
-    this.infixValue(node, " INTERSECT ");
-    this.collector.append(" )");
-    return this.collector;
-  }
-
-  protected visitArelNodesExcept(node: Nodes.Except): SQLString {
-    this.collector.append("( ");
-    this.infixValue(node, " EXCEPT ");
-    this.collector.append(" )");
-    return this.collector;
-  }
-
-  // -- CTE --
-
-  private visitArelNodesWith(node: Nodes.With): SQLString {
-    this.collector.append("WITH ");
-    this.injectJoin(node.children, ", ");
-    return this.collector;
-  }
-
-  private visitArelNodesWithRecursive(node: Nodes.WithRecursive): SQLString {
-    this.collector.append("WITH RECURSIVE ");
-    this.injectJoin(node.children, ", ");
-    return this.collector;
-  }
-
-  private visitArelNodesTableAlias(node: Nodes.TableAlias): SQLString {
-    this.visit(node.relation);
-    // Rails: `SelectManager#as` wraps the alias name in a SqlLiteral,
-    // and `AbstractAdapter#quote_table_name` returns SqlLiterals
-    // unchanged — so subquery aliases render bare. We approximate the
-    // same outcome at the visitor layer by checking whether the
-    // relation is a Grouping (the shape `SelectManager#as` produces);
-    // plain `Table#alias("foo")` keeps `"foo"`. Caveat: callers that
-    // construct a TableAlias on a Table with a SqlLiteral name
-    // wouldn't get the bare form here — Rails would. The runtime
-    // signature of `TableAlias.name` is `string`, so that path isn't
-    // currently reachable, but it's a Rails-fidelity divergence to
-    // revisit if the type widens.
-    if (node.relation instanceof Nodes.Grouping) {
-      this.collector.append(` ${node.name}`);
-    } else {
-      this.collector.append(` ${this.quoteTableName(node.name)}`);
-    }
-    return this.collector;
-  }
-
-  // -- Boolean literals --
-
-  protected visitArelNodesTrue(_node: Nodes.True): SQLString {
-    this.collector.append("TRUE");
-    return this.collector;
-  }
-
-  protected visitArelNodesFalse(_node: Nodes.False): SQLString {
-    this.collector.append("FALSE");
-    return this.collector;
-  }
-
-  // -- Advanced grouping --
 
   protected visitArelNodesCube(node: Nodes.Cube): SQLString {
     this.collector.append("CUBE(");
@@ -1239,63 +1740,10 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     return this.collector;
   }
 
-  private visitArelNodesGroup(node: Nodes.Group): SQLString {
-    if (node.expr instanceof Node) {
-      return this.visit(node.expr);
-    }
-    this.collector.append(String(node.expr));
-    return this.collector;
-  }
-
   protected visitArelNodesLateral(node: Nodes.Lateral): SQLString {
     // Mirrors Rails: `collector << "LATERAL "; grouping_parentheses(o.expr, ...)`.
     this.collector.append("LATERAL ");
     return this.groupingParentheses(node.subquery);
-  }
-
-  // Mirrors Rails: visit_Arel_Nodes_Comment (to_sql.rb:175) — emits the
-  // joined `/* ... */` blocks without a leading space. Callers add the
-  // leading separator (typically via `maybeVisit`).
-  protected visitArelNodesComment(node: Nodes.Comment): SQLString {
-    const blocks = node.values.map((v) => `/* ${this.sanitizeAsSqlComment(v)} */`);
-    this.collector.append(blocks.join(" "));
-    return this.collector;
-  }
-
-  // Mirrors Rails: visit_Arel_Nodes_OptimizerHints (to_sql.rb:170). The
-  // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
-  // an array); each hint is sanitized and the joined result wrapped in
-  // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
-  // node and `emitOptimizerHints` delegates here.
-  protected visitArelNodesOptimizerHints(node: Nodes.OptimizerHints): SQLString {
-    // Mirrors Rails: plain string hints are sanitized (newlines, comment
-    // delimiters, `--` line comments stripped) and empty results dropped.
-    // SqlLiteral hints are the explicit escape hatch and pass through
-    // unchanged — same contract as `sanitizeAsSqlComment`.
-    const sanitized = node.hints
-      .map((h) => (h instanceof Nodes.SqlLiteral ? h.value : this.sanitizeHint(h)))
-      .filter((h) => h.length > 0);
-    if (sanitized.length === 0) return this.collector;
-    this.collector.append(` /*+ ${sanitized.join(" ")} */`);
-    return this.collector;
-  }
-
-  // -- Matches with ESCAPE --
-
-  protected visitArelNodesMatches(node: Nodes.Matches): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" LIKE ");
-    this.visitNodeOrValue(node.right);
-    this.appendEscape(node.escape);
-    return this.collector;
-  }
-
-  protected visitArelNodesDoesNotMatch(node: Nodes.DoesNotMatch): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" NOT LIKE ");
-    this.visitNodeOrValue(node.right);
-    this.appendEscape(node.escape);
-    return this.collector;
   }
 
   // Mirrors Rails to_sql.rb: when ESCAPE is set, Rails calls `visit
@@ -1318,136 +1766,14 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
     }
   }
 
-  // -- NullsFirst / NullsLast --
-
-  protected visitArelNodesNullsFirst(node: Nodes.NullsFirst): SQLString {
-    if (node.expr instanceof Node) this.visit(node.expr);
-    this.collector.append(" NULLS FIRST");
-    return this.collector;
-  }
-
-  protected visitArelNodesNullsLast(node: Nodes.NullsLast): SQLString {
-    if (node.expr instanceof Node) this.visit(node.expr);
-    this.collector.append(" NULLS LAST");
-    return this.collector;
-  }
-
-  // -- Cte --
-
-  protected visitArelNodesCte(node: Nodes.Cte): SQLString {
-    this.collector.append(`${this.quoteTableName(node.name)} AS `);
-    if (node.materialized === true) {
-      this.collector.append("MATERIALIZED ");
-    } else if (node.materialized === false) {
-      this.collector.append("NOT MATERIALIZED ");
-    }
-    this.collector.append("(");
-    this.visit(node.relation);
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  // -- UnaryOperation --
-
-  private visitArelNodesUnaryOperation(node: Nodes.UnaryOperation): SQLString {
-    // Mirrors Rails: `collector << " #{o.operator} "` (visitors/to_sql.rb).
-    // The operator is emitted verbatim with a space on each side; callers
-    // are responsible for the operator's own whitespace.
-    this.collector.append(` ${node.operator} `);
-    this.visit(node.operand);
-    return this.collector;
-  }
-
-  // -- Filter --
-
-  private visitArelNodesFilter(node: Nodes.Filter): SQLString {
-    this.visitNodeOrValue(node.left);
-    this.collector.append(" FILTER (WHERE ");
-    this.visitNodeOrValue(node.right);
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  // -- Leaf nodes --
-
-  private visitArelNodesDistinct(_node: Nodes.Distinct): SQLString {
-    this.collector.append("DISTINCT");
-    return this.collector;
-  }
-
-  private visitArelTable(node: Table): SQLString {
-    // Mirrors Rails visit_Arel_Table (to_sql.rb): if name is a Node, visit
-    // it (subquery-as-table); else quote as identifier. Trails types
-    // `Table.name` as `string`; callers smuggling a Node in must cast.
-    const name = node.name as unknown;
-    if (name instanceof Node) {
-      this.visit(name);
-    } else {
-      this.collector.append(this.quoteTableName(node.name));
-    }
-    if (node.tableAlias) {
-      this.collector.append(` ${this.quoteTableName(node.tableAlias)}`);
-    }
-    return this.collector;
-  }
-
-  private visitArelAttributesAttribute(node: Nodes.Attribute): SQLString {
-    const tbl = node.relation.tableAlias || node.relation.name;
-    this.collector.append(`${this.quoteTableName(tbl)}.${this.quoteColumnName(node.name)}`);
-    return this.collector;
-  }
-
-  protected visitArelNodesUnqualifiedColumn(node: Nodes.UnqualifiedColumn): SQLString {
-    // Mirrors Arel's visit_Arel_Nodes_UnqualifiedColumn — strips the table
-    // qualifier so `SET col = col + 1` works in UPDATE statements.
-    const attr = node.attribute as Partial<Nodes.Attribute> | undefined;
-    if (!attr || typeof attr.name !== "string") {
-      throw new UnsupportedVisitError("UnqualifiedColumn must wrap an Attribute node with a name");
-    }
-    this.collector.append(this.quoteColumnName(attr.name));
-    return this.collector;
-  }
-
-  private visitArelNodesSqlLiteral(node: Nodes.SqlLiteral): SQLString {
-    if (!(node as { retryableFlag?: boolean }).retryableFlag) {
-      this.collector.retryable = false;
-    }
-    this.collector.append(node.value);
-    return this.collector;
-  }
+  // ---------------------------------------------------------------------
+  // Non-Arel visit dispatchers (Rails dispatches on Ruby native classes
+  // for stray values that drift into the visitor).
+  // ---------------------------------------------------------------------
 
   private visitQuoted(node: Nodes.Quoted): SQLString {
     return this.visitArelNodesCasted(node);
   }
-
-  protected visitArelNodesCasted(node: Nodes.Casted | Nodes.Quoted): SQLString {
-    // Mirrors AbstractAdapter#quote: resolve valueForDatabase on the wrapped
-    // value before quoting, so types that carry a valueForDatabase getter
-    // (e.g. encrypted AdditionalValue) surface the serialized form.
-    const value = resolveValueForDatabase(node.valueForDatabase());
-    if (this._extractBinds) {
-      this.collector.addBind(value, this.bindBlock());
-    } else {
-      this.collector.append(this.quote(value));
-    }
-    return this.collector;
-  }
-
-  private visitArelNodesValuesList(node: Nodes.ValuesList): SQLString {
-    this.collector.append("VALUES ");
-    for (let i = 0; i < node.rows.length; i++) {
-      if (i > 0) this.collector.append(", ");
-      this.collector.append("(");
-      for (let j = 0; j < node.rows[i].length; j++) {
-        if (j > 0) this.collector.append(", ");
-        this.visitNodeOrValue(node.rows[i][j] as Nodes.NodeOrValue);
-      }
-      this.collector.append(")");
-    }
-    return this.collector;
-  }
-
-  // -- Helpers --
 
   protected visitNodeOrValue(v: Nodes.NodeOrValue): SQLString {
     // Duck-type check for SelectManager (not a Node, but has ast/toSql).
@@ -1531,57 +1857,6 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       : `'${date} ${time}'`;
   }
 
-  protected quote(value: unknown): string {
-    if (value === null || value === undefined) return "NULL";
-    if (typeof value === "number") {
-      // Non-finite numbers (Float::INFINITY / NaN) must be string-quoted so
-      // PostgreSQL parses them as float literals rather than identifiers.
-      // SQLite/MySQL reject the values either way; delegate to connection.quote
-      // for adapter-specific handling.
-      if (!Number.isFinite(value)) return this.connection.quote(value);
-      return String(value);
-    }
-    if (typeof value === "boolean")
-      return value ? this.connection.quotedTrue() : this.connection.quotedFalse();
-    if (typeof value === "bigint") return value.toString();
-    // Normalise all typed-array views (ArrayBuffer, SharedArrayBuffer) to
-    // Uint8Array before handing off so adapters' quotedBinary can rely on a
-    // consistent shape. Uint8Array itself passes through unchanged.
-    if (ArrayBuffer.isView(value)) {
-      const bytes =
-        value instanceof Uint8Array
-          ? value
-          : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-      return this.connection.quotedBinary(bytes);
-    }
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toISOString" in value &&
-      typeof (value as { toISOString: unknown }).toISOString === "function"
-    ) {
-      return this.quotedDate(value as { toISOString(): string });
-    }
-    if (typeof value === "object" && value !== null) {
-      const proto = Object.getPrototypeOf(value);
-      const hasCustomToString =
-        proto === Object.prototype && value.toString !== Object.prototype.toString;
-      if ((proto === Object.prototype || proto === null) && !hasCustomToString) {
-        try {
-          const json = JSON.stringify(value);
-          if (json !== undefined) {
-            return `'${json.replace(/'/g, "''")}'`;
-          }
-        } catch {
-          // circular references, BigInt, etc. — fall through
-        }
-      }
-    }
-    // Unknown object types (custom classes, Temporal types without toISOString,
-    // etc.) — delegate to the connection, which knows the adapter-specific rules.
-    return this.connection.quote(value);
-  }
-
   private sanitizeHint(hint: string): string {
     return hint
       .replace(/[\r\n]+/g, " ")
@@ -1590,96 +1865,6 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       .replace(/--/g, "")
       .replace(/\s+/g, " ")
       .trim();
-  }
-
-  // ---------------------------------------------------------------------
-  // Rails-mirrored private helpers (to_sql.rb).
-  // ---------------------------------------------------------------------
-
-  /**
-   * Mirrors `to_sql.rb#collect_nodes_for`. Emits `spacer` then visits each
-   * node separated by `connector` (default `", "`). No-op when empty.
-   */
-  protected collectNodesFor(nodes: Node[], spacer: string, connector = ", "): SQLString {
-    if (nodes.length === 0) return this.collector;
-    this.collector.append(spacer);
-    this.injectJoin(nodes, connector);
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#inject_join`: visits `list[0]`, then for each
-   * subsequent node emits `joinStr` and visits.
-   */
-  protected injectJoin(list: Node[], joinStr: string): SQLString {
-    list.forEach((n, i) => {
-      if (i > 0) this.collector.append(joinStr);
-      this.visit(n);
-    });
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#maybe_visit`: if `thing` is non-null, emits a leading
-   * space and visits it; otherwise no-op. Used to thread optional clauses
-   * (limit/offset/lock/comment) through select-statement visitors.
-   */
-  protected maybeVisit(thing: Node | null | undefined): SQLString {
-    if (!thing) return this.collector;
-    this.collector.append(" ");
-    this.visit(thing);
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#collect_optimizer_hints`. Rails delegates to
-   * `maybe_visit o.optimizer_hints`; Trails' SelectCore now stores an
-   * `OptimizerHints` node (or null), and `emitOptimizerHints` does the
-   * `maybe_visit` no-op-when-nil dispatch.
-   */
-  protected collectOptimizerHints(o: Nodes.SelectCore): SQLString {
-    this.emitOptimizerHints(o);
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#sanitize_as_sql_comment`. SqlLiteral values pass
-   * through unchanged; otherwise strip newlines and `/*`/`* /` so the value
-   * is safe to embed inside a `/* … * /` SQL comment.
-   */
-  protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
-    if (value instanceof Nodes.SqlLiteral) return value.value;
-    return String(value)
-      .replace(/[\r\n]+/g, " ")
-      .replace(/\/\*/g, "")
-      .replace(/\*\//g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  /** @internal */
-  protected quoteTableName(name: string | Nodes.SqlLiteral): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteTableName(String(name));
-  }
-
-  /** @internal */
-  protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteColumnName(String(name));
-  }
-
-  /**
-   * Mirrors `to_sql.rb#bind_block` (which returns Rails' `BIND_BLOCK = proc { "?" }`).
-   * Returns the placeholder-rendering callback the SQLString collector calls
-   * for each unbound bind. Dialects override to emit numbered placeholders
-   * (e.g. `$1`, `$2` for Postgres-with-binds).
-   *
-   * The default callback is cached at module load (Rails caches it under
-   * `BIND_BLOCK`) so the hot bind path doesn't allocate a closure per call.
-   */
-  protected bindBlock(): (index: number) => string {
-    return DEFAULT_BIND_BLOCK;
   }
 
   /**
@@ -1713,190 +1898,5 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
       if ("value" in v) return this.unboundableSign(v.value);
     }
     return 0;
-  }
-
-  /** Mirrors `to_sql.rb#unboundable?` as a truthy check. */
-  protected isUnboundable(value: unknown): boolean {
-    return this.unboundableSign(value) !== 0;
-  }
-
-  /** Mirrors `to_sql.rb#has_group_by_and_having?`. */
-  protected hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean {
-    return o.groups.length > 0 && o.havings.length > 0;
-  }
-
-  /** Mirrors `to_sql.rb#infix_value`. Visits left, emits literal, visits right. */
-  protected infixValue(o: { left: Node; right: Node }, value: string): SQLString {
-    this.visit(o.left);
-    this.collector.append(value);
-    this.visit(o.right);
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#infix_value_with_paren`. Recursively wraps adjacent
-   * same-class infix nodes in `( ... )` per Rails' shape — Rails compares
-   * `o.left.class == o.class` to keep nested same-operator chains flat.
-   */
-  protected infixValueWithParen(
-    o: Node & { left: Node; right: Node },
-    value: string,
-    suppressParens = false,
-  ): SQLString {
-    const sameClass = (child: Node): child is typeof o =>
-      Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
-
-    if (!suppressParens) this.collector.append("( ");
-    if (sameClass(o.left)) {
-      this.infixValueWithParen(o.left, value, true);
-    } else {
-      this.groupingParentheses(o.left, false);
-    }
-    this.collector.append(value);
-    if (sameClass(o.right)) {
-      this.infixValueWithParen(o.right, value, true);
-    } else {
-      this.groupingParentheses(o.right, false);
-    }
-    if (!suppressParens) this.collector.append(" )");
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#grouping_parentheses`. Wraps a SelectStatement in
-   * parens when it would otherwise emit ambiguously; otherwise plain visit.
-   */
-  protected groupingParentheses(o: Node, alwaysWrapSelects = true): SQLString {
-    if (o instanceof Nodes.SelectStatement && (alwaysWrapSelects || this.isRequireParentheses(o))) {
-      this.collector.append("(");
-      this.visit(o);
-      this.collector.append(")");
-      return this.collector;
-    }
-    this.visit(o);
-    return this.collector;
-  }
-
-  /** Mirrors `to_sql.rb#require_parentheses?`. */
-  protected isRequireParentheses(o: Nodes.SelectStatement): boolean {
-    return o.orders.length > 0 || Boolean(o.limit) || Boolean(o.offset);
-  }
-
-  /**
-   * Mirrors `to_sql.rb#aggregate`. Renders `NAME(DISTINCT? expr, ...) AS alias?`.
-   */
-  protected aggregate(name: string, o: Nodes.Function): SQLString {
-    // Trails-specific: aggregate calls aren't safe to retry against a
-    // detached connection. Rails has no equivalent (the retryable flag is
-    // a Trails collector concern), so this is the one piece of behavior we
-    // carry alongside the Rails-shaped body.
-    this.collector.retryable = false;
-    this.collector.append(`${name}(`);
-    if (o.distinct) this.collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, ", ");
-    this.collector.append(")");
-    if (o.alias) {
-      this.collector.append(" AS ");
-      this.visit(o.alias);
-    }
-    return this.collector;
-  }
-
-  /**
-   * Mirrors `to_sql.rb#is_distinct_from`. CASE-form fallback for adapters
-   * that lack native `IS [NOT] DISTINCT FROM`.
-   */
-  protected isDistinctFrom(o: { left: Node; right: Node }): SQLString {
-    this.collector.append("CASE WHEN ");
-    this.visit(o.left);
-    this.collector.append(" = ");
-    this.visit(o.right);
-    this.collector.append(" OR (");
-    this.visit(o.left);
-    this.collector.append(" IS NULL AND ");
-    this.visit(o.right);
-    this.collector.append(" IS NULL)");
-    this.collector.append(" THEN 0 ELSE 1 END");
-    return this.collector;
-  }
-
-  /** Mirrors `to_sql.rb#collect_ctes`. Visits each CTE child joined by ", ". */
-  protected collectCtes(children: ReadonlyArray<{ toCte(): Node } | Node>): SQLString {
-    children.forEach((child, i) => {
-      if (i > 0) this.collector.append(", ");
-      const node =
-        typeof (child as { toCte?: () => Node }).toCte === "function"
-          ? (child as { toCte: () => Node }).toCte()
-          : (child as Node);
-      this.visit(node);
-    });
-    return this.collector;
-  }
-
-  /** Mirrors `to_sql.rb#unsupported`. */
-  protected unsupported(o: Node): never {
-    throw new UnsupportedVisitError(`Unknown node type: ${o.constructor.name}`);
-  }
-
-  // ---------------------------------------------------------------------
-  // Non-Arel visit dispatchers (Rails dispatches on Ruby native classes
-  // for stray values that drift into the visitor).
-  // ---------------------------------------------------------------------
-
-  /** Mirrors Rails: `visit_Integer`. */
-  protected visitInteger(o: number): SQLString {
-    this.collector.append(String(o));
-    return this.collector;
-  }
-
-  /**
-   * Mirrors Rails: `visit_Array` (to_sql.rb:858). Rails delegates to
-   * `inject_join` which calls `visit` on each element; in Ruby `visit` of
-   * a primitive routes through `visit_Integer`/`visit_String`/etc. Trails
-   * doesn't dispatch on JS primitives — `visitNodeOrValue` is the
-   * equivalent path that handles both Node and non-Node entries.
-   */
-  protected visitArray(items: ReadonlyArray<Nodes.NodeOrValue>): SQLString {
-    items.forEach((item, i) => {
-      if (i > 0) this.collector.append(", ");
-      this.visitNodeOrValue(item);
-    });
-    return this.collector;
-  }
-
-  /**
-   * Mirrors Rails: `visit_ActiveModel_Attribute` (to_sql.rb:756).
-   * Rails calls `collector.add_bind(o, &bind_block)` — always emits an
-   * unbound placeholder regardless of bind-extraction state. We do the
-   * same: the dispatch never delegates to the BindParam visitor (which
-   * would inline-quote when `_extractBinds` is false).
-   */
-  protected visitActiveModelAttribute(o: unknown): SQLString {
-    this.collector.addBind(o, this.bindBlock());
-    return this.collector;
-  }
-
-  /**
-   * Mirrors Rails: `visit_Arel_SelectManager` — visits the manager's AST
-   * wrapped in parens so it can be embedded as a subquery.
-   */
-  protected visitArelSelectManager(o: { ast: Node }): SQLString {
-    this.collector.append("(");
-    this.visit(o.ast);
-    this.collector.append(")");
-    return this.collector;
-  }
-
-  /**
-   * Mirrors Rails: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). Emits
-   * limit/offset/lock via `maybeVisit`. Trails' SelectStatement carries
-   * those fields directly, so this fires only when a caller constructs a
-   * `Nodes.SelectOptions` explicitly. Reachable through the dispatch table.
-   */
-  protected visitArelNodesSelectOptions(o: Nodes.SelectOptions): SQLString {
-    this.maybeVisit(o.limit);
-    this.maybeVisit(o.offset);
-    this.maybeVisit(o.lock);
-    return this.collector;
   }
 }

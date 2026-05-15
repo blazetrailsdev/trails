@@ -89,15 +89,12 @@ export class Attribute extends Node {
   readonly name: string;
   readonly caster?: TypeCaster;
 
-  constructor(relation: RelationLike, name: string, caster?: TypeCaster) {
-    super();
-    this.relation = relation;
-    this.name = name;
-    this.caster = caster;
-  }
-
   get typeCaster(): unknown {
     return this.relation.typeForAttribute ? this.relation.typeForAttribute(this.name) : undefined;
+  }
+
+  lower(): NamedFunction {
+    return new NamedFunction("LOWER", [this]);
   }
 
   typeCastForDatabase(value: unknown): unknown {
@@ -111,6 +108,15 @@ export class Attribute extends Node {
       ? this.relation.isAbleToTypeCast()
       : false;
   }
+
+  constructor(relation: RelationLike, name: string, caster?: TypeCaster) {
+    super();
+    this.relation = relation;
+    this.name = name;
+    this.caster = caster;
+  }
+
+  // -- Predicates --
 
   /**
    * Mirrors: Arel::Predications#quoted_node — the type-aware wrapper
@@ -133,8 +139,6 @@ export class Attribute extends Node {
     }
     return new Casted(value, this);
   }
-
-  // -- Predicates --
 
   eq(other: unknown): Equality {
     return new Equality(this, this.quotedNode(other));
@@ -201,17 +205,17 @@ export class Attribute extends Node {
     }
     return new NotIn(this, values.map(buildQuoted) as unknown as Node);
   }
-
   between(range: [unknown, unknown]): Node;
   between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+
   between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
     return betweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
-
   notBetween(range: [unknown, unknown]): Node;
   notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+
   notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
     return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
@@ -220,11 +224,11 @@ export class Attribute extends Node {
     return new Equality(this, new Quoted(null));
   }
 
+  // -- _any / _all variants --
+
   isNotNull(): NotEqual {
     return new NotEqual(this, new Quoted(null));
   }
-
-  // -- _any / _all variants --
 
   eqAny(others: unknown[]): Grouping {
     return groupedAny(others.map((o) => this.eq(o)));
@@ -302,10 +306,6 @@ export class Attribute extends Node {
     return groupedAny(others.map((o) => this.notIn(o)));
   }
 
-  notInAll(others: unknown[][]): Grouping {
-    return groupedAll(others.map((o) => this.notIn(o)));
-  }
-
   // -- Rails-private helpers (mirror Arel::Predications) --
   //
   // Rails' Attribute inherits these from Predications via `include`.
@@ -316,6 +316,10 @@ export class Attribute extends Node {
   // visibility of HomogeneousIn#ivars / SelectManager#collapse) since
   // they exist for Rails-fidelity / api:compare privates coverage,
   // not as a public API surface.
+
+  notInAll(others: unknown[][]): Grouping {
+    return groupedAll(others.map((o) => this.notIn(o)));
+  }
 
   protected groupingAny(
     methodId: string | ((this: Attribute, expr: unknown, ...extras: unknown[]) => Node),
@@ -349,6 +353,8 @@ export class Attribute extends Node {
     return Predications.isUnboundable.call(this, value);
   }
 
+  // -- Ordering --
+
   protected isOpenEnded(value: unknown): boolean {
     // Cast widens this' protected isInfinity/isUnboundable so they
     // match Predications.isOpenEnded's `this` constraint, which
@@ -363,20 +369,18 @@ export class Attribute extends Node {
     );
   }
 
-  // -- Ordering --
-
   asc(): Ascending {
     return new Ascending(this);
-  }
-
-  desc(): Descending {
-    return new Descending(this);
   }
 
   // -- Math --
   //
   // Mirrors Arel::Math: operands pass through unwrapped. The visitor
   // renders primitive values via `visitNodeOrValue`.
+
+  desc(): Descending {
+    return new Descending(this);
+  }
 
   add(other: unknown): Grouping {
     return new Grouping(new Addition(this, other as NodeOrValue));
@@ -414,14 +418,10 @@ export class Attribute extends Node {
     return new Grouping(new BitwiseShiftRight(this, other as NodeOrValue));
   }
 
-  bitwiseNot(): BitwiseNot {
-    return new BitwiseNot(this);
-  }
-
   // -- Aliasing --
 
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
+  bitwiseNot(): BitwiseNot {
+    return new BitwiseNot(this);
   }
 
   // -- Aggregate functions --
@@ -431,6 +431,10 @@ export class Attribute extends Node {
   // `instanceof` checks line up across the codebase. The visitor
   // (visitAggregate in to-sql.ts) renders them identically to a
   // NamedFunction with the same name.
+
+  as(aliasName: string): As {
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
+  }
 
   count(distinct = false): Count {
     return new Count([this], distinct);
@@ -448,14 +452,10 @@ export class Attribute extends Node {
     return new Min([this]);
   }
 
-  average(): Avg {
-    return new Avg([this]);
-  }
-
   // -- String functions --
 
-  lower(): NamedFunction {
-    return new NamedFunction("LOWER", [this]);
+  average(): Avg {
+    return new Avg([this]);
   }
 
   upper(): NamedFunction {

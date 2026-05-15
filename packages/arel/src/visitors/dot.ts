@@ -88,20 +88,15 @@ export class Dot extends Visitor {
     return sink as { value: string };
   }
 
-  /** Convenience entry that returns the dot string directly. */
-  compile(node: Node): string {
-    return this.accept(node).value;
-  }
-
-  // ---------------------------------------------------------------------
-  // visit_* methods (per-node-type edge declarations)
-  // ---------------------------------------------------------------------
-
   protected visitArelNodesFunction(o: Nodes.Function): void {
     this.visitEdge(o, "expressions");
     this.visitEdge(o, "distinct");
     this.visitEdge(o, "alias");
   }
+
+  // ---------------------------------------------------------------------
+  // visit_* methods (per-node-type edge declarations)
+  // ---------------------------------------------------------------------
 
   protected visitArelNodesUnary(o: Nodes.Unary): void {
     this.visitEdge(o, "expr");
@@ -178,17 +173,6 @@ export class Dot extends Visitor {
   protected visitArelNodesExtract(o: Nodes.Extract): void {
     this.visitEdge(o, "expr");
     this.visitEdge(o, "field");
-  }
-
-  /**
-   * Trails' Exists is a standalone Node with `expressions: Node` (single)
-   * and `alias` — not a Function subclass like Rails. Walk only the two
-   * fields it actually has; the generic visitArelNodesFunction would emit
-   * a `distinct` edge that doesn't exist on this node.
-   */
-  protected visitArelNodesExists(o: Nodes.Exists): void {
-    this.visitEdge(o, "expressions");
-    this.visitEdge(o, "alias");
   }
 
   protected visitArelNodesNamedFunction(o: Nodes.NamedFunction): void {
@@ -329,19 +313,6 @@ export class Dot extends Visitor {
   }
 
   /**
-   * Trails' OptimizerHints carries hints on `hints`, not on Unary's
-   * `expr` field (which stays `null` — see nodes/unary.ts). The default
-   * Unary fallback would visit `expr` and miss the hints entirely.
-   */
-  protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints): void {
-    this.visitEdge(o, "hints");
-  }
-
-  // ---------------------------------------------------------------------
-  // Core machinery (visit, edge, with_node, quote, to_dot)
-  // ---------------------------------------------------------------------
-
-  /**
    * Mirrors Rails' Dot#visit_edge — descend into a named field. Rails uses
    * `o.send(method)`, which raises `NoMethodError` on a typo; we mirror
    * that by checking the property exists (allowing `null`/`undefined` when
@@ -355,36 +326,6 @@ export class Dot extends Visitor {
     }
     const value = (o as Record<string, unknown>)[method];
     this.edge(method, () => this.visit(value));
-  }
-
-  /** Mirrors Rails' Dot#edge — push edge, run block, pop. */
-  protected edge(name: string, block: () => void): void {
-    const from = this.nodeStack[this.nodeStack.length - 1]!;
-    const e = new DotEdge(name, from);
-    this.edgeStack.push(e);
-    this.edges.push(e);
-    try {
-      block();
-    } finally {
-      this.edgeStack.pop();
-    }
-  }
-
-  /** Mirrors Rails' Dot#with_node — link incoming edge then push node. */
-  protected withNode(node: DotNode, block: () => void): void {
-    const e = this.edgeStack[this.edgeStack.length - 1];
-    if (e) e.to = node;
-    this.nodeStack.push(node);
-    try {
-      block();
-    } finally {
-      this.nodeStack.pop();
-    }
-  }
-
-  /** Mirrors Rails' Dot#quote — escape `"` for inclusion in a label. */
-  protected quote(value: unknown): string {
-    return String(value).replace(/"/g, '\\"');
   }
 
   /**
@@ -466,6 +407,40 @@ export class Dot extends Visitor {
     return undefined;
   }
 
+  /** Mirrors Rails' Dot#edge — push edge, run block, pop. */
+  protected edge(name: string, block: () => void): void {
+    const from = this.nodeStack[this.nodeStack.length - 1]!;
+    const e = new DotEdge(name, from);
+    this.edgeStack.push(e);
+    this.edges.push(e);
+    try {
+      block();
+    } finally {
+      this.edgeStack.pop();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Core machinery (visit, edge, with_node, quote, to_dot)
+  // ---------------------------------------------------------------------
+
+  /** Mirrors Rails' Dot#with_node — link incoming edge then push node. */
+  protected withNode(node: DotNode, block: () => void): void {
+    const e = this.edgeStack[this.edgeStack.length - 1];
+    if (e) e.to = node;
+    this.nodeStack.push(node);
+    try {
+      block();
+    } finally {
+      this.nodeStack.pop();
+    }
+  }
+
+  /** Mirrors Rails' Dot#quote — escape `"` for inclusion in a label. */
+  protected quote(value: unknown): string {
+    return String(value).replace(/"/g, '\\"');
+  }
+
   /**
    * Mirrors Rails' Dot#to_dot — emits the digraph header, one
    * `id [label="..."]` line per node, then one `from -> to [label="..."]`
@@ -491,6 +466,31 @@ export class Dot extends Visitor {
       return `${e.from.id} -> ${e.to.id} [label="${e.name}"];`;
     });
     return [header, ...nodeLines, ...edgeLines, "}"].join("\n");
+  }
+
+  /** Convenience entry that returns the dot string directly. */
+  compile(node: Node): string {
+    return this.accept(node).value;
+  }
+
+  /**
+   * Trails' Exists is a standalone Node with `expressions: Node` (single)
+   * and `alias` — not a Function subclass like Rails. Walk only the two
+   * fields it actually has; the generic visitArelNodesFunction would emit
+   * a `distinct` edge that doesn't exist on this node.
+   */
+  protected visitArelNodesExists(o: Nodes.Exists): void {
+    this.visitEdge(o, "expressions");
+    this.visitEdge(o, "alias");
+  }
+
+  /**
+   * Trails' OptimizerHints carries hints on `hints`, not on Unary's
+   * `expr` field (which stays `null` — see nodes/unary.ts). The default
+   * Unary fallback would visit `expr` and miss the hints entirely.
+   */
+  protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints): void {
+    this.visitEdge(o, "hints");
   }
 
   private isPrimitive(o: unknown): boolean {

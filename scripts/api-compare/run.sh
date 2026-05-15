@@ -20,3 +20,4 @@ LIB_PATHS_JSON="$(pnpm -s tsx "$ROOT/vendor/fetch.ts" --print-lib-paths)" \
 pnpm tsx "$DIR/extract-ts-api.ts"
 pnpm tsx "$DIR/compare.ts" "$@"
 pnpm tsx "$ROOT/scripts/build-rails-privates-manifest.ts"
+pnpm tsx "$ROOT/scripts/build-rails-method-order-manifest.ts"

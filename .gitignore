@@ -16,4 +16,5 @@ scripts/api-compare/.rails-source
 
 # Generated from rails-api.json by scripts/build-rails-privates-manifest.ts
 eslint/rails-private-methods.json
+eslint/rails-method-order.json
 .claude/skills

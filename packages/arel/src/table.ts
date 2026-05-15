@@ -28,6 +28,10 @@ export class Table extends Node {
   readonly klass?: TableKlass;
   private typeCaster: unknown;
 
+  get engine(): unknown {
+    return Table.engine;
+  }
+
   constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
     super();
     this.name = name;
@@ -35,63 +39,6 @@ export class Table extends Node {
     this.tableAlias = as === name ? null : as;
     this.klass = options?.klass;
     this.typeCaster = options?.typeCaster ?? null;
-  }
-
-  get engine(): unknown {
-    return Table.engine;
-  }
-
-  typeCastForDatabase(attrName: string, value: unknown): unknown {
-    if (
-      this.typeCaster &&
-      typeof (this.typeCaster as Record<string, unknown>).typeCastForDatabase === "function"
-    ) {
-      return (
-        this.typeCaster as { typeCastForDatabase: (n: string, v: unknown) => unknown }
-      ).typeCastForDatabase(attrName, value);
-    }
-    return value;
-  }
-
-  typeForAttribute(name: string): unknown {
-    if (
-      this.typeCaster &&
-      typeof (this.typeCaster as Record<string, unknown>).typeForAttribute === "function"
-    ) {
-      return (this.typeCaster as { typeForAttribute: (n: string) => unknown }).typeForAttribute(
-        name,
-      );
-    }
-    return undefined;
-  }
-
-  isAbleToTypeCast(): boolean {
-    return this.typeCaster != null;
-  }
-
-  get(name: string, table?: Attribute["relation"]): Attribute {
-    const resolved = this.klass?._attributeAliases?.[name] ?? name;
-    return new Attribute(table ?? this, resolved);
-  }
-
-  attr(name: string): Attribute {
-    return this.get(name);
-  }
-
-  project(...projections: (Node | string)[]): SelectManager {
-    const manager = new SelectManager(this);
-    if (projections.length > 0) {
-      manager.project(...projections);
-    }
-    return manager;
-  }
-
-  from(): SelectManager {
-    return new SelectManager(this);
-  }
-
-  get star(): SqlLiteral {
-    return new SqlLiteral(`${quoteSchemaQualifiedName(this.name)}.*`);
   }
 
   /**
@@ -103,16 +50,8 @@ export class Table extends Node {
     return new TableAlias(this, name ?? `${this.name}_2`);
   }
 
-  /**
-   * Factory: create a Join node (defaults to InnerJoin).
-   * Arguments are passed directly to the join constructor, matching
-   * Ruby's Arel::FactoryMethods#create_join.
-   *
-   * Mirrors: Arel::Table#create_join
-   */
-  createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
-    const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
-    return new JoinClass(to as Node, (constraint ?? null) as Node | null);
+  from(): SelectManager {
+    return new SelectManager(this);
   }
 
   /**
@@ -177,6 +116,14 @@ export class Table extends Node {
     return manager;
   }
 
+  project(...projections: (Node | string)[]): SelectManager {
+    const manager = new SelectManager(this);
+    if (projections.length > 0) {
+      manager.project(...projections);
+    }
+    return manager;
+  }
+
   /**
    * Convenience: creates a SelectManager with LIMIT.
    *
@@ -208,6 +155,59 @@ export class Table extends Node {
     const manager = new SelectManager(this);
     manager.having(expr);
     return manager;
+  }
+
+  typeCastForDatabase(attrName: string, value: unknown): unknown {
+    if (
+      this.typeCaster &&
+      typeof (this.typeCaster as Record<string, unknown>).typeCastForDatabase === "function"
+    ) {
+      return (
+        this.typeCaster as { typeCastForDatabase: (n: string, v: unknown) => unknown }
+      ).typeCastForDatabase(attrName, value);
+    }
+    return value;
+  }
+
+  typeForAttribute(name: string): unknown {
+    if (
+      this.typeCaster &&
+      typeof (this.typeCaster as Record<string, unknown>).typeForAttribute === "function"
+    ) {
+      return (this.typeCaster as { typeForAttribute: (n: string) => unknown }).typeForAttribute(
+        name,
+      );
+    }
+    return undefined;
+  }
+
+  isAbleToTypeCast(): boolean {
+    return this.typeCaster != null;
+  }
+
+  get(name: string, table?: Attribute["relation"]): Attribute {
+    const resolved = this.klass?._attributeAliases?.[name] ?? name;
+    return new Attribute(table ?? this, resolved);
+  }
+
+  attr(name: string): Attribute {
+    return this.get(name);
+  }
+
+  get star(): SqlLiteral {
+    return new SqlLiteral(`${quoteSchemaQualifiedName(this.name)}.*`);
+  }
+
+  /**
+   * Factory: create a Join node (defaults to InnerJoin).
+   * Arguments are passed directly to the join constructor, matching
+   * Ruby's Arel::FactoryMethods#create_join.
+   *
+   * Mirrors: Arel::Table#create_join
+   */
+  createJoin(to: Node | string, constraint?: Node | string | null, klass?: typeof InnerJoin): Join {
+    const JoinClass = klass && typeof klass === "function" ? klass : InnerJoin;
+    return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
   /**

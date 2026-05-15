@@ -67,10 +67,6 @@ export class Casted extends NodeExpression {
     this.attribute = attribute;
   }
 
-  valueBeforeTypeCast(): unknown {
-    return this.value;
-  }
-
   valueForDatabase(): unknown {
     const attr = this.attribute as unknown as {
       caster?: { typeCastForDatabase(v: unknown): unknown };
@@ -86,6 +82,10 @@ export class Casted extends NodeExpression {
     return this.value;
   }
 
+  valueBeforeTypeCast(): unknown {
+    return this.value;
+  }
+
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
@@ -97,19 +97,15 @@ export class Casted extends NodeExpression {
  * Mirrors: Arel::Nodes::Quoted (extends Unary; value stored in expr slot)
  */
 export class Quoted extends Unary {
-  constructor(value: unknown) {
-    super(value);
-  }
-
   get value(): unknown {
     return this.expr;
   }
 
-  valueForDatabase(): unknown {
-    return this.value;
+  constructor(value: unknown) {
+    super(value);
   }
 
-  valueBeforeTypeCast(): unknown {
+  valueForDatabase(): unknown {
     return this.value;
   }
 
@@ -117,6 +113,10 @@ export class Quoted extends Unary {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
     return null;
+  }
+
+  valueBeforeTypeCast(): unknown {
+    return this.value;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

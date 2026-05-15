@@ -1,6 +1,10 @@
 import { Ordering } from "./ordering.js";
 
 export class Ascending extends Ordering {
+  reverse(): Descending {
+    return new Descending(this.expr);
+  }
+
   get direction(): "asc" {
     return "asc";
   }
@@ -11,10 +15,6 @@ export class Ascending extends Ordering {
 
   isDescending(): boolean {
     return false;
-  }
-
-  reverse(): Descending {
-    return new Descending(this.expr);
   }
 
   nullsFirst(): NullsFirst {

@@ -28,6 +28,35 @@ export class InsertManager extends TreeManager {
   }
 
   /**
+   * Return the current columns list.
+   *
+   * Mirrors: Arel::InsertManager#columns
+   */
+  get columns(): Node[] {
+    return this.ast.columns;
+  }
+
+  /**
+   * Mirrors: Arel::InsertManager `values=` (insert_manager.rb).
+   */
+  set values(val: Node | null) {
+    this.ast.values = val;
+  }
+
+  /**
+   * Set a SelectManager as the source for INSERT ... SELECT.
+   *
+   * Mirrors: Arel::InsertManager#select — stores the manager itself
+   * rather than unwrapping to its inner `.ast`. The visitor handles
+   * either shape (raw Node or SelectManager-shaped duck-type) via
+   * `visitNodeOrValue`.
+   */
+  select(selectManager: InsertSelectSource): this {
+    this.ast.select = selectManager;
+    return this;
+  }
+
+  /**
    * Set column/value pairs.
    *
    * Mirrors: Arel::InsertManager#insert (insert_manager.rb).
@@ -59,35 +88,6 @@ export class InsertManager extends TreeManager {
       row.push(val);
     }
     this.ast.values = this.createValues(row);
-    return this;
-  }
-
-  /**
-   * Mirrors: Arel::InsertManager `values=` (insert_manager.rb).
-   */
-  set values(val: Node | null) {
-    this.ast.values = val;
-  }
-
-  /**
-   * Return the current columns list.
-   *
-   * Mirrors: Arel::InsertManager#columns
-   */
-  get columns(): Node[] {
-    return this.ast.columns;
-  }
-
-  /**
-   * Set a SelectManager as the source for INSERT ... SELECT.
-   *
-   * Mirrors: Arel::InsertManager#select — stores the manager itself
-   * rather than unwrapping to its inner `.ast`. The visitor handles
-   * either shape (raw Node or SelectManager-shaped duck-type) via
-   * `visitNodeOrValue`.
-   */
-  select(selectManager: InsertSelectSource): this {
-    this.ast.select = selectManager;
     return this;
   }
 

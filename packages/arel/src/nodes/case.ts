@@ -35,6 +35,10 @@ export class Case extends NodeExpression {
     return this;
   };
 
+  else(result: Node | unknown): this {
+    this.default = new Else(buildQuoted(result === undefined ? null : result));
+    return this;
+  }
   // Mirrors Arel::Nodes::Case#then — sets the right side of the most
   // recent When clause. Rails: `@conditions.last.right = build_quoted(expression)`.
   // Rails raises NoMethodError on `nil.right=` if no #when has been called;
@@ -52,6 +56,7 @@ export class Case extends NodeExpression {
   // resolve `this.when` without an undefined-check).
   then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
   then(result: Node | unknown): this;
+
   then(result: Node | unknown, onRejected?: unknown): this | void {
     if (typeof result === "function" && typeof onRejected === "function") {
       (onRejected as (e: Error) => unknown)(
@@ -62,11 +67,6 @@ export class Case extends NodeExpression {
     const last = this.conditions[this.conditions.length - 1];
     if (!last) throw new Error("Case#then called before Case#when");
     last.right = buildQuoted(result === undefined ? null : result);
-    return this;
-  }
-
-  else(result: Node | unknown): this {
-    this.default = new Else(buildQuoted(result === undefined ? null : result));
     return this;
   }
 

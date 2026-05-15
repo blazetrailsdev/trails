@@ -41,26 +41,6 @@ export abstract class Visitor {
   }
 
   /**
-   * Per-class dispatch cache. Each subclass gets its own map seeded from
-   * its parent (mirrors Rails' `@dispatch_cache ||= ...` per-class ivar).
-   *
-   * @internal
-   */
-  static dispatchCache(this: VisitorCtor): Map<NodeCtor, string> {
-    let cache = PER_CLASS_CACHE.get(this);
-    if (!cache) {
-      const parent = Object.getPrototypeOf(this) as VisitorCtor | null;
-      const inherited =
-        parent && typeof parent.dispatchCache === "function" && parent !== this
-          ? parent.dispatchCache()
-          : undefined;
-      cache = new Map(inherited);
-      PER_CLASS_CACHE.set(this, cache);
-    }
-    return cache;
-  }
-
-  /**
    * Instance-side accessor mirroring Rails' private `get_dispatch_cache`.
    * Returns the class-level dispatch cache for `this.constructor`.
    */
@@ -85,6 +65,26 @@ export abstract class Visitor {
       );
     }
     return (fn as (n: Node, c?: unknown) => unknown).call(this, object, collector);
+  }
+
+  /**
+   * Per-class dispatch cache. Each subclass gets its own map seeded from
+   * its parent (mirrors Rails' `@dispatch_cache ||= ...` per-class ivar).
+   *
+   * @internal
+   */
+  static dispatchCache(this: VisitorCtor): Map<NodeCtor, string> {
+    let cache = PER_CLASS_CACHE.get(this);
+    if (!cache) {
+      const parent = Object.getPrototypeOf(this) as VisitorCtor | null;
+      const inherited =
+        parent && typeof parent.dispatchCache === "function" && parent !== this
+          ? parent.dispatchCache()
+          : undefined;
+      cache = new Map(inherited);
+      PER_CLASS_CACHE.set(this, cache);
+    }
+    return cache;
   }
 
   /**
