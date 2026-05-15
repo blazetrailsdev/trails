@@ -2069,7 +2069,11 @@ describe("TransactionTest", () => {
 
     it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
-      const spy = vi.spyOn(adapter as Required<DatabaseAdapter>, "clearCacheBang");
+      // TM routes through this.inner (the real connection), so spy on innerAdapter.
+      // SchemaAdapter.clearCacheBang delegates to inner, and TM calls clearCacheBang
+      // on _connection (= inner) directly — spying on the wrapper would miss it.
+      const innerAdapter = (adapter as any).innerAdapter ?? adapter;
+      const spy = vi.spyOn(innerAdapter as Required<DatabaseAdapter>, "clearCacheBang");
       await expect(
         transaction(Account, async () => {
           throw new PreparedStatementCacheExpired("cached plan expired");
@@ -2079,7 +2083,8 @@ describe("TransactionTest", () => {
     });
 
     it("does not call clearCacheBang for unrelated errors", async () => {
-      const spy = vi.spyOn(adapter as Required<DatabaseAdapter>, "clearCacheBang");
+      const innerAdapter = (adapter as any).innerAdapter ?? adapter;
+      const spy = vi.spyOn(innerAdapter as Required<DatabaseAdapter>, "clearCacheBang");
       await expect(
         transaction(Account, async () => {
           throw new Error("unrelated");
@@ -2088,10 +2093,12 @@ describe("TransactionTest", () => {
       expect(spy).not.toHaveBeenCalled();
     });
 
-    // The tests above exercise the fallback path (test-adapter has no
-    // withinNewTransaction). The TransactionManager path is reached
-    // when an adapter defines withinNewTransaction — cover that branch
-    // explicitly so it can't regress without a failing test.
+    // The "after_failure_actions" tests above run on a SchemaAdapter, which
+    // (after Phase 1) takes the TM path. They cover the SchemaAdapter→TM
+    // delegation by spying on inner.clearCacheBang. The test below covers
+    // the pure-TM path directly, against a hand-rolled TransactionManager
+    // with no SchemaAdapter wrapper — guards against TM-internal regressions
+    // independently of the wrapper.
     it("calls clearCacheBang via TransactionManager.withinNewTransaction", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
       const { TransactionManager } = await import("./connection-adapters/abstract/transaction.js");
@@ -2244,5 +2251,178 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
 
     expect((topic as any)._dirty.changed).toBe(false);
     expect((topic as any)._dirty.mutationsFromDatabase).toEqual({});
+  });
+});
+
+// ==========================================================================
+// SchemaAdapter TM delegation regression test (Phase 1)
+// ==========================================================================
+describe("SchemaAdapter TM delegation", () => {
+  // createTestAdapter wraps a shared inner adapter; without local restore,
+  // spies leak into the next test in this file.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // SchemaAdapter.setup() calls execDdlWithSavepoint which issues
+  // this.inner.createSavepoint directly — bypassing TM intentionally.
+  // After Phase 1, TM may have an open frame when setup() fires inside a
+  // test transaction. This test confirms that:
+  //   1. SchemaAdapter satisfies the withinNewTransaction duck-type check,
+  //      so transaction() takes the TM path (not _transactionFallback).
+  //   2. setup() triggered inside a transaction (via DDL recovery) doesn't
+  //      interfere with the enclosing SavepointTransaction: TM's commit()
+  //      releases the SavepointTransaction's own savepoint name, not the
+  //      already-released DDL savepoints.
+  //
+  // DDL savepoints are released eagerly (releaseSavepoint right after exec);
+  // TM does not track them and never tries to release them again.
+  it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
+    const testAdapter = createTestAdapter();
+    const inner = (testAdapter as any).innerAdapter;
+    const spy = vi.spyOn(inner, "withinNewTransaction");
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = testAdapter;
+      }
+    }
+    await transaction(Item, async () => {
+      await Item.create({ name: "tm-path" });
+    });
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("requiresNew nested transaction uses SavepointTransaction on top of outer RealTransaction", async () => {
+    const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
+    const { SavepointTransaction, RealTransaction } =
+      await import("./connection-adapters/abstract/transaction.js");
+    const testAdapter = createTestAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = testAdapter;
+      }
+    }
+
+    let outerType: string | undefined;
+    let innerType: string | undefined;
+
+    await transaction(Item, async () => {
+      await Item.create({ name: "outer" });
+      const cur = (testAdapter as any).currentTransaction?.();
+      outerType = cur instanceof TxBase ? cur.constructor.name : String(cur);
+
+      await transaction(
+        Item,
+        async () => {
+          await Item.create({ name: "inner" });
+          const curIn = (testAdapter as any).currentTransaction?.();
+          innerType = curIn instanceof TxBase ? curIn.constructor.name : String(curIn);
+        },
+        { requiresNew: true },
+      );
+    });
+
+    // Outer must be a real DB transaction frame; inner must be a Savepoint
+    // (NOT RestartParent or NullTransaction). This guards against TM joining
+    // the parent instead of opening a savepoint.
+    expect(outerType).toBe(RealTransaction.name);
+    expect(innerType).toBe(SavepointTransaction.name);
+  });
+
+  it("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
+    // Regression: before the per-inner-adapter mutex + async-chain-aware
+    // delegations, two concurrent top-level transactions would race the
+    // shared TM stack and corrupt instrumenter state (the failure that
+    // hit MariaDB CI).
+    const testAdapter = createTestAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = testAdapter;
+      }
+    }
+    // Force a defineSchema-like priming so concurrent creates don't race on DDL.
+    await Item.create({ name: "prime" });
+
+    const observed: Array<{ inside: unknown }> = [];
+    // Track concurrent execution: increment on entry, decrement on exit.
+    // The mutex should keep this at 1 for the entire run.
+    let active = 0;
+    let maxActive = 0;
+    await Promise.all(
+      Array.from({ length: 6 }, (_v, i) =>
+        transaction(Item, async () => {
+          active++;
+          if (active > maxActive) maxActive = active;
+          try {
+            // Each chain must see its own frame inside. If foreign chains
+            // were leaking, two concurrent callers would observe the SAME
+            // frame here.
+            await Item.create({ name: `concurrent-${i}` });
+            const inside = (testAdapter as any).currentTransaction?.();
+            observed.push({ inside });
+          } finally {
+            active--;
+          }
+        }),
+      ),
+    );
+
+    // After all transactions complete, the adapter's chain-aware view sees
+    // no current transaction (storage cleared).
+    expect((testAdapter as any).currentTransaction?.()).toBeFalsy();
+    // Mutex must have fully serialized — no two bodies ever overlapped.
+    expect(maxActive).toBe(1);
+    // Every chain must have seen a frame (no nulls/undefined) AND each frame
+    // must be distinct — if the mutex degenerated to "join", or if a chain
+    // saw the empty NULL_TRANSACTION, this would fail.
+    expect(observed).toHaveLength(6);
+    for (const o of observed) {
+      expect(o.inside).toBeDefined();
+      expect(o.inside).not.toBeNull();
+    }
+    const distinctFrames = new Set(observed.map((o) => o.inside)).size;
+    expect(distinctFrames).toBe(observed.length);
+    expect(await Item.count()).toBe(7);
+  });
+
+  it("manual beginTransaction/commit pair exposes inner state via _manualTxDepth", async () => {
+    // Direct adapter.beginTransaction() callers (query-cache tests,
+    // migrations, fixtures) don't enter withinNewTransaction so they don't
+    // set the AsyncLocalStorage flag. _manualTxDepth tracks them per
+    // wrapper so the chain-aware delegations expose inner state.
+    const testAdapter = createTestAdapter();
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = testAdapter;
+      }
+    }
+    // Prime the schema before beginTransaction so MySQL DDL doesn't
+    // implicit-commit the manual transaction.
+    await Item.create({ name: "prime" });
+
+    // Before any manual tx: state hidden.
+    expect((testAdapter as any).inTransaction).toBe(false);
+    expect((testAdapter as any).openTransactions).toBe(0);
+    expect((testAdapter as any).currentTransaction?.()).toBeNull();
+
+    await testAdapter.beginTransaction();
+    // After manual BEGIN: inner state visible to this wrapper.
+    expect((testAdapter as any).inTransaction).toBe(true);
+    expect((testAdapter as any).openTransactions).toBeGreaterThan(0);
+
+    await testAdapter.commit();
+    // After commit: state hidden again.
+    expect((testAdapter as any).inTransaction).toBe(false);
+    expect((testAdapter as any).openTransactions).toBe(0);
+
+    // Rollback path also clears.
+    await testAdapter.beginTransaction();
+    expect((testAdapter as any).inTransaction).toBe(true);
+    await testAdapter.rollback();
+    expect((testAdapter as any).inTransaction).toBe(false);
   });
 });

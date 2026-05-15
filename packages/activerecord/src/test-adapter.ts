@@ -16,6 +16,8 @@
  * creation from model definitions — not SQL guessing.
  */
 
+import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
+
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
@@ -74,6 +76,62 @@ const _registeredModelClasses = new Set<any>();
 
 // Module-level lock to serialize setup() across all SchemaAdapter instances.
 let _setupLock: Promise<void> | null = null;
+
+// Per-inner-adapter mutex for outermost withinNewTransaction calls. Rails uses
+// `connection.lock.synchronize` to serialize concurrent transactions on a
+// shared connection; the `_transactionFallback` path in `transactions.ts` has
+// the equivalent via `_adapterLocks` (Phase 2 will delete that fallback).
+// SchemaAdapter no longer takes the fallback path after Phase 1, so it loses
+// the fallback's serialization. Concurrent `Promise.all([Model.create, ...])`
+// callers would otherwise corrupt the TM stack on the shared inner adapter.
+// This mutex restores serialization for that case.
+//
+// Reentrancy: AsyncLocalStorage marks "we already hold the lock in THIS async
+// chain." Nested transaction() calls within the same chain (including those
+// fired by after_commit/after_rollback callbacks before
+// inner.withinNewTransaction returns) skip lock acquisition, avoiding deadlock.
+// A concurrent call from a DIFFERENT async chain sees an empty store and
+// correctly blocks on the mutex.
+//
+// Known limitations (both fixed by Phase 8 — push lock into TM itself):
+//   1. `Promise.all([transaction(M, …, requiresNew), transaction(M, …,
+//      requiresNew)])` started from inside a transaction body shares the
+//      parent's storage flag. Both child branches see "in our own chain"
+//      and skip the mutex, then race the TM stack at await points. Exotic
+//      pattern; the common Promise.all(top-level) case IS serialized.
+//   2. Cross-wrapper manual transactions on the same inner adapter aren't
+//      visible to other wrappers in the same chain (_manualTxDepth is
+//      per-instance). Phase 7 deletes SchemaAdapter so this becomes moot.
+const _withinNewTxLocks = new WeakMap<object, Promise<void>>();
+let _txLockHeld: AsyncContext<true> | null = null;
+let _txLockHeldAdapter: ReturnType<typeof getAsyncContext> | null = null;
+function _txLockStorage(): AsyncContext<true> {
+  // Recreate storage if ActiveSupport.asyncContextAdapter is swapped at
+  // runtime (matches the pattern in transactions.ts / core.ts /
+  // explain-registry.ts). Caching the first adapter forever would leak
+  // visibility state across browser-compat / DI swaps.
+  const asyncContext = getAsyncContext();
+  if (!_txLockHeld || _txLockHeldAdapter !== asyncContext) {
+    _txLockHeld = asyncContext.create<true>();
+    _txLockHeldAdapter = asyncContext;
+  }
+  return _txLockHeld;
+}
+
+async function _acquireWithinNewTxLock(adapter: object): Promise<() => void> {
+  while (_withinNewTxLocks.has(adapter)) {
+    await _withinNewTxLocks.get(adapter);
+  }
+  let release!: () => void;
+  const lock = new Promise<void>((resolve) => {
+    release = () => {
+      _withinNewTxLocks.delete(adapter);
+      resolve();
+    };
+  });
+  _withinNewTxLocks.set(adapter, lock);
+  return release;
+}
 
 // Set true when createTestAdapter() is called; cleared after data cleanup.
 let _needsCleanup = false;
@@ -370,6 +428,11 @@ let _ddlSpCounter = 0;
  */
 async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
   const useSp = isPg() && ((inner.openTransactions ?? 0) > 0 || inner.inTransaction);
+  // TM uses lazy materialization: openTransactions>0 doesn't mean BEGIN was
+  // sent. If we issue SAVEPOINT now PG errors with "SAVEPOINT can only be
+  // used in transaction blocks". Force materialization so the BEGIN is on
+  // the wire before SAVEPOINT.
+  if (useSp) await inner.materializeTransactions?.();
   const sp = useSp ? `_ddl_sp_${++_ddlSpCounter}` : "";
   try {
     if (useSp) await inner.createSavepoint(sp);
@@ -588,9 +651,24 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   private inner: DatabaseAdapter;
+  // Counts manual beginTransaction()/commit()/rollback() pairs on this
+  // wrapper instance. Direct callers (migrations, fixtures, query-cache
+  // tests) don't go through withinNewTransaction so they don't set the
+  // AsyncLocalStorage flag — without this counter the chain-aware
+  // delegations would hide the transaction state from them.
+  private _manualTxDepth = 0;
 
   constructor(inner: DatabaseAdapter) {
     this.inner = inner;
+  }
+
+  /**
+   * True when this caller should see the inner adapter's transaction state.
+   * Either we entered through withinNewTransaction (storage set) or the
+   * caller manually opened a transaction on this wrapper instance.
+   */
+  private _txVisible(): boolean {
+    return _txLockStorage().getStore() === true || this._manualTxDepth > 0;
   }
 
   get schemaCache(): SchemaCache | undefined {
@@ -713,6 +791,15 @@ class SchemaAdapter implements DatabaseAdapter {
       // can rollback the failed statement and retry after auto-creating the
       // missing table/column.
       const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
+      // Force TM materialization (BEGIN on the wire) before SAVEPOINT — TM uses
+      // lazy materialization so openTransactions>0 alone doesn't mean BEGIN was sent.
+      // Known limitation: TM.materializeTransactions() returns immediately when
+      // another caller is already materializing, so concurrent statements
+      // inside the same lazy transaction can still race SAVEPOINT-before-BEGIN.
+      // The proper fix lives in TransactionManager (Phase 8 of the plan doc).
+      // The outer mutex in withinNewTransaction prevents the cross-transaction
+      // race that hits MariaDB CI; this case requires deeper TM changes.
+      if (useSp) await this.materializeTransactions();
       const sp = useSp ? `_sr_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -758,6 +845,7 @@ class SchemaAdapter implements DatabaseAdapter {
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
       const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
+      if (useSp) await this.materializeTransactions();
       const sp = useSp ? `_sr_m_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -926,17 +1014,71 @@ class SchemaAdapter implements DatabaseAdapter {
     return m[1] || m[2] || null;
   }
 
+  async withinNewTransaction<T>(
+    opts: { isolation?: string | null; joinable?: boolean },
+    fn: (tx?: unknown) => Promise<T> | T,
+  ): Promise<T> {
+    const inner = this.inner as any;
+    // Detect "nested in our OWN async chain" via AsyncLocalStorage — not via
+    // shared adapter state. An unrelated concurrent transaction on the same
+    // inner adapter must NOT cause us to bypass the mutex (would race the TM
+    // stack); conversely, callbacks fired from within our own transaction
+    // (after_commit, etc.) must skip the lock to avoid self-deadlock.
+    const storage = _txLockStorage();
+    const inOurOwnTx = storage.getStore() === true;
+    if (inOurOwnTx) return inner.withinNewTransaction(opts, fn);
+
+    const release = await _acquireWithinNewTxLock(inner);
+    try {
+      // setup() runs before TM enters its frame (mirrors beginTransaction()'s
+      // existing invariant): MySQL DDL implicit-commits an open tx; PG would
+      // try SAVEPOINT before BEGIN was sent.
+      await this.setup();
+      return await storage.run(true, () => inner.withinNewTransaction(opts, fn));
+    } finally {
+      release();
+    }
+  }
+
+  currentTransaction() {
+    // Async-chain-aware: a foreign concurrent caller must NOT see another
+    // chain's TM frame as joinable. database-statements.transaction() checks
+    // currentTransaction() before falling through to withinNewTransaction;
+    // if we exposed a foreign frame here it would "join" and bypass the
+    // outer mutex entirely (failure mode: Promise.all top-level transactions
+    // observing each other's frame as joinable, breaking serialization).
+    // Return null when our own chain has no transaction open.
+    if (!this._txVisible()) return null;
+    return (this.inner as any).currentTransaction?.();
+  }
+
+  addTransactionRecord(record: unknown, ensureFinalize?: boolean) {
+    return (this.inner as any).addTransactionRecord?.(record, ensureFinalize);
+  }
+
+  materializeTransactions() {
+    return (this.inner as any).materializeTransactions?.();
+  }
+
   async beginTransaction(): Promise<void> {
     // Run pending DDL before beginning the transaction because MySQL DDL
     // causes implicit commits which destroy savepoints and break nesting.
     await this.setup();
-    return this.inner.beginTransaction();
+    await this.inner.beginTransaction();
+    this._manualTxDepth++;
   }
   async commit(): Promise<void> {
-    return this.inner.commit();
+    // Only decrement on success — failed COMMIT can leave PG/MySQL in an
+    // unresolved transaction (driver clears `inTransaction` only when COMMIT
+    // succeeds). If we decremented in finally, SchemaAdapter would report
+    // no tx while inner is still mid-transaction, sending the next
+    // transaction() call down the wrong path.
+    await this.inner.commit();
+    if (this._manualTxDepth > 0) this._manualTxDepth--;
   }
   async rollback(): Promise<void> {
-    return this.inner.rollback();
+    await this.inner.rollback();
+    if (this._manualTxDepth > 0) this._manualTxDepth--;
   }
   async createSavepoint(name: string): Promise<void> {
     return this.inner.createSavepoint(name);
@@ -951,10 +1093,17 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner.clearCacheBang?.();
   }
   get inTransaction(): boolean {
+    // Async-chain-aware (see currentTransaction comment). transactions.ts:142
+    // uses adapter.inTransaction in the duck-type check; if we returned true
+    // for foreign chains, that caller would route to _transactionFallback,
+    // bypass the outer mutex, and run as a nested savepoint inside the
+    // unrelated chain's transaction.
+    if (!this._txVisible()) return false;
     return this.inner.inTransaction;
   }
 
   get openTransactions(): number {
+    if (!this._txVisible()) return 0;
     return this.inner.openTransactions ?? 0;
   }
 
