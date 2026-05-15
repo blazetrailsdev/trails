@@ -84,23 +84,32 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
   const byFile = new Map<string, string[]>();
   const seenPerFile = new Map<string, Set<string>>();
 
+  // Emit ALL candidates from rubyMethodToTs, not just the first. Some
+  // Ruby predicates camelize to multiple acceptable TS names (e.g.
+  // `empty?` → `["isEmpty", "empty"]`, `has_attribute?` → `["hasAttribute",
+  // "isHasAttribute"]`). Recording only the first means a TS port that
+  // chose the alternate spelling becomes "unmapped" and skips ordering.
+  // The rule's `for (const name of expectedOrder)` loop naturally
+  // handles alternates: candidates that aren't present in the container
+  // are no-ops, so emitting both is safe.
   const push = (rubyFile: string, name: string) => {
     const candidates = rubyMethodToTs(name);
     if (!candidates || candidates.length === 0) return;
-    const ts = candidates[0];
     let seen = seenPerFile.get(rubyFile);
     if (!seen) {
       seen = new Set();
       seenPerFile.set(rubyFile, seen);
     }
-    if (seen.has(ts)) return;
-    seen.add(ts);
     let list = byFile.get(rubyFile);
     if (!list) {
       list = [];
       byFile.set(rubyFile, list);
     }
-    list.push(ts);
+    for (const ts of candidates) {
+      if (seen.has(ts)) continue;
+      seen.add(ts);
+      list.push(ts);
+    }
   };
 
   const visit = (entities: Record<string, RubyEntity>) => {
