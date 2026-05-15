@@ -134,14 +134,13 @@ export async function transaction<T>(
 ): Promise<T | undefined> {
   const adapter = modelClass.adapter;
 
-  // If the adapter supports the full TransactionManager path, use it.
-  // Also check adapter.inTransaction to detect external transactions
-  // (e.g., fixtures) that TransactionManager doesn't know about — fall
-  // through to the fallback which handles nesting via savepoints.
-  if (
-    typeof (adapter as any).withinNewTransaction === "function" &&
-    !(currentTransaction() === null && adapter.inTransaction)
-  ) {
+  // Invariant: every trails adapter begins transactions through TM. The
+  // only legitimate raw `BEGIN` (via `exec()` / `executeMutation`) is
+  // reserved for migrations performing DDL. Transactional fixtures route
+  // through `adapter.beginTransaction()` → TM, so the previously needed
+  // `inTransaction && currentTransaction() === null` "external BEGIN"
+  // bypass is gone (TM Phase 3 unification).
+  if (typeof (adapter as any).withinNewTransaction === "function") {
     // No per-adapter lock needed: TransactionManager's join-or-savepoint
     // logic handles concurrent callers. The second caller either joins the
     // existing transaction (if joinable) or creates a SavepointTransaction.
