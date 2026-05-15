@@ -272,21 +272,30 @@ const rule = {
 
     return {
       ClassBody(node) {
-        // Only consider classes at the top level of the file. Classes
-        // nested inside a function body (e.g. the `class NumericType
-        // extends Base` inside `applyNumericMixin()`) are
-        // implementation detail of the surrounding function — if we
-        // also reorder a containing top-level FunctionDeclaration, the
-        // two fix ranges overlap and ESLint throws.
-        const klass = node.parent; // ClassDeclaration | ClassExpression
-        const klassParent = klass?.parent;
-        const topLevel =
-          klassParent?.type === "Program" ||
-          (klassParent?.type === "ExportNamedDeclaration" &&
-            klassParent.parent?.type === "Program") ||
-          (klassParent?.type === "ExportDefaultDeclaration" &&
-            klassParent.parent?.type === "Program");
-        if (!topLevel) return;
+        // Eligible iff no function-like scope sits between the class
+        // and the Program root. Rejects classes nested inside a
+        // function body (whose members would otherwise emit fixes
+        // overlapping with a reordered enclosing FunctionDeclaration);
+        // accepts top-level ClassDeclaration, default/named export,
+        // and `const Foo = class { … }` / variable-declarator forms.
+        let ancestor = node.parent?.parent;
+        let nested = false;
+        while (ancestor && ancestor.type !== "Program") {
+          // TSDeclareFunction (signature-only `function foo(...): T;`)
+          // intentionally omitted — it has no body, so it cannot
+          // contain a ClassBody and would never appear in this chain.
+          if (
+            ancestor.type === "FunctionDeclaration" ||
+            ancestor.type === "FunctionExpression" ||
+            ancestor.type === "ArrowFunctionExpression" ||
+            ancestor.type === "MethodDefinition"
+          ) {
+            nested = true;
+            break;
+          }
+          ancestor = ancestor.parent;
+        }
+        if (nested) return;
         const orderable = node.body.filter(isOrderableClassMember);
         if (orderable.length < 2) return;
         containers.push({ container: node, members: orderable });

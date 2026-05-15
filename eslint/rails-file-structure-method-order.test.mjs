@@ -104,6 +104,29 @@ try {
           `  };\n` +
           `}\n`,
       },
+      // Class nested inside an arrow function — also rejected. The
+      // ancestor walk catches ArrowFunctionExpression too.
+      {
+        filename: classFile,
+        code: `const mk = () => class {\n  third() {}\n  first() {}\n  second() {}\n};\n`,
+      },
+      // Class nested inside another class's method — also rejected.
+      // The ancestor walk hits a function-like node (the method's
+      // FunctionExpression, then MethodDefinition) on the way up to
+      // Program and short-circuits.
+      {
+        filename: classFile,
+        code:
+          `class Outer {\n` +
+          `  build() {\n` +
+          `    return class {\n` +
+          `      third() {}\n` +
+          `      first() {}\n` +
+          `      second() {}\n` +
+          `    };\n` +
+          `  }\n` +
+          `}\n`,
+      },
       // Hoisting-scope safety: ClassDeclaration and `const`/`let` are NOT
       // orderable. A file with only those declarations (no
       // MethodDefinition or FunctionDeclaration) emits no diagnostic,
@@ -143,6 +166,17 @@ try {
         code: `class X {\n  third() {}\n  first() {}\n  second() {}\n}\n`,
         errors: [{ messageId: "outOfOrder" }],
         output: `class X {\n  first() {}\n  second() {}\n  third() {}\n}\n`,
+      },
+      // `const X = class { … }` — class expression bound to a
+      // top-level variable. Reachable from Program through
+      // VariableDeclarator / VariableDeclaration with no function-like
+      // ancestor between, so it's still file-level structure and gets
+      // reordered.
+      {
+        filename: classFile,
+        code: `const X = class {\n  third() {}\n  first() {}\n  second() {}\n};\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `const X = class {\n  first() {}\n  second() {}\n  third() {}\n};\n`,
       },
       // Method-level @rails-structure-skip JSDoc must NOT suppress the
       // whole file — even though the marker is present, it sits inside
