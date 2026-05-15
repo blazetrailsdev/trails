@@ -111,7 +111,7 @@ describeIfPg("TransactionIsolationTest", () => {
       await Tag.transaction(
         async () => {
           expect(await Tag.count()).toBe(0);
-          await Tag2.create({ name: "x" });
+          await Tag2.create({});
           expect(await Tag.count()).toBe(1);
         },
         { isolation: "read_uncommitted" },
@@ -127,7 +127,7 @@ describeIfPg("TransactionIsolationTest", () => {
         async () => {
           expect(await Tag.count()).toBe(0);
           await Tag2.transaction(async () => {
-            await Tag2.create({ name: "x" });
+            await Tag2.create({});
             expect(await Tag.count()).toBe(0);
           });
         },
@@ -167,7 +167,7 @@ describeIfPg("TransactionIsolationTest", () => {
       const { Tag } = tagModels(adapter, adapter2);
       await Tag.transaction(
         async () => {
-          await Tag.create({ name: "x" });
+          await Tag.create({});
         },
         { isolation: "serializable" },
       );

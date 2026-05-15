@@ -44,6 +44,7 @@ function makeSQLiteMovie() {
   class Movie extends Base {
     static {
       this.primaryKey = "movieid";
+      this.attribute("movieid", "integer");
       this.attribute("name", "string");
       this._tableName = "movies";
       this.adapter = adapter;
@@ -1683,7 +1684,7 @@ describe("TransactionTest", () => {
     });
 
     movie.writeAttribute("movieid", null);
-    expect(movie.readAttribute("movieid")).toBeNull();
+    expect(movie.movieid).toBeNull();
   });
   it("sqlite add column in transaction", () => {
     expect(true).toBe(true);
