@@ -19,10 +19,9 @@ globalid side via a side-effect import (same pattern as
 `findSignedGlobalId` working without bloating `base.ts`, and unblocks future
 ActionCable / ActiveJob ports that need GIDs without an AR dependency.
 
-Rails source root: `scripts/globalid-source/vendor/bundle/ruby/*/gems/globalid-1.3.0/lib/`
-(abbreviated as `$GID/` below). Pinned to globalid 1.3.0 via `scripts/globalid-source/Gemfile`.
-The vendor tree is gitignored — run `scripts/globalid-source/fetch-globalid.sh` once after
-checkout to populate it.
+Globalid source root: `vendor/globalid/lib/` (abbreviated as `$GID/` below).
+Pinned to globalid 1.3.0 via `vendor/sources.ts`. Run `pnpm vendor:fetch --source globalid`
+once after checkout to populate it.
 
 ## Why
 
@@ -91,12 +90,13 @@ infrastructure already exists in our packages.
 
 ## Migration plan
 
-### GID-0 — Vendor source for cross-reference (~25 LOC, plan-only) ✅ this commit
+### GID-0 — Vendor source for cross-reference (~25 LOC, plan-only) ✅ done
 
-- Add `scripts/globalid-source/Gemfile` pinning `globalid` 1.3.0
-- Add `scripts/globalid-source/.gitignore` ignoring `vendor/`, `.bundle/`, `Gemfile.lock`
-- Add `scripts/globalid-source/fetch-globalid.sh` (mirrors `scripts/api-compare/fetch-rails.sh`)
-- Add this plan doc
+- Originally added `scripts/globalid-source/` (Gemfile + bundler fetch script). Superseded by
+  the unified vendor system (PR #1552 plan, waves 1–3) — globalid now lives at `vendor/globalid/`,
+  cloned from `rails/globalid` at v1.3.0 by `pnpm vendor:fetch --source globalid`. The old
+  `scripts/globalid-source/` was deleted in wave 3.
+- Plan doc landed.
 
 ### GID-1 — Create `packages/globalid` skeleton + delete the lie in AR (~150 LOC)
 
