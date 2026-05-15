@@ -14,6 +14,10 @@ const KNOWN_SGID_KEYS = new Set(["app", "for", "purpose", "expiresIn", "expiresA
 /** Monotonic counter for stable inspect() ids; mirrors Ruby's object_id. @internal */
 let _nextObjectId = 0;
 
+/** Class-level defaults — mirror Rails' `SignedGlobalID.verifier` / `.expires_in` attr_accessors. @internal */
+let _classVerifier: MessageVerifier | undefined;
+let _classExpiresIn: number | null | undefined;
+
 export interface SignedGlobalIDOptions {
   app?: string;
   /** Rails-canonical purpose option. */
@@ -24,7 +28,8 @@ export interface SignedGlobalIDOptions {
   expiresIn?: number | null;
   /** Explicit expiration time. `null` explicitly disables expiration (Rails: `expires_at: nil`). */
   expiresAt?: Temporal.Instant | null;
-  verifier: MessageVerifier;
+  /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
+  verifier?: MessageVerifier;
   /** Custom GID query params (any extra keys become URI params). */
   [key: string]: unknown;
 }
@@ -34,8 +39,12 @@ export interface ParseOptions {
   for?: string;
   /** Alias of `for` kept for backward compatibility. */
   purpose?: string;
-  verifier: MessageVerifier;
+  /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
+  verifier?: MessageVerifier;
 }
+
+/** Mirrors: SignedGlobalID::ExpiredMessage. */
+export class ExpiredMessage extends Error {}
 
 /** @internal */
 interface SgidPayload {
@@ -79,7 +88,7 @@ export class SignedGlobalID {
    *
    * Mirrors: SignedGlobalID.new
    */
-  static create(model: GlobalIDModel, options: SignedGlobalIDOptions): SignedGlobalID {
+  static create(model: GlobalIDModel, options: SignedGlobalIDOptions = {}): SignedGlobalID {
     const app = options.app ?? getApp();
     if (!app) {
       throw new Error(
@@ -99,24 +108,129 @@ export class SignedGlobalID {
       Object.keys(filteredParams).length ? filteredParams : null,
     );
 
-    const purpose = options.for ?? options.purpose ?? DEFAULT_PURPOSE;
+    const verifier = SignedGlobalID.pickVerifier(options);
+    const purpose = SignedGlobalID.pickPurpose(options);
     const expiresAt = pickExpiration(options);
 
-    return new SignedGlobalID(uri, purpose, expiresAt, options.verifier);
+    return new SignedGlobalID(uri, purpose, expiresAt, verifier);
   }
 
   /**
    * Parse a signed SGID token. Returns null on invalid signature, expiration,
    * or purpose mismatch.
    *
-   * Mirrors: SignedGlobalID.parse (verify_with_verifier_validated_metadata path)
+   * Mirrors: SignedGlobalID.parse
    */
-  static parse(sgid: string, options: ParseOptions): SignedGlobalID | null {
-    const purpose = options.for ?? options.purpose ?? DEFAULT_PURPOSE;
-    const result = verifyToken(sgid, purpose, options.verifier);
-    if (result === null) return null;
-    const { uri, expiresAt } = result;
-    return new SignedGlobalID(uri, purpose, expiresAt, options.verifier);
+  static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
+    const verifier = SignedGlobalID.pickVerifier(options);
+    const purpose = SignedGlobalID.pickPurpose(options);
+    const verified = SignedGlobalID.verify(sgid, options);
+    if (verified === null) return null;
+    return new SignedGlobalID(verified.uri, purpose, verified.expiresAt, verifier);
+  }
+
+  // ─── Class-level config (Rails: attr_accessor :verifier, :expires_in) ─────
+
+  /** Default verifier used when an SGID create/parse call omits the `verifier:` option. */
+  static get verifier(): MessageVerifier | undefined {
+    return _classVerifier;
+  }
+  static set verifier(v: MessageVerifier | undefined) {
+    _classVerifier = v;
+  }
+
+  /** Default `expires_in` (seconds) for new SGIDs that omit both expiresIn and expiresAt. */
+  static get expiresIn(): number | null | undefined {
+    return _classExpiresIn;
+  }
+  static set expiresIn(v: number | null | undefined) {
+    _classExpiresIn = v;
+  }
+
+  /**
+   * Mirrors: SignedGlobalID.pick_verifier. Falls back to the class-level
+   * verifier when the option isn't passed. Throws if neither is set.
+   */
+  static pickVerifier(options: { verifier?: MessageVerifier }): MessageVerifier {
+    const v = options.verifier ?? _classVerifier;
+    if (!v) {
+      throw new Error(
+        "Pass a `verifier:` option with a MessageVerifier instance, or set a default SignedGlobalID.verifier.",
+      );
+    }
+    return v;
+  }
+
+  /** Mirrors: SignedGlobalID.pick_purpose. */
+  static pickPurpose(options: { for?: string; purpose?: string }): string {
+    return options.for ?? options.purpose ?? DEFAULT_PURPOSE;
+  }
+
+  // ─── Verify dispatch (Rails private class methods) ────────────────────────
+
+  /**
+   * @internal Mirrors SignedGlobalID.verify — dispatches to the verifier-
+   * validated path, then falls back to the legacy self-validated path.
+   */
+  static verify(
+    sgid: string,
+    options: ParseOptions,
+  ): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
+    return (
+      SignedGlobalID.verifyWithVerifierValidatedMetadata(sgid, options) ??
+      SignedGlobalID.verifyWithLegacySelfValidatedMetadata(sgid, options)
+    );
+  }
+
+  /**
+   * @internal Mirrors verify_with_verifier_validated_metadata. Verifier
+   * validates purpose + expires_at; we then re-check the embedded URI parses.
+   */
+  static verifyWithVerifierValidatedMetadata(
+    sgid: string,
+    options: ParseOptions,
+  ): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
+    try {
+      const verifier = SignedGlobalID.pickVerifier(options);
+      const purpose = SignedGlobalID.pickPurpose(options);
+      const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
+      if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
+      if (raw.purpose !== purpose) return null;
+      parseGid(raw.gid);
+      let expiresAt: Temporal.Instant | undefined;
+      if (raw.expires_at) {
+        expiresAt = Temporal.Instant.from(raw.expires_at);
+        if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
+      }
+      return { uri: raw.gid, expiresAt };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * @internal Mirrors verify_with_legacy_self_validated_metadata — Rails
+   * 1.3.0 still parses SGIDs issued before the verifier-validated form.
+   * Trails has no legacy SGIDs to read; documented as out of scope in the
+   * GlobalID plan, so this always returns null. Kept for api:compare parity.
+   */
+  static verifyWithLegacySelfValidatedMetadata(
+    _sgid: string,
+    _options: ParseOptions,
+  ): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
+    return null;
+  }
+
+  /**
+   * @internal Mirrors raise_if_expired. Throws `ExpiredMessage` when
+   * `expiresAt` (ISO 8601 string) is in the past; no-op for null/missing.
+   * Only used by the legacy verify path in Rails; we expose it for parity.
+   */
+  static raiseIfExpired(expiresAt: string | null | undefined): void {
+    if (!expiresAt) return;
+    const instant = Temporal.Instant.from(expiresAt);
+    if (Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0) return;
+    throw new ExpiredMessage("This signed global id has expired.");
   }
 
   toString(): string {
@@ -177,45 +291,23 @@ export class SignedGlobalID {
 }
 
 /** @internal */
-function verifyToken(
-  sgid: string,
-  purpose: string,
-  verifier: MessageVerifier,
-): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
-  try {
-    const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
-    if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
-    if (raw.purpose !== purpose) return null;
-    // Validate the embedded URI by attempting a full parse. Without this, a
-    // signed payload like "gid://app/Person" (no model id) verifies and
-    // later throws when modelId/modelName/params are accessed.
-    parseGid(raw.gid);
-    let expiresAt: Temporal.Instant | undefined;
-    if (raw.expires_at) {
-      expiresAt = Temporal.Instant.from(raw.expires_at);
-      if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
-    }
-    return { uri: raw.gid, expiresAt };
-  } catch {
-    return null;
-  }
-}
-
-/** @internal */
 function pickExpiration(
   options: Pick<SignedGlobalIDOptions, "expiresAt" | "expiresIn">,
 ): Temporal.Instant | undefined {
-  // Rails parity (with TS-friendly tweak for the spread-defaults case):
+  // Rails parity:
   //   - explicit null   → disable expiration; wins over expiresIn (Rails nil)
   //   - real Instant    → use it
   //   - undefined       → treat as omitted; fall through to expiresIn
-  //                       (so `{ ...defaults, expiresIn: 60 }` where defaults
-  //                       has expiresAt: undefined doesn't silently disable)
+  //   - both omitted    → fall through to class-level SignedGlobalID.expiresIn
   if (options.expiresAt !== undefined) return options.expiresAt ?? undefined;
-  if (options.expiresIn !== undefined) {
-    if (options.expiresIn === null) return undefined;
-    const ms = Math.round(options.expiresIn * 1000);
-    return Temporal.Now.instant().add({ milliseconds: ms });
-  }
-  return undefined;
+  const expiresIn = options.expiresIn !== undefined ? options.expiresIn : _classExpiresIn;
+  if (expiresIn == null) return undefined;
+  const ms = Math.round(expiresIn * 1000);
+  return Temporal.Now.instant().add({ milliseconds: ms });
+}
+
+/** @internal — test use only: clear class-level config between tests. */
+export function _resetSignedGlobalIDClassConfig(): void {
+  _classVerifier = undefined;
+  _classExpiresIn = undefined;
 }

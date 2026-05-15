@@ -213,6 +213,58 @@ describe("SignedGlobalIDExpirationTest", () => {
     const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: -1 });
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
   });
+
+  it("expires_in defaults to class level expiration", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      SignedGlobalID.expiresIn = 3600; // 1 hour class-level default
+      const sgid = SignedGlobalID.create(person(5), { verifier });
+      vi.setSystemTime(new Date("2024-01-01T00:59:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      vi.setSystemTime(new Date("2024-01-01T01:01:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      SignedGlobalID.expiresIn = undefined;
+    }
+  });
+
+  it("passing in expires_in overrides class level expiration", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      SignedGlobalID.expiresIn = 3600;
+      // Per-call expiresIn: 2 hours wins over class-level 1 hour
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 7200 });
+      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      vi.setSystemTime(new Date("2024-01-01T01:00:03.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+      SignedGlobalID.expiresIn = undefined;
+    }
+  });
+
+  it("passing expires_at overrides class level expires_in", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      SignedGlobalID.expiresIn = 3600;
+      // Per-call expiresAt: tomorrow wins over class-level 1 hour
+      const tomorrow = Temporal.Instant.from("2024-01-02T00:00:00.000Z");
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: tomorrow });
+      vi.setSystemTime(new Date("2024-01-01T02:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+      SignedGlobalID.expiresIn = undefined;
+    }
+  });
 });
 
 describe("SignedGlobalIDCustomParamsTest", () => {
@@ -297,6 +349,38 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
     it("throws when no app configured and no app option", () => {
       const verifier = makeVerifier();
       expect(() => SignedGlobalID.create(person(5), { verifier })).toThrow(/app is required/i);
+    });
+  });
+
+  describe("class-level verifier config (Rails: SignedGlobalID.verifier=)", () => {
+    afterEach(() => {
+      SignedGlobalID.verifier = undefined;
+    });
+
+    it("create uses class-level verifier when none in options", () => {
+      const v = makeVerifier();
+      SignedGlobalID.verifier = v;
+      const sgid = SignedGlobalID.create(person(5));
+      // Token verifies with the class-level verifier (no option needed).
+      const parsed = SignedGlobalID.parse(sgid.toString());
+      expect(parsed).not.toBeNull();
+      expect(parsed!.uri).toBe("gid://bcx/Person/5");
+    });
+
+    it("pickVerifier throws when neither option nor class-level is set", () => {
+      expect(() => SignedGlobalID.pickVerifier({})).toThrow(
+        /Pass a `verifier:` option .* SignedGlobalID\.verifier/,
+      );
+    });
+
+    it("per-call verifier wins over class-level", () => {
+      const classV = makeVerifier("class-secret");
+      const callV = makeVerifier("call-secret");
+      SignedGlobalID.verifier = classV;
+      const sgid = SignedGlobalID.create(person(5), { verifier: callV });
+      // Class-level verifier can't verify a token signed with a different one.
+      expect(SignedGlobalID.parse(sgid.toString())).toBeNull();
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier: callV })).not.toBeNull();
     });
   });
 });
