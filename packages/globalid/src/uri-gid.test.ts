@@ -3,6 +3,7 @@ import {
   parseGid,
   buildGid,
   validateApp,
+  GID,
   MissingModelIdError,
   InvalidComponentError,
   BadURIError,
@@ -175,5 +176,57 @@ describe("URI::GIDParamsTest", () => {
   it("as String", () => {
     const uri = buildGid("bcx", "Person", "5", { hello: "world" });
     expect(uri).toBe("gid://bcx/Person/5?hello=world");
+  });
+});
+
+describe("URI::GID class wrapper", () => {
+  it("GID.parse exposes app / modelName / modelId / params", () => {
+    const gid = GID.parse("gid://bcx/Person/5?hello=world");
+    expect(gid.app).toBe("bcx");
+    expect(gid.modelName).toBe("Person");
+    expect(gid.modelId).toBe("5");
+    expect(gid.params).toEqual({ hello: "world" });
+    expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
+  });
+
+  it("GID.create builds from app + model instance", () => {
+    const gid = GID.create("bcx", { id: 5, constructor: { name: "Person" } });
+    expect(gid.toString()).toBe("gid://bcx/Person/5");
+  });
+
+  it("GID.build accepts a components-hash with composite primary key", () => {
+    const gid = GID.build({
+      app: "bcx",
+      modelName: "CompositePrimaryKeyModel",
+      modelId: ["tenant", "id"],
+      params: { db: "primary" },
+    });
+    expect(gid.toString()).toBe("gid://bcx/CompositePrimaryKeyModel/tenant/id?db=primary");
+    expect(gid.modelId).toEqual(["tenant", "id"]);
+  });
+
+  it("GID.validateApp rejects invalid app names", () => {
+    expect(() => GID.validateApp(null)).toThrow();
+    expect(() => GID.validateApp("foo_bar")).toThrow();
+    expect(GID.validateApp("foo-bar")).toBe("foo-bar");
+  });
+
+  it("GID#deconstructKeys returns a deep-enough copy of the component hash", () => {
+    const gid = GID.parse("gid://bcx/Person/5?k=v");
+    const a = gid.deconstructKeys();
+    expect(a).toEqual({ app: "bcx", modelName: "Person", modelId: "5", params: { k: "v" } });
+    // Mutating any field of the returned object must not affect the GID.
+    (a as { app: string }).app = "evil";
+    a.params["k"] = "evil";
+    expect(gid.app).toBe("bcx");
+    expect(gid.params).toEqual({ k: "v" });
+  });
+
+  it("GID#deconstructKeys also copies composite modelId arrays", () => {
+    const gid = GID.parse("gid://bcx/CompositePrimaryKeyModel/tenant/id");
+    const a = gid.deconstructKeys();
+    expect(a.modelId).toEqual(["tenant", "id"]);
+    (a.modelId as string[]).push("evil");
+    expect(gid.modelId).toEqual(["tenant", "id"]);
   });
 });

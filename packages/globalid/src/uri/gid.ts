@@ -149,3 +149,202 @@ function cgiEscape(s: string): string {
 function cgiUnescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, "%20"));
 }
+
+// ─── URI::GID class wrapper (Rails parity) ─────────────────────────────────
+
+/**
+ * Class form of the GID URI. Wraps {@link parseGid}/{@link buildGid} so the
+ * Rails `URI::GID` method surface (parse / create / build / validate_app on
+ * the class; modelName / modelId / params / toString / deconstructKeys on
+ * the instance) is reachable for api:compare matching and for callers who
+ * prefer an OO shape.
+ *
+ * Mirrors: URI::GID (vendor/globalid/lib/global_id/uri/gid.rb)
+ */
+export class GID {
+  /** The raw GID URI string. */
+  readonly uri: string;
+  private readonly _components: GidComponents;
+
+  /** @internal — callers should use {@link GID.parse} / {@link GID.create} / {@link GID.build}. */
+  constructor(uri: string, components?: GidComponents) {
+    this.uri = uri;
+    this._components = components ?? parseGid(uri);
+  }
+
+  /** Mirrors `alias :app :host`. */
+  get app(): string {
+    return this._components.app;
+  }
+  /** Mirrors `attr_reader :model_name`. */
+  get modelName(): string {
+    return this._components.modelName;
+  }
+  /** Mirrors `attr_reader :model_id`. */
+  get modelId(): string | string[] {
+    return this._components.modelId;
+  }
+  /** Mirrors `attr_reader :params`. */
+  get params(): Record<string, string> {
+    return this._components.params;
+  }
+
+  /** Mirrors: URI::GID#to_s */
+  toString(): string {
+    return this.uri;
+  }
+
+  /**
+   * Mirrors: URI::GID#deconstruct_keys. Ruby uses this for pattern
+   * matching; TS has no equivalent, so we return a shallow copy of the
+   * components hash (a copy, not the internal state, so callers can't
+   * mutate the GID via the returned object).
+   */
+  deconstructKeys(_keys: readonly string[] | null = null): GidComponents {
+    const { modelId } = this._components;
+    return {
+      ...this._components,
+      modelId: Array.isArray(modelId) ? [...modelId] : modelId,
+      params: { ...this._components.params },
+    };
+  }
+
+  // ─── Static factories ────────────────────────────────────────────────────
+
+  /** Mirrors: URI::GID.parse */
+  static parse(uri: string): GID {
+    return new GID(uri);
+  }
+
+  /** Mirrors: URI::GID.create(app, model, params) */
+  static create(
+    app: string,
+    model: { id: unknown; constructor: { name: string } },
+    params: Record<string, string> | null = null,
+  ): GID {
+    return GID.build({ app, modelName: model.constructor.name, modelId: model.id, params });
+  }
+
+  /** Mirrors: URI::GID.build({app:, model_name:, model_id:, params:}) */
+  static build(args: {
+    app: string;
+    modelName: string;
+    modelId: unknown;
+    params?: Record<string, string> | null;
+  }): GID {
+    const uri = buildGid(args.app, args.modelName, args.modelId, args.params);
+    // Construct components directly from inputs — buildGid already validated
+    // them, so skipping the round-trip through parseGid saves a regex match
+    // + URL decode pass. modelId is normalized to the same shape parseGid
+    // produces: arrays for composite, string for scalar.
+    const modelId = Array.isArray(args.modelId)
+      ? args.modelId.map((p) => String(p))
+      : String(args.modelId ?? "");
+    return new GID(uri, {
+      app: args.app,
+      modelName: args.modelName,
+      modelId,
+      params: args.params ?? {},
+    });
+  }
+
+  /** Mirrors: URI::GID.validate_app */
+  static validateApp(app: string | null | undefined): string {
+    return validateApp(app);
+  }
+
+  // ─── URI::Generic subclass hooks ─────────────────────────────────────────
+  //
+  // Rails URI::GID inherits from URI::Generic and overrides these hooks so
+  // the standard URI library calls them while parsing/assigning. We don't
+  // subclass URI in TS — public parsing goes through GID.parse → parseGid,
+  // not through these hooks. They exist for two reasons:
+  //   1. api:compare parity (the methods need to be present on URI::GID).
+  //   2. Subclass extension points: a TS subclass of GID can override these
+  //      to plug into the validation pipeline if needed.
+  // Each delegates to the same standalone helpers parseGid/validateApp use,
+  // so behavior matches if anyone does call them directly.
+
+  /** @internal Mirrors URI::GID#set_path — re-parses model components from path. */
+  protected setPath(path: string): void {
+    this.setModelComponents(path, true);
+  }
+  /** @internal Mirrors URI::GID#query= — assigns parsed params via a setter. */
+  protected set query(value: string | undefined) {
+    this.setParams(this.parseQueryParams(value));
+  }
+  /** @internal Mirrors URI::GID#set_query (Ruby ≤ 2.1 alias of query=). */
+  protected setQuery(query: string | undefined): void {
+    this.query = query;
+  }
+  /** @internal Mirrors URI::GID#set_params. */
+  protected setParams(params: Record<string, string>): void {
+    (this._components as { params: Record<string, string> }).params = params;
+  }
+  /** @internal Mirrors URI::GID#check_host. */
+  protected checkHost(host: string): true {
+    this.validateComponent(host);
+    return true;
+  }
+  /** @internal Mirrors URI::GID#check_path. */
+  protected checkPath(path: string): true {
+    this.validateComponent(path);
+    this.setModelComponents(path, true);
+    return true;
+  }
+  /** @internal Mirrors URI::GID#check_scheme — only "gid" is valid. */
+  protected checkScheme(scheme: string): true {
+    if (scheme !== "gid") {
+      throw new BadURIError(`Not a gid:// URI scheme: ${scheme}`);
+    }
+    return true;
+  }
+  /**
+   * @internal Mirrors URI::GID#set_model_components.
+   *
+   * Nominal stub for api:compare parity. In Rails this assigns
+   * `@model_name` and `@model_id` from the path; our GID instances are
+   * built from a parsed `GidComponents` snapshot at construction time
+   * (via parseGid in the public path, or directly from args in build()),
+   * so re-deriving model components from the path string after the fact
+   * isn't needed. We still run the same validation a Rails caller would
+   * see so a TS subclass that overrides this gets predictable failures.
+   */
+  protected setModelComponents(path: string, validate = false): void {
+    const parts = path.split("/");
+    const modelName = parts[1];
+    const rawModelId = parts.slice(2).join("/");
+    if (validate) {
+      this.validateComponent(modelName);
+      this.validateModelIdSection(rawModelId, modelName);
+    }
+  }
+  /** @internal Mirrors URI::GID#validate_component — must be non-blank. */
+  protected validateComponent(component: string | null | undefined): string {
+    if (!component) {
+      throw new InvalidComponentError(`Expected a URI like gid://app/Person/1234`);
+    }
+    return component;
+  }
+  /** @internal Mirrors URI::GID#validate_model_id_section. */
+  protected validateModelIdSection(modelId: string, modelName: string): string {
+    if (!modelId) {
+      throw new MissingModelIdError(
+        `Unable to create a Global ID for ${modelName} without a model id.`,
+      );
+    }
+    return modelId;
+  }
+  /** @internal Mirrors URI::GID#validate_model_id — composite parts cannot contain '/'. */
+  protected validateModelId(modelIdPart: string): void {
+    if (modelIdPart.includes("/")) {
+      throw new InvalidModelIdError(
+        `Unable to create a Global ID for ${this.modelName} with a malformed model id.`,
+      );
+    }
+  }
+  /** @internal Mirrors URI::GID#parse_query_params. */
+  protected parseQueryParams(query: string | undefined): Record<string, string> {
+    return parseQueryParams(query);
+  }
+}

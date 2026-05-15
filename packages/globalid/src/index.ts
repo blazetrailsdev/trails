@@ -9,6 +9,7 @@ export {
   parseGid,
   buildGid,
   validateApp,
+  GID,
   MissingModelIdError,
   InvalidModelIdError,
 } from "./uri/gid.js";
