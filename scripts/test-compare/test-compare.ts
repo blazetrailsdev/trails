@@ -21,7 +21,14 @@
  * activesupport, rack, trailties). Using --package overrides this and always shows detail.
  *
  * Usage:
- *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json] [--package activesupport]
+ *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
+ *     [--incomplete] [--package activesupport]
+ *
+ *   --incomplete  In the per-file table, hide files that are fully complete
+ *                 (every Ruby test matched in the convention TS file, no
+ *                 wrong-describe). Misplaced tests are not in this file's
+ *                 match count, so a file with misplaced > 0 is always
+ *                 incomplete and never hidden. Mirrors `api:compare --incomplete`.
  */
 
 import * as fs from "fs";
@@ -40,6 +47,7 @@ const DETAIL_PACKAGES = new Set([
   "rack",
   "actionview",
   "trailties",
+  "globalid",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -170,6 +178,7 @@ function main() {
   const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
   const showMissing = args.includes("--missing");
   const jsonOutput = args.includes("--json");
+  const showIncomplete = args.includes("--incomplete");
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-tests.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-tests.json");
@@ -622,6 +631,7 @@ function main() {
         const fileImplemented = f.matched - f.matchedSkipped;
         const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
         const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
+        if (showIncomplete && isComplete && f.tsFileExists) continue;
         const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
         console.log(
           `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
@@ -663,6 +673,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     actioncontroller: "packages/actionpack/src/actioncontroller/",
     actionview: "packages/actionview/src/",
     trailties: "packages/trailties/src/",
+    globalid: "packages/globalid/src/",
   };
 
   const prefix = pkgDirs[pkg];

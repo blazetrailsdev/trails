@@ -23,6 +23,10 @@ RACK_DIR = ENV.fetch("RACK_DIR") do
   abort "extract-ruby-tests.rb: RACK_DIR env var not set. Caller must export " \
         "it via `RACK_DIR=$(pnpm -s vendor:fetch --print-paths rack)`."
 end
+GLOBALID_DIR = ENV.fetch("GLOBALID_DIR") do
+  abort "extract-ruby-tests.rb: GLOBALID_DIR env var not set. Caller must export " \
+        "it via `GLOBALID_DIR=$(pnpm -s vendor:fetch --print-paths globalid)`."
+end
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 
 # Map packages to their test directories
@@ -36,6 +40,7 @@ PACKAGE_TEST_DIRS = {
   "actioncontroller" => File.join(RAILS_DIR, "actionpack", "test"),
   "actionview" => File.join(RAILS_DIR, "actionview", "test"),
   "trailties" => File.join(RAILS_DIR, "railties", "test"),
+  "globalid" => File.join(GLOBALID_DIR, "test", "cases"),
 }
 
 # Files/directories to skip (infrastructure, not actual tests)
@@ -526,6 +531,9 @@ def run
   end
   unless File.directory?(RACK_DIR)
     abort "Rack source not found at #{RACK_DIR}. Run `pnpm vendor:fetch` first."
+  end
+  unless File.directory?(GLOBALID_DIR)
+    abort "GlobalID source not found at #{GLOBALID_DIR}. Run `pnpm vendor:fetch` first."
   end
 
   Dir.mkdir(OUTPUT_DIR) unless File.directory?(OUTPUT_DIR)
