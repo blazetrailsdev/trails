@@ -140,11 +140,24 @@ export function batchOnLoadedRelation(opts: {
 }): any[] {
   const { relation, cursor, batchLimit } = opts;
   // relation.records() is async in this codebase; loaded records live on _records.
-  const records: any[] = Array.isArray((relation as any)._records)
-    ? (relation as any)._records
-    : [];
+  let records: any[] = Array.isArray((relation as any)._records) ? (relation as any)._records : [];
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
   const orderDirs = batchOrders.map(([, dir]) => dir);
+
+  if (opts.start != null || opts.finish != null) {
+    const startArr =
+      opts.start != null ? (Array.isArray(opts.start) ? opts.start : [opts.start]) : null;
+    const finishArr =
+      opts.finish != null ? (Array.isArray(opts.finish) ? opts.finish : [opts.finish]) : null;
+    records = records.filter((record) => {
+      const values = recordCursorValues(record, cursor);
+      if (startArr != null && compareValuesForOrder(values, startArr, orderDirs) < 0) return false;
+      if (finishArr != null && compareValuesForOrder(values, finishArr, orderDirs) > 0)
+        return false;
+      return true;
+    });
+  }
+
   const sorted = [...records].sort((a, b) => {
     const v1 = recordCursorValues(a, cursor);
     const v2 = recordCursorValues(b, cursor);
