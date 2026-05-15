@@ -59,7 +59,16 @@ export class Locator {
     return record ?? null;
   }
 
-  /** Mirrors: Locator.locate_many(gids, options) */
+  /**
+   * Mirrors: Locator.locate_many(gids, options).
+   *
+   * Returns records matching the input GIDs in input order. Unknown classes,
+   * invalid GIDs, and `only:`-rejected entries are skipped (no null
+   * placeholders). With `ignoreMissing: true`, missing records are also
+   * skipped — the result array may be shorter than the input array.
+   *
+   * Each model class is hit with a single batch `find(ids)` (Rails parity).
+   */
   static async locateMany(
     gids: Array<string | GlobalID>,
     options: LocateOptions = {},

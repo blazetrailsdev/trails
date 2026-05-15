@@ -620,6 +620,13 @@ export class Base extends Model {
   }
 
   static _adapter: DatabaseAdapter | null = null;
+  /**
+   * Class name → class, populated whenever a subclass receives an adapter.
+   * Used by globalid's model finder so Base.findGlobalId can resolve any
+   * AR model without requiring explicit registerModel() calls.
+   * @internal
+   */
+  static _modelsByName: Map<string, typeof Base> = new Map();
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;
   static _abstractClass = false;
@@ -936,6 +943,7 @@ export class Base extends Model {
     this._adapter = adapter;
     _wireArelVisitor(adapter);
     fireAdapterSetHook(this);
+    if (this !== Base && this.name) Base._modelsByName.set(this.name, this as typeof Base);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
@@ -3559,19 +3567,20 @@ registerMigrationArConfig({
 // register here without callers needing to re-add it.
 import "@blazetrails/globalid/wire";
 
-// Register globalid's model finder. modelRegistry is the canonical lookup
-// (associations populate it via registerModel); Base.descendants is a fallback
-// for classes that extend Base but aren't registered through associations.
+// Register globalid's model finder. Base._modelsByName is populated by the
+// adapter setter (every AR model receives an adapter), so any class that
+// behaves as an AR model is reachable here. modelRegistry from associations
+// covers the explicit registerModel(name, klass) form for models registered
+// under aliases.
 import {
   setModelFinder as _setGlobalIdModelFinder,
   type LocatorModel as _LocatorModel,
 } from "@blazetrails/globalid";
 import { modelRegistry as _gidModelRegistry } from "./associations.js";
 _setGlobalIdModelFinder((name: string) => {
-  const fromRegistry = _gidModelRegistry.get(name);
-  if (fromRegistry) return fromRegistry as unknown as _LocatorModel;
-  for (const klass of Base.descendants) {
-    if (klass.name === name) return klass as unknown as _LocatorModel;
-  }
+  const fromBase = Base._modelsByName.get(name);
+  if (fromBase) return fromBase as unknown as _LocatorModel;
+  const fromAssoc = _gidModelRegistry.get(name);
+  if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
   return undefined;
 });
