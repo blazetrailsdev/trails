@@ -645,37 +645,30 @@ export class SchemaStatements {
 
     if (options.bulk && supportsBulk) {
       const ops: Array<[string, string, ...unknown[]]> = [];
-      const rec =
-        (cmd: string) =>
-        (...args: unknown[]) => {
-          ops.push([cmd, ...(args as [string, ...unknown[]])]);
-          return Promise.resolve();
-        };
-      const recorder: SchemaStatementsLike = {
-        addIndex: rec("addIndex"),
-        removeIndex: rec("removeIndex"),
-        addColumn: rec("addColumn"),
-        removeColumn: rec("removeColumn"),
-        renameColumn: rec("renameColumn"),
-        changeColumn: rec("changeColumn"),
-        changeColumnDefault: rec("changeColumnDefault"),
-        changeColumnNull: rec("changeColumnNull"),
-        renameIndex: rec("renameIndex"),
-        addTimestamps: rec("addTimestamps"),
-        removeTimestamps: rec("removeTimestamps"),
-        addReference: rec("addReference"),
-        removeReference: rec("removeReference"),
-        addForeignKey: rec("addForeignKey"),
-        removeForeignKey: rec("removeForeignKey"),
-        addCheckConstraint: rec("addCheckConstraint"),
-        removeCheckConstraint: rec("removeCheckConstraint"),
-        // Read-only predicates pass through to the real SchemaStatements.
-        columnExists: (t, col) => this.columnExists(t, col),
-        indexExists: (t, col, opts) => this.indexExists(t, col, opts as any),
-        foreignKeyExists: (t, opts) => this.foreignKeyExists(t, opts as any),
-        isCheckConstraintExists: (t, opts) => this.isCheckConstraintExists(t, opts as any),
-        primaryKey: (t) => this.primaryKey(t),
-      };
+      // Mirrors Rails' CommandRecorder#method_missing: records any DDL method call into ops
+      // so bulkChangeTable can coalesce or fall back. Read-only predicates delegate to the
+      // real SchemaStatements so Table#isColumnExists / isIndexExists etc. work in bulk blocks.
+      // Using a Proxy handles adapter-specific methods (e.g. PgTable#addUniqueConstraint)
+      // without enumerating them statically.
+      const predicates = new Set([
+        "columnExists",
+        "indexExists",
+        "foreignKeyExists",
+        "isCheckConstraintExists",
+        "primaryKey",
+      ]);
+      const ss = this;
+      const recorder = new Proxy({} as SchemaStatementsLike, {
+        get(_target, prop: string) {
+          if (predicates.has(prop)) {
+            return (ss as any)[prop].bind(ss);
+          }
+          return (...args: unknown[]) => {
+            ops.push([prop, ...(args as [string, ...unknown[]])]);
+            return Promise.resolve();
+          };
+        },
+      });
       const bulkTable = this.updateTableDefinition(tableName, recorder as any);
       if (callback) await callback(bulkTable);
       await this.bulkChangeTable(tableName, ops);
