@@ -709,11 +709,12 @@ describe("Migration DDL (extended)", () => {
     },
   );
 
-  // BLOCKED: adapter — MySQL/MariaDB implements addIndex(ifNotExists:) via a
-  // pre-flight indexExists() lookup, not an "IF NOT EXISTS" SQL clause, so the
-  // SQL-string assertion below does not hold on the mysql path; pre-flight also
-  // currently fails to detect the just-created index on MariaDB (ER_DUP_KEYNAME).
-  it.skip("addIndex with ifNotExists option", async () => {
+  // PG/SQLite emit `CREATE INDEX IF NOT EXISTS …` for both calls. MySQL/MariaDB
+  // can't (MySQL doesn't support it; MariaDB does but Rails standardizes on the
+  // pre-flight approach) — instead the second call short-circuits via
+  // `indexExists()` in `MysqlSchemaStatements.addIndex`, so only one
+  // `CREATE INDEX` reaches the database.
+  it("addIndex with ifNotExists option", async () => {
     const adapter = freshAdapter();
     const spy = vi.spyOn(adapter, "executeMutation");
     class AddIdxIfNotExists extends Migration {
@@ -728,10 +729,18 @@ describe("Migration DDL (extended)", () => {
     }
     const m = new AddIdxIfNotExists();
     await m.run(adapter, "up");
-    const indexCalls = spy.mock.calls.filter(
-      ([sql]) => typeof sql === "string" && sql.includes("IF NOT EXISTS"),
+    const createIndexCalls = spy.mock.calls.filter(
+      ([sql]) => typeof sql === "string" && /CREATE\s+(UNIQUE\s+)?INDEX/i.test(sql),
     );
-    expect(indexCalls).toHaveLength(2);
+    if (adapterType === "mysql") {
+      expect(createIndexCalls).toHaveLength(1);
+      expect(createIndexCalls[0][0]).not.toMatch(/IF NOT EXISTS/i);
+    } else {
+      expect(createIndexCalls).toHaveLength(2);
+      for (const [sql] of createIndexCalls) {
+        expect(sql as string).toMatch(/IF NOT EXISTS/i);
+      }
+    }
   });
 
   it.skipIf(adapterType === "sqlite")(

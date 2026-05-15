@@ -14,7 +14,8 @@ import {
   NotImplementedError,
   SQLWarning,
 } from "../errors.js";
-import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import { CreateIndexDefinition, ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import type { AddIndexOptions } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
@@ -38,6 +39,37 @@ class MysqlSchemaStatements extends SchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation());
+  }
+
+  /**
+   * `Migration#addIndex` routes through `this.schema.addIndex(...)`, so
+   * we override here. Mirrors Rails' `AbstractMysqlAdapter#add_index` /
+   * `#build_create_index_definition` pair: pre-flight via
+   * `indexExists()` and emit `CREATE INDEX` without `IF NOT EXISTS`
+   * (MySQL doesn't support the keyword; MariaDB does but Rails
+   * standardizes on the pre-flight for portability). Without this, the
+   * second `addIndex(..., { ifNotExists: true })` call trips
+   * `ER_DUP_KEYNAME` on MariaDB because `MysqlSchemaCreation`
+   * correctly omits the keyword.
+   *
+   * Mirrors: AbstractMysqlAdapter#add_index +
+   * AbstractMysqlAdapter#build_create_index_definition
+   */
+  override async addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options: AddIndexOptions = {},
+  ): Promise<void> {
+    const [idx, algorithmClause, ifNotExists] = this.addIndexOptions(
+      tableName,
+      columnName,
+      options as Record<string, unknown>,
+    );
+    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
+      return;
+    }
+    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
+    await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
 
   override async dropTable(

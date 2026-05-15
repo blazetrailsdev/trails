@@ -709,24 +709,33 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const ss = this.schemaStatements();
-    const [idx, algorithmClause, ifNotExists] = ss.addIndexOptions(tableName, columnName, options);
-    if (ifNotExists && (await ss.indexExists(tableName, idx.columns, { name: idx.name }))) {
-      return;
-    }
-    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
-    await this._execMutation(new MysqlSchemaCreation().accept(createDef));
+    const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
+    if (!createIndex) return;
+    await this._execMutation(this.schemaStatements().schemaCreation.accept(createIndex));
   }
 
-  buildCreateIndexDefinition(
+  /**
+   * Returns a {@link CreateIndexDefinition} or `undefined` when
+   * `ifNotExists: true` and the index already exists. Mirrors Rails'
+   * MySQL `build_create_index_definition`, which is the seam used by
+   * `add_index` so callers can build-without-executing or short-circuit
+   * uniformly. The `IF NOT EXISTS` keyword is intentionally not carried
+   * onto the definition — MySQL doesn't support it; the pre-flight here
+   * is the portable substitute.
+   *
+   * Mirrors: AbstractMysqlAdapter#build_create_index_definition
+   */
+  async buildCreateIndexDefinition(
     tableName: string,
     columnName: string | string[],
     options: Record<string, unknown> = {},
-  ): Record<string, unknown> {
-    void tableName;
-    void columnName;
-    void options;
-    return {};
+  ): Promise<CreateIndexDefinition | undefined> {
+    const ss = this.schemaStatements();
+    const [idx, algorithmClause, ifNotExists] = ss.addIndexOptions(tableName, columnName, options);
+    if (ifNotExists && (await ss.indexExists(tableName, idx.columns, { name: idx.name }))) {
+      return undefined;
+    }
+    return new CreateIndexDefinition(idx, false, algorithmClause);
   }
 
   addSqlComment(sql: string, comment: string): string {
