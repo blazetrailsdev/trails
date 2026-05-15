@@ -1008,11 +1008,25 @@ export abstract class Migration {
     await this.schema.dropJoinTable(table1, table2, options);
   }
 
-  async changeTable(tableName: string, fn?: (t: Table) => void | Promise<void>): Promise<void> {
+  async changeTable(
+    tableName: string,
+    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: Table) => void | Promise<void>,
+  ): Promise<void> {
+    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
+    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+    if (options.bulk) {
+      // Bulk path mirrors Rails: delegate to SchemaStatements#changeTable which
+      // records ops via a Proxy and coalesces into a single ALTER. Apply
+      // tableNamePrefix here since SchemaStatements doesn't.
+      const tname = this._pt(tableName);
+      await this.schema.changeTable(tname, options, callback);
+      return;
+    }
     // Build Table against Migration (not SchemaStatements) so that
     // per-operation recording in addColumn/removeColumn/etc. still applies
     const table = new Table(tableName, this);
-    if (fn) await fn(table);
+    if (callback) await callback(table);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {

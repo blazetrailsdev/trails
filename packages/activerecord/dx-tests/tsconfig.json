@@ -13,6 +13,7 @@
         "../../activesupport/src/message-verifier.ts"
       ],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
+      "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/sqlite-adapter": ["../../activesupport/src/sqlite-adapter.ts"],
       "@blazetrails/activesupport/sqlite/better-sqlite3": [
         "../../activesupport/src/sqlite-drivers/better-sqlite3.ts"

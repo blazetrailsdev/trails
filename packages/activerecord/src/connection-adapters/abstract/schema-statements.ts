@@ -586,6 +586,9 @@ export class SchemaStatements {
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     const opts: ColumnOptions = { ...options, null: options.null ?? false };
+    if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
+      opts.precision = 6;
+    }
     await this.addColumn(tableName, "created_at", "datetime", opts);
     await this.addColumn(tableName, "updated_at", "datetime", opts);
   }

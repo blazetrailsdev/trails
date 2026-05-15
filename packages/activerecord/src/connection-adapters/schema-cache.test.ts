@@ -31,10 +31,18 @@ describe("SchemaCacheTest", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it.skip("cached?", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("cached?", () => {
+    const cache = new SchemaCache();
+    expect(cache.isCached("courses")).toBe(false);
+    cache.setColumns("courses", [makeColumn("id", "integer")]);
+    expect(cache.isCached("courses")).toBe(true);
+
+    // Round-trip through dump/load preserves cached state.
+    const filename = path.join(tmpDir, "schema_cache.json");
+    cache.dumpTo(filename);
+    const loaded = SchemaCache._loadFrom(filename);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.isCached("courses")).toBe(true);
   });
 
   it("yaml dump and load", () => {
@@ -221,10 +229,26 @@ describe("SchemaCacheTest", () => {
     // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
   });
-  it.skip("gzip dumps identical", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("gzip dumps identical", () => {
+    // Rails: two .gz dumps of the same cache (with a 1s sleep between) must
+    // be byte-identical, since the gzip header carries no mtime. Node's
+    // zlib.gzipSync writes mtime=0 / OS=0xff, so the same property holds.
+    const cache = new SchemaCache();
+    cache.setColumns("posts", [makeColumn("id", "integer", { primaryKey: true })]);
+    cache.setPrimaryKeys("posts", "id");
+
+    const a = path.join(tmpDir, "schema_cache_a.json.gz");
+    const b = path.join(tmpDir, "schema_cache_b.json.gz");
+    cache.dumpTo(a);
+    cache.dumpTo(b);
+
+    const bufA = fs.readFileSync(a);
+    const bufB = fs.readFileSync(b);
+    expect(bufA.equals(bufB)).toBe(true);
+
+    // Round-trip through the gzip reader: the cache loads back identically.
+    const loaded = SchemaCache._loadFrom(a);
+    expect(loaded!.isCached("posts")).toBe(true);
   });
 
   it("data source exist", () => {
@@ -267,10 +291,15 @@ describe("SchemaCacheTest", () => {
     // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
   });
-  it.skip("#init_with skips deduplication if told to", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("#init_with skips deduplication if told to", () => {
+    // Mirrors Rails: when coder["deduplicated"] is set, init_with uses the
+    // provided columns map directly rather than re-deriving / deep-deduping
+    // it. In TS we model that by passing a real Map<string, Column[]>; the
+    // initWith fast-path assigns the same reference into @columns.
+    const cols = new Map<string, Column[]>([["t", [makeColumn("id", "integer")]]]);
+    const cache = new SchemaCache();
+    cache.initWith({ columns: cols, deduplicated: true });
+    expect((cache as unknown as { _columns: Map<string, Column[]> })._columns).toBe(cols);
   });
 
   it("#encode_with sorts members", () => {

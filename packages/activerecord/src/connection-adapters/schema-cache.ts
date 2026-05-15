@@ -6,6 +6,7 @@
  */
 
 import { getFs, getPath } from "@blazetrails/activesupport";
+import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
 
@@ -75,7 +76,6 @@ export class SchemaCache {
       const fs = getFs();
       if (!fs.existsSync(filename)) return null;
       const data = SchemaCache.read(filename, (content) => content);
-      if (typeof data !== "string") return null;
       const parsed = JSON.parse(data);
       const cache = new SchemaCache();
       cache.initWith(parsed);
@@ -85,10 +85,14 @@ export class SchemaCache {
     }
   }
 
+  /** @internal Mirrors SchemaCache.read in Rails: transparently gunzips .gz files. */
   static read<T>(filename: string, callback: (data: string) => T): T {
     const fs = getFs();
-    const content = fs.readFileSync(filename, "utf-8");
-    return callback(content);
+    if (filename.endsWith(".gz")) {
+      const raw = fs.readFileSync(filename, "latin1") as string;
+      return callback(Gzip.decompress(raw));
+    }
+    return callback(fs.readFileSync(filename, "utf-8"));
   }
 
   initializeDup(): SchemaCache {
@@ -345,7 +349,16 @@ export class SchemaCache {
     fs.mkdirSync(path.dirname(filename), { recursive: true });
     const coder: Record<string, unknown> = {};
     this.encodeWith(coder);
-    fs.writeFileSync(filename, JSON.stringify(coder, null, 2), "utf-8");
+    const payload = JSON.stringify(coder, null, 2);
+    if (filename.endsWith(".gz")) {
+      // Mirrors Rails: .gz files are gzipped on disk. Gzip.compress (via
+      // node:zlib gzipSync) writes a header with mtime=0 and OS=0xff, so
+      // two dumps of the same cache produce byte-identical output (Rails
+      // relies on this in `test_gzip_dumps_identical`).
+      fs.writeFileSync(filename, Gzip.compress(payload), "latin1");
+    } else {
+      fs.writeFileSync(filename, payload, "utf-8");
+    }
   }
 
   marshalDump(): unknown[] {

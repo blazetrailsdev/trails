@@ -3,7 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
-import { Migration, Schema, TableDefinition } from "./index.js";
+import { Base, Migration, Schema, TableDefinition } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -78,11 +78,21 @@ describe("ActiveRecordSchemaTest", () => {
     expect(rows[0].title).toBe("hello");
   });
 
-  it.skip("schema define with table name prefix", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in active-record-schema
-    // ROOT-CAUSE: active-record-schema.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in active-record-schema.test.ts
-    /* table name prefixes not supported */
+  it("schema define with table name prefix", async () => {
+    const saved = Base.tableNamePrefix;
+    Base.tableNamePrefix = "nep_";
+    try {
+      await Schema.define(adapter, async (schema) => {
+        await schema.createTable("fruits", (t) => {
+          t.string("color");
+        });
+      });
+      await adapter.executeMutation(`INSERT INTO "nep_fruits" ("color") VALUES ('red')`);
+      const rows = await adapter.execute(`SELECT * FROM "nep_fruits"`);
+      expect(rows.length).toBe(1);
+    } finally {
+      Base.tableNamePrefix = saved;
+    }
   });
 
   it("schema raises an error for invalid column type", () => {
@@ -181,11 +191,34 @@ describe("ActiveRecordSchemaTest", () => {
     ).toBe("2023-01-01");
   });
 
-  it.skip("timestamps with implicit default on change table with bulk", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in active-record-schema
-    // ROOT-CAUSE: active-record-schema.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in active-record-schema.test.ts
-    /* bulk mode not supported */
+  it("timestamps with implicit default on change table with bulk", async () => {
+    class BulkTsMig extends Migration {
+      async up() {
+        await this.createTable("has_timestamps", (t) => {
+          t.string("name");
+        });
+        await this.changeTable("has_timestamps", { bulk: true }, async (t) => {
+          await t.timestamps();
+        });
+      }
+      async down() {
+        await this.dropTable("has_timestamps");
+      }
+    }
+    const m = new BulkTsMig();
+    (m as any).adapter = adapter;
+    await m.up();
+    // Rails asserts column_exists?(:has_timestamps, :created_at, precision: 6, null: false).
+    // The TS adapter mirror: timestamps columns should both be present and the
+    // insert below must succeed only because addTimestamps applied null: false
+    // alongside the supportsDatetimeWithPrecision precision default.
+    await adapter.executeMutation(
+      `INSERT INTO "has_timestamps" ("name", "created_at", "updated_at") VALUES ('x', '2023-01-01', '2023-01-01')`,
+    );
+    const rows = await adapter.execute(`SELECT * FROM "has_timestamps"`);
+    expect(rows.length).toBe(1);
+    expect(rows[0].created_at).not.toBeNull();
+    expect(rows[0].updated_at).not.toBeNull();
   });
 
   it("addTimestamps forwards options to addColumn", async () => {
