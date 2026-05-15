@@ -771,6 +771,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("habtm respects select", async () => {
     // Scope-applied SELECT narrows attributes on returned records.
+    // Selecting only `id` proves the SELECT clause is forwarded — without
+    // forwarding the model would hydrate `name` from `SELECT *`.
     const dev = await Developer.create({ name: "SelDev", salary: 90000 });
     const proj = await Project.create({ name: "SelProj" });
     await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
@@ -778,11 +780,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       className: "Project",
       joinTable: "developer_projects",
       foreignKey: "developer_id",
-      scope: (r: any) => r.select("id", "name"),
+      scope: (r: any) => r.select("id"),
     });
     expect(projects.length).toBe(1);
     expect((projects[0] as any).id).toBe(proj.id);
-    expect((projects[0] as any).name).toBe("SelProj");
+    // Unselected attribute stays at its uninitialized null sentinel.
+    expect((projects[0] as any).name).toBeNull();
   });
 
   it("habtm selects all columns by default", async () => {
@@ -802,7 +805,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("habtm respects select query method", async () => {
-    // .select() chained inside the scope lambda is forwarded into the join query.
+    // .select() chained inside the scope lambda is forwarded into the join
+    // query. Selecting only `name` (not `id`) proves the SELECT clause is
+    // forwarded — without forwarding, `id` would be populated from `SELECT *`.
     const dev = await Developer.create({ name: "SelChainDev", salary: 90000 });
     const proj = await Project.create({ name: "SelChainProj" });
     await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
@@ -814,6 +819,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     });
     expect(projects.length).toBe(1);
     expect((projects[0] as any).name).toBe("SelChainProj");
+    // Unselected `id` stays at its uninitialized null sentinel.
+    expect((projects[0] as any).id).toBeNull();
   });
 
   it.skip("join middle table alias", () => {
@@ -829,17 +836,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("join with group", async () => {
-    // group() chained inside the scope lambda is forwarded into the habtm join query.
+    // group() + having() chained inside the scope lambda are forwarded into
+    // the habtm join query. having("count(*) >= 1") only passes if GROUP BY
+    // is applied — otherwise the aggregate clause is invalid against the
+    // raw rows.
     const dev = await Developer.create({ name: "GroupDev", salary: 80000 });
     const p1 = await Project.create({ name: "G1" });
     const p2 = await Project.create({ name: "G2" });
     await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
     await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const rel: any = (Project.all() as any).where({ id: [p1.id, p2.id] }).group("id", "name");
+    const sql: string = rel.toSql();
+    expect(sql.toLowerCase()).toContain("group by");
     const projects = await loadHabtm(dev, "projects", {
       className: "Project",
       joinTable: "developer_projects",
       foreignKey: "developer_id",
-      scope: (r: any) => r.group("id", "name").order("name ASC"),
+      scope: (r: any) => r.group("id", "name").having("count(*) >= 1").order("name ASC"),
     });
     expect(projects.length).toBe(2);
     expect(projects.map((p: any) => p.name)).toEqual(["G1", "G2"]);
