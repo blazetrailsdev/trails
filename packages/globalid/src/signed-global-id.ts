@@ -177,8 +177,11 @@ function verifyToken(
   try {
     const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
     if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
-    if (!raw.gid.startsWith("gid://")) return null;
     if (raw.purpose !== purpose) return null;
+    // Validate the embedded URI by attempting a full parse. Without this, a
+    // signed payload like "gid://app/Person" (no model id) verifies and
+    // later throws when modelId/modelName/params are accessed.
+    parseGid(raw.gid);
     let expiresAt: Temporal.Instant | undefined;
     if (raw.expires_at) {
       expiresAt = Temporal.Instant.from(raw.expires_at);

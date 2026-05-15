@@ -31,14 +31,6 @@ describe("SignedGlobalIDTest", () => {
     expect(sgid.modelId).toBe("5");
   });
 
-  it("model name", () => {
-    const verifier = makeVerifier();
-    expect(SignedGlobalID.create(person(5), { verifier }).modelName).toBe("Person");
-    expect(
-      SignedGlobalID.create({ id: 1, constructor: { name: "Account" } }, { verifier }).modelName,
-    ).toBe("Account");
-  });
-
   it("value equality", () => {
     const verifier = makeVerifier();
     const a = SignedGlobalID.create(person(5), { verifier });
@@ -117,7 +109,11 @@ describe("SignedGlobalIDExpirationTest", () => {
 
   it("passing expires_in less than a second is not expired", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 1 });
+    // Use a sub-second value to exercise the fractional-second path through
+    // pickExpiration (Math.round(0.5 * 1000) = 500ms). Without time mocking
+    // we can only verify the not-yet-expired half here; the expired half is
+    // covered by 'returns null for expired token (expiresAt in the past)'.
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 0.5 });
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
   });
 
@@ -185,6 +181,26 @@ describe("SignedGlobalIDCustomParamsTest", () => {
 describe("SignedGlobalID (non-Rails coverage)", () => {
   beforeEach(() => setApp(TEST_APP));
   afterEach(() => _resetApp());
+
+  it("modelName getter delegates to parseGid", () => {
+    const verifier = makeVerifier();
+    expect(SignedGlobalID.create(person(5), { verifier }).modelName).toBe("Person");
+    expect(
+      SignedGlobalID.create({ id: 1, constructor: { name: "Account" } }, { verifier }).modelName,
+    ).toBe("Account");
+  });
+
+  it("parse returns null for a signed-but-malformed URI", () => {
+    // Hand-craft a payload with a gid:// prefix but no model id. The
+    // verifier would happily sign it, but parse() must reject so that
+    // modelId / modelName accessors never throw on a returned SGID.
+    const verifier = makeVerifier();
+    const malformedToken = verifier.generate(
+      { gid: "gid://app/Person", purpose: "default", expires_at: null },
+      { purpose: "default" },
+    );
+    expect(SignedGlobalID.parse(malformedToken, { verifier })).toBeNull();
+  });
 
   it("returns null for tampered token", () => {
     const verifier = makeVerifier();
