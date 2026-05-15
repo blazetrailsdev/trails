@@ -7,7 +7,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
-import { ExceptionWrapper } from "../exception-wrapper.js";
+import { ExceptionWrapper } from "./exception-wrapper.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

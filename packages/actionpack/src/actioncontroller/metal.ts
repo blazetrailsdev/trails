@@ -6,8 +6,8 @@
  */
 
 import { AbstractController } from "./abstract-controller.js";
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
+import { Request } from "../actiondispatch/http/request.js";
+import { Response } from "../actiondispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";

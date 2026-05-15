@@ -5,7 +5,7 @@
  * Mirrors Rails' respond_to block DSL.
  */
 
-import { MimeType } from "./mime-type.js";
+import { MimeType } from "./http/mime-type.js";
 
 export class UnknownFormat extends Error {
   constructor(message = "Unknown format") {
