@@ -392,11 +392,136 @@ describe("ConnectionHandlersShardingDbTest", () => {
     }
   });
 
-  it.skip("same shards across clusters", () => {
-    // BLOCKED: connection-pool — multi-cluster shard isolation with real DB; Slot C-b
+  it("same shards across clusters", async () => {
+    class SecondaryBase extends Base {
+      static override abstractClass = true;
+    }
+    class ShardConnectionTestModel extends SecondaryBase {}
+
+    class SomeOtherBase extends Base {
+      static override abstractClass = true;
+    }
+    class ShardConnectionTestModelB extends SomeOtherBase {}
+
+    const makePool = (owner: string, shard: string) =>
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", owner, { adapter: "sqlite3", database: ":memory:" }),
+        { owner, role: "writing", shard, adapterFactory: () => new SQLite3Adapter() },
+      );
+
+    try {
+      makePool("SecondaryBase", "one");
+      makePool("SomeOtherBase", "one");
+      (SecondaryBase as any).connectionClass = true;
+      (SomeOtherBase as any).connectionClass = true;
+      (SecondaryBase as any)._shardKeys = ["one"];
+      (SomeOtherBase as any)._shardKeys = ["one"];
+
+      await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
+        const connA = ShardConnectionTestModel.leaseConnection();
+        await connA.executeMutation(
+          `CREATE TABLE "shard_connection_test_models" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
+        );
+        await connA.executeMutation(
+          `INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('test_model_default')`,
+        );
+
+        const connB = ShardConnectionTestModelB.leaseConnection();
+        await connB.executeMutation(
+          `CREATE TABLE "shard_connection_test_model_bs" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
+        );
+        await connB.executeMutation(
+          `INSERT INTO "shard_connection_test_model_bs" ("shard_key") VALUES ('test_model_b_default')`,
+        );
+
+        const rowsA = await connA.execute(
+          `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'test_model_default'`,
+        );
+        expect(rowsA[0]?.shard_key).toBe("test_model_default");
+
+        const rowsB = await connB.execute(
+          `SELECT shard_key FROM "shard_connection_test_model_bs" WHERE shard_key = 'test_model_b_default'`,
+        );
+        expect(rowsB[0]?.shard_key).toBe("test_model_b_default");
+      });
+    } finally {
+      Base.connectionHandler.clearAllConnectionsBang();
+      (SecondaryBase as any).connectionClass = undefined;
+      (SomeOtherBase as any).connectionClass = undefined;
+    }
   });
-  it.skip("sharding separation", () => {
-    // BLOCKED: connection-pool — per-shard DB isolation with real DDL/DML; Slot C-b
+
+  it("sharding separation", async () => {
+    class SecondaryBase extends Base {
+      static override abstractClass = true;
+    }
+    class ShardConnectionTestModel extends SecondaryBase {}
+
+    const makePool = (shard: string) =>
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "SecondaryBase", { adapter: "sqlite3", database: ":memory:" }),
+        {
+          owner: "SecondaryBase",
+          role: "writing",
+          shard,
+          adapterFactory: () => new SQLite3Adapter(),
+        },
+      );
+
+    try {
+      makePool("default");
+      makePool("one");
+      (SecondaryBase as any).connectionClass = true;
+      (SecondaryBase as any)._shardKeys = ["default", "one"];
+      (SecondaryBase as any)._defaultShard = "default";
+
+      for (const shardName of ["default", "one"]) {
+        await Base.connectedTo({ role: "writing", shard: shardName }, async () => {
+          await ShardConnectionTestModel.leaseConnection().executeMutation(
+            `CREATE TABLE "shard_connection_test_models" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
+          );
+        });
+      }
+
+      // Create a record on :default
+      await ShardConnectionTestModel.leaseConnection().executeMutation(
+        `INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('foo')`,
+      );
+
+      // Can read it when explicitly connecting to :default
+      await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
+        const rows = await ShardConnectionTestModel.leaseConnection().execute(
+          `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`,
+        );
+        expect(rows.length).toBe(1);
+      });
+
+      // Cannot read :default record on :one; add a record on :one
+      await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
+        const rows = await ShardConnectionTestModel.leaseConnection().execute(
+          `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`,
+        );
+        expect(rows.length).toBe(0);
+
+        await ShardConnectionTestModel.leaseConnection().executeMutation(
+          `INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('bar')`,
+        );
+      });
+
+      // Cannot read 'bar' from :default, but can read 'foo'
+      const barRows = await ShardConnectionTestModel.leaseConnection().execute(
+        `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'bar'`,
+      );
+      expect(barRows.length).toBe(0);
+
+      const fooRows = await ShardConnectionTestModel.leaseConnection().execute(
+        `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`,
+      );
+      expect(fooRows.length).toBe(1);
+    } finally {
+      Base.connectionHandler.clearAllConnectionsBang();
+      (SecondaryBase as any).connectionClass = undefined;
+    }
   });
   it.skip("swapping shards globally in a multi threaded environment", () => {
     // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
