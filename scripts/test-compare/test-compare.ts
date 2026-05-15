@@ -671,6 +671,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     rack: "packages/rack/src/",
     actiondispatch: "packages/actionpack/src/actiondispatch/",
     actioncontroller: "packages/actionpack/src/actioncontroller/",
+    abstractcontroller: "packages/actionpack/src/abstractcontroller/",
     actionview: "packages/actionview/src/",
     trailties: "packages/trailties/src/",
     globalid: "packages/globalid/src/",
