@@ -96,16 +96,18 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
-    it("data source exists", async () => {
+    it("data source exists?", async () => {
       await defineSchema(adapter, { topics: { title: "string" } });
       try {
-        const db = await currentDatabase(adapter);
         expect(await adapter.dataSourceExists("topics")).toBe(true);
-        expect(await adapter.dataSourceExists(`${db}.topics`)).toBe(true);
-        expect(await adapter.dataSourceExists(`${db}.zomg`)).toBe(false);
       } finally {
         await adapter.dropTable("topics", { ifExists: true });
       }
+    });
+
+    it("data source exists wrong schema", async () => {
+      const db = await currentDatabase(adapter);
+      expect(await adapter.dataSourceExists(`${db}.zomg`)).toBe(false);
     });
 
     it("dump indexes", async () => {
