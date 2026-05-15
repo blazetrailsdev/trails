@@ -86,20 +86,6 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   return (roundable as Roundable<T>).round(opts);
 }
 
-export function serializeTimeValue(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  if (
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainTime ||
-    value instanceof Temporal.ZonedDateTime
-  ) {
-    return value.toJSON();
-  }
-  return String(value);
-}
-
 export function userInputInTimeZone(
   value: unknown,
   zone: string = "UTC",
@@ -232,4 +218,18 @@ export function fastStringToTime(s: string): Temporal.Instant | null {
   } catch {
     return null;
   }
+}
+
+export function serializeTimeValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime ||
+    value instanceof Temporal.ZonedDateTime
+  ) {
+    return value.toJSON();
+  }
+  return String(value);
 }

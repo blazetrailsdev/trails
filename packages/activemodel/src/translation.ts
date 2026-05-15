@@ -44,6 +44,18 @@ export function raiseOnMissingTranslations(value?: boolean): boolean {
 }
 
 /**
+ * Walk the class prototype chain collecting constructors that expose a
+ * modelName static (i.e. those that include ActiveModel::Naming in Rails).
+ *
+ * @internal Mirrors ActiveModel::Translation#lookup_ancestors
+ */
+export function lookupAncestors(
+  this: object,
+): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
+  return _walkAncestors(this);
+}
+
+/**
  * Transforms attribute names into a more human format, such as "First name"
  * instead of "first_name".
  *
@@ -117,18 +129,6 @@ function _appendUserDefaults(
   for (const item of items) {
     defaults.push({ message: item });
   }
-}
-
-/**
- * Walk the class prototype chain collecting constructors that expose a
- * modelName static (i.e. those that include ActiveModel::Naming in Rails).
- *
- * @internal Mirrors ActiveModel::Translation#lookup_ancestors
- */
-export function lookupAncestors(
-  this: object,
-): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
-  return _walkAncestors(this);
 }
 
 function _walkAncestors(

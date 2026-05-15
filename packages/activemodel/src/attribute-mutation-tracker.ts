@@ -121,14 +121,14 @@ export class AttributeMutationTracker {
     this.forcedChanges.set(name, this.fetchValue(name));
   }
 
-  protected attributeChanged(name: string): boolean {
-    return this.forcedChanges.has(name) || this.attributes.getAttribute(name).isChanged();
-  }
-
   protected attrNames(): string[] {
     const keys = new Set(this.attributes.keys());
     for (const name of this.forcedChanges.keys()) keys.add(name);
     return [...keys];
+  }
+
+  protected attributeChanged(name: string): boolean {
+    return this.forcedChanges.has(name) || this.attributes.getAttribute(name).isChanged();
   }
 
   /** @internal */
@@ -150,18 +150,6 @@ export class AttributeMutationTracker {
 export class ForcedMutationTracker extends AttributeMutationTracker {
   private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
 
-  protected override attributeChanged(name: string): boolean {
-    return this.forcedChanges.has(name);
-  }
-
-  protected override attrNames(): string[] {
-    return Array.from(this.forcedChanges.keys());
-  }
-
-  changedInPlace(_name: string): boolean {
-    return false;
-  }
-
   changeToAttribute(name: string): [unknown, unknown] | null {
     if (
       this.finalizedChanges &&
@@ -170,6 +158,10 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
       return [...this.finalizedChanges[name]];
     }
     return super.changeToAttribute(name);
+  }
+
+  changedInPlace(_name: string): boolean {
+    return false;
   }
 
   forgetChange(name: string): void {
@@ -189,13 +181,21 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     this.forcedChanges.set(name, cloneValue(value));
   }
 
-  finalizeChanges(): void {
-    this.finalizedChanges = this.changes();
+  protected override attrNames(): string[] {
+    return Array.from(this.forcedChanges.keys());
+  }
+
+  protected override attributeChanged(name: string): boolean {
+    return this.forcedChanges.has(name);
   }
 
   /** @internal */
   protected override typeCast(_name: string, value: unknown): unknown {
     return value;
+  }
+
+  finalizeChanges(): void {
+    this.finalizedChanges = this.changes();
   }
 }
 
@@ -233,11 +233,11 @@ export class NullMutationTracker {
     return false;
   }
 
+  forgetChange(_name: string): void {}
+
   originalValue(_name: string): unknown {
     return undefined;
   }
-
   forceChange(_name: string): void {}
-  forgetChange(_name: string): void {}
   finalizeChanges(): void {}
 }

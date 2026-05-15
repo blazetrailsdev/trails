@@ -22,17 +22,6 @@ export class TypeRegistry {
    */
   protected registrationsMap = new Map<string, () => Type>();
 
-  /**
-   * Mirrors: ActiveModel::Type::Registry#registrations (registry.rb:30,
-   * `attr_reader :registrations`). Private in Rails; protected here so
-   * subclasses can read or replace the registry.
-   *
-   * @internal Rails-private helper.
-   */
-  protected get registrations(): Map<string, () => Type> {
-    return this.registrationsMap;
-  }
-
   constructor() {
     this.register("string", () => new StringType());
     this.register("integer", () => new IntegerType());
@@ -56,6 +45,17 @@ export class TypeRegistry {
     const factory = this.registrations.get(name);
     if (!factory) throw new Error(`Unknown type: ${name}`);
     return factory();
+  }
+
+  /**
+   * Mirrors: ActiveModel::Type::Registry#registrations (registry.rb:30,
+   * `attr_reader :registrations`). Private in Rails; protected here so
+   * subclasses can read or replace the registry.
+   *
+   * @internal Rails-private helper.
+   */
+  protected get registrations(): Map<string, () => Type> {
+    return this.registrationsMap;
   }
 }
 

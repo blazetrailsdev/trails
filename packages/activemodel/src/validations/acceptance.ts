@@ -16,56 +16,18 @@ export class LazilyDefineAttributes {
     this.attributes = Object.freeze([...attributes]);
   }
 
-  include(attribute: string): boolean {
-    return this.attributes.includes(attribute);
-  }
-
   matches(method: string): string | null {
     return this.include(method) ? method : null;
+  }
+
+  include(attribute: string): boolean {
+    return this.attributes.includes(attribute);
   }
 
   define(attribute: string): LazilyDefineAttributes {
     if (this.include(attribute)) return this;
     return new LazilyDefineAttributes([...this.attributes, attribute]);
   }
-}
-
-/**
- * Ruby `Array()` coerces any object with `to_a`/`to_ary` (Set, Enumerator,
- * Hash, etc.) into an array, but leaves strings wrapped as `[str]`. Match
- * that: if the value is iterable but not a string, spread it.
- */
-function isNonStringIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value !== "object" || value === null) return false;
-  // Boxed strings (`new String("yes")`) are iterable by char; Ruby's
-  // `Array("yes")` still wraps as `["yes"]`, so treat them as scalars.
-  if (value instanceof String) return false;
-  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
-}
-
-export class AcceptanceValidator extends EachValidator {
-  static readonly lazilyDefineAttributes = new LazilyDefineAttributes([]);
-
-  /** @internal Rails-private helper. */
-  declare setupBang: typeof setupBang;
-  /** @internal Rails-private helper. */
-  declare isAcceptableOption: typeof isAcceptableOption;
-
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const allowNil = this.options.allowNil ?? true;
-    if (allowNil && (value === null || value === undefined)) return;
-    if (!this.isAcceptableOption(value)) {
-      record.errors.add(attribute, "accepted", this.filteredErrorOptions(["accept", "allowNil"]));
-    }
-  }
-
-  static setup(attributes: string[]): LazilyDefineAttributes {
-    return new LazilyDefineAttributes(attributes);
-  }
-}
-
-interface AcceptanceHost {
-  attributes: readonly string[];
 }
 
 /**
@@ -111,6 +73,31 @@ export function setupBang(this: AcceptanceHost, klass: unknown): void {
   }
 }
 
+export class AcceptanceValidator extends EachValidator {
+  static readonly lazilyDefineAttributes = new LazilyDefineAttributes([]);
+
+  /** @internal Rails-private helper. */
+  declare setupBang: typeof setupBang;
+  /** @internal Rails-private helper. */
+  declare isAcceptableOption: typeof isAcceptableOption;
+
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+    const allowNil = this.options.allowNil ?? true;
+    if (allowNil && (value === null || value === undefined)) return;
+    if (!this.isAcceptableOption(value)) {
+      record.errors.add(attribute, "accepted", this.filteredErrorOptions(["accept", "allowNil"]));
+    }
+  }
+
+  static setup(attributes: string[]): LazilyDefineAttributes {
+    return new LazilyDefineAttributes(attributes);
+  }
+}
+
+interface AcceptanceHost {
+  attributes: readonly string[];
+}
+
 /**
  * Mirrors: acceptance.rb:24-26
  *   def acceptable_option?(value)
@@ -140,6 +127,19 @@ export function isAcceptableOption(
     else accepted = [rawAccept];
   }
   return accepted.includes(value);
+}
+
+/**
+ * Ruby `Array()` coerces any object with `to_a`/`to_ary` (Set, Enumerator,
+ * Hash, etc.) into an array, but leaves strings wrapped as `[str]`. Match
+ * that: if the value is iterable but not a string, spread it.
+ */
+function isNonStringIterable(value: unknown): value is Iterable<unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  // Boxed strings (`new String("yes")`) are iterable by char; Ruby's
+  // `Array("yes")` still wraps as `["yes"]`, so treat them as scalars.
+  if (value instanceof String) return false;
+  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 
 AcceptanceValidator.prototype.setupBang = setupBang;

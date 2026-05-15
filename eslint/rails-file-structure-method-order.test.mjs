@@ -87,6 +87,23 @@ try {
           `  third() {}\n` +
           `}\n`,
       },
+      // Class nested inside a function body is not reordered. If we
+      // also reordered the outer function (it has 0 siblings here so
+      // we don't), the nested class members' fix ranges would overlap
+      // the function's fix range and ESLint would throw. Skipping
+      // non-top-level classes avoids the conflict and matches the
+      // file-structure intent (top-of-file mirroring, not deep AST).
+      {
+        filename: classFile,
+        code:
+          `export function mkClass() {\n` +
+          `  return class {\n` +
+          `    third() {}\n` +
+          `    first() {}\n` +
+          `    second() {}\n` +
+          `  };\n` +
+          `}\n`,
+      },
       // Hoisting-scope safety: ClassDeclaration and `const`/`let` are NOT
       // orderable. A file with only those declarations (no
       // MethodDefinition or FunctionDeclaration) emits no diagnostic,
@@ -99,6 +116,27 @@ try {
       },
     ],
     invalid: [
+      // TS function overload signatures (TSDeclareFunction) travel
+      // with their implementation. Separating them would produce
+      // TS2389 ("Function implementation name must be 'foo'").
+      // Same-name grouping in computeTargetOrder keeps the
+      // signature(s) + implementation adjacent across a reorder.
+      {
+        filename: fnFile,
+        code:
+          `export function beta(x: string): string;\n` +
+          `export function beta(x: number): number;\n` +
+          `export function beta(x: any): any { return x; }\n` +
+          `export function alpha(): void {}\n` +
+          `export function gamma(): void {}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `export function alpha(): void {}\n` +
+          `export function beta(x: string): string;\n` +
+          `export function beta(x: number): number;\n` +
+          `export function beta(x: any): any { return x; }\n` +
+          `export function gamma(): void {}\n`,
+      },
       // Class methods out of order.
       {
         filename: classFile,

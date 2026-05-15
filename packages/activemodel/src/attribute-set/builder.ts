@@ -69,6 +69,13 @@ export class LazyAttributeSet extends AttributeSet {
     return this._additionalTypes;
   }
 
+  override deepDup(): LazyAttributeSet {
+    const cache = new Map<Attribute, Attribute>();
+    const newAttrs = new Map<string, Attribute>();
+    this.forEach((attr, name) => newAttrs.set(name, this.cloneAttribute(attr, cache)));
+    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
+  }
+
   /**
    * @internal Rails-private helper. Mirrors: LazyAttributeSet#materialize (protected)
    * Materializes the lazy set by resolving all keys into the attribute map.
@@ -83,13 +90,6 @@ export class LazyAttributeSet extends AttributeSet {
     const result = new Map<string, Attribute>();
     this.forEach((attr, name) => result.set(name, attr));
     return result;
-  }
-
-  override deepDup(): LazyAttributeSet {
-    const cache = new Map<Attribute, Attribute>();
-    const newAttrs = new Map<string, Attribute>();
-    this.forEach((attr, name) => newAttrs.set(name, this.cloneAttribute(attr, cache)));
-    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
   }
 
   override map(fn: (attr: Attribute) => Attribute): LazyAttributeSet {
@@ -125,21 +125,8 @@ export class LazyAttributeHash {
     this.delegate = delegateHash;
   }
 
-  get(name: string): Attribute {
-    if (this.delegate.has(name)) return this.delegate.get(name)!;
-    return this.assignDefault(name);
-  }
-
-  set(name: string, attr: Attribute): void {
-    this.delegate.set(name, attr);
-  }
-
-  has(name: string): boolean {
-    return (
-      this.delegate.has(name) ||
-      Object.prototype.hasOwnProperty.call(this.values, name) ||
-      this.types.has(name)
-    );
+  isKey(key: string): boolean {
+    return this.has(key);
   }
 
   keys(): string[] {
@@ -163,22 +150,6 @@ export class LazyAttributeHash {
       copy.delegate.set(name, LazyAttributeHash.cloneAttr(attr, cache));
     }
     return copy;
-  }
-
-  private static cloneAttr(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
-    const existing = cache.get(attr);
-    if (existing) return existing;
-    const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
-    cache.set(attr, cloned);
-    const orig = attr.getOriginalAttribute();
-    if (orig) {
-      cloned.setOriginalAttribute(LazyAttributeHash.cloneAttr(orig, cache));
-    }
-    return cloned;
-  }
-
-  isKey(key: string): boolean {
-    return this.has(key);
   }
 
   eachKey(fn: (key: string) => void): void {
@@ -223,6 +194,35 @@ export class LazyAttributeHash {
    */
   assignDefaultValue(name: string): Attribute {
     return this.assignDefault(name);
+  }
+
+  get(name: string): Attribute {
+    if (this.delegate.has(name)) return this.delegate.get(name)!;
+    return this.assignDefault(name);
+  }
+
+  set(name: string, attr: Attribute): void {
+    this.delegate.set(name, attr);
+  }
+
+  has(name: string): boolean {
+    return (
+      this.delegate.has(name) ||
+      Object.prototype.hasOwnProperty.call(this.values, name) ||
+      this.types.has(name)
+    );
+  }
+
+  private static cloneAttr(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
+    const existing = cache.get(attr);
+    if (existing) return existing;
+    const cloned = Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
+    cache.set(attr, cloned);
+    const orig = attr.getOriginalAttribute();
+    if (orig) {
+      cloned.setOriginalAttribute(LazyAttributeHash.cloneAttr(orig, cache));
+    }
+    return cloned;
   }
 
   private assignDefault(name: string): Attribute {

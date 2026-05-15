@@ -114,6 +114,40 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     this.checkValidity();
   }
 
+  validate(record: ValidatableRecord<TBase>): void {
+    for (const attribute of this.attributes) {
+      let value = this.readAttributeForValidation(record, attribute);
+      if (value == null && this.options.allowNil === true) continue;
+      if (isBlank(value) && this.options.allowBlank === true) continue;
+      value = this.prepareValueForValidation(value, record, attribute);
+      this.validateEach(record, attribute, value);
+    }
+  }
+
+  validateEach(_record: ValidatableRecord<TBase>, _attribute: string, _value: unknown): void {
+    throw new Error("Subclasses must implement validateEach(record, attribute, value)");
+  }
+
+  checkValidityBang(): void {
+    this.checkValidity();
+  }
+
+  /**
+   * Mirrors: ActiveModel::EachValidator#prepare_value_for_validation
+   * (validator.rb:170-172). Identity by default; subclasses (e.g.
+   * NumericalityValidator) override to coerce the value before
+   * validation. Wired through `validate` so subclass overrides fire.
+   *
+   * @internal Rails-private hook.
+   */
+  protected prepareValueForValidation(
+    value: unknown,
+    _record: ValidatableRecord<TBase>,
+    _attribute: string,
+  ): unknown {
+    return value;
+  }
+
   /**
    * Mirrors: ActiveModel::Validations#read_attribute_for_validation.
    * Defaults to `send(attr)` (record[attr]); ActiveRecord overrides to
@@ -133,36 +167,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
       return (rec.readAttribute as (a: string) => unknown)(attribute);
     }
     return rec[attribute];
-  }
-
-  validate(record: ValidatableRecord<TBase>): void {
-    for (const attribute of this.attributes) {
-      let value = this.readAttributeForValidation(record, attribute);
-      if (value == null && this.options.allowNil === true) continue;
-      if (isBlank(value) && this.options.allowBlank === true) continue;
-      value = this.prepareValueForValidation(value, record, attribute);
-      this.validateEach(record, attribute, value);
-    }
-  }
-
-  /**
-   * Mirrors: ActiveModel::EachValidator#prepare_value_for_validation
-   * (validator.rb:170-172). Identity by default; subclasses (e.g.
-   * NumericalityValidator) override to coerce the value before
-   * validation. Wired through `validate` so subclass overrides fire.
-   *
-   * @internal Rails-private hook.
-   */
-  protected prepareValueForValidation(
-    value: unknown,
-    _record: ValidatableRecord<TBase>,
-    _attribute: string,
-  ): unknown {
-    return value;
-  }
-
-  validateEach(_record: ValidatableRecord<TBase>, _attribute: string, _value: unknown): void {
-    throw new Error("Subclasses must implement validateEach(record, attribute, value)");
   }
 
   /**
@@ -186,10 +190,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
 
   checkValidity(): void {
     // Override in subclasses to validate options
-  }
-
-  checkValidityBang(): void {
-    this.checkValidity();
   }
 }
 

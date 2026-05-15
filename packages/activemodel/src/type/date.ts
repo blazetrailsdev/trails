@@ -16,6 +16,16 @@ export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativ
 export class DateType extends ValueType<DateCastResult> {
   readonly name: string = "date";
 
+  type(): string {
+    return this.name;
+  }
+
+  typeCastForSchema(value: unknown): string {
+    const cast = this.cast(value);
+    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return "null";
+    return JSON.stringify(cast.toString());
+  }
+
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): DateCastResult | null {
     if (value === DateInfinity) return DateInfinity;
@@ -36,28 +46,6 @@ export class DateType extends ValueType<DateCastResult> {
     const str = String(value).trim();
     if (str === "") return null;
     return this.fastStringToDate(str) ?? this.fallbackStringToDate(str);
-  }
-
-  serialize(value: unknown): string | null {
-    const cast = this.cast(value);
-    // Sentinels are Postgres-specific; base type returns null. The Postgres
-    // OID::Date subclass overrides serialize() to emit 'infinity'/'-infinity'.
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
-    return cast.toString();
-  }
-
-  serializeCastValue(value: DateCastResult | null): string | null {
-    return this.serialize(value);
-  }
-
-  type(): string {
-    return this.name;
-  }
-
-  typeCastForSchema(value: unknown): string {
-    const cast = this.cast(value);
-    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return "null";
-    return JSON.stringify(cast.toString());
   }
 
   /**
@@ -158,6 +146,18 @@ export class DateType extends ValueType<DateCastResult> {
     values: Record<number, number | null | undefined>,
   ): Temporal.PlainDate | null {
     return this.newDate(values[1], values[2], values[3]);
+  }
+
+  serialize(value: unknown): string | null {
+    const cast = this.cast(value);
+    // Sentinels are Postgres-specific; base type returns null. The Postgres
+    // OID::Date subclass overrides serialize() to emit 'infinity'/'-infinity'.
+    if (cast === null || cast === DateInfinity || cast === DateNegativeInfinity) return null;
+    return cast.toString();
+  }
+
+  serializeCastValue(value: DateCastResult | null): string | null {
+    return this.serialize(value);
   }
 }
 

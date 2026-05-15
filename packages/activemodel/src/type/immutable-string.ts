@@ -19,6 +19,18 @@ export class ImmutableStringType extends ValueType<string> {
     this.falseString = options?.falseString ?? "f";
   }
 
+  type(): string {
+    return "string";
+  }
+
+  serialize(value: unknown): unknown {
+    return this.cast(value);
+  }
+
+  serializeCastValue(value: string | null): string | null {
+    return value;
+  }
+
   /**
    * Mirrors: ActiveModel::Type::ImmutableString#cast_value
    * (immutable_string.rb):
@@ -36,17 +48,5 @@ export class ImmutableStringType extends ValueType<string> {
     if (value === false) return Object.freeze(this.falseString) as string;
     const str = String(value);
     return Object.freeze(str) as string;
-  }
-
-  serialize(value: unknown): unknown {
-    return this.cast(value);
-  }
-
-  type(): string {
-    return "string";
-  }
-
-  serializeCastValue(value: string | null): string | null {
-    return value;
   }
 }

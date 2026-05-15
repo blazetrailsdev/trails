@@ -46,65 +46,6 @@ export class NumericalityValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare isRecordAttributeChangedInPlace: typeof isRecordAttributeChangedInPlace;
 
-  private resolveNumeric(
-    val: NumericValue | undefined,
-    record: ValidatableRecord,
-    precision: number,
-    scale?: number,
-  ): number | undefined {
-    if (val === undefined) return undefined;
-    return this.optionAsNumber(record, val, precision, scale);
-  }
-
-  override checkValidity(): void {
-    const compareKeys = [
-      "greaterThan",
-      "greaterThanOrEqualTo",
-      "lessThan",
-      "lessThanOrEqualTo",
-      "equalTo",
-      "otherThan",
-    ] as const;
-    for (const key of compareKeys) {
-      const val = this.options[key];
-      if (
-        val !== undefined &&
-        typeof val !== "number" &&
-        typeof val !== "function" &&
-        typeof val !== "string"
-      ) {
-        throw new Error(`:${key} must be a number, a symbol or a proc`);
-      }
-    }
-    if (this.options.in !== undefined && !Array.isArray(this.options.in)) {
-      throw new Error(":in must be a range");
-    }
-  }
-
-  // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
-  /**
-   * Override EachValidator.validate so prepareValueForValidation runs
-   * BEFORE the allow_nil short-circuit. Rails' EachValidator
-   * normally would skip nil values when allow_nil: true, but
-   * Numericality wants to validate what the user actually typed —
-   * an integer column casting "abc" to null mustn't bypass the check
-   * (numericality.rb's validate_each operates on raw input).
-   */
-  override validate(record: ValidatableRecord): void {
-    for (const attribute of this.attributes) {
-      // Reuses EachValidator.readAttributeForValidation so the lookup
-      // chain stays in one place. The flow then runs through
-      // prepareValueForValidation BEFORE the allowNil/allowBlank
-      // short-circuits so raw user input ('abc' → cast null) still
-      // gets validated.
-      const cast = this.readAttributeForValidation(record, attribute);
-      const value = this.prepareValueForValidation(cast, record, attribute);
-      if (value == null && this.options.allowNil === true) continue;
-      if (isBlank(value) && this.options.allowBlank === true) continue;
-      this.validateEach(record, attribute, value);
-    }
-  }
-
   validateEach(
     record: ValidatableRecord,
     attribute: string,
@@ -210,6 +151,65 @@ export class NumericalityValidator extends EachValidator {
       record.errors.add(attribute, "even", this.filteredOptions(value));
     }
   }
+
+  private resolveNumeric(
+    val: NumericValue | undefined,
+    record: ValidatableRecord,
+    precision: number,
+    scale?: number,
+  ): number | undefined {
+    if (val === undefined) return undefined;
+    return this.optionAsNumber(record, val, precision, scale);
+  }
+
+  override checkValidity(): void {
+    const compareKeys = [
+      "greaterThan",
+      "greaterThanOrEqualTo",
+      "lessThan",
+      "lessThanOrEqualTo",
+      "equalTo",
+      "otherThan",
+    ] as const;
+    for (const key of compareKeys) {
+      const val = this.options[key];
+      if (
+        val !== undefined &&
+        typeof val !== "number" &&
+        typeof val !== "function" &&
+        typeof val !== "string"
+      ) {
+        throw new Error(`:${key} must be a number, a symbol or a proc`);
+      }
+    }
+    if (this.options.in !== undefined && !Array.isArray(this.options.in)) {
+      throw new Error(":in must be a range");
+    }
+  }
+
+  // Rails: validate_each(record, attr_name, value, precision: Float::DIG, scale: nil)
+  /**
+   * Override EachValidator.validate so prepareValueForValidation runs
+   * BEFORE the allow_nil short-circuit. Rails' EachValidator
+   * normally would skip nil values when allow_nil: true, but
+   * Numericality wants to validate what the user actually typed —
+   * an integer column casting "abc" to null mustn't bypass the check
+   * (numericality.rb's validate_each operates on raw input).
+   */
+  override validate(record: ValidatableRecord): void {
+    for (const attribute of this.attributes) {
+      // Reuses EachValidator.readAttributeForValidation so the lookup
+      // chain stays in one place. The flow then runs through
+      // prepareValueForValidation BEFORE the allowNil/allowBlank
+      // short-circuits so raw user input ('abc' → cast null) still
+      // gets validated.
+      const cast = this.readAttributeForValidation(record, attribute);
+      const value = this.prepareValueForValidation(cast, record, attribute);
+      if (value == null && this.options.allowNil === true) continue;
+      if (isBlank(value) && this.options.allowBlank === true) continue;
+      this.validateEach(record, attribute, value);
+    }
+  }
 }
 
 // Rails: /\A[+-]?\d+\z/ — use a true end-of-string check rather than
@@ -247,6 +247,65 @@ const RESERVED_OPTIONS = [
 ] as const;
 
 /**
+ * Mirrors: numericality.rb:67-69
+ *   def option_as_number(record, option_value, precision, scale)
+ *     parse_as_number(resolve_value(record, option_value), precision, scale)
+ *   end
+ *
+ * The single Rails call site that consumes `resolve_value` for compare
+ * options (numericality.rb:60). With this private in place, validateEach
+ * routes every numeric option through `this.optionAsNumber(...)` rather
+ * than the previous inline resolve+coerce.
+ *
+ * @internal Rails-private helper.
+ */
+export function optionAsNumber(
+  this: {
+    resolveValue(record: unknown, value: unknown): unknown;
+  },
+  record: ValidatableRecord,
+  optionValue: unknown,
+  precision: number,
+  scale?: number,
+): number | undefined {
+  const resolved = this.resolveValue(record, optionValue);
+  if (resolved === undefined || resolved === null) return undefined;
+  // Rails option_as_number → parse_as_number → Kernel.Float would raise
+  // TypeError on non-Numeric/non-String input (Date, boolean, object).
+  // Throw the consistent validator error rather than silently accepting
+  // values that JS Number() happens to coerce (true → 1, Date → epoch).
+  if (typeof resolved !== "number" && typeof resolved !== "string") {
+    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+  }
+  if (typeof resolved === "string") {
+    if (resolved.trim() === "") {
+      // Rails Kernel.Float raises ArgumentError on blank strings, so
+      // option_as_number propagates the error.
+      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+    }
+    // Rails parse_as_number's elsif chain only falls through for hex
+    // literals when the ANCHORED regex matches (HEXADECIMAL_REGEX uses
+    // \A so leading whitespace doesn't qualify). "  0x10" doesn't
+    // match, falls through to Kernel.Float, and raises — so we should
+    // raise too rather than silently skipping.
+    if (HEXADECIMAL_REGEX.test(resolved)) return undefined;
+    const trimmed = resolved.trimStart();
+    // Anything non-decimal that survives — leading-whitespace hex,
+    // 0b… / 0o… — is rejected by Rails Kernel.Float. JS Number() would
+    // silently coerce 0b/0o, so the explicit guard is load-bearing
+    // on the trails side.
+    if (HEXADECIMAL_REGEX.test(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) {
+      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+    }
+  }
+  const numeric = typeof resolved === "number" ? resolved : Number(resolved);
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
+  }
+  return parseAsNumber(numeric, precision, scale);
+}
+
+/**
  * Rails: parse_as_number → branches by Ruby type (Float / BigDecimal /
  * Numeric / integer-string / non-hex string). In TS we just narrow to
  * number and route through round + parseFloat per Rails:
@@ -271,22 +330,6 @@ const RESERVED_OPTIONS = [
 export function parseAsNumber(num: number, precision: number, scale?: number): number | undefined {
   if (!Number.isFinite(num)) return undefined;
   return parseFloatRails(num, precision, scale);
-}
-
-/**
- * Mirrors: numericality.rb:86-88
- *   def parse_float(raw_value, precision, scale)
- *     round(raw_value, scale).to_d(precision)
- *   end
- *
- * Rounds to `scale` decimal places, then rounds to `precision`
- * significant digits — matches Ruby's `BigDecimal(float.round(scale), precision)`.
- * (Number.prototype.toPrecision performs rounding, not truncation.)
- *
- * @internal Rails-private helper.
- */
-export function parseFloatRails(num: number, precision: number, scale?: number): number {
-  return +round(num, scale).toPrecision(precision);
 }
 
 /**
@@ -386,65 +429,6 @@ export function isHexadecimalLiteral(rawValue: unknown): boolean {
 }
 
 /**
- * Mirrors: numericality.rb:67-69
- *   def option_as_number(record, option_value, precision, scale)
- *     parse_as_number(resolve_value(record, option_value), precision, scale)
- *   end
- *
- * The single Rails call site that consumes `resolve_value` for compare
- * options (numericality.rb:60). With this private in place, validateEach
- * routes every numeric option through `this.optionAsNumber(...)` rather
- * than the previous inline resolve+coerce.
- *
- * @internal Rails-private helper.
- */
-export function optionAsNumber(
-  this: {
-    resolveValue(record: unknown, value: unknown): unknown;
-  },
-  record: ValidatableRecord,
-  optionValue: unknown,
-  precision: number,
-  scale?: number,
-): number | undefined {
-  const resolved = this.resolveValue(record, optionValue);
-  if (resolved === undefined || resolved === null) return undefined;
-  // Rails option_as_number → parse_as_number → Kernel.Float would raise
-  // TypeError on non-Numeric/non-String input (Date, boolean, object).
-  // Throw the consistent validator error rather than silently accepting
-  // values that JS Number() happens to coerce (true → 1, Date → epoch).
-  if (typeof resolved !== "number" && typeof resolved !== "string") {
-    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
-  }
-  if (typeof resolved === "string") {
-    if (resolved.trim() === "") {
-      // Rails Kernel.Float raises ArgumentError on blank strings, so
-      // option_as_number propagates the error.
-      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
-    }
-    // Rails parse_as_number's elsif chain only falls through for hex
-    // literals when the ANCHORED regex matches (HEXADECIMAL_REGEX uses
-    // \A so leading whitespace doesn't qualify). "  0x10" doesn't
-    // match, falls through to Kernel.Float, and raises — so we should
-    // raise too rather than silently skipping.
-    if (HEXADECIMAL_REGEX.test(resolved)) return undefined;
-    const trimmed = resolved.trimStart();
-    // Anything non-decimal that survives — leading-whitespace hex,
-    // 0b… / 0o… — is rejected by Rails Kernel.Float. JS Number() would
-    // silently coerce 0b/0o, so the explicit guard is load-bearing
-    // on the trails side.
-    if (HEXADECIMAL_REGEX.test(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) {
-      throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
-    }
-  }
-  const numeric = typeof resolved === "number" ? resolved : Number(resolved);
-  if (!Number.isFinite(numeric)) {
-    throw new Error(`Resolved numericality option must be numeric: ${String(resolved)}`);
-  }
-  return parseAsNumber(numeric, precision, scale);
-}
-
-/**
  * Mirrors: numericality.rb:110-114
  *   def filtered_options(value)
  *     filtered = options.except(*RESERVED_OPTIONS)
@@ -496,14 +480,6 @@ export function isAllowOnlyInteger(
   // clusivity.ts:delimiter, comparison.ts).
   const resolved = this.resolveValue(record, this.options.onlyInteger);
   return resolved !== undefined && resolved !== null && resolved !== false;
-}
-
-interface RecordWithRawAttribute {
-  attributeChangedInPlace?: (name: string) => boolean;
-  cameFromUser?: (name: string) => boolean;
-  readAttribute?: (name: string) => unknown;
-  readAttributeBeforeTypeCast?: (name: string) => unknown;
-  [key: string]: unknown;
 }
 
 /**
@@ -580,6 +556,14 @@ export function prepareValueForValidation(
   return rawValue !== undefined && rawValue !== null && rawValue !== false ? rawValue : value;
 }
 
+interface RecordWithRawAttribute {
+  attributeChangedInPlace?: (name: string) => boolean;
+  cameFromUser?: (name: string) => boolean;
+  readAttribute?: (name: string) => unknown;
+  readAttributeBeforeTypeCast?: (name: string) => unknown;
+  [key: string]: unknown;
+}
+
 /**
  * Mirrors: numericality.rb:140-143
  *   def record_attribute_changed_in_place?(record, attr_name)
@@ -595,6 +579,22 @@ export function isRecordAttributeChangedInPlace(
 ): boolean {
   const r = record as unknown as RecordWithRawAttribute;
   return typeof r.attributeChangedInPlace === "function" && r.attributeChangedInPlace(attrName);
+}
+
+/**
+ * Mirrors: numericality.rb:86-88
+ *   def parse_float(raw_value, precision, scale)
+ *     round(raw_value, scale).to_d(precision)
+ *   end
+ *
+ * Rounds to `scale` decimal places, then rounds to `precision`
+ * significant digits — matches Ruby's `BigDecimal(float.round(scale), precision)`.
+ * (Number.prototype.toPrecision performs rounding, not truncation.)
+ *
+ * @internal Rails-private helper.
+ */
+export function parseFloatRails(num: number, precision: number, scale?: number): number {
+  return +round(num, scale).toPrecision(precision);
 }
 
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;

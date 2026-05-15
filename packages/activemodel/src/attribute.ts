@@ -86,9 +86,8 @@ export abstract class Attribute {
     return this._cachedValueForDatabase;
   }
 
-  /** @internal */
-  protected _valueForDatabase(): unknown {
-    return this.type.serialize(this.value);
+  isSerializable(): boolean {
+    return this.type.isSerializable(this.value);
   }
 
   isChanged(): boolean {
@@ -99,6 +98,10 @@ export abstract class Attribute {
     return (
       this.hasBeenRead() && this.type.isChangedInPlace(this.originalValueForDatabase(), this.value)
     );
+  }
+
+  forgettingAssignment(): Attribute {
+    return this.withValueFromDatabase(this.valueForDatabase);
   }
 
   withValueFromUser(value: unknown): Attribute {
@@ -112,6 +115,10 @@ export abstract class Attribute {
 
   withCastValue(value: unknown): Attribute {
     return new WithCastValue(this.name, value, this.type);
+  }
+
+  static withCastValue(name: string, value: unknown, type: Type): WithCastValue {
+    return new WithCastValue(name, value, type);
   }
 
   withType(type: Type): Attribute {
@@ -139,8 +146,54 @@ export abstract class Attribute {
     return this._hasValue;
   }
 
-  forgettingAssignment(): Attribute {
-    return this.withValueFromDatabase(this.valueForDatabase);
+  originalValueForDatabase(): unknown {
+    if (this.originalAttribute !== null) {
+      return this.originalAttribute.originalValueForDatabase();
+    }
+    return this._originalValueForDatabase();
+  }
+
+  private changedFromAssignment(): boolean {
+    if (!this.isAssigned()) return false;
+    return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
+  }
+
+  abstract typeCast(value: unknown): unknown;
+
+  /** @internal */
+  protected _valueForDatabase(): unknown {
+    return this.type.serialize(this.value);
+  }
+
+  /** @internal */
+  protected _originalValueForDatabase(): unknown {
+    return this.type.serialize(this.originalValue);
+  }
+
+  // --- Factory methods ---
+
+  static fromDatabase(name: string, value: unknown, type: Type, castValue?: unknown): FromDatabase {
+    if (arguments.length >= 4) {
+      return new FromDatabase(name, value, type, null, castValue);
+    }
+    return new FromDatabase(name, value, type, null);
+  }
+
+  static fromUser(
+    name: string,
+    value: unknown,
+    type: Type,
+    originalAttribute: Attribute | null = null,
+  ): FromUser {
+    return new FromUser(name, value, type, originalAttribute);
+  }
+
+  static null(name: string): Null {
+    return new Null(name);
+  }
+
+  static uninitialized(name: string, type: Type): Uninitialized {
+    return new Uninitialized(name, type);
   }
 
   /**
@@ -155,11 +208,6 @@ export abstract class Attribute {
     this._hasValueForDatabase = false;
   }
 
-  /** @internal */
-  protected _originalValueForDatabase(): unknown {
-    return this.type.serialize(this.originalValue);
-  }
-
   equals(other: Attribute): boolean {
     const typeEqual = this.type === other.type || this.type.constructor === other.type.constructor;
     return (
@@ -168,19 +216,6 @@ export abstract class Attribute {
       this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
       typeEqual
     );
-  }
-
-  abstract typeCast(value: unknown): unknown;
-
-  isSerializable(): boolean {
-    return this.type.isSerializable(this.value);
-  }
-
-  originalValueForDatabase(): unknown {
-    if (this.originalAttribute !== null) {
-      return this.originalAttribute.originalValueForDatabase();
-    }
-    return this._originalValueForDatabase();
   }
 
   withUserDefault(value: unknown): Attribute {
@@ -212,41 +247,6 @@ export abstract class Attribute {
     return this.originalAttribute !== null;
   }
 
-  private changedFromAssignment(): boolean {
-    if (!this.isAssigned()) return false;
-    return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
-  }
-
-  // --- Factory methods ---
-
-  static fromDatabase(name: string, value: unknown, type: Type, castValue?: unknown): FromDatabase {
-    if (arguments.length >= 4) {
-      return new FromDatabase(name, value, type, null, castValue);
-    }
-    return new FromDatabase(name, value, type, null);
-  }
-
-  static fromUser(
-    name: string,
-    value: unknown,
-    type: Type,
-    originalAttribute: Attribute | null = null,
-  ): FromUser {
-    return new FromUser(name, value, type, originalAttribute);
-  }
-
-  static withCastValue(name: string, value: unknown, type: Type): WithCastValue {
-    return new WithCastValue(name, value, type);
-  }
-
-  static null(name: string): Null {
-    return new Null(name);
-  }
-
-  static uninitialized(name: string, type: Type): Uninitialized {
-    return new Uninitialized(name, type);
-  }
-
   /**
    * Create an attribute where we already have both the raw and cast values.
    * Used in the Model constructor after applying normalization/nullify.
@@ -262,15 +262,6 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
-  typeCast(value: unknown): unknown {
-    return this.type.deserialize(value);
-  }
-
-  /** @internal */
-  protected override _originalValueForDatabase(): unknown {
-    return this.valueBeforeTypeCast;
-  }
-
   override forgettingAssignment(): Attribute {
     // Rails condition: `!defined?(@value_for_database) && !changed_in_place?`
     // → fast-path creates a new FromDatabase using the existing value_before_type_cast.
@@ -280,6 +271,15 @@ export class FromDatabase extends Attribute {
     // a new FromDatabase, resetting the baseline to the post-mutation state.
     if (!this.changedInPlace()) return this;
     return super.forgettingAssignment();
+  }
+
+  typeCast(value: unknown): unknown {
+    return this.type.deserialize(value);
+  }
+
+  /** @internal */
+  protected override _originalValueForDatabase(): unknown {
+    return this.valueBeforeTypeCast;
   }
 }
 
@@ -303,12 +303,12 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
-  typeCast(value: unknown): unknown {
-    return value;
-  }
-
   changedInPlace(): boolean {
     return false;
+  }
+
+  typeCast(value: unknown): unknown {
+    return value;
   }
 }
 
@@ -317,20 +317,20 @@ export class Null extends Attribute {
     super(name, null, typeRegistry.lookup("value"));
   }
 
-  typeCast(): unknown {
-    return null;
+  withValueFromUser(_value: unknown): Attribute {
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
   }
 
   withValueFromDatabase(_value: unknown): Attribute {
     throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
   }
 
-  withValueFromUser(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name}\``);
-  }
-
   override withType(type: Type): Attribute {
     return Attribute.withCastValue(this.name, null, type);
+  }
+
+  typeCast(): unknown {
+    return null;
   }
 }
 
@@ -351,10 +351,6 @@ export class Uninitialized extends Attribute {
     return undefined;
   }
 
-  isInitialized(): boolean {
-    return false;
-  }
-
   forgettingAssignment(): Attribute {
     return new Uninitialized(this.name, this.type);
   }
@@ -365,5 +361,9 @@ export class Uninitialized extends Attribute {
 
   typeCast(): unknown {
     return undefined;
+  }
+
+  isInitialized(): boolean {
+    return false;
   }
 }

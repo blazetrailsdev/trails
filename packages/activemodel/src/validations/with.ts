@@ -2,16 +2,6 @@ import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 
 export class WithValidator extends EachValidator {
-  override checkValidity(): void {
-    super.checkValidity();
-    const methodName = this.options.with;
-    if (typeof methodName !== "string" || methodName.trim().length === 0) {
-      throw new globalThis.Error(
-        "WithValidator requires the :with option to be a non-blank string",
-      );
-    }
-  }
-
   validateEach(record: ValidatableRecord, attribute: string, _value: unknown): void {
     const methodName = this.options.with as string;
     const method = (record as unknown as Record<string, unknown>)[methodName];
@@ -28,6 +18,16 @@ export class WithValidator extends EachValidator {
       method.call(record);
     } else {
       method.call(record, attribute);
+    }
+  }
+
+  override checkValidity(): void {
+    super.checkValidity();
+    const methodName = this.options.with;
+    if (typeof methodName !== "string" || methodName.trim().length === 0) {
+      throw new globalThis.Error(
+        "WithValidator requires the :with option to be a non-blank string",
+      );
     }
   }
 }

@@ -29,13 +29,6 @@ export class AcceptsMultiparameterTime {
     this.defaults = defaults;
   }
 
-  cast(value: unknown): unknown {
-    if (this.isMultiparameterHash(value)) {
-      return this.castFromMultiparameter(value as Record<string, unknown>);
-    }
-    return this.type.cast(value);
-  }
-
   serialize(value: unknown): unknown {
     return this.type.serialize(value);
   }
@@ -50,6 +43,13 @@ export class AcceptsMultiparameterTime {
       ).serializeCastValue(value);
     }
     return this.type.serialize(value);
+  }
+
+  cast(value: unknown): unknown {
+    if (this.isMultiparameterHash(value)) {
+      return this.castFromMultiparameter(value as Record<string, unknown>);
+    }
+    return this.type.cast(value);
   }
 
   assertValidValue(value: unknown): void {

@@ -12,48 +12,6 @@ export interface SerializationRecord {
 }
 
 /**
- * Set `key` on `target` as an own data property, even when `key` is
- * `__proto__` (or another magic name that has accessors on
- * `Object.prototype`). A plain assignment would invoke the inherited
- * setter and mutate the target's prototype chain. Used everywhere the
- * key may originate from user input — attribute names, include keys,
- * association names from a JSON-decoded options bag.
- */
-function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
-  Object.defineProperty(target, key, {
-    value,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
-}
-
-/**
- * Serialization mixin contract — provides serializable_hash.
- *
- * Mirrors: ActiveModel::Serialization
- */
-export interface Serialization {
-  serializableHash(options?: SerializeOptions): Record<string, unknown>;
-}
-
-/**
- * Serialization options.
- */
-export interface SerializeOptions {
-  only?: string[];
-  except?: string[];
-  methods?: string[];
-  // Mirrors Rails `:include` polymorphism: a single name, an array of
-  // names, a hash of name → opts, or — like `include: [:posts, { comments: {} }]`
-  // — an array mixing names and hashes.
-  include?:
-    | Record<string, SerializeOptions>
-    | Array<string | Record<string, SerializeOptions>>
-    | string;
-}
-
-/**
  * Serialize a model's attributes to a plain object.
  *
  * Mirrors: ActiveModel::Serialization#serializable_hash
@@ -119,26 +77,29 @@ export function serializableHash(
 }
 
 /**
- * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
- * (serialization.rb:158-160)
+ * Serialization mixin contract — provides serializable_hash.
  *
- *   def attribute_names_for_serialization
- *     attributes.keys
- *   end
- *
- * Models can override this hook to scope which attributes appear.
- * Trails has multiple attribute storage shapes (AttributeSet via
- * `_attributes`, Map, plain object) so the fallback walks them in
- * order. Virtual attributes (acceptance/confirmation) are filtered
- * out — they aren't real attributes and shouldn't surface in JSON.
- *
- * @internal Rails-private helper.
+ * Mirrors: ActiveModel::Serialization
  */
-type AttributeStore =
-  | { keys(): string[]; fetchValue(key: string): unknown }
-  | Map<string, unknown>
-  | null
-  | undefined;
+export interface Serialization {
+  serializableHash(options?: SerializeOptions): Record<string, unknown>;
+}
+
+/**
+ * Serialization options.
+ */
+export interface SerializeOptions {
+  only?: string[];
+  except?: string[];
+  methods?: string[];
+  // Mirrors Rails `:include` polymorphism: a single name, an array of
+  // names, a hash of name → opts, or — like `include: [:posts, { comments: {} }]`
+  // — an array mixing names and hashes.
+  include?:
+    | Record<string, SerializeOptions>
+    | Array<string | Record<string, SerializeOptions>>
+    | string;
+}
 
 /** @internal */
 export function attributeNamesForSerialization(record: SerializationRecord): string[] {
@@ -166,6 +127,28 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
   }
   return keys;
 }
+
+/**
+ * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+ * (serialization.rb:158-160)
+ *
+ *   def attribute_names_for_serialization
+ *     attributes.keys
+ *   end
+ *
+ * Models can override this hook to scope which attributes appear.
+ * Trails has multiple attribute storage shapes (AttributeSet via
+ * `_attributes`, Map, plain object) so the fallback walks them in
+ * order. Virtual attributes (acceptance/confirmation) are filtered
+ * out — they aren't real attributes and shouldn't surface in JSON.
+ *
+ * @internal Rails-private helper.
+ */
+type AttributeStore =
+  | { keys(): string[]; fetchValue(key: string): unknown }
+  | Map<string, unknown>
+  | null
+  | undefined;
 
 /**
  * Mirrors: ActiveModel::Serialization#serializable_attributes
@@ -258,6 +241,23 @@ export function serializableAddIncludes(
       callback(assocName, cached, assocOpts);
     }
   }
+}
+
+/**
+ * Set `key` on `target` as an own data property, even when `key` is
+ * `__proto__` (or another magic name that has accessors on
+ * `Object.prototype`). A plain assignment would invoke the inherited
+ * setter and mutate the target's prototype chain. Used everywhere the
+ * key may originate from user input — attribute names, include keys,
+ * association names from a JSON-decoded options bag.
+ */
+function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
 }
 
 /**

@@ -19,6 +19,18 @@ export abstract class Type<T = unknown> {
     return this._scale;
   }
 
+  isSerializable(_value: unknown): boolean {
+    return true;
+  }
+
+  type(): string {
+    return this.name;
+  }
+
+  deserialize(value: unknown): T | null {
+    return this.cast(value);
+  }
+
   /**
    * Mirrors: ActiveModel::Type::Value#cast (value.rb:53-55)
    *
@@ -37,6 +49,52 @@ export abstract class Type<T = unknown> {
     return this.castValue(value);
   }
 
+  serialize(value: unknown): unknown {
+    return value;
+  }
+
+  typeCastForSchema(value: unknown): string {
+    return JSON.stringify(value) ?? String(value);
+  }
+
+  isBinary(): boolean {
+    return false;
+  }
+
+  isChanged(oldValue: unknown, newValue: unknown, _newValueBeforeTypeCast?: unknown): boolean {
+    return oldValue !== newValue;
+  }
+
+  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
+    return false;
+  }
+
+  isValueConstructedByMassAssignment(_value: unknown): boolean {
+    return false;
+  }
+
+  isForceEquality(_value: unknown): boolean {
+    return false;
+  }
+
+  map(value: T | null): T | null {
+    return value;
+  }
+
+  assertValidValue(_value: unknown): void {}
+
+  isSerialized(): boolean {
+    return false;
+  }
+
+  isMutable(): boolean {
+    return false;
+  }
+
+  asJson(): never {
+    throw new Error("Unimplemented");
+  }
+
   /**
    * Mirrors: ActiveModel::Type::Value#cast_value (value.rb:155-157)
    *
@@ -52,18 +110,6 @@ export abstract class Type<T = unknown> {
    */
   protected castValue(value: unknown): T | null {
     return value as T | null;
-  }
-
-  type(): string {
-    return this.name;
-  }
-
-  deserialize(value: unknown): T | null {
-    return this.cast(value);
-  }
-
-  serialize(value: unknown): unknown {
-    return value;
   }
 
   serializeCastValue(value: T | null): unknown {
@@ -137,52 +183,6 @@ export abstract class Type<T = unknown> {
       configurable: true,
     });
     return result;
-  }
-
-  isSerializable(_value: unknown): boolean {
-    return true;
-  }
-
-  typeCastForSchema(value: unknown): string {
-    return JSON.stringify(value) ?? String(value);
-  }
-
-  isBinary(): boolean {
-    return false;
-  }
-
-  isChanged(oldValue: unknown, newValue: unknown, _newValueBeforeTypeCast?: unknown): boolean {
-    return oldValue !== newValue;
-  }
-
-  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
-    return false;
-  }
-
-  isValueConstructedByMassAssignment(_value: unknown): boolean {
-    return false;
-  }
-
-  isForceEquality(_value: unknown): boolean {
-    return false;
-  }
-
-  map(value: T | null): T | null {
-    return value;
-  }
-
-  assertValidValue(_value: unknown): void {}
-
-  isSerialized(): boolean {
-    return false;
-  }
-
-  isMutable(): boolean {
-    return false;
-  }
-
-  asJson(): never {
-    throw new Error("Unimplemented");
   }
 }
 

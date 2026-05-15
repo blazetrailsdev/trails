@@ -54,60 +54,6 @@ export class JSON {
   /** Plain attribute store for lightweight adopters; subclasses override with their storage shape. */
   declare attributes: Record<string, unknown>;
 
-  // Rails: included do; extend ActiveModel::Naming; end — surfaces
-  // model_name on the host class. Subclasses override to customize.
-  static get modelName(): ModelName {
-    if (!this._modelName || this._modelName.name !== this.name) {
-      this._modelName = new ModelName(this.name, { klass: this });
-    }
-    return this._modelName;
-  }
-
-  /**
-   * Mirrors: ActiveModel::Serialization#serializable_hash
-   * (serialization.rb), included into JSON via `include
-   * ActiveModel::Serialization`. Delegates to the canonical
-   * implementation in `serialization.ts` so a subclass that mixes in
-   * the JSON host gets the same Rails semantics for `:only`, `:except`,
-   * `:methods`, `:include`.
-   */
-  serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash(this as unknown as SerializationRecord, options);
-  }
-
-  /**
-   * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
-   * (serialization.rb:158-160), inherited via `include Serialization`.
-   *
-   * @internal Rails-private helper.
-   */
-  protected attributeNamesForSerialization(): string[] {
-    return attributeNamesForSerialization(this as unknown as SerializationRecord);
-  }
-
-  /**
-   * Mirrors: ActiveModel::Serialization#serializable_attributes
-   * (serialization.rb:162-164), inherited via `include Serialization`.
-   *
-   * @internal Rails-private helper.
-   */
-  protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
-    return serializableAttributes(this as unknown as SerializationRecord, attributeNames);
-  }
-
-  /**
-   * Mirrors: ActiveModel::Serialization#serializable_add_includes
-   * (serialization.rb:171-183), inherited via `include Serialization`.
-   *
-   * @internal Rails-private helper.
-   */
-  protected serializableAddIncludes(
-    options: SerializeOptions = {},
-    callback: (association: string, records: unknown, opts: SerializeOptions) => void = () => {},
-  ): void {
-    serializableAddIncludes(this as unknown as SerializationRecord, options, callback);
-  }
-
   /**
    * Mirrors: json.rb:96-108
    *   def as_json(options = nil)
@@ -174,6 +120,60 @@ export class JSON {
     }
     this.attributes = hash as Record<string, unknown>;
     return this;
+  }
+
+  // Rails: included do; extend ActiveModel::Naming; end — surfaces
+  // model_name on the host class. Subclasses override to customize.
+  static get modelName(): ModelName {
+    if (!this._modelName || this._modelName.name !== this.name) {
+      this._modelName = new ModelName(this.name, { klass: this });
+    }
+    return this._modelName;
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_hash
+   * (serialization.rb), included into JSON via `include
+   * ActiveModel::Serialization`. Delegates to the canonical
+   * implementation in `serialization.ts` so a subclass that mixes in
+   * the JSON host gets the same Rails semantics for `:only`, `:except`,
+   * `:methods`, `:include`.
+   */
+  serializableHash(options?: SerializeOptions): Record<string, unknown> {
+    return serializableHash(this as unknown as SerializationRecord, options);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+   * (serialization.rb:158-160), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected attributeNamesForSerialization(): string[] {
+    return attributeNamesForSerialization(this as unknown as SerializationRecord);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_attributes
+   * (serialization.rb:162-164), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
+    return serializableAttributes(this as unknown as SerializationRecord, attributeNames);
+  }
+
+  /**
+   * Mirrors: ActiveModel::Serialization#serializable_add_includes
+   * (serialization.rb:171-183), inherited via `include Serialization`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected serializableAddIncludes(
+    options: SerializeOptions = {},
+    callback: (association: string, records: unknown, opts: SerializeOptions) => void = () => {},
+  ): void {
+    serializableAddIncludes(this as unknown as SerializationRecord, options, callback);
   }
 
   /**

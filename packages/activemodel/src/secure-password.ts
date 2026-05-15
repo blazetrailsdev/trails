@@ -20,27 +20,6 @@ export namespace SecurePassword {
   }
 }
 
-function setPassword(
-  instance: Model,
-  value: unknown,
-  attribute: string,
-  digestAttr: string,
-  passwordCache: WeakMap<object, string | null>,
-) {
-  if (value === null || value === undefined) {
-    passwordCache.set(instance, null);
-    instance.writeAttribute(digestAttr, null);
-    return;
-  }
-  const str = String(value);
-  if (str === "") {
-    return;
-  }
-  passwordCache.set(instance, str);
-  const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
-  instance.writeAttribute(digestAttr, bcrypt.hashSync(str, cost));
-}
-
 export function hasSecurePassword(
   modelClass: typeof Model,
   attribute: string = "password",
@@ -166,6 +145,27 @@ export function hasSecurePassword(
       }
     });
   }
+}
+
+function setPassword(
+  instance: Model,
+  value: unknown,
+  attribute: string,
+  digestAttr: string,
+  passwordCache: WeakMap<object, string | null>,
+) {
+  if (value === null || value === undefined) {
+    passwordCache.set(instance, null);
+    instance.writeAttribute(digestAttr, null);
+    return;
+  }
+  const str = String(value);
+  if (str === "") {
+    return;
+  }
+  passwordCache.set(instance, str);
+  const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
+  instance.writeAttribute(digestAttr, bcrypt.hashSync(str, cost));
 }
 
 /**

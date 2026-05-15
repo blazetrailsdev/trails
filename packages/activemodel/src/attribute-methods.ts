@@ -130,34 +130,46 @@ export interface AttributeMethodHost {
   prototype: { [key: string]: unknown };
 }
 
-function ensureOwnPatterns(host: AttributeMethodHost): void {
-  if (!Object.prototype.hasOwnProperty.call(host, "_attributeMethodPatterns")) {
-    host._attributeMethodPatterns = [...host._attributeMethodPatterns];
-  }
+/** @internal Rails-private helper. Mirrors: #attribute_method? */
+export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
+  return this._attributes?.has(attrName) ?? false;
 }
 
-function ensureOwnGeneratedMethods(host: AttributeMethodHost): void {
-  if (!Object.prototype.hasOwnProperty.call(host, "_generatedMethods")) {
-    host._generatedMethods = new Set(host._generatedMethods ?? []);
-  }
+/** @internal Rails-private helper. Mirrors: #matched_attribute_method */
+export function matchedAttributeMethod(
+  this: InstanceHost,
+  methodName: string,
+): { proxyTarget: string; attrName: string } | null {
+  const matches = attributeMethodPatternsMatching.call(
+    this.constructor as AttributeMethodHost,
+    methodName,
+  );
+  return matches.find((m) => isAttributeMethod.call(this, m.attrName)) ?? null;
 }
 
-function ensureOwnAliases(host: AttributeMethodHost): void {
-  if (!Object.prototype.hasOwnProperty.call(host, "_attributeAliases")) {
-    host._attributeAliases = { ...host._attributeAliases };
-  }
+/** @internal Rails-private helper. Mirrors: #missing_attribute */
+export function missingAttribute(this: InstanceHost, attrName: string): never {
+  throw new MissingAttributeError(
+    `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+  );
 }
 
-export function aliasesByAttributeName(host: AttributeMethodHost): Map<string, string[]> {
-  if (!Object.prototype.hasOwnProperty.call(host, "_aliasesByAttributeName")) {
-    const parent = host._aliasesByAttributeName;
-    const copy = new Map<string, string[]>();
-    if (parent) {
-      for (const [k, v] of parent) copy.set(k, [...v]);
-    }
-    host._aliasesByAttributeName = copy;
+/**
+ * @internal Rails-private helper. Mirrors: #_read_attribute
+ * Bypasses alias resolution and reads directly from the attribute store,
+ * matching Rails AR _read_attribute (fetch_value without alias lookup).
+ */
+export function _readAttribute(
+  this: InstanceHost & {
+    _attributes?: { fetchValue(name: string): unknown };
+    _readAttribute?(name: string): unknown;
+  },
+  attr: string,
+): unknown {
+  if (typeof this._readAttribute === "function" && this._readAttribute !== _readAttribute) {
+    return this._readAttribute(attr);
   }
-  return host._aliasesByAttributeName;
+  return this._attributes?.fetchValue(attr) ?? null;
 }
 
 // -- Public ClassMethods (use `this`, assigned to Model directly) -----------
@@ -223,27 +235,55 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
   defineDirtyAttributeMethods(this.prototype, newName);
 }
 
-export function undefineAttributeMethods(this: AttributeMethodHost): void {
-  if (!this._generatedMethods) return;
-  for (const methodName of this._generatedMethods) {
-    const desc = Object.getOwnPropertyDescriptor(this.prototype, methodName);
-    if (!desc) continue;
-    // Only delete if the method is still the generated one (has our marker)
-    const fn = desc.value ?? desc.get;
-    if (fn && (fn as TaggedFn).__generatedAttributeMethod) {
-      delete this.prototype[methodName];
+export function eagerlyGenerateAliasAttributeMethods(
+  host: AttributeMethodHost,
+  newName: string,
+  oldName: string,
+): void {
+  generateAliasAttributeMethods(host, newName, oldName);
+}
+
+export function generateAliasAttributeMethods(
+  host: AttributeMethodHost,
+  newName: string,
+  oldName: string,
+): void {
+  for (const pattern of host._attributeMethodPatterns) {
+    aliasAttributeMethodDefinition(host, pattern, newName, oldName);
+  }
+}
+
+export function aliasAttributeMethodDefinition(
+  host: AttributeMethodHost,
+  pattern: AttributeMethodPattern,
+  newName: string,
+  oldName: string,
+): void {
+  const methodName = pattern.methodName(newName);
+  const targetName = pattern.methodName(oldName);
+  ensureOwnGeneratedMethods(host);
+  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
+    const target = this[targetName];
+    if (typeof target === "function") {
+      return (target as (...a: unknown[]) => unknown).apply(this, args);
     }
-  }
-  this._generatedMethods.clear();
-  // Clear the pattern-match cache so stale entries don't survive after patterns change.
-  // Mirrors: Rails attribute_method_patterns_cache.clear in undefine_attribute_methods.
-  // Only clear an own-property cache; don't reach up and clear a parent's cache
-  // via inherited prototype-chain lookup.
-  if (Object.prototype.hasOwnProperty.call(this, "_attributeMethodPatternsCache")) {
-    (
-      this as AttributeMethodHost & { _attributeMethodPatternsCache: Map<unknown, unknown> }
-    )._attributeMethodPatternsCache.clear();
-  }
+    return this.readAttribute(oldName);
+  };
+  fn.__generatedAttributeMethod = true;
+  Object.defineProperty(host.prototype, methodName, {
+    value: fn,
+    writable: true,
+    configurable: true,
+  });
+  host._generatedMethods.add(methodName);
+}
+
+export function isAttributeAlias(host: AttributeMethodHost, name: string): boolean {
+  return Object.prototype.hasOwnProperty.call(host._attributeAliases, name);
+}
+
+export function attributeAlias(host: AttributeMethodHost, name: string): string | undefined {
+  return host._attributeAliases[name];
 }
 
 export function defineAttributeMethods(this: AttributeMethodHost, ...attrNames: string[]): void {
@@ -288,47 +328,169 @@ export function defineAttributeMethodPattern(
   host._generatedMethods.add(methodName);
 }
 
-export function eagerlyGenerateAliasAttributeMethods(
-  host: AttributeMethodHost,
-  newName: string,
-  oldName: string,
-): void {
-  generateAliasAttributeMethods(host, newName, oldName);
-}
-
-export function generateAliasAttributeMethods(
-  host: AttributeMethodHost,
-  newName: string,
-  oldName: string,
-): void {
-  for (const pattern of host._attributeMethodPatterns) {
-    aliasAttributeMethodDefinition(host, pattern, newName, oldName);
+export function undefineAttributeMethods(this: AttributeMethodHost): void {
+  if (!this._generatedMethods) return;
+  for (const methodName of this._generatedMethods) {
+    const desc = Object.getOwnPropertyDescriptor(this.prototype, methodName);
+    if (!desc) continue;
+    // Only delete if the method is still the generated one (has our marker)
+    const fn = desc.value ?? desc.get;
+    if (fn && (fn as TaggedFn).__generatedAttributeMethod) {
+      delete this.prototype[methodName];
+    }
+  }
+  this._generatedMethods.clear();
+  // Clear the pattern-match cache so stale entries don't survive after patterns change.
+  // Mirrors: Rails attribute_method_patterns_cache.clear in undefine_attribute_methods.
+  // Only clear an own-property cache; don't reach up and clear a parent's cache
+  // via inherited prototype-chain lookup.
+  if (Object.prototype.hasOwnProperty.call(this, "_attributeMethodPatternsCache")) {
+    (
+      this as AttributeMethodHost & { _attributeMethodPatternsCache: Map<unknown, unknown> }
+    )._attributeMethodPatternsCache.clear();
   }
 }
 
-export function aliasAttributeMethodDefinition(
-  host: AttributeMethodHost,
-  pattern: AttributeMethodPattern,
-  newName: string,
-  oldName: string,
-): void {
-  const methodName = pattern.methodName(newName);
-  const targetName = pattern.methodName(oldName);
-  ensureOwnGeneratedMethods(host);
-  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
-    const target = this[targetName];
-    if (typeof target === "function") {
-      return (target as (...a: unknown[]) => unknown).apply(this, args);
+export function aliasesByAttributeName(host: AttributeMethodHost): Map<string, string[]> {
+  if (!Object.prototype.hasOwnProperty.call(host, "_aliasesByAttributeName")) {
+    const parent = host._aliasesByAttributeName;
+    const copy = new Map<string, string[]>();
+    if (parent) {
+      for (const [k, v] of parent) copy.set(k, [...v]);
     }
-    return this.readAttribute(oldName);
+    host._aliasesByAttributeName = copy;
+  }
+  return host._aliasesByAttributeName;
+}
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
+export function resolveAttributeName(this: AttributeMethodHost, name: string): string {
+  return this._attributeAliases?.[name] ?? name;
+}
+
+// ---------------------------------------------------------------------------
+// Class-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#generated_attribute_methods */
+export function generatedAttributeMethods(this: AttributeMethodHost): Set<string> {
+  return this._generatedMethods;
+}
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#instance_method_already_implemented? */
+export function isInstanceMethodAlreadyImplemented(
+  this: AttributeMethodHost,
+  methodName: string,
+): boolean {
+  return this._generatedMethods?.has(methodName) ?? false;
+}
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_cache */
+export function attributeMethodPatternsCache(
+  this: AttributeMethodHost,
+): Map<string, Array<{ proxyTarget: string; attrName: string }>> {
+  const h = this as AttributeMethodHost & {
+    _attributeMethodPatternsCache?: Map<string, Array<{ proxyTarget: string; attrName: string }>>;
+  };
+  if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
+    h._attributeMethodPatternsCache = new Map();
+  }
+  return h._attributeMethodPatternsCache!;
+}
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_matching */
+export function attributeMethodPatternsMatching(
+  this: AttributeMethodHost,
+  methodName: string,
+): Array<{ proxyTarget: string; attrName: string }> {
+  const cache = attributeMethodPatternsCache.call(this);
+  if (cache.has(methodName)) return cache.get(methodName)!;
+  const matches = this._attributeMethodPatterns.flatMap((pattern) => {
+    const m = pattern.match(methodName);
+    return m ? [{ proxyTarget: pattern.proxyTarget, attrName: m.attr }] : [];
+  });
+  cache.set(methodName, matches);
+  return matches;
+}
+
+/** @internal Rails-private helper. Mirrors: ClassMethods#define_proxy_call */
+export function defineProxyCall(
+  this: AttributeMethodHost,
+  name: string,
+  proxyTarget: string,
+  _parameters: string | null,
+  attrName: string,
+): void {
+  ensureOwnGeneratedMethods(this);
+  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
+    const handler = this[proxyTarget];
+    if (typeof handler !== "function") {
+      throw new MissingAttributeError(
+        `attribute_missing dispatch failed: ${proxyTarget} not defined`,
+      );
+    }
+    return (handler as (...a: unknown[]) => unknown).call(this, attrName, ...args);
   };
   fn.__generatedAttributeMethod = true;
-  Object.defineProperty(host.prototype, methodName, {
-    value: fn,
-    writable: true,
-    configurable: true,
-  });
-  host._generatedMethods.add(methodName);
+  Object.defineProperty(this.prototype, name, { value: fn, writable: true, configurable: true });
+  this._generatedMethods.add(name);
+}
+
+/**
+ * @internal Rails-private helper. Mirrors: ClassMethods#build_mangled_name
+ * Returns a compilable temp name for attributes with non-identifier characters.
+ */
+export function buildMangledName(this: AttributeMethodHost, name: string): string {
+  if (NAME_COMPILABLE_REGEXP.test(name)) return name;
+  const hex = Array.from(name)
+    .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+    .join("");
+  return `__temp__${hex}`;
+}
+
+/**
+ * @internal Rails-private helper. Mirrors: ClassMethods#define_call
+ * Trails has no eval/code generation, so delegates to defineProxyCall.
+ */
+export function defineCall(
+  this: AttributeMethodHost,
+  name: string,
+  targetName: string,
+  _mangledName: string,
+  _parameters: string | null,
+  attrName: string,
+): void {
+  defineProxyCall.call(this, name, targetName, _parameters, attrName);
+}
+
+function ensureOwnPatterns(host: AttributeMethodHost): void {
+  if (!Object.prototype.hasOwnProperty.call(host, "_attributeMethodPatterns")) {
+    host._attributeMethodPatterns = [...host._attributeMethodPatterns];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Instance-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+export type InstanceHost = {
+  _attributes?: { has(name: string): boolean };
+  _attributeMethodPatterns?: AttributeMethodPattern[];
+  constructor: AttributeMethodHost;
+};
+
+function ensureOwnGeneratedMethods(host: AttributeMethodHost): void {
+  if (!Object.prototype.hasOwnProperty.call(host, "_generatedMethods")) {
+    host._generatedMethods = new Set(host._generatedMethods ?? []);
+  }
+}
+
+function ensureOwnAliases(host: AttributeMethodHost): void {
+  if (!Object.prototype.hasOwnProperty.call(host, "_attributeAliases")) {
+    host._attributeAliases = { ...host._attributeAliases };
+  }
 }
 
 /**
@@ -390,14 +552,6 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
   }
 }
 
-export function isAttributeAlias(host: AttributeMethodHost, name: string): boolean {
-  return Object.prototype.hasOwnProperty.call(host._attributeAliases, name);
-}
-
-export function attributeAlias(host: AttributeMethodHost, name: string): string | undefined {
-  return host._attributeAliases[name];
-}
-
 /**
  * Resolve `name` to its canonical attribute name, following one alias
  * hop. Mirrors Rails `ActiveModel::AttributeMethods#read_attribute`'s
@@ -408,158 +562,4 @@ export function attributeAlias(host: AttributeMethodHost, name: string): string 
 export function resolveAliasName(host: AttributeMethodHost, name: string): string {
   const aliased = host._attributeAliases?.[name];
   return aliased ?? name;
-}
-
-// ---------------------------------------------------------------------------
-// Class-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
-export function resolveAttributeName(this: AttributeMethodHost, name: string): string {
-  return this._attributeAliases?.[name] ?? name;
-}
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#generated_attribute_methods */
-export function generatedAttributeMethods(this: AttributeMethodHost): Set<string> {
-  return this._generatedMethods;
-}
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#instance_method_already_implemented? */
-export function isInstanceMethodAlreadyImplemented(
-  this: AttributeMethodHost,
-  methodName: string,
-): boolean {
-  return this._generatedMethods?.has(methodName) ?? false;
-}
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_cache */
-export function attributeMethodPatternsCache(
-  this: AttributeMethodHost,
-): Map<string, Array<{ proxyTarget: string; attrName: string }>> {
-  const h = this as AttributeMethodHost & {
-    _attributeMethodPatternsCache?: Map<string, Array<{ proxyTarget: string; attrName: string }>>;
-  };
-  if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
-    h._attributeMethodPatternsCache = new Map();
-  }
-  return h._attributeMethodPatternsCache!;
-}
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#attribute_method_patterns_matching */
-export function attributeMethodPatternsMatching(
-  this: AttributeMethodHost,
-  methodName: string,
-): Array<{ proxyTarget: string; attrName: string }> {
-  const cache = attributeMethodPatternsCache.call(this);
-  if (cache.has(methodName)) return cache.get(methodName)!;
-  const matches = this._attributeMethodPatterns.flatMap((pattern) => {
-    const m = pattern.match(methodName);
-    return m ? [{ proxyTarget: pattern.proxyTarget, attrName: m.attr }] : [];
-  });
-  cache.set(methodName, matches);
-  return matches;
-}
-
-/**
- * @internal Rails-private helper. Mirrors: ClassMethods#build_mangled_name
- * Returns a compilable temp name for attributes with non-identifier characters.
- */
-export function buildMangledName(this: AttributeMethodHost, name: string): string {
-  if (NAME_COMPILABLE_REGEXP.test(name)) return name;
-  const hex = Array.from(name)
-    .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-    .join("");
-  return `__temp__${hex}`;
-}
-
-/** @internal Rails-private helper. Mirrors: ClassMethods#define_proxy_call */
-export function defineProxyCall(
-  this: AttributeMethodHost,
-  name: string,
-  proxyTarget: string,
-  _parameters: string | null,
-  attrName: string,
-): void {
-  ensureOwnGeneratedMethods(this);
-  const fn: TaggedFn = function (this: ReadWriteHost, ...args: unknown[]) {
-    const handler = this[proxyTarget];
-    if (typeof handler !== "function") {
-      throw new MissingAttributeError(
-        `attribute_missing dispatch failed: ${proxyTarget} not defined`,
-      );
-    }
-    return (handler as (...a: unknown[]) => unknown).call(this, attrName, ...args);
-  };
-  fn.__generatedAttributeMethod = true;
-  Object.defineProperty(this.prototype, name, { value: fn, writable: true, configurable: true });
-  this._generatedMethods.add(name);
-}
-
-/**
- * @internal Rails-private helper. Mirrors: ClassMethods#define_call
- * Trails has no eval/code generation, so delegates to defineProxyCall.
- */
-export function defineCall(
-  this: AttributeMethodHost,
-  name: string,
-  targetName: string,
-  _mangledName: string,
-  _parameters: string | null,
-  attrName: string,
-): void {
-  defineProxyCall.call(this, name, targetName, _parameters, attrName);
-}
-
-// ---------------------------------------------------------------------------
-// Instance-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-export type InstanceHost = {
-  _attributes?: { has(name: string): boolean };
-  _attributeMethodPatterns?: AttributeMethodPattern[];
-  constructor: AttributeMethodHost;
-};
-
-/** @internal Rails-private helper. Mirrors: #attribute_method? */
-export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return this._attributes?.has(attrName) ?? false;
-}
-
-/** @internal Rails-private helper. Mirrors: #matched_attribute_method */
-export function matchedAttributeMethod(
-  this: InstanceHost,
-  methodName: string,
-): { proxyTarget: string; attrName: string } | null {
-  const matches = attributeMethodPatternsMatching.call(
-    this.constructor as AttributeMethodHost,
-    methodName,
-  );
-  return matches.find((m) => isAttributeMethod.call(this, m.attrName)) ?? null;
-}
-
-/** @internal Rails-private helper. Mirrors: #missing_attribute */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  throw new MissingAttributeError(
-    `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-  );
-}
-
-/**
- * @internal Rails-private helper. Mirrors: #_read_attribute
- * Bypasses alias resolution and reads directly from the attribute store,
- * matching Rails AR _read_attribute (fetch_value without alias lookup).
- */
-export function _readAttribute(
-  this: InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
-  },
-  attr: string,
-): unknown {
-  if (typeof this._readAttribute === "function" && this._readAttribute !== _readAttribute) {
-    return this._readAttribute(attr);
-  }
-  return this._attributes?.fetchValue(attr) ?? null;
 }

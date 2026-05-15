@@ -100,27 +100,6 @@ export class ModelName {
   private _humanFallback: string;
   private _klass: ModelLike | null;
 
-  // Uncountable lookup delegates to `@blazetrails/activesupport`'s
-  // `Inflections.instance("en")` — the same store Rails models go
-  // through via `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
-  // (activesupport/lib/active_support/inflections.rb). Previously we
-  // maintained a local 6-word set that ignored user-added inflections
-  // and diverged from activesupport's own pluralize() which uses the
-  // shared store.
-  private static get _uncountables(): Set<string> {
-    return Inflections.instance("en").uncountables;
-  }
-
-  /**
-   * Register an uncountable word. Mirrors Rails
-   * `ActiveSupport::Inflector.inflections.uncountable(word)` — writes
-   * through to the shared inflector store so `pluralize("sheep")`,
-   * `ModelName`, and every other inflection consumer see it.
-   */
-  static addUncountable(word: string): void {
-    Inflections.instance("en").uncountable(word);
-  }
-
   /**
    * Construct a ModelName.
    *
@@ -241,6 +220,85 @@ export class ModelName {
     return this.collection;
   }
 
+  get human(): string {
+    if (!this._klass) return this._humanFallback;
+
+    const i18nKeys = this.i18nKeys();
+    const i18nScope = this._i18nScope();
+    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
+
+    const [primaryKey, ...restKeys] = i18nKeys;
+    const scopePrefix = i18nScope.join(".");
+    const fullKey = `${scopePrefix}.${primaryKey}`;
+
+    const defaults: Array<{ key: string } | { message: string }> = restKeys.map((k) => ({
+      key: `${scopePrefix}.${k}`,
+    }));
+    defaults.push({ message: this._humanFallback });
+
+    return I18n.t(fullKey, { defaults });
+  }
+
+  /**
+   * Flatten a class name into the singular `_`-joined form. Mirrors
+   * Rails `_singularize` (activemodel/lib/active_model/naming.rb:216-218):
+   * `ActiveSupport::Inflector.underscore(string).tr("/", "_")`.
+   *
+   * @internal Rails-private helper.
+   */
+  _singularize(string: string): string {
+    return underscore(string).replace(/\//g, "_");
+  }
+
+  /**
+   * Lazy list of i18n lookup keys for this model and its ancestors.
+   * Mirrors Rails `i18n_keys` (activemodel/lib/active_model/naming.rb:220-226).
+   *
+   * @internal Rails-private helper.
+   */
+  i18nKeys(): string[] {
+    if (this._cachedI18nKeys) return this._cachedI18nKeys;
+    let keys: string[];
+    if (!this._klass) {
+      keys = [];
+    } else if (typeof this._klass.lookupAncestors === "function") {
+      keys = this._klass.lookupAncestors().map((k) => {
+        if (k.modelName) return k.modelName.i18nKey;
+        return underscore(k.name);
+      });
+    } else {
+      keys = [this.i18nKey];
+    }
+    this._cachedI18nKeys = keys;
+    return keys;
+  }
+
+  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
+  [Symbol.toPrimitive](_hint: string): string {
+    return this.name;
+  }
+
+  // Uncountable lookup delegates to `@blazetrails/activesupport`'s
+  // `Inflections.instance("en")` — the same store Rails models go
+  // through via `ActiveSupport::Inflector.inflections { |i| i.uncountable ... }`
+  // (activesupport/lib/active_support/inflections.rb). Previously we
+  // maintained a local 6-word set that ignored user-added inflections
+  // and diverged from activesupport's own pluralize() which uses the
+  // shared store.
+  private static get _uncountables(): Set<string> {
+    return Inflections.instance("en").uncountables;
+  }
+
+  /**
+   * Register an uncountable word. Mirrors Rails
+   * `ActiveSupport::Inflector.inflections.uncountable(word)` — writes
+   * through to the shared inflector store so `pluralize("sheep")`,
+   * `ModelName`, and every other inflection consumer see it.
+   */
+  static addUncountable(word: string): void {
+    Inflections.instance("en").uncountable(word);
+  }
+
   // ---------------------------------------------------------------------------
   // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
   //   include Comparable
@@ -268,11 +326,6 @@ export class ModelName {
    * directly.
    */
   toString(): string {
-    return this.name;
-  }
-
-  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
-  [Symbol.toPrimitive](_hint: string): string {
     return this.name;
   }
 
@@ -354,64 +407,11 @@ export class ModelName {
     return this.name;
   }
 
+  private _cachedI18nKeys?: string[];
+
   /** JSON.stringify hook — delegates to `asJson`. */
   toJSON(): string {
     return this.asJson();
-  }
-
-  get human(): string {
-    if (!this._klass) return this._humanFallback;
-
-    const i18nKeys = this.i18nKeys();
-    const i18nScope = this._i18nScope();
-    if (i18nKeys.length === 0 || i18nScope.length === 0) return this._humanFallback;
-
-    const [primaryKey, ...restKeys] = i18nKeys;
-    const scopePrefix = i18nScope.join(".");
-    const fullKey = `${scopePrefix}.${primaryKey}`;
-
-    const defaults: Array<{ key: string } | { message: string }> = restKeys.map((k) => ({
-      key: `${scopePrefix}.${k}`,
-    }));
-    defaults.push({ message: this._humanFallback });
-
-    return I18n.t(fullKey, { defaults });
-  }
-
-  /**
-   * Lazy list of i18n lookup keys for this model and its ancestors.
-   * Mirrors Rails `i18n_keys` (activemodel/lib/active_model/naming.rb:220-226).
-   *
-   * @internal Rails-private helper.
-   */
-  i18nKeys(): string[] {
-    if (this._cachedI18nKeys) return this._cachedI18nKeys;
-    let keys: string[];
-    if (!this._klass) {
-      keys = [];
-    } else if (typeof this._klass.lookupAncestors === "function") {
-      keys = this._klass.lookupAncestors().map((k) => {
-        if (k.modelName) return k.modelName.i18nKey;
-        return underscore(k.name);
-      });
-    } else {
-      keys = [this.i18nKey];
-    }
-    this._cachedI18nKeys = keys;
-    return keys;
-  }
-
-  private _cachedI18nKeys?: string[];
-
-  /**
-   * Flatten a class name into the singular `_`-joined form. Mirrors
-   * Rails `_singularize` (activemodel/lib/active_model/naming.rb:216-218):
-   * `ActiveSupport::Inflector.underscore(string).tr("/", "_")`.
-   *
-   * @internal Rails-private helper.
-   */
-  _singularize(string: string): string {
-    return underscore(string).replace(/\//g, "_");
   }
 
   private _i18nScope(): string[] {

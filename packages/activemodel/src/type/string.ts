@@ -3,6 +3,22 @@ import { ImmutableStringType } from "./immutable-string.js";
 export class StringType extends ImmutableStringType {
   readonly name: string = "string";
 
+  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+    if (typeof newValue !== "string") return false;
+    if (rawOldValue === null || rawOldValue === undefined) return true;
+    return rawOldValue !== newValue;
+  }
+
+  toImmutableString(): ImmutableStringType {
+    return new ImmutableStringType({
+      precision: this.precision,
+      scale: this.scale,
+      limit: this.limit,
+      trueString: this.trueString,
+      falseString: this.falseString,
+    });
+  }
+
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): string | null {
     // Rails type/string.rb subclasses immutable_string.rb, so the
@@ -18,21 +34,5 @@ export class StringType extends ImmutableStringType {
   // output type the way Rails' loosely-typed `serialize` does.
   serialize(value: unknown): unknown {
     return this.cast(value);
-  }
-
-  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    if (typeof newValue !== "string") return false;
-    if (rawOldValue === null || rawOldValue === undefined) return true;
-    return rawOldValue !== newValue;
-  }
-
-  toImmutableString(): ImmutableStringType {
-    return new ImmutableStringType({
-      precision: this.precision,
-      scale: this.scale,
-      limit: this.limit,
-      trueString: this.trueString,
-      falseString: this.falseString,
-    });
   }
 }

@@ -42,22 +42,6 @@ export class UserProvidedDefault extends FromUser {
     return this.userProvidedValue;
   }
 
-  /**
-   * Create a fresh instance from the original function/value so function
-   * defaults re-evaluate — called by AttributeSet.deepDup.
-   */
-  dupForDeepClone(): UserProvidedDefault {
-    // Functions re-evaluate on each construction. Non-function objects need
-    // cloning to prevent cross-instance mutation (JS has no Ruby-style dup
-    // that copies value semantics for built-in types).
-    const val = this.userProvidedValue;
-    const clonedVal =
-      typeof val === "function" || val === null || typeof val !== "object"
-        ? val
-        : structuredClone(val);
-    return new UserProvidedDefault(this.name, clonedVal, this.type, this.getOriginalAttribute());
-  }
-
   override withType(type: Type): Attribute {
     return new UserProvidedDefault(
       this.name,
@@ -73,6 +57,22 @@ export class UserProvidedDefault extends FromUser {
 
   static marshalLoad(data: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
     return new UserProvidedDefault(data[0], data[1], data[2], data[3]);
+  }
+
+  /**
+   * Create a fresh instance from the original function/value so function
+   * defaults re-evaluate — called by AttributeSet.deepDup.
+   */
+  dupForDeepClone(): UserProvidedDefault {
+    // Functions re-evaluate on each construction. Non-function objects need
+    // cloning to prevent cross-instance mutation (JS has no Ruby-style dup
+    // that copies value semantics for built-in types).
+    const val = this.userProvidedValue;
+    const clonedVal =
+      typeof val === "function" || val === null || typeof val !== "object"
+        ? val
+        : structuredClone(val);
+    return new UserProvidedDefault(this.name, clonedVal, this.type, this.getOriginalAttribute());
   }
 }
 

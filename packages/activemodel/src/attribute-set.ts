@@ -16,6 +16,132 @@ export class AttributeSet {
     this.attributes = attributes;
   }
 
+  castTypes(): Record<string, import("./type/value.js").Type> {
+    const result: Record<string, import("./type/value.js").Type> = {};
+    for (const [name, attr] of this.attributes) {
+      result[name] = attr.type;
+    }
+    return result;
+  }
+
+  valuesBeforeTypeCast(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [name, attr] of this.attributes) {
+      if (attr.isInitialized()) {
+        result[name] = attr.valueBeforeTypeCast;
+      }
+    }
+    return result;
+  }
+
+  valuesForDatabase(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [name, attr] of this.attributes) {
+      if (attr.isInitialized()) {
+        result[name] = attr.valueForDatabase;
+      }
+    }
+    return result;
+  }
+
+  isKey(name: string): boolean {
+    const attr = this.attributes.get(name);
+    return attr !== undefined && attr.isInitialized();
+  }
+
+  keys(): string[] {
+    const result: string[] = [];
+    for (const [name, attr] of this.attributes) {
+      if (attr.isInitialized()) result.push(name);
+    }
+    return result;
+  }
+
+  fetchValue(name: string): unknown {
+    return this.getAttribute(name).value;
+  }
+
+  writeFromDatabase(name: string, value: unknown): void {
+    this.assertNotFrozen();
+    const existing = this.attributes.get(name);
+    if (existing) {
+      this.attributes.set(name, existing.withValueFromDatabase(value));
+    } else {
+      this.attributes.set(name, Attribute.fromDatabase(name, value, typeRegistry.lookup("value")));
+    }
+  }
+
+  writeFromUser(name: string, value: unknown): unknown {
+    this.assertNotFrozen();
+    const existing = this.attributes.get(name);
+    if (existing) {
+      this.attributes.set(name, existing.withValueFromUser(value));
+    } else {
+      // New attribute not previously declared — create a FromUser with default type
+      this.attributes.set(name, Attribute.fromUser(name, value, typeRegistry.lookup("value")));
+    }
+    return value;
+  }
+
+  writeCastValue(name: string, value: unknown): void {
+    this.assertNotFrozen();
+    const attr = this.attributes.get(name);
+    if (attr) {
+      attr.overrideCastValue(value);
+    } else {
+      this.attributes.set(name, Attribute.withCastValue(name, value, typeRegistry.lookup("value")));
+    }
+  }
+
+  deepDup(): AttributeSet {
+    const newAttrs = new Map<string, Attribute>();
+    const cache = new Map<Attribute, Attribute>();
+
+    for (const [name, attr] of this.attributes) {
+      newAttrs.set(name, this.cloneAttribute(attr, cache));
+    }
+
+    return new AttributeSet(newAttrs);
+  }
+
+  reset(name: string): void {
+    if (this.has(name)) {
+      this.writeFromDatabase(name, null);
+    }
+  }
+
+  accessed(): string[] {
+    const result: string[] = [];
+    for (const [name, attr] of this.attributes) {
+      if (attr.hasBeenRead()) result.push(name);
+    }
+    return result;
+  }
+
+  map(fn: (attr: Attribute) => Attribute): AttributeSet {
+    const newAttrs = new Map<string, Attribute>();
+    for (const [name, attr] of this.attributes) {
+      newAttrs.set(name, fn(attr));
+    }
+    return new AttributeSet(newAttrs);
+  }
+
+  reverseMergeBang(target: AttributeSet): this {
+    this.assertNotFrozen();
+    const cache = new Map<Attribute, Attribute>();
+    target.forEach((attr, name) => {
+      if (!this.isKey(name)) {
+        this.attributes.set(name, this.cloneAttribute(attr, cache));
+      }
+    });
+    return this;
+  }
+
+  /** @internal */
+  protected defaultAttribute(name: string): Attribute {
+    return Attribute.null(name);
+  }
+
   /**
    * Freeze this set in place so subsequent mutations throw.
    * Matches Ruby's `Hash#freeze` semantic used by `ActiveRecord::Core#freeze`.
@@ -54,11 +180,6 @@ export class AttributeSet {
     return attr.value;
   }
 
-  /** @internal */
-  protected defaultAttribute(name: string): Attribute {
-    return Attribute.null(name);
-  }
-
   set(name: string, attrOrValue: Attribute | unknown): void {
     this.assertNotFrozen();
     if (attrOrValue instanceof Attribute) {
@@ -75,50 +196,6 @@ export class AttributeSet {
     return attr !== undefined && attr.isInitialized();
   }
 
-  keys(): string[] {
-    const result: string[] = [];
-    for (const [name, attr] of this.attributes) {
-      if (attr.isInitialized()) result.push(name);
-    }
-    return result;
-  }
-
-  fetchValue(name: string): unknown {
-    return this.getAttribute(name).value;
-  }
-
-  writeFromUser(name: string, value: unknown): unknown {
-    this.assertNotFrozen();
-    const existing = this.attributes.get(name);
-    if (existing) {
-      this.attributes.set(name, existing.withValueFromUser(value));
-    } else {
-      // New attribute not previously declared — create a FromUser with default type
-      this.attributes.set(name, Attribute.fromUser(name, value, typeRegistry.lookup("value")));
-    }
-    return value;
-  }
-
-  writeFromDatabase(name: string, value: unknown): void {
-    this.assertNotFrozen();
-    const existing = this.attributes.get(name);
-    if (existing) {
-      this.attributes.set(name, existing.withValueFromDatabase(value));
-    } else {
-      this.attributes.set(name, Attribute.fromDatabase(name, value, typeRegistry.lookup("value")));
-    }
-  }
-
-  writeCastValue(name: string, value: unknown): void {
-    this.assertNotFrozen();
-    const attr = this.attributes.get(name);
-    if (attr) {
-      attr.overrideCastValue(value);
-    } else {
-      this.attributes.set(name, Attribute.withCastValue(name, value, typeRegistry.lookup("value")));
-    }
-  }
-
   toHash(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this.keys()) {
@@ -127,14 +204,14 @@ export class AttributeSet {
     return result;
   }
 
-  valuesBeforeTypeCast(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes) {
-      if (attr.isInitialized()) {
-        result[name] = attr.valueBeforeTypeCast;
-      }
+  /**
+   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
+   * with code that iterates `for (const [k, v] of _attributes)`.
+   */
+  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
+    for (const name of this.keys()) {
+      yield [name, this.fetchValue(name)];
     }
-    return result;
   }
 
   /**
@@ -170,25 +247,9 @@ export class AttributeSet {
     return value;
   }
 
-  valuesForDatabase(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes) {
-      if (attr.isInitialized()) {
-        result[name] = attr.valueForDatabase;
-      }
-    }
-    return result;
-  }
-
   delete(name: string): boolean {
     this.assertNotFrozen();
     return this.attributes.delete(name);
-  }
-
-  reset(name: string): void {
-    if (this.has(name)) {
-      this.writeFromDatabase(name, null);
-    }
   }
 
   protected cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
@@ -213,30 +274,9 @@ export class AttributeSet {
     return cloned;
   }
 
-  deepDup(): AttributeSet {
-    const newAttrs = new Map<string, Attribute>();
-    const cache = new Map<Attribute, Attribute>();
-
-    for (const [name, attr] of this.attributes) {
-      newAttrs.set(name, this.cloneAttribute(attr, cache));
-    }
-
-    return new AttributeSet(newAttrs);
-  }
-
   forEach(fn: (attr: Attribute, name: string) => void): void {
     for (const [name, attr] of this.attributes) {
       fn(attr, name);
-    }
-  }
-
-  /**
-   * Make AttributeSet iterable — yields [name, value] pairs for compatibility
-   * with code that iterates `for (const [k, v] of _attributes)`.
-   */
-  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
-    for (const name of this.keys()) {
-      yield [name, this.fetchValue(name)];
     }
   }
 
@@ -244,38 +284,9 @@ export class AttributeSet {
     return this[Symbol.iterator]();
   }
 
-  castTypes(): Record<string, import("./type/value.js").Type> {
-    const result: Record<string, import("./type/value.js").Type> = {};
-    for (const [name, attr] of this.attributes) {
-      result[name] = attr.type;
-    }
-    return result;
-  }
-
-  isKey(name: string): boolean {
-    const attr = this.attributes.get(name);
-    return attr !== undefined && attr.isInitialized();
-  }
-
   /** Whether `name` is present in the internal map (initialized or not). */
   protected hasAttribute(name: string): boolean {
     return this.attributes.has(name);
-  }
-
-  accessed(): string[] {
-    const result: string[] = [];
-    for (const [name, attr] of this.attributes) {
-      if (attr.hasBeenRead()) result.push(name);
-    }
-    return result;
-  }
-
-  map(fn: (attr: Attribute) => Attribute): AttributeSet {
-    const newAttrs = new Map<string, Attribute>();
-    for (const [name, attr] of this.attributes) {
-      newAttrs.set(name, fn(attr));
-    }
-    return new AttributeSet(newAttrs);
   }
 
   /**
@@ -293,16 +304,5 @@ export class AttributeSet {
       const next = attr.forgettingAssignment();
       if (next !== attr) this.attributes.set(name, next);
     }
-  }
-
-  reverseMergeBang(target: AttributeSet): this {
-    this.assertNotFrozen();
-    const cache = new Map<Attribute, Attribute>();
-    target.forEach((attr, name) => {
-      if (!this.isKey(name)) {
-        this.attributes.set(name, this.cloneAttribute(attr, cache));
-      }
-    });
-    return this;
   }
 }

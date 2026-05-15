@@ -42,6 +42,31 @@ export interface AttributeDefinition {
   source?: "user" | "schema";
 }
 
+/**
+ * Return all attributes as a plain hash.
+ *
+ * Mirrors: ActiveModel::Attributes#attributes
+ */
+export function attributes(attrs: AttributeSet): Record<string, unknown> {
+  return attrs.toHash();
+}
+
+/**
+ * Mirrors: ActiveModel::Attributes#_write_attribute
+ *
+ * Writes a value into the attribute store via the user-write path (casts
+ * through the type's `cast` method before storing).
+ *
+ * @internal Rails-private helper.
+ */
+export function _writeAttribute(
+  this: AttributeInstanceHost,
+  attrName: string,
+  value: unknown,
+): void {
+  this._attributes.writeFromUser(attrName, value);
+}
+
 // ---------------------------------------------------------------------------
 // Class methods — Mirrors: ActiveModel::Attributes::ClassMethods
 // ---------------------------------------------------------------------------
@@ -136,46 +161,6 @@ export function attribute(
   defineDirtyAttributeMethods(this.prototype, name);
 }
 
-// ---------------------------------------------------------------------------
-// Instance methods — Mirrors: ActiveModel::Attributes instance methods
-// ---------------------------------------------------------------------------
-
-/**
- * Build default AttributeSet from class definitions.
- *
- * Mirrors: ActiveModel::AttributeRegistration._default_attributes
- */
-export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
-  const attrMap = new Map<string, Attribute>();
-  for (const [name, def] of defs) {
-    const userProvided = def.userProvided ?? true;
-    if (def.defaultValue != null) {
-      if (userProvided) {
-        // Rails: user_provided_default: true → wraps the default so it is
-        // cast through the user-type (and procs re-evaluate per instance).
-        const base = Attribute.withCastValue(name, null, def.type);
-        attrMap.set(name, base.withUserDefault(def.defaultValue));
-      } else {
-        // Rails: user_provided_default: false → column default comes from
-        // the database; use fromDatabase so deserialize is applied.
-        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
-      }
-    } else {
-      attrMap.set(name, Attribute.withCastValue(name, null, def.type));
-    }
-  }
-  return new AttributeSet(attrMap);
-}
-
-/**
- * Return all attributes as a plain hash.
- *
- * Mirrors: ActiveModel::Attributes#attributes
- */
-export function attributes(attrs: AttributeSet): Record<string, unknown> {
-  return attrs.toHash();
-}
-
 /**
  * Concrete mixin host for `ActiveModel::Attributes`. Rails ships
  * `Attributes` as a module included into a model; in TS this class is
@@ -229,55 +214,6 @@ export class Attributes {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rails privates surfaced by attributes.rb
-// ---------------------------------------------------------------------------
-
-/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
-export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return _isAttributeMethod.call(this, attrName);
-}
-
-/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
-export function matchedAttributeMethod(
-  this: InstanceHost,
-  methodName: string,
-): { proxyTarget: string; attrName: string } | null {
-  return _matchedAttributeMethod.call(this, methodName);
-}
-
-/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  return _missingAttribute.call(this, attrName);
-}
-
-/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
-export function _readAttribute(this: InstanceHost, attr: string): unknown {
-  type ReadAttributeThis = InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
-  };
-  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
-}
-
-type AttributeInstanceHost = { _attributes: AttributeSet };
-
-/**
- * Mirrors: ActiveModel::Attributes#_write_attribute
- *
- * Writes a value into the attribute store via the user-write path (casts
- * through the type's `cast` method before storing).
- *
- * @internal Rails-private helper.
- */
-export function _writeAttribute(
-  this: AttributeInstanceHost,
-  attrName: string,
-  value: unknown,
-): void {
-  this._attributes.writeFromUser(attrName, value);
-}
-
 /**
  * Mirrors: ActiveModel::Attributes::ClassMethods#define_method_attribute=
  *
@@ -298,4 +234,68 @@ export function defineMethodAttribute(
   // that inspect the name (e.g. alias generation paths).
   const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
   void methodName;
+}
+
+// ---------------------------------------------------------------------------
+// Instance methods — Mirrors: ActiveModel::Attributes instance methods
+// ---------------------------------------------------------------------------
+
+/**
+ * Build default AttributeSet from class definitions.
+ *
+ * Mirrors: ActiveModel::AttributeRegistration._default_attributes
+ */
+export function buildDefaultAttributes(defs: Map<string, AttributeDefinition>): AttributeSet {
+  const attrMap = new Map<string, Attribute>();
+  for (const [name, def] of defs) {
+    const userProvided = def.userProvided ?? true;
+    if (def.defaultValue != null) {
+      if (userProvided) {
+        // Rails: user_provided_default: true → wraps the default so it is
+        // cast through the user-type (and procs re-evaluate per instance).
+        const base = Attribute.withCastValue(name, null, def.type);
+        attrMap.set(name, base.withUserDefault(def.defaultValue));
+      } else {
+        // Rails: user_provided_default: false → column default comes from
+        // the database; use fromDatabase so deserialize is applied.
+        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
+      }
+    } else {
+      attrMap.set(name, Attribute.withCastValue(name, null, def.type));
+    }
+  }
+  return new AttributeSet(attrMap);
+}
+
+// ---------------------------------------------------------------------------
+// Rails privates surfaced by attributes.rb
+// ---------------------------------------------------------------------------
+
+/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
+export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
+  return _isAttributeMethod.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
+export function matchedAttributeMethod(
+  this: InstanceHost,
+  methodName: string,
+): { proxyTarget: string; attrName: string } | null {
+  return _matchedAttributeMethod.call(this, methodName);
+}
+
+type AttributeInstanceHost = { _attributes: AttributeSet };
+
+/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
+export function missingAttribute(this: InstanceHost, attrName: string): never {
+  return _missingAttribute.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
+export function _readAttribute(this: InstanceHost, attr: string): unknown {
+  type ReadAttributeThis = InstanceHost & {
+    _attributes?: { fetchValue(name: string): unknown };
+    _readAttribute?(name: string): unknown;
+  };
+  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
 }

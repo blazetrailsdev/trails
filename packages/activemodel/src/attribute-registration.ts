@@ -117,125 +117,6 @@ export class PendingDecorator implements PendingModification {
  */
 type HostAsClass = new (...args: unknown[]) => unknown;
 
-export function registerWithSuperclass(cls: AttributeHostInternals): void {
-  const superclass = Object.getPrototypeOf(cls) as AttributeHostInternals;
-  if (!superclass || (superclass as unknown) === Function.prototype) return;
-  // Only register if the superclass participates in the attribute system.
-  if (!("_attributeDefinitions" in superclass)) return;
-  DescendantsTracker.registerSubclass(
-    superclass as unknown as HostAsClass,
-    cls as unknown as HostAsClass,
-  );
-}
-
-/**
- * Clear the cached default AttributeSet on this class and all known
- * subclasses, so the next call to _defaultAttributes() recomputes.
- *
- * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#reset_default_attributes
- * which calls reset_default_attributes! then recurses via subclasses.each.
- *
- * @internal
- */
-export function resetDefaultAttributes(cls: AttributeHostInternals): void {
-  resetDefaultAttributesBang.call(cls);
-  for (const sub of DescendantsTracker.subclasses(cls as unknown as HostAsClass)) {
-    resetDefaultAttributes(sub as unknown as AttributeHostInternals);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function collectPendingModifications(cls: AttributeHostInternals): PendingModification[] {
-  if (!cls || (cls as unknown) === Function.prototype || !cls._pendingAttributeModifications)
-    return [];
-  const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
-  const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
-    ? (cls._pendingAttributeModifications as PendingModification[])
-    : [];
-  return [...superMods, ...own];
-}
-
-/**
- * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#apply_pending_attribute_modifications
- *
- * @internal
- */
-export function applyPendingAttributeModifications(
-  cls: AttributeHostInternals,
-  attributeSet: AttributeSet,
-): void {
-  for (const mod of collectPendingModifications(cls)) {
-    mod.applyTo(attributeSet);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Exported functions
-// ---------------------------------------------------------------------------
-
-/**
- * Push a type declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingType(cls: AttributeHostInternals, name: string, type: Type): void {
-  pendingAttributeModifications.call(cls).push(new PendingType(name, type));
-}
-
-/**
- * Push a default declaration onto the pending-modification queue.
- * Called internally by attribute() implementations.
- *
- * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
- */
-export function pushPendingDefault(
-  cls: AttributeHostInternals,
-  name: string,
-  value: unknown,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
-}
-
-/**
- * Push a decorator onto the pending-modification queue.
- * Called by decorateAttributes and AR's applyPendingEncryptions.
- *
- * Mirrors: the PendingDecorator push inside ActiveModel::AttributeRegistration#decorate_attributes
- */
-export function pushPendingDecorator(
-  cls: AttributeHostInternals,
-  names: string[] | null,
-  decorator: (name: string, type: Type) => Type,
-): void {
-  pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
-}
-
-/**
- * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#_default_attributes
- *
- * Seeds an empty AttributeSet and replays all pending attribute modifications
- * from the class hierarchy. The result is cached.
- *
- * AR overrides this to seed from columnsHash first, then replay.
- */
-export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
-  if (!this._cachedDefaultAttributes) {
-    // Register with our superclass so resetDefaultAttributes() cascades to us
-    // when the superclass gains new attribute declarations. Mirrors the
-    // ActiveSupport::DescendantsTracker registration that Rails does via
-    // the `inherited` hook; we do it lazily here instead.
-    registerWithSuperclass(this);
-    const attributeSet = new AttributeSet(new Map<string, Attribute>());
-    applyPendingAttributeModifications(this, attributeSet);
-    this._cachedDefaultAttributes = attributeSet;
-  }
-  return this._cachedDefaultAttributes;
-}
-
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#decorate_attributes
  *
@@ -270,6 +151,28 @@ export function decorateAttributes(
   }
 
   resetDefaultAttributes(this);
+}
+
+/**
+ * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#_default_attributes
+ *
+ * Seeds an empty AttributeSet and replays all pending attribute modifications
+ * from the class hierarchy. The result is cached.
+ *
+ * AR overrides this to seed from columnsHash first, then replay.
+ */
+export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
+  if (!this._cachedDefaultAttributes) {
+    // Register with our superclass so resetDefaultAttributes() cascades to us
+    // when the superclass gains new attribute declarations. Mirrors the
+    // ActiveSupport::DescendantsTracker registration that Rails does via
+    // the `inherited` hook; we do it lazily here instead.
+    registerWithSuperclass(this);
+    const attributeSet = new AttributeSet(new Map<string, Attribute>());
+    applyPendingAttributeModifications(this, attributeSet);
+    this._cachedDefaultAttributes = attributeSet;
+  }
+  return this._cachedDefaultAttributes;
 }
 
 /**
@@ -315,6 +218,36 @@ export function pendingAttributeModifications(this: AttributeHostInternals): Pen
     this._pendingAttributeModifications = [];
   }
   return this._pendingAttributeModifications as PendingModification[];
+}
+
+/**
+ * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#apply_pending_attribute_modifications
+ *
+ * @internal
+ */
+export function applyPendingAttributeModifications(
+  cls: AttributeHostInternals,
+  attributeSet: AttributeSet,
+): void {
+  for (const mod of collectPendingModifications(cls)) {
+    mod.applyTo(attributeSet);
+  }
+}
+
+/**
+ * Clear the cached default AttributeSet on this class and all known
+ * subclasses, so the next call to _defaultAttributes() recomputes.
+ *
+ * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#reset_default_attributes
+ * which calls reset_default_attributes! then recurses via subclasses.each.
+ *
+ * @internal
+ */
+export function resetDefaultAttributes(cls: AttributeHostInternals): void {
+  resetDefaultAttributesBang.call(cls);
+  for (const sub of DescendantsTracker.subclasses(cls as unknown as HostAsClass)) {
+    resetDefaultAttributes(sub as unknown as AttributeHostInternals);
+  }
 }
 
 /**
@@ -375,4 +308,71 @@ export function hookAttributeType(
   type: Type,
 ): Type {
   return type;
+}
+
+export function registerWithSuperclass(cls: AttributeHostInternals): void {
+  const superclass = Object.getPrototypeOf(cls) as AttributeHostInternals;
+  if (!superclass || (superclass as unknown) === Function.prototype) return;
+  // Only register if the superclass participates in the attribute system.
+  if (!("_attributeDefinitions" in superclass)) return;
+  DescendantsTracker.registerSubclass(
+    superclass as unknown as HostAsClass,
+    cls as unknown as HostAsClass,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function collectPendingModifications(cls: AttributeHostInternals): PendingModification[] {
+  if (!cls || (cls as unknown) === Function.prototype || !cls._pendingAttributeModifications)
+    return [];
+  const superMods = collectPendingModifications(Object.getPrototypeOf(cls));
+  const own = Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")
+    ? (cls._pendingAttributeModifications as PendingModification[])
+    : [];
+  return [...superMods, ...own];
+}
+
+// ---------------------------------------------------------------------------
+// Exported functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Push a type declaration onto the pending-modification queue.
+ * Called internally by attribute() implementations.
+ *
+ * Mirrors: the PendingType push inside ActiveModel::AttributeRegistration#attribute
+ */
+export function pushPendingType(cls: AttributeHostInternals, name: string, type: Type): void {
+  pendingAttributeModifications.call(cls).push(new PendingType(name, type));
+}
+
+/**
+ * Push a default declaration onto the pending-modification queue.
+ * Called internally by attribute() implementations.
+ *
+ * Mirrors: the PendingDefault push inside ActiveModel::AttributeRegistration#attribute
+ */
+export function pushPendingDefault(
+  cls: AttributeHostInternals,
+  name: string,
+  value: unknown,
+): void {
+  pendingAttributeModifications.call(cls).push(new PendingDefault(name, value));
+}
+
+/**
+ * Push a decorator onto the pending-modification queue.
+ * Called by decorateAttributes and AR's applyPendingEncryptions.
+ *
+ * Mirrors: the PendingDecorator push inside ActiveModel::AttributeRegistration#decorate_attributes
+ */
+export function pushPendingDecorator(
+  cls: AttributeHostInternals,
+  names: string[] | null,
+  decorator: (name: string, type: Type) => Type,
+): void {
+  pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
 }

@@ -193,7 +193,7 @@ export default defineConfig(
   // by `pnpm tsx scripts/build-rails-file-structure-manifest.ts`,
   // invoked by `pnpm api:compare`). Autofixable.
   {
-    files: ["packages/arel/src/**/*.ts"],
+    files: ["packages/arel/src/**/*.ts", "packages/activemodel/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-file-structure-method-order": "error",

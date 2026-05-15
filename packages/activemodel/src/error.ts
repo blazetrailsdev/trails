@@ -103,19 +103,6 @@ export class Error {
     this.options = options;
   }
 
-  /**
-   * Return a deep-duped copy of this error, optionally rebinding `base` to a
-   * new model instance. Mirrors Rails' usage in
-   * `ActiveModel::Errors#copy!` where each error is `deep_dup`ed and then
-   * its `@base` is reset to the receiver
-   * (activemodel/lib/active_model/errors.rb:138-143). Preserves a split
-   * between `type` and `rawType` when a NestedError-style override was in
-   * play.
-   */
-  dupWithBase(newBase: ModelBase): Error {
-    return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
-  }
-
   get message(): string {
     // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
     // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
@@ -155,88 +142,6 @@ export class Error {
 
   get fullMessage(): string {
     return Error.fullMessage(this.attribute, this.message, this.base);
-  }
-
-  /**
-   * See if this error matches `attribute`, `type`, and `options`. Mirrors
-   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
-   * subset match — every key in `options` must equal (Ruby `==`, i.e.
-   * structural for Array/Hash, value-equal for primitives) the
-   * corresponding value in `this.options`; extra keys on the error are
-   * ignored. Not Ruby's case-equality (`===`), which would imply
-   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
-   */
-  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
-    if (this.attribute !== attribute) return false;
-    if (type !== undefined && this.type !== type) return false;
-    if (options) {
-      for (const [key, value] of Object.entries(options)) {
-        if (!optionsEqual(this.options[key], value)) return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Strict match — Rails `Error#strict_match?`
-   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
-   * match and `options` must equal the error's `@options` with
-   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
-   */
-  strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
-    if (!this.match(attribute, type)) return false;
-    const expected = options ?? {};
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
-    }
-    const expectedKeys = Object.keys(expected);
-    const ownKeys = Object.keys(own);
-    if (expectedKeys.length !== ownKeys.length) return false;
-    for (const k of expectedKeys) {
-      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
-        return false;
-    }
-    return true;
-  }
-
-  equals(other: Error): boolean {
-    if (!(other instanceof Error)) return false;
-    const a = this.attributesForHash();
-    const b = other.attributesForHash();
-    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
-    return optionsEqual(a[3], b[3]);
-  }
-
-  /**
-   * Identity tuple used by `==` and `hash`. Mirrors Rails
-   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
-   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
-   *
-   * @internal Rails-private helper.
-   */
-  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
-    }
-    return [this.base, this.attribute, this.rawType, own];
-  }
-
-  inspect(): string {
-    let optionsStr: string;
-    try {
-      optionsStr = JSON.stringify(this.options);
-    } catch {
-      optionsStr = "{...}";
-    }
-    return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
-  }
-
-  static interpolate(msg: string, options: Record<string, unknown>): string {
-    return msg.replace(/%\{(\w+)\}/g, (_, key) => {
-      return options[key] !== undefined ? String(options[key]) : `%{${key}}`;
-    });
   }
 
   static fullMessage(attribute: string, message: string, base: ModelBase): string {
@@ -290,6 +195,64 @@ export class Error {
     }
 
     return format;
+  }
+
+  /**
+   * See if this error matches `attribute`, `type`, and `options`. Mirrors
+   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
+   * subset match — every key in `options` must equal (Ruby `==`, i.e.
+   * structural for Array/Hash, value-equal for primitives) the
+   * corresponding value in `this.options`; extra keys on the error are
+   * ignored. Not Ruby's case-equality (`===`), which would imply
+   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
+   */
+  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
+    if (this.attribute !== attribute) return false;
+    if (type !== undefined && this.type !== type) return false;
+    if (options) {
+      for (const [key, value] of Object.entries(options)) {
+        if (!optionsEqual(this.options[key], value)) return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Strict match — Rails `Error#strict_match?`
+   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
+   * match and `options` must equal the error's `@options` with
+   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
+   */
+  strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
+    if (!this.match(attribute, type)) return false;
+    const expected = options ?? {};
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
+    }
+    const expectedKeys = Object.keys(expected);
+    const ownKeys = Object.keys(own);
+    if (expectedKeys.length !== ownKeys.length) return false;
+    for (const k of expectedKeys) {
+      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
+        return false;
+    }
+    return true;
+  }
+
+  /**
+   * Identity tuple used by `==` and `hash`. Mirrors Rails
+   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
+   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
+    }
+    return [this.base, this.attribute, this.rawType, own];
   }
 
   /**
@@ -369,6 +332,43 @@ export class Error {
       ...i18nOptions,
       defaults: defaults.slice(1),
       defaultValue: type,
+    });
+  }
+
+  /**
+   * Return a deep-duped copy of this error, optionally rebinding `base` to a
+   * new model instance. Mirrors Rails' usage in
+   * `ActiveModel::Errors#copy!` where each error is `deep_dup`ed and then
+   * its `@base` is reset to the receiver
+   * (activemodel/lib/active_model/errors.rb:138-143). Preserves a split
+   * between `type` and `rawType` when a NestedError-style override was in
+   * play.
+   */
+  dupWithBase(newBase: ModelBase): Error {
+    return new Error(newBase, this.attribute, this.type, deepDup(this.options), this.rawType);
+  }
+
+  equals(other: Error): boolean {
+    if (!(other instanceof Error)) return false;
+    const a = this.attributesForHash();
+    const b = other.attributesForHash();
+    if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) return false;
+    return optionsEqual(a[3], b[3]);
+  }
+
+  inspect(): string {
+    let optionsStr: string;
+    try {
+      optionsStr = JSON.stringify(this.options);
+    } catch {
+      optionsStr = "{...}";
+    }
+    return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
+  }
+
+  static interpolate(msg: string, options: Record<string, unknown>): string {
+    return msg.replace(/%\{(\w+)\}/g, (_, key) => {
+      return options[key] !== undefined ? String(options[key]) : `%{${key}}`;
     });
   }
 }

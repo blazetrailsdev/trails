@@ -9,12 +9,20 @@ import { ValueType } from "../value.js";
 const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /**
- * Mirrors: ActiveModel::Type::Helpers::Numeric#non_numeric_string?
+ * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
+ *
+ * Trails has no BigDecimal class, so the constructor-equality check
+ * collapses to "both are JS numbers and both are NaN".
  *
  * @internal Rails-private helper.
  */
-export function isNonNumericString(value: unknown): boolean {
-  return !NUMERIC_REGEX.test(String(value));
+export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
+  return (
+    typeof oldValue === "number" &&
+    Number.isNaN(oldValue) &&
+    typeof newValue === "number" &&
+    Number.isNaN(newValue)
+  );
 }
 
 /**
@@ -31,20 +39,12 @@ export function isNumberToNonNumber(oldValue: unknown, newValueBeforeTypeCast: u
 }
 
 /**
- * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
- *
- * Trails has no BigDecimal class, so the constructor-equality check
- * collapses to "both are JS numbers and both are NaN".
+ * Mirrors: ActiveModel::Type::Helpers::Numeric#non_numeric_string?
  *
  * @internal Rails-private helper.
  */
-export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
-  return (
-    typeof oldValue === "number" &&
-    Number.isNaN(oldValue) &&
-    typeof newValue === "number" &&
-    Number.isNaN(newValue)
-  );
+export function isNonNumericString(value: unknown): boolean {
+  return !NUMERIC_REGEX.test(String(value));
 }
 
 // Constructor rest args must be `any[]` — idiomatic in TypeScript mixin

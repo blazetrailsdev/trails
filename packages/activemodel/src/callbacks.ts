@@ -23,53 +23,6 @@ import {
 
 type AnyCallback = BeforeCallback | AfterCallback | AroundCallback;
 
-function isThenable(v: unknown): v is PromiseLike<unknown> {
-  return (
-    v !== null &&
-    (typeof v === "object" || typeof v === "function") &&
-    typeof (v as { then?: unknown }).then === "function"
-  );
-}
-
-/** Minimum shape required of a record object threaded through a callback chain. */
-export type CallbackRecord = object;
-
-export interface DefineModelCallbacksOptions {
-  only?: CallbackTiming[];
-}
-
-export interface CallbacksClassMethods {
-  defineModelCallbacks(
-    ...args: [string, ...string[]] | [string, ...string[], DefineModelCallbacksOptions]
-  ): void;
-}
-
-export type Callbacks = CallbacksClassMethods;
-
-export type CallbackTiming = CallbackKind;
-export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;
-export type AroundCallbackFn = (
-  record: CallbackRecord,
-  proceed: () => void | Promise<void>,
-) => void | Promise<void>;
-/** Rails supports passing an object with callback-named methods. */
-export type CallbackObject = object;
-export interface RunCallbacksOptions {
-  strict?: "sync";
-}
-export interface CallbackConditions<TRecord = CallbackRecord> {
-  if?(record: TRecord): boolean;
-  unless?(record: TRecord): boolean;
-  prepend?: boolean;
-}
-
-/** Extends CallbackConditions with the `on:` option available on commit/rollback callbacks. */
-export interface TransactionalCallbackConditions<
-  TRecord = CallbackRecord,
-> extends CallbackConditions<TRecord> {
-  on?: string | string[];
-}
-
 /**
  * Core implementation of define_model_callbacks.
  * Creates beforeX(), afterX(), and/or aroundX() class methods for each event
@@ -145,7 +98,44 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   }
 }
 
-type CallbackHost = object;
+/** Minimum shape required of a record object threaded through a callback chain. */
+export type CallbackRecord = object;
+
+export interface DefineModelCallbacksOptions {
+  only?: CallbackTiming[];
+}
+
+export interface CallbacksClassMethods {
+  defineModelCallbacks(
+    ...args: [string, ...string[]] | [string, ...string[], DefineModelCallbacksOptions]
+  ): void;
+}
+
+export type Callbacks = CallbacksClassMethods;
+
+export type CallbackTiming = CallbackKind;
+export type CallbackFn = (record: CallbackRecord) => void | boolean | Promise<void | boolean>;
+export type AroundCallbackFn = (
+  record: CallbackRecord,
+  proceed: () => void | Promise<void>,
+) => void | Promise<void>;
+/** Rails supports passing an object with callback-named methods. */
+export type CallbackObject = object;
+export interface RunCallbacksOptions {
+  strict?: "sync";
+}
+export interface CallbackConditions<TRecord = CallbackRecord> {
+  if?(record: TRecord): boolean;
+  unless?(record: TRecord): boolean;
+  prepend?: boolean;
+}
+
+/** Extends CallbackConditions with the `on:` option available on commit/rollback callbacks. */
+export interface TransactionalCallbackConditions<
+  TRecord = CallbackRecord,
+> extends CallbackConditions<TRecord> {
+  on?: string | string[];
+}
 
 /**
  * Mirrors: ActiveModel::Callbacks#_define_before_model_callback
@@ -161,6 +151,8 @@ export function _defineBeforeModelCallback(klass: CallbackHost, event: string): 
     configurable: true,
   });
 }
+
+type CallbackHost = object;
 
 /**
  * Mirrors: ActiveModel::Callbacks#_define_around_model_callback
@@ -193,6 +185,14 @@ export function _defineAfterModelCallback(klass: CallbackHost, event: string): v
     writable: true,
     configurable: true,
   });
+}
+
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return (
+    v !== null &&
+    (typeof v === "object" || typeof v === "function") &&
+    typeof (v as { then?: unknown }).then === "function"
+  );
 }
 
 function _resolveCallbackObject(

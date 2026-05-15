@@ -3,6 +3,17 @@ import { IntegerType } from "./integer.js";
 export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
+  serializeCastValue(value: number | null): number | null {
+    return value;
+  }
+
+  /**
+   * @internal Rails-private helper. Returns Infinity to bypass Integer's range check.
+   */
+  protected maxValue(): number {
+    return Number.POSITIVE_INFINITY;
+  }
+
   /** @internal Rails-private helper. */
   protected castValue(value: unknown): number | null {
     if (typeof value === "bigint") return value as unknown as number;
@@ -27,16 +38,5 @@ export class BigIntegerType extends IntegerType {
   serialize(value: unknown): unknown {
     // No range check — maxValue is Infinity. Return cast value as-is (matches Rails).
     return this.cast(value);
-  }
-
-  serializeCastValue(value: number | null): number | null {
-    return value;
-  }
-
-  /**
-   * @internal Rails-private helper. Returns Infinity to bypass Integer's range check.
-   */
-  protected maxValue(): number {
-    return Number.POSITIVE_INFINITY;
   }
 }

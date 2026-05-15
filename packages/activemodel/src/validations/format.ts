@@ -33,19 +33,6 @@ export class FormatValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare regexpUsingMultilineAnchors: typeof regexpUsingMultilineAnchors;
 
-  override checkValidity(): void {
-    // Rails: `unless options.include?(:with) ^ options.include?(:without)`
-    // — Hash#include? checks own keys only; use Object.hasOwn to avoid
-    // prototype-chain surprises (the `in` operator would include inherited).
-    const hasWith = Object.hasOwn(this.options, "with");
-    const hasWithout = Object.hasOwn(this.options, "without");
-    if (hasWith === hasWithout) {
-      throw new Error("Either :with or :without must be supplied (but not both)");
-    }
-    this.checkOptionsValidity("with");
-    this.checkOptionsValidity("without");
-  }
-
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     // Rails uses Ruby truthiness on options[:with] / options[:without] —
     // nil/false skip the branch entirely. Mirror that so an explicit
@@ -63,6 +50,19 @@ export class FormatValidator extends EachValidator {
         this.recordError(record, attribute, "without", value);
       }
     }
+  }
+
+  override checkValidity(): void {
+    // Rails: `unless options.include?(:with) ^ options.include?(:without)`
+    // — Hash#include? checks own keys only; use Object.hasOwn to avoid
+    // prototype-chain surprises (the `in` operator would include inherited).
+    const hasWith = Object.hasOwn(this.options, "with");
+    const hasWithout = Object.hasOwn(this.options, "without");
+    if (hasWith === hasWithout) {
+      throw new Error("Either :with or :without must be supplied (but not both)");
+    }
+    this.checkOptionsValidity("with");
+    this.checkOptionsValidity("without");
   }
 }
 

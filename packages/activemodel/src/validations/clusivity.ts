@@ -45,6 +45,82 @@ interface ClusivityHost {
 }
 
 /**
+ * Mirrors: clusivity.rb:14-18
+ *   def check_validity!
+ *     unless delimiter.respond_to?(:include?) || delimiter.respond_to?(:call) || delimiter.respond_to?(:to_sym)
+ *       raise ArgumentError, ERROR_MESSAGE
+ *     end
+ *   end
+ *
+ * TS analogues for the three Ruby duck checks:
+ * - `respond_to?(:include?)` ↔ array / iterable / Set
+ * - `respond_to?(:call)` ↔ function
+ * - `respond_to?(:to_sym)` ↔ string (resolved via resolveValue at call time)
+ */
+export function checkValidityBang(this: ClusivityHost): void {
+  const d = this.delimiter();
+  if (d === undefined || d === null) {
+    throw new Error(ERROR_MESSAGE);
+  }
+  // Symmetric with isMemberOf — anything membership accepts must also
+  // pass validity. Maps Ruby duck checks to TS analogues:
+  //   respond_to?(:include?) ↔ string (substring), Array, Set, iterable,
+  //                            custom .includes / .has
+  //   respond_to?(:call)     ↔ function
+  //   respond_to?(:to_sym)   ↔ string (resolved via resolveValue at call time)
+  const isString = typeof d === "string";
+  const hasIncludeMethod =
+    typeof d === "object" &&
+    d !== null &&
+    (typeof (d as { includes?: unknown }).includes === "function" ||
+      typeof (d as { has?: unknown }).has === "function");
+  const isIterable =
+    Array.isArray(d) ||
+    d instanceof Set ||
+    d instanceof Map ||
+    (typeof d === "object" &&
+      d !== null &&
+      typeof (d as Record<symbol, unknown>)[Symbol.iterator] === "function");
+  const isCallable = typeof d === "function";
+  if (!isString && !hasIncludeMethod && !isIterable && !isCallable) {
+    throw new Error(ERROR_MESSAGE);
+  }
+}
+
+/**
+ * Mirrors: clusivity.rb:21-29
+ *   def include?(record, value)
+ *     members = resolve_value(record, delimiter)
+ *     if value.is_a?(Array)
+ *       value.all? { |v| members.public_send(inclusion_method(members), v) }
+ *     else
+ *       members.public_send(inclusion_method(members), value)
+ *     end
+ *   end
+ *
+ * `resolve_value` resolves Procs and Symbol-method references; a string
+ * option treated as a method name only if the record responds to it
+ * (resolve-value.ts).
+ *
+ * @internal
+ */
+export function isInclude(this: ClusivityHost, record: unknown, value: unknown): boolean {
+  // Route through `this.delimiter()` / `this.inclusionMethod(...)` so
+  // a subclass that overrides either gets the same dispatch Rails'
+  // Ruby method lookup would give it. Direct calls to the free
+  // functions would bypass overrides.
+  const members = this.resolveValue(record, this.delimiter());
+  // Rails: `members.public_send(inclusion_method(members), v)`. The
+  // cover-vs-include branch slots in via inclusionMethod when a Range
+  // type lands without reworking the call path.
+  const method = this.inclusionMethod(members);
+  if (Array.isArray(value)) {
+    return value.every((v) => testMembership(members, v, method));
+  }
+  return testMembership(members, value, method);
+}
+
+/**
  * Mirrors: clusivity.rb:31-33
  *   def delimiter
  *     @delimiter ||= options[:in] || options[:within]
@@ -99,39 +175,6 @@ export function delimiter(this: ClusivityHost): unknown {
  */
 export function inclusionMethod(_enumerable: unknown): "include?" | "cover?" {
   return "include?";
-}
-
-/**
- * Mirrors: clusivity.rb:21-29
- *   def include?(record, value)
- *     members = resolve_value(record, delimiter)
- *     if value.is_a?(Array)
- *       value.all? { |v| members.public_send(inclusion_method(members), v) }
- *     else
- *       members.public_send(inclusion_method(members), value)
- *     end
- *   end
- *
- * `resolve_value` resolves Procs and Symbol-method references; a string
- * option treated as a method name only if the record responds to it
- * (resolve-value.ts).
- *
- * @internal
- */
-export function isInclude(this: ClusivityHost, record: unknown, value: unknown): boolean {
-  // Route through `this.delimiter()` / `this.inclusionMethod(...)` so
-  // a subclass that overrides either gets the same dispatch Rails'
-  // Ruby method lookup would give it. Direct calls to the free
-  // functions would bypass overrides.
-  const members = this.resolveValue(record, this.delimiter());
-  // Rails: `members.public_send(inclusion_method(members), v)`. The
-  // cover-vs-include branch slots in via inclusionMethod when a Range
-  // type lands without reworking the call path.
-  const method = this.inclusionMethod(members);
-  if (Array.isArray(value)) {
-    return value.every((v) => testMembership(members, v, method));
-  }
-  return testMembership(members, value, method);
 }
 
 function testMembership(members: unknown, value: unknown, method: "include?" | "cover?"): boolean {
@@ -193,47 +236,4 @@ export function exceptInWithinMergeValue(
   }
   rest.value = value;
   return rest;
-}
-
-/**
- * Mirrors: clusivity.rb:14-18
- *   def check_validity!
- *     unless delimiter.respond_to?(:include?) || delimiter.respond_to?(:call) || delimiter.respond_to?(:to_sym)
- *       raise ArgumentError, ERROR_MESSAGE
- *     end
- *   end
- *
- * TS analogues for the three Ruby duck checks:
- * - `respond_to?(:include?)` ↔ array / iterable / Set
- * - `respond_to?(:call)` ↔ function
- * - `respond_to?(:to_sym)` ↔ string (resolved via resolveValue at call time)
- */
-export function checkValidityBang(this: ClusivityHost): void {
-  const d = this.delimiter();
-  if (d === undefined || d === null) {
-    throw new Error(ERROR_MESSAGE);
-  }
-  // Symmetric with isMemberOf — anything membership accepts must also
-  // pass validity. Maps Ruby duck checks to TS analogues:
-  //   respond_to?(:include?) ↔ string (substring), Array, Set, iterable,
-  //                            custom .includes / .has
-  //   respond_to?(:call)     ↔ function
-  //   respond_to?(:to_sym)   ↔ string (resolved via resolveValue at call time)
-  const isString = typeof d === "string";
-  const hasIncludeMethod =
-    typeof d === "object" &&
-    d !== null &&
-    (typeof (d as { includes?: unknown }).includes === "function" ||
-      typeof (d as { has?: unknown }).has === "function");
-  const isIterable =
-    Array.isArray(d) ||
-    d instanceof Set ||
-    d instanceof Map ||
-    (typeof d === "object" &&
-      d !== null &&
-      typeof (d as Record<symbol, unknown>)[Symbol.iterator] === "function");
-  const isCallable = typeof d === "function";
-  if (!isString && !hasIncludeMethod && !isIterable && !isCallable) {
-    throw new Error(ERROR_MESSAGE);
-  }
 }

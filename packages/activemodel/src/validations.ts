@@ -32,6 +32,51 @@ export const _defineAroundModelCallback = _defineAroundModelCallbackImpl;
 export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 
 /**
+ * Lazy per-instance accessor for the active `ValidationContext`.
+ * Mirrors Rails
+ * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
+ * (activemodel/lib/active_model/validations.rb:463-465). Trails stores
+ * the active context as `_validationContext: string | string[] | null`
+ * directly; this helper returns a `ValidationContext` whose
+ * `.context` property is a live view of that field, so Rails' pattern
+ * `context_for_validation.context = ctx` still works.
+ *
+ * @internal Rails-private helper.
+ */
+export function contextForValidation(this: ContextForValidationHost): ValidationContext {
+  if (this._contextForValidation) return this._contextForValidation;
+  // Construct via the real constructor so any future
+  // ValidationContext initialization runs, then replace the
+  // `context` and underlying `_context` slot with a live view of
+  // `_validationContext`. Both must be aliased so `vc.name` /
+  // `vc.toString()` stay consistent with the live field.
+  const vc = new ValidationContext();
+  const accessor: PropertyDescriptor = {
+    get: (): string | string[] | null => this._validationContext,
+    set: (value: string | string[] | null): void => {
+      this._validationContext = value;
+    },
+    configurable: true,
+    enumerable: false,
+  };
+  Object.defineProperty(vc, "context", accessor);
+  Object.defineProperty(vc, "_context", accessor);
+  this._contextForValidation = vc;
+  return vc;
+}
+
+/**
+ * Host shape consumed by `initInternals`. Kept loose so any class with
+ * the validation-related fields satisfies it without circular imports
+ * back to `Model`.
+ */
+export interface ValidationsInternalsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
+}
+
+/**
  * Per-instance reset hook for validation state. Mirrors Rails
  * `ActiveModel::Validations#init_internals`
  * (activemodel/lib/active_model/validations.rb:467-471):
@@ -52,26 +97,6 @@ export function initInternals<TBase extends object>(this: ValidationsInternalsHo
   this.errors = new Errors(this as unknown as TBase);
   this._validationContext = null;
   this._contextForValidation = undefined;
-}
-
-/**
- * Host shape consumed by `initInternals`. Kept loose so any class with
- * the validation-related fields satisfies it without circular imports
- * back to `Model`.
- */
-export interface ValidationsInternalsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-/**
- * Rails: ActiveModel::Validations extends Translation (validations.rb:43),
- * so the singleton accessor surfaces on Validations directly. Mirror that
- * here so callers can read/write via `Validations.raiseOnMissingTranslations(...)`.
- */
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  return translationRaise(value);
 }
 
 /**
@@ -230,6 +255,47 @@ const _predicatesForValidationContexts = new Map<
 >();
 
 /**
+ * Run the `:validate` callbacks and report whether the model has no
+ * errors. Mirrors Rails
+ * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
+ * (activemodel/lib/active_model/validations.rb:473-476).
+ *
+ * @internal Rails-private helper.
+ */
+export function runValidationsBang(this: RunValidationsHost): boolean {
+  this._runValidateCallbacks();
+  return this.errors.empty;
+}
+
+/**
+ * Host shape consumed by `predicateForValidationContext`.
+ */
+export interface ValidationsContextHost {
+  readonly validationContext: string | string[] | null;
+}
+
+/**
+ * Throw `ValidationError` for the current model. Mirrors Rails
+ * `def raise_validation_error; raise(ValidationError.new(self)); end`
+ * (activemodel/lib/active_model/validations.rb:478-480).
+ *
+ * @internal Rails-private helper.
+ */
+export function raiseValidationError<TBase extends object = object>(this: {
+  errors: Errors<TBase>;
+}): never {
+  throw new ValidationError(this);
+}
+
+/**
+ * Host shape consumed by `contextForValidation`.
+ */
+export interface ContextForValidationHost {
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
+}
+
+/**
  * Build a predicate that returns whether a model's
  * `validationContext` matches one of the supplied contexts. Used by
  * `validates(..., on: :create)` to gate a validator on the active
@@ -259,68 +325,6 @@ export function predicateForValidationContext(
 }
 
 /**
- * Host shape consumed by `predicateForValidationContext`.
- */
-export interface ValidationsContextHost {
-  readonly validationContext: string | string[] | null;
-}
-
-/**
- * Lazy per-instance accessor for the active `ValidationContext`.
- * Mirrors Rails
- * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
- * (activemodel/lib/active_model/validations.rb:463-465). Trails stores
- * the active context as `_validationContext: string | string[] | null`
- * directly; this helper returns a `ValidationContext` whose
- * `.context` property is a live view of that field, so Rails' pattern
- * `context_for_validation.context = ctx` still works.
- *
- * @internal Rails-private helper.
- */
-export function contextForValidation(this: ContextForValidationHost): ValidationContext {
-  if (this._contextForValidation) return this._contextForValidation;
-  // Construct via the real constructor so any future
-  // ValidationContext initialization runs, then replace the
-  // `context` and underlying `_context` slot with a live view of
-  // `_validationContext`. Both must be aliased so `vc.name` /
-  // `vc.toString()` stay consistent with the live field.
-  const vc = new ValidationContext();
-  const accessor: PropertyDescriptor = {
-    get: (): string | string[] | null => this._validationContext,
-    set: (value: string | string[] | null): void => {
-      this._validationContext = value;
-    },
-    configurable: true,
-    enumerable: false,
-  };
-  Object.defineProperty(vc, "context", accessor);
-  Object.defineProperty(vc, "_context", accessor);
-  this._contextForValidation = vc;
-  return vc;
-}
-
-/**
- * Host shape consumed by `contextForValidation`.
- */
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-/**
- * Run the `:validate` callbacks and report whether the model has no
- * errors. Mirrors Rails
- * `def run_validations!; _run_validate_callbacks; errors.empty?; end`
- * (activemodel/lib/active_model/validations.rb:473-476).
- *
- * @internal Rails-private helper.
- */
-export function runValidationsBang(this: RunValidationsHost): boolean {
-  this._runValidateCallbacks();
-  return this.errors.empty;
-}
-
-/**
  * Host shape consumed by `runValidationsBang`.
  */
 export interface RunValidationsHost<TBase extends object = object> {
@@ -329,16 +333,12 @@ export interface RunValidationsHost<TBase extends object = object> {
 }
 
 /**
- * Throw `ValidationError` for the current model. Mirrors Rails
- * `def raise_validation_error; raise(ValidationError.new(self)); end`
- * (activemodel/lib/active_model/validations.rb:478-480).
- *
- * @internal Rails-private helper.
+ * Rails: ActiveModel::Validations extends Translation (validations.rb:43),
+ * so the singleton accessor surfaces on Validations directly. Mirror that
+ * here so callers can read/write via `Validations.raiseOnMissingTranslations(...)`.
  */
-export function raiseValidationError<TBase extends object = object>(this: {
-  errors: Errors<TBase>;
-}): never {
-  throw new ValidationError(this);
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  return translationRaise(value);
 }
 
 /**

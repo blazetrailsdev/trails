@@ -34,6 +34,35 @@ interface CallbackHostRecord {
 }
 
 /**
+ * Mirrors: callbacks.rb:113-115
+ *   def run_validations!
+ *     _run_validation_callbacks { super }
+ *   end
+ *
+ * The interface declaration above adds `runValidationsBang()` to the
+ * Callbacks contract — host classes that want before/after validation
+ * dispatch implement the method to wrap their underlying validation
+ * pass in the callback chain. This export documents the Rails surface
+ * and gives downstream hosts a typed reference for that
+ * callback-wrapping behavior.
+ *
+ * @internal Rails-private helper.
+ */
+export function runValidationsBang(this: {
+  _runValidationCallbacks?: (block: () => boolean) => boolean;
+  runValidations?: () => boolean;
+}): boolean {
+  const block = (): boolean => {
+    if (typeof this.runValidations === "function") return this.runValidations();
+    return true;
+  };
+  if (typeof this._runValidationCallbacks === "function") {
+    return this._runValidationCallbacks(block);
+  }
+  return block();
+}
+
+/**
  * Mirrors: callbacks.rb:99-110
  *   def set_options_for_callback(options)
  *     if options.key?(:on)
@@ -68,33 +97,4 @@ export function setOptionsForCallback(options: CallbackOptions): void {
   const existingArr =
     existingIf == null ? [] : Array.isArray(existingIf) ? existingIf : [existingIf];
   options.if = [contextGuard, ...existingArr];
-}
-
-/**
- * Mirrors: callbacks.rb:113-115
- *   def run_validations!
- *     _run_validation_callbacks { super }
- *   end
- *
- * The interface declaration above adds `runValidationsBang()` to the
- * Callbacks contract — host classes that want before/after validation
- * dispatch implement the method to wrap their underlying validation
- * pass in the callback chain. This export documents the Rails surface
- * and gives downstream hosts a typed reference for that
- * callback-wrapping behavior.
- *
- * @internal Rails-private helper.
- */
-export function runValidationsBang(this: {
-  _runValidationCallbacks?: (block: () => boolean) => boolean;
-  runValidations?: () => boolean;
-}): boolean {
-  const block = (): boolean => {
-    if (typeof this.runValidations === "function") return this.runValidations();
-    return true;
-  };
-  if (typeof this._runValidationCallbacks === "function") {
-    return this._runValidationCallbacks(block);
-  }
-  return block();
 }

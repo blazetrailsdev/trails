@@ -88,35 +88,6 @@ export class LengthValidator extends EachValidator {
     super(options);
   }
 
-  override checkValidity(): void {
-    const hasCheck =
-      this.options.minimum !== undefined ||
-      this.options.maximum !== undefined ||
-      this.options.is !== undefined;
-
-    if (!hasCheck) {
-      throw new Error(
-        "Range unspecified. Specify the :in, :within, :maximum, :minimum, or :is option.",
-      );
-    }
-
-    for (const key of ["minimum", "maximum", "is"] as const) {
-      const value = this.options[key];
-      if (value === undefined) continue;
-      if (
-        (Number.isInteger(value as number) && (value as number) >= 0) ||
-        value === Infinity ||
-        typeof value === "function" ||
-        typeof value === "string"
-      ) {
-        continue;
-      }
-      throw new Error(
-        `:${key} must be a non-negative Integer, Infinity, string (method name), or Proc`,
-      );
-    }
-  }
-
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
     // For nil → 0 (nil.to_s.length); for non-nil values without a .length
@@ -177,21 +148,35 @@ export class LengthValidator extends EachValidator {
       }
     }
   }
-}
 
-/**
- * @internal Resolves a length option through this.resolveValue (so a
- * Proc / method-name reference is honored per Rails length.rb:55) and
- * narrows the result to a number.
- */
-function resolveLengthOpt(
-  this: { resolveValue(record: unknown, value: unknown): unknown },
-  record: ValidatableRecord,
-  raw: unknown,
-): number | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  const resolved = this.resolveValue(record, raw);
-  return typeof resolved === "number" ? resolved : undefined;
+  override checkValidity(): void {
+    const hasCheck =
+      this.options.minimum !== undefined ||
+      this.options.maximum !== undefined ||
+      this.options.is !== undefined;
+
+    if (!hasCheck) {
+      throw new Error(
+        "Range unspecified. Specify the :in, :within, :maximum, :minimum, or :is option.",
+      );
+    }
+
+    for (const key of ["minimum", "maximum", "is"] as const) {
+      const value = this.options[key];
+      if (value === undefined) continue;
+      if (
+        (Number.isInteger(value as number) && (value as number) >= 0) ||
+        value === Infinity ||
+        typeof value === "function" ||
+        typeof value === "string"
+      ) {
+        continue;
+      }
+      throw new Error(
+        `:${key} must be a non-negative Integer, Infinity, string (method name), or Proc`,
+      );
+    }
+  }
 }
 
 /**
@@ -216,6 +201,21 @@ export function skipNilCheck(
     this.options.allowNil === undefined &&
     this.options.allowBlank === undefined
   );
+}
+
+/**
+ * @internal Resolves a length option through this.resolveValue (so a
+ * Proc / method-name reference is honored per Rails length.rb:55) and
+ * narrows the result to a number.
+ */
+function resolveLengthOpt(
+  this: { resolveValue(record: unknown, value: unknown): unknown },
+  record: ValidatableRecord,
+  raw: unknown,
+): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const resolved = this.resolveValue(record, raw);
+  return typeof resolved === "number" ? resolved : undefined;
 }
 
 LengthValidator.prototype.resolveValue = resolveValue;

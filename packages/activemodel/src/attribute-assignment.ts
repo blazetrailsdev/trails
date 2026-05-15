@@ -5,6 +5,65 @@ interface PermittedAttributes {
   permitted?(): boolean;
 }
 
+export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
+  if (typeof newAttributes !== "object" || newAttributes === null || Array.isArray(newAttributes)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(newAttributes)} passed.`,
+    );
+  }
+
+  const attrs = newAttributes as Record<string, unknown>;
+  if (Object.keys(attrs).length === 0) return;
+
+  const sanitized = sanitizeForMassAssignment(attrs);
+  _assignAttributes(model, sanitized);
+}
+
+export interface AttributeAssignment {
+  writeAttribute(name: string, value: unknown): void;
+  attributeWriterMissing?(name: string, value: unknown): void;
+}
+
+export function attributeWriterMissing(
+  model: AttributeAssignment,
+  name: string,
+  _value: unknown,
+): void {
+  throw new UnknownAttributeError(model, name);
+}
+
+/** @internal Rails-private helper. */
+export function _assignAttributes(
+  model: AttributeAssignment,
+  attributes: Record<string, unknown>,
+): void {
+  for (const [k, v] of Object.entries(attributes)) {
+    _assignAttribute(model, k, v);
+  }
+}
+
+/** @internal Rails-private helper. */
+export function _assignAttribute(model: AttributeAssignment, key: string, value: unknown): void {
+  const setter = findSetter(model, key);
+  if (setter) {
+    setter.call(model, value);
+    return;
+  }
+  try {
+    model.writeAttribute(key, value);
+  } catch (error) {
+    if (error instanceof UnknownAttributeError) {
+      if (typeof model.attributeWriterMissing === "function") {
+        model.attributeWriterMissing(key, value);
+      } else {
+        attributeWriterMissing(model, key, value);
+      }
+    } else {
+      throw error;
+    }
+  }
+}
+
 /** @internal Rails-private helper. */
 export function sanitizeForMassAssignment(
   attributes: Record<string, unknown>,
@@ -18,30 +77,11 @@ export function sanitizeForMassAssignment(
   return attributes;
 }
 
-export interface AttributeAssignment {
-  writeAttribute(name: string, value: unknown): void;
-  attributeWriterMissing?(name: string, value: unknown): void;
-}
-
 function typeNameForError(value: unknown): string {
   if (value === null) return "Null";
   if (Array.isArray(value)) return "Array";
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
-  if (typeof newAttributes !== "object" || newAttributes === null || Array.isArray(newAttributes)) {
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(newAttributes)} passed.`,
-    );
-  }
-
-  const attrs = newAttributes as Record<string, unknown>;
-  if (Object.keys(attrs).length === 0) return;
-
-  const sanitized = sanitizeForMassAssignment(attrs);
-  _assignAttributes(model, sanitized);
 }
 
 /**
@@ -80,46 +120,6 @@ function findSetter(model: object, key: string): ((this: object, value: unknown)
     obj = Object.getPrototypeOf(obj);
   }
   return null;
-}
-
-/** @internal Rails-private helper. */
-export function _assignAttributes(
-  model: AttributeAssignment,
-  attributes: Record<string, unknown>,
-): void {
-  for (const [k, v] of Object.entries(attributes)) {
-    _assignAttribute(model, k, v);
-  }
-}
-
-/** @internal Rails-private helper. */
-export function _assignAttribute(model: AttributeAssignment, key: string, value: unknown): void {
-  const setter = findSetter(model, key);
-  if (setter) {
-    setter.call(model, value);
-    return;
-  }
-  try {
-    model.writeAttribute(key, value);
-  } catch (error) {
-    if (error instanceof UnknownAttributeError) {
-      if (typeof model.attributeWriterMissing === "function") {
-        model.attributeWriterMissing(key, value);
-      } else {
-        attributeWriterMissing(model, key, value);
-      }
-    } else {
-      throw error;
-    }
-  }
-}
-
-export function attributeWriterMissing(
-  model: AttributeAssignment,
-  name: string,
-  _value: unknown,
-): void {
-  throw new UnknownAttributeError(model, name);
 }
 
 class ArgumentError extends globalThis.Error {

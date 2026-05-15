@@ -6,6 +6,14 @@ const NumericValueType = applyNumericMixin(ValueType<string>);
 export class DecimalType extends NumericValueType {
   readonly name: string = "decimal";
 
+  type(): string {
+    return this.name;
+  }
+
+  typeCastForSchema(value: unknown): string {
+    return JSON.stringify(value) ?? String(value);
+  }
+
   // JS has no BigDecimal, so we represent decimals as strings to avoid
   // losing precision through IEEE-754 floats. Rails' `cast_value`:
   //   - Numeric  -> BigDecimal(value)
@@ -17,50 +25,6 @@ export class DecimalType extends NumericValueType {
   protected castValue(value: unknown): string | null {
     const casted = this._castWithoutScale(value);
     return this.applyScale(casted);
-  }
-
-  /**
-   * Apply Rails' `scale:` option to a decimal string, rounding to the
-   * configured number of fractional digits using Ruby's default
-   * `BigDecimal#round` mode (`ROUND_HALF_UP` — half away from zero).
-   *
-   * Mirrors: ActiveModel::Type::Decimal#apply_scale
-   * (activemodel/lib/active_model/type/decimal.rb).
-   */
-  protected applyScale(value: string | null): string | null {
-    if (value === null) return null;
-    if (this.scale === undefined) return value;
-    // Ruby `BigDecimal#round(n)` only accepts an Integer argument; a
-    // non-integer or negative TS `scale:` option would just misfire our
-    // slice/charCodeAt math, so leave the value untouched rather than
-    // invent new semantics.
-    if (!Number.isInteger(this.scale) || this.scale < 0) return value;
-    return roundHalfUpToScale(value, this.scale);
-  }
-
-  private _castWithoutScale(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "bigint") return value.toString();
-    if (typeof value === "number") {
-      if (!Number.isFinite(value)) return null;
-      // Rails dispatches Float through `convert_float_to_big_decimal`
-      // (decimal.rb:75-81). Route every JS number through the same hook
-      // so a configured `precision:` applies the same significant-digit
-      // rounding per Rails; integer-valued inputs may still change when
-      // the value has more digits than `floatPrecision()` preserves.
-      return this.convertFloatToBigDecimal(value);
-    }
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "") return null;
-      // Rails' `String#to_d` parses a leading numeric prefix and
-      // silently drops everything after, returning `BigDecimal(0)` if
-      // no leading number is present. Tests assert, e.g.,
-      // `"1ignore" -> BigDecimal("1")`, `"bad" -> BigDecimal("0")`.
-      const match = trimmed.match(/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?/);
-      return match ? match[0] : "0";
-    }
-    return null;
   }
 
   /**
@@ -121,12 +85,48 @@ export class DecimalType extends NumericValueType {
     return p > 16 ? 16 : p;
   }
 
-  type(): string {
-    return this.name;
+  /**
+   * Apply Rails' `scale:` option to a decimal string, rounding to the
+   * configured number of fractional digits using Ruby's default
+   * `BigDecimal#round` mode (`ROUND_HALF_UP` — half away from zero).
+   *
+   * Mirrors: ActiveModel::Type::Decimal#apply_scale
+   * (activemodel/lib/active_model/type/decimal.rb).
+   */
+  protected applyScale(value: string | null): string | null {
+    if (value === null) return null;
+    if (this.scale === undefined) return value;
+    // Ruby `BigDecimal#round(n)` only accepts an Integer argument; a
+    // non-integer or negative TS `scale:` option would just misfire our
+    // slice/charCodeAt math, so leave the value untouched rather than
+    // invent new semantics.
+    if (!Number.isInteger(this.scale) || this.scale < 0) return value;
+    return roundHalfUpToScale(value, this.scale);
   }
 
-  typeCastForSchema(value: unknown): string {
-    return JSON.stringify(value) ?? String(value);
+  private _castWithoutScale(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "bigint") return value.toString();
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return null;
+      // Rails dispatches Float through `convert_float_to_big_decimal`
+      // (decimal.rb:75-81). Route every JS number through the same hook
+      // so a configured `precision:` applies the same significant-digit
+      // rounding per Rails; integer-valued inputs may still change when
+      // the value has more digits than `floatPrecision()` preserves.
+      return this.convertFloatToBigDecimal(value);
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed === "") return null;
+      // Rails' `String#to_d` parses a leading numeric prefix and
+      // silently drops everything after, returning `BigDecimal(0)` if
+      // no leading number is present. Tests assert, e.g.,
+      // `"1ignore" -> BigDecimal("1")`, `"bad" -> BigDecimal("0")`.
+      const match = trimmed.match(/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?/);
+      return match ? match[0] : "0";
+    }
+    return null;
   }
 }
 

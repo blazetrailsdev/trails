@@ -15,15 +15,8 @@ export class IntegerType extends NumericValueType {
     super(options);
   }
 
-  /** @internal Rails-private helper. */
-  protected castValue(value: unknown): number | null {
-    if (typeof value === "number") {
-      if (isNaN(value)) return null;
-      return Math.trunc(value);
-    }
-    if (typeof value === "bigint") return Number(value);
-    const parsed = parseInt(String(value), 10);
-    return isNaN(parsed) ? null : parsed;
+  type(): string {
+    return this.name;
   }
 
   /**
@@ -48,10 +41,6 @@ export class IntegerType extends NumericValueType {
 
   serialize(value: unknown): unknown {
     return this.ensureInRange(this.cast(value));
-  }
-
-  type(): string {
-    return this.name;
   }
 
   serializeCastValue(value: number | null): number | null {
@@ -100,6 +89,17 @@ export class IntegerType extends NumericValueType {
     if (value == null) return true;
     const [min, max] = this.range;
     return value >= min && value <= max;
+  }
+
+  /** @internal Rails-private helper. */
+  protected castValue(value: unknown): number | null {
+    if (typeof value === "number") {
+      if (isNaN(value)) return null;
+      return Math.trunc(value);
+    }
+    if (typeof value === "bigint") return Number(value);
+    const parsed = parseInt(String(value), 10);
+    return isNaN(parsed) ? null : parsed;
   }
 
   /**

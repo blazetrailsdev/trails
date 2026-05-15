@@ -29,6 +29,34 @@ export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
+  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+    for (const optKey of COMPARE_CHECKS) {
+      const raw = (this.options as Record<string, unknown>)[optKey];
+      if (raw === undefined) continue;
+      const optionValue = this.resolveValue(record, raw);
+
+      if (value === null || value === undefined || (typeof value === "string" && isBlank(value))) {
+        record.errors.add(attribute, "blank", this.errorOptions(value, optionValue));
+        return;
+      }
+
+      try {
+        const cmp = this.compare(value, optionValue);
+        if (!COMPARE_OPS[optKey](cmp)) {
+          record.errors.add(
+            attribute,
+            COMPARE_KEYS_TO_RAILS[optKey],
+            this.errorOptions(value, optionValue),
+          );
+        }
+      } catch (e) {
+        // Rails comparison.rb:30 — uses the ArgumentError message as the
+        // error key/message and continues to the next compare option.
+        record.errors.add(attribute, (e as Error).message);
+      }
+    }
+  }
+
   private compare(a: unknown, b: unknown): number {
     if (a instanceof Temporal.Instant && b instanceof Temporal.Instant)
       return Temporal.Instant.compare(a, b);
@@ -60,34 +88,6 @@ export class ComparisonValidator extends EachValidator {
       throw new Error(
         "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
       );
-    }
-  }
-
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    for (const optKey of COMPARE_CHECKS) {
-      const raw = (this.options as Record<string, unknown>)[optKey];
-      if (raw === undefined) continue;
-      const optionValue = this.resolveValue(record, raw);
-
-      if (value === null || value === undefined || (typeof value === "string" && isBlank(value))) {
-        record.errors.add(attribute, "blank", this.errorOptions(value, optionValue));
-        return;
-      }
-
-      try {
-        const cmp = this.compare(value, optionValue);
-        if (!COMPARE_OPS[optKey](cmp)) {
-          record.errors.add(
-            attribute,
-            COMPARE_KEYS_TO_RAILS[optKey],
-            this.errorOptions(value, optionValue),
-          );
-        }
-      } catch (e) {
-        // Rails comparison.rb:30 — uses the ArgumentError message as the
-        // error key/message and continues to the next compare option.
-        record.errors.add(attribute, (e as Error).message);
-      }
     }
   }
 }

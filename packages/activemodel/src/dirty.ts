@@ -38,10 +38,6 @@ export interface Dirty {
   clearAttributeChange(name: string): void;
 }
 
-function resolveValue(value: unknown): unknown {
-  return AttributeSet.resolveSnapshotValue(value);
-}
-
 /**
  * Per-instance reset hook for dirty-tracking state. Mirrors Rails
  * `ActiveModel::Dirty#init_internals`
@@ -64,6 +60,20 @@ export function initInternals(this: DirtyInternalsHost): void {
 }
 
 /**
+ * Mirrors: ActiveModel::Dirty#attribute_previous_change
+ *
+ * Dispatch target for `*_previous_change` per-attribute methods.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributePreviousChange(
+  this: DirtyDispatchHost,
+  attrName: string,
+): [unknown, unknown] | undefined {
+  return this._dirty.previousChanges[attrName];
+}
+
+/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
@@ -82,6 +92,171 @@ export class DirtyTracker {
   private _previousChanges: Map<string, [unknown, unknown]> = new Map();
   /** Names explicitly force-dirtied via attribute_will_change!. @internal */
   private _forcedNames: Set<string> = new Set();
+
+  initAttributes(
+    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
+  ): void {
+    this.snapshot(attributes);
+  }
+
+  asJson(): Record<string, [unknown, unknown]> {
+    return this.changes;
+  }
+
+  changesApplied(
+    currentAttributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
+  ): void {
+    this._previousChanges = new Map(this._changedAttributes);
+    if (currentAttributes instanceof Map) {
+      this._originalAttributes = new Map(currentAttributes);
+      this._originalHas = new Set(currentAttributes.keys());
+    } else {
+      this._originalAttributes = currentAttributes.snapshotValues();
+      this._originalHas = new Set(this._originalAttributes.keys());
+    }
+    this._clearChanges();
+  }
+
+  get changed(): boolean {
+    return this._changedAttributes.size > 0;
+  }
+
+  attributeChanged(name: string): boolean {
+    return this._changedAttributes.has(name);
+  }
+
+  attributeWas(name: string): unknown {
+    const change = this._changedAttributes.get(name);
+    return change ? change[0] : resolveValue(this._originalAttributes.get(name));
+  }
+
+  clearChangesInformation(): void {
+    this._clearChanges();
+    this._previousChanges.clear();
+  }
+
+  clearAttributeChanges(attributes: string[]): void {
+    for (const attr of attributes) {
+      this._deleteChange(attr);
+    }
+  }
+
+  get changedAttributes(): string[] {
+    return Array.from(this._changedAttributes.keys());
+  }
+
+  get changes(): Record<string, [unknown, unknown]> {
+    const result: Record<string, [unknown, unknown]> = {};
+    for (const [k, v] of this._changedAttributes) {
+      result[k] = v;
+    }
+    return result;
+  }
+
+  get previousChanges(): Record<string, [unknown, unknown]> {
+    const result: Record<string, [unknown, unknown]> = {};
+    for (const [k, v] of this._previousChanges) {
+      result[k] = v;
+    }
+    return result;
+  }
+
+  /**
+   * Drop a single attribute's pending change and rebind its baseline to
+   * the current value, so a later write reports `[current, next]` instead
+   * of `[originalFromFirstSnapshot, next]`.
+   *
+   * Mirrors: ActiveModel::Dirty#clear_attribute_change
+   * -> `mutation_tracker.forget_change(name)`.
+   *
+   * @internal
+   */
+  clearAttributeChange(
+    attributes:
+      | Map<string, unknown>
+      | { has(name: string): boolean; fetchValue(name: string): unknown }
+      | { snapshotValues(): Map<string, unknown> },
+    name: string,
+  ): void {
+    this._deleteChange(name);
+    // Fast path: avoid snapshotting every attribute when only one baseline
+    // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
+    // fall back to the full snapshot for plain Maps / other shapes.
+    let has: boolean;
+    let value: unknown;
+    const perAttr = attributes as { has?: unknown; fetchValue?: unknown };
+    if (typeof perAttr.has === "function" && typeof perAttr.fetchValue === "function") {
+      const src = attributes as { has(n: string): boolean; fetchValue(n: string): unknown };
+      has = src.has(name);
+      value = has ? src.fetchValue(name) : undefined;
+    } else {
+      const snap =
+        attributes instanceof Map
+          ? attributes
+          : (attributes as { snapshotValues(): Map<string, unknown> }).snapshotValues();
+      has = snap.has(name);
+      value = snap.get(name);
+    }
+    if (has) {
+      this._originalAttributes.set(name, value);
+      this._originalHas.add(name);
+    } else {
+      this._originalAttributes.delete(name);
+      this._originalHas.delete(name);
+    }
+  }
+
+  /**
+   * Pending changes diff against the values loaded from the database —
+   * what will be written on the next save. Cleared by `changesApplied()`.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_from_database
+   * (activemodel/lib/active_model/dirty.rb + attribute_mutation_tracker.rb).
+   *
+   * @internal
+   */
+  get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
+    return this.changes;
+  }
+
+  /**
+   * Drop all pending assignment tracking and reset the baseline to the
+   * current in-memory values. Subsequent writes diff from the new baseline.
+   *
+   * Rails' `forget_attribute_assignments` replaces `@attributes` with
+   * `@attributes.map(&:forgotten_change)`, which rebinds each Attribute's
+   * `@original_attribute` to its current cast value. Mirror that by
+   * re-snapshotting (while preserving `_previousChanges` from the last save).
+   *
+   * Mirrors: ActiveModel::Dirty#forget_attribute_assignments
+   *
+   * @internal
+   */
+  forgetAttributeAssignments(
+    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
+  ): void {
+    // Same shape as snapshot(): reset baseline + clear pending changes.
+    // `snapshot` also clears `_changedAttributes`, so the single call
+    // covers both sides of Rails' `forget_attribute_assignments`.
+    this.snapshot(attributes);
+  }
+
+  /**
+   * Snapshot of `mutations_from_database` at the moment of the last save.
+   * Lives until the next save.
+   *
+   * Mirrors: ActiveModel::Dirty#mutations_before_last_save
+   *
+   * @internal
+   */
+  get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
+    return this.previousChanges;
+  }
+
+  /** @internal */
+  attributeChange(name: string): [unknown, unknown] | null {
+    return this._changedAttributes.get(name) ?? null;
+  }
 
   /** @internal Delete a single change entry and its forced-dirty marker together. */
   private _deleteChange(name: string): void {
@@ -169,63 +344,6 @@ export class DirtyTracker {
     }
   }
 
-  get changed(): boolean {
-    return this._changedAttributes.size > 0;
-  }
-
-  get changedAttributes(): string[] {
-    return Array.from(this._changedAttributes.keys());
-  }
-
-  get changes(): Record<string, [unknown, unknown]> {
-    const result: Record<string, [unknown, unknown]> = {};
-    for (const [k, v] of this._changedAttributes) {
-      result[k] = v;
-    }
-    return result;
-  }
-
-  attributeChanged(name: string): boolean {
-    return this._changedAttributes.has(name);
-  }
-
-  attributeWas(name: string): unknown {
-    const change = this._changedAttributes.get(name);
-    return change ? change[0] : resolveValue(this._originalAttributes.get(name));
-  }
-
-  /** @internal */
-  attributeChange(name: string): [unknown, unknown] | null {
-    return this._changedAttributes.get(name) ?? null;
-  }
-
-  changesApplied(
-    currentAttributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
-  ): void {
-    this._previousChanges = new Map(this._changedAttributes);
-    if (currentAttributes instanceof Map) {
-      this._originalAttributes = new Map(currentAttributes);
-      this._originalHas = new Set(currentAttributes.keys());
-    } else {
-      this._originalAttributes = currentAttributes.snapshotValues();
-      this._originalHas = new Set(this._originalAttributes.keys());
-    }
-    this._clearChanges();
-  }
-
-  get previousChanges(): Record<string, [unknown, unknown]> {
-    const result: Record<string, [unknown, unknown]> = {};
-    for (const [k, v] of this._previousChanges) {
-      result[k] = v;
-    }
-    return result;
-  }
-
-  clearChangesInformation(): void {
-    this._clearChanges();
-    this._previousChanges.clear();
-  }
-
   /**
    * Walk `currentAttributes` (post-TX) and populate `_changedAttributes` for
    * any attribute whose current value differs from the pre-TX baseline already
@@ -258,114 +376,6 @@ export class DirtyTracker {
         }
       }
     }
-  }
-
-  clearAttributeChanges(attributes: string[]): void {
-    for (const attr of attributes) {
-      this._deleteChange(attr);
-    }
-  }
-
-  /**
-   * Pending changes diff against the values loaded from the database —
-   * what will be written on the next save. Cleared by `changesApplied()`.
-   *
-   * Mirrors: ActiveModel::Dirty#mutations_from_database
-   * (activemodel/lib/active_model/dirty.rb + attribute_mutation_tracker.rb).
-   *
-   * @internal
-   */
-  get mutationsFromDatabase(): Record<string, [unknown, unknown]> {
-    return this.changes;
-  }
-
-  /**
-   * Snapshot of `mutations_from_database` at the moment of the last save.
-   * Lives until the next save.
-   *
-   * Mirrors: ActiveModel::Dirty#mutations_before_last_save
-   *
-   * @internal
-   */
-  get mutationsBeforeLastSave(): Record<string, [unknown, unknown]> {
-    return this.previousChanges;
-  }
-
-  /**
-   * Drop all pending assignment tracking and reset the baseline to the
-   * current in-memory values. Subsequent writes diff from the new baseline.
-   *
-   * Rails' `forget_attribute_assignments` replaces `@attributes` with
-   * `@attributes.map(&:forgotten_change)`, which rebinds each Attribute's
-   * `@original_attribute` to its current cast value. Mirror that by
-   * re-snapshotting (while preserving `_previousChanges` from the last save).
-   *
-   * Mirrors: ActiveModel::Dirty#forget_attribute_assignments
-   *
-   * @internal
-   */
-  forgetAttributeAssignments(
-    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
-  ): void {
-    // Same shape as snapshot(): reset baseline + clear pending changes.
-    // `snapshot` also clears `_changedAttributes`, so the single call
-    // covers both sides of Rails' `forget_attribute_assignments`.
-    this.snapshot(attributes);
-  }
-
-  /**
-   * Drop a single attribute's pending change and rebind its baseline to
-   * the current value, so a later write reports `[current, next]` instead
-   * of `[originalFromFirstSnapshot, next]`.
-   *
-   * Mirrors: ActiveModel::Dirty#clear_attribute_change
-   * -> `mutation_tracker.forget_change(name)`.
-   *
-   * @internal
-   */
-  clearAttributeChange(
-    attributes:
-      | Map<string, unknown>
-      | { has(name: string): boolean; fetchValue(name: string): unknown }
-      | { snapshotValues(): Map<string, unknown> },
-    name: string,
-  ): void {
-    this._deleteChange(name);
-    // Fast path: avoid snapshotting every attribute when only one baseline
-    // needs rebinding. AttributeSet exposes has/fetchValue per-attribute;
-    // fall back to the full snapshot for plain Maps / other shapes.
-    let has: boolean;
-    let value: unknown;
-    const perAttr = attributes as { has?: unknown; fetchValue?: unknown };
-    if (typeof perAttr.has === "function" && typeof perAttr.fetchValue === "function") {
-      const src = attributes as { has(n: string): boolean; fetchValue(n: string): unknown };
-      has = src.has(name);
-      value = has ? src.fetchValue(name) : undefined;
-    } else {
-      const snap =
-        attributes instanceof Map
-          ? attributes
-          : (attributes as { snapshotValues(): Map<string, unknown> }).snapshotValues();
-      has = snap.has(name);
-      value = snap.get(name);
-    }
-    if (has) {
-      this._originalAttributes.set(name, value);
-      this._originalHas.add(name);
-    } else {
-      this._originalAttributes.delete(name);
-      this._originalHas.delete(name);
-    }
-  }
-
-  initAttributes(
-    attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
-  ): void {
-    this.snapshot(attributes);
-  }
-
-  asJson(): Record<string, [unknown, unknown]> {
-    return this.changes;
   }
 
   restore(attributes: {
@@ -417,60 +427,6 @@ export class DirtyTracker {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rails privates surfaced by dirty.rb
-// ---------------------------------------------------------------------------
-
-/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
-export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
-  return _isAttributeMethod.call(this, attrName);
-}
-
-/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
-export function matchedAttributeMethod(
-  this: InstanceHost,
-  methodName: string,
-): { proxyTarget: string; attrName: string } | null {
-  return _matchedAttributeMethod.call(this, methodName);
-}
-
-/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
-export function missingAttribute(this: InstanceHost, attrName: string): never {
-  return _missingAttribute.call(this, attrName);
-}
-
-/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
-export function _readAttribute(this: InstanceHost, attr: string): unknown {
-  type ReadAttributeThis = InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
-  };
-  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
-}
-
-type DirtyDispatchHost = {
-  _dirty: DirtyTracker;
-  _attributes: AttributeSet;
-  restoreAttribute?(name: string): void;
-  attributeWas?(name: string): unknown;
-  writeAttribute?(name: string, value: unknown): void;
-  clearAttributeChange?(name: string): void;
-};
-
-/**
- * Mirrors: ActiveModel::Dirty#attribute_previous_change
- *
- * Dispatch target for `*_previous_change` per-attribute methods.
- *
- * @internal Rails-private helper.
- */
-export function attributePreviousChange(
-  this: DirtyDispatchHost,
-  attrName: string,
-): [unknown, unknown] | undefined {
-  return this._dirty.previousChanges[attrName];
-}
-
 /**
  * Mirrors: ActiveModel::Dirty#attribute_will_change!
  *
@@ -494,4 +450,48 @@ export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: strin
  */
 export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string): void {
   this._dirty.restoreAttribute(this._attributes, attrName);
+}
+
+function resolveValue(value: unknown): unknown {
+  return AttributeSet.resolveSnapshotValue(value);
+}
+
+// ---------------------------------------------------------------------------
+// Rails privates surfaced by dirty.rb
+// ---------------------------------------------------------------------------
+
+/** @internal Rails-private helper. Mirrors: #attribute_method? (via AttributeMethods include) */
+export function isAttributeMethod(this: InstanceHost, attrName: string): boolean {
+  return _isAttributeMethod.call(this, attrName);
+}
+
+type DirtyDispatchHost = {
+  _dirty: DirtyTracker;
+  _attributes: AttributeSet;
+  restoreAttribute?(name: string): void;
+  attributeWas?(name: string): unknown;
+  writeAttribute?(name: string, value: unknown): void;
+  clearAttributeChange?(name: string): void;
+};
+
+/** @internal Rails-private helper. Mirrors: #matched_attribute_method (via AttributeMethods include) */
+export function matchedAttributeMethod(
+  this: InstanceHost,
+  methodName: string,
+): { proxyTarget: string; attrName: string } | null {
+  return _matchedAttributeMethod.call(this, methodName);
+}
+
+/** @internal Rails-private helper. Mirrors: #missing_attribute (via AttributeMethods include) */
+export function missingAttribute(this: InstanceHost, attrName: string): never {
+  return _missingAttribute.call(this, attrName);
+}
+
+/** @internal Rails-private helper. Mirrors: #_read_attribute (via AttributeMethods include) */
+export function _readAttribute(this: InstanceHost, attr: string): unknown {
+  type ReadAttributeThis = InstanceHost & {
+    _attributes?: { fetchValue(name: string): unknown };
+    _readAttribute?(name: string): unknown;
+  };
+  return __readAttribute.call(this as unknown as ReadAttributeThis, attr);
 }

@@ -6,6 +6,14 @@ const textDecoder = new TextDecoder();
 export class BinaryType extends ValueType<Uint8Array> {
   readonly name = "binary";
 
+  type(): string {
+    return this.name;
+  }
+
+  isBinary(): boolean {
+    return true;
+  }
+
   cast(value: unknown): Uint8Array | null {
     if (value === null || value === undefined) return null;
     if (value instanceof Data) return value.bytes;
@@ -15,19 +23,6 @@ export class BinaryType extends ValueType<Uint8Array> {
 
   serialize(value: unknown): Uint8Array | null {
     return this.cast(value);
-  }
-
-  deserialize(value: unknown): Uint8Array | null {
-    if (value instanceof Data) return value.bytes;
-    return this.cast(value);
-  }
-
-  type(): string {
-    return this.name;
-  }
-
-  isBinary(): boolean {
-    return true;
   }
 
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
@@ -40,6 +35,11 @@ export class BinaryType extends ValueType<Uint8Array> {
       if (old[i] !== (cur as Uint8Array)[i]) return true;
     }
     return false;
+  }
+
+  deserialize(value: unknown): Uint8Array | null {
+    if (value instanceof Data) return value.bytes;
+    return this.cast(value);
   }
 }
 
@@ -54,13 +54,13 @@ export class Data {
     return textDecoder.decode(this.bytes);
   }
 
-  byteSize(): number {
-    return this.bytes.length;
-  }
-
   hex(): string {
     return Array.from(this.bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
+  }
+
+  byteSize(): number {
+    return this.bytes.length;
   }
 }

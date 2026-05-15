@@ -95,15 +95,6 @@ function extendedStart(node, sourceCode) {
   return i + 1;
 }
 
-function blockText(node, sourceCode) {
-  const start = extendedStart(node, sourceCode);
-  return {
-    start,
-    end: node.range[1],
-    text: sourceCode.getText().slice(start, node.range[1]),
-  };
-}
-
 function memberName(node) {
   // MethodDefinition / PropertyDefinition.
   if (node.type === "MethodDefinition" || node.type === "PropertyDefinition") {
@@ -111,9 +102,17 @@ function memberName(node) {
     if (node.key.name === "constructor") return "constructor";
     return node.key.name;
   }
-  // FunctionDeclaration (incl. as child of ExportNamedDeclaration).
-  if (node.type === "FunctionDeclaration") return node.id?.name ?? null;
-  if (node.type === "ExportNamedDeclaration" && node.declaration?.type === "FunctionDeclaration") {
+  // FunctionDeclaration / TSDeclareFunction (overload signatures —
+  // signature-only declarations without a body), incl. as child of
+  // ExportNamedDeclaration.
+  if (node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction") {
+    return node.id?.name ?? null;
+  }
+  if (
+    node.type === "ExportNamedDeclaration" &&
+    (node.declaration?.type === "FunctionDeclaration" ||
+      node.declaration?.type === "TSDeclareFunction")
+  ) {
     return node.declaration.id?.name ?? null;
   }
   return null;
@@ -126,15 +125,52 @@ function isOrderableClassMember(node) {
 }
 
 function isOrderableTopLevel(node) {
-  if (node.type === "FunctionDeclaration") return !!node.id;
-  if (node.type === "ExportNamedDeclaration" && node.declaration?.type === "FunctionDeclaration") {
+  // TSDeclareFunction = overload signature (no body). Including them
+  // is essential so a same-named impl+signature group stays adjacent
+  // under reorder — TS errors out ("Function implementation name must
+  // be 'foo'") if signatures get separated from their implementation.
+  // The same-name grouping in computeTargetOrder keeps them together.
+  if (node.type === "FunctionDeclaration" || node.type === "TSDeclareFunction") {
+    return !!node.id;
+  }
+  if (
+    node.type === "ExportNamedDeclaration" &&
+    (node.declaration?.type === "FunctionDeclaration" ||
+      node.declaration?.type === "TSDeclareFunction")
+  ) {
     return !!node.declaration.id;
   }
   return false;
 }
 
+/**
+ * Group consecutive same-named members into a single "unit". TS
+ * function overload signatures (TSDeclareFunction) plus their
+ * implementation must remain physically adjacent — `function foo(x):
+ * A; function foo(x): B { … }` would otherwise be split by reorder if
+ * a non-orderable node (type alias, interface) sits in the original
+ * "slot" between the signatures and the impl. Same intent for class
+ * member overloads.
+ *
+ * Each unit gets one slot spanning all its consecutive members. The
+ * reorder algorithm then operates on units, not individual members.
+ */
+function groupUnits(members) {
+  const units = [];
+  for (const m of members) {
+    const name = memberName(m);
+    const prev = units[units.length - 1];
+    if (prev && prev.name === name && name !== null) {
+      prev.members.push(m);
+    } else {
+      units.push({ name, members: [m] });
+    }
+  }
+  return units;
+}
+
 function computeTargetOrder(currentNodes, expectedOrder) {
-  const names = currentNodes.map(memberName);
+  const names = currentNodes.map((u) => u.name);
   const expectedSet = new Set(expectedOrder);
   // Mapped subset in current order — used to detect "already correct"
   // without rebuilding when nothing maps.
@@ -236,6 +272,21 @@ const rule = {
 
     return {
       ClassBody(node) {
+        // Only consider classes at the top level of the file. Classes
+        // nested inside a function body (e.g. the `class NumericType
+        // extends Base` inside `applyNumericMixin()`) are
+        // implementation detail of the surrounding function — if we
+        // also reorder a containing top-level FunctionDeclaration, the
+        // two fix ranges overlap and ESLint throws.
+        const klass = node.parent; // ClassDeclaration | ClassExpression
+        const klassParent = klass?.parent;
+        const topLevel =
+          klassParent?.type === "Program" ||
+          (klassParent?.type === "ExportNamedDeclaration" &&
+            klassParent.parent?.type === "Program") ||
+          (klassParent?.type === "ExportDefaultDeclaration" &&
+            klassParent.parent?.type === "Program");
+        if (!topLevel) return;
         const orderable = node.body.filter(isOrderableClassMember);
         if (orderable.length < 2) return;
         containers.push({ container: node, members: orderable });
@@ -251,26 +302,39 @@ const rule = {
         let mismatchCount = 0;
 
         for (const { members } of containers) {
-          const target = computeTargetOrder(members, expectedOrder);
-          if (!ordersDiffer(members, target)) continue;
+          // Collapse consecutive same-named members into units before
+          // reorder, so TS overload groups (and class accessor pairs
+          // where the pair is already adjacent) move as a single block.
+          const units = groupUnits(members);
+          const target = computeTargetOrder(units, expectedOrder);
+          if (!ordersDiffer(units, target)) continue;
 
-          // Capture block texts BEFORE any fixes are applied so the
-          // single autofix pass swaps them all at once.
-          const slotBlocks = members.map((m) => blockText(m, sourceCode));
-          const targetBlocks = target.map((m) => blockText(m, sourceCode));
+          // Each unit's slot spans from the first member's extended
+          // start to the last member's end. Captured BEFORE any fixes
+          // are applied so the single autofix pass swaps them at once.
+          const slotBlocks = units.map((u) => {
+            const start = extendedStart(u.members[0], sourceCode);
+            const end = u.members[u.members.length - 1].range[1];
+            return { start, end, text: sourceCode.getText().slice(start, end) };
+          });
+          const targetBlocks = target.map((u) => {
+            const start = extendedStart(u.members[0], sourceCode);
+            const end = u.members[u.members.length - 1].range[1];
+            return { start, end, text: sourceCode.getText().slice(start, end) };
+          });
 
-          for (let i = 0; i < members.length; i++) {
+          for (let i = 0; i < units.length; i++) {
             fixes.push({
               range: [slotBlocks[i].start, slotBlocks[i].end],
               text: targetBlocks[i].text,
             });
-            if (members[i] !== target[i]) {
+            if (units[i] !== target[i]) {
               mismatchCount++;
               if (!firstMismatch) {
                 firstMismatch = {
-                  node: members[i],
-                  expectedName: memberName(target[i]),
-                  beforeName: memberName(members[i]),
+                  node: units[i].members[0],
+                  expectedName: target[i].name,
+                  beforeName: units[i].name,
                 };
               }
             }

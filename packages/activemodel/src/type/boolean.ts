@@ -20,6 +20,18 @@ export class BooleanType extends ValueType<boolean> {
     "OFF",
   ]);
 
+  type(): string {
+    return this.name;
+  }
+
+  serialize(value: unknown): boolean | null {
+    return this.cast(value);
+  }
+
+  serializeCastValue(value: boolean | null): boolean | null {
+    return value;
+  }
+
   /**
    * Mirrors Rails `cast_value` (type/boolean.rb:40-45):
    *
@@ -39,17 +51,5 @@ export class BooleanType extends ValueType<boolean> {
   protected castValue(value: unknown): boolean | null {
     if (value === "") return null;
     return !BooleanType.FALSE_VALUES.has(value);
-  }
-
-  serialize(value: unknown): boolean | null {
-    return this.cast(value);
-  }
-
-  type(): string {
-    return this.name;
-  }
-
-  serializeCastValue(value: boolean | null): boolean | null {
-    return value;
   }
 }
