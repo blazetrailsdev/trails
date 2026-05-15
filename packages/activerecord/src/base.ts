@@ -2544,7 +2544,7 @@ export class Base extends Model {
     let sql: string;
     if (columns.length === 0) {
       const emptyValue = ctor.adapter.emptyInsertStatementValue();
-      sql = `INSERT INTO "${table.name}" ${emptyValue}`;
+      sql = `INSERT INTO ${ctor.adapter.quoteTableName(table.name)} ${emptyValue}`;
     } else {
       const im = new InsertManager(table);
       const insertValues: [InstanceType<typeof Nodes.Node>, unknown][] = columns.map((c, i) => {

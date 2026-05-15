@@ -18,6 +18,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Data as BitData } from "./oid/bit.js";
 import { MultiRange, Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
+import { Visitors as ArelVisitors } from "@blazetrails/arel";
 
 // Rails inherits from StandardError — use plain Error in TS for
 // parity. JS's `RangeError` is a built-in that extends Error; it
@@ -86,42 +87,7 @@ export function quoteIdentifier(name: string): string {
 }
 
 export function quoteTableName(name: string): string {
-  return splitSchemaQualifiedName(name)
-    .map((part) => {
-      const unquoted =
-        part.startsWith('"') && part.endsWith('"') && part.length >= 2
-          ? part.slice(1, -1).replace(/""/g, '"')
-          : part;
-      return `"${unquoted.replace(/"/g, '""')}"`;
-    })
-    .join(".");
-}
-
-function splitSchemaQualifiedName(name: string): string[] {
-  const parts: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < name.length; i++) {
-    const ch = name[i];
-    if (ch === '"') {
-      current += ch;
-      if (inQuotes && i + 1 < name.length && name[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === "." && !inQuotes) {
-      parts.push(current);
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-
-  parts.push(current);
-  return parts;
+  return ArelVisitors.quoteSchemaQualifiedName(name);
 }
 
 export function quoteColumnName(name: string): string {

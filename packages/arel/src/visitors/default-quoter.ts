@@ -1,4 +1,5 @@
 import type { ArelConnection } from "./connection.js";
+import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 
 function quoteScalar(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
@@ -66,10 +67,7 @@ export const mysqlDefaultQuoter: ArelConnection = {
  */
 export const defaultQuoter: ArelConnection = {
   quoteTableName(name: string): string {
-    return String(name)
-      .split(".")
-      .map((p) => `"${p.replace(/"/g, '""')}"`)
-      .join(".");
+    return quoteSchemaQualifiedName(String(name));
   },
 
   quoteColumnName(name: string): string {
