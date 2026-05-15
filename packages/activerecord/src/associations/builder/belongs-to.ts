@@ -1,15 +1,9 @@
 import { underscore, pluralize, camelize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import {
-  beforeValidation,
-  beforeSave,
-  afterCreate,
-  afterUpdate,
-  afterDestroy,
-} from "../../callbacks.js";
+import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { resolveModel, modelRegistry } from "../../associations.js";
-import { saveBelongsToAssociation, defineNonCyclicMethod } from "../../autosave-association.js";
+import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 
 /**
@@ -59,25 +53,8 @@ export class BelongsTo extends SingularAssociation {
       this.addDefaultCallbacks(model, reflection);
     }
     if (options.autosave) {
-      this.addAutosaveCallbacks(model, reflection);
+      addAutosaveAssociationCallbacks(model, reflection);
     }
-  }
-
-  static addAutosaveCallbacks(model: any, reflection: any): void {
-    // Mirrors add_autosave_association_callbacks belongs_to branch:
-    //   define_non_cyclic_method(save_method) { throw(:abort) if save_belongs_to_association == false }
-    //   before_save save_method
-    const saveMethod = `autosaveAssociatedRecordsFor_${reflection.name}`;
-    defineNonCyclicMethod(model, saveMethod, function (this: any) {
-      return saveBelongsToAssociation.call(this, reflection);
-    });
-    // Runtime: resolved false halts the chain (activesupport asyncHalted check).
-    // Type cast needed because beforeSave's fn type doesn't expose Promise<false>.
-    beforeSave(
-      model,
-      (record: any): Promise<void> =>
-        record[saveMethod]().then((ok: boolean) => (ok ? undefined : (false as unknown as void))),
-    );
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {

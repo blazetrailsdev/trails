@@ -70,6 +70,7 @@ import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
+import { addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import * as Reflection from "./reflection.js";
 
 /**
@@ -312,6 +313,10 @@ export class Associations {
       createHabtmJoinModel,
       modelRegistry,
     });
+    if (options.autosave) {
+      const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
+      if (habtmReflection) addAutosaveAssociationCallbacks(this, habtmReflection);
+    }
   }
 }
 

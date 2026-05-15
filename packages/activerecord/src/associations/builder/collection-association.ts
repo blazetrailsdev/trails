@@ -2,6 +2,7 @@ import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { association } from "../../associations.js";
 import type { Base } from "../../base.js";
+import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 const CALLBACKS = ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const;
 
@@ -28,6 +29,9 @@ export class CollectionAssociation extends Association {
     const options = reflection.options ?? {};
     for (const callbackName of CALLBACKS) {
       this.defineCallback(model, callbackName, name, options);
+    }
+    if (options.autosave) {
+      addAutosaveAssociationCallbacks(model, reflection);
     }
   }
 
