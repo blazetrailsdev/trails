@@ -532,4 +532,12 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
     expect(Locator.normalizeApp("MyApp")).toBe("myapp");
     expect(Locator.normalizeApp("FOO")).toBe("foo");
   });
+
+  it("locateMany returns [] when parseAllowed filters out every input", async () => {
+    // All GIDs are invalid / unknown class / filtered by only: → empty allowed
+    // set → return [] without dispatching to any locator (no first-locator
+    // crash, no extraneous work).
+    const found = await Locator.locateMany(["not-a-gid", "gid://bcx/Unknown/1"], {});
+    expect(found).toEqual([]);
+  });
 });

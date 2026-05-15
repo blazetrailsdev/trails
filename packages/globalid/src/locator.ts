@@ -182,6 +182,15 @@ export class BlockLocator {
     return result ?? null;
   }
 
+  /**
+   * Locate each GID via the block sequentially.
+   *
+   * Divergence from Rails: Rails' `BlockLocator#locate_many` returns whatever
+   * the block returns (including nils, preserving input order with gaps).
+   * We filter nulls to stay consistent with `BaseLocator#locateMany` which
+   * uses `filter_map` in Rails. If positional alignment with the input array
+   * matters to callers, they should call `locate` per GID directly.
+   */
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
     const results = await Promise.all(gids.map((gid) => this.locate(gid, options)));
     return results.filter((r): r is unknown => r !== null);
@@ -206,7 +215,10 @@ export class Locator {
     if (!klass) return null;
     if (!Locator.findAllowed(klass, options.only)) return null;
     const locator = Locator.locatorFor(parsed);
-    return locator.locate(parsed, options);
+    // Rails: options.except(:only) — the only: filter is the facade's
+    // concern, not the per-locator one.
+    const { only: _, ...rest } = options;
+    return locator.locate(parsed, rest);
   }
 
   /** Mirrors: Locator.locate_many. All GIDs must share an app (Rails parity). */
@@ -217,7 +229,9 @@ export class Locator {
     const allowed = Locator.parseAllowed(gids, options.only);
     if (allowed.length === 0) return [];
     const locator = Locator.locatorFor(allowed[0]);
-    return locator.locateMany(allowed, options);
+    // Same as locate: strip the only: option before delegating.
+    const { only: _, ...rest } = options;
+    return locator.locateMany(allowed, rest);
   }
 
   /** Mirrors: Locator.locate_signed */
