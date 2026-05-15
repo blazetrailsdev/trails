@@ -25,8 +25,10 @@
  *     [--incomplete] [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
- *                 (every Ruby test matched, none skipped, no wrong-describe,
- *                 no misplaced). Mirrors `api:compare --incomplete`.
+ *                 (every Ruby test matched in the convention TS file, no
+ *                 wrong-describe). Misplaced tests are not in this file's
+ *                 match count, so a file with misplaced > 0 is always
+ *                 incomplete and never hidden. Mirrors `api:compare --incomplete`.
  */
 
 import * as fs from "fs";
