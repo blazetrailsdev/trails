@@ -846,7 +846,9 @@ describeIfMysql("Mysql2Adapter", () => {
       };
       expect(semanticType("varchar")).toBe("string");
       expect(semanticType("int")).toBe("integer");
-      expect(semanticType("tinyint")).toBe("boolean");
+      // tinyint(1) is the column-type form that triggers the boolean mapping.
+      // Plain "tinyint" (without width) maps to integer on MariaDB.
+      expect(semanticType("tinyint(1)")).toBe("boolean");
       expect(semanticType("datetime")).toBe("datetime");
       expect(semanticType("timestamp")).toBe("datetime");
     });

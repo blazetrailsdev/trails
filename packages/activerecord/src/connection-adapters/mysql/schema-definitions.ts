@@ -38,6 +38,14 @@ export interface ColumnMethods {
   unsignedDecimal(name: string, options?: ColumnOptions): unknown;
 }
 
+/**
+ * @todo `SchemaStatements#createTable` instantiates `AbstractTableDefinition` directly (not this
+ *   subclass) via `new TableDefinition(...)`. The MySQL-specific overrides here
+ *   (`newColumnDefinition`, `integerLikePrimaryKeyType`, `validColumnDefinitionOptions`) are
+ *   exercised by `changeColumn` (see `abstract-mysql-adapter.ts`) but NOT by `createTable`.
+ *   Fix: override `createTableDefinition()` in an MySQL-specific SchemaStatements to return
+ *   this subclass, mirroring Rails' `MySQL::SchemaStatements#create_table_definition`.
+ */
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
     tableName: string,

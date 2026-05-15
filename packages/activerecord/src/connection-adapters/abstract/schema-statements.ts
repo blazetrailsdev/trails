@@ -27,6 +27,7 @@ import {
   type AddIndexOptions,
   type ColumnType,
   type ColumnOptions,
+  type IdHashOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { quote } from "./quoting.js";
@@ -86,7 +87,7 @@ export class SchemaStatements {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid" | Record<string, unknown>;
+          id?: boolean | "uuid" | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -102,7 +103,7 @@ export class SchemaStatements {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let options: {
-      id?: boolean | "uuid" | Record<string, unknown>;
+      id?: boolean | "uuid" | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;

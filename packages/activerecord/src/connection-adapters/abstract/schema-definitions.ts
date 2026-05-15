@@ -196,6 +196,22 @@ export class ChangeColumnDefaultDefinition {
   }
 }
 
+/**
+ * Typed shape for the hash form of `createTable`'s `id:` option.
+ * Mirrors the Rails subset: `id: { type: :string, collation: "utf8mb4_bin" }` etc.
+ */
+export interface IdHashOptions {
+  type?: ColumnType;
+  limit?: number;
+  default?: unknown;
+  charset?: string;
+  collation?: string;
+  precision?: number;
+  scale?: number;
+  unsigned?: boolean;
+  comment?: string;
+}
+
 export interface ColumnOptions {
   null?: boolean;
   default?: unknown;
@@ -562,14 +578,14 @@ export class TableDefinition {
   readonly charset?: string;
   readonly collation?: string;
   readonly compositePrimaryKey?: string[];
-  private _id: boolean | PrimaryKeyType | Record<string, unknown>;
+  private _id: boolean | PrimaryKeyType | IdHashOptions;
   private _adapterName: "sqlite" | "postgres" | "mysql";
   protected _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,
     tdOptions: {
-      id?: boolean | PrimaryKeyType | Record<string, unknown>;
+      id?: boolean | PrimaryKeyType | IdHashOptions;
       primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter?: SchemaQuoter;
@@ -615,7 +631,7 @@ export class TableDefinition {
         // Hash form: id: { type: "string", collation: "utf8mb4_bin" }
         // Mirrors Rails set_primary_key: outer options (incl. default) merge first,
         // then id.except(:type) merges on top, so hash wins on collision.
-        const { type: idType, ...idRest } = this._id as { type?: string; [k: string]: unknown };
+        const { type: idType, ...idRest } = this._id as IdHashOptions;
         // Use truthiness so any falsy value (empty string, null) falls back, matching
         // Rails' `id.delete(:type) || :primary_key`.
         pkType = (idType || "primary_key") as string as ColumnType;
