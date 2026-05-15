@@ -14,6 +14,7 @@ import {
   RecordNotUnique,
   ValueTooLong,
 } from "../../errors.js";
+import { Result } from "../../result.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -91,25 +92,44 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("Mysql2AdapterTest", () => {
-    it.skip("mysql2 default prepared statements", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("mysql2 default prepared statements", () => {
+      // Mirrors: test_mysql2_default_prepared_statements
+      // Instantiate with _fakeConnection:true to skip pool creation — mirrors
+      // Rails' fake_connection constructor path.
+      const fakeAdapter = new Mysql2Adapter({ _fakeConnection: true });
+      expect(fakeAdapter.preparedStatements).toBe(false);
     });
-    it.skip("exec query with prepared statements", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("exec query with prepared statements", async () => {
+      // Mirrors: test_exec_query_with_prepared_statements
+      const result = await adapter.execQuery("SELECT 1", "SQL", [], { prepare: true });
+      expect(result).toBeInstanceOf(Result);
+      expect(result.toArray()).toEqual([{ "1": 1 }]);
     });
-    it.skip("exec query nothing raises with no result queries", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("exec query nothing raises with no result queries", async () => {
+      // Mirrors: test_exec_query_nothing_raises_with_no_result_queries
+      await adapter.executeMutation("CREATE TABLE IF NOT EXISTS `ex` (`number` INT) ENGINE=InnoDB");
+      try {
+        await expect(
+          adapter.execQuery("INSERT INTO `ex` (number) VALUES (1)"),
+        ).resolves.toBeInstanceOf(Result);
+        await expect(
+          adapter.execQuery("DELETE FROM `ex` WHERE number = 1"),
+        ).resolves.toBeInstanceOf(Result);
+      } finally {
+        await adapter.executeMutation("DROP TABLE IF EXISTS `ex`");
+      }
     });
-    it.skip("database exists returns false if database does not exist", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("database exists returns false if database does not exist", async () => {
+      // Mirrors: test_database_exists_returns_false_if_database_does_not_exist
+      const url = new URL(MYSQL_TEST_URL);
+      url.pathname = "/inexistent_activerecord_unittest";
+      const exists = await Mysql2Adapter.databaseExists(url.toString());
+      expect(exists).toBe(false);
+    });
+    it("database exists returns true when the database exists", async () => {
+      // Mirrors: test_database_exists_returns_true_when_the_database_exists
+      const exists = await Mysql2Adapter.databaseExists(MYSQL_TEST_URL);
+      expect(exists).toBe(true);
     });
 
     // FK type-mismatch fixture tables — created/dropped around each test so
