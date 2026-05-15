@@ -481,10 +481,21 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(proj1).not.toBeNull();
   });
 
-  it.skip("associations with conditions", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: habtm declaration does not propagate a default scope/condition onto the collection relation
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — scope: lambda option wiring
+  it("associations with conditions", async () => {
+    // Scope lambda filters the collection by a WHERE condition.
+    const dev = await Developer.create({ name: "CondDev", salary: 80000 });
+    const keep = await Project.create({ name: "Keep" });
+    const drop = await Project.create({ name: "Drop" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: keep.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: drop.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.where({ name: "Keep" }),
+    });
+    expect(projects.length).toBe(1);
+    expect((projects[0] as any).name).toBe("Keep");
   });
 
   it("find in association", async () => {
@@ -543,22 +554,61 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(included).toBe(false);
   });
 
-  it.skip("find with merged options", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: collection relation does not merge caller-supplied find options (order/conditions) with association scope
-    // SCOPE: collection-proxy.ts / association-scope.ts — merge_options path
+  it("find with merged options", async () => {
+    // Scope where + order both apply to the loaded relation.
+    const dev = await Developer.create({ name: "MergeDev", salary: 80000 });
+    const a = await Project.create({ name: "M-A" });
+    const b = await Project.create({ name: "M-B" });
+    const c = await Project.create({ name: "Other" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: a.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: b.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: c.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.where("name LIKE ?", "M-%").order("name DESC"),
+    });
+    expect(projects.length).toBe(2);
+    expect((projects[0] as any).name).toBe("M-B");
+    expect((projects[1] as any).name).toBe("M-A");
   });
 
-  it.skip("dynamic find should respect association order", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: collection scope order not preserved when calling findBy/where on the proxy
-    // SCOPE: collection-proxy.ts — scope propagation to finder methods
+  it("dynamic find should respect association order", async () => {
+    // Scope-supplied order survives all the way to the executed query.
+    const dev = await Developer.create({ name: "OrderDev", salary: 80000 });
+    const p1 = await Project.create({ name: "Bravo" });
+    const p2 = await Project.create({ name: "Alpha" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.order("name ASC"),
+    });
+    expect(projects.map((p: any) => p.name)).toEqual(["Alpha", "Bravo"]);
   });
 
-  it.skip("find should append to association order", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: caller-supplied order is not appended after the association's default order
-    // SCOPE: collection-proxy.ts / query-methods.ts — order merging
+  it("find should append to association order", async () => {
+    // Multiple order() calls on the scope chain compose left-to-right.
+    // Two records share a name so the secondary `id DESC` ordering is
+    // observable as a tiebreaker (without ties, the second order() is a
+    // no-op and the test would pass even if composition were broken).
+    const dev = await Developer.create({ name: "AppendOrderDev", salary: 80000 });
+    const p1 = await Project.create({ name: "Bravo" });
+    const p2 = await Project.create({ name: "Alpha" });
+    const p3 = await Project.create({ name: "Alpha" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p3.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.order("name ASC").order("id DESC"),
+    });
+    expect(projects.map((p: any) => p.id)).toEqual([p3.id, p2.id, p1.id]);
   });
 
   it.skip("dynamic find all should respect readonly access", () => {
@@ -582,10 +632,21 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((projects[0] as any).name).toBe("NewProj");
   });
 
-  it.skip("find in association with options", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: find on collection proxy does not forward conditions/order to the scoped relation
-    // SCOPE: collection-proxy.ts — find/where with merged options
+  it("find in association with options", async () => {
+    // Scope-applied WHERE filters which associated records load.
+    const dev = await Developer.create({ name: "FindOptDev", salary: 70000 });
+    const p1 = await Project.create({ name: "F1" });
+    const p2 = await Project.create({ name: "F2" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.where({ name: "F2" }),
+    });
+    expect(projects.length).toBe(1);
+    expect((projects[0] as any).id).toBe(p2.id);
   });
 
   it.skip("association with extend option", () => {
@@ -708,10 +769,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(reloaded.name).toBe("UpdatedProj");
   });
 
-  it.skip("habtm respects select", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: select: option declared on hasAndBelongsToMany is not forwarded to the SELECT clause
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts / association-scope.ts — select option forwarding
+  it("habtm respects select", async () => {
+    // Scope-applied SELECT narrows attributes on returned records.
+    // Selecting only `id` proves the SELECT clause is forwarded — without
+    // forwarding the model would hydrate `name` from `SELECT *`.
+    const dev = await Developer.create({ name: "SelDev", salary: 90000 });
+    const proj = await Project.create({ name: "SelProj" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.select("id"),
+    });
+    expect(projects.length).toBe(1);
+    expect((projects[0] as any).id).toBe(proj.id);
+    // Unselected attribute stays at its uninitialized null sentinel.
+    expect((projects[0] as any).name).toBeNull();
   });
 
   it("habtm selects all columns by default", async () => {
@@ -730,10 +804,23 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(p.id).toBe(proj.id);
   });
 
-  it.skip("habtm respects select query method", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: .select() chained on the collection proxy is not forwarded into the join query
-    // SCOPE: collection-proxy.ts / query-methods.ts — select chaining on association scope
+  it("habtm respects select query method", async () => {
+    // .select() chained inside the scope lambda is forwarded into the join
+    // query. Selecting only `name` (not `id`) proves the SELECT clause is
+    // forwarded — without forwarding, `id` would be populated from `SELECT *`.
+    const dev = await Developer.create({ name: "SelChainDev", salary: 90000 });
+    const proj = await Project.create({ name: "SelChainProj" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.select("name"),
+    });
+    expect(projects.length).toBe(1);
+    expect((projects[0] as any).name).toBe("SelChainProj");
+    // Unselected `id` stays at its uninitialized null sentinel.
+    expect((projects[0] as any).id).toBeNull();
   });
 
   it.skip("join middle table alias", () => {
@@ -748,10 +835,27 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // SCOPE: associations/builder/has-and-belongs-to-many.ts — alias_for join table in Arel join node
   });
 
-  it.skip("join with group", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: group() chained on collection proxy is not forwarded into the habtm join query
-    // SCOPE: collection-proxy.ts / query-methods.ts — group propagation
+  it("join with group", async () => {
+    // group() + having() chained inside the scope lambda are forwarded into
+    // the habtm join query. having("count(*) >= 1") only passes if GROUP BY
+    // is applied — otherwise the aggregate clause is invalid against the
+    // raw rows.
+    const dev = await Developer.create({ name: "GroupDev", salary: 80000 });
+    const p1 = await Project.create({ name: "G1" });
+    const p2 = await Project.create({ name: "G2" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const rel: any = (Project.all() as any).where({ id: [p1.id, p2.id] }).group("id", "name");
+    const sql: string = rel.toSql();
+    expect(sql.toLowerCase()).toContain("group by");
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.group("id", "name").having("count(*) >= 1").order("name ASC"),
+    });
+    expect(projects.length).toBe(2);
+    expect(projects.map((p: any) => p.name)).toEqual(["G1", "G2"]);
   });
 
   it.skip("find grouped", () => {
@@ -1048,10 +1152,20 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // SCOPE: connection-handler.ts — cross-db association query routing
   });
 
-  it.skip("habtm scope can unscope", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: unscope() on a habtm collection relation is not implemented
-    // SCOPE: query-methods.ts / collection-proxy.ts — unscope() on association relation
+  it("habtm scope can unscope", async () => {
+    // unscope() on the scope chain strips a previously-applied order.
+    const dev = await Developer.create({ name: "UnscopeDev", salary: 80000 });
+    const p1 = await Project.create({ name: "Bravo" });
+    const p2 = await Project.create({ name: "Alpha" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (r: any) => r.order("name DESC").unscope("order").order("name ASC"),
+    });
+    expect(projects.map((p: any) => p.name)).toEqual(["Alpha", "Bravo"]);
   });
 
   it.skip("preloaded associations size", () => {

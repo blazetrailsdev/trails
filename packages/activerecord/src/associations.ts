@@ -1532,7 +1532,16 @@ export async function loadHabtm(
   const targetArelTable = new ArelTable(targetModel.tableName);
   const inNode = targetArelTable.get(targetPkCol as string).in(subquery);
 
-  return targetModel.all().where(inNode).toArray();
+  // Start from `klass.scope_for_association` so target-model default_scope
+  // / current_scope are honored — matches Rails' `Association#scope` which
+  // builds via `AssociationRelation.create(klass, self).merge!(klass.scope_for_association)`
+  // (collection_association.rb / association.rb). Then apply the join-IN
+  // filter and the caller-supplied scope lambda for query-method
+  // composition (where/order/select/group/having/unscope).
+  let rel: any = _scopeForAssociation(targetModel).where(inNode);
+  if (options.scope) rel = options.scope(rel);
+
+  return rel.toArray();
 }
 
 /**
