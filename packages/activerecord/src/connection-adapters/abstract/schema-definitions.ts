@@ -240,7 +240,7 @@ export interface AddIndexOptions {
   type?: string;
   comment?: string;
   ifNotExists?: boolean;
-  length?: Record<string, number>;
+  length?: number | null | Record<string, number>;
   opclass?: Record<string, string>;
   include?: string[];
   nullsNotDistinct?: boolean;
@@ -285,7 +285,7 @@ export class IndexDefinition {
     options: {
       where?: string;
       orders?: Record<string, string>;
-      lengths?: Record<string, number>;
+      lengths?: number | null | Record<string, number>;
       opclasses?: Record<string, string>;
       type?: string;
       using?: string;
@@ -303,7 +303,10 @@ export class IndexDefinition {
     this.columns = columns;
     this.where = options.where;
     this.orders = this.conciseOptions(options.orders ?? {});
-    this.lengths = this.conciseOptions(options.lengths ?? {});
+    this.lengths =
+      typeof options.lengths === "number"
+        ? options.lengths
+        : this.conciseOptions((options.lengths ?? {}) as Record<string, number>);
     this.opclasses = this.conciseOptions(options.opclasses ?? {});
     this.type = options.type;
     this.using = options.using;
