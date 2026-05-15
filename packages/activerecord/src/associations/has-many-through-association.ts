@@ -75,8 +75,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     }
 
     // Regular has_many :through — build the join record via reflection.
+    // buildThroughRecord always calls proxy.build() which returns a new unsaved
+    // record, so isNewRecord() is always true here.  The check mirrors Rails'
+    // save_through_record which calls record.changed? (always true for new records).
     const joinRecord = buildThroughRecord(this, record);
-    if (joinRecord) {
+    if (joinRecord && (joinRecord.isNewRecord() || (joinRecord as any).hasChangesToSave?.())) {
       const saved = await (joinRecord as any).save({ validate });
       if (!saved) {
         if (raise) raiseValidationError(joinRecord);
