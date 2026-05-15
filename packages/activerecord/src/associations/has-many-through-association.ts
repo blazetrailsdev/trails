@@ -26,21 +26,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     super(owner, definition);
   }
 
-  /**
-   * Mirrors Rails' HasManyThroughAssociation#insert_record
-   * (has_many_through_association.rb:24-34):
-   *
-   *   ensure_not_nested
-   *   if record.new_record? || record.has_changes_to_save?
-   *     return unless super
-   *   end
-   *   save_through_record(record)
-   *   record
-   *
-   * Saves the target via `super` (HasManyAssociation#insertRecord — which
-   * no-ops setOwnerAttributes for through and just calls `record.save`),
-   * then creates/saves the join row via the through association.
-   */
   // Rails uses scope.pluck(*reflection.association_primary_key) where `scope`
   // is a JOIN-aware AssociationScope relation.  Our `scope()` only builds a
   // direct-FK WHERE clause, which produces "no such column: target.owner_id"
@@ -56,6 +41,21 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return this._associationIds as unknown[];
   }
 
+  /**
+   * Mirrors Rails' HasManyThroughAssociation#insert_record
+   * (has_many_through_association.rb:24-34):
+   *
+   *   ensure_not_nested
+   *   if record.new_record? || record.has_changes_to_save?
+   *     return unless super
+   *   end
+   *   save_through_record(record)
+   *   record
+   *
+   * Saves the target via `super` (HasManyAssociation#insertRecord — which
+   * no-ops setOwnerAttributes for through and just calls `record.save`),
+   * then creates/saves the join row via the through association.
+   */
   override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
     ensureNotNested(this);
     const needsTargetSave =
