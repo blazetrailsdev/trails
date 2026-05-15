@@ -5,7 +5,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/PermissionsPolicy.html
  */
 
-import type { CallbackOptions } from "../abstract-controller.js";
+import type { CallbackOptions } from "../../abstractcontroller/callbacks.js";
 import { deleteHeaderCaseInsensitive } from "./header-utils.js";
 
 export function applyPermissionsPolicy(

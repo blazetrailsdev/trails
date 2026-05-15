@@ -3,28 +3,23 @@
  *
  * Foundation for all controllers. Provides action dispatching,
  * callbacks, and format collection.
+ * @see https://api.rubyonrails.org/classes/AbstractController/Base.html
  */
 
-export type ActionCallback = (
-  controller: AbstractController,
-) => void | Promise<void> | boolean | Promise<boolean>;
-export type AroundCallback = (
-  controller: AbstractController,
-  next: () => Promise<void>,
-) => void | Promise<void>;
+import type {
+  ActionCallback,
+  AroundCallback,
+  CallbackOptions,
+  CallbackEntry,
+} from "./callbacks.js";
+export type { ActionCallback, AroundCallback, CallbackOptions } from "./callbacks.js";
 
-export interface CallbackOptions {
-  only?: string[];
-  except?: string[];
-  if?: (controller: AbstractController) => boolean;
-  unless?: (controller: AbstractController) => boolean;
-  prepend?: boolean;
-}
-
-interface CallbackEntry {
-  callback: ActionCallback | AroundCallback;
-  type: "before" | "after" | "around";
-  options: CallbackOptions;
+/** Raised when an action cannot be found for the given controller. */
+export class ActionNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionNotFound";
+  }
 }
 
 export class AbstractController {
@@ -291,12 +286,5 @@ export class AbstractController {
       klass = Object.getPrototypeOf(klass);
     }
     return chain;
-  }
-}
-
-export class ActionNotFound extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ActionNotFound";
   }
 }

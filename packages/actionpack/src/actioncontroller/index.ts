@@ -6,7 +6,7 @@ export {
   type ActionCallback,
   type AroundCallback,
   type CallbackOptions,
-} from "./abstract-controller.js";
+} from "../abstractcontroller/base.js";
 
 export { Metal, MiddlewareStack, Middleware } from "./metal.js";
 

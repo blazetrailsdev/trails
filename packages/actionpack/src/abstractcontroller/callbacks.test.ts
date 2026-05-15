@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AbstractController, ActionNotFound } from "./abstract-controller.js";
+import { AbstractController, ActionNotFound } from "./base.js";
 
 // ==========================================================================
 // abstract/callbacks_test.rb

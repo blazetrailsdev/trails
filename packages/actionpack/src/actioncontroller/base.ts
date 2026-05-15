@@ -12,7 +12,12 @@ import { FlashHash } from "../actiondispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";
-import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
+import { AbstractControllerError } from "../abstractcontroller/error.js";
+import type {
+  ActionCallback,
+  AroundCallback,
+  CallbackOptions,
+} from "../abstractcontroller/callbacks.js";
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
@@ -589,7 +594,7 @@ export class Base extends Metal {
   }
 }
 
-export class DoubleRenderError extends Error {
+export class DoubleRenderError extends AbstractControllerError {
   constructor(message = "Render and/or redirect were called multiple times in this action.") {
     super(message);
     this.name = "DoubleRenderError";

@@ -103,6 +103,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "abstractcontroller",
         libPath: "actionpack/lib/abstract_controller",
+        testPath: "actionpack/test/abstract",
       },
       {
         name: "actionview",
