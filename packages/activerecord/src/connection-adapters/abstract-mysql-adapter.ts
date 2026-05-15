@@ -55,6 +55,7 @@ import {
 } from "./abstract/schema-definitions.js";
 import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
+import { isRowFormatDynamicByDefault } from "./mysql/schema-statements.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -397,6 +398,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       default: "ALGORITHM = DEFAULT",
       copy: "ALGORITHM = COPY",
       inplace: "ALGORITHM = INPLACE",
+      instant: "ALGORITHM = INSTANT",
     };
   }
 
@@ -423,17 +425,36 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
-    void name;
-    void options;
+    await this.dropDatabase(name);
+    await this.createDatabase(name, options);
   }
 
   async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
-    void name;
-    void options;
+    if (options.collation) {
+      await this._execMutation(
+        `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT COLLATE ${this.quoteTableName(String(options.collation))}`,
+      );
+    } else if (options.charset) {
+      await this._execMutation(
+        `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
+      );
+    } else if (
+      // "" → Version._parts=[NaN] → NaN comparisons fall through → 0 < 5.7.9 → false,
+      // so an uninitialized _databaseVersion correctly falls through to the error branch.
+      isRowFormatDynamicByDefault(this._mariadb, this._databaseVersion?.toString() ?? "")
+    ) {
+      await this._execMutation(
+        `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
+      );
+    } else {
+      throw new Error(
+        "Configure a supported :charset and ensure innodb_large_prefix is enabled to support indexes on varchar(255) string columns.",
+      );
+    }
   }
 
   async dropDatabase(name: string): Promise<void> {
-    void name;
+    await this._execMutation(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
   async currentDatabase(): Promise<string> {

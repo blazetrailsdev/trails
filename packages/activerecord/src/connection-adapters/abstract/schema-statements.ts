@@ -1366,21 +1366,23 @@ export class SchemaStatements {
   indexAlgorithm(algorithm?: string): string | undefined {
     if (!algorithm) return undefined;
     const normalized = algorithm.toLowerCase();
-    if (normalized === "default") return undefined;
 
     const adapterAlgorithms =
       typeof (this.adapter as any).indexAlgorithms === "function"
         ? ((this.adapter as any).indexAlgorithms() as Record<string, string>)
         : null;
 
-    if (adapterAlgorithms && normalized in adapterAlgorithms) {
-      return adapterAlgorithms[normalized];
+    if (adapterAlgorithms) {
+      if (normalized in adapterAlgorithms) {
+        const result = adapterAlgorithms[normalized];
+        return result || undefined;
+      }
+    } else if (normalized === "concurrently") {
+      return "CONCURRENTLY";
     }
 
-    const valid = adapterAlgorithms
-      ? ["default", ...Object.keys(adapterAlgorithms)]
-      : ["default", "concurrently"];
-    throw new Error(
+    const valid = adapterAlgorithms ? Object.keys(adapterAlgorithms) : ["concurrently"];
+    throw new ArgumentError(
       `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
     );
   }

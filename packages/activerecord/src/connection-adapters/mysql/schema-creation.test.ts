@@ -112,18 +112,18 @@ describe("MySQL::SchemaCreation", () => {
     expect(sql).toMatch(/ADD .+ AUTO_INCREMENT/);
   });
 
-  it("typeToSql emits FLOAT for float without limit", () => {
-    expect(sc.typeToSql("float", {})).toBe("FLOAT");
+  it("typeToSql emits float(24) for float without limit", () => {
+    expect(sc.typeToSql("float", {})).toBe("float(24)");
   });
 
-  it("typeToSql emits FLOAT(N) for float with limit", () => {
-    expect(sc.typeToSql("float", { limit: 5 })).toBe("FLOAT(5)");
-    expect(sc.typeToSql("float", { limit: 53 })).toBe("FLOAT(53)");
+  it("typeToSql emits float(N) for float with limit", () => {
+    expect(sc.typeToSql("float", { limit: 5 })).toBe("float(5)");
+    expect(sc.typeToSql("float", { limit: 53 })).toBe("float(53)");
   });
 
   it("typeToSql delegates non-float types to super", () => {
-    expect(sc.typeToSql("integer", {})).not.toContain("FLOAT");
-    expect(sc.typeToSql("string", {})).toMatch(/VARCHAR/i);
+    expect(sc.typeToSql("integer", {})).not.toContain("float");
+    expect(sc.typeToSql("string", {})).toMatch(/varchar/i);
   });
 
   it("addColumnOptions emits ON UPDATE when onUpdate is set (MySQL-specific)", () => {
