@@ -24,7 +24,7 @@ infrastructure files only**.
 | `action_dispatch/testing/`                                                                                   | 10                  | 0                                                  | **0%**                 | All test helpers live in `actioncontroller/test-case.ts` instead.                                                                                                                                                               |
 | `action_dispatch/system_testing/`                                                                            | 5                   | 0                                                  | **0%**                 | Likely intentionally deferred — flag for triage.                                                                                                                                                                                |
 | `action_dispatch/request/`                                                                                   | 2                   | 0 (have `dispatch/request/session.ts`)             | misnested              | We placed `session.ts` under a non-Rails `dispatch/` directory.                                                                                                                                                                 |
-| `action_pack/` (version)                                                                                     | 2                   | 0 (`VERSION` const in `actioncontroller/index.ts`) | **0%**                 | Belongs under `actionpack/src/actionpack/{version,gem-version}.ts` — see Wave 6.5.                                                                                                                                              |
+| `action_pack/` (version)                                                                                     | 2                   | 0 (`VERSION` const in `actioncontroller/index.ts`) | **0%**                 | Belongs under `actionpack/src/action-pack/{version,gem-version}.ts` — see Wave 3.5.                                                                                                                                             |
 | top-level loaders (`abstract_controller.rb`, `action_controller.rb`, `action_dispatch.rb`, `action_pack.rb`) | 4                   | 0 (re-exports via `index.ts` files)                | n/a                    | Rails `lib/<name>.rb` requires; we use `index.ts` barrels per dir.                                                                                                                                                              |
 | **Total Rails .rb under `actionpack/lib/`**                                                                  | **154**             | **84 TS files**                                    | **~55% files present** | ~45% of Rails source files have **no corresponding TS file**.                                                                                                                                                                   |
 
@@ -235,8 +235,8 @@ Selected larger files that mash multiple Rails files together:
 | `actiondispatch/journey.ts`               | missing                                                        | P3 (root entry for journey engine) |
 | `actiondispatch/routing.ts`               | missing (we have `routing/index.ts`)                           | naming P4                          |
 | `actiondispatch/system_test_case.ts`      | missing                                                        | P3 — probably deferred             |
-| `action_pack/version.rb`                  | **missing** — `VERSION` inlined in `actioncontroller/index.ts` | P1 + P3 — see Wave 6.5             |
-| `action_pack/gem_version.rb`              | **missing**                                                    | P3 — see Wave 6.5                  |
+| `action_pack/version.rb`                  | **missing** — `VERSION` inlined in `actioncontroller/index.ts` | P1 + P3 — see Wave 3.5             |
+| `action_pack/gem_version.rb`              | **missing**                                                    | P3 — see Wave 3.5                  |
 
 ## Pattern taxonomy
 
@@ -265,7 +265,6 @@ Create empty directories with placeholder `index.ts` re-exports:
 
 ```
 packages/actionpack/src/abstractcontroller/   ← NEW top-level sibling
-packages/actionpack/src/actionpack/           ← NEW top-level sibling (version namespace)
 packages/actionpack/src/actiondispatch/http/
 packages/actionpack/src/actiondispatch/testing/
 packages/actionpack/src/actiondispatch/request/
@@ -276,6 +275,12 @@ packages/actionpack/src/actiondispatch/middleware/session/
 top-level directory.** api:compare path matching is the primary signal;
 Rails splits the namespace; this PR sequence accepts the import-path
 churn across the monorepo as one-time cost.
+
+**Update (2026-05-15):** Wave 1 shipped with concat names
+(`abstractcontroller/`, `actiondispatch/`, etc.) — Wave 3.5 below
+renames these to hyphenated Rails-literal forms
+(`abstract-controller/`, `action-dispatch/`, etc.) and adds the
+missing `action-pack/` sibling.
 
 ### Wave 2 — action_dispatch mechanical moves (P1) (1 PR, ~500 LOC)
 
@@ -363,66 +368,116 @@ Do **not** add empty stubs for `system_testing/` — it's intentionally
 not ported (see Known divergences). `journey/` gets its own wave; do
 not stub here.
 
-### Wave 6.5 — `actionpack/` namespace top-level dir (1 PR, ~80 LOC)
+### Wave 3.5 — Rails-literal hyphenated rename + `action-pack/` namespace (1 PR, mechanical, LOC-uncapped)
 
-Rails' `actionpack/lib/action_pack/` houses the `ActionPack` module
-itself (version + gem-version helpers) — a fourth top-level sibling
-alongside `abstract_controller/`, `action_controller/`, and
-`action_dispatch/`. We currently inline the `VERSION` const at the top
-of `actioncontroller/index.ts`, which means:
+**Decision (2026-05-15):** the existing concat-name subdirs
+(`abstractcontroller/`, `actioncontroller/`, `actiondispatch/`)
+diverge from Rails' `abstract_controller/`, `action_controller/`,
+`action_dispatch/`. Rename to the TS-convention hyphenated form
+(`abstract-controller/`, `action-controller/`, `action-dispatch/`)
+and add the missing `action-pack/` namespace as a fourth sibling.
+This makes the layout a direct character-for-character mirror of
+Rails (with `_` → `-` per TS naming).
 
-- `api:compare` reports `action_pack/version.rb` and
-  `action_pack/gem_version.rb` as missing (no path-matched TS file).
-- The `ActionPack` namespace is not exported from the package barrel.
-- New `action_pack/*.rb` ports (if Rails adds any) have no obvious
-  home in our tree.
+Final layout:
 
-Single PR creates the namespace dir + version files and registers the
-new logical package with the matchers:
+```
+packages/actionpack/src/
+  abstract-controller/   ← renamed from abstractcontroller/
+  action-controller/     ← renamed from actioncontroller/
+  action-dispatch/       ← renamed from actiondispatch/
+  action-pack/           ← NEW (Rails action_pack/, version namespace)
+  index.ts
+```
 
-- Create `packages/actionpack/src/actionpack/version.ts` exporting
-  the `VERSION` const (move from `actioncontroller/index.ts`).
-- Create `packages/actionpack/src/actionpack/gem-version.ts` exporting
-  a `gemVersion()` helper — return value can be a plain string for
-  now (no `Gem::Version` equivalent); annotate `@internal` and accept
-  the api:compare miss until a use-case lands.
-- Create `packages/actionpack/src/actionpack/index.ts` barrel.
+#### Source moves
+
+- `git mv packages/actionpack/src/abstractcontroller packages/actionpack/src/abstract-controller`
+- `git mv packages/actionpack/src/actioncontroller   packages/actionpack/src/action-controller`
+- `git mv packages/actionpack/src/actiondispatch     packages/actionpack/src/action-dispatch`
+- Create `action-pack/version.ts` exporting `VERSION` (move from
+  `action-controller/index.ts`).
+- Create `action-pack/gem-version.ts` exporting `gemVersion()` — plain
+  string for now (no `Gem::Version` equivalent); annotate `@internal`.
+- Create `action-pack/index.ts` barrel.
 - Update `packages/actionpack/src/index.ts` to add
-  `export * as ActionPack from "./actionpack/index.js";`
-  alongside the existing `AbstractController` / `ActionController`
-  namespace exports.
-- Update `actioncontroller/index.ts` to re-export `VERSION` from
-  `../actionpack/version.js` (no callers should reach for it via
-  ActionController, but keep the existing surface stable).
+  `export * as ActionPack from "./action-pack/index.js";` alongside
+  the existing namespace exports.
+
+#### Cross-directory import updates
+
+After the renames, every cross-directory import (e.g.
+`../actiondispatch/http/request.js` in `action-controller/metal.ts`)
+needs its path string updated to the new hyphenated form. Mechanical
+sed-style sweep across all `.ts` files under `packages/actionpack/src/`:
+
+- `from "../abstractcontroller/...` → `from "../abstract-controller/...`
+- `from "../actiondispatch/...` → `from "../action-dispatch/...`
+- `from "../actioncontroller/...` → `from "../action-controller/...`
+- `from "./abstractcontroller/...` → `from "./abstract-controller/...`
+- etc. (also handle `../../`, `./`, deeper paths)
+
+Intra-directory imports (file → file within the same renamed subtree)
+keep their relative paths unchanged.
 
 #### Tooling impact
 
-`actionpack` overlaps with the npm package name (`@blazetrails/actionpack`)
-and the source-dir-name convention used in
-`scripts/api-compare/config.ts:PACKAGE_DIR_OVERRIDES`. Disambiguate by
-using a distinct logical key — e.g. `actionpacknamespace` or
-`actionpackversion` — so the matcher can target the new subdir
-without colliding with the existing `PACKAGE_DIR_OVERRIDES.actionpack`
-behavior. Concretely:
+**Logical keys stay concat** (`abstractcontroller`, `actioncontroller`,
+`actiondispatch`, `actionpack`) — they're not file paths, they're
+api-compare identifiers, and changing them would force every memory
+entry and historical PR reference to retitle. The mapping happens
+through `PACKAGE_SRC_SUBDIR`.
 
-- `scripts/api-compare/config.ts`: append the chosen key to
-  `PACKAGES`, set `PACKAGE_DIR_OVERRIDES.<key> = "actionpack"`, and
-  `PACKAGE_SRC_SUBDIR.<key> = "actionpack"`.
-- `scripts/api-compare/compare.ts`: add the key to `DETAIL_PACKAGES`.
-- `scripts/test-compare/test-compare.ts` + `generate-stubs.ts`: add
-  `<key>: "packages/actionpack/src/actionpack/"` to the `pkgDirs`
-  maps.
-- `vendor/sources.ts`: add a new package entry
-  `{ name: "<key>", libPath: "actionpack/lib/action_pack" }`.
-  No `testPath` — Rails has no `actionpack/test/action_pack/`
-  directory.
-- `scripts/test-compare/extract-ts-tests.ts`: glob
-  `packages/actionpack/src/actionpack/**/*.test.ts` under the key.
+- `scripts/api-compare/config.ts`:
+  - `PACKAGE_SRC_SUBDIR.abstractcontroller = "abstract-controller"`
+  - `PACKAGE_SRC_SUBDIR.actioncontroller   = "action-controller"`
+  - `PACKAGE_SRC_SUBDIR.actiondispatch     = "action-dispatch"`
+  - Add: `actionpack` to `PACKAGES`,
+    `PACKAGE_DIR_OVERRIDES.actionpack = "actionpack"` (npm pkg),
+    `PACKAGE_SRC_SUBDIR.actionpack = "action-pack"`.
+  - **Key collision risk:** `actionpack` is already used in
+    `DIR_TO_PACKAGES` derivation. Verify the npm-name → logical-key
+    resolution still works after adding the new entry; if it conflicts,
+    rename the new key to `actionpackversion` and document.
+- `scripts/api-compare/compare.ts`: add `actionpack` to
+  `DETAIL_PACKAGES`.
+- `scripts/test-compare/test-compare.ts` + `generate-stubs.ts`:
+  update existing pkgDirs values to hyphenated paths, add new entry:
+  - `abstractcontroller: "packages/actionpack/src/abstract-controller/"`
+  - `actioncontroller:   "packages/actionpack/src/action-controller/"`
+  - `actiondispatch:     "packages/actionpack/src/action-dispatch/"`
+  - `actionpack:         "packages/actionpack/src/action-pack/"`
+- `scripts/test-compare/extract-ts-tests.ts`: update existing globs,
+  add new glob for `action-pack/`.
+- `vendor/sources.ts`: add `{ name: "actionpack", libPath:
+"actionpack/lib/action_pack" }`. No `testPath` — Rails has no
+  `actionpack/test/action_pack/` directory.
 
-Net: `actionpack` (the version namespace) becomes the fourth
-api-compare logical package nested under `packages/actionpack/`,
-alongside `actiondispatch`, `actioncontroller`, and
-`abstractcontroller`. Folds into Wave 6.5's ~80 LOC budget.
+#### Other follow-ups in the same PR
+
+- `docs/actionpack-100-percent.md`, `docs/actioncontroller-100-percent.md`,
+  `docs/actiondispatch-100-percent.md`, and any other docs referencing
+  the old paths: sed-update path mentions.
+- `package.json` workspace entries — verify no path-based scripts
+  reference the old dir names.
+- This audit doc itself: every `actiondispatch/` etc. mention should
+  be re-anchored to the new names in a follow-up sweep (not the same
+  PR, or bundle as a last commit).
+
+#### Size
+
+Mechanical only — no logic changes. Likely 200–400 files touched
+(every cross-dir import updates one line). The CLAUDE.md 300-LOC
+ceiling is explicitly waived for mechanical moves per the Wave 2/4
+precedent.
+
+#### Ordering
+
+Position **before Wave 4** (testing relocation): doing Wave 4 against
+the renamed dirs is cheaper than redoing it after. Wave 3 (PR #1615)
+must merge first — it adds `abstractcontroller/` which then gets
+renamed in 3.5. Memory entries with concat names can stay; future
+ones use the new names.
 
 ### Wave 7 — journey/ routing engine port (10 PRs)
 
@@ -585,11 +640,11 @@ Per-file ports for missing `middleware/*` files and `http/*` files.
 Sequenced by what unblocks `actioncontroller-100-percent.md` cleanup.
 Drives independently of this audit.
 
-**Total restructure work: 6 mechanical PRs (Waves 1–6.5: skeleton +
-dispatch moves + abstractcontroller split + testing relocation +
-conventions/infra + actionpack namespace; Wave 5 is bundled into Wave 6
-as a ~10 LOC edit) + Wave 7 journey port (10 PRs per the inline section
-above) + open-ended fill-in (Wave 8+).**
+**Total restructure work: 6 mechanical PRs (Waves 1–6: skeleton +
+dispatch moves + abstractcontroller split + Rails-literal hyphenated
+rename / action-pack namespace + testing relocation + conventions/infra;
+Wave 5 is bundled into Wave 6 as a ~10 LOC edit) + Wave 7 journey port
+(10 PRs per the inline section above) + open-ended fill-in (Wave 8+).**
 
 ## Known divergences from Rails
 
@@ -661,13 +716,14 @@ directory creation, so the same commit that moves files into
 `abstractcontroller/` teaches the matchers to look there. ~20 LOC
 total — folds into Wave 3's ~450 LOC budget.
 
-### Wave 6.5 (actionpack/ namespace top-level dir) — script edits required
+### Wave 3.5 (Rails-literal hyphenated rename + action-pack/) — script edits required
 
-Same shape as the Wave 3 (AbstractController) tooling additions: a new
-logical package nested under `packages/actionpack/src/`. See Wave 6.5
-above for the full list of edits across `vendor/sources.ts`,
+The rename of all three existing subdirs (`abstractcontroller/` →
+`abstract-controller/`, etc.) plus the new `action-pack/` namespace
+forces edits across every tooling file that hardcodes subdir paths.
+See Wave 3.5 above for the full list of edits across `vendor/sources.ts`,
 `scripts/api-compare/{config,compare}.ts`, and `scripts/test-compare/`.
-~20 LOC of script edits; folds into Wave 6.5's ~80 LOC budget.
+~40 LOC of script edits; folds into Wave 3.5's mechanical-rename PR.
 
 ### Waves 1, 2, 6, 7, 8+ — no tooling changes
 
