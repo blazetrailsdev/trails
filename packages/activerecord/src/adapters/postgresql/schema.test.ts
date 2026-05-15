@@ -872,6 +872,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(indexLine).toBeDefined();
         if (adapter.supportsIndexInclude()) {
           expect(indexLine).toContain(`include: ["name","account_id"]`);
+          // INCLUDE columns must not appear in the key columns list (PG11+ stores them in indkey).
+          expect(indexLine).not.toMatch(/\[("firm_id","type"|"firm_id", "type")\][^,]*"name"/);
         } else {
           expect(indexLine).not.toContain("include:");
         }

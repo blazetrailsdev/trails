@@ -2604,6 +2604,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               ARRAY(
                 SELECT pg_get_indexdef(ix.indexrelid, k + 1, true)
                 FROM generate_subscripts(ix.indkey, 1) AS k
+                WHERE k < ix.indnkeyatts
                 ORDER BY k
               ) AS columns,
               pg_get_indexdef(ix.indexrelid) AS definition,
@@ -2655,12 +2656,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
 
       // concise_options: collapse to a single scalar when all key columns share the same value.
-      const keyColumns = include ? columns.filter((c) => !include.includes(c)) : columns;
-
+      // `columns` is already key-only because the SQL limits to ix.indnkeyatts.
       let opclasses: Record<string, string> | string | undefined;
       const opclassVals = Object.values(opclassesMap);
       if (opclassVals.length > 0) {
-        if (keyColumns.length === opclassVals.length && new Set(opclassVals).size === 1) {
+        if (columns.length === opclassVals.length && new Set(opclassVals).size === 1) {
           opclasses = opclassVals[0];
         } else {
           opclasses = opclassesMap;
@@ -2670,7 +2670,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       let orders: Record<string, string> | string | undefined;
       const orderVals = Object.values(ordersMap);
       if (orderVals.length > 0) {
-        if (keyColumns.length === orderVals.length && new Set(orderVals).size === 1) {
+        if (columns.length === orderVals.length && new Set(orderVals).size === 1) {
           orders = orderVals[0];
         } else {
           orders = ordersMap;
