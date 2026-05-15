@@ -16,7 +16,11 @@ import { Associations, setBelongsTo, association, loadHasManyThrough } from "./a
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
+import {
+  markForDestruction,
+  isMarkedForDestruction,
+  computePrimaryKey,
+} from "./autosave-association.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -3727,5 +3731,86 @@ describe("ChangedForAutosaveTest", () => {
     // Should not stack overflow
     expect(a.changedForAutosave()).toBe(false);
     expect(b.changedForAutosave()).toBe(false);
+  });
+});
+
+describe("computePrimaryKey", () => {
+  // Unit tests for the computePrimaryKey helper, which mirrors
+  // Rails autosave_association.rb:576-587 (compute_primary_key).
+
+  function makeRecord(opts: {
+    primaryKey?: string | string[];
+    queryConstraintsList?: string[];
+    hasQueryConstraints?: boolean;
+  }): any {
+    return {
+      constructor: {
+        primaryKey: opts.primaryKey ?? "id",
+        _queryConstraintsList: opts.queryConstraintsList ?? null,
+        _hasQueryConstraints: opts.hasQueryConstraints ?? false,
+      },
+    };
+  }
+
+  it("returns explicit reflection primaryKey option as-is", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey.call(record, { options: { primaryKey: "custom_id" } });
+    expect(result).toBe("custom_id");
+  });
+
+  it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
+    // Mirrors: elsif reflection.options[:query_constraints] && (qcl = record.class.query_constraints_list)
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["tenant_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, { options: { queryConstraints: true } });
+    expect(result).toEqual(["tenant_id", "id"]);
+  });
+
+  it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
+    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toEqual(["shop_id", "id"]);
+  });
+
+  it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
+    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
+    // — the !:foreign_key guard prevents queryConstraintsList from being used.
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, {
+      options: { foreignKey: "order_id" },
+    });
+    expect(result).toBe("id");
+  });
+
+  it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
+    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
+    const record = makeRecord({ primaryKey: ["shop_id", "id"] });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toBe("id");
+  });
+
+  it("returns full composite PK when CPK has no 'id' column", () => {
+    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
+    const record = makeRecord({ primaryKey: ["shop_id", "status"] });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toEqual(["shop_id", "status"]);
+  });
+
+  it("returns class primary key for non-composite, non-constrained record", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toBe("id");
   });
 });

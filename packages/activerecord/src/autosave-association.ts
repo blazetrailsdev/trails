@@ -543,12 +543,15 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (childRecord.isNewRecord() || childRecord.changed) {
     const ctor = record.constructor as typeof Base;
     const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-    let primaryKey: string | string[] = assoc.options.primaryKey ?? ctor.primaryKey;
-    // Mirrors Rails compute_primary_key composite branch (autosave_association.rb:582-585):
-    // when CPK includes "id", collapse to "id" so the scalar FK can be assigned.
-    // When CPK has no "id" column, leave it as an array — the composite/scalar mismatch
-    // branch below will throw CompositePrimaryKeyMismatchError, matching Rails' behavior.
-    if (Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
+    // Mirrors Rails compute_primary_key (autosave_association.rb:576-587):
+    // explicit :primary_key option is returned as-is (line 577), never reaching
+    // the composite_primary_key? fallback — so the CPK "id" collapse only applies
+    // to the class default, not an explicitly set association primaryKey option.
+    const explicitPk = assoc.options.primaryKey;
+    let primaryKey: string | string[] = explicitPk ?? ctor.primaryKey;
+    if (!explicitPk && Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
+      // composite_primary_key? branch: if CPK includes "id", assign only that column.
+      // If CPK has no "id", leave as array — mismatch branch below throws, matching Rails.
       if ((primaryKey as string[]).includes("id")) primaryKey = "id";
     }
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
