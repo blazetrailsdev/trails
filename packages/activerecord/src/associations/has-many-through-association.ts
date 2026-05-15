@@ -7,6 +7,8 @@ import {
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import { raiseValidationError } from "../validations.js";
+import { underscore, singularize } from "@blazetrails/activesupport";
+import { resolveAssocClass } from "../associations.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -64,14 +66,15 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       const saved = await super.insertRecord(record, validate, raise);
       if (!saved) return false;
     }
-    // Rails build_through_record + save_through_record: build the join
-    // record (cached in @through_records), save if changed. Inline rather
-    // than via the existing `saveThroughRecord` helper because that one
-    // filters the through association's target by FK match, which is the
-    // wrong direction for the build-and-save path.
-    // Rails: save_through_record unconditionally saves the new join row.
-    // Base has no `changed` getter so the previous `(joinRecord as any).changed`
-    // guard was always falsy, silently skipping join-record creation.
+
+    // HABTM: constructJoinAttributes relies on a sourceReflection chain that
+    // isn't wired for habtm reflections.  Use a direct join-record path instead,
+    // matching what CollectionProxy._pushThrough does.
+    if ((this.reflection as any).type === "hasAndBelongsToMany") {
+      return insertHabtmRecord(this, record, validate, raise);
+    }
+
+    // Regular has_many :through — build the join record via reflection.
     const joinRecord = buildThroughRecord(this, record);
     if (joinRecord) {
       const saved = await (joinRecord as any).save({ validate });
@@ -95,6 +98,42 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
   if (!proxy) return null;
   const attrs = constructJoinAttributes(assoc, record);
   return typeof proxy.build === "function" ? proxy.build(attrs) : null;
+}
+
+/** @internal */
+async function insertHabtmRecord(
+  assoc: HasManyThroughAssociation,
+  record: Base,
+  validate: boolean,
+  raise: boolean,
+): Promise<boolean> {
+  const ctor = assoc.owner.constructor as any;
+  const assocDef = assoc.reflection as any;
+  const throughName = assocDef.options?.through as string | undefined;
+  if (!throughName) return false;
+  const associations: AssociationDefinition[] = ctor._associations ?? [];
+  const throughAssocDef = associations.find((a: any) => a.name === throughName);
+  if (!throughAssocDef) return false;
+  const throughClassName =
+    throughAssocDef.options.className ??
+    `${ctor.name}::HABTM_${assocDef.name.charAt(0).toUpperCase()}${assocDef.name.slice(1)}`;
+  const throughModel = resolveAssocClass(assoc.owner, throughName, throughClassName);
+  const ownerPk = throughAssocDef.options.primaryKey ?? ctor.primaryKey ?? "id";
+  const ownerFk = throughAssocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const pkValue = (assoc.owner as any)._readAttribute?.(ownerPk) ?? (assoc.owner as any)[ownerPk];
+  const sourceName = assocDef.options?.source ?? singularize(assocDef.name);
+  const sourceFk = `${underscore(sourceName)}_id`;
+  const targetPk = (record.constructor as any).primaryKey ?? "id";
+  const joinAttrs: Record<string, unknown> = {
+    [ownerFk as string]: pkValue,
+    [sourceFk]: (record as any)._readAttribute?.(targetPk) ?? (record as any)[targetPk],
+  };
+  const joinRecord = await throughModel.create(joinAttrs);
+  if (!(joinRecord as any).isPersisted?.()) {
+    if (raise) raiseValidationError(joinRecord as Base);
+    return false;
+  }
+  return true;
 }
 
 /** @internal */
