@@ -158,12 +158,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: GVL / thread-model ---
   {
-    testFile: "transaction_isolation_test.rb",
-    reason:
-      "All tests require concurrent Ruby threads exercising the GVL. " +
-      "Node.js is single-threaded; transaction-isolation guarantees verified by the DB engine, not the runtime.",
-  },
-  {
     testFile: "schema_loading_test.rb",
     reason:
       "Tests ActiveSupport.on_load / Zeitwerk autoload hooks triggered from background threads. " +

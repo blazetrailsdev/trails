@@ -37,6 +37,22 @@ function makeSQLiteTopic() {
   return { Topic, adapter };
 }
 
+function makeSQLiteMovie() {
+  const adapter = new SQLite3Adapter(":memory:");
+  openAdapters.push(adapter);
+  adapter.exec("CREATE TABLE movies (movieid INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+  class Movie extends Base {
+    static {
+      this.primaryKey = "movieid";
+      this.attribute("movieid", "integer");
+      this.attribute("name", "string");
+      this._tableName = "movies";
+      this.adapter = adapter;
+    }
+  }
+  return { Movie, adapter };
+}
+
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -1644,14 +1660,31 @@ describe("TransactionTest", () => {
   it("assign custom primary key after rollback", () => {
     expect(true).toBe(true);
   });
-  it("read attribute with custom primary key after rollback", () => {
-    expect(true).toBe(true);
+  it("read attribute with custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = Movie.new({ name: "foo" }) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    expect(movie.readAttribute("movieid")).toBeNull();
   });
   it("write attribute after rollback", () => {
     expect(true).toBe(true);
   });
-  it("write attribute with custom primary key after rollback", () => {
-    expect(true).toBe(true);
+  it("write attribute with custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = (await Movie.create({ name: "foo" })) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    movie.writeAttribute("movieid", null);
+    expect(movie.movieid).toBeNull();
   });
   it("sqlite add column in transaction", () => {
     expect(true).toBe(true);
