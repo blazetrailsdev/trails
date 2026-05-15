@@ -13,10 +13,6 @@ export class Grouping extends Unary {
     super(expr);
   }
 
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
-  }
-
   fetchAttribute(block: (attr: Node) => unknown): unknown {
     if (
       this.expr &&
@@ -27,5 +23,9 @@ export class Grouping extends Unary {
       ).fetchAttribute(block);
     }
     return undefined;
+  }
+
+  as(aliasName: string): As {
+    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
   }
 }

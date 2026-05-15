@@ -11,10 +11,6 @@ export class Bind {
     this.binds = [];
   }
 
-  append(_str: string): this {
-    return this;
-  }
-
   addBind(bind: unknown, _block?: (index: number) => string): this {
     this.binds.push(bind);
     return this;
@@ -28,5 +24,9 @@ export class Bind {
 
   get value(): unknown[] {
     return this.binds;
+  }
+
+  append(_str: string): this {
+    return this;
   }
 }

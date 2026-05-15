@@ -10,17 +10,6 @@ import { quoteArrayLiteral } from "../quote-array.js";
  * Mirrors: Arel::Visitors::PostgreSQL
  */
 export class PostgreSQL extends ToSql {
-  protected override visitArelNodesDistinctOn(node: Nodes.DistinctOn): SQLString {
-    this.collector.append("DISTINCT ON (");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr);
-    } else if (node.expr !== null) {
-      this.collector.append(String(node.expr));
-    }
-    this.collector.append(")");
-    return this.collector;
-  }
-
   protected override visitArelNodesMatches(node: Nodes.Matches): SQLString {
     this.visitNodeOrValue(node.left);
     this.collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
@@ -45,12 +34,15 @@ export class PostgreSQL extends ToSql {
     return this.visitBinaryOp(node, node.caseSensitive ? "!~" : "!~*");
   }
 
-  protected override quote(value: unknown): string {
-    if (Array.isArray(value)) {
-      const literal = quoteArrayLiteral(value);
-      return `'${literal.replace(/'/g, "''")}'`;
+  protected override visitArelNodesDistinctOn(node: Nodes.DistinctOn): SQLString {
+    this.collector.append("DISTINCT ON (");
+    if (node.expr instanceof Node) {
+      this.visit(node.expr);
+    } else if (node.expr !== null) {
+      this.collector.append(String(node.expr));
     }
-    return super.quote(value);
+    this.collector.append(")");
+    return this.collector;
   }
 
   // Mirrors Rails Postgres formatting: `( expr )` with spaces inside
@@ -111,6 +103,14 @@ export class PostgreSQL extends ToSql {
     });
     this.collector.append(" )");
     return this.collector;
+  }
+
+  protected override quote(value: unknown): string {
+    if (Array.isArray(value)) {
+      const literal = quoteArrayLiteral(value);
+      return `'${literal.replace(/'/g, "''")}'`;
+    }
+    return super.quote(value);
   }
 }
 

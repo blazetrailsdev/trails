@@ -100,6 +100,12 @@ export class Attribute extends Node {
     return this.relation.typeForAttribute ? this.relation.typeForAttribute(this.name) : undefined;
   }
 
+  // -- String functions --
+
+  lower(): NamedFunction {
+    return new NamedFunction("LOWER", [this]);
+  }
+
   typeCastForDatabase(value: unknown): unknown {
     return this.relation.typeCastForDatabase
       ? this.relation.typeCastForDatabase(this.name, value)
@@ -201,17 +207,17 @@ export class Attribute extends Node {
     }
     return new NotIn(this, values.map(buildQuoted) as unknown as Node);
   }
-
   between(range: [unknown, unknown]): Node;
   between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+
   between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
     return betweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
-
   notBetween(range: [unknown, unknown]): Node;
   notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+
   notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
     return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
@@ -450,12 +456,6 @@ export class Attribute extends Node {
 
   average(): Avg {
     return new Avg([this]);
-  }
-
-  // -- String functions --
-
-  lower(): NamedFunction {
-    return new NamedFunction("LOWER", [this]);
   }
 
   upper(): NamedFunction {

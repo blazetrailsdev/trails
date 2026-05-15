@@ -25,10 +25,17 @@ export class Composite {
     this.right = right;
   }
 
-  append(str: string): this {
-    this.left.append(str);
-    this.right.append(str);
-    return this;
+  get retryable(): boolean {
+    if ("retryable" in this.left && this.left.retryable === false) return false;
+    if ("retryable" in this.right && this.right.retryable === false) return false;
+    return true;
+  }
+
+  set retryable(value: boolean) {
+    if ("retryable" in this.left)
+      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
+    if ("retryable" in this.right)
+      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
   }
 
   addBind(value: unknown, block?: (index: number) => string): this {
@@ -47,20 +54,13 @@ export class Composite {
     return this;
   }
 
-  get retryable(): boolean {
-    if ("retryable" in this.left && this.left.retryable === false) return false;
-    if ("retryable" in this.right && this.right.retryable === false) return false;
-    return true;
-  }
-
-  set retryable(value: boolean) {
-    if ("retryable" in this.left)
-      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
-    if ("retryable" in this.right)
-      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
-  }
-
   get value(): [unknown, unknown] {
     return [this.left.value, this.right.value];
+  }
+
+  append(str: string): this {
+    this.left.append(str);
+    this.right.append(str);
+    return this;
   }
 }

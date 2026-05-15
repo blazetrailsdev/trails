@@ -38,11 +38,6 @@ export class StatementMethods {
     return this;
   }
 
-  where(this: StatementMethodsHost, expr: Node): unknown {
-    (this.ast.wheres ??= []).push(expr);
-    return this;
-  }
-
   set key(key: unknown) {
     this.ast.key = Array.isArray(key) ? key.map((k) => buildQuoted(k)) : buildQuoted(key);
   }
@@ -57,6 +52,11 @@ export class StatementMethods {
 
   get wheres(): Node[] {
     return this.ast.wheres ?? [];
+  }
+
+  where(this: StatementMethodsHost, expr: Node): unknown {
+    (this.ast.wheres ??= []).push(expr);
+    return this;
   }
 }
 

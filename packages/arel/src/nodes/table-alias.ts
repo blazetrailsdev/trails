@@ -20,10 +20,6 @@ export class TableAlias extends Binary {
     this.name = name;
   }
 
-  get(columnName: string): Attribute {
-    return new Attribute(this, columnName);
-  }
-
   get tableName(): string {
     const rel = this.relation as TypeCastable;
     return typeof rel?.name === "string" ? rel.name : this.name;
@@ -46,6 +42,10 @@ export class TableAlias extends Binary {
 
   toCte(): Cte {
     return new Cte(this.name, this.relation);
+  }
+
+  get(columnName: string): Attribute {
+    return new Attribute(this, columnName);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
