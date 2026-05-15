@@ -333,6 +333,28 @@ describe("Base.findGlobalId", () => {
   });
 });
 
+describe("Base.toGlobalId / toGidParam", () => {
+  afterEach(() => _resetApp());
+
+  it("toGlobalId returns a GlobalID instance; toGidParam round-trips through findGlobalId", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Pat" });
+    const gid = u.toGlobalId();
+    expect(gid.uri).toBe(`gid://MyApp/User/${u.id}`);
+    expect(gid.modelName).toBe("User");
+    const found = (await Base.findGlobalId(u.toGidParam())) as User;
+    expect(found.id).toBe(u.id);
+  });
+});
+
 describe("Base.findSignedGlobalId", () => {
   beforeEach(() => setSignedIdVerifierSecret("blazetrails-test-secret"));
   afterEach(() => _resetApp());

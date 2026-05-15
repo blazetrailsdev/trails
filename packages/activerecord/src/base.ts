@@ -2906,7 +2906,7 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::Base.find_signed_global_id — uses signedIdVerifier(this). */
   static async findSignedGlobalId(
     input: string,
-    options?: { for?: string; only?: import("@blazetrails/globalid").LocateOptions["only"] },
+    options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
   ): Promise<unknown | null> {
     const SignedIdModule = await loadSignedId();
     const verifier = SignedIdModule.signedIdVerifier(this);
@@ -2916,7 +2916,7 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::Base.find_signed_global_id! — throws on miss. */
   static async findSignedGlobalIdBang(
     input: string,
-    options?: { for?: string; only?: import("@blazetrails/globalid").LocateOptions["only"] },
+    options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
   ): Promise<unknown> {
     const found = await this.findSignedGlobalId(input, options);
     if (found == null) throw new RecordNotFound("Couldn't find SignedGlobalID");
