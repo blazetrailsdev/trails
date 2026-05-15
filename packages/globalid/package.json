@@ -24,13 +24,5 @@
   },
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*"
-  },
-  "peerDependencies": {
-    "@blazetrails/activerecord": "workspace:*"
-  },
-  "peerDependenciesMeta": {
-    "@blazetrails/activerecord": {
-      "optional": true
-    }
   }
 }

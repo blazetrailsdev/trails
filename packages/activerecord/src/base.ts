@@ -1,5 +1,9 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp as _getGlobalIdApp, buildGid as _buildGid } from "@blazetrails/globalid";
+import {
+  getApp as _getGlobalIdApp,
+  buildGid as _buildGid,
+  Locator as _Locator,
+} from "@blazetrails/globalid";
 import type {
   GlobalIDModel,
   SignedGlobalID as SignedGlobalIDType,
@@ -616,6 +620,13 @@ export class Base extends Model {
   }
 
   static _adapter: DatabaseAdapter | null = null;
+  /**
+   * Class name → class, populated whenever a subclass receives an adapter.
+   * Used by globalid's model finder so Base.findGlobalId can resolve any
+   * AR model without requiring explicit registerModel() calls.
+   * @internal
+   */
+  static _modelsByName: Map<string, typeof Base> = new Map();
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _configPath: string | null = null;
   static _abstractClass = false;
@@ -932,6 +943,7 @@ export class Base extends Model {
     this._adapter = adapter;
     _wireArelVisitor(adapter);
     fireAdapterSetHook(this);
+    if (this !== Base && this.name) Base._modelsByName.set(this.name, this as typeof Base);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
     // their prototype accessors (preserves user-declared defs), and
@@ -2858,6 +2870,21 @@ export class Base extends Model {
     return (await this.toSgid(options)).toParam();
   }
 
+  /**
+   * Find a record by its GlobalID URI string (or GlobalID instance).
+   * Returns null if the GID is invalid, the model class isn't registered, or
+   * the `only:` filter rejects it. If the record doesn't exist, `find`
+   * raises (Rails parity: RecordNotFound).
+   *
+   * Mirrors: ActiveRecord::Base.find_global_id (via GlobalID::Locator.locate)
+   */
+  static findGlobalId(
+    input: string | import("@blazetrails/globalid").GlobalID,
+    options?: import("@blazetrails/globalid").LocateOptions,
+  ): Promise<unknown | null> {
+    return _Locator.locate(input, options);
+  }
+
   // valuesAt / assignAttributes extracted to persistence.ts.
 
   /**
@@ -3536,6 +3563,24 @@ registerMigrationArConfig({
   },
 });
 
-// Triggers globalid's registration side-effects (currently a no-op stub;
-// filled in GID-4). Kept at the bottom for readability — ESM hoists it.
+// Side-effect import (currently no-op); kept so future globalid hooks can
+// register here without callers needing to re-add it.
 import "@blazetrails/globalid/wire";
+
+// Register globalid's model finder. Base._modelsByName is populated by the
+// adapter setter (every AR model receives an adapter), so any class that
+// behaves as an AR model is reachable here. modelRegistry from associations
+// covers the explicit registerModel(name, klass) form for models registered
+// under aliases.
+import {
+  setModelFinder as _setGlobalIdModelFinder,
+  type LocatorModel as _LocatorModel,
+} from "@blazetrails/globalid";
+import { modelRegistry as _gidModelRegistry } from "./associations.js";
+_setGlobalIdModelFinder((name: string) => {
+  const fromBase = Base._modelsByName.get(name);
+  if (fromBase) return fromBase as unknown as _LocatorModel;
+  const fromAssoc = _gidModelRegistry.get(name);
+  if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
+  return undefined;
+});
