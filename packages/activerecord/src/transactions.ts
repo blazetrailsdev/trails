@@ -671,6 +671,13 @@ export async function withTransactionReturningStatus<T>(
 ): Promise<T> {
   const modelClass = this.constructor as typeof Base;
 
+  // Capture whether this is the outermost withTransactionReturningStatus for this
+  // record BEFORE rememberTransactionRecordState initializes _startTransactionState.
+  // Used by the !hasTransactionManager fallback to avoid double-registering callbacks
+  // when update() wraps save() — both call withTransactionReturningStatus, but only
+  // the outermost should schedule committedBang/rolledbackBang.
+  const isOutermostWtrs = (this as any)._startTransactionState == null;
+
   // rememberTransactionRecordState also sets _newRecordBeforeLastCommit.
   const snapshot = rememberTransactionRecordState.call(this);
 
@@ -723,15 +730,24 @@ export async function withTransactionReturningStatus<T>(
     if (!rolledBack) {
       const outerTx = currentTransaction();
       if (outerTx) {
-        outerTx.afterCommit(async () => await committedBang.call(this));
-        outerTx.afterRollback(async () => {
-          // Fire callbacks before restoring state — rolledbackBang needs
-          // isPersisted()/isDestroyed() to reflect what happened during the
-          // transaction, not the pre-transaction state. Matches Rails where
-          // rolledback! fires during rollback, restore runs in ensure.
-          await rolledbackBang.call(this);
-          restoreTransactionRecordState.call(this, snapshot);
-        });
+        // Only register commit/rollback callbacks from the outermost
+        // withTransactionReturningStatus for this record. When update() wraps
+        // save() in its own wTRS, the inner save wTRS runs inside an
+        // intermediate fallback transaction that commits successfully — without
+        // this guard the inner wTRS would register afterCommit(committedBang) on
+        // that intermediate tx, prematurely clearing _triggerUpdateCallback and
+        // preventing after_rollback callbacks from firing on the outer rollback.
+        if (isOutermostWtrs) {
+          outerTx.afterCommit(async () => await committedBang.call(this));
+          outerTx.afterRollback(async () => {
+            // Fire callbacks before restoring state — rolledbackBang needs
+            // isPersisted()/isDestroyed() to reflect what happened during the
+            // transaction, not the pre-transaction state. Matches Rails where
+            // rolledback! fires during rollback, restore runs in ensure.
+            await rolledbackBang.call(this);
+            restoreTransactionRecordState.call(this, snapshot);
+          });
+        }
       } else {
         await committedBang.call(this);
       }

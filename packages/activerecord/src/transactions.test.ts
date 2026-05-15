@@ -3,7 +3,16 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Base, transaction, savepoint, Rollback, afterAllTransactionsCommit } from "./index.js";
+import {
+  Base,
+  transaction,
+  savepoint,
+  Rollback,
+  afterAllTransactionsCommit,
+  Associations,
+  registerModel,
+  modelRegistry,
+} from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -894,13 +903,29 @@ describe("TransactionTest", () => {
     // block exits via throw. The `break from transaction commits` test covers
     // the JS equivalent (early return = commit).
   });
-  it.skip("number of transactions in commit", () => {
-    // BLOCKED: transactions — needs openTransactions probe on adapter
-    // ROOT-CAUSE: Rails test monkey-patches commit_db_transaction to read
-    //   transaction_manager.open_transactions at commit time and assert it = 0.
-    //   Requires exposing openTransactions count on our TransactionManager
-    //   and a way to hook into commitDbTransaction without modifying src.
-    // SCOPE: ~15 LOC (openTransactions accessor + test body).
+  it("number of transactions in commit", async () => {
+    const { Topic, adapter } = makeSQLiteTopic();
+    // Create the record before installing the spy so that the create commit
+    // does not set openCount prematurely and mask a missing transaction commit.
+    const first = await Topic.create({ title: "First", approved: false });
+
+    let openCount: number | undefined;
+    const original = adapter.commitDbTransaction.bind(adapter);
+    const spy = vi.spyOn(adapter, "commitDbTransaction").mockImplementation(async () => {
+      openCount = adapter.transactionManager.openTransactions;
+      return original();
+    });
+
+    try {
+      await Topic.transaction(async () => {
+        first.approved = true;
+        await first.saveBang();
+      });
+
+      expect(openCount).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("raising exception in callback rollbacks in save", async () => {
@@ -923,12 +948,56 @@ describe("TransactionTest", () => {
     const reloaded = await Topic.find(first.id);
     expect(reloaded.approved).toBe(false);
   });
-  it.skip("update should rollback on failure!", () => {
-    // BLOCKED: transactions — needs has_many association + validation-triggered rollback
-    // ROOT-CAUSE: Rails test uses Topic with has_many :replies and a save! that fails
-    //   validation on the associated record, rolling back the outer transaction.
-    //   Requires has_many association wiring (Slot B fixture models).
-    // SCOPE: ~20 LOC test body; unblocked after Slot B (Topic+Reply model).
+  it("update should rollback on failure!", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+    );
+    adapter.exec(
+      "CREATE TABLE replies (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, topic_id INTEGER)",
+    );
+
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+        this.adapter = adapter;
+      }
+    }
+    Topic.validates("title", { presence: true });
+    Associations.hasMany.call(Topic, "replies", {
+      className: "Reply",
+      foreignKey: "topic_id",
+      autosave: true,
+    });
+    registerModel(Topic);
+    registerModel(Reply);
+
+    try {
+      const topic = await Topic.create({ title: "First", approved: false });
+      await Reply.create({ content: "A reply", topic_id: topic.id });
+      const repliesCount = (await Reply.all().count()) as number;
+      expect(repliesCount).toBeGreaterThan(0);
+
+      // Mirrors Rails: author.update!(name: nil, post_ids: [])
+      // Rails' post_ids=[] marks the collection for deletion via autosave. The key
+      // invariant: when update! fails validation, autosave (flushPendingReplaces)
+      // never runs and the DB is unchanged. We verify the same invariant: validation
+      // fails before any autosave DB ops, so reply count is unchanged.
+      await expect((topic as any).updateBang({ title: null })).rejects.toThrow();
+      expect(await Reply.all().count()).toBe(repliesCount);
+    } finally {
+      modelRegistry.delete("Topic");
+      modelRegistry.delete("Reply");
+    }
   });
   it("manually rolling back a transaction", async () => {
     class Topic extends Base {
@@ -1016,11 +1085,53 @@ describe("TransactionTest", () => {
     expect(topic.isFrozen()).toBe(true);
   });
 
-  it.skip("restore frozen state after double destroy", () => {
-    // BLOCKED: transactions — needs dependent associations (has_many :replies)
-    // ROOT-CAUSE: Rails test calls topic.destroy twice inside a transaction, relying
-    //   on :dependent => :destroy cascade. Requires Topic+Reply fixture models (Slot B).
-    // SCOPE: ~15 LOC test body; unblocked after Slot B.
+  it("restore frozen state after double destroy", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+    );
+    adapter.exec(
+      "CREATE TABLE replies (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, topic_id INTEGER)",
+    );
+
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Topic, "replies", {
+      className: "Reply",
+      foreignKey: "topic_id",
+      dependent: "destroy",
+    });
+    registerModel(Topic);
+    registerModel(Reply);
+
+    try {
+      const topic = await Topic.create({ title: "test" });
+      const reply = await Reply.create({ content: "reply", topic_id: topic.id });
+
+      await Topic.transaction(async () => {
+        await topic.destroy(); // cascades: destroys reply
+        await reply.destroy(); // double destroy
+        throw new Rollback();
+      });
+
+      expect(reply.isFrozen()).toBe(false);
+      expect(topic.isFrozen()).toBe(false);
+    } finally {
+      modelRegistry.delete("Topic");
+      modelRegistry.delete("Reply");
+    }
   });
 
   it.skip("restore previously new record after double save", () => {
@@ -1036,20 +1147,56 @@ describe("TransactionTest", () => {
     // SCOPE: ~10 LOC fix in transactions.ts#withTransactionReturningStatus; deferred.
   });
 
-  it.skip("restore composite id after rollback", () => {
-    // BLOCKED: transactions — needs Cpk::Book fixture model (composite PK)
-    // ROOT-CAUSE: Rails test uses Cpk::Book with id=[1,2], updates to [42,42],
-    //   rolls back, expects id restored to [1,2]. Requires composite-PK model
-    //   fixture wiring (Slot B).
-    // SCOPE: ~10 LOC test body; unblocked after Slot B.
+  it("restore composite id after rollback", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec(
+      "CREATE TABLE cpk_books (shop_id INTEGER NOT NULL, id INTEGER NOT NULL, title TEXT, PRIMARY KEY(shop_id, id))",
+    );
+
+    class CpkBook extends Base {
+      static {
+        this._tableName = "cpk_books";
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+
+    const book = await CpkBook.create({ shop_id: 1, id: 2, title: "Rails Way" });
+
+    await CpkBook.transaction(async () => {
+      await (book as any).update({ shop_id: 42, id: 42 });
+      throw new Rollback();
+    });
+
+    expect(book.id).toEqual([1, 2]);
   });
 
-  it.skip("restore custom primary key after rollback", () => {
-    // BLOCKED: transactions — needs Movie fixture model (custom primary key)
-    // ROOT-CAUSE: Rails test uses Movie with primaryKey="movieid", updates PK
-    //   inside a transaction, rolls back, expects original PK restored.
-    //   Requires Movie model fixture wiring (Slot B).
-    // SCOPE: ~10 LOC test body; unblocked after Slot B.
+  it("restore custom primary key after rollback", async () => {
+    const adapter = new SQLite3Adapter(":memory:");
+    openAdapters.push(adapter);
+    adapter.exec("CREATE TABLE movies (movieid INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+
+    class Movie extends Base {
+      static {
+        this.primaryKey = "movieid";
+        this.attribute("name", "string");
+        this._tableName = "movies";
+        this.adapter = adapter;
+      }
+    }
+
+    const movie = Movie.new({ name: "foo" }) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    expect(movie.readAttribute("movieid")).toBeNull();
   });
 
   it("assign id after rollback", async () => {

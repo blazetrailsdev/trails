@@ -479,27 +479,28 @@ function assertLockingColumnNotExplicitly(
  * boolean from save so callers can detect validation / callback aborts
  * without catching exceptions.
  *
- * Note: Rails wraps this in `with_transaction_returning_status` so DB
- * side-effects of the assignment (e.g. nested-attributes creating child
- * records) roll back with the save. We don't yet — our callback
- * infrastructure fires after_commit twice when inner + outer transactions
- * both complete. Tracked as a separate fidelity fix; preserve the
- * pre-extraction behavior here.
+ * Rails wraps this in `with_transaction_returning_status` so the pre-assignment
+ * state snapshot is captured before any attribute writes. This ensures that on
+ * rollback, composite PKs and other attributes modified by the assignment are
+ * restored to their pre-update values.
  */
 export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<boolean> {
   assertLockingColumnNotExplicitly(this, attrs);
-  // Rails' #update delegates to `assign_attributes`, which iterates setters
-  // and lets their exceptions propagate raw. Our Base#assignAttributes wraps
-  // every writeAttribute failure in AttributeAssignmentError — more aggressive
-  // than Rails. Use a raw writeAttribute loop here to preserve original error
-  // classes (pre-extraction behavior; closer to Rails than wrapping).
-  for (const [key, value] of Object.entries(attrs)) {
-    this.writeAttribute(key, value);
-  }
-  return this.save();
+  const self = this as any;
+  return withTransactionReturningStatus.call(self, async () => {
+    // Rails' #update delegates to `assign_attributes`, which iterates setters
+    // and lets their exceptions propagate raw. Our Base#assignAttributes wraps
+    // every writeAttribute failure in AttributeAssignmentError — more aggressive
+    // than Rails. Use a raw writeAttribute loop here to preserve original error
+    // classes (pre-extraction behavior; closer to Rails than wrapping).
+    for (const [key, value] of Object.entries(attrs)) {
+      self.writeAttribute(key, value);
+    }
+    return self.save() as Promise<boolean>;
+  }) as Promise<boolean>;
 }
 
 /**
@@ -511,12 +512,15 @@ export async function updateBang<T extends UpdateRecord>(
   attrs: Record<string, unknown>,
 ): Promise<true> {
   assertLockingColumnNotExplicitly(this, attrs);
-  // See update(): raw loop preserves original error classes (matches Rails,
-  // avoids Base#assignAttributes's AttributeAssignmentError wrap).
-  for (const [key, value] of Object.entries(attrs)) {
-    this.writeAttribute(key, value);
-  }
-  return this.saveBang();
+  const self = this as any;
+  return withTransactionReturningStatus.call(self, async () => {
+    // See update(): raw loop preserves original error classes (matches Rails,
+    // avoids Base#assignAttributes's AttributeAssignmentError wrap).
+    for (const [key, value] of Object.entries(attrs)) {
+      self.writeAttribute(key, value);
+    }
+    return self.saveBang() as Promise<true>;
+  }) as Promise<true>;
 }
 
 interface DeleteRecord {
