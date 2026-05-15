@@ -14,7 +14,8 @@ import {
   NotImplementedError,
   SQLWarning,
 } from "../errors.js";
-import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import { CreateIndexDefinition, ForeignKeyDefinition } from "./abstract/schema-definitions.js";
+import type { AddIndexOptions } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
@@ -38,6 +39,34 @@ class MysqlSchemaStatements extends SchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation());
+  }
+
+  /**
+   * MySQL/MariaDB don't support `CREATE INDEX IF NOT EXISTS` (MySQL never
+   * has; MariaDB does, but Rails standardizes on the pre-flight approach
+   * for portability). Override `addIndex` to mirror Rails' MySQL
+   * `add_index`: if `ifNotExists: true` and the index is already present,
+   * short-circuit before emitting DDL — otherwise the second call trips
+   * `ER_DUP_KEYNAME` because `MysqlSchemaCreation` (correctly) omits the
+   * `IF NOT EXISTS` keyword.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#add_index
+   */
+  override async addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options: AddIndexOptions = {},
+  ): Promise<void> {
+    const [idx, algorithmClause, ifNotExists] = this.addIndexOptions(
+      tableName,
+      columnName,
+      options as Record<string, unknown>,
+    );
+    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
+      return;
+    }
+    const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
+    await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
   }
 
   override async dropTable(
