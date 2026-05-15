@@ -12,7 +12,7 @@
 // for non-test consumers.
 import "@blazetrails/activesupport/sqlite/better-sqlite3";
 import { beforeEach } from "vitest";
-import { resetTestAdapterState } from "./test-adapter.js";
+import { resetTestAdapterState, shouldSkipGlobalReset } from "./test-adapter.js";
 
 // Wipe shared test-adapter state before every test. The previous lazy
 // "clean up on first DB op of next test" model left a window where a
@@ -21,5 +21,6 @@ import { resetTestAdapterState } from "./test-adapter.js";
 // schema setup, causing intermittent failures (count→0, queries against
 // stale schemas). Eager reset closes that window.
 beforeEach(async () => {
+  if (shouldSkipGlobalReset()) return;
   await resetTestAdapterState();
 });
