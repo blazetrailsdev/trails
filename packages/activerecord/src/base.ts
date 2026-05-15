@@ -52,7 +52,6 @@ import {
 } from "./errors.js";
 import {
   AutosaveAssociation,
-  autosaveChildren,
   flushPendingReplaces,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
@@ -2493,20 +2492,6 @@ export class Base extends Model {
       }
 
       await flushPendingReplaces(this);
-
-      // Mirrors Rails' `around_save_collection_association` (autosave_
-      // association.rb:402-409): `@new_record_before_save = !prev &&
-      // new_record?`. Once an outer scope set it true, nested re-entrant
-      // saves on the same record must NOT clobber to false. Restore prev
-      // in `finally`.
-      const _prevNewRecordBeforeSave = (this as any)._newRecordBeforeSave ?? false;
-      (this as any)._newRecordBeforeSave = !_prevNewRecordBeforeSave && wasNewRecord;
-      try {
-        const autosaveOk = await autosaveChildren(this);
-        if (!autosaveOk) return false;
-      } finally {
-        (this as any)._newRecordBeforeSave = _prevNewRecordBeforeSave;
-      }
     }
 
     return saved;

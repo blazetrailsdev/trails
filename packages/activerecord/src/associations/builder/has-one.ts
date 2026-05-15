@@ -1,5 +1,6 @@
 import { SingularAssociation } from "./singular-association.js";
 import { afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /**
  * Mirrors: ActiveRecord::Associations::Builder::HasOne
@@ -54,6 +55,9 @@ export class HasOne extends SingularAssociation {
     const options = reflection.options ?? {};
     if (options.touch) {
       this.addTouchCallbacks(model, reflection);
+    }
+    if (options.autosave) {
+      addAutosaveAssociationCallbacks(model, reflection);
     }
   }
 
