@@ -904,6 +904,10 @@ describe("TransactionTest", () => {
   });
   it("number of transactions in commit", async () => {
     const { Topic, adapter } = makeSQLiteTopic();
+    // Create the record before installing the spy so that the create commit
+    // does not set openCount prematurely and mask a missing transaction commit.
+    const first = await Topic.create({ title: "First", approved: false });
+
     let openCount: number | undefined;
     const original = adapter.commitDbTransaction.bind(adapter);
     const spy = vi.spyOn(adapter, "commitDbTransaction").mockImplementation(async () => {
@@ -912,7 +916,6 @@ describe("TransactionTest", () => {
     });
 
     try {
-      const first = await Topic.create({ title: "First", approved: false });
       await Topic.transaction(async () => {
         first.approved = true;
         await first.saveBang();
