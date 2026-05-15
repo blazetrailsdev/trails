@@ -20,12 +20,15 @@ beforeEach(async () => {
     r_books: { title: "string", author_id: "integer" },
     r_writers: { name: "string" },
     r_novels: { title: "string", writer_id: "integer" },
-    r_a_users: { name: "string" },
-    r_a_profiles: { bio: "string", r_a_user_id: "integer" },
-    r_h_users: { name: "string" },
-    r_h_profiles: { bio: "string", r_h_user_id: "integer" },
-    r_m_users: { name: "string" },
-    r_m_profiles: { bio: "string", r_m_user_id: "integer" },
+    // RAUser/RAProfile etc. tableize as ra_*, rh_*, rm_* (consecutive-caps
+    // collapse per Rails' String#underscore; see packages/activesupport
+    // inflector). The same key columns map through.
+    ra_users: { name: "string" },
+    ra_profiles: { bio: "string", r_a_user_id: "integer" },
+    rh_users: { name: "string" },
+    rh_profiles: { bio: "string", r_h_user_id: "integer" },
+    rm_users: { name: "string" },
+    rm_profiles: { bio: "string", r_m_user_id: "integer" },
   });
 });
 function freshAdapter(): DatabaseAdapter {

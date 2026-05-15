@@ -19,9 +19,24 @@ const files = execSync(`find ${root} -name '*.test.ts' -type f`, { encoding: "ut
   .split("\n")
   .filter(Boolean);
 
+/**
+ * Strip line comments, block comments, and string literals so a commented-
+ * out `defineSchema(...)` or a string mentioning it doesn't make the file
+ * look compliant. Cheap regex pass — not a real parser, but adequate for
+ * identifier-presence matching.
+ */
+function stripCommentsAndStrings(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/`(?:\\.|[^`\\])*`/g, "``")
+    .replace(/'(?:\\.|[^'\\])*'/g, "''")
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+}
+
 const offenders: string[] = [];
 for (const f of files) {
-  const src = readFileSync(f, "utf8");
+  const src = stripCommentsAndStrings(readFileSync(f, "utf8"));
   // Match both named declarations (`class Foo extends Base`) and anonymous
   // class expressions (`class extends Base` — typically assigned to a const
   // or returned from a factory, as in encryption/test-helpers.ts).

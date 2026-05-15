@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { defineSchema } from "./define-schema.js";
+import { defineSchema, type ColumnSpec } from "./define-schema.js";
 
 let adapter: DatabaseAdapter;
 
@@ -134,6 +134,26 @@ describe("defineSchema", () => {
       const rows = (await adapter.execute(`SELECT * FROM "sti"`)) as Array<Record<string, unknown>>;
       expect(rows[0]["type"]).toBe("Dog");
       expect("id" in rows[0]).toBe(false);
+    });
+
+    it("legacy table with columns both named 'columns' and 'primaryKey' stays legacy (primaryKey is not wrapper-shaped)", async () => {
+      // primaryKey here is a column name with a ColumnSpec value, not a
+      // string[]/false marker. The discriminator must validate the
+      // primaryKey value's shape before treating the table as a wrapper.
+      await defineSchema(adapter, {
+        legacy_pk_col: {
+          columns: { type: "string" },
+          primaryKey: "string",
+        } as unknown as Record<string, ColumnSpec>,
+      });
+      await adapter.executeMutation(
+        `INSERT INTO "legacy_pk_col" ("columns","primaryKey") VALUES ('a','b')`,
+      );
+      const rows = (await adapter.execute(`SELECT * FROM "legacy_pk_col"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows[0]["columns"]).toBe("a");
+      expect(rows[0]["primaryKey"]).toBe("b");
     });
 
     it("legacy single-column table named 'columns' with object ColumnSpec stays legacy", async () => {

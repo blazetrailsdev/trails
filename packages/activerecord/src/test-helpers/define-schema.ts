@@ -69,6 +69,11 @@ function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
   //   3. No other top-level keys.
   if (!table || typeof table !== "object") return false;
   if (!("primaryKey" in table)) return false;
+  const pk = (table as { primaryKey?: unknown }).primaryKey;
+  // Validate primaryKey is the wrapper-shaped value; otherwise this is a
+  // legacy table that happens to have a column called `primaryKey`.
+  if (pk !== false && !Array.isArray(pk)) return false;
+  if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
   const candidate = (table as { columns?: unknown }).columns;
   if (!candidate || typeof candidate !== "object") return false;
   for (const key of Object.keys(table)) {
