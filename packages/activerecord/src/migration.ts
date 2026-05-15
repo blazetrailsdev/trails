@@ -2490,7 +2490,8 @@ export class Migrator {
         filename: file,
         scope: scope || undefined,
         migration: async () => {
-          const mod = await import(file);
+          const { pathToFileURL } = await import("node:url");
+          const mod = await import(pathToFileURL(file).href);
           return (mod.default ?? mod[name]) as MigrationLike;
         },
       });
