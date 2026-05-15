@@ -233,6 +233,7 @@ export {
   LockWaitTimeout,
   QueryCanceled,
   RangeError,
+  AssociationTypeMismatch,
 } from "./errors.js";
 export {
   ReadonlyAttributeError,

@@ -23,7 +23,12 @@ import {
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
-import { StrictLoadingViolationError, RecordNotSaved, ConfigurationError } from "../errors.js";
+import {
+  StrictLoadingViolationError,
+  RecordNotSaved,
+  ConfigurationError,
+  AssociationTypeMismatch,
+} from "../errors.js";
 import { RecordInvalid } from "../validations.js";
 import {
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -939,6 +944,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async push(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
+    this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
@@ -1065,6 +1071,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         if (!skipCallbacks) {
           fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
         }
+      }
+    }
+  }
+
+  private _raiseOnTypeMismatch(records: T[]): void {
+    const opts = this._assocDef.options;
+    // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
+    if (opts.polymorphic) return;
+    const className =
+      (opts.className as string | undefined) ?? camelize(singularize(this._assocName));
+    const klass = resolveAssocClass(this._record, this._assocName, className);
+    for (const record of records) {
+      if (record == null || !(record instanceof klass)) {
+        const actual =
+          record == null
+            ? String(record)
+            : `an instance of ${(record as any)?.constructor?.name ?? "unknown"}`;
+        throw new AssociationTypeMismatch(`${className}`, actual);
       }
     }
   }
@@ -1289,6 +1313,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
   async isInclude(record: T): Promise<boolean> {
+    if (record.isNewRecord()) {
+      return this._target.includes(record);
+    }
+
     if (this._targetLoaded) {
       const targetId = this._identityFor(record);
       if (targetId != null) {

@@ -12,6 +12,13 @@ export class SubclassNotFound extends ActiveRecordError {
   }
 }
 
+export class AssociationTypeMismatch extends ActiveRecordError {
+  constructor(expected: string, actual: string) {
+    super(`${expected} expected, got ${actual}`);
+    this.name = "AssociationTypeMismatch";
+  }
+}
+
 export class SerializationTypeMismatch extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);

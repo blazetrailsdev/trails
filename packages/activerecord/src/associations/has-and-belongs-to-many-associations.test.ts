@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base, registerModel, AssociationTypeMismatch } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Associations, loadHasMany, loadHabtm, association } from "../associations.js";
@@ -112,10 +112,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(projects.length).toBe(1);
   });
 
-  it.skip("adding type mismatch", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: CollectionProxy#push does not raise AssociationTypeMismatch for wrong model
-    // SCOPE: collection-proxy.ts — type guard on push/append
+  it("adding type mismatch", async () => {
+    const dev = await Developer.create({ name: "TypeMismatch", salary: 80000 });
+    const proxy = association(dev, "projects");
+    await expect(proxy.push(null as any)).rejects.toThrow(AssociationTypeMismatch);
+    await expect(proxy.push(1 as any)).rejects.toThrow(AssociationTypeMismatch);
+    await expect(proxy.push(dev as any)).rejects.toThrow(AssociationTypeMismatch);
   });
 
   it("adding from the project", async () => {
@@ -515,10 +517,15 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(included).toBe(true);
   });
 
-  it.skip("include checks if record exists if target not loaded", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: CollectionProxy#include? (include without prior load) issues a DB EXISTS check — not yet implemented
-    // SCOPE: collection-proxy.ts — include? lazy/db-check path
+  it("include checks if record exists if target not loaded", async () => {
+    const dev = await Developer.create({ name: "IncludeCheck", salary: 80000 });
+    const proj = await Project.create({ name: "IncludeProj" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
+    const proxy = association<Project>(dev, "projects");
+    expect(proxy.loaded).toBe(false);
+    const result = await proxy.isInclude(proj);
+    expect(result).toBe(true);
+    expect(proxy.loaded).toBe(false);
   });
 
   it("include returns false for non matching record to verify scoping", async () => {
@@ -890,10 +897,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // SCOPE: collection-proxy.ts — scope_attributes merging for chained where conditions
   });
 
-  it.skip("include method in has and belongs to many association should return true for instance added with build", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: CollectionProxy#include? returns false for a record that was built (not yet persisted) via the proxy
-    // SCOPE: collection-proxy.ts — in-memory include? check for unsaved built records
+  it("include method in has and belongs to many association should return true for instance added with build", async () => {
+    const dev = new Developer({ name: "BuiltDev", salary: 50000 });
+    const proxy = association<Project>(dev, "projects");
+    const proj = proxy.build({ name: "BuiltProj" });
+    expect(await proxy.isInclude(proj)).toBe(true);
   });
 
   it("destruction does not error without primary key", async () => {
