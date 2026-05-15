@@ -75,6 +75,29 @@ const _registeredModelClasses = new Set<any>();
 // Module-level lock to serialize setup() across all SchemaAdapter instances.
 let _setupLock: Promise<void> | null = null;
 
+// Per-inner-adapter mutex for outermost withinNewTransaction calls. Rails uses
+// `connection.lock.synchronize` to serialize concurrent transactions on a
+// shared connection; the deleted _transactionFallback had the equivalent via
+// `_adapterLocks`. Routing through TM (Phase 1) loses that serialization, so
+// concurrent `Promise.all([Model.create, Model.create])` callers corrupt the
+// TM stack on the shared inner adapter. This mutex restores serialization.
+const _withinNewTxLocks = new WeakMap<object, Promise<void>>();
+
+async function _acquireWithinNewTxLock(adapter: object): Promise<() => void> {
+  while (_withinNewTxLocks.has(adapter)) {
+    await _withinNewTxLocks.get(adapter);
+  }
+  let release!: () => void;
+  const lock = new Promise<void>((resolve) => {
+    release = () => {
+      _withinNewTxLocks.delete(adapter);
+      resolve();
+    };
+  });
+  _withinNewTxLocks.set(adapter, lock);
+  return release;
+}
+
 // Set true when createTestAdapter() is called; cleared after data cleanup.
 let _needsCleanup = false;
 let _cleanupPromise: Promise<void> | null = null;
@@ -914,12 +937,25 @@ class SchemaAdapter implements DatabaseAdapter {
     opts: { isolation?: string | null; joinable?: boolean },
     fn: (tx?: unknown) => Promise<T> | T,
   ): Promise<T> {
-    // Run setup() before entering TM — same invariant as beginTransaction().
-    // Without this, pending cleanup/DDL could run while TM already has an open
-    // frame: on PG execDdlWithSavepoint would issue SAVEPOINT before BEGIN;
-    // on MySQL, DDL inside a transaction causes an implicit commit.
-    await this.setup();
-    return (this.inner as any).withinNewTransaction(opts, fn);
+    const inner = this.inner as any;
+    const nested = (inner.openTransactions ?? 0) > 0 || inner.inTransaction;
+    // Only run setup() and acquire the per-adapter mutex on the OUTERMOST
+    // transaction. For nested (requiresNew) calls, running setup() would
+    // drain pending schema work mid-transaction — on MySQL, DDL implicitly
+    // commits the outer transaction so the outer rollback can no longer
+    // undo prior writes.
+    if (nested) return inner.withinNewTransaction(opts, fn);
+
+    const release = await _acquireWithinNewTxLock(inner);
+    try {
+      // setup() runs before TM enters its frame (mirrors beginTransaction()'s
+      // existing invariant): MySQL DDL implicit-commits an open tx; PG would
+      // try SAVEPOINT before BEGIN was sent.
+      await this.setup();
+      return await inner.withinNewTransaction(opts, fn);
+    } finally {
+      release();
+    }
   }
 
   currentTransaction() {

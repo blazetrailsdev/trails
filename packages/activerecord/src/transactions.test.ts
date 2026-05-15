@@ -2269,20 +2269,26 @@ describe("SchemaAdapter TM delegation", () => {
   //
   // DDL savepoints are released eagerly (releaseSavepoint right after exec);
   // TM does not track them and never tries to release them again.
-  it("SchemaAdapter exposes withinNewTransaction, routing transaction() through TM", async () => {
-    const adapter = createTestAdapter();
-    expect(typeof (adapter as any).withinNewTransaction).toBe("function");
+  it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
+    const testAdapter = createTestAdapter();
+    const inner = (testAdapter as any).innerAdapter;
+    const spy = vi.spyOn(inner, "withinNewTransaction");
+    class Item extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = testAdapter;
+      }
+    }
+    await transaction(Item, async () => {
+      await Item.create({ name: "tm-path" });
+    });
+    expect(spy).toHaveBeenCalled();
   });
 
-  it("setup() inside a TM transaction does not corrupt the SavepointTransaction lifecycle", async () => {
-    // SchemaAdapter.setup() calls execDdlWithSavepoint (direct createSavepoint on inner,
-    // bypassing TM intentionally — DDL savepoints are released eagerly and TM never
-    // tracks them). After Phase 1, setup() runs inside withinNewTransaction, so TM
-    // already has an open frame when DDL savepoints are issued. This test confirms:
-    //   - setup() fires inside the outer transaction (via the first Item.create() call)
-    //   - requiresNew:true creates a real SavepointTransaction on top of the outer frame
-    //   - TM's commit() releases its own savepoint name without touching the already-
-    //     released DDL savepoints; no error escapes.
+  it("requiresNew nested transaction uses SavepointTransaction on top of outer RealTransaction", async () => {
+    const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
+    const { SavepointTransaction, RealTransaction } =
+      await import("./connection-adapters/abstract/transaction.js");
     const testAdapter = createTestAdapter();
     class Item extends Base {
       static {
@@ -2291,25 +2297,29 @@ describe("SchemaAdapter TM delegation", () => {
       }
     }
 
-    let outerCount = 0;
-    let innerCount = 0;
+    let outerType: string | undefined;
+    let innerType: string | undefined;
 
     await transaction(Item, async () => {
-      // This create triggers setup() → DDL CREATE TABLE inside the outer TM frame.
       await Item.create({ name: "outer" });
-      outerCount = (await Item.count()) as number;
+      const cur = (testAdapter as any).currentTransaction?.();
+      outerType = cur instanceof TxBase ? cur.constructor.name : String(cur);
 
       await transaction(
         Item,
         async () => {
           await Item.create({ name: "inner" });
-          innerCount = (await Item.count()) as number;
+          const curIn = (testAdapter as any).currentTransaction?.();
+          innerType = curIn instanceof TxBase ? curIn.constructor.name : String(curIn);
         },
         { requiresNew: true },
       );
     });
 
-    expect(outerCount).toBeGreaterThanOrEqual(1);
-    expect(innerCount).toBeGreaterThanOrEqual(2);
+    // Outer must be a real DB transaction frame; inner must be a Savepoint
+    // (NOT RestartParent or NullTransaction). This guards against TM joining
+    // the parent instead of opening a savepoint.
+    expect(outerType).toBe(RealTransaction.name);
+    expect(innerType).toBe(SavepointTransaction.name);
   });
 });
