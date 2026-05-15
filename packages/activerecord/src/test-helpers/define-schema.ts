@@ -26,9 +26,17 @@ export type ColumnSpec =
       primary?: boolean;
     };
 
-export type TableSchema =
-  | Record<string, ColumnSpec>
-  | { columns: Record<string, ColumnSpec>; primaryKey?: string | string[] | false };
+export interface WrappedTableSchema {
+  columns: Record<string, ColumnSpec>;
+  /**
+   * Table-level primary key. `string[]` builds a composite PK constraint and
+   * suppresses the auto-`id` column. `false` builds the table without a PK.
+   * `string` is not supported — use the matching column with `primary: true`
+   * via the legacy shape, or pass `[name]` for a single-column composite.
+   */
+  primaryKey?: string[] | false;
+}
+export type TableSchema = Record<string, ColumnSpec> | WrappedTableSchema;
 export type Schema = Record<string, TableSchema>;
 
 export interface DefineSchemaOpts {
@@ -36,19 +44,26 @@ export interface DefineSchemaOpts {
 }
 
 /** @internal */
-function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
-  if (table && typeof table === "object" && "columns" in table && !("type" in table)) {
-    return (table as { columns: Record<string, ColumnSpec> }).columns;
-  }
-  return table as Record<string, ColumnSpec>;
+function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
+  // Discriminate strictly: only treat as wrapper when `columns` is an object
+  // map — otherwise a legacy column literally named "columns" (with a string
+  // or column-spec value) would be mis-parsed as the wrapper shape.
+  if (!table || typeof table !== "object") return false;
+  const candidate = (table as { columns?: unknown }).columns;
+  if (!candidate || typeof candidate !== "object") return false;
+  // A ColumnSpec object has a `type` key; the wrapper's `columns` map does not.
+  if ("type" in (candidate as object)) return false;
+  return true;
 }
 
 /** @internal */
-function primaryKeyOf(table: TableSchema): string | string[] | false | undefined {
-  if (table && typeof table === "object" && "columns" in table && !("type" in table)) {
-    return (table as { primaryKey?: string | string[] | false }).primaryKey;
-  }
-  return undefined;
+function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
+  return isWrappedSchema(table) ? table.columns : (table as Record<string, ColumnSpec>);
+}
+
+/** @internal */
+function primaryKeyOf(table: TableSchema): string[] | false | undefined {
+  return isWrappedSchema(table) ? table.primaryKey : undefined;
 }
 
 /** @internal */
@@ -158,9 +173,6 @@ export async function defineSchema(
     else if (Array.isArray(pk)) {
       createOpts["primaryKey"] = pk;
       createOpts["id"] = false;
-    } else if (typeof pk === "string") {
-      createOpts["primaryKey"] = pk;
-      createOpts["id"] = false;
     }
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
@@ -171,7 +183,7 @@ export async function defineSchema(
           if (spec.limit !== undefined) options["limit"] = spec.limit;
           if (spec.null !== undefined) options["null"] = spec.null;
           if (spec.default !== undefined) options["default"] = spec.default;
-          if (spec.primary && !Array.isArray(pk) && typeof pk !== "string") {
+          if (spec.primary && !Array.isArray(pk)) {
             options["primaryKey"] = true;
           }
         }

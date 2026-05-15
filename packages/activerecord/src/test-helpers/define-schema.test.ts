@@ -86,6 +86,54 @@ describe("defineSchema", () => {
     ).rejects.toThrow(/circular reference/);
   });
 
+  describe("wrapped { columns, primaryKey } shape", () => {
+    it("composite primary key produces a PRIMARY KEY constraint over the named columns", async () => {
+      await defineSchema(adapter, {
+        comp: {
+          columns: { shop_id: "integer", order_number: "integer", name: "string" },
+          primaryKey: ["shop_id", "order_number"],
+        },
+      });
+      // Both rows differ in (shop_id, order_number) → both insert.
+      await adapter.executeMutation(
+        `INSERT INTO "comp" ("shop_id","order_number","name") VALUES (1,1,'a'),(1,2,'b')`,
+      );
+      // Same composite key → should reject.
+      await expect(
+        adapter.executeMutation(
+          `INSERT INTO "comp" ("shop_id","order_number","name") VALUES (1,1,'dup')`,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("primaryKey: false creates a table with no primary key (no auto id column)", async () => {
+      await defineSchema(adapter, {
+        no_pk: { columns: { tag: "string" }, primaryKey: false },
+      });
+      // No "id" column present.
+      await adapter.executeMutation(`INSERT INTO "no_pk" ("tag") VALUES ('x')`);
+      const rows = (await adapter.execute(`SELECT * FROM "no_pk"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows).toHaveLength(1);
+      expect("id" in rows[0]).toBe(false);
+    });
+
+    it("does not mis-classify a legacy column literally named 'columns'", async () => {
+      // The discriminator must require `columns` to be an object map (not a
+      // ColumnSpec string/object) — otherwise a legacy table with a column
+      // called "columns" would be parsed as the wrapper shape.
+      await defineSchema(adapter, {
+        reports: { columns: "string", count: "integer" },
+      });
+      await adapter.executeMutation(`INSERT INTO "reports" ("columns","count") VALUES ('hello',1)`);
+      const rows = (await adapter.execute(`SELECT * FROM "reports"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows[0]["columns"]).toBe("hello");
+    });
+  });
+
   it("dropExisting drops first then creates", async () => {
     await defineSchema(adapter, { items: { name: "string" } });
     await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('old')`);
