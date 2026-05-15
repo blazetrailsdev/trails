@@ -490,29 +490,56 @@ function buildPackageReport(
   return result;
 }
 
-const RED = "\x1b[31m";
-const YELLOW = "\x1b[33m";
-const DIM = "\x1b[2m";
-const BOLD = "\x1b[1m";
-const RESET = "\x1b[0m";
+interface Palette {
+  red: string;
+  yellow: string;
+  dim: string;
+  bold: string;
+  reset: string;
+}
+const COLOR_ON: Palette = {
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  dim: "\x1b[2m",
+  bold: "\x1b[1m",
+  reset: "\x1b[0m",
+};
+const COLOR_OFF: Palette = { red: "", yellow: "", dim: "", bold: "", reset: "" };
 
-function colorCount(n: number, useColor: boolean): string {
-  if (!useColor) return String(n);
-  if (n >= 20) return `${RED}${BOLD}${n}${RESET}`;
-  if (n >= 10) return `${RED}${n}${RESET}`;
-  if (n >= 5) return `${YELLOW}${n}${RESET}`;
+function colorCount(n: number, p: Palette): string {
+  if (n >= 20) return `${p.red}${p.bold}${n}${p.reset}`;
+  if (n >= 10) return `${p.red}${n}${p.reset}`;
+  if (n >= 5) return `${p.yellow}${n}${p.reset}`;
   return String(n);
 }
 
-function printHumanReport(report: Report, topN: number, maxDetail: number): void {
-  const useColor = process.stdout.isTTY === true;
+/**
+ * `useColor` defaults to TTY but is forceable via env so CI logs and pipes
+ * don't get raw escape codes. Padding widens by the per-cell escape-sequence
+ * length when color is on so the columns still align.
+ */
+function pickPalette(): { palette: Palette; colored: boolean } {
+  const env = process.env["FORCE_COLOR"];
+  if (env === "0" || env === "false") return { palette: COLOR_OFF, colored: false };
+  if (env && env !== "") return { palette: COLOR_ON, colored: true };
+  return process.stdout.isTTY === true
+    ? { palette: COLOR_ON, colored: true }
+    : { palette: COLOR_OFF, colored: false };
+}
 
-  console.log(`\n${BOLD}Extra TS surface vs Rails${RESET}  (the inverse of api:compare)`);
+function printHumanReport(report: Report, topN: number, maxDetail: number): void {
+  const { palette: p, colored } = pickPalette();
+  // colorCount adds invisible escape characters; widen padding by the
+  // max envelope length so the columns still align when color is on.
+  // Worst case is red+bold+reset = 13 chars (\x1b[31m\x1b[1m...\x1b[0m).
+  const padBoost = colored ? 13 : 0;
+
+  console.log(`\n${p.bold}Extra TS surface vs Rails${p.reset}  (the inverse of api:compare)`);
   console.log(
-    `${DIM}Generated ${report.generatedAt}  |  novel = name not found anywhere in Rails;  moved = found, just in a different .rb${RESET}\n`,
+    `${p.dim}Generated ${report.generatedAt}  |  novel = name not found anywhere in Rails;  moved = found, just in a different .rb${p.reset}\n`,
   );
 
-  console.log(`${BOLD}Per-package totals${RESET}`);
+  console.log(`${p.bold}Per-package totals${p.reset}`);
   console.log(
     `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)}`,
   );
@@ -520,15 +547,14 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
     `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
   );
   for (const pkg of report.packages) {
-    const novel = colorCount(pkg.totalNovel, useColor);
-    const pad = useColor ? 16 : 7;
+    const novel = colorCount(pkg.totalNovel, p);
     console.log(
-      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel.padStart(pad)} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)}`,
+      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel.padStart(7 + padBoost)} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)}`,
     );
   }
 
   console.log(
-    `\n${BOLD}Top ${Math.min(topN, report.topN.length)} most-divergent files${RESET}  ${DIM}(ranked by novel count, then total)${RESET}`,
+    `\n${p.bold}Top ${Math.min(topN, report.topN.length)} most-divergent files${p.reset}  ${p.dim}(ranked by novel count, then total)${p.reset}`,
   );
   console.log(
     `  ${"#".padStart(3)}  ${"Novel".padStart(5)}  ${"Moved".padStart(5)}  ${"Package".padEnd(16)} ${"TS file".padEnd(60)}`,
@@ -538,35 +564,31 @@ function printHumanReport(report: Report, topN: number, maxDetail: number): void
   );
   for (let i = 0; i < Math.min(topN, report.topN.length); i++) {
     const f = report.topN[i];
-    const c = colorCount(f.novelCount, useColor);
-    const pad = useColor ? 14 : 5;
+    const c = colorCount(f.novelCount, p);
     console.log(
-      `  ${String(i + 1).padStart(3)}  ${c.padStart(pad)}  ${String(f.movedCount).padStart(5)}  ${f.package.padEnd(16)} ${f.tsFile.padEnd(60)}`,
+      `  ${String(i + 1).padStart(3)}  ${c.padStart(5 + padBoost)}  ${String(f.movedCount).padStart(5)}  ${f.package.padEnd(16)} ${f.tsFile.padEnd(60)}`,
     );
   }
 
   console.log(
-    `\n${BOLD}Per-file detail${RESET}  ${DIM}(novel-first; moved names dimmed; +N more elided when over --max-detail)${RESET}\n`,
+    `\n${p.bold}Per-file detail${p.reset}  ${p.dim}(novel-first; moved names dimmed; +N more elided when over --max-detail)${p.reset}\n`,
   );
   for (const pkg of report.packages) {
     if (pkg.extraFiles.length === 0) continue;
-    console.log(`${BOLD}${pkg.package}${RESET}`);
+    console.log(`${p.bold}${pkg.package}${p.reset}`);
     for (const f of pkg.extraFiles) {
-      const novelTag = useColor
-        ? colorCount(f.novelCount, useColor) + " novel"
-        : `${f.novelCount} novel`;
-      console.log(`  ${f.tsFile} — ${novelTag}, ${f.movedCount} moved`);
+      console.log(`  ${f.tsFile} — ${colorCount(f.novelCount, p)} novel, ${f.movedCount} moved`);
       const shown = maxDetail > 0 ? f.extras.slice(0, maxDetail) : f.extras;
       const cols = 4;
       for (let i = 0; i < shown.length; i += cols) {
         const row = shown.slice(i, i + cols).map((e) => {
           const label = e.name.padEnd(24);
-          return useColor && e.kind === "moved" ? `${DIM}${label}${RESET}` : label;
+          return e.kind === "moved" ? `${p.dim}${label}${p.reset}` : label;
         });
         console.log(`    ${row.join(" ")}`);
       }
       const elided = f.extras.length - shown.length;
-      if (elided > 0) console.log(`    ${DIM}… +${elided} more${RESET}`);
+      if (elided > 0) console.log(`    ${p.dim}… +${elided} more${p.reset}`);
     }
     console.log();
   }
