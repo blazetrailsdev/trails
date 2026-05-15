@@ -61,11 +61,11 @@ export class PredicateBuilder {
   }
 
   buildFromHash(conditions: Record<string, unknown>): Nodes.Node[] {
-    return this.buildFromHashInternal(conditions, false);
+    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), false);
   }
 
   buildNegatedFromHash(conditions: Record<string, unknown>): Nodes.Node[] {
-    return this.buildFromHashInternal(conditions, true);
+    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), true);
   }
 
   private buildFromHashInternal(
@@ -402,7 +402,7 @@ export class PredicateBuilder {
     ) {
       throw new TypeError("registerHandler requires a constructor function as the first argument");
     }
-    this.handlers.push([klass, handler]);
+    this.handlers.unshift([klass, handler]);
   }
 
   buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
@@ -462,9 +462,14 @@ export class PredicateBuilder {
     return null;
   }
 
-  static references(conditions: Record<string, unknown>): Nodes.SqlLiteral[] {
+  static references(conditions: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
     const refs: Nodes.SqlLiteral[] = [];
-    for (const [key, value] of Object.entries(conditions)) {
+    // Support array form: references(["schema.table.column"]) → ["schema.table"]
+    // Rails iterates attributes with each_with_object; for array input the "key" is each element.
+    const entries: Array<[string, unknown]> = Array.isArray(conditions)
+      ? conditions.map((k) => [k, undefined] as [string, unknown])
+      : Object.entries(conditions);
+    for (const [key, value] of entries) {
       if (isPlainObject(value)) {
         refs.push(arelSql(key));
       } else {

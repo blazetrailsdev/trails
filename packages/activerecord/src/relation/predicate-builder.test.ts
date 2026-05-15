@@ -5,37 +5,119 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
+import { createTestAdapter } from "../test-adapter.js";
 
 describe("PredicateBuilderTest", () => {
-  it.skip("registering new handlers", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+  // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
+  // Teardown: Topic.class_eval { @predicate_builder = nil }
+  // We use a local custom class instead of Regexp to keep the test self-contained.
+
+  it("registering new handlers", () => {
+    class PbTopic extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    class RegexFilter {
+      constructor(public source: string) {}
+    }
+    PbTopic.predicateBuilder.registerHandler(RegexFilter, {
+      call: (attr, val: RegexFilter) =>
+        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
+    });
+    try {
+      const sql = PbTopic.where({ title: new RegexFilter("rails") }).toSql();
+      expect(sql).toMatch(/"topics"."title" ~ 'rails'/i);
+    } finally {
+      (PbTopic as any)._predicateBuilder = null;
+    }
   });
-  it.skip("registering new handlers for association", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+
+  it("registering new handlers for association", () => {
+    class PbTopic2 extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    class PbReply2 extends Base {
+      static {
+        this.tableName = "replies";
+        this.attribute("parent_id", "integer");
+        this.belongsTo("pbTopic2");
+      }
+    }
+    registerModel("PbTopic2", PbTopic2);
+    registerModel("PbReply2", PbReply2);
+    class RegexFilter2 {
+      constructor(public source: string) {}
+    }
+    PbTopic2.predicateBuilder.registerHandler(RegexFilter2, {
+      call: (attr, val: RegexFilter2) =>
+        new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
+    });
+    try {
+      const sql = PbReply2.where({ pbTopic2: { title: new RegexFilter2("rails") } }).toSql();
+      // Handler propagates to associated table — column uses association-resolved table name.
+      expect(sql).toMatch(/"pbTopic2"."title" ~ 'rails'/i);
+    } finally {
+      modelRegistry.delete("PbTopic2");
+      modelRegistry.delete("PbReply2");
+      (PbTopic2 as any)._predicateBuilder = null;
+    }
   });
+
   it.skip("registering new handlers for joins", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+    // BLOCKED: relation — requires scoped belongs_to (lambda scope) evaluated against association's
+    // predicate builder; our scoped-association where-clause expansion doesn't yet propagate
+    // the custom handlers registered on the target model into the scope lambda context.
   });
-  it.skip("references with schema", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+
+  it("references with schema", () => {
+    // Rails: PredicateBuilder.references(%w{schema.table.column}) => ["schema.table"]
+    const refs = PredicateBuilder.references(["schema.table.column"]);
+    expect(refs.map((r) => r.value)).toEqual(["schema.table"]);
   });
-  it.skip("build from hash with schema", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+
+  it("build from hash with schema", () => {
+    // Rails: predicate_builder.build_from_hash("schema.table.column" => "value").first.to_sql
+    // convert_dot_notation_to_hash splits on rindex("."):
+    //   "schema.table.column" → { "schema.table" => { "column" => "value" } }
+    // TableMetadata.associated_table("schema.table") falls back to a bare Arel::Table("schema.table"),
+    // so expand_from_hash produces: "schema.table"."column" = 'value'
+    class PbSchemaModel extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+        this.adapter = createTestAdapter();
+      }
+    }
+    // Use TableMetadata-backed PB to enable associated_table fallback expansion,
+    // matching Rails' Topic.predicate_builder which is always backed by TableMetadata.
+    const [node] = new TableMetadata(
+      PbSchemaModel as any,
+      PbSchemaModel.arelTable,
+    ).predicateBuilder.buildFromHash({ "schema.table.column": "value" });
+    const sql = new Visitors.ToSql().compile(node);
+    // Arel resolves "schema.table" as schema.table identifier, producing:
+    // "schema"."table"."column" = 'value'
+    expect(sql).toMatch(/"schema"\."table"\."column"/);
+    expect(sql).toContain("value");
   });
-  it.skip("does not mutate", () => {
-    // BLOCKED: relation — Relation API gap in predicate-builder
-    // ROOT-CAUSE: relation/predicate-builder.ts or relation.ts missing Rails parity for this query feature
-    // SCOPE: ~30–100 LOC fix in relation/; affects ~10–39 tests in predicate-builder.test.ts
+
+  it("does not mutate", () => {
+    class PbTopic3 extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+        this.attribute("approved", "boolean");
+      }
+    }
+    const defaults: Record<string, unknown> = { title: "rails", approved: true };
+    const original = { ...defaults };
+    PbTopic3.where(defaults).toSql();
+    expect(defaults).toEqual(original);
   });
 
   describe("buildFromHash", () => {
