@@ -3,7 +3,14 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
+import {
+  Locator,
+  BlockLocator,
+  setModelFinder,
+  _resetModelFinder,
+  _resetLocators,
+  type LocatorModel,
+} from "./locator.js";
 
 const TEST_APP = "bcx";
 const UUID = "7ef9b614-353c-43a1-a203-ab2307851990";
@@ -381,6 +388,46 @@ describe("GlobalLocatorTest", () => {
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/")).toBeNull();
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value")).toBeNull();
   });
+
+  // ─── Locator.use(app, locator) — per-app dispatch ──────────────────────
+
+  it("use locator with block", async () => {
+    Locator.use("foo", (gid) => `block-located:${gid.modelName}:${gid.modelId}`);
+    try {
+      const found = await Locator.locate("gid://foo/Person/1");
+      expect(found).toBe("block-located:Person:1");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("use locator with class", async () => {
+    class CustomLocator extends BlockLocator {
+      constructor() {
+        super((gid) => `class-located:${gid.modelId}`);
+      }
+    }
+    Locator.use("bar", new CustomLocator());
+    try {
+      expect(await Locator.locate("gid://bar/Person/9")).toBe("class-located:9");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("app locator is case insensitive", async () => {
+    Locator.use("MyApp", (gid) => `case-test:${gid.modelId}`);
+    try {
+      expect(await Locator.locate("gid://myapp/Person/3")).toBe("case-test:3");
+      expect(await Locator.locate("gid://MYAPP/Person/4")).toBe("case-test:4");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("locator name cannot have underscore", () => {
+    expect(() => Locator.use("invalid_app", () => null)).toThrow(/invalid app name/i);
+  });
 });
 
 // ─── Non-Rails coverage (regressions / edge cases not in Rails suite) ──────
@@ -438,5 +485,51 @@ describe("Locator without model finder", () => {
 
   it("returns null when no finder is registered", async () => {
     expect(await Locator.locate("gid://bcx/Person/1")).toBeNull();
+  });
+});
+
+describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
+  beforeEach(() => {
+    setApp(TEST_APP);
+    setModelFinder((name) => REGISTRY[name]);
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+    _resetLocators();
+  });
+
+  it("falls back to the default locator when no app-specific locator is registered", async () => {
+    Locator.use("other-app", () => "should-not-be-called");
+    const found = (await Locator.locate("gid://bcx/Person/5")) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("5");
+  });
+
+  it("defaultLocator getter/setter (Rails: Locator.default_locator=)", () => {
+    const original = Locator.defaultLocator;
+    const custom = new BlockLocator(() => "custom-default");
+    Locator.defaultLocator = custom as unknown as typeof original;
+    expect(Locator.defaultLocator).toBe(custom);
+    Locator.defaultLocator = original;
+  });
+
+  it("locatorFor returns the registered locator for the app", () => {
+    const custom = new BlockLocator(() => null);
+    Locator.use("zed", custom);
+    const gid = GlobalID.parse("gid://zed/Person/1");
+    expect(Locator.locatorFor(gid!)).toBe(custom);
+  });
+
+  it("parseAllowed filters by class allowlist", () => {
+    const gids = ["gid://bcx/Person/1", "gid://bcx/PersonChild/2", "gid://bcx/Unknown/3"];
+    const allowed = Locator.parseAllowed(gids, PersonChild as unknown as LocatorModel);
+    expect(allowed).toHaveLength(1);
+    expect(allowed[0].modelName).toBe("PersonChild");
+  });
+
+  it("normalizeApp lowercases the app name", () => {
+    expect(Locator.normalizeApp("MyApp")).toBe("myapp");
+    expect(Locator.normalizeApp("FOO")).toBe("foo");
   });
 });

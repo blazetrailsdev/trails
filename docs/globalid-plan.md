@@ -9,17 +9,17 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-8)
+### Parity scoreboard (after GID-9)
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
 
-| Signal       | Current          | 100% target (pre-skip) | Gap          |
-| ------------ | ---------------- | ---------------------- | ------------ |
-| api:compare  | 47 / 59 (79.7%)  | 59 / 59                | 12 methods   |
-| test:compare | 98 / 158 (62.0%) | 158 / 158              | 60 tests     |
-| files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
-| files (test) | 5 / 8            | 8 / 8                  | 3 test files |
+| Signal       | Current           | 100% target (pre-skip) | Gap          |
+| ------------ | ----------------- | ---------------------- | ------------ |
+| api:compare  | 57 / 59 (96.6%)   | 59 / 59                | 2 methods    |
+| test:compare | 102 / 158 (64.6%) | 158 / 158              | 56 tests     |
+| files (api)  | 4 / 5             | 5 / 5                  | verifier.ts  |
+| files (test) | 5 / 8             | 8 / 8                  | 3 test files |
 
 Per-file api:compare:
 
@@ -28,7 +28,7 @@ Per-file api:compare:
 | `identification.rb`   | 4     | 4     | 100% |
 | `uri/gid.rb`          | 21    | 21    | 100% |
 | `signed_global_id.rb` | 16    | 16    | 100% |
-| `locator.rb`          | 6     | 16    | 38%  |
+| `locator.rb`          | 16    | 16    | 100% |
 | `verifier.rb`         | 0     | 2     | 0%   |
 
 Per-file test:compare:
@@ -38,7 +38,7 @@ Per-file test:compare:
 | `uri_gid_test.rb`               | 27    | 30    | 90% |
 | `signed_global_id_test.rb`      | 20    | 24    | 83% |
 | `global_identification_test.rb` | 5     | 6     | 83% |
-| `global_locator_test.rb`        | 33    | 59    | 56% |
+| `global_locator_test.rb`        | 37    | 59    | 63% |
 | `global_id_test.rb`             | 13    | 26    | 50% |
 | `verifier_test.rb`              | 0     | 4     | 0%  |
 | `pattern_matching_test.rb`      | 0     | 2     | 0%  |
@@ -137,28 +137,34 @@ test:compare `signed_global_id_test.rb`: 17/24 → **20/24** (the 3
 class-level expires_in tests now pass via vi.useFakeTimers — the same
 js-temporal-polyfill + Date.now mocking pattern GID-6b established).
 
-### GID-9 — Locator class hierarchy + `use(app, locator)` (~150 LOC)
+### GID-9 — Locator class hierarchy + `use(app, locator)` — **done**
 
-11 missing methods on `locator.rb`. Implement the three nested Rails
-classes:
+Refactored `locator.ts` from a single static-method `Locator` into the
+Rails class hierarchy:
 
-- `BaseLocator` class with `locate`, `locateMany`, `findRecords`,
-  `modelIdIsValid?`, `primaryKey`. Most logic already lives in the
-  current top-level `Locator` — refactor into the class hierarchy.
-- `UnscopedLocator extends BaseLocator` with `unscoped(modelClass)` helper
-  for the `Model.unscoped { ... }` block pattern.
-- `BlockLocator` with constructor + `locate` / `locateMany` for the
+- `BaseLocator` class — instance `locate` / `locateMany` plus protected
+  `findRecords` / `modelIdIsValid` / `primaryKey`. The existing logic from
+  the old top-level `Locator` moved here.
+- `UnscopedLocator extends BaseLocator` — wraps lookups in
+  `klass.unscoped { ... }` when the model supports it; yields otherwise.
+- `BlockLocator` — `constructor(block)` + `locate` / `locateMany` for the
   `Locator.use(app, &block)` form.
-- `Locator.defaultLocator` getter/setter (replaces internal singleton).
-- `Locator.use(appName, locator)` — registers per-app locators in a
-  `Map<string, BaseLocator | BlockLocator>`. Now in scope.
-- `Locator.locatorFor`, `Locator.findAllowed?`, `Locator.parseAllowed`,
-  `Locator.normalizeApp` — private helpers extracted from the current
-  inline implementation.
+- `Locator` (the static facade) — `locate` / `locateMany` now parse the
+  GID, run `findAllowed`, look up the per-app locator via `locatorFor`,
+  and delegate. New static methods: `defaultLocator` getter/setter,
+  `use(app, locator | block)`, `locatorFor`, `findAllowed`,
+  `parseAllowed`, `normalizeApp`.
 
-This was deferred from GID-4 as "out of scope per plan." Lifting that
-restriction is what unlocks the last ~50 test:compare matches in
-`global_locator_test.rb`.
+`LocatorModel` interface gained an optional `unscoped` method so
+`UnscopedLocator` can call it when present.
+
+api:compare `locator.rb`: 38% (6/16) → **100% (16/16)**.
+api:compare overall: 79.7% → **96.6%** — only `verifier.rb` (2
+methods) remains.
+test:compare `global_locator_test.rb`: 33/59 → **37/59 (63%)** with the
+4 new Rails-named tests (`use locator with block`, `use locator with
+class`, `app locator is case insensitive`, `locator name cannot have
+underscore`). Overall test:compare: 98/158 → **102/158 (64.6%)**.
 
 ### GID-10a — Drop `purpose:` option key (~40 LOC, breaking)
 
