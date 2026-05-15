@@ -3,6 +3,7 @@ export const VERSION = "8.0.2";
 export { Deprecator, deprecator } from "./deprecator.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export * as Constants from "./constants.js";
+export * as Journey from "./journey/index.js";
 
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
 _LogSubscriber.attachTo("action_dispatch");

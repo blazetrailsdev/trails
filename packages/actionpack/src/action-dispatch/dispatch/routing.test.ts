@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
-import { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../routing/utils.js";
 import { bodyToString } from "@blazetrails/rack";
+import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
@@ -294,31 +294,6 @@ describe("TestRouter", () => {
     const route = new Route("GET", "/page(/:id)", "pages", "show");
     // Without the optional param, path should still work
     expect(route.pathFor({})).toBe("/page");
-  });
-});
-
-// ==========================================================================
-// Journey::Router::Utils tests (journey/router/utils_test.rb)
-// ==========================================================================
-describe("Router", () => {
-  it("path escape", () => {
-    expect(escapePath("a/b c+d%")).toBe("a/b%20c+d%25");
-  });
-
-  it("segment escape", () => {
-    expect(escapeSegment("a/b c+d%")).toBe("a%2Fb%20c%2Bd%25");
-  });
-
-  it("fragment escape", () => {
-    expect(escapeFragment("a/b c+d%?e")).toBe("a/b%20c+d%25?e");
-  });
-
-  it("uri unescape", () => {
-    expect(unescapeUri("a%2Fb%20c+d")).toBe("a/b c d");
-  });
-
-  it("uri unescape with utf8 string", () => {
-    expect(unescapeUri("%E4%B8%AD%E6%96%87")).toBe("中文");
   });
 });
 

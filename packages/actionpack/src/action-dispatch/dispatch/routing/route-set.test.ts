@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../../routing/route-set.js";
-import { escapeSegment } from "../../routing/utils.js";
+import { escapeSegment } from "../../journey/router/utils.js";
 
 // ==========================================================================
 // dispatch/routing/route_set_test.rb
