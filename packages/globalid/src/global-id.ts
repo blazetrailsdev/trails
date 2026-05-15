@@ -81,6 +81,11 @@ export class GlobalID {
     return this.uri;
   }
 
+  /** Mirrors: GlobalID#as_json — `JSON.stringify(gid)` produces `"gid://..."`. */
+  toJSON(): string {
+    return this.uri;
+  }
+
   /** @internal */
   [Symbol.toPrimitive](_hint: string): string {
     return this.uri;

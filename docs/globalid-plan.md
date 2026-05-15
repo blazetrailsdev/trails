@@ -2,317 +2,252 @@
 
 ## Status (2026-05-15)
 
-| PR        | Title                                                          | Status                                              |
-| --------- | -------------------------------------------------------------- | --------------------------------------------------- |
-| **GID-0** | Vendor globalid gem source for cross-reference                 | ✅ now via `vendor/globalid/` (vendor wave 3 #1578) |
-| **GID-1** | Create `packages/globalid` skeleton + delete the lie in AR     | ✅ #1536                                            |
-| **GID-2** | `SignedGlobalID` in the new package (over `signedId` verifier) | ✅ #1548                                            |
-| **GID-3** | `URI::GID` parser + `GlobalID` class                           | ⏳ next                                             |
-| **GID-4** | `GlobalID::Locator` + `findGlobalId` class methods on AR Base  | ⏳                                                  |
-| **GID-5** | `Identification` mixin polish + `expiresIn`/purpose            | ⏳                                                  |
+GID-1 through GID-5 all merged. The package is fully functional end-to-end:
+URI parsing, GlobalID + SignedGlobalID classes, Locator (locate / locateMany /
+locateSigned / locateManySigned), and the Identification mixin (toGlobalId,
+toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
+toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
+findSignedGlobalId / findSignedGlobalIdBang.
 
-**Tooling status (post-vendor-wave-6 #1589):** globalid is now wired into both `api:compare` and `test:compare` via `vendor/sources.ts` with `compareApi: true`. Current parity scores:
+### Parity scoreboard (after GID-6a)
 
-- `api:compare` — globalid surfaces as a package (0/0 today — `packages/globalid/src/` has no Rails-mirrored named exports yet). GID-3 onwards will move this number.
-- `test:compare` — **12 tests in 1 file** mirroring `vendor/globalid/test/cases/global_id_test.rb`.
+Targets are **pre-skip** — the unportable-surface skip list (see below)
+brings the practical 100% to 56/56 api / 149/149 tests.
 
-**GID-3 priority lift:** GID-2 left `toGid()` producing non-parseable URIs when no app is configured (`gid://User/1` has no model-name segment). GID-3 should tighten this — require `setApp` before any `toGid` call, or define a default app. `signed-id.test.ts:289` hardcodes the current shape and will need updating.
+| Signal       | Current          | 100% target (pre-skip) | Gap          |
+| ------------ | ---------------- | ---------------------- | ------------ |
+| api:compare  | 19 / 59 (32.2%)  | 59 / 59                | 40 methods   |
+| test:compare | 55 / 158 (34.8%) | 158 / 158              | 103 tests    |
+| files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
+| files (test) | 5 / 8            | 8 / 8                  | 3 test files |
 
-**GID-2 followups for GID-5:** no `SignedGlobalID.verifier` class-level default; no `expires_in` class-level default; redundant inner `verifyToken` purpose check (harmless cleanup).
+Per-file api:compare:
 
-**Packaging decision (2026-05-14):** GlobalID ships as a **separate package**
-`packages/globalid/`, matching Rails' gem boundary. AR depends on globalid
-(one-way); the `Identification` mixin is included onto `Base` from the
-globalid side via a side-effect import (same pattern as
-`registerMigrationArConfig`). This keeps `Base#findGlobalId` /
-`findSignedGlobalId` working without bloating `base.ts`, and unblocks future
-ActionCable / ActiveJob ports that need GIDs without an AR dependency.
+| Ruby file             | Match | Total | %    |
+| --------------------- | ----- | ----- | ---- |
+| `identification.rb`   | 4     | 4     | 100% |
+| `signed_global_id.rb` | 8     | 16    | 50%  |
+| `locator.rb`          | 5     | 16    | 31%  |
+| `uri/gid.rb`          | 2     | 21    | 10%  |
+| `verifier.rb`         | 0     | 2     | 0%   |
+
+Per-file test:compare:
+
+| Ruby file                       | Match | Total | %   |
+| ------------------------------- | ----- | ----- | --- |
+| `uri_gid_test.rb`               | 27    | 30    | 90% |
+| `global_identification_test.rb` | 5     | 6     | 83% |
+| `global_id_test.rb`             | 13    | 26    | 50% |
+| `signed_global_id_test.rb`      | 5     | 24    | 21% |
+| `global_locator_test.rb`        | 5     | 59    | 8%  |
+| `verifier_test.rb`              | 0     | 4     | 0%  |
+| `pattern_matching_test.rb`      | 0     | 2     | 0%  |
+| `railtie_test.rb`               | 0     | 7     | 0%  |
 
 Globalid source root: `vendor/globalid/lib/` (abbreviated as `$GID/` below).
-Pinned to globalid 1.3.0 via `vendor/sources.ts`. Run `pnpm vendor:fetch --source globalid`
-once after checkout to populate it.
+Pinned to globalid 1.3.0 via `vendor/sources.ts`.
 
-## Why
+## Path to 100% — remaining work
 
-`Base#toSgid()` in `packages/activerecord/src/base.ts:2462` claims to produce a
-"signed GlobalID-like URI" but actually does plain `btoa(gid)`. Any caller can
-forge one. The doc-comment admits this:
+~10 PRs (GID-6a/b/c + GID-7..11 with 10a/10b/10c sub-PRs), ordered
+cheapest-first. Each stays under the 300 LOC ceiling.
+
+### GID-6 — Test parity sweep (~3 PRs, ~600 LOC total)
+
+Most of the test:compare gap is missing test FILES, not test logic — the
+implementations already exist. Ship the mirrored test suites:
+
+**GID-6a** — open in [#1631](https://github.com/blazetrailsdev/trails/pull/1631):
+
+- `uri-gid.test.ts` — 27/30 Ruby tests match by name (90%).
+- `global-id.test.ts` — 13/26 match (50%); the remaining 13 are
+  `find*`/`finding`/`model class` Ruby tests that depend on
+  `GlobalID#find` → Locator. They belong in `global-locator.test.ts`
+  (GID-6c) once GID-9 lands the Locator class hierarchy.
+- test:compare moved 10 → 55 (6.3% → 34.8%).
+
+**GID-6b** (~180 LOC): expand `signed-global-id.test.ts` to mirror
+`signed_global_id_test.rb` (24 tests) + new `verifier.test.ts` (4 tests once
+GID-10 lands a Verifier wrapper to test against).
+
+**GID-6c** (~250 LOC): expand `global-locator.test.ts` from 13 smoke tests
+to the full 59-test Rails mirror. Most depend on Locator features added in
+GID-9 (cross-app locators, BaseLocator).
+
+### GID-7 — `URI::GID` class wrapping (~120 LOC)
+
+`uri/gid.rb` exposes 21 methods; we expose 2 (`parseGid`, `buildGid`). Wrap
+them into a `URI.GID` class that holds parsed components and exposes the
+Rails surface:
+
+- Public: `URI.GID.parse(uri)`, `URI.GID.create(app, model, params)`,
+  `URI.GID.build(args)`, instance: `modelName`, `modelId`, `params`,
+  `toString()`, `deconstructKeys()` (TS stub — no Ruby pattern-matching).
+- Protected/private (URI::Generic subclass hooks): `setPath`, `setQuery`,
+  `setParams`, `checkHost`, `checkPath`, `checkScheme`,
+  `setModelComponents`, `validateComponent`, `validateModelIdSection`,
+  `validateModelId`, `parseQueryParams`.
+
+Most private methods are RFC2396 parser hooks Rails inherits from
+`URI::Generic`. We don't subclass URI, so they're nominal-only — implement
+as `@internal` no-op stubs that exercise the same invariants.
+
+Keep `parseGid`/`buildGid` exports as the public functional API (used
+internally + by AR's `toGid`). The class wraps them.
+
+### GID-8 — `SignedGlobalID` class-level config + verify split (~80 LOC)
+
+8 missing methods on `SignedGlobalID`:
+
+- `expiresIn` / `expiresIn=` (class-level default; currently per-call only).
+  Mirrors Rails' `SignedGlobalID.expires_in = 1.month` config.
+- Refactor existing `verifyToken` helper into the Rails method layout:
+  `pickVerifier(options)`, `pickPurpose(options)`,
+  `verifyWithVerifierValidatedMetadata`,
+  `verifyWithLegacySelfValidatedMetadata`,
+  `raiseIfExpired`, `verify` (dispatcher). These are mostly internal
+  helpers — exposing them as static methods keeps api:compare happy
+  without changing behavior.
+
+### GID-9 — Locator class hierarchy + `use(app, locator)` (~150 LOC)
+
+11 missing methods on `locator.rb`. Implement the three nested Rails
+classes:
+
+- `BaseLocator` class with `locate`, `locateMany`, `findRecords`,
+  `modelIdIsValid?`, `primaryKey`. Most logic already lives in the
+  current top-level `Locator` — refactor into the class hierarchy.
+- `UnscopedLocator extends BaseLocator` with `unscoped(modelClass)` helper
+  for the `Model.unscoped { ... }` block pattern.
+- `BlockLocator` with constructor + `locate` / `locateMany` for the
+  `Locator.use(app, &block)` form.
+- `Locator.defaultLocator` getter/setter (replaces internal singleton).
+- `Locator.use(appName, locator)` — registers per-app locators in a
+  `Map<string, BaseLocator | BlockLocator>`. Now in scope.
+- `Locator.locatorFor`, `Locator.findAllowed?`, `Locator.parseAllowed`,
+  `Locator.normalizeApp` — private helpers extracted from the current
+  inline implementation.
+
+This was deferred from GID-4 as "out of scope per plan." Lifting that
+restriction is what unlocks the last ~50 test:compare matches in
+`global_locator_test.rb`.
+
+### GID-10a — Drop `purpose:` option key (~40 LOC, breaking)
+
+Rails has never accepted `purpose:` as an option key — it only reads `for:`
+(`options.fetch :for, DEFAULT_PURPOSE`). `purpose` exists only as the
+internal `@purpose` attribute on the SGID instance. GID-2 introduced
+`purpose:` as a Trails-only option key; GID-5 added `for:` alongside it.
+Match Rails exactly:
+
+- Remove `purpose?: string` from `SignedGlobalIDOptions`, `ParseOptions`,
+  `LocateSignedOptions`, `ToSgidOptions`.
+- Remove the `options.for ?? options.purpose` fallbacks in
+  `SignedGlobalID.create`/`parse` and `Locator.locateSigned` /
+  `locateManySigned`.
+- `SignedGlobalID#purpose` (the instance accessor) stays — that mirrors
+  Rails' `attr_reader :purpose`.
+- Breaking change: any caller passing `{ purpose: "login" }` must switch
+  to `{ for: "login" }`.
+
+### GID-10b — Unify `Base.toGid()` to return GlobalID instance (~80 LOC, breaking)
+
+Rails has `to_gid` as an alias of `to_global_id`; both return a GlobalID
+instance. Trails currently has `toGid()` returning the URI string and
+`toGlobalId()` returning the instance — a divergence inherited from GID-1.
+Unify:
+
+- `Base.toGid()` returns a GlobalID instance (alias of `Base.toGlobalId()`).
+- Audit call sites in tests for `expect(u.toGid()).toBe("gid://...")` and
+  rewrite to `.toString()` or `.uri`. Known sites: `signed-id.test.ts`,
+  `calculations.test.ts`. AR's `signed-global-id.ts` may inline-use the
+  string form — switch to `.toString()`.
+- Update CLAUDE.md and any guide docs referencing the string form.
+
+### GID-10c — Global `SignedGlobalID.verifier` (~40 LOC)
+
+Rails has a global `SignedGlobalID.verifier=` setter that ActionCable /
+ActiveJob use to issue SGIDs without an AR instance. Add the same:
+
+- New `SignedGlobalID.setVerifier(verifier)` / `getVerifier()` on the class.
+- `SignedGlobalID.create(model, options)` defaults `options.verifier` to
+  `getVerifier()` when not supplied.
+- `Locator.locateSigned(sgid, options)` defaults `options.verifier` to
+  `getVerifier()` when not supplied.
+- AR's per-model `signedIdVerifier(klass)` path stays — `Base.toSgid`
+  still passes the per-model verifier explicitly, overriding the global.
+- Cross-package consumers (ActionCable/ActiveJob ports) can now issue
+  SGIDs by calling `SignedGlobalID.setVerifier(...)` once at boot.
+
+### GID-11 — `Verifier` wrapper (~30 LOC)
+
+New file `packages/globalid/src/verifier.ts`. Rails has
+`GlobalID::Verifier` wrapping `ActiveSupport::MessageVerifier` with
+sha256 digest. We use `MessageVerifier` directly today; wrap it:
 
 ```ts
-/**
- * Return a signed GlobalID-like URI for this record.
- * Uses a simple base64 encoding (not cryptographically signed).
- */
-toSgid(): string {
-  const gid = this.toGid();
-  if (typeof btoa === "function") {
-    return btoa(gid);
-  }
-  return Buffer.from(gid).toString("base64");
+export class Verifier {
+  constructor(secret: string) { /* sha256 + url_safe MessageVerifier */ }
+  /** @internal */ encode(data: unknown): string { ... }
+  /** @internal */ decode(token: string): unknown { ... }
 }
 ```
 
-This is exactly the trap CLAUDE.md warns about: a method that matches a Rails API
-surface but doesn't deliver the behavior. Worst case is a downstream user
-authenticating off the token. Best case is silent confusion when a Trails-issued
-"sgid" can't be verified by Rails-issued infra (or vice versa).
+Two private methods (`encode`, `decode`) close out `verifier.rb`. New
+test file `verifier.test.ts` (4 tests) closes the test:compare file.
 
-The fix is straightforward because the load-bearing pieces already exist:
+### Unportable surface — accept as gap, add to skip list
 
-- `MessageVerifier` (HMAC-SHA256, URL-safe) — `packages/activesupport/src/message-verifier.ts`
-- `signedId` / `findSigned` / `findSignedBang` — `packages/activerecord/src/signed-id.ts`
-- `getCrypto()` adapter (webcrypto + node:crypto) — `packages/activesupport/src/crypto-adapter.ts`
+Some Ruby methods don't map to TS. Rather than implementing nominal
+stubs, add them to `scripts/api-compare/unported-files.ts` so the
+denominator shrinks:
 
-GlobalID just needs a URI shape and a Locator on top of these.
+- `URI::GID#deconstruct_keys` — Ruby pattern matching only. No TS
+  equivalent. Skip.
+- `pattern_matching_test.rb` (2 tests) — exercises `deconstruct_keys`.
+  Skip the whole file.
+- `railtie_test.rb` (7 tests) — exercises Rails::Railtie wiring. We
+  have no Railtie analogue in globalid (Trails wires via the `wire.ts`
+  side-effect import). Skip the test file; the `railtie.rb` source
+  isn't part of api:compare's PACKAGE_DIRS for globalid today.
+- `verify_with_legacy_self_validated_metadata` (GID-8) — Rails 1.3.0
+  legacy path for SGIDs issued before the verifier-validated form
+  existed. Trails has no legacy SGIDs to read; implement as a
+  `@nie disposition=skip` stub or skip outright.
 
-## What's currently in the codebase
-
-| Piece                        | Status                                                   | Location                                         |
-| ---------------------------- | -------------------------------------------------------- | ------------------------------------------------ |
-| `Base#toGid`                 | trivial; no app namespace                                | `packages/activerecord/src/base.ts:2453`         |
-| `Base#toSgid`                | **fake — base64 only**                                   | `packages/activerecord/src/base.ts:2462`         |
-| `signedId` (HMAC)            | real; tested                                             | `packages/activerecord/src/signed-id.ts`         |
-| `findSigned` / `findSigned!` | real; tested                                             | `packages/activerecord/src/signed-id.ts`         |
-| `MessageVerifier`            | real; sha256 + url_safe                                  | `packages/activesupport/src/message-verifier.ts` |
-| `URI::GID` equivalent        | **missing**                                              | —                                                |
-| `GlobalID.parse` / `.find`   | **missing**                                              | —                                                |
-| `GlobalID::Locator`          | **missing**                                              | —                                                |
-| App namespace config         | **missing** (Rails: `GlobalID.app=`)                     | —                                                |
-| Model registry for locator   | **partial** — `Base.descendants()` exists; no name index | `packages/activerecord/src/base.ts`              |
-
-## Rails surface to mirror (globalid 1.3.0)
-
-```
-$GID/global_id.rb                  — 83  LOC — GlobalID class + URI delegation
-$GID/global_id/global_id.rb        — alias; loads above
-$GID/global_id/uri/gid.rb          — 207 LOC — URI::GID parse/build/validate
-$GID/global_id/signed_global_id.rb —  87 LOC — SignedGlobalID with verifier + expiry + purpose
-$GID/global_id/locator.rb          — 246 LOC — Locator.locate / locate_signed / locate_many / app-scoped locators
-$GID/global_id/identification.rb   — 120 LOC — Mixin: to_global_id, to_signed_global_id, to_gid_param, to_sgid_param
-$GID/global_id/verifier.rb         —  14 LOC — Wraps MessageVerifier with sha256 digest
-$GID/global_id/fixture_set.rb      —  21 LOC — Test fixture support
-$GID/global_id/railtie.rb          —  52 LOC — Rails wiring (out of scope)
-```
-
-Total ~830 LOC. Realistic TS port lands ~400–500 LOC because the URI and verifier
-infrastructure already exists in our packages.
-
-## Migration plan
-
-### GID-0 — Vendor source for cross-reference (~25 LOC, plan-only) ✅ done
-
-- Originally added `scripts/globalid-source/` (Gemfile + bundler fetch script). Superseded by
-  the unified vendor system (PR #1552 plan, waves 1–3) — globalid now lives at `vendor/globalid/`,
-  cloned from `rails/globalid` at v1.3.0 by `pnpm vendor:fetch --source globalid`. The old
-  `scripts/globalid-source/` was deleted in wave 3.
-- Plan doc landed.
-
-### GID-1 — Create `packages/globalid` skeleton + delete the lie in AR (~150 LOC)
-
-Stand up the new package and remove the dishonest `toSgid` from AR in a
-single shot — this gives every subsequent PR a real home and avoids a brief
-intermediate state where AR has bogus methods.
-
-**New package skeleton:**
-
-- `packages/globalid/package.json` — name `@blazetrails/globalid`, deps on
-  `@blazetrails/activesupport` (for MessageVerifier), peer-dep on
-  `@blazetrails/activerecord` (only used by the Identification mixin and
-  Locator; declared peer to avoid the cycle).
-- `packages/globalid/tsconfig.json` — same `trails-tsc` setup as siblings.
-- `packages/globalid/src/index.ts` — barrel; empty for now (PRs 2–5 fill it).
-- `packages/globalid/src/config.ts` — `setApp(name)` / `getApp()` singletons
-  (mirrors `GlobalID.app=`). Validates app name against `^[a-zA-Z0-9-]+$`.
-- `packages/globalid/dx-tests/` directory placeholder for type-level tests.
-
-**AR-side changes:**
-
-- Delete `Base#toSgid` outright. The base64 fallback was a lie; no callers in
-  this repo depend on it (grep confirms it's only referenced in tests).
-- Update `Base#toGid` to read app from `@blazetrails/globalid`'s `getApp()`
-  via a runtime import. When app is unset, fall back to the existing
-  `gid://${ctor.name}/${this.id}` shape — keeps `signed-id.test.ts:289`
-  green until GID-5 lands the namespaced form.
-- Add the side-effect-import pattern at the bottom of `base.ts`:
-  `import "@blazetrails/globalid/wire";` (the wire module is added in later
-  PRs as it gets richer — GID-1 just creates an empty stub so the import
-  resolves).
-
-**Files touched:** `packages/globalid/*` (new), `packages/activerecord/src/base.ts`,
-`packages/activerecord/src/signed-id.test.ts`, root `pnpm-workspace.yaml` if
-needed, `tsconfig.references.json` chains.
-
-**Tests:** `packages/globalid/src/config.test.ts` round-trips app
-get/set; invalid app names rejected. AR tests stay green.
-
-**Risk:** workspace plumbing — new package needs to land in `pnpm-workspace`,
-turbo pipelines if any, and the CI test matrix.
-
-### GID-2 — `SignedGlobalID` in the new package (~150 LOC)
-
-New file `packages/globalid/src/signed-global-id.ts`. Mirrors
-`$GID/global_id/signed_global_id.rb`.
-
-The verifier comes from AR's existing `signedIdVerifier(klass)` — globalid
-takes it as a parameter rather than importing AR directly. Caller (typically
-AR via the wire module) supplies the verifier; globalid stays AR-agnostic
-in its own source.
-
-- Reuse `signedIdVerifier(klass)` from `signed-id.ts` — no new secret config,
-  no new crypto.
-- Payload shape mirrors Rails: `{ "gid": "<uri>", "purpose": "...", "expires_at": "<iso8601>" }`.
-  This means the same MessageVerifier secret can verify tokens issued by
-  either `signedId` or `SignedGlobalID`, distinguished by their payload shape.
-- Implement `SignedGlobalID.create(model, { app, purpose, expiresIn, expiresAt, verifier })`
-  → returns a `SignedGlobalID` whose `.toString()` / `.toParam()` is the verifier-signed
-  payload.
-- Implement `SignedGlobalID.parse(sgid, { purpose, verifier })` →
-  returns a `SignedGlobalID` instance or `null` on invalid signature, expired,
-  or purpose mismatch (matches Rails' `verify` semantics).
-- Wire `Base#toSgid(options?)` to call `SignedGlobalID.create(this, options).toString()`.
-  This is the **real** signed GID, replacing the fake from GID-1.
-
-The `verify_with_legacy_self_validated_metadata` path in Rails 1.3.0 (lines
-40-60 of `signed_global_id.rb`) is **out of scope** — Trails has no legacy
-unverified-metadata SGIDs to read, so we only implement the verifier-validated
-path.
-
-- Files: `signed-global-id.ts` (new), `base.ts` (rewire toSgid)
-- Tests: `signed-global-id.test.ts` — round-trip, expiration, purpose mismatch,
-  tampered token, wrong verifier
-- Risk: getting the payload key names exactly right for cross-Rails
-  interop ("gid"/"purpose"/"expires_at") — verify against
-  `$GID/global_id/signed_global_id.rb` line 67.
-
-### GID-3 — `URI::GID` parser + `GlobalID` class (~120 LOC)
-
-New files `packages/globalid/src/uri-gid.ts` and `packages/globalid/src/global-id.ts`,
-mirroring `$GID/global_id/uri/gid.rb` + `$GID/global_id/global_id.rb` —
-keep the file split so api:compare picks up Rails-mirroring layout.
-
-- Pure-JS URI parser: extract `app`, `modelName`, `modelId`, `params`. We don't
-  need a full `URI::Generic` subclass — a small `parseGid(str)` function
-  returning `{ app, modelName, modelId, params }` covers all callers. Validate
-  app names against `^[a-zA-Z0-9-]+$` (Rails: `validate_app`).
-- `GlobalID.create(model, options)` → uses the configured `app` (from GID-1) or
-  the option override; returns a `GlobalID` instance with `.uri`, `.modelName`,
-  `.modelId`, `.params`, `.toParam()`, `.toString()`.
-- `GlobalID.parse(input)` → accepts `gid://...` strings or already-parsed
-  `GlobalID` instances; falls back to base64-decoded form (Rails:
-  `parse_encoded_gid`).
-- `GlobalID.find(input, options)` → calls `Locator.locate` from GID-4.
-- Equality: `gid1.equals(gid2)` if URIs match.
-
-- Files: `global-id.ts` (new)
-- Tests: parse roundtrip, equality, base64 param decode, invalid app rejection,
-  cross-validation against fixtures from `$GID/test/uri/gid_test.rb`
-- Risk: encoded params (`?key=value`) — Rails encodes via URL params; align
-  exactly so Rails-issued GIDs round-trip.
-
-### GID-4 — `GlobalID::Locator` + `findGlobalId` class methods (~100 LOC)
-
-New file `packages/globalid/src/locator.ts`. Mirrors `$GID/global_id/locator.rb`.
-
-The locator needs to find a model class from a name. Globalid declares the
-locator interface (`{ locate(gid): Promise<T | null>; locateMany(gids): Promise<T[]> }`)
-and provides a default implementation that asks a registered model-finder.
-AR registers its finder from the wire module — it walks `Base.descendants()`
-and builds a name → class map keyed by `ctor.name`.
-
-The `Base.findGlobalId` / `findSignedGlobalId` class methods live in AR
-(`packages/activerecord/src/base.ts`), delegating to the globalid locator
-they registered with at boot.
-
-The crux: how does the locator find `User` from `gid://app/User/1`?
-
-Rails uses `model_name.constantize` (Ruby's `String#constantize`). TS has no
-constantize — we need a model registry. Two options:
-
-1. **Walk `Base.descendants()`.** Already exists. `Base.descendants()` returns
-   every class that extends `Base`. Build a name → class map on each lookup
-   (cached after first call, invalidated on new descendant registration).
-2. **Explicit registration.** `registerGlobalIdModel(klass)` populates a
-   registry. Strictly opt-in but breaks Rails parity (Rails models are
-   findable by default).
-
-Recommendation: option 1 with a cache. The cache invalidation hook plugs into
-`Base`'s subclass-registration path (already exists for STI).
-
-- `Locator.locate(gid, { only })` → parses → finds model class → calls
-  `klass.find(id)` → returns instance or `null`.
-- `Locator.locateMany(gids, { only, ignoreMissing })` → groups by model class,
-  calls `klass.where({ id: ids }).toArray()` once per class for efficiency,
-  then re-orders to match input order.
-- `Locator.locateSigned(sgid, { for, only })` → parses signed → delegates.
-- App-scoped locators (Rails: `Locator.use(app, locator)`) — **out of scope for
-  GID-4**, can land as GID-4b if a consumer requests cross-app locator.
-- `Base.findGlobalId(input, options)`, `Base.findSignedGlobalId(input, options)`,
-  `Base.findSignedGlobalIdBang(input, options)` — class methods on `Base`.
-
-- Files: `global-id-locator.ts` (new), `base.ts` (add class methods)
-- Tests: locate by uri string, locate by GID instance, `only:` class filter,
-  `ignoreMissing:` semantics, invalid uri returns null
-- Risk: STI subclass routing — `gid://app/Manager/1` should find `Manager` (a
-  `User` subclass via `inheritanceColumn`), not the wrong class. Match Rails'
-  behavior: locator does `Manager.find(1)`, which Rails routes through STI.
-
-### GID-5 — `Identification` mixin polish + ergonomics (~80 LOC)
-
-New file `packages/globalid/src/identification.ts`, mirrors
-`$GID/global_id/identification.rb`. Methods are exported as `this`-typed
-functions and mixed onto `Base` in the wire module. Most of this is method
-aliases and options threading. Net new (on the host that includes the mixin):
-
-- `toGlobalId(options?)` (alias of `toGid`)
-- `toSignedGlobalId(options?)` (alias of `toSgid`)
-- `toGidParam(options?)` — base64 of toGid().toString(), URL-safe, no padding
-- `toSgidParam(options?)` — same as toSgid (already a string token, but Rails
-  exposes both names)
-
-Also:
-
-- `setGlobalIdAppDefaultExpiresIn(duration)` — mirrors `SignedGlobalID.expires_in=`.
-- Default purpose constant `"default"` matches Rails (line 23 of
-  signed_global_id.rb).
-
-- Files: `base.ts`, `signed-global-id.ts`
-- Tests: `to_gid_param` roundtrip via `GlobalID.parse(encoded)`; default
-  purpose; default expires_in
-- Risk: low. This is mostly aliases.
+After skips: api:compare denominator drops from 59 → 56, test:compare
+denominator drops from 158 → 149. 100% becomes 56/56 and 149/149.
 
 ## Browser-compat tie-in
 
-GlobalID/SignedGlobalID inherit `signedId`'s portability:
+Already noted as resolved in `docs/browser-compat-plan.md` §6:
+GlobalID/SignedGlobalID port is portable by construction; no extra
+adapters required.
 
-- `MessageVerifier` already routes through `getCrypto()` (webcrypto in browser,
-  `node:crypto` in Node).
-- `URI::GID` parsing is pure-JS string work.
-- `Base.descendants()` is in-memory.
-- `btoa` / `atob` are global in browser and Node ≥18.
-
-No new BC-N PR needed. Add a single line to `docs/browser-compat-plan.md` §6
-"Open questions" → "Resolved": _GlobalID/SignedGlobalID port is portable by
-construction; no extra adapters required (see `docs/globalid-plan.md`)._
-
-## Out of scope (v1)
+## Out of scope (post-1.0)
 
 - ActionCable / ActiveJob integration. Both gems use GIDs for argument
-  serialization; that wires up via the `Identification` mixin once GID-1..5
+  serialization; ports will use the `Identification` mixin once they
   land.
-- Cross-app locators (`Locator.use(app, locator)`).
-- Legacy `verify_with_legacy_self_validated_metadata` path (no Trails-issued
-  legacy SGIDs exist).
-- Custom URI schemes other than `gid://` (Rails has `sgid://` for some
-  contexts; same parser, different scheme bit).
+- Custom URI schemes other than `gid://`.
 
 ## Open questions
 
-- **App name configuration.** Global singleton (`setGlobalIdApp`) vs
-  per-instance config? Rails uses a class-level singleton on `GlobalID`. Match
-  it. Multi-tenant scenarios use the `app:` option override per-call.
-- **Default expires_in.** Rails default is `nil` (no expiration). Match.
-- **Purpose namespace separator.** `signedId` already combines purpose with
-  the model name (`combineSignedIdPurposes` in `signed-id.ts`). For
-  `SignedGlobalID`, purpose is just the user's `for:` option, no model name
-  combining (Rails behavior — verify against
-  `signed_global_id.rb:24-27`).
+(All three previously open questions — `purpose:` deprecation, `toGid()`
+return type, global SGID verifier — were resolved 2026-05-15 and folded
+into the plan as GID-10a, GID-10b, and GID-10c respectively. Each matches
+Rails exactly; GID-10a and GID-10b are breaking changes to existing
+Trails-only API.)
+
+## Cleanup follow-ups (from PR post-merge findings)
+
+These don't move the 100% needle but improve internals:
+
+- **`base.ts` `loadSgid()` / `loadSignedId()` dynamic-import dance** —
+  vestigial from GID-1/2 era. Static imports now proven to work
+  (`_GlobalIDCtor`, `_Locator`, `_SignedGlobalIDType`). Drop the dynamic
+  loaders, make `toSgid` / `toSgidParam` / `toSignedGlobalId` sync.
+  ~50 LOC.
+- **`Base._modelsByName` test cleanup hook** — populated by the adapter
+  setter, never cleared between tests. Test-adapter should call
+  `Base._modelsByName.clear()` in setup. ~10 LOC.
