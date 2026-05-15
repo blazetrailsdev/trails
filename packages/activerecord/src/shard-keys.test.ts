@@ -68,19 +68,37 @@ describe("ShardsKeysTest", () => {
     expect(ShardedModel.isSharded()).toBe(true);
   });
 
-  it.skip("connected to all shards", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+  it("connected to all shards", () => {
+    const unshardedResults = UnshardedBase.connectedToAllShards({}, () => {
+      return UnshardedBase.connectionPool().dbConfig.name;
+    });
+
+    const shardedResults = ShardedBase.connectedToAllShards({}, () => {
+      return ShardedBase.connectionPool().dbConfig.name;
+    });
+
+    expect(unshardedResults).toEqual([]);
+    expect(shardedResults).toEqual(["shard_one", "shard_two"]);
   });
-  it.skip("connected to all shards can switch each to reading role", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+
+  it("connected to all shards can switch each to reading role", () => {
+    const results = ShardedBase.connectedToAllShards({ role: "reading" }, () => {
+      return ShardedBase.connectionPool().dbConfig.name;
+    });
+
+    expect(results).toEqual(["shard_one_reading", "shard_two_reading"]);
   });
-  it.skip("connected to all shards respects preventing writes", () => {
-    // BLOCKED: connection-pool — sharding / shard-selector not fully implemented
-    // ROOT-CAUSE: connection-handling.ts#connectedTo shard routing + connection-adapters/abstract/connection-handler.ts pool-per-shard not fully implemented
-    // SCOPE: ~100 LOC in connection-handling.ts + connection-adapters/abstract/connection-handler.ts; affects ~19–26 tests in sharding files
+
+  it("connected to all shards respects preventing writes", () => {
+    expect(ShardedBase.currentPreventingWrites()).toBe(false);
+
+    const results = ShardedBase.connectedToAllShards(
+      { role: "writing", preventWrites: true },
+      () => {
+        return ShardedBase.currentPreventingWrites();
+      },
+    );
+
+    expect(results).toEqual([true, true]);
   });
 });

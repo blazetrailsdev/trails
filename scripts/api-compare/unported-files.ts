@@ -248,6 +248,16 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
+    testFile: "connection_handlers_sharding_db_test.rb",
+    tests: [
+      "swapping shards globally in a multi threaded environment",
+      "swapping shards and roles in a multi threaded environment",
+      "swapping granular shards and roles in a multi threaded environment",
+    ],
+    reason:
+      "GVL / Ruby Thread semantics — concurrent shard-swapping tests cannot translate to single-threaded Node.js.",
+  },
+  {
     testFile: "connection_pool_test.rb",
     tests: [
       "lock thread allow fiber reentrency",
