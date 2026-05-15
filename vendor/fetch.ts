@@ -15,10 +15,13 @@
 //   --print-paths:        no fetch; print absolute path of every source,
 //                         one per line. With <name>: print just that one.
 
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 import { SOURCES, type UpstreamSource } from "./sources.js";
 
@@ -54,18 +57,26 @@ function writeLockfile(lock: Lockfile): void {
   writeFileSync(LOCKFILE_PATH, JSON.stringify(sorted, null, 2) + "\n");
 }
 
-function git(args: string[], cwd: string): string {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+async function git(args: string[], cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync("git", args, { cwd });
+  return stdout.trim();
 }
 
 function destFor(source: UpstreamSource): string {
   return join(VENDOR_DIR, source.name);
 }
 
-function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: boolean }): void {
+/**
+ * Fetch one source. Returns the resolved LockEntry; the caller serializes
+ * lockfile writes after all parallel fetches resolve (writing inside this
+ * function would race when called via Promise.all).
+ */
+async function fetchSource(
+  source: UpstreamSource,
+  opts: { refresh: boolean; migrate: boolean; lockEntry?: LockEntry },
+): Promise<LockEntry> {
   const dest = destFor(source);
-  const lock = loadLockfile();
-  const lockEntry = lock.sources[source.name];
+  const lockEntry = opts.lockEntry;
 
   if (opts.migrate && !existsSync(join(dest, ".git"))) {
     const legacyRel = LEGACY_PATHS[source.name];
@@ -75,6 +86,7 @@ function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: 
         console.log(`[${source.name}] migrating ${legacyRel} → vendor/${source.name}/`);
         mkdirSync(VENDOR_DIR, { recursive: true });
         renameSync(legacyAbs, dest);
+        disableSparseCheckout(dest);
       } else {
         console.log(`[${source.name}] --migrate: no legacy clone at ${legacyRel}; will clone`);
       }
@@ -87,29 +99,29 @@ function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: 
   }
 
   if (existsSync(join(dest, ".git"))) {
-    const headSha = git(["rev-parse", "HEAD"], dest);
+    const headSha = await git(["rev-parse", "HEAD"], dest);
     if (lockEntry && lockEntry.sha !== headSha) {
       throw new Error(
         `[${source.name}] HEAD ${headSha} does not match lockfile ${lockEntry.sha}. ` +
           `Re-run with --refresh to discard the local clone and re-fetch.`,
       );
     }
-    if (!lockEntry) {
-      lock.sources[source.name] = { ref: source.origin.ref, sha: headSha };
-      writeLockfile(lock);
-    }
     console.log(`[${source.name}] up to date at ${headSha.slice(0, 12)}`);
-    return;
+    verifyPackages(source);
+    return { ref: source.origin.ref, sha: headSha };
   }
 
   console.log(`[${source.name}] cloning ${source.origin.url}@${source.origin.ref}...`);
   mkdirSync(VENDOR_DIR, { recursive: true });
-  execFileSync(
-    "git",
-    ["clone", "--depth=1", "--branch", source.origin.ref, source.origin.url, dest],
-    { stdio: "inherit" },
-  );
-  const sha = git(["rev-parse", "HEAD"], dest);
+  await execFileAsync("git", [
+    "clone",
+    "--depth=1",
+    "--branch",
+    source.origin.ref,
+    source.origin.url,
+    dest,
+  ]);
+  const sha = await git(["rev-parse", "HEAD"], dest);
 
   if (lockEntry && lockEntry.sha !== sha) {
     rmSync(dest, { recursive: true, force: true });
@@ -119,9 +131,55 @@ function fetchSource(source: UpstreamSource, opts: { refresh: boolean; migrate: 
         `Partial clone removed.`,
     );
   }
-  lock.sources[source.name] = { ref: source.origin.ref, sha };
-  writeLockfile(lock);
   console.log(`[${source.name}] cloned at ${sha.slice(0, 12)}`);
+  verifyPackages(source);
+  return { ref: source.origin.ref, sha };
+}
+
+/**
+ * Assert every declared lib/test path exists under the source's vendored root.
+ * Catches incomplete/sparse/corrupt clones before downstream extractors silently
+ * skip missing directories and produce undercounted output. Runs after every
+ * fetch, including when an existing clone is reused.
+ */
+function verifyPackages(source: UpstreamSource): void {
+  const root = destFor(source);
+  const missing: string[] = [];
+  for (const pkg of source.packages) {
+    if (!existsSync(join(root, pkg.libPath))) missing.push(`${pkg.name}: ${pkg.libPath}`);
+    if (pkg.testPath && !existsSync(join(root, pkg.testPath))) {
+      missing.push(`${pkg.name}: ${pkg.testPath}`);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `[${source.name}] vendored tree is missing declared paths:\n  ` +
+        missing.join("\n  ") +
+        `\nRe-run with --refresh to discard the clone and re-fetch.`,
+    );
+  }
+}
+
+/**
+ * Defensive: pre-PR-#1483 mirrors of rails were created with sparse-checkout
+ * enabled. The old fetch-rails.sh auto-disabled it on first run; --migrate
+ * inherits that contract so a sparse legacy clone doesn't get moved into
+ * vendor/ with paths silently absent.
+ */
+function disableSparseCheckout(dest: string): void {
+  try {
+    const isSparse = execFileSync("git", ["config", "--bool", "core.sparseCheckout"], {
+      cwd: dest,
+      encoding: "utf8",
+    }).trim();
+    if (isSparse === "true") {
+      console.log(`  disabling sparse-checkout in ${dest}`);
+      execFileSync("git", ["-C", dest, "sparse-checkout", "disable"], { stdio: "inherit" });
+    }
+  } catch {
+    // `git config --bool core.sparseCheckout` exits non-zero when the key is
+    // unset (the modern default). That's the happy path — nothing to do.
+  }
 }
 
 function printPaths(filter: string | undefined): void {
@@ -156,7 +214,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return out;
 }
 
-function main(argv: string[]): void {
+async function main(argv: string[]): Promise<void> {
   const args = parseArgs(argv);
 
   if (args.printPaths.active) {
@@ -168,12 +226,28 @@ function main(argv: string[]): void {
   if (args.sourceFilter && targets.length === 0) {
     throw new Error(`--source: no entry named "${args.sourceFilter}" in vendor/sources.ts`);
   }
-  for (const source of targets) {
-    fetchSource(source, { refresh: args.refresh, migrate: args.migrate });
-  }
+
+  // Fetch in parallel: cold runs are sum(clone times) sequentially → max(...)
+  // here. Lockfile entries are returned, not written in fetchSource, so there's
+  // no write race. The pre-load is the single read; we merge results below.
+  const lock = loadLockfile();
+  const results = await Promise.all(
+    targets.map((source) =>
+      fetchSource(source, {
+        refresh: args.refresh,
+        migrate: args.migrate,
+        lockEntry: lock.sources[source.name],
+      }).then((entry) => ({ name: source.name, entry })),
+    ),
+  );
+  for (const { name, entry } of results) lock.sources[name] = entry;
+  writeLockfile(lock);
 }
 
 // Only run main() when invoked as a script, not when imported by tests.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main(process.argv.slice(2));
+  main(process.argv.slice(2)).catch((err) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
 }

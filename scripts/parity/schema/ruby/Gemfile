@@ -2,6 +2,6 @@
 
 source "https://rubygems.org"
 
-gem "activerecord", "8.0.2"     # D10 — matches scripts/api-compare/fetch-rails.sh RAILS_TAG
+gem "activerecord", "8.0.2"     # D10 — matches rails ref in vendor/sources.ts (wave 7 will generate)
 gem "sqlite3", "~> 2.1"         # matches AR 8.0.2 declared dependency range
 gem "minitest", "~> 5.25"       # canonicalize_test.rb

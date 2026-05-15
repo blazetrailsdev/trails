@@ -138,9 +138,13 @@ link_source() {
       # otherwise fail to overwrite the dangling link with a directory.
       echo "      rm -rf $(printf %q "$src") && cp -r $(printf %q "$donor") $(printf %q "$src")" >&2
     else
-      echo "      No sibling worktree has $rel either. Re-run the appropriate fetch" >&2
-      echo "      script (e.g. scripts/api-compare/fetch-rails.sh for .rails-source)" >&2
-      echo "      or copy from a backup." >&2
+      echo "      No sibling worktree has $rel either." >&2
+      if [[ "$rel" == vendor/* ]]; then
+        echo "      Re-run \`pnpm vendor:fetch\` from the main worktree." >&2
+      else
+        echo "      Restore $rel in the main worktree (from git, a backup, or" >&2
+        echo "      whatever process originally produced it) and re-run." >&2
+      fi
     fi
     exit 1
   fi
@@ -150,16 +154,53 @@ link_source() {
   echo "    linked $rel -> $src"
 }
 
-echo "==> Linking Rails and Rack source from main worktree"
-link_source "scripts/api-compare/.rails-source"
-link_source "scripts/api-compare/.rack-source" optional
-
 echo "==> Linking .claude config from main worktree (skills + per-machine permissions)"
 link_source ".claude/skills"
 link_source ".claude/settings.local.json" optional
 
 echo "==> Running pnpm install"
 ( cd "$TARGET" && pnpm install )
+
+echo "==> Linking upstream Ruby sources from main worktree"
+# vendor/<name>/ entries are populated by `pnpm vendor:fetch` on the main
+# worktree; each new worktree symlinks them to avoid re-cloning ~53 MiB
+# per worktree.
+#
+# Source the list from the NEW worktree's vendor/sources.ts (it was just
+# checked out at origin/main, which may be ahead of the local main checkout
+# that drives the symlink targets). Must run AFTER `pnpm install` since
+# tsx lives in node_modules/.bin.
+#
+# Per-source fallback: when origin/main adds a new source that local main
+# hasn't fetched yet, the symlink target doesn't exist in $MAIN_REPO. Fall
+# back to fetching that source directly in the new worktree (slower; only
+# this worktree, not future ones). When local main catches up, future
+# worktrees will symlink as usual.
+VENDOR_PATHS="$(cd "$TARGET" && pnpm -s tsx vendor/fetch.ts --print-paths)"
+LOCK_JSON="$TARGET/vendor/sources.lock.json"
+while IFS= read -r src; do
+  name="$(basename "$src")"
+  rel="vendor/$name"
+  main_clone="$MAIN_REPO/$rel"
+  if [[ -e "$main_clone/.git" ]]; then
+    # Validate main's clone HEAD against the new worktree's lockfile.
+    # When local main lags origin/main on a ref bump, the clone exists but
+    # at the old SHA; symlinking it would just defer the failure to fetch.ts.
+    main_sha="$(git -C "$main_clone" rev-parse HEAD)"
+    # Read lockfile via env vars, not shell interpolation — worktree names
+    # can contain characters that would break a single-quoted JS literal.
+    want_sha="$(LOCKFILE="$LOCK_JSON" SOURCE_NAME="$name" node -e 'const fs=require("fs"); const lock=JSON.parse(fs.readFileSync(process.env.LOCKFILE,"utf8")); process.stdout.write(lock.sources[process.env.SOURCE_NAME]?.sha ?? "")')"
+    if [[ -n "$want_sha" && "$main_sha" != "$want_sha" ]]; then
+      echo "    $rel: main's clone HEAD ($main_sha) differs from target lockfile ($want_sha) — fetching into $TARGET"
+      ( cd "$TARGET" && pnpm -s vendor:fetch --source "$name" )
+    else
+      link_source "$rel"
+    fi
+  else
+    echo "    $rel missing from main worktree — fetching into $TARGET (local main is behind)"
+    ( cd "$TARGET" && pnpm -s vendor:fetch --source "$name" )
+  fi
+done <<< "$VENDOR_PATHS"
 
 WORKTREE_CREATED=0  # success — disable EXIT-trap cleanup
 

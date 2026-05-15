@@ -36,7 +36,7 @@ canonical formats — not a "what to build" plan.
 | D7  | Diff behavior                                | Run all fixtures, per-fixture pass/fail, exit 1 if any failed.                                                                                                        |
 | D8  | Local dev                                    | Both toolchains required for full run. `pnpm parity:schema --side=rails\|trails\|diff` runs just one side.                                                            |
 | D9  | Canonical format versioning                  | `version: 1` is pinned. Any bump touches: JSON Schema, both canonicalizers, baselines — single PR.                                                                    |
-| D10 | Rails pin                                    | `8.0.2` (matches `scripts/api-compare/fetch-rails.sh`).                                                                                                               |
+| D10 | Rails pin                                    | `8.0.2` (matches `vendor/sources.ts`).                                                                                                                                |
 
 ## Canonical formats (v1)
 
