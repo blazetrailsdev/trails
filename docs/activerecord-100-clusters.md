@@ -320,13 +320,9 @@ Slot D was 2 notification un-skips. Gap 8 (process-fork lifecycle) was a phantom
 
 ---
 
-## PG-schema audit cluster (~50 LOC followup remaining)
+## PG-schema audit cluster (closed)
 
-Slots A (#1504 indexes() opclass + nulls order), B (#1458 INHERITS + #1469 comment/partition), and C (#1469 schema-qualified createJoinTable) closed.
-
-- **Slot A followup** (~50 LOC) — `indexes()` `columns` array includes INCLUDE column names (PG11+ stores them in `indkey`); switch to `ix.indnkeyatts` to limit subquery to key columns, fetch INCLUDE separately. Plus the 3 `SchemaIndexNullsNotDistinctTest` tests still skipped because they need the same try/finally + dumpTable scaffolding the un-skipped tests in #1504 got.
-
-Plus: `setSchemaSearchPath` unquoted-`$user` rejection + 5 fixture-model gaps (`Thing1..5`, `Song`/`Album` habtm) — small enough to bundle with the followup.
+Slots A (#1504 indexes() opclass + nulls order), B (#1458 INHERITS + #1469 comment/partition), C (#1469 schema-qualified createJoinTable), and Slot A followup (`indexes()` INCLUDE column filtering via `ix.indnkeyatts`) all closed. The 3 `SchemaIndexNullsNotDistinctTest` tests, `setSchemaSearchPath` unquoted-`$user` rejection, and Thing1..5 / Song-Album fixture-model gaps were resolved by prior Slot H-b work (#1592 / #1618).
 
 ## Unknown-triage cluster (~640 LOC, from audit-unknown-triage)
 
