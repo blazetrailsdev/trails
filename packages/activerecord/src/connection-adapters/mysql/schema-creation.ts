@@ -64,20 +64,30 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     const limit = options.limit as number | null | undefined;
+    const unsigned = (options as Record<string, unknown>).unsigned;
+    let sql: string;
     switch (type) {
       case "float":
-        return `float(${limit ?? 24})`;
+        sql = `float(${limit ?? 24})`;
+        break;
       case "integer":
-        return integerToSql(limit);
+        sql = integerToSql(limit);
+        break;
       case "text":
-        return typeWithSizeToSql("text", limitToSize(limit ?? null, "text"));
+        sql = typeWithSizeToSql("text", limitToSize(limit ?? null, "text"));
+        break;
       case "blob":
-        return typeWithSizeToSql("blob", limitToSize(limit ?? null, "blob"));
+        sql = typeWithSizeToSql("blob", limitToSize(limit ?? null, "blob"));
+        break;
       case "binary":
-        if (limit != null && limit >= 0 && limit <= 0xfff) return `varbinary(${limit})`;
-        return typeWithSizeToSql("blob", limitToSize(limit ?? null, "binary"));
+        sql =
+          limit != null && limit >= 0 && limit <= 0xfff
+            ? `varbinary(${limit})`
+            : typeWithSizeToSql("blob", limitToSize(limit ?? null, "binary"));
+        break;
       case "string":
-        return `varchar(${limit ?? 255})`;
+        sql = `varchar(${limit ?? 255})`;
+        break;
       case "datetime":
       case "timestamp": {
         const base = type === "timestamp" ? "timestamp" : "datetime";
@@ -86,7 +96,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
           throw new ArgumentError(
             `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
           );
-        return p != null ? `${base}(${p})` : base;
+        sql = p != null ? `${base}(${p})` : base;
+        break;
       }
       case "time": {
         const p = options.precision;
@@ -94,30 +105,43 @@ export class SchemaCreation extends AbstractSchemaCreation {
           throw new ArgumentError(
             `No time type has precision of ${p}. The allowed range of precision is from 0 to 6`,
           );
-        return p != null ? `time(${p})` : "time";
+        sql = p != null ? `time(${p})` : "time";
+        break;
       }
       case "date":
-        return "date";
+        sql = "date";
+        break;
       case "bigint":
-        return "bigint";
+        sql = "bigint";
+        break;
       case "decimal": {
         const p = options.precision;
         const s = options.scale;
-        if (p != null && s != null) return `decimal(${p},${s})`;
-        if (p != null) return `decimal(${p})`;
-        if (s != null)
+        if (p != null && s != null) {
+          sql = `decimal(${p},${s})`;
+        } else if (p != null) {
+          sql = `decimal(${p})`;
+        } else if (s != null) {
           throw new ArgumentError(
             "Error adding decimal column: precision cannot be empty if scale is specified",
           );
-        return "decimal";
+        } else {
+          sql = "decimal";
+        }
+        break;
       }
       case "boolean":
-        return "tinyint(1)";
+        sql = "tinyint(1)";
+        break;
       case "json":
-        return "json";
+        sql = "json";
+        break;
       default:
-        return super.typeToSql(type, options);
+        sql = super.typeToSql(type, options);
+        break;
     }
+    if (unsigned && type !== "primary_key") sql += " unsigned";
+    return sql;
   }
 
   visitAddForeignKey(fromTable: string, toTable: string, options: Record<string, unknown>): string {

@@ -167,22 +167,24 @@ export class SchemaStatements {
       await this.adapter.changeTableComment(name, options.comment);
     }
 
-    for (const idx of td.indexes) {
-      await this.addIndex(name, idx.columns, {
-        unique: idx.unique,
-        name: idx.name,
-        where: idx.where,
-        order: expandIndexOption(idx.orders, idx.columns) as Record<string, string>,
-        using: idx.using,
-        type: idx.type,
-        comment: idx.comment,
-        length: expandIndexOption(idx.lengths, idx.columns) as Record<string, number>,
-        opclass: expandIndexOption(idx.opclasses, idx.columns) as Record<string, string>,
-        include: idx.include,
-        nullsNotDistinct: idx.nullsNotDistinct,
-        algorithm: idx.algorithm,
-        ifNotExists: idx.ifNotExists,
-      });
+    if (this.adapter.adapterName !== "mysql") {
+      for (const idx of td.indexes) {
+        await this.addIndex(name, idx.columns, {
+          unique: idx.unique,
+          name: idx.name,
+          where: idx.where,
+          order: expandIndexOption(idx.orders, idx.columns) as Record<string, string>,
+          using: idx.using,
+          type: idx.type,
+          comment: idx.comment,
+          length: expandIndexOption(idx.lengths, idx.columns) as Record<string, number>,
+          opclass: expandIndexOption(idx.opclasses, idx.columns) as Record<string, string>,
+          include: idx.include,
+          nullsNotDistinct: idx.nullsNotDistinct,
+          algorithm: idx.algorithm,
+          ifNotExists: idx.ifNotExists,
+        });
+      }
     }
   }
 

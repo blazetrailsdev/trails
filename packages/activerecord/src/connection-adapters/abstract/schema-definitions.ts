@@ -967,6 +967,26 @@ export class TableDefinition {
     return this;
   }
 
+  /** @internal Builds MySQL inline INDEX clause for use inside CREATE TABLE (...). */
+  private _mysqlInlineIndexSql(idx: IndexDefinition): string {
+    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
+    const parts: string[] = [];
+    if (indexType) parts.push(indexType);
+    parts.push("INDEX");
+    parts.push(this._adapter.quoteIdentifier(idx.name));
+    if (idx.using) parts.push(`USING ${idx.using}`);
+    const cols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
+    const quotedCols = cols.map((c) => {
+      let q = this._adapter.quoteIdentifier(c);
+      const lengths = idx.lengths as Record<string, number> | number | undefined;
+      const len = typeof lengths === "number" ? lengths : (lengths as Record<string, number>)?.[c];
+      if (len != null) q += `(${len})`;
+      return q;
+    });
+    parts.push(`(${quotedCols.join(", ")})`);
+    return parts.join(" ");
+  }
+
   /**
    * Generate CREATE TABLE SQL.
    */
@@ -1124,7 +1144,12 @@ export class TableDefinition {
     sql += ` ${this._adapter.quoteTableName(this.tableName)}`;
 
     if (this.as) {
-      sql += ` AS ${this.as}`;
+      if (this._adapterName === "mysql" && this.indexes.length > 0) {
+        const inlineIdxSql = this.indexes.map((idx) => this._mysqlInlineIndexSql(idx));
+        sql += ` (${inlineIdxSql.join(", ")}) AS ${this.as}`;
+      } else {
+        sql += ` AS ${this.as}`;
+      }
     } else {
       const tableElements = [...columnDefs];
       for (const chk of this.checkConstraints) {
@@ -1162,6 +1187,11 @@ export class TableDefinition {
           .map((k) => this._adapter.quoteIdentifier(k))
           .join(", ");
         tableElements.push(`PRIMARY KEY (${quotedCols})`);
+      }
+      if (this._adapterName === "mysql") {
+        for (const idx of this.indexes) {
+          tableElements.push(this._mysqlInlineIndexSql(idx));
+        }
       }
       sql += ` (${tableElements.join(", ")})`;
     }
