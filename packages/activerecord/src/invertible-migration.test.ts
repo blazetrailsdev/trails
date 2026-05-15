@@ -421,10 +421,38 @@ describe("InvertibleMigrationTest", () => {
     /* check constraints not implemented */
   });
 
-  it.skip("migrate revert change table", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
+  it("migrate revert change table", async () => {
+    class CreateHorses extends Migration {
+      async change() {
+        await this.createTable("horses", (t) => {
+          t.string("content");
+          t.datetime("remind_at");
+        });
+      }
+    }
+
+    class ChangeHorsesTable extends Migration {
+      async change() {
+        await this.changeTable("horses", async (t) => {
+          await t.string("name");
+          await t.remove("remind_at", { type: "datetime" });
+        });
+      }
+    }
+
+    const schemaOf = (m: Migration) => (m as any).schema;
+
+    const create = makeMigration(new CreateHorses());
+    await create.up();
+    expect(await schemaOf(create).columnExists("horses", "remind_at")).toBe(true);
+
+    const cm = makeMigration(new ChangeHorsesTable());
+    await cm.up();
+    expect(await schemaOf(cm).columnExists("horses", "remind_at")).toBe(false);
+    expect(await schemaOf(cm).columnExists("horses", "name")).toBe(true);
+
+    await cm.down();
+    expect(await schemaOf(cm).columnExists("horses", "remind_at")).toBe(true);
   });
 });
 

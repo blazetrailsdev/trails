@@ -2193,38 +2193,47 @@ describe("MigrationTest", () => {
     });
 
     it.skip("changing columns", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* ALTER COLUMN TYPE not supported in SQLite */
+      // BLOCKED: adapter — changeColumn requires ALTER COLUMN TYPE not supported by SQLite
     });
 
     it.skip("changing column null with default", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* ALTER COLUMN not supported */
+      // BLOCKED: adapter — changeColumnNull requires ALTER COLUMN ... SET NOT NULL not supported by SQLite
     });
 
     it.skip("default functions on columns", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* not supported */
+      // BLOCKED: adapter — gen_random_uuid() / UUID() requires PostgreSQL or MySQL
     });
 
     it.skip("updating auto increment", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* not supported */
+      // BLOCKED: adapter — auto_increment is MySQL-only (Mysql2Adapter / TrilogyAdapter)
     });
 
-    it.skip("changing index", () => {
-      // BLOCKED: migration — migration runner gap in migration
-      // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-      // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in migration.test.ts
-      /* ALTER INDEX not supported */
+    it("changing index", async () => {
+      // Create table with a non-unique index, then swap to a unique index
+      await makeBulkMig(
+        new (class extends Migration {
+          async up() {
+            await this.createTable("bk_idx", (t) => {
+              t.string("username");
+            });
+            await this.addIndex("bk_idx", "username", { name: "username_index" });
+          }
+          async down() {}
+        })(),
+      ).up();
+      await makeBulkMig(
+        new (class extends Migration {
+          async up() {
+            await this.removeIndex("bk_idx", { name: "username_index" });
+            await this.addIndex("bk_idx", "username", { name: "username_index", unique: true });
+          }
+          async down() {}
+        })(),
+      ).up();
+      await bulkAdapter.executeMutation(`INSERT INTO "bk_idx" ("username") VALUES ('alice')`);
+      await expect(
+        bulkAdapter.executeMutation(`INSERT INTO "bk_idx" ("username") VALUES ('alice')`),
+      ).rejects.toThrow();
     });
   }); // BulkAlterTableMigrationsTest
 
