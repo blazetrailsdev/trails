@@ -13,7 +13,7 @@ Style match: [activerecord-type-audit.md](activerecord-type-audit.md) +
 [actionpack-restructure-audit.md](actionpack-restructure-audit.md).
 This is the _within-file_ analog of the actionpack restructure audit.
 
-> **Note:** [PR #1552](https://github.com/blazetrailsdev/trails/pull/1552) (vendor migration) is merged. Rails source lives at
+> **Note:** The vendor migration (waves tracked in `vendor/README.md`, starting with [PR #1559](https://github.com/blazetrailsdev/trails/pull/1559)) is complete. Rails source lives at
 > `vendor/rails/` via `vendor/sources.ts`. The structure extractor should consume
 > `resolvePath("activerecord", "lib")` etc. via the env-var contract defined there.
 >
@@ -629,7 +629,7 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
   the directory-level analog to this within-file plan.
 - [scripts/api-compare/conventions.ts](../scripts/api-compare/conventions.ts) —
   TS↔Ruby naming/path mapping registry; reused by the new rule.
-- [PR #1552](https://github.com/blazetrailsdev/trails/pull/1552) — vendor migration; `vendor/sources.ts` is the source of truth for
+- `vendor/README.md` — vendor migration history and wave PRs; `vendor/sources.ts` is the source of truth for
   fetched Ruby source locations.
 - [scripts/api-compare/extract-ruby-api.rb](../scripts/api-compare/extract-ruby-api.rb) —
   precedent Ruby extractor; new structure extractor copies its caching gate
