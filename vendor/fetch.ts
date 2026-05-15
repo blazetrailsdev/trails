@@ -18,6 +18,9 @@
 //                         for every package with a testPath and
 //                         compareTests !== false. Used by extract-ruby-tests.rb
 //                         via the TEST_PATHS_JSON env var.
+//   --print-lib-paths:    no fetch; print JSON map {package: absolute_lib_dir}
+//                         for every package with compareApi !== false. Used by
+//                         extract-ruby-api.rb via the LIB_PATHS_JSON env var.
 
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -27,7 +30,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-import { SOURCES, testPathsManifest, type UpstreamSource } from "./sources.js";
+import { libPathsManifest, SOURCES, testPathsManifest, type UpstreamSource } from "./sources.js";
 
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");
@@ -58,7 +61,12 @@ function writeLockfile(lock: Lockfile): void {
   for (const name of Object.keys(lock.sources).sort()) {
     sorted.sources[name] = lock.sources[name];
   }
-  writeFileSync(LOCKFILE_PATH, JSON.stringify(sorted, null, 2) + "\n");
+  const next = JSON.stringify(sorted, null, 2) + "\n";
+  // Only write when content actually changed. Otherwise every no-op fetch
+  // would bump the lockfile mtime and defeat extract-ruby-api.rb's cache
+  // gate (which compares output_path mtime to LOCKFILE_PATH mtime).
+  if (existsSync(LOCKFILE_PATH) && readFileSync(LOCKFILE_PATH, "utf8") === next) return;
+  writeFileSync(LOCKFILE_PATH, next);
 }
 
 async function git(args: string[], cwd: string): Promise<string> {
@@ -197,12 +205,17 @@ function printTestPaths(): void {
   process.stdout.write(JSON.stringify(testPathsManifest()) + "\n");
 }
 
+function printLibPaths(): void {
+  process.stdout.write(JSON.stringify(libPathsManifest()) + "\n");
+}
+
 export interface ParsedArgs {
   sourceFilter?: string;
   refresh: boolean;
   migrate: boolean;
   printPaths: { active: boolean; name?: string };
   printTestPaths: boolean;
+  printLibPaths: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -211,6 +224,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     migrate: false,
     printPaths: { active: false },
     printTestPaths: false,
+    printLibPaths: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -218,6 +232,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     else if (a === "--refresh") out.refresh = true;
     else if (a === "--migrate") out.migrate = true;
     else if (a === "--print-test-paths") out.printTestPaths = true;
+    else if (a === "--print-lib-paths") out.printLibPaths = true;
     else if (a === "--print-paths") {
       const next = argv[i + 1];
       out.printPaths = {
@@ -238,6 +253,10 @@ async function main(argv: string[]): Promise<void> {
   }
   if (args.printTestPaths) {
     printTestPaths();
+    return;
+  }
+  if (args.printLibPaths) {
+    printLibPaths();
     return;
   }
 

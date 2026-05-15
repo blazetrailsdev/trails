@@ -127,7 +127,10 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/rack/rack.git",
       ref: "v3.1.14",
     },
-    packages: [{ name: "rack", libPath: "lib", testPath: "test", compareApi: false }],
+    // libPath points at `lib/rack/` (the Rack module root) for symmetry with
+    // how Rails subgems are mapped — see e.g. activerecord/lib/active_record.
+    // Bare `lib` would also scan lib/rack.rb (the entrypoint shim).
+    packages: [{ name: "rack", libPath: "lib/rack", testPath: "test" }],
   },
   {
     name: "globalid",
@@ -139,12 +142,13 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         name: "globalid",
-        libPath: "lib",
+        // Globalid's lib root is `lib/global_id/` (Ruby module GlobalID maps
+        // to global_id). Pointing at `lib` directly would scan global_id.rb +
+        // global_id/*.rb together; pointing at `lib/global_id` matches the
+        // pattern used for activerecord (lib/active_record/).
+        libPath: "lib/global_id",
         // Globalid puts *_test.rb under test/cases/ (not test/ directly).
         testPath: "test/cases",
-        compareApi: false,
-        // compareTests defaults to true; globalid tests are already in
-        // extract-ruby-tests.rb's PACKAGE_TEST_DIRS (predates this PR).
       },
     ],
   },
@@ -226,6 +230,23 @@ export function vendoredRoot(sourceName: string): string {
   const found = SOURCES.find((s) => s.name === sourceName);
   if (!found) throw new Error(`vendor/sources.ts: no source named "${sourceName}"`);
   return join(VENDOR_DIR, sourceName);
+}
+
+/**
+ * Map of package name → absolute lib directory for every package with
+ * `compareApi !== false`. Wave 6: feeds extract-ruby-api.rb via
+ * `LIB_PATHS_JSON` env var so the Ruby script's PACKAGE_DIRS isn't a
+ * hand-maintained map that drifts from SOURCES.
+ */
+export function libPathsManifest(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const source of SOURCES) {
+    for (const pkg of source.packages) {
+      if (pkg.compareApi === false) continue;
+      out[pkg.name] = resolve(VENDOR_DIR, source.name, pkg.libPath);
+    }
+  }
+  return out;
 }
 
 /**

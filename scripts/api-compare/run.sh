@@ -9,8 +9,14 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/../.." && pwd)"
 
-pnpm tsx "$ROOT/vendor/fetch.ts" --source rails
-RAILS_DIR="$(pnpm tsx "$ROOT/vendor/fetch.ts" --print-paths rails)" ruby "$DIR/extract-ruby-api.rb"
+# Fetch every source the registry knows about (rails, rack, globalid, …).
+# extract-ruby-api.rb iterates whichever packages are in LIB_PATHS_JSON; the
+# old per-source --source rails was a wave-2b vestige that pre-dated rack
+# and globalid being api-compared.
+pnpm -s tsx "$ROOT/vendor/fetch.ts"
+LIB_PATHS_JSON="$(pnpm -s tsx "$ROOT/vendor/fetch.ts" --print-lib-paths)" \
+  LOCKFILE_PATH="$ROOT/vendor/sources.lock.json" \
+  ruby "$DIR/extract-ruby-api.rb"
 pnpm tsx "$DIR/extract-ts-api.ts"
 pnpm tsx "$DIR/compare.ts" "$@"
 pnpm tsx "$ROOT/scripts/build-rails-privates-manifest.ts"

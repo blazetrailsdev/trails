@@ -11,37 +11,48 @@ require "time"
 require "set"
 
 SCRIPT_DIR = File.dirname(__FILE__)
-RAILS_DIR = ENV.fetch("RAILS_DIR") do
-  abort "extract-ruby-api.rb: RAILS_DIR env var not set. Caller must export " \
-        "it via `RAILS_DIR=$(pnpm -s vendor:fetch --print-paths rails)`."
-end
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 
-# Cache gate: Rails source is pinned to a tag by vendor/sources.ts and
-# doesn't change between runs. Skip the ~8s Ripper pass when the
-# output already exists and the Rails source hasn't moved since it
-# was last written. Honours `API_COMPARE_FORCE=1` for the rare case
-# where the extractor itself was modified and you want a fresh
-# manifest.
+# PACKAGE_DIRS is fed by the caller via LIB_PATHS_JSON (a JSON map of
+# {package_name: absolute_lib_dir}) — built from vendor/sources.ts by
+# `vendor/fetch.ts --print-lib-paths`. This Ruby script no longer carries
+# a parallel package table that drifts from the registry; adding a source
+# with compareApi !== false in vendor/sources.ts feeds through automatically.
+LIB_PATHS_JSON = ENV.fetch("LIB_PATHS_JSON") do
+  abort "extract-ruby-api.rb: LIB_PATHS_JSON env var not set. Caller must export " \
+        "it via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+end
+PACKAGE_DIRS =
+  begin
+    parsed = JSON.parse(LIB_PATHS_JSON)
+    unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+      abort "extract-ruby-api.rb: LIB_PATHS_JSON must be a JSON object of " \
+            "{string: string}; got #{parsed.class}. Re-run vendor:fetch --print-lib-paths."
+    end
+    parsed
+  rescue JSON::ParserError => e
+    abort "extract-ruby-api.rb: LIB_PATHS_JSON is not valid JSON (#{e.message}). " \
+          "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+  end
+
+# Cache gate: invalidate on either (a) a re-fetch (lockfile mtime bumped) or
+# (b) a registry edit (sources.ts mtime bumped — covers compareApi flips,
+# libPath edits, source add/remove). The output is current only when it's
+# newer than BOTH signals. Honours `API_COMPARE_FORCE=1` for the rare case
+# where the extractor itself was modified and you want a fresh manifest.
 output_path = File.join(OUTPUT_DIR, "rails-api.json")
-rails_head = File.join(RAILS_DIR, ".git", "HEAD")
+lockfile_path = ENV.fetch("LOCKFILE_PATH") do
+  abort "extract-ruby-api.rb: LOCKFILE_PATH env var not set. Caller must export " \
+        "it (e.g. LOCKFILE_PATH=\"$ROOT/vendor/sources.lock.json\")."
+end
+sources_ts_path = File.join(File.dirname(lockfile_path), "sources.ts")
 if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
-   File.exist?(rails_head) && File.mtime(output_path) >= File.mtime(rails_head)
+   File.exist?(lockfile_path) && File.exist?(sources_ts_path) &&
+   File.mtime(output_path) >= File.mtime(lockfile_path) &&
+   File.mtime(output_path) >= File.mtime(sources_ts_path)
   puts "Rails manifest #{output_path} is up to date (set API_COMPARE_FORCE=1 to regenerate)"
   exit 0
 end
-
-# Map of source directories to package names
-PACKAGE_DIRS = {
-  "arel" => File.join(RAILS_DIR, "activerecord", "lib", "arel"),
-  "activemodel" => File.join(RAILS_DIR, "activemodel", "lib", "active_model"),
-  "activerecord" => File.join(RAILS_DIR, "activerecord", "lib", "active_record"),
-  "activesupport" => File.join(RAILS_DIR, "activesupport", "lib", "active_support"),
-  "actiondispatch" => File.join(RAILS_DIR, "actionpack", "lib", "action_dispatch"),
-  "actioncontroller" => File.join(RAILS_DIR, "actionpack", "lib", "action_controller"),
-  "actionview" => File.join(RAILS_DIR, "actionview", "lib", "action_view"),
-  "trailties" => File.join(RAILS_DIR, "railties", "lib", "rails"),
-}
 
 # ---- Param extraction from Ripper AST ----
 
@@ -928,8 +939,11 @@ end
 # ---- Main ----
 
 def run
-  unless File.directory?(RAILS_DIR)
-    abort "Rails source not found at #{RAILS_DIR}. Run `pnpm vendor:fetch --source rails` first."
+  # Validate per-package paths (the JSON manifest may include paths the user
+  # hasn't fetched yet, e.g. a fresh checkout that skipped pnpm vendor:fetch).
+  PACKAGE_DIRS.each do |pkg, dir|
+    next if File.directory?(dir)
+    abort "Lib directory for #{pkg} not found at #{dir}. Run `pnpm vendor:fetch` first."
   end
 
   Dir.mkdir(OUTPUT_DIR) unless File.directory?(OUTPUT_DIR)

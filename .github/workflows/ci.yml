@@ -408,7 +408,7 @@ jobs:
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
       - name: Extract Ruby API
-        run: cd scripts/api-compare && RAILS_DIR=$(pnpm -s -C ../.. vendor:fetch --print-paths rails) ruby extract-ruby-api.rb
+        run: cd scripts/api-compare && LIB_PATHS_JSON=$(pnpm -s -C ../.. vendor:fetch --print-lib-paths) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb
       - name: Extract Ruby tests
         run: cd scripts/test-compare && TEST_PATHS_JSON=$(pnpm -s -C ../.. vendor:fetch --print-test-paths) ruby extract-ruby-tests.rb
       - name: API comparison

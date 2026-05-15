@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apiComparePackages,
+  libPathsManifest,
   resolvePath,
   SOURCES,
   testPathsManifest,
@@ -42,9 +43,7 @@ describe("vendor/sources.ts", () => {
     const rack = SOURCES.find((s) => s.name === "rack");
     expect(rack).toBeDefined();
     expect(rack!.origin.ref).toBe("v3.1.14");
-    expect(rack!.packages).toEqual([
-      { name: "rack", libPath: "lib", testPath: "test", compareApi: false },
-    ]);
+    expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib/rack", testPath: "test" }]);
   });
 
   it("declares the globalid source (wave 3)", () => {
@@ -56,7 +55,7 @@ describe("vendor/sources.ts", () => {
       ref: "v1.3.0",
     });
     expect(gid!.packages).toEqual([
-      { name: "globalid", libPath: "lib", testPath: "test/cases", compareApi: false },
+      { name: "globalid", libPath: "lib/global_id", testPath: "test/cases" },
     ]);
   });
 
@@ -142,20 +141,20 @@ describe("vendor/sources.ts", () => {
     expect(() => vendoredRoot("nope")).toThrow(/no source named "nope"/);
   });
 
-  it("apiComparePackages excludes compareApi:false entries (rack, globalid)", () => {
+  it("apiComparePackages includes rack and globalid (wave 6: compareApi flipped on)", () => {
     const pkgs = apiComparePackages();
-    expect(pkgs).not.toContain("rack");
-    expect(pkgs).not.toContain("globalid");
+    expect(pkgs).toContain("rack");
+    expect(pkgs).toContain("globalid");
     expect(pkgs).toContain("activerecord");
     expect(pkgs).toContain("abstractcontroller");
   });
 
-  it("apiComparePackages returns exactly the historic 9-entry api-compare set", () => {
-    // Bulletproofs against a future PR that accidentally toggles compareApi on
-    // an api-compared package, or adds/drops a Rails subgem from SOURCES
-    // without updating extract-ruby-api.rb. If extract-ruby-api.rb's PACKAGE_DIRS
-    // gets derived from SOURCES (a future wave), this assertion needs to grow
-    // with it — that's the intended forcing function.
+  it("apiComparePackages returns exactly the wave-6 11-entry api-compare set", () => {
+    // Bulletproofs against a future PR that accidentally toggles compareApi
+    // on a package, or adds/drops a source from SOURCES without updating
+    // extract-ruby-api.rb. extract-ruby-api.rb's PACKAGE_DIRS is now derived
+    // from libPathsManifest() — same SOURCES list — so this assertion stays
+    // in lockstep with the Ruby script automatically.
     expect(apiComparePackages().sort()).toEqual(
       [
         "abstractcontroller",
@@ -166,9 +165,22 @@ describe("vendor/sources.ts", () => {
         "activerecord",
         "activesupport",
         "arel",
+        "globalid",
+        "rack",
         "trailties",
       ].sort(),
     );
+  });
+
+  it("libPathsManifest returns absolute lib dirs for every api-compared package", () => {
+    const m = libPathsManifest();
+    expect(Object.keys(m).sort()).toEqual(apiComparePackages().sort());
+    expect(m["activerecord"].endsWith("vendor/rails/activerecord/lib/active_record")).toBe(true);
+    expect(
+      m["abstractcontroller"].endsWith("vendor/rails/actionpack/lib/abstract_controller"),
+    ).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/lib/rack")).toBe(true);
+    expect(m["globalid"].endsWith("vendor/globalid/lib/global_id")).toBe(true);
   });
 
   it("testPathsManifest returns absolute test dirs for the wave-5 set", () => {

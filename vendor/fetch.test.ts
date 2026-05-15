@@ -8,6 +8,7 @@ describe("vendor/fetch.ts parseArgs", () => {
       migrate: false,
       printPaths: { active: false },
       printTestPaths: false,
+      printLibPaths: false,
     });
   });
 
@@ -44,6 +45,10 @@ describe("vendor/fetch.ts parseArgs", () => {
     expect(parseArgs(["--print-test-paths"]).printTestPaths).toBe(true);
   });
 
+  it("--print-lib-paths sets the flag", () => {
+    expect(parseArgs(["--print-lib-paths"]).printLibPaths).toBe(true);
+  });
+
   it("--print-test-paths emits valid JSON matching testPathsManifest()", async () => {
     // Spawn the CLI for real (not just parseArgs) so the integration that
     // ruby relies on — `TEST_PATHS_JSON=$(pnpm -s vendor:fetch --print-test-paths)`
@@ -59,6 +64,20 @@ describe("vendor/fetch.ts parseArgs", () => {
     });
     const { testPathsManifest } = await import("./sources.js");
     expect(JSON.parse(out)).toEqual(testPathsManifest());
+  });
+
+  it("--print-lib-paths emits valid JSON matching libPathsManifest()", async () => {
+    // Mirror of the --print-test-paths integration test for wave-6's
+    // LIB_PATHS_JSON pipeline (extract-ruby-api.rb).
+    const { execFileSync } = await import("node:child_process");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const out = execFileSync("pnpm", ["-s", "tsx", join(here, "fetch.ts"), "--print-lib-paths"], {
+      encoding: "utf8",
+    });
+    const { libPathsManifest } = await import("./sources.js");
+    expect(JSON.parse(out)).toEqual(libPathsManifest());
   });
 
   it("rejects unknown flags", () => {
