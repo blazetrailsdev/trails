@@ -19,11 +19,12 @@ class CaptureLogger {
 
 function makeEvent(payload: Record<string, unknown>, duration = 12): NotificationEvent {
   const ev = Object.create(NotificationEvent.prototype) as NotificationEvent;
+  const fixedTime = new Date("2026-01-01T00:00:00Z");
   Object.assign(ev, {
     name: "redirect.action_dispatch",
     transactionId: "x",
-    time: new Date(),
-    endTime: new Date(),
+    time: fixedTime,
+    endTime: fixedTime,
     payload,
     children: [],
   });
@@ -60,9 +61,9 @@ describe("ActionDispatch::LogSubscriber#redirect", () => {
     expect(logger.messages[1]).toBe("Completed 301 Moved Permanently in 5ms");
   });
 
-  it("falls back to empty reason phrase for non-3xx status", () => {
-    subscriber.redirect(makeEvent({ location: "/x", status: 200 }, 1));
-    expect(logger.messages[1]).toBe("Completed 200  in 1ms");
+  it("falls back to empty reason phrase for status not in Rack table", () => {
+    subscriber.redirect(makeEvent({ location: "/x", status: 999 }, 1));
+    expect(logger.messages[1]).toBe("Completed 999  in 1ms");
   });
 
   it("rounds non-integer duration", () => {
