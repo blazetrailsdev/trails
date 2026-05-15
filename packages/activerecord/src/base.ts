@@ -895,7 +895,14 @@ export class Base extends Model {
     return _Core.arelTable.call(this);
   }
 
-  /** @internal */
+  /**
+   * Returns the model's predicate builder, creating it if necessary.
+   * Use this to register custom value handlers:
+   *
+   *   MyModel.predicateBuilder.registerHandler(MyRange, handler)
+   *
+   * Mirrors: ActiveRecord::Base.predicate_builder
+   */
   static get predicateBuilder(): import("./relation/predicate-builder.js").PredicateBuilder {
     return _Core.predicateBuilder.call(this);
   }

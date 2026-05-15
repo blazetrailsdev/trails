@@ -5,6 +5,7 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
+import { createTestAdapter } from "../test-adapter.js";
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
@@ -25,10 +26,12 @@ describe("PredicateBuilderTest", () => {
       call: (attr, val: RegexFilter) =>
         new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
     });
-    const sql = PbTopic.where({ title: new RegexFilter("rails") }).toSql();
-    expect(sql).toMatch(/"topics"."title" ~ 'rails'/i);
-    // Reset so next test isn't affected
-    (PbTopic as any)._predicateBuilder = null;
+    try {
+      const sql = PbTopic.where({ title: new RegexFilter("rails") }).toSql();
+      expect(sql).toMatch(/"topics"."title" ~ 'rails'/i);
+    } finally {
+      (PbTopic as any)._predicateBuilder = null;
+    }
   });
 
   it("registering new handlers for association", () => {
@@ -54,12 +57,15 @@ describe("PredicateBuilderTest", () => {
       call: (attr, val: RegexFilter2) =>
         new Nodes.InfixOperation("~", attr, new Nodes.Quoted(val.source)),
     });
-    const sql = PbReply2.where({ pbTopic2: { title: new RegexFilter2("rails") } }).toSql();
-    // Handler propagates to associated table — column uses association-resolved table name.
-    expect(sql).toMatch(/"pbTopic2"."title" ~ 'rails'/i);
-    modelRegistry.delete("PbTopic2");
-    modelRegistry.delete("PbReply2");
-    (PbTopic2 as any)._predicateBuilder = null;
+    try {
+      const sql = PbReply2.where({ pbTopic2: { title: new RegexFilter2("rails") } }).toSql();
+      // Handler propagates to associated table — column uses association-resolved table name.
+      expect(sql).toMatch(/"pbTopic2"."title" ~ 'rails'/i);
+    } finally {
+      modelRegistry.delete("PbTopic2");
+      modelRegistry.delete("PbReply2");
+      (PbTopic2 as any)._predicateBuilder = null;
+    }
   });
 
   it.skip("registering new handlers for joins", () => {
@@ -76,13 +82,27 @@ describe("PredicateBuilderTest", () => {
 
   it("build from hash with schema", () => {
     // Rails: predicate_builder.build_from_hash("schema.table.column" => "value").first.to_sql
-    // Mirrors convert_dot_notation_to_hash: "schema.table.column" → {schema.table: {column: value}}
-    // which then expands to "schema"."table"."column" = 'value'
-    const table = new Table("topics");
-    const builder = new PredicateBuilder(table);
-    const [node] = builder.buildFromHash({ "schema.table.column": "value" });
+    // convert_dot_notation_to_hash splits on rindex("."):
+    //   "schema.table.column" → { "schema.table" => { "column" => "value" } }
+    // TableMetadata.associated_table("schema.table") falls back to a bare Arel::Table("schema.table"),
+    // so expand_from_hash produces: "schema.table"."column" = 'value'
+    class PbSchemaModel extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+        this.adapter = createTestAdapter();
+      }
+    }
+    // Use TableMetadata-backed PB to enable associated_table fallback expansion,
+    // matching Rails' Topic.predicate_builder which is always backed by TableMetadata.
+    const [node] = new TableMetadata(
+      PbSchemaModel as any,
+      PbSchemaModel.arelTable,
+    ).predicateBuilder.buildFromHash({ "schema.table.column": "value" });
     const sql = new Visitors.ToSql().compile(node);
-    expect(sql).toMatch(/schema.*table.*column/i);
+    // Arel resolves "schema.table" as schema.table identifier, producing:
+    // "schema"."table"."column" = 'value'
+    expect(sql).toMatch(/"schema"\."table"\."column"/);
     expect(sql).toContain("value");
   });
 
