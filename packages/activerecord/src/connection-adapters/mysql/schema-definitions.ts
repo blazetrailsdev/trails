@@ -6,7 +6,6 @@
  *          ActiveRecord::ConnectionAdapters::MySQL::ColumnMethods (module)
  */
 
-import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -39,6 +38,14 @@ export interface ColumnMethods {
   unsignedDecimal(name: string, options?: ColumnOptions): unknown;
 }
 
+/**
+ * @todo `SchemaStatements#createTable` instantiates `AbstractTableDefinition` directly (not this
+ *   subclass) via `new TableDefinition(...)`. The MySQL-specific overrides here
+ *   (`newColumnDefinition`, `integerLikePrimaryKeyType`, `validColumnDefinitionOptions`) are
+ *   exercised by `changeColumn` (see `abstract-mysql-adapter.ts`) but NOT by `createTable`.
+ *   Fix: override `createTableDefinition()` in an MySQL-specific SchemaStatements to return
+ *   this subclass, mirroring Rails' `MySQL::SchemaStatements#create_table_definition`.
+ */
 export class TableDefinition extends AbstractTableDefinition {
   constructor(
     tableName: string,
@@ -132,24 +139,52 @@ export class TableDefinition extends AbstractTableDefinition {
   ): ColumnDefinition {
     let resolvedType = type as string;
     if (resolvedType === "primary_key") {
+      resolvedType = "integer";
       (options as any).limit = (options as any).limit ?? 8;
       (options as any).primaryKey = true;
-      return new ColumnDefinition(name, "integer" as ColumnType, options);
-    }
-    if (resolvedType === "virtual") {
+    } else if (resolvedType === "virtual") {
       resolvedType = (options as any).type ?? resolvedType;
+    } else {
+      const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
+      if (unsignedMatch) {
+        resolvedType = unsignedMatch[1];
+        (options as any).unsigned = true;
+      }
     }
-    const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
-    if (unsignedMatch) {
-      resolvedType = unsignedMatch[1];
-      (options as any).unsigned = true;
-    }
-    return new ColumnDefinition(name, resolvedType as ColumnType, options);
+    return super.newColumnDefinition(name, resolvedType as ColumnType, options);
   }
 
   /** @internal */
   override aliasedTypes(_name: string, fallback: string): string {
     return fallback;
+  }
+
+  /** @internal */
+  protected override validColumnDefinitionOptions(): string[] {
+    return super
+      .validColumnDefinitionOptions()
+      .concat([
+        "autoIncrement",
+        "charset",
+        "as",
+        "size",
+        "unsigned",
+        "first",
+        "after",
+        "type",
+        "stored",
+      ]);
+  }
+
+  /** @internal */
+  protected override integerLikePrimaryKeyType(
+    type: ColumnType,
+    options: ColumnOptions,
+  ): ColumnType {
+    if (options.autoIncrement !== false) {
+      options.autoIncrement = true;
+    }
+    return type;
   }
 
   /** @internal */
@@ -193,28 +228,4 @@ export class Table extends AbstractTable {
   override async primaryKey(): Promise<string | null> {
     return super.primaryKey();
   }
-}
-
-/** @internal */
-function validColumnDefinitionOptions(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#valid_column_definition_options is not implemented",
-  );
-}
-
-/** @internal */
-function aliasedTypes(name: any, fallback: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#aliased_types is not implemented",
-  );
-}
-
-/** @internal */
-function integerLikePrimaryKeyType(type: any, options: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#integer_like_primary_key_type is not implemented",
-  );
 }

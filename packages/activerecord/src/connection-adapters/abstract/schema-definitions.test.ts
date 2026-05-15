@@ -199,3 +199,57 @@ describe("Table#aliasedTypes", () => {
     expect(t.aliasedTypes("datetime", "datetime")).toBe("datetime");
   });
 });
+
+describe("TableDefinition id hash form", () => {
+  const mysqlAdapter = {
+    quoteIdentifier: (s: string) => `\`${s}\``,
+    quoteTableName: (s: string) => `\`${s}\``,
+    quoteDefaultExpression: (_v: unknown) => "",
+  };
+
+  it("extracts type and merges remaining keys as pk column options", () => {
+    const td = new TableDefinition("t", {
+      id: { type: "string", collation: "utf8mb4_bin" },
+      adapterName: "mysql",
+      adapter: mysqlAdapter,
+    });
+    const id = td.columns.find((c) => c.name === "id")!;
+    expect(id.type).toBe("string");
+    expect(id.options.collation).toBe("utf8mb4_bin");
+    expect(id.options.primaryKey).toBe(true);
+  });
+
+  it("defaults type to primary_key when hash omits type", () => {
+    const td = new TableDefinition("t", {
+      id: { collation: "utf8mb4_bin" },
+      adapterName: "mysql",
+      adapter: mysqlAdapter,
+    });
+    const id = td.columns.find((c) => c.name === "id")!;
+    expect(id.type).toBe("primary_key");
+    expect(id.options.collation).toBe("utf8mb4_bin");
+  });
+
+  it("outer default is merged first, hash content overrides", () => {
+    const td = new TableDefinition("t", {
+      id: { type: "string", default: "generated" },
+      default: "outer",
+      adapterName: "mysql",
+      adapter: mysqlAdapter,
+    });
+    const id = td.columns.find((c) => c.name === "id")!;
+    expect(id.options.default).toBe("generated");
+  });
+
+  it("emits CHARACTER SET and COLLATE per-column in toSql for mysql", () => {
+    const td = new TableDefinition("charset_collations", {
+      id: { type: "string", collation: "utf8mb4_bin" },
+      adapterName: "mysql",
+      adapter: mysqlAdapter,
+    });
+    (td as any).string("string_ascii_bin", { charset: "ascii", collation: "ascii_bin" });
+    const sql = td.toSql();
+    expect(sql).toContain("CHARACTER SET ascii COLLATE ascii_bin");
+    expect(sql).toContain("COLLATE utf8mb4_bin");
+  });
+});

@@ -80,6 +80,7 @@ import type {
   AddIndexOptions,
   ColumnType,
   ColumnOptions,
+  IdHashOptions,
 } from "./abstract/schema-definitions.js";
 import type { Column } from "./column.js";
 import { TypeMap } from "../type/type-map.js";
@@ -167,7 +168,7 @@ export interface AbstractAdapter {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid";
+          id?: boolean | "uuid" | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
