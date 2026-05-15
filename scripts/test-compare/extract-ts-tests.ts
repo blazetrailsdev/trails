@@ -30,14 +30,14 @@ function getPackageTestFiles(): Record<string, string[]> {
   }
 
   // ActionPack special handling
-  const actionDispatchFiles = globSync("packages/actionpack/src/actiondispatch/**/*.test.ts", {
+  const actionDispatchFiles = globSync("packages/actionpack/src/action-dispatch/**/*.test.ts", {
     cwd: ROOT_DIR,
   }).sort();
-  const actionControllerFiles = globSync("packages/actionpack/src/actioncontroller/**/*.test.ts", {
+  const actionControllerFiles = globSync("packages/actionpack/src/action-controller/**/*.test.ts", {
     cwd: ROOT_DIR,
   }).sort();
   const abstractControllerFiles = globSync(
-    "packages/actionpack/src/abstractcontroller/**/*.test.ts",
+    "packages/actionpack/src/abstract-controller/**/*.test.ts",
     {
       cwd: ROOT_DIR,
     },

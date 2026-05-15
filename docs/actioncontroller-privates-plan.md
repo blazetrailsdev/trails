@@ -25,19 +25,19 @@ less vendor/rails/actionpack/lib/<rails-file>.rb
 # 3. Implement in the TS file the api:compare row points to.
 #    Do NOT relocate methods to a helper file or the row stops counting.
 #    Use cwd-relative paths (`packages/...`), never absolute paths into the user's repo.
-$EDITOR packages/actionpack/src/actioncontroller/<ts-file>.ts
+$EDITOR packages/actionpack/src/action-controller/<ts-file>.ts
 
 # 4. Add tests next to the source as <ts-file>.test.ts
-$EDITOR packages/actionpack/src/actioncontroller/<ts-file>.test.ts
-pnpm test packages/actionpack/src/actioncontroller/<ts-file>.test.ts
+$EDITOR packages/actionpack/src/action-controller/<ts-file>.test.ts
+pnpm test packages/actionpack/src/action-controller/<ts-file>.test.ts
 
 # 5. Refresh and confirm api:compare row hits 100%
 pnpm api:compare --package actioncontroller --privates | grep <rails-file>
 
 # 6. Build clean, prettier clean
 pnpm build
-pnpm exec prettier --write packages/actionpack/src/actioncontroller/<ts-file>.ts \
-                            packages/actionpack/src/actioncontroller/<ts-file>.test.ts
+pnpm exec prettier --write packages/actionpack/src/action-controller/<ts-file>.ts \
+                            packages/actionpack/src/action-controller/<ts-file>.test.ts
 
 # 7. Commit (NO --no-verify, NO Co-Authored-By trailer) + push
 git add -A

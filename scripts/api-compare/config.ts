@@ -19,6 +19,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
   actioncontroller: "actionpack",
   abstractcontroller: "actionpack",
+  actionpackversion: "actionpack",
 };
 
 /**
@@ -36,9 +37,10 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
 
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
-  actiondispatch: "actiondispatch",
-  actioncontroller: "actioncontroller",
-  abstractcontroller: "abstractcontroller",
+  actiondispatch: "action-dispatch",
+  actioncontroller: "action-controller",
+  abstractcontroller: "abstract-controller",
+  actionpackversion: "action-pack",
 };
 
 export function packageSrcDir(pkg: string): string {

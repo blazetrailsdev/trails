@@ -32,7 +32,7 @@ This is the _within-file_ analog of the actionpack restructure audit.
 > `extract-ruby-api.rb:32–41` currently omits `abstractcontroller`, but
 > Rails source does have a dedicated `actionpack/lib/abstract_controller/`
 > directory (verified: `base.rb`, `callbacks.rb`, `caching.rb`, …) and
-> the trails side has `packages/actionpack/src/abstractcontroller/`. PR 1
+> the trails side has `packages/actionpack/src/abstract-controller/`. PR 1
 > of the wave plan adds `PACKAGE_DIRS["abstractcontroller"]` pointing at
 > `actionpack/lib/abstract_controller` — a 1-line registry addition that
 > brings the Ruby side into parity with the TS side before the structure

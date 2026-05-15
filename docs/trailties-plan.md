@@ -356,9 +356,9 @@ generators to extend it. **Refactor existing, don't keep parallel impls.**
 
 **Files changed:**
 
-- `packages/actionpack/src/actiondispatch/routing/mapper.ts` — add `mount`
-- `packages/actionpack/src/actiondispatch/routing/route-set.ts` — accept mounted apps in dispatch
-- `packages/actionpack/src/actiondispatch/routing/mapper.test.ts` — port Rails' `mount` tests verbatim
+- `packages/actionpack/src/action-dispatch/routing/mapper.ts` — add `mount`
+- `packages/actionpack/src/action-dispatch/routing/route-set.ts` — accept mounted apps in dispatch
+- `packages/actionpack/src/action-dispatch/routing/mapper.test.ts` — port Rails' `mount` tests verbatim
 
 **Rails source:** `actionpack/lib/action_dispatch/routing/mapper.rb#mount` (`:at`, `:as`, `:via`, anchor handling, default `host`); `actionpack/lib/action_dispatch/journey/router.rb` (anchor: false matching).
 

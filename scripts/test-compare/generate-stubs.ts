@@ -24,9 +24,9 @@ const PKG_DIRS: Record<string, string> = {
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/src/",
   rack: "packages/rack/src/",
-  actiondispatch: "packages/actionpack/src/actiondispatch/",
-  actioncontroller: "packages/actionpack/src/actioncontroller/",
-  abstractcontroller: "packages/actionpack/src/abstractcontroller/",
+  actiondispatch: "packages/actionpack/src/action-dispatch/",
+  actioncontroller: "packages/actionpack/src/action-controller/",
+  abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
 };
 

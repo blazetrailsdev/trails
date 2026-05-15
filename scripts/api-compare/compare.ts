@@ -50,6 +50,7 @@ const DETAIL_PACKAGES = new Set([
   "actiondispatch",
   "actioncontroller",
   "abstractcontroller",
+  "actionpackversion",
   "actionview",
 ]);
 

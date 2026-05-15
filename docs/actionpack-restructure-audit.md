@@ -264,11 +264,11 @@ file moves + index.ts re-exports**; method bodies untouched.
 Create empty directories with placeholder `index.ts` re-exports:
 
 ```
-packages/actionpack/src/abstractcontroller/   ← NEW top-level sibling
-packages/actionpack/src/actiondispatch/http/
-packages/actionpack/src/actiondispatch/testing/
-packages/actionpack/src/actiondispatch/request/
-packages/actionpack/src/actiondispatch/middleware/session/
+packages/actionpack/src/abstract-controller/   ← NEW top-level sibling
+packages/actionpack/src/action-dispatch/http/
+packages/actionpack/src/action-dispatch/testing/
+packages/actionpack/src/action-dispatch/request/
+packages/actionpack/src/action-dispatch/middleware/session/
 ```
 
 **Decision (2026-05-14): use `abstractcontroller/` as a separate
@@ -487,14 +487,14 @@ gtg automaton → router); slicing must follow the import graph.
 
 #### Headline numbers
 
-| Metric                                                                           | Value                                 |
-| -------------------------------------------------------------------------------- | ------------------------------------- |
-| Rails `.rb` files under `action_dispatch/journey/`                               | **14**                                |
-| Total Ruby LOC                                                                   | **2062**                              |
-| Estimated TS LOC after porting (≈ Ruby × 1.3)                                    | **~2680**                             |
-| Existing TS counterparts under `packages/actionpack/src/actiondispatch/journey/` | **0** (subtree absent)                |
-| Rails journey test LOC (`test/journey/`)                                         | **1603** across 11 files              |
-| PR count (LOC ceiling waived; sized by logical cluster)                          | **9 port PRs + 1 wire-up = 10 total** |
+| Metric                                                                            | Value                                 |
+| --------------------------------------------------------------------------------- | ------------------------------------- |
+| Rails `.rb` files under `action_dispatch/journey/`                                | **14**                                |
+| Total Ruby LOC                                                                    | **2062**                              |
+| Estimated TS LOC after porting (≈ Ruby × 1.3)                                     | **~2680**                             |
+| Existing TS counterparts under `packages/actionpack/src/action-dispatch/journey/` | **0** (subtree absent)                |
+| Rails journey test LOC (`test/journey/`)                                          | **1603** across 11 files              |
+| PR count (LOC ceiling waived; sized by logical cluster)                           | **9 port PRs + 1 wire-up = 10 total** |
 
 Per-file LOC (Ruby, `wc -l`):
 
@@ -670,7 +670,7 @@ file moves into coverage gains. Inspection of `scripts/api-compare/` and
 `scripts/api-compare/conventions.ts:rubyFileToTs` already transforms
 Ruby paths like `action_dispatch/middleware/cookies.rb` to the expected
 TS form (kebab-case, `.ts` extension) and `config.ts:packageSrcDir`
-roots the lookup at `packages/actionpack/src/actiondispatch/`. So once
+roots the lookup at `packages/actionpack/src/action-dispatch/`. So once
 the TS files land at the Rails-mirrored paths (`middleware/cookies.ts`,
 `http/request.ts`, etc.) the matcher succeeds with no config edits.
 
@@ -691,7 +691,7 @@ standalone ~10 LOC PR.
 
 ### Wave 3 (AbstractController top-level split) — script edits required
 
-Creating `packages/actionpack/src/abstractcontroller/` as a top-level
+Creating `packages/actionpack/src/abstract-controller/` as a top-level
 sibling means teaching the tooling about a new logical package:
 
 - `scripts/api-compare/config.ts`: append `abstractcontroller` to
@@ -701,11 +701,11 @@ sibling means teaching the tooling about a new logical package:
 - `scripts/api-compare/compare.ts`: add `abstractcontroller` to the
   `DETAIL_PACKAGES` set.
 - `scripts/test-compare/extract-ts-tests.ts`: add a glob for
-  `packages/actionpack/src/abstractcontroller/**/*.test.ts` and
+  `packages/actionpack/src/abstract-controller/**/*.test.ts` and
   expose it under the new `abstractcontroller` package key.
 - `scripts/test-compare/test-compare.ts` (`extractRelativeTsPath`) and
   `scripts/test-compare/generate-stubs.ts`: add
-  `abstractcontroller: "packages/actionpack/src/abstractcontroller/"`
+  `abstractcontroller: "packages/actionpack/src/abstract-controller/"`
   to the `pkgDirs` maps.
 - `scripts/test-compare/extract-ruby-tests.rb`: add
   `"abstractcontroller" => File.join(RAILS_DIR, "actionpack", "test")`

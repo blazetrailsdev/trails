@@ -106,6 +106,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "actionpack/test/abstract",
       },
       {
+        name: "actionpackversion",
+        libPath: "actionpack/lib/action_pack",
+      },
+      {
         name: "actionview",
         libPath: "actionview/lib/action_view",
         testPath: "actionview/test",
