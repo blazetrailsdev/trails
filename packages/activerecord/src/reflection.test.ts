@@ -288,29 +288,284 @@ describe("ReflectionTest", () => {
     expect(ref!.isHasMany()).toBe(false);
   });
 
-  it.skip("scope chain does not interfere with hmt with polymorphic case", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* needs has_many :through */
+  it("scope chain does not interfere with hmt with polymorphic case", async () => {
+    class ScHotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ScDept extends Base {
+      static {
+        this.attribute("hotel_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class ScChef extends Base {
+      static {
+        this.attribute("department_id", "integer");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class ScCake extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    class ScDrink extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ScHotel", ScHotel);
+    registerModel("ScDept", ScDept);
+    registerModel("ScChef", ScChef);
+    registerModel("ScCake", ScCake);
+    registerModel("ScDrink", ScDrink);
+    Associations.hasMany.call(ScHotel, "departments", {
+      className: "ScDept",
+      foreignKey: "hotel_id",
+    });
+    Associations.hasMany.call(ScDept, "chefs", {
+      className: "ScChef",
+      foreignKey: "department_id",
+    });
+    Associations.belongsTo.call(ScChef, "employable", { polymorphic: true });
+    Associations.hasMany.call(ScHotel, "chefs", { through: "departments", className: "ScChef" });
+    Associations.hasMany.call(ScHotel, "cakeDesigners", {
+      through: "chefs",
+      source: "employable",
+      sourceType: "ScCake",
+      className: "ScCake",
+    });
+    Associations.hasMany.call(ScHotel, "drinkDesigners", {
+      through: "chefs",
+      source: "employable",
+      sourceType: "ScDrink",
+      className: "ScDrink",
+    });
+
+    const hotel = await ScHotel.create({ name: "Grand" });
+    const dept = await ScDept.create({ hotel_id: hotel.id });
+    const cake = await ScCake.create({});
+    const drink = await ScDrink.create({});
+    await ScChef.create({
+      department_id: dept.id,
+      employable_id: cake.id,
+      employable_type: "ScCake",
+    });
+    await ScChef.create({
+      department_id: dept.id,
+      employable_id: drink.id,
+      employable_type: "ScDrink",
+    });
+
+    const h = hotel as any;
+    expect((await h.cakeDesigners.toArray()).length).toBe(1);
+    expect(await h.cakeDesigners.count()).toBe(1);
+    expect((await h.drinkDesigners.toArray()).length).toBe(1);
+    expect(await h.drinkDesigners.count()).toBe(1);
+    expect((await h.chefs.toArray()).length).toBe(2);
+    expect(await h.chefs.count()).toBe(2);
   });
-  it.skip("scope chain does not interfere with hmt with polymorphic case and subclass source", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* needs has_many :through */
+  it("scope chain does not interfere with hmt with polymorphic case and subclass source", async () => {
+    class SC2Hotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC2ChefList extends Base {
+      static {
+        this.attribute("employable_list_id", "integer");
+        this.attribute("employable_list_type", "string");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC2Mocktail extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SC2Hotel", SC2Hotel);
+    registerModel("SC2ChefList", SC2ChefList);
+    registerModel("SC2Mocktail", SC2Mocktail);
+    Associations.hasMany.call(SC2Hotel, "chefLists", {
+      className: "SC2ChefList",
+      as: "employableList",
+    });
+    Associations.belongsTo.call(SC2ChefList, "employable", { polymorphic: true });
+    Associations.hasMany.call(SC2Hotel, "mocktailDesigners", {
+      through: "chefLists",
+      source: "employable",
+      sourceType: "SC2Mocktail",
+      className: "SC2Mocktail",
+    });
+
+    const hotel = await SC2Hotel.create({ name: "Grand" });
+    const mocktail = await SC2Mocktail.create({});
+    await SC2ChefList.create({
+      employable_list_id: hotel.id,
+      employable_list_type: "SC2Hotel",
+      employable_id: mocktail.id,
+      employable_type: "SC2Mocktail",
+    });
+
+    const h2 = hotel as any;
+    expect((await h2.mocktailDesigners.toArray()).length).toBe(1);
+    expect(await h2.mocktailDesigners.count()).toBe(1);
+    expect((await h2.chefLists.toArray()).length).toBe(1);
+    expect(await h2.chefLists.count()).toBe(1);
+
+    await SC2ChefList.where({ employable_list_id: hotel.id }).deleteAll();
+
+    expect((await h2.mocktailDesigners.toArray()).length).toBe(0);
+    expect(await h2.mocktailDesigners.count()).toBe(0);
+    expect((await h2.chefLists.toArray()).length).toBe(0);
+    expect(await h2.chefLists.count()).toBe(0);
   });
-  it.skip("scope chain does not interfere with hmt with polymorphic and subclass source 2", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* needs has_many :through */
+  it("scope chain does not interfere with hmt with polymorphic and subclass source 2", async () => {
+    class SC3Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC3Book extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("format_record_id", "integer");
+        this.attribute("format_record_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC3Hardback extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    class SC3BestHardback extends SC3Hardback {}
+    SC3BestHardback.adapter = adapter;
+    registerModel("SC3Author", SC3Author);
+    registerModel("SC3Book", SC3Book);
+    registerModel("SC3Hardback", SC3Hardback);
+    registerModel("SC3BestHardback", SC3BestHardback);
+    Associations.hasMany.call(SC3Author, "books", {
+      className: "SC3Book",
+      foreignKey: "author_id",
+    });
+    Associations.belongsTo.call(SC3Book, "formatRecord", { polymorphic: true });
+    Associations.hasMany.call(SC3Author, "bestHardbacks", {
+      through: "books",
+      source: "formatRecord",
+      sourceType: "SC3BestHardback",
+      className: "SC3BestHardback",
+    });
+
+    const author = await SC3Author.create({ name: "John Doe" });
+    const hardback = await SC3BestHardback.create({});
+    await SC3Book.create({
+      author_id: author.id,
+      format_record_id: hardback.id,
+      format_record_type: "SC3BestHardback",
+    });
+
+    const a3 = author as any;
+    const bh1 = await a3.bestHardbacks.toArray();
+    expect(bh1.length).toBe(1);
+    expect(bh1[0].id).toBe(hardback.id);
+    const bh1r = await SC3Author.find(author.id).then((a: any) => a.bestHardbacks.toArray());
+    expect(bh1r.length).toBe(1);
+
+    await SC3Book.where({ author_id: author.id }).deleteAll();
+
+    expect((await a3.bestHardbacks.toArray()).length).toBe(0);
+    const bh2r = await SC3Author.find(author.id).then((a: any) => a.bestHardbacks.toArray());
+    expect(bh2r.length).toBe(0);
   });
-  it.skip("scope chain of polymorphic association does not leak into other hmt associations", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    /* needs has_many :through */
+  it("scope chain of polymorphic association does not leak into other hmt associations", async () => {
+    class SC4Hotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC4Dept extends Base {
+      static {
+        this.attribute("hotel_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class SC4Chef extends Base {
+      static {
+        this.attribute("department_id", "integer");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SC4Drink extends Base {
+      static {
+        this.adapter = adapter;
+      }
+    }
+    class SC4Recipe extends Base {
+      static {
+        this.attribute("chef_id", "integer");
+        this.attribute("hotel_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("SC4Hotel", SC4Hotel);
+    registerModel("SC4Dept", SC4Dept);
+    registerModel("SC4Chef", SC4Chef);
+    registerModel("SC4Drink", SC4Drink);
+    registerModel("SC4Recipe", SC4Recipe);
+    Associations.hasMany.call(SC4Hotel, "departments", {
+      className: "SC4Dept",
+      foreignKey: "hotel_id",
+    });
+    Associations.hasMany.call(SC4Dept, "chefs", {
+      className: "SC4Chef",
+      foreignKey: "department_id",
+    });
+    Associations.belongsTo.call(SC4Chef, "employable", { polymorphic: true });
+    Associations.hasMany.call(SC4Hotel, "chefs", { through: "departments", className: "SC4Chef" });
+    Associations.hasMany.call(SC4Hotel, "drinkDesigners", {
+      through: "chefs",
+      source: "employable",
+      sourceType: "SC4Drink",
+      className: "SC4Drink",
+    });
+    Associations.hasMany.call(SC4Chef, "recipes", {
+      className: "SC4Recipe",
+      foreignKey: "chef_id",
+    });
+    Associations.hasMany.call(SC4Hotel, "recipes", { through: "chefs", className: "SC4Recipe" });
+
+    const hotel = await SC4Hotel.create({ name: "Grand" });
+    const dept = await SC4Dept.create({ hotel_id: hotel.id });
+    const drink = await SC4Drink.create({});
+    const chef = await SC4Chef.create({
+      department_id: dept.id,
+      employable_id: drink.id,
+      employable_type: "SC4Drink",
+    });
+    await SC4Recipe.create({ chef_id: chef.id, hotel_id: hotel.id });
+
+    const recipesBefore = await (hotel as any).recipes.toArray();
+
+    reflectOnAssociation(SC4Hotel, "recipes")?.clearAssociationScopeCache();
+    const hotelReloaded = (await SC4Hotel.find(hotel.id)) as any;
+    await hotelReloaded.drinkDesigners.toArray();
+    const recipesAfter = await hotelReloaded.recipes.toArray();
+
+    expect(recipesAfter.length).toBe(recipesBefore.length);
+    expect(recipesAfter[0].id).toBe(recipesBefore[0].id);
   });
 
   it("has many reflection", () => {
