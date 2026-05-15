@@ -9,15 +9,15 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-7)
+### Parity scoreboard (after GID-8)
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
 
 | Signal       | Current          | 100% target (pre-skip) | Gap          |
 | ------------ | ---------------- | ---------------------- | ------------ |
-| api:compare  | 39 / 59 (66.1%)  | 59 / 59                | 20 methods   |
-| test:compare | 95 / 158 (60.1%) | 158 / 158              | 63 tests     |
+| api:compare  | 47 / 59 (79.7%)  | 59 / 59                | 12 methods   |
+| test:compare | 98 / 158 (62.0%) | 158 / 158              | 60 tests     |
 | files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
 | files (test) | 5 / 8            | 8 / 8                  | 3 test files |
 
@@ -27,7 +27,7 @@ Per-file api:compare:
 | --------------------- | ----- | ----- | ---- |
 | `identification.rb`   | 4     | 4     | 100% |
 | `uri/gid.rb`          | 21    | 21    | 100% |
-| `signed_global_id.rb` | 8     | 16    | 50%  |
+| `signed_global_id.rb` | 16    | 16    | 100% |
 | `locator.rb`          | 6     | 16    | 38%  |
 | `verifier.rb`         | 0     | 2     | 0%   |
 
@@ -36,8 +36,8 @@ Per-file test:compare:
 | Ruby file                       | Match | Total | %   |
 | ------------------------------- | ----- | ----- | --- |
 | `uri_gid_test.rb`               | 27    | 30    | 90% |
+| `signed_global_id_test.rb`      | 20    | 24    | 83% |
 | `global_identification_test.rb` | 5     | 6     | 83% |
-| `signed_global_id_test.rb`      | 17    | 24    | 71% |
 | `global_locator_test.rb`        | 33    | 59    | 56% |
 | `global_id_test.rb`             | 13    | 26    | 50% |
 | `verifier_test.rb`              | 0     | 4     | 0%  |
@@ -110,19 +110,32 @@ api:compare `uri/gid.rb`: 10% → **100% (21/21)**. Overall api:compare
 functional API (used by SignedGlobalID and GlobalID internally + by AR's
 `toGid`); the class is the OO veneer on top.
 
-### GID-8 — `SignedGlobalID` class-level config + verify split (~80 LOC)
+### GID-8 — `SignedGlobalID` class-level config + verify split — **done**
 
-8 missing methods on `SignedGlobalID`:
+Added 8 methods on `SignedGlobalID`:
 
-- `expiresIn` / `expiresIn=` (class-level default; currently per-call only).
-  Mirrors Rails' `SignedGlobalID.expires_in = 1.month` config.
-- Refactor existing `verifyToken` helper into the Rails method layout:
-  `pickVerifier(options)`, `pickPurpose(options)`,
-  `verifyWithVerifierValidatedMetadata`,
-  `verifyWithLegacySelfValidatedMetadata`,
-  `raiseIfExpired`, `verify` (dispatcher). These are mostly internal
-  helpers — exposing them as static methods keeps api:compare happy
-  without changing behavior.
+- `verifier` / `verifier=` and `expiresIn` / `expiresIn=` (Rails
+  `attr_accessor` — class-level defaults). `SignedGlobalID.create` /
+  `parse` now make `verifier:` optional and fall back to the class
+  default via `pickVerifier()`; `expires_in` is consulted by
+  `pickExpiration()` when no per-call value is provided.
+- `pickVerifier(options)` / `pickPurpose(options)` — public class methods
+  matching Rails. `pickVerifier` throws if neither option nor class-level
+  is set.
+- `verify(sgid, options)` — private class method dispatching to
+  `verifyWithVerifierValidatedMetadata` then falling back to
+  `verifyWithLegacySelfValidatedMetadata` (always returns null — Trails
+  has no Rails 1.3.0-era legacy SGIDs; kept for api:compare parity).
+- `raiseIfExpired(expiresAt)` — private class method throwing
+  `ExpiredMessage` when the ISO 8601 timestamp is in the past. Used by
+  the legacy verify path; nominal for our verifier-validated flow.
+- New `ExpiredMessage` exception class.
+
+api:compare `signed_global_id.rb`: 50% (8/16) → **100% (16/16)**.
+Overall api:compare: 66.1% → **79.7%**.
+test:compare `signed_global_id_test.rb`: 17/24 → **20/24** (the 3
+class-level expires_in tests now pass via vi.useFakeTimers — the same
+js-temporal-polyfill + Date.now mocking pattern GID-6b established).
 
 ### GID-9 — Locator class hierarchy + `use(app, locator)` (~150 LOC)
 
