@@ -809,28 +809,52 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(ids).toContain(p3.id);
   });
 
-  it.skip("get ids for unloaded associations does not load them", () => {
-    // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: no SELECT-id-only path exists; *_ids reader not implemented on habtm collection
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — *_ids lazy SELECT-id path
+  it("get ids for unloaded associations does not load them", async () => {
+    const dev = await Developer.create({ name: "UnloadedIdsDev", salary: 70000 });
+    const p1 = await Project.create({ name: "UI1" });
+    const p2 = await Project.create({ name: "UI2" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p2.id });
+    const proxy = association(dev, "projects");
+    expect(proxy.loaded).toBe(false);
+    const ids = await (dev as any).projectIds;
+    expect(ids).toContain(p1.id);
+    expect(ids).toContain(p2.id);
+    expect(proxy.loaded).toBe(false);
   });
 
-  it.skip("assign ids", () => {
-    // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: projectIds= writer (replace-all via join table diff) is not implemented
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — *_ids= replace-all path
+  it("assign ids", async () => {
+    const dev = new Developer({ name: "AssignIdsDev", salary: 60000 });
+    const p1 = await Project.create({ name: "AI1" });
+    const p2 = await Project.create({ name: "AI2" });
+    (dev as any).projectIds = [p1.id, p2.id];
+    await dev.save();
+    const ids = await (dev as any).projectIds;
+    expect(ids.sort()).toEqual([p1.id, p2.id].sort());
   });
 
-  it.skip("assign ids ignoring blanks", () => {
-    // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: projectIds= does not filter blank/"" entries before deriving the id set
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — blank-reject in *_ids= path
+  it("assign ids ignoring blanks", async () => {
+    const dev = new Developer({ name: "BlankIdsDev", salary: 60000 });
+    const p1 = await Project.create({ name: "BI1" });
+    const p2 = await Project.create({ name: "BI2" });
+    (dev as any).projectIds = [p1.id, null, p2.id, ""];
+    await dev.save();
+    const ids = await (dev as any).projectIds;
+    expect(ids.length).toBe(2);
+    expect(ids.sort()).toEqual([p1.id, p2.id].sort());
   });
 
-  it.skip("singular ids are reloaded after collection concat", () => {
-    // BLOCKED: associations — *_ids reader/writer
-    // ROOT-CAUSE: projectIds cache is not invalidated when records are appended via << / push
-    // SCOPE: associations/builder/has-and-belongs-to-many.ts — ids cache reset on collection mutation
+  it("singular ids are reloaded after collection concat", async () => {
+    const dev = await Developer.create({ name: "ConcatIdsDev", salary: 70000 });
+    const p1 = await Project.create({ name: "CI1" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: p1.id });
+    const idsBefore = await (dev as any).projectIds;
+    expect(idsBefore).toContain(p1.id);
+    const p2 = await Project.create({ name: "CI2" });
+    const proxy = association(dev, "projects");
+    await proxy.push(p2 as any);
+    const idsAfter = await (dev as any).projectIds;
+    expect(idsAfter).toContain(p2.id);
   });
 
   it.skip("scoped find on through association doesnt return read only records", () => {

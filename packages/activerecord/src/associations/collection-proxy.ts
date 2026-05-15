@@ -989,6 +989,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const saved = await record.save();
       if (saved) {
         this._target.push(record);
+        this._invalidateAssociationIds();
         fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
       }
     }
@@ -1068,11 +1069,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       if (joinRecord.isPersisted()) {
         this._target.push(record);
+        this._invalidateAssociationIds();
         if (!skipCallbacks) {
           fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
         }
       }
     }
+  }
+
+  private _invalidateAssociationIds(): void {
+    const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
+    if (assocInstance) (assocInstance as any)._associationIds = null;
   }
 
   private _raiseOnTypeMismatch(records: T[]): void {
@@ -1165,6 +1172,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (id != null) return !pkIdentities.has(id);
       return !nullPkRecords.has(r);
     });
+    this._invalidateAssociationIds();
   }
 
   private async _deleteThrough(records: Base[]): Promise<void> {
@@ -1995,6 +2003,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     this._target = [];
     this._targetLoaded = true;
+    this._invalidateAssociationIds();
     this.resetScope();
     return count;
   }
