@@ -1373,7 +1373,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#many?
    */
-  async many(): Promise<boolean> {
+  async many(predicate?: (record: T) => boolean): Promise<boolean> {
+    if (predicate !== undefined) {
+      const records = await this.loadTarget();
+      let matched = 0;
+      for (const r of records) {
+        if (predicate(r) && ++matched > 1) return true;
+      }
+      return false;
+    }
     return (await this.count()) > 1;
   }
 
@@ -1385,7 +1393,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // @ts-expect-error Rails Relation#none? fires a query (Enumerable#none?
   //   via each); our Relation#isNone only checks the NullRelation flag.
   //   CP must fire a count query to check actual emptiness. Permanent.
-  async isNone(): Promise<boolean> {
+  async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
+    if (predicate !== undefined) {
+      const records = await this.loadTarget();
+      for (const r of records) {
+        if (predicate(r)) return false;
+      }
+      return true;
+    }
     return (await this.count()) === 0;
   }
 
