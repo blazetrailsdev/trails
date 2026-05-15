@@ -52,8 +52,7 @@ describe("DelegatedTypeTest", () => {
 
   it("delegated types", () => {
     const { Entry } = makeModels();
-    const e = new Entry({ title: "hi", entryable_type: "Message", entryable_id: 1 });
-    expect(e.entryable_type).toBe("Message");
+    expect((Entry as any).entryableTypes).toEqual(["Message", "Comment"]);
   });
 
   it("delegated class", () => {
@@ -149,12 +148,50 @@ describe("DelegatedTypeTest", () => {
 
   it("association id", () => {
     const { Entry } = makeModels();
-    const e = new Entry({ entryable_type: "Message", entryable_id: 99 });
-    expect(e.entryable_id).toBe(99);
+    const eMsg = new Entry({ entryable_type: "Message", entryable_id: 99 });
+    expect(eMsg.entryable_id).toBe(99);
+    expect((eMsg as any).messageId).toBe(99);
+    expect((eMsg as any).commentId).toBeNull();
+
+    const eCmt = new Entry({ entryable_type: "Comment", entryable_id: 42 });
+    expect((eCmt as any).commentId).toBe(42);
+    expect((eCmt as any).messageId).toBeNull();
   });
 
-  it.skip("association uuid", () => {
-    // BLOCKED: uuid-pk — delegated type uses a UUID primary key; no STI routing gap
+  it("association uuid", () => {
+    // Mirrors Rails PostgreSQLDelegatedTypeTest#test_association_uuid.
+    // UUID PK accessor naming: delegatedType with primaryKey: "uuid" and
+    // foreignKey: "entryable_uuid" generates `uuidMessageUuid` / `uuidCommentUuid`
+    // accessors (camelCase of ${singular}_${primaryKey}) instead of the default `Id` suffix.
+    class UuidEntry extends Base {
+      static {
+        this.attribute("entryable_uuid", "string");
+        this.attribute("entryable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    delegatedType(UuidEntry, "entryable", {
+      types: ["UuidMessage", "UuidComment"],
+      primaryKey: "uuid",
+      foreignKey: "entryable_uuid",
+    });
+
+    const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+    const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+
+    const entryWithMessage = new UuidEntry({
+      entryable_type: "UuidMessage",
+      entryable_uuid: uuid1,
+    });
+    expect((entryWithMessage as any).uuidMessageUuid).toBe(uuid1);
+    expect((entryWithMessage as any).uuidCommentUuid).toBeNull();
+
+    const entryWithComment = new UuidEntry({
+      entryable_type: "UuidComment",
+      entryable_uuid: uuid2,
+    });
+    expect((entryWithComment as any).uuidCommentUuid).toBe(uuid2);
+    expect((entryWithComment as any).uuidMessageUuid).toBeNull();
   });
 
   it.skip("touch account", () => {

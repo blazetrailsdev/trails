@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { underscore } from "@blazetrails/activesupport";
+import { camelize, underscore } from "@blazetrails/activesupport";
 
 /**
  * Configuration for a delegated type.
@@ -8,6 +8,15 @@ export interface DelegatedTypeOptions {
   types: string[];
   foreignKey?: string;
   foreignType?: string;
+  /**
+   * Primary key column on the delegated-type target models.
+   * Defaults to "id". Set to "uuid" (or another column name) when the
+   * target models use a non-integer primary key — e.g.
+   * `delegatedType(Entry, "entryable", { types: [...], primaryKey: "uuid", foreignKey: "entryable_uuid" })`.
+   * Mirrors Rails' `:primary_key` option, which controls the name of the
+   * generated `${singular}_${primaryKey}` accessor on each type.
+   */
+  primaryKey?: string;
 }
 
 /**
@@ -45,7 +54,8 @@ export function delegatedType(
 ): void {
   const foreignKey = options.foreignKey ?? `${role}_id`;
   const foreignType = options.foreignType ?? `${role}_type`;
-  const config = { ...options, foreignKey, foreignType };
+  const primaryKey = options.primaryKey ?? "id";
+  const config = { ...options, foreignKey, foreignType, primaryKey };
 
   // Rails: belongs_to role, **options.merge(polymorphic: true)
   // (Rails also accepts an optional scope proc; we omit it as there's no proc equivalent)
@@ -67,6 +77,15 @@ export function delegatedType(
     (modelClass as any)._delegatedTypes = new Map();
   }
   (modelClass as any)._delegatedTypes.set(role, config);
+
+  // Class method: Entry.entryableTypes → ["Message", "Comment"]
+  // Mirrors Rails' define_singleton_method("#{role}_types") { types.map(&:to_s) }
+  Object.defineProperty(modelClass, `${role}Types`, {
+    get() {
+      return options.types.map(String);
+    },
+    configurable: true,
+  });
 
   // Add instance method: delegatedClass (e.g. entryableClass)
   Object.defineProperty(modelClass.prototype, `${role}Class`, {
@@ -113,8 +132,20 @@ export function delegatedType(
       configurable: true,
     });
 
-    // Accessor: entry.message → returns the record if type matches
+    // Accessor: entry.message → returns the FK value if type matches
     Object.defineProperty(modelClass.prototype, snakeName, {
+      get(this: Base) {
+        if (this.readAttribute(foreignType) !== typeName) return null;
+        return this.readAttribute(foreignKey);
+      },
+      configurable: true,
+    });
+
+    // FK accessor: entry.messageId (or entry.uuidMessageUuid for UUID PKs) → returns FK if type matches
+    // Mirrors Rails' define_method("#{singular}_#{primary_key}") { public_send(role_id) if public_send(query) }
+    // Name is camelCase of `${snakeName}_${primaryKey}` (e.g. "message_id" → "messageId").
+    const fkAccessorName = camelize(`${snakeName.replace(/\//g, "_")}_${primaryKey}`, false);
+    Object.defineProperty(modelClass.prototype, fkAccessorName, {
       get(this: Base) {
         if (this.readAttribute(foreignType) !== typeName) return null;
         return this.readAttribute(foreignKey);
