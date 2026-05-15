@@ -27,6 +27,8 @@ import { readdirSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+import { buildGemfile } from "./schema/ruby/build-gemfile.js";
+
 const FIXTURES_DIR = "scripts/parity/fixtures";
 const GEMFILE = "scripts/parity/schema/ruby/Gemfile";
 
@@ -246,6 +248,10 @@ function dumpOne(cfg: TypeConfig, label: "rails" | "trails", fixture: string): P
 }
 
 async function runRails(cfg: TypeConfig): Promise<void> {
+  // Regenerate the parity Gemfile from vendor/sources.ts so the activerecord
+  // pin can't drift from the rails ref. Idempotent: writes only on diff.
+  const { changed, path } = buildGemfile();
+  if (changed) console.log(`parity: regenerated ${path} from vendor/sources.ts`);
   rmSync(cfg.outRails, { recursive: true, force: true });
   mkdirSync(cfg.outRails, { recursive: true });
   await runPool(fixtures(cfg), (fixture) => dumpOne(cfg, "rails", fixture));

@@ -1,7 +1,11 @@
 # frozen_string_literal: true
+#
+# GENERATED from vendor/sources.ts by scripts/parity/schema/ruby/build-gemfile.ts.
+# Do not edit by hand — change vendor/sources.ts and the parity-schema runner
+# regenerates this file on its next invocation.
 
 source "https://rubygems.org"
 
-gem "activerecord", "8.0.2"     # D10 — matches rails ref in vendor/sources.ts (wave 7 will generate)
+gem "activerecord", "8.0.2"     # tracks rails ref in vendor/sources.ts
 gem "sqlite3", "~> 2.1"         # matches AR 8.0.2 declared dependency range
 gem "minitest", "~> 5.25"       # canonicalize_test.rb
