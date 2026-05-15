@@ -34,6 +34,7 @@ import { withTransactionReturningStatus } from "./transactions.js";
 import {
   performValidations,
   raiseValidationError,
+  RecordInvalid,
   type ValidationContextArg,
 } from "./validations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
@@ -622,6 +623,12 @@ export async function save<T extends SaveRecord>(
     return (await withTransactionReturningStatus.call(self, () =>
       self.createOrUpdate(),
     )) as boolean;
+  } catch (e) {
+    // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
+    // callbacks raise RecordInvalid when a child fails to save. The transaction
+    // has already rolled back at this point.
+    if (e instanceof RecordInvalid) return false;
+    throw e;
   } finally {
     self._skipTouch = false;
   }

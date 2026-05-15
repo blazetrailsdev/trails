@@ -7,6 +7,7 @@
  */
 import type { Base } from "./base.js";
 import type { ValidationContextArg } from "./validations.js";
+import { RecordInvalid } from "./validations.js";
 import {
   AssociationNotFoundError,
   CompositePrimaryKeyMismatchError,
@@ -16,6 +17,7 @@ import type { AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
+import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
@@ -513,7 +515,8 @@ async function _insertCollectionRecordFallback(
   child: Base,
 ): Promise<boolean> {
   const ctor = record.constructor as typeof Base;
-  const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
+  const foreignKey =
+    assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(ctor.name)}_id`;
   const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
   if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
     if (primaryKey.length !== foreignKey.length) {
@@ -1006,6 +1009,100 @@ export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) 
       return result;
     };
   }
+}
+
+const _AUTOSAVE_AROUND_SAVE_KEY = Symbol.for("blazetrails.autosaveAroundSaveRegistered");
+
+/**
+ * Registers save callbacks for an association declared with `autosave: true`.
+ *
+ * - Collection (hasMany / habtm): dedup-registers `aroundSave` for
+ *   `_newRecordBeforeSave` tracking, then `afterCreate` + `afterUpdate` to
+ *   persist children. Raises `RecordInvalid` on failure so `save()` returns
+ *   false and the enclosing DB transaction is rolled back.
+ * - HasOne: same as collection minus the around_save.
+ * - BelongsTo: `beforeSave` that halts the chain on failure.
+ *
+ * @internal
+ */
+export function addAutosaveAssociationCallbacks(model: any, reflection: any): void {
+  const saveMethod = `autosaveAssociatedRecordsFor_${reflection.name}`;
+  const isCollection: boolean =
+    typeof reflection.isCollection === "function"
+      ? reflection.isCollection()
+      : reflection.collection === true ||
+        reflection.macro === "hasMany" ||
+        reflection.macro === "hasAndBelongsToMany" ||
+        reflection.type === "hasMany" ||
+        reflection.type === "hasAndBelongsToMany";
+  const isHasOne: boolean =
+    typeof reflection.hasOne === "function"
+      ? reflection.hasOne()
+      : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
+
+  if (isCollection) {
+    // around_save runs only once per model regardless of how many collection
+    // autosave associations are declared — mirrors Rails' dedup via symbol.
+    if (!(model as any)[_AUTOSAVE_AROUND_SAVE_KEY]) {
+      Object.defineProperty(model, _AUTOSAVE_AROUND_SAVE_KEY, {
+        value: true,
+        configurable: true,
+        writable: false,
+      });
+      model.aroundSave(function (record: any, proceed: () => any) {
+        return aroundSaveCollectionAssociation.call(record, proceed);
+      });
+    }
+    const collectionName = reflection.name;
+    defineNonCyclicMethod(model, saveMethod, async function (this: any) {
+      return saveCollectionAssociation.call(this, reflection);
+    });
+    afterCreate(model, async (record: any) => {
+      const assocDef = (record.constructor as any)._associations?.find(
+        (a: any) => a.name === collectionName,
+      );
+      if (!assocDef?.options?.autosave) return;
+      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+    });
+    afterUpdate(model, async (record: any) => {
+      const assocDef = (record.constructor as any)._associations?.find(
+        (a: any) => a.name === collectionName,
+      );
+      if (!assocDef?.options?.autosave) return;
+      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+    });
+  } else if (isHasOne) {
+    const hasOneName = reflection.name;
+    defineNonCyclicMethod(model, saveMethod, async function (this: any) {
+      return saveHasOneAssociation.call(this, reflection);
+    });
+    afterCreate(model, async (record: any) => {
+      const assocDef = (record.constructor as any)._associations?.find(
+        (a: any) => a.name === hasOneName,
+      );
+      if (!assocDef?.options?.autosave) return;
+      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+    });
+    afterUpdate(model, async (record: any) => {
+      const assocDef = (record.constructor as any)._associations?.find(
+        (a: any) => a.name === hasOneName,
+      );
+      if (!assocDef?.options?.autosave) return;
+      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+    });
+  } else {
+    // belongs_to
+    defineNonCyclicMethod(model, saveMethod, function (this: any) {
+      return saveBelongsToAssociation.call(this, reflection);
+    });
+    beforeSave(
+      model,
+      (record: any): Promise<void> =>
+        record[saveMethod]().then((ok: boolean) => (ok ? undefined : (false as unknown as void))),
+    );
+  }
+
+  defineAutosaveValidationCallbacks(model, reflection);
 }
 
 /** @internal */

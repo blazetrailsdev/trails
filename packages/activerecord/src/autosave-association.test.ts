@@ -129,11 +129,23 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("should rollback destructions if an exception occurred while saving a child", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires transaction rollback */
+  it("should rollback destructions if an exception occurred while saving a child", async () => {
+    const { Pirate, Ship } = makePirateShip();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const origSave = ship.save.bind(ship);
+    (ship as any).save = async (opts?: any) => {
+      await origSave(opts);
+      await ship.destroy();
+      throw new Error("Oh noes!");
+    };
+    // Mirror Rails: @ship.name_will_change! — force ship dirty so autosaveHasOne calls save
+    ship.name = "Pearl Changed";
+    cacheAssoc(pirate, "ship", ship);
+    await expect(pirate.save()).rejects.toThrow("Oh noes!");
+    // Destruction should be rolled back — ship still exists
+    const reloaded = await Ship.find(ship.id);
+    expect(reloaded).toBeTruthy();
   });
 
   it("should save changed has one changed object if child is saved", async () => {
@@ -200,11 +212,23 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("should rollback destructions if an exception occurred while saving a parent", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires transaction rollback */
+  it("should rollback destructions if an exception occurred while saving a parent", async () => {
+    const { Pirate, Ship } = makePirateShip();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    const origSave = pirate.save.bind(pirate);
+    (pirate as any).save = async (opts?: any) => {
+      await origSave(opts);
+      await pirate.destroy();
+      throw new Error("Oh noes!");
+    };
+    // Mirror Rails: @ship.pirate.catchphrase = "Changed Catchphrase" — make pirate dirty
+    pirate.catchphrase = "Changed Catchphrase";
+    cacheAssoc(ship, "pirate", pirate);
+    await expect(ship.save()).rejects.toThrow("Oh noes!");
+    // Destruction should be rolled back — pirate still exists
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded).toBeTruthy();
   });
 
   it("should save changed child objects if parent is saved", async () => {
@@ -276,11 +300,24 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("should rollback destructions if an exception occurred while saving has many", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* requires transaction rollback */
+  it("should rollback destructions if an exception occurred while saving has many", async () => {
+    const { Pirate, Bird } = makePirateShip();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const b1 = await Bird.create({ name: "birds_0", pirate_id: pirate.id });
+    const b2 = await Bird.create({ name: "birds_1", pirate_id: pirate.id });
+    markForDestruction(b1);
+    markForDestruction(b2);
+    // Override the second bird's destroy to raise after super
+    const origDestroy = b2.destroy.bind(b2);
+    (b2 as any).destroy = async () => {
+      await origDestroy();
+      throw new Error("Oh noes!");
+    };
+    cacheAssoc(pirate, "birds", [b1, b2]);
+    await expect(pirate.save()).rejects.toThrow("Oh noes!");
+    // Both destructions should be rolled back
+    const remaining = await Bird.where({ pirate_id: pirate.id }).toArray();
+    expect(remaining.length).toBe(2);
   });
 
   it("when new record a child marked for destruction should not affect other records from saving", async () => {
@@ -429,11 +466,26 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const saved = await pirate.save();
     expect(saved).toBe(true);
   });
-  it.skip("should rollback destructions if an exception occurred while saving habtm", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs transaction rollback support */
+  it("should rollback destructions if an exception occurred while saving habtm", async () => {
+    const { Pirate, Parrot } = makePirateParrot();
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const p1 = await Parrot.create({ name: "Polly" });
+    const p2 = await Parrot.create({ name: "Crackers" });
+    const proxy = association(pirate, "parrots");
+    await proxy.push(p1);
+    await proxy.push(p2);
+    markForDestruction(p1);
+    markForDestruction(p2);
+    const origDestroy = p2.destroy.bind(p2);
+    (p2 as any).destroy = async () => {
+      await origDestroy();
+      throw new Error("Oh noes!");
+    };
+    cacheAssoc(pirate, "parrots", [p1, p2]);
+    await expect(pirate.save()).rejects.toThrow("Oh noes!");
+    // Both destructions should be rolled back — parrots still exist
+    expect(p1.isDestroyed()).toBe(false);
+    expect(p2.isDestroyed()).toBe(false);
   });
 });
 
