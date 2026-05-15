@@ -3,7 +3,7 @@ import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { currentRole } from "../core.js";
+import { currentRole, connectedToStack } from "../core.js";
 
 function withBaseConfigs(
   raw: Record<string, unknown>,
@@ -365,6 +365,27 @@ describe("ConnectionHandlersShardingDbTest", () => {
       expect(SomeOtherBase.defaultShard()).toBe("default");
     } finally {
       Base.connectionHandler.clearAllConnectionsBang();
+    }
+  });
+
+  it("connectingTo uses the class defaultShard when shard is omitted", () => {
+    class ShardedAbstractBase extends Base {
+      static override abstractClass = true;
+    }
+    try {
+      ShardedAbstractBase.connectsTo({
+        shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
+      });
+      expect(ShardedAbstractBase.defaultShard()).toBe("not_default");
+
+      ShardedAbstractBase.connectingTo({ role: "writing" });
+      expect(ShardedAbstractBase.connectedToQ({ role: "writing", shard: "not_default" })).toBe(
+        true,
+      );
+    } finally {
+      Base.connectionHandler.clearAllConnectionsBang();
+      // pop the stack entry added by connectingTo
+      connectedToStack().pop();
     }
   });
 
