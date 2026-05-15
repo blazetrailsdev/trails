@@ -1,10 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, serialize } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import type { DatabaseAdapter } from "../adapter.js";
+
+let adapter: DatabaseAdapter;
+
+beforeEach(async () => {
+  adapter = createTestAdapter();
+  await defineSchema(adapter, { topics: { content: "string" } });
+});
 
 describe("JSONTest", () => {
   it("returns nil if empty string given", async () => {
-    const adapter = createTestAdapter();
     class Topic extends Base {
       static {
         this.attribute("content", "string");
@@ -18,7 +26,6 @@ describe("JSONTest", () => {
   });
 
   it("returns nil if nil given", async () => {
-    const adapter = createTestAdapter();
     class Topic extends Base {
       static {
         this.attribute("content", "string");
