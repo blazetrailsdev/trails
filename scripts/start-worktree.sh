@@ -156,7 +156,16 @@ link_source() {
 
 echo "==> Linking .claude config from main worktree (skills + per-machine permissions)"
 link_source ".claude/skills"
-link_source ".claude/settings.local.json" optional
+# settings.local.json is copied, not symlinked — claude resolves the file via
+# realpath and a symlink to the main worktree's settings has been observed to
+# yield an agent session with no permissions. A plain copy works.
+if [[ -e "$MAIN_REPO/.claude/settings.local.json" ]]; then
+  mkdir -p "$TARGET/.claude"
+  cp "$MAIN_REPO/.claude/settings.local.json" "$TARGET/.claude/settings.local.json"
+  echo "    copied .claude/settings.local.json"
+else
+  echo "    skip .claude/settings.local.json (not present in main worktree, optional)"
+fi
 
 echo "==> Running pnpm install"
 ( cd "$TARGET" && pnpm install )

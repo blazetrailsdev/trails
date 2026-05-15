@@ -103,6 +103,13 @@ When NOT to use this:
   matches our tests to Rails tests. If a test fails or the behavior doesn't
   match the name, fix the implementation — not the name. Read the
   corresponding Rails test first.
+- **Do NOT run the whole test suite locally** (`pnpm test`, `pnpm -r test`,
+  `pnpm --filter activerecord test`, etc.). CI runs the full suite on every
+  push. Locally, run only the individual test files or small groups you
+  touched: `pnpm vitest run path/to/file.test.ts` or
+  `pnpm vitest run -t "specific test name"`. The full AR suite forks 6
+  workers per invocation; multiple parallel agents running it concurrently
+  saturate the host (load avg 100+).
 
 ## Measuring progress
 

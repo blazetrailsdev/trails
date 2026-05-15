@@ -1,15 +1,24 @@
 # GlobalID plan
 
-## Status (2026-05-14)
+## Status (2026-05-15)
 
-| PR        | Title                                                          | Status     |
-| --------- | -------------------------------------------------------------- | ---------- |
-| **GID-0** | Vendor globalid gem source for cross-reference                 | ✅ shipped |
-| **GID-1** | Create `packages/globalid` skeleton + delete the lie in AR     | ⏳ next    |
-| **GID-2** | `SignedGlobalID` in the new package (over `signedId` verifier) | ⏳         |
-| **GID-3** | `URI::GID` parser + `GlobalID` class                           | ⏳         |
-| **GID-4** | `GlobalID::Locator` + `findGlobalId` class methods on AR Base  | ⏳         |
-| **GID-5** | `Identification` mixin polish + `expiresIn`/purpose            | ⏳         |
+| PR        | Title                                                          | Status                                              |
+| --------- | -------------------------------------------------------------- | --------------------------------------------------- |
+| **GID-0** | Vendor globalid gem source for cross-reference                 | ✅ now via `vendor/globalid/` (vendor wave 3 #1578) |
+| **GID-1** | Create `packages/globalid` skeleton + delete the lie in AR     | ✅ #1536                                            |
+| **GID-2** | `SignedGlobalID` in the new package (over `signedId` verifier) | ✅ #1548                                            |
+| **GID-3** | `URI::GID` parser + `GlobalID` class                           | ⏳ next                                             |
+| **GID-4** | `GlobalID::Locator` + `findGlobalId` class methods on AR Base  | ⏳                                                  |
+| **GID-5** | `Identification` mixin polish + `expiresIn`/purpose            | ⏳                                                  |
+
+**Tooling status (post-vendor-wave-6 #1589):** globalid is now wired into both `api:compare` and `test:compare` via `vendor/sources.ts` with `compareApi: true`. Current parity scores:
+
+- `api:compare` — globalid surfaces as a package (0/0 today — `packages/globalid/src/` has no Rails-mirrored named exports yet). GID-3 onwards will move this number.
+- `test:compare` — **12 tests in 1 file** mirroring `vendor/globalid/test/cases/global_id_test.rb`.
+
+**GID-3 priority lift:** GID-2 left `toGid()` producing non-parseable URIs when no app is configured (`gid://User/1` has no model-name segment). GID-3 should tighten this — require `setApp` before any `toGid` call, or define a default app. `signed-id.test.ts:289` hardcodes the current shape and will need updating.
+
+**GID-2 followups for GID-5:** no `SignedGlobalID.verifier` class-level default; no `expires_in` class-level default; redundant inner `verifyToken` purpose check (harmless cleanup).
 
 **Packaging decision (2026-05-14):** GlobalID ships as a **separate package**
 `packages/globalid/`, matching Rails' gem boundary. AR depends on globalid
