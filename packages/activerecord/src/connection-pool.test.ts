@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   ConnectionPool,
   withExecutionContext,
@@ -573,18 +574,50 @@ it("anonymous class exception", async () => {
   await expect(Anon.establishConnection()).rejects.toThrow("Anonymous class is not allowed.");
 });
 
-it.skip("connection notification is called", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs instrumentation/notifications */
+class ConnectionTestModel extends Base {
+  static override abstractClass = true;
+}
+
+it("connection notification is called", () => {
+  const payloads: Record<string, unknown>[] = [];
+  const sub = Notifications.subscribe("!connection.active_record", (event) => {
+    payloads.push(event.payload as Record<string, unknown>);
+  });
+  try {
+    const dbConfig = new HashConfig("test", "primary", {
+      adapter: "sqlite3",
+      database: ":memory:",
+    });
+    Base.connectionHandler.establishConnection(dbConfig, { owner: ConnectionTestModel });
+    expect(payloads).toHaveLength(1);
+    expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
+    expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);
+    expect(payloads[0].shard).toBe("default");
+    expect(payloads[0].role).toBe("writing");
+  } finally {
+    Notifications.unsubscribe(sub);
+    Base.connectionHandler.clearAllConnectionsBang();
+  }
 });
 
-it.skip("connection notification is called for shard", () => {
-  // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
-  // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
-  // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in connection-pool.test.ts
-  /* needs instrumentation/notifications */
+it("connection notification is called for shard", () => {
+  const payloads: Record<string, unknown>[] = [];
+  const sub = Notifications.subscribe("!connection.active_record", (event) => {
+    payloads.push(event.payload as Record<string, unknown>);
+  });
+  try {
+    ConnectionTestModel.connectsTo({
+      shards: { default: { writing: { adapter: "sqlite3", database: ":memory:" } } },
+    });
+    expect(payloads).toHaveLength(1);
+    expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
+    expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);
+    expect(payloads[0].shard).toBe("default");
+    expect(payloads[0].role).toBe("writing");
+  } finally {
+    Notifications.unsubscribe(sub);
+    Base.connectionHandler.clearAllConnectionsBang();
+  }
 });
 
 it("sets pool schema reflection", () => {
