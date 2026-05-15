@@ -6735,11 +6735,53 @@ describe("AssociationProxyTest", () => {
     await proxy.push(comment);
     expect(proxy.loaded).toBe(false);
   });
-  it.skip("push has many through does not load target", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* Rails: david.categories << category; assert_not david.categories.loaded? — needs has_many_through push-without-load */
+  it("push has many through does not load target", async () => {
+    class APTagging extends Base {
+      static {
+        this._tableName = "ap_taggings";
+        this.attribute("ap_tagged_post_id", "integer");
+        this.attribute("ap_category_id", "integer");
+        this.adapter = apAdapter;
+      }
+    }
+    class APCategory extends Base {
+      static {
+        this._tableName = "ap_categories";
+        this.attribute("name", "string");
+        this.adapter = apAdapter;
+      }
+    }
+    class APTaggedPost extends Base {
+      static {
+        this._tableName = "ap_tagged_posts";
+        this.attribute("title", "string");
+        this.adapter = apAdapter;
+      }
+    }
+    Associations.hasMany.call(APTaggedPost, "apTaggings", {
+      className: "APTagging",
+      foreignKey: "ap_tagged_post_id",
+    });
+    Associations.hasMany.call(APTaggedPost, "apCategories", {
+      className: "APCategory",
+      through: "apTaggings",
+      source: "apCategory",
+    });
+    Associations.belongsTo.call(APTagging, "apCategory", {
+      className: "APCategory",
+      foreignKey: "ap_category_id",
+    });
+    registerModel("APTagging", APTagging);
+    registerModel("APCategory", APCategory);
+    registerModel("APTaggedPost", APTaggedPost);
+
+    const post = await APTaggedPost.create({ title: "tagged" });
+    const category = await APCategory.create({ name: "ruby" });
+    const proxy = association(post, "apCategories");
+    expect(proxy.loaded).toBe(false);
+    await proxy.push(category as any);
+    // pushing via through creates the join record but must NOT load the target
+    expect(proxy.loaded).toBe(false);
   });
   it("push followed by save does not load target", async () => {
     const { APPost, APComment } = setupProxyModels();

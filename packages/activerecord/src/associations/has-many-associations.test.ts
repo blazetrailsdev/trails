@@ -3645,59 +3645,67 @@ describe("HasManyAssociationsTest", () => {
     expect((posts2[0] as any).title).toBe("First");
   });
   it("reload with query cache", async () => {
-    class Author extends Base {
+    class ReloadQcAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class ReloadQcPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts1 = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(ReloadQcAuthor, "reloadQcPosts", {
+      className: "ReloadQcPost",
       foreignKey: "author_id",
     });
-    expect(posts1.length).toBe(1);
-    // Reload should return same results
-    const posts2 = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts2.length).toBe(1);
+    registerModel("ReloadQcAuthor", ReloadQcAuthor);
+    registerModel("ReloadQcPost", ReloadQcPost);
+    const author = await ReloadQcAuthor.create({ name: "Alice" });
+    await ReloadQcPost.create({ author_id: author.id, title: "A" });
+    const proxy = association(author, "reloadQcPosts");
+    await proxy.load();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.target.length).toBe(1);
+    // Insert a new record behind the proxy's back
+    await ReloadQcPost.create({ author_id: author.id, title: "B" });
+    // reload clears the cache and fetches fresh data
+    await proxy.reload();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.target.length).toBe(2);
   });
   it("reloading unloaded associations with query cache", async () => {
-    class Author extends Base {
+    class ReloadUlAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class ReloadUlPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    // Load without having previously loaded
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(ReloadUlAuthor, "reloadUlPosts", {
+      className: "ReloadUlPost",
       foreignKey: "author_id",
     });
-    expect(posts.length).toBe(1);
+    registerModel("ReloadUlAuthor", ReloadUlAuthor);
+    registerModel("ReloadUlPost", ReloadUlPost);
+    const author = await ReloadUlAuthor.create({ name: "Alice" });
+    await ReloadUlPost.create({ author_id: author.id, title: "A" });
+    const proxy = association(author, "reloadUlPosts");
+    expect(proxy.loaded).toBe(false);
+    // reload on an unloaded proxy still loads and returns the correct data
+    await proxy.reload();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.target.length).toBe(1);
+    expect(proxy.target[0].title).toBe("A");
   });
   it("find all with include and conditions", async () => {
     class FICAuthor extends Base {
@@ -5963,16 +5971,18 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(InclAuthor);
-    registerModel(InclPost);
-    const author = await InclAuthor.create({ name: "Alice" });
-    const post = await InclPost.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "incl_posts", {
+    Associations.hasMany.call(InclAuthor, "inclPosts", {
       className: "InclPost",
       foreignKey: "author_id",
     });
-    const found = posts.some((p: any) => p.id === post.id);
-    expect(found).toBe(true);
+    registerModel("InclAuthor", InclAuthor);
+    registerModel("InclPost", InclPost);
+    const author = await InclAuthor.create({ name: "Alice" });
+    const post = await InclPost.create({ author_id: author.id, title: "A" });
+    const proxy = association(author, "inclPosts");
+    // target not loaded — isInclude must query the DB
+    expect(proxy.loaded).toBe(false);
+    expect(await proxy.isInclude(post as any)).toBe(true);
   });
   it("include returns false for non matching record to verify scoping", async () => {
     class InclScopeAuthor extends Base {
@@ -5988,17 +5998,18 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(InclScopeAuthor);
-    registerModel(InclScopePost);
-    const author1 = await InclScopeAuthor.create({ name: "Alice" });
-    const author2 = await InclScopeAuthor.create({ name: "Bob" });
-    const post = await InclScopePost.create({ author_id: author2.id, title: "B" });
-    const posts = await loadHasMany(author1, "incl_scope_posts", {
+    Associations.hasMany.call(InclScopeAuthor, "inclScopePosts", {
       className: "InclScopePost",
       foreignKey: "author_id",
     });
-    const found = posts.some((p: any) => p.id === post.id);
-    expect(found).toBe(false);
+    registerModel("InclScopeAuthor", InclScopeAuthor);
+    registerModel("InclScopePost", InclScopePost);
+    const author1 = await InclScopeAuthor.create({ name: "Alice" });
+    const author2 = await InclScopeAuthor.create({ name: "Bob" });
+    const post = await InclScopePost.create({ author_id: author2.id, title: "B" });
+    const proxy = association(author1, "inclScopePosts");
+    // record belongs to author2, not author1 — scope prevents match
+    expect(await proxy.isInclude(post as any)).toBe(false);
   });
   it("calling first nth or last on association should not load association", async () => {
     class FnlAuthor extends Base {
@@ -6172,17 +6183,20 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(ManyCountAuthor);
-    registerModel(ManyCountPost);
-    const author = await ManyCountAuthor.create({ name: "Alice" });
-    await ManyCountPost.create({ author_id: author.id, title: "A" });
-    await ManyCountPost.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "many_count_posts", {
+    Associations.hasMany.call(ManyCountAuthor, "manyCountPosts", {
       className: "ManyCountPost",
       foreignKey: "author_id",
     });
-    // "many?" means length > 1
-    expect(posts.length > 1).toBe(true);
+    registerModel("ManyCountAuthor", ManyCountAuthor);
+    registerModel("ManyCountPost", ManyCountPost);
+    const author = await ManyCountAuthor.create({ name: "Alice" });
+    await ManyCountPost.create({ author_id: author.id, title: "A" });
+    await ManyCountPost.create({ author_id: author.id, title: "B" });
+    const proxy = association(author, "manyCountPosts");
+    expect(proxy.loaded).toBe(false);
+    expect(await proxy.many()).toBe(true);
+    // many() uses COUNT — must NOT have loaded the target
+    expect(proxy.loaded).toBe(false);
   });
   it("calling many on loaded association should not use query", async () => {
     class ManyLoadAuthor extends Base {
@@ -6198,22 +6212,21 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(ManyLoadAuthor);
-    registerModel(ManyLoadPost);
+    Associations.hasMany.call(ManyLoadAuthor, "manyLoadPosts", {
+      className: "ManyLoadPost",
+      foreignKey: "author_id",
+    });
+    registerModel("ManyLoadAuthor", ManyLoadAuthor);
+    registerModel("ManyLoadPost", ManyLoadPost);
     const author = await ManyLoadAuthor.create({ name: "Alice" });
     await ManyLoadPost.create({ author_id: author.id, title: "A" });
     await ManyLoadPost.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "many_load_posts", {
-      className: "ManyLoadPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length > 1).toBe(true);
-    // Calling again should return same result
-    const posts2 = await loadHasMany(author, "many_load_posts", {
-      className: "ManyLoadPost",
-      foreignKey: "author_id",
-    });
-    expect(posts2.length > 1).toBe(true);
+    const proxy = association(author, "manyLoadPosts");
+    await proxy.load();
+    expect(proxy.loaded).toBe(true);
+    // many() on a loaded proxy reads target.length — no extra query
+    expect(await proxy.many()).toBe(true);
+    expect(proxy.loaded).toBe(true);
   });
   it("subsequent calls to many should use query", async () => {
     class ManySubAuthor extends Base {
@@ -6229,21 +6242,21 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(ManySubAuthor);
-    registerModel(ManySubPost);
+    Associations.hasMany.call(ManySubAuthor, "manySubPosts", {
+      className: "ManySubPost",
+      foreignKey: "author_id",
+    });
+    registerModel("ManySubAuthor", ManySubAuthor);
+    registerModel("ManySubPost", ManySubPost);
     const author = await ManySubAuthor.create({ name: "Alice" });
     await ManySubPost.create({ author_id: author.id, title: "A" });
-    const posts1 = await loadHasMany(author, "many_sub_posts", {
-      className: "ManySubPost",
-      foreignKey: "author_id",
-    });
-    expect(posts1.length > 1).toBe(false);
+    const proxy = association(author, "manySubPosts");
+    // 1 post → not many
+    expect(await proxy.many()).toBe(false);
+    expect(proxy.loaded).toBe(false);
+    // second call still issues a COUNT (not cached)
     await ManySubPost.create({ author_id: author.id, title: "B" });
-    const posts2 = await loadHasMany(author, "many_sub_posts", {
-      className: "ManySubPost",
-      foreignKey: "author_id",
-    });
-    expect(posts2.length > 1).toBe(true);
+    expect(await proxy.many()).toBe(true);
   });
   it("calling many should defer to collection if using a block", async () => {
     class ManyBlkAuthor extends Base {
@@ -6259,18 +6272,22 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(ManyBlkAuthor);
-    registerModel(ManyBlkPost);
-    const author = await ManyBlkAuthor.create({ name: "Alice" });
-    await ManyBlkPost.create({ author_id: author.id, title: "A" });
-    await ManyBlkPost.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "many_blk_posts", {
+    Associations.hasMany.call(ManyBlkAuthor, "manyBlkPosts", {
       className: "ManyBlkPost",
       foreignKey: "author_id",
     });
-    // Block-style: filter and check many
-    const filtered = posts.filter((p: any) => p.title === "A");
-    expect(filtered.length > 1).toBe(false);
+    registerModel("ManyBlkAuthor", ManyBlkAuthor);
+    registerModel("ManyBlkPost", ManyBlkPost);
+    const author = await ManyBlkAuthor.create({ name: "Alice" });
+    await ManyBlkPost.create({ author_id: author.id, title: "A" });
+    await ManyBlkPost.create({ author_id: author.id, title: "B" });
+    const proxy = association(author, "manyBlkPosts");
+    // predicate form: loads target, filters, checks count > 1
+    expect(await proxy.many((p) => (p as any).title === "A")).toBe(false);
+    // predicate matched all → many
+    expect(await proxy.many((_p) => true)).toBe(true);
+    // loading side-effect: target should now be loaded
+    expect(proxy.loaded).toBe(true);
   });
   it("calling none should count instead of loading association", async () => {
     class NoneCountAuthor extends Base {
@@ -6286,15 +6303,18 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(NoneCountAuthor);
-    registerModel(NoneCountPost);
-    const author = await NoneCountAuthor.create({ name: "Alice" });
-    const posts = await loadHasMany(author, "none_count_posts", {
+    Associations.hasMany.call(NoneCountAuthor, "noneCountPosts", {
       className: "NoneCountPost",
       foreignKey: "author_id",
     });
-    // "none?" means length === 0
-    expect(posts.length === 0).toBe(true);
+    registerModel("NoneCountAuthor", NoneCountAuthor);
+    registerModel("NoneCountPost", NoneCountPost);
+    const author = await NoneCountAuthor.create({ name: "Alice" });
+    const proxy = association(author, "noneCountPosts");
+    expect(proxy.loaded).toBe(false);
+    expect(await proxy.isNone()).toBe(true);
+    // isNone() uses COUNT — must NOT have loaded the target
+    expect(proxy.loaded).toBe(false);
   });
   it("calling none on loaded association should not use query", async () => {
     class NoneLoadAuthor extends Base {
@@ -6310,15 +6330,19 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(NoneLoadAuthor);
-    registerModel(NoneLoadPost);
-    const author = await NoneLoadAuthor.create({ name: "Alice" });
-    await NoneLoadPost.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "none_load_posts", {
+    Associations.hasMany.call(NoneLoadAuthor, "noneLoadPosts", {
       className: "NoneLoadPost",
       foreignKey: "author_id",
     });
-    expect(posts.length === 0).toBe(false);
+    registerModel("NoneLoadAuthor", NoneLoadAuthor);
+    registerModel("NoneLoadPost", NoneLoadPost);
+    const author = await NoneLoadAuthor.create({ name: "Alice" });
+    await NoneLoadPost.create({ author_id: author.id, title: "A" });
+    const proxy = association(author, "noneLoadPosts");
+    await proxy.load();
+    expect(proxy.loaded).toBe(true);
+    // loaded → isNone reads target.length, no extra query
+    expect(await proxy.isNone()).toBe(false);
   });
   it("calling none should defer to collection if using a block", async () => {
     class NoneBlkAuthor extends Base {
@@ -6334,16 +6358,20 @@ describe("HasManyAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
-    registerModel(NoneBlkAuthor);
-    registerModel(NoneBlkPost);
-    const author = await NoneBlkAuthor.create({ name: "Alice" });
-    await NoneBlkPost.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "none_blk_posts", {
+    Associations.hasMany.call(NoneBlkAuthor, "noneBlkPosts", {
       className: "NoneBlkPost",
       foreignKey: "author_id",
     });
-    const filtered = posts.filter((p: any) => p.title === "Z");
-    expect(filtered.length === 0).toBe(true);
+    registerModel("NoneBlkAuthor", NoneBlkAuthor);
+    registerModel("NoneBlkPost", NoneBlkPost);
+    const author = await NoneBlkAuthor.create({ name: "Alice" });
+    await NoneBlkPost.create({ author_id: author.id, title: "A" });
+    const proxy = association(author, "noneBlkPosts");
+    // predicate matches nothing → none
+    expect(await proxy.isNone((p) => (p as any).title === "Z")).toBe(true);
+    // predicate matched some → not none
+    expect(await proxy.isNone((_p) => true)).toBe(false);
+    expect(proxy.loaded).toBe(true);
   });
   it("calling one should count instead of loading association", async () => {
     class OneCountAuthor extends Base {
