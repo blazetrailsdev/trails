@@ -209,11 +209,21 @@ export class HasAndBelongsToMany {
       name,
       options: habtmOptions,
     });
-    const { through: _through, ...habtmReflectionOptions } = habtmOptions;
+    // Pull `scope:` off the options bag and forward it as the dedicated
+    // scope arg on the reflection. Mirrors Rails' Builder::Association,
+    // which captures `scope` as a positional arg to `has_and_belongs_to_many`
+    // rather than treating it as a generic option. `loadHabtm` (and the
+    // through-routing loaders) already check `options.scope` — keeping it
+    // there too means callers who don't go through reflection still see it.
+    const habtmScope =
+      typeof habtmOptions.scope === "function"
+        ? (habtmOptions.scope as (...args: any[]) => any)
+        : null;
+    const { through: _through, scope: _scope, ...habtmReflectionOptions } = habtmOptions;
     const habtmReflection = Reflection.create(
       "hasAndBelongsToMany" as any,
       name,
-      null,
+      habtmScope,
       habtmReflectionOptions,
       model,
     );

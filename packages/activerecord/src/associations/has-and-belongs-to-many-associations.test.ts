@@ -611,10 +611,67 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(projects.map((p: any) => p.id)).toEqual([p3.id, p2.id, p1.id]);
   });
 
-  it.skip("dynamic find all should respect readonly access", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: CollectionProxy does not mark returned records readonly when readonly: true is declared
-    // SCOPE: collection-proxy.ts — readonly flag propagation to loaded records
+  it("habtm builder forwards `scope:` onto the reflection (macro-time scope)", async () => {
+    // Mirrors Rails' `has_and_belongs_to_many(name, scope = nil, **options)`
+    // signature (vendor/rails/activerecord/lib/active_record/associations.rb:1870-1871):
+    // the macro-time scope flows positionally into the reflection, not
+    // into the options bag. This is the exact wire the PR adds.
+    const a5 = createTestAdapter();
+    class ScDev extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a5;
+      }
+    }
+    class ScProj extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a5;
+      }
+    }
+    class ScDevProj extends Base {
+      static {
+        this.attribute("sc_dev_id", "integer");
+        this.attribute("sc_proj_id", "integer");
+        this.adapter = a5;
+      }
+    }
+    registerModel(ScDev);
+    registerModel(ScProj);
+    registerModel(ScDevProj);
+    const macroScope = (rel: any) => rel.where({ name: "Visible" });
+    Associations.hasAndBelongsToMany.call(ScDev, "sc_projs", {
+      className: "ScProj",
+      joinTable: "sc_dev_projs",
+      foreignKey: "sc_dev_id",
+      associationForeignKey: "sc_proj_id",
+      scope: macroScope,
+    });
+
+    const reflection = (ScDev as any)._reflectOnAssociation("sc_projs");
+    expect(reflection).toBeTruthy();
+    // Pre-fix this was `null`; post-fix it carries the macro-time scope
+    // exactly as Rails' HasAndBelongsToManyReflection does.
+    expect(reflection.scope).toBe(macroScope);
+  });
+
+  it("dynamic find all should respect readonly access", async () => {
+    // Verifies the load-path piece of the readonly story: an `options.scope`
+    // that calls `readonlyBang()` propagates `_readonly = true` to every
+    // record returned by `loadHabtm` via Relation (relation.ts:1962-1967).
+    // The companion macro-time wiring is covered by the "habtm builder
+    // forwards `scope:` onto the reflection" test above.
+    const dev = await Developer.create({ name: "ROAccess", salary: 90000 });
+    const proj = await Project.create({ name: "ROProj" });
+    await DeveloperProject.create({ developer_id: dev.id, project_id: proj.id });
+    const projects = await loadHabtm(dev, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      foreignKey: "developer_id",
+      scope: (rel: any) => rel.readonlyBang(),
+    });
+    expect(projects.length).toBe(1);
+    expect((projects[0] as any).isReadonly()).toBe(true);
   });
 
   it("new with values in collection", async () => {
@@ -1066,15 +1123,19 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("association with validate false does not run associated validation callbacks on create", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: push() on collection does not respect validate: false; validation callbacks always run
-    // SCOPE: collection-proxy.ts — validate option on push/create
+    // BLOCKED: associations — autosave-on-habtm
+    // ROOT-CAUSE: HABTM declaration does not wire autosave validation callbacks
+    //   by default, so `validate: false` has no observable effect on parent.valid?.
+    //   Rails wires define_autosave_validation_callbacks for every has_many (and
+    //   HABTM proxies through has_many in Rails); our HABTM builder skips it
+    //   unless `autosave: true` is also passed.
+    // SCOPE: associations.ts hasAndBelongsToMany — wire defineAutosaveValidationCallbacks
   });
 
   it.skip("association with validate false does not run associated validation callbacks on update", () => {
-    // BLOCKED: associations — collection-proxy mutation
-    // ROOT-CAUSE: update through collection does not suppress validation callbacks when validate: false declared
-    // SCOPE: collection-proxy.ts — validate option on update path
+    // BLOCKED: associations — autosave-on-habtm
+    // ROOT-CAUSE: same as the "on create" case above.
+    // SCOPE: associations.ts hasAndBelongsToMany — wire defineAutosaveValidationCallbacks
   });
 
   it("custom join table", async () => {
