@@ -35,6 +35,7 @@ import { getInheritanceColumn, findStiClass } from "../inheritance.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   resolveModel,
+  resolveAssocClass,
   fireAssocCallbacks,
   buildHasManyRelation,
   loadHasMany,
@@ -999,7 +1000,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     if (Array.isArray(ownerFk)) {
       throw new Error(
@@ -1150,7 +1151,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
     const pkValue = this._record._readAttribute(primaryKey as string);
@@ -1186,7 +1187,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
     if (Array.isArray(primaryKey)) {
       throw new Error(
@@ -1724,7 +1725,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
     const sourceAssoc =
       throughModelAssocs.find((a) => a.name === sourceName) ??

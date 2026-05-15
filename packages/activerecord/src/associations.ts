@@ -1234,7 +1234,7 @@ export async function loadHasManyThrough(
 
   // Resolve the target model
   const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
 
   // The source defaults to the singularized association name
   const sourceName = options.source ?? singularize(assocName);
@@ -1243,7 +1243,7 @@ export async function loadHasManyThrough(
   // push sourceType filtering into the through query
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-  const throughModel = resolveModel(throughClassName);
+  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
   const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
   const sourceAssoc =
     throughModelAssocs.find((a) => a.name === sourceName) ??
@@ -1709,7 +1709,7 @@ export function buildThroughAssociation(
   // Build intermediate record with owner FK
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-  const throughModel = resolveModel(throughClassName);
+  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
   const ownerFk = ownerFkOption as string;
   const ownerPk = ownerPkOption as string;
   const throughAttrs: Record<string, unknown> = {};
