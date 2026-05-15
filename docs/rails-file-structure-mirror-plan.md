@@ -7,29 +7,17 @@ Rails-mirroring file paths. It does **not** validate **structure within a file**
 — definition order, module nesting, public/private grouping, position of
 `include` / `extend` / constants, or section comments. This plan designs a
 data-driven ESLint rule (`blazetrails/rails-file-structure`) backed by a
-cached Ruby analysis of `scripts/api-compare/.rails-source/`.
+cached Ruby analysis of `vendor/rails/`.
 
 Style match: [activerecord-type-audit.md](activerecord-type-audit.md) +
 [actionpack-restructure-audit.md](actionpack-restructure-audit.md).
 This is the _within-file_ analog of the actionpack restructure audit.
 
-> **Convergence with [PR #1552](https://github.com/blazetrailsdev/trails/pull/1552)** (ruby-source-fetcher-plan).
-> The sibling plan unifies Ruby source fetching under `vendor/sources.ts`
-> and moves the Rails clone from `scripts/api-compare/.rails-source/` to
-> `vendor/rails/`, exposing a `resolvePath(pkg, "lib"|"test")` helper that
-> replaces hardcoded paths in `extract-ruby-api.rb` and friends. This plan
-> assumes both PRs land but does **not** block on order:
+> **Note:** The vendor migration (waves tracked in `vendor/README.md`, starting with [PR #1559](https://github.com/blazetrailsdev/trails/pull/1559)) is complete. Rails source lives at
+> `vendor/rails/` via `vendor/sources.ts`. The structure extractor should consume
+> `resolvePath("activerecord", "lib")` etc. via the env-var contract defined there.
 >
-> - If #1552 ships first: the structure extractor consumes
->   `resolvePath("activerecord", "lib")` etc. via the same env-var contract
->   §4 of #1552 defines for `extract-ruby-api.rb`. Wave PR 1 here references
->   `vendor/rails/...` directly.
-> - If this plan ships first: the structure extractor copies
->   `extract-ruby-api.rb`'s current `RAILS_DIR = File.join(SCRIPT_DIR,
-".rails-source")` pattern, and wave PR 7 of #1552 sweeps the new
->   extractor into the env-var contract alongside the others.
->
-> The dev-package set today is the union of two registries that must stay
+> The dev-package set is the union of two registries that must stay
 > in sync: `extract-ruby-api.rb:32–41` `PACKAGE_DIRS` (Ruby side) and
 > `scripts/api-compare/config.ts:7–17` `PACKAGES` (TS side). The TS side is
 > the superset and contains **`arel`, `activemodel`, `activerecord`,
@@ -46,14 +34,7 @@ This is the _within-file_ analog of the actionpack restructure audit.
 > `actionpack/lib/abstract_controller` — a 1-line registry addition that
 > brings the Ruby side into parity with the TS side before the structure
 > extractor runs. The day-one scope is therefore exactly the 9 TS-side
-> keys. `globalid`, `rack`, and
-> `actionmailer` are **future expansion owned by PR #1552**: they're
-> fetched by the new vendor system but not yet in api:compare's
-> registries. The structure rule picks them up only after #1552's wave
-> that adds them to the comparison surface.
-> Path references below (`scripts/api-compare/.rails-source/...`) will be
-> rewritten to `vendor/rails/...` in the first wave that touches them
-> after #1552 merges.
+> keys.
 
 ## 1. Headline numbers
 
@@ -161,7 +142,7 @@ Implementation sketch:
 {
   "schemaVersion": 1,
   "generatedAt": "2026-05-14T…",
-  "railsSha": "<git rev of .rails-source>",
+  "railsSha": "<git rev of vendor/rails>",
   "files": {
     "active_record/persistence.rb": {
       "modules": [
@@ -243,7 +224,7 @@ on both sides.
   - Ruby remains a dev/CI dependency only, same as today.
 - **Refresh trigger**: same gate as
   [`extract-ruby-api.rb`](../scripts/api-compare/extract-ruby-api.rb) lines
-  16–28 — compare cache mtime to `.rails-source/.git/HEAD`, honour
+  16–28 — compare cache mtime to `vendor/rails/.git/HEAD`, honour
   `API_COMPARE_FORCE=1`. Regeneration runs whenever the extractor is
   invoked, locally via `pnpm api:compare` or in CI via the explicit
   workflow step (next bullet).
@@ -648,10 +629,8 @@ reason="rails-source-is-itself-disordered"` is the escape hatch and
   the directory-level analog to this within-file plan.
 - [scripts/api-compare/conventions.ts](../scripts/api-compare/conventions.ts) —
   TS↔Ruby naming/path mapping registry; reused by the new rule.
-- [PR #1552](https://github.com/blazetrailsdev/trails/pull/1552) (ruby-source-fetcher-plan, not yet merged on `main`) — sibling
-  plan (PR #1552); `vendor/sources.ts` becomes the source of truth for
-  fetched Ruby source locations and replaces hardcoded `.rails-source`
-  paths consumed here.
+- `vendor/README.md` — vendor migration history and wave PRs; `vendor/sources.ts` is the source of truth for
+  fetched Ruby source locations.
 - [scripts/api-compare/extract-ruby-api.rb](../scripts/api-compare/extract-ruby-api.rb) —
   precedent Ruby extractor; new structure extractor copies its caching gate
   and PACKAGE_DIRS map.

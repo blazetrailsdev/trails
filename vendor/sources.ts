@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 //
 // Single source of truth for which upstream gems we mirror, where to fetch
 // them from, and where each one's lib/test directories live on disk after
-// fetching. Designed in docs/ruby-source-fetcher-plan.md.
+// fetching.
 //
 // Each entry corresponds to one vendored root at `vendor/<source-name>/`.
 // `libPath` / `testPath` on each package are relative paths *inside* that
@@ -50,10 +50,6 @@ export interface UpstreamSource {
 }
 
 /**
- * Wave-3 state: rails + rack + globalid.
- * The end-state list (all three sources) is enumerated in
- * docs/ruby-source-fetcher-plan.md §2.2.
- *
  * Package names mirror scripts/api-compare/config.ts PACKAGES exactly,
  * including the trails-side rename `trailties` (← railties) and the
  * actionpack split into `actiondispatch` / `actioncontroller` /

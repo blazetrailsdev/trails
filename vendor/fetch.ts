@@ -1,17 +1,12 @@
 #!/usr/bin/env -S npx tsx
-// Unified Ruby source fetcher. Designed in docs/ruby-source-fetcher-plan.md.
+// Unified Ruby source fetcher.
 //
 // CLI:
-//   tsx vendor/fetch.ts [--source <name>] [--refresh] [--migrate]
+//   tsx vendor/fetch.ts [--source <name>] [--refresh]
 //   tsx vendor/fetch.ts --print-paths [<name>]
 //
 //   --source <name>:      limit to one source.
 //   --refresh:            rm -rf <dest> and re-clone (hard reset).
-//   --migrate:            wave-2 helper. For any source whose old
-//                         pre-vendor path exists (e.g. scripts/api-compare/
-//                         .rails-source) and whose new vendor/<name>/ does
-//                         not, fs-mv the old dir into place. Falls back to
-//                         a normal fetch if the old dir is absent.
 //   --print-paths:        no fetch; print absolute path of every source,
 //                         one per line. With <name>: print just that one.
 //   --print-test-paths:   no fetch; print JSON map {package: absolute_test_dir}
@@ -22,8 +17,8 @@
 //                         for every package with compareApi !== false. Used by
 //                         extract-ruby-api.rb via the LIB_PATHS_JSON env var.
 
-import { execFile, execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -35,13 +30,6 @@ import { libPathsManifest, SOURCES, testPathsManifest, type UpstreamSource } fro
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");
 const LOCKFILE_PATH = join(VENDOR_DIR, "sources.lock.json");
-
-// Pre-vendor paths that wave 2's --migrate flag moves into vendor/<name>/.
-// Keyed by source name → repo-relative old path.
-const LEGACY_PATHS: Record<string, string> = {
-  rails: "scripts/api-compare/.rails-source",
-  rack: "scripts/api-compare/.rack-source",
-};
 
 interface LockEntry {
   ref: string;
@@ -85,25 +73,10 @@ function destFor(source: UpstreamSource): string {
  */
 async function fetchSource(
   source: UpstreamSource,
-  opts: { refresh: boolean; migrate: boolean; lockEntry?: LockEntry },
+  opts: { refresh: boolean; lockEntry?: LockEntry },
 ): Promise<LockEntry> {
   const dest = destFor(source);
   const lockEntry = opts.lockEntry;
-
-  if (opts.migrate && !existsSync(join(dest, ".git"))) {
-    const legacyRel = LEGACY_PATHS[source.name];
-    if (legacyRel) {
-      const legacyAbs = join(REPO_ROOT, legacyRel);
-      if (existsSync(join(legacyAbs, ".git"))) {
-        console.log(`[${source.name}] migrating ${legacyRel} → vendor/${source.name}/`);
-        mkdirSync(VENDOR_DIR, { recursive: true });
-        renameSync(legacyAbs, dest);
-        disableSparseCheckout(dest);
-      } else {
-        console.log(`[${source.name}] --migrate: no legacy clone at ${legacyRel}; will clone`);
-      }
-    }
-  }
 
   if (opts.refresh && existsSync(dest)) {
     console.log(`[${source.name}] --refresh: removing ${dest}`);
@@ -172,28 +145,6 @@ function verifyPackages(source: UpstreamSource): void {
   }
 }
 
-/**
- * Defensive: pre-PR-#1483 mirrors of rails were created with sparse-checkout
- * enabled. The old fetch-rails.sh auto-disabled it on first run; --migrate
- * inherits that contract so a sparse legacy clone doesn't get moved into
- * vendor/ with paths silently absent.
- */
-function disableSparseCheckout(dest: string): void {
-  try {
-    const isSparse = execFileSync("git", ["config", "--bool", "core.sparseCheckout"], {
-      cwd: dest,
-      encoding: "utf8",
-    }).trim();
-    if (isSparse === "true") {
-      console.log(`  disabling sparse-checkout in ${dest}`);
-      execFileSync("git", ["-C", dest, "sparse-checkout", "disable"], { stdio: "inherit" });
-    }
-  } catch {
-    // `git config --bool core.sparseCheckout` exits non-zero when the key is
-    // unset (the modern default). That's the happy path — nothing to do.
-  }
-}
-
 function printPaths(filter: string | undefined): void {
   for (const source of SOURCES) {
     if (filter && source.name !== filter) continue;
@@ -212,7 +163,6 @@ function printLibPaths(): void {
 export interface ParsedArgs {
   sourceFilter?: string;
   refresh: boolean;
-  migrate: boolean;
   printPaths: { active: boolean; name?: string };
   printTestPaths: boolean;
   printLibPaths: boolean;
@@ -221,7 +171,6 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = {
     refresh: false,
-    migrate: false,
     printPaths: { active: false },
     printTestPaths: false,
     printLibPaths: false,
@@ -230,7 +179,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
     const a = argv[i];
     if (a === "--source") out.sourceFilter = argv[++i];
     else if (a === "--refresh") out.refresh = true;
-    else if (a === "--migrate") out.migrate = true;
     else if (a === "--print-test-paths") out.printTestPaths = true;
     else if (a === "--print-lib-paths") out.printLibPaths = true;
     else if (a === "--print-paths") {
@@ -273,7 +221,6 @@ async function main(argv: string[]): Promise<void> {
     targets.map((source) =>
       fetchSource(source, {
         refresh: args.refresh,
-        migrate: args.migrate,
         lockEntry: lock.sources[source.name],
       }).then((entry) => ({ name: source.name, entry })),
     ),

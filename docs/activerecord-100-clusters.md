@@ -111,7 +111,7 @@ Plus: MySQL `SchemaDumper.tableCollationCache` is never populated; base `createT
 4. **Slot D** (~270 LOC) — Nested-through preloader + STI + joins/includes.
 5. **Slot E** (~260 LOC) — Nested-through advanced (distinct/repeated table/polymorphic-with-scope/source-reset/autosave-skip).
 
-Note: audit worktree didn't have rails source populated (pre-wave-2b: `scripts/api-compare/.rails-source/`; now `vendor/rails/`) → slots sized by test-name-family inference rather than line-by-line Rails read. Workers picking these up should re-validate against `vendor/rails/` once spawned (run `pnpm vendor:fetch` to populate).
+Note: audit worktree didn't have rails source populated (historical path was `scripts/api-compare/.rails-source/`; now `vendor/rails/`) → slots sized by test-name-family inference rather than line-by-line Rails read. Workers picking these up should re-validate against `vendor/rails/` once spawned (run `pnpm vendor:fetch` to populate).
 
 ## Associations-HABTM cluster (~1690 LOC across 9 slots, from audit-associations-habtm)
 

@@ -5,17 +5,14 @@ describe("vendor/fetch.ts parseArgs", () => {
   it("defaults: no flags", () => {
     expect(parseArgs([])).toEqual({
       refresh: false,
-      migrate: false,
       printPaths: { active: false },
       printTestPaths: false,
       printLibPaths: false,
     });
   });
 
-  it("--refresh + --migrate", () => {
-    const a = parseArgs(["--refresh", "--migrate"]);
-    expect(a.refresh).toBe(true);
-    expect(a.migrate).toBe(true);
+  it("--refresh sets the flag", () => {
+    expect(parseArgs(["--refresh"]).refresh).toBe(true);
   });
 
   it("--source <name>", () => {

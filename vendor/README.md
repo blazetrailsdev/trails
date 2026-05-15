@@ -4,9 +4,7 @@ Upstream Ruby source mirrors used by `api-compare`, `test-compare`, and
 schema-parity tooling.
 
 - `sources.ts` — declarative registry. Single source of truth for which
-  gems we mirror and at what version. See
-  [`docs/ruby-source-fetcher-plan.md`](../docs/ruby-source-fetcher-plan.md)
-  for the full design.
+  gems we mirror and at what version.
 - Per-source subdirs (`rails/`, `rack/`, `globalid/`, …) are gitignored
   shallow clones of the upstream repo at the pinned tag. They land here
   via the unified fetcher (wave 2).
