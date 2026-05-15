@@ -23,6 +23,7 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
+import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 
 /**
  * MySQL-specific SchemaStatements subclass. Extends the base `dropTable` to support
@@ -34,6 +35,11 @@ import { SchemaStatements } from "./abstract/schema-statements.js";
  * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements (partial)
  */
 class MysqlSchemaStatements extends SchemaStatements {
+  private _mysqlSchemaCreation?: MysqlSchemaCreation;
+  override get schemaCreation(): MysqlSchemaCreation {
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation());
+  }
+
   override async dropTable(
     ...args:
       | [string, ...string[]]
