@@ -66,6 +66,7 @@ export class Locator {
     const klass = lookupClass(parsed.modelName);
     if (!klass) return null;
     if (!isAllowed(klass, options.only)) return null;
+    if (!modelIdIsValid(klass, parsed.modelId)) return null;
     const record = await klass.find(parsed.modelId);
     return record ?? null;
   }
@@ -151,6 +152,17 @@ export class Locator {
     }
     return Locator.locateMany(uris, options);
   }
+}
+
+/**
+ * Mirrors Rails BaseLocator#model_id_is_valid? — reject GIDs whose modelId
+ * arity doesn't match the model's primaryKey arity (e.g. a composite-PK URI
+ * with too few or too many segments).
+ */
+function modelIdIsValid(klass: LocatorModel, modelId: unknown): boolean {
+  const pkArity = Array.isArray(klass.primaryKey) ? klass.primaryKey.length : 1;
+  const idArity = Array.isArray(modelId) ? modelId.length : 1;
+  return idArity === pkArity;
 }
 
 function lookupClass(name: string): LocatorModel | undefined {

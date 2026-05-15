@@ -1,56 +1,98 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
+import { SignedGlobalID } from "./signed-global-id.js";
 import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
-class FakePerson {
-  static name = "FakePerson";
+const TEST_APP = "bcx";
+const UUID = "7ef9b614-353c-43a1-a203-ab2307851990";
+
+function makeVerifier(secret = "test-secret"): MessageVerifier {
+  return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
+}
+
+// ─── Fixture models ────────────────────────────────────────────────────────
+
+class Person {
   static primaryKey = "id";
   id: string;
   constructor(id: string) {
     this.id = id;
   }
-  // find(scalar) → single; find(array) → batch (Rails parity).
-  static async find(id: unknown): Promise<FakePerson | FakePerson[]> {
+  static async find(id: unknown): Promise<Person | Person[]> {
     if (Array.isArray(id)) {
       if (id.some((p) => p === "missing")) throw new Error("not found");
-      return id.map((i) => new FakePerson(String(i)));
+      return id.map((i) => new this(String(i)));
     }
     if (id === "missing") throw new Error("not found");
-    return new FakePerson(String(id));
+    return new this(String(id));
   }
-  static where(conds: Record<string, unknown>): { toArray(): Promise<FakePerson[]> } {
+  static where(
+    this: typeof Person,
+    conds: Record<string, unknown>,
+  ): { toArray(): Promise<Person[]> } {
     const ids = conds["id"] as unknown[];
+    // Subclasses (PersonUuid, PersonChild) should instantiate themselves;
+    // arrow function captures `this` lexically as the class constructor.
+    const make = (id: unknown) => new this(String(id));
     return {
       async toArray() {
-        return ids.filter((id) => id !== "missing").map((id) => new FakePerson(String(id)));
+        return ids.filter((id) => id !== "missing").map(make);
       },
     };
   }
 }
+// Rails 'Person::Child' equivalent — class extending Person.
+class PersonChild extends Person {}
+class PersonUuid extends Person {}
 
-class FakeAccount {
-  static name = "FakeAccount";
-  static primaryKey = "id";
-  id: string;
-  constructor(id: string) {
+class CompositePrimaryKeyModel {
+  static primaryKey: string[] = ["tenant", "key"];
+  id: string[];
+  constructor(id: string[]) {
     this.id = id;
   }
-  static async find(id: unknown): Promise<FakeAccount | FakeAccount[]> {
-    if (Array.isArray(id)) return id.map((i) => new FakeAccount(String(i)));
-    return new FakeAccount(String(id));
+  static async find(id: unknown): Promise<CompositePrimaryKeyModel | CompositePrimaryKeyModel[]> {
+    const arr = id as unknown[];
+    if (Array.isArray(arr[0])) {
+      return arr.map((i) => new CompositePrimaryKeyModel((i as string[]).map(String)));
+    }
+    return new CompositePrimaryKeyModel((arr as string[]).map(String));
   }
 }
 
 const REGISTRY: Record<string, LocatorModel> = {
-  FakePerson: FakePerson as unknown as LocatorModel,
-  FakeAccount: FakeAccount as unknown as LocatorModel,
+  Person: Person as unknown as LocatorModel,
+  PersonChild: PersonChild as unknown as LocatorModel,
+  PersonUuid: PersonUuid as unknown as LocatorModel,
+  CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
 
+// ─── GlobalLocatorTest ─────────────────────────────────────────────────────
+
 describe("GlobalLocatorTest", () => {
+  let verifier: MessageVerifier;
+  let personGid: GlobalID;
+  let cpkGid: GlobalID;
+  let uuidGid: GlobalID;
+  let personSgid: SignedGlobalID;
+  let cpkSgid: SignedGlobalID;
+
   beforeEach(() => {
-    setApp("bcx");
+    setApp(TEST_APP);
     setModelFinder((name) => REGISTRY[name]);
+    verifier = makeVerifier();
+    personGid = GlobalID.create(new Person("id"));
+    cpkGid = GlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]));
+    uuidGid = GlobalID.create(new PersonUuid(UUID));
+    personSgid = SignedGlobalID.create(new Person("id"), { verifier });
+    cpkSgid = SignedGlobalID.create(
+      new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
+      {
+        verifier,
+      },
+    );
   });
   afterEach(() => {
     _resetApp();
@@ -58,164 +100,329 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by GID", async () => {
-    const gid = GlobalID.create(new FakePerson("5"));
-    const found = (await Locator.locate(gid)) as FakePerson;
-    expect(found).toBeInstanceOf(FakePerson);
-    expect(found.id).toBe("5");
+    const found = (await Locator.locate(personGid)) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personGid.modelId);
   });
 
-  it("by GID string", async () => {
-    const found = (await Locator.locate("gid://bcx/FakePerson/7")) as FakePerson;
-    expect(found).toBeInstanceOf(FakePerson);
-    expect(found.id).toBe("7");
+  it("composite primary key model by GID", async () => {
+    const found = (await Locator.locate(cpkGid)) as CompositePrimaryKeyModel;
+    expect(found).toBeInstanceOf(CompositePrimaryKeyModel);
+    expect(found.id).toEqual(["tenant-key-value", "id-value"]);
   });
 
   it("by GID with only: restriction with match", async () => {
-    const gid = GlobalID.create(new FakePerson("5"));
-    const found = await Locator.locate(gid, { only: FakePerson as unknown as LocatorModel });
-    expect(found).toBeInstanceOf(FakePerson);
+    const found = await Locator.locate(personGid, { only: Person as unknown as LocatorModel });
+    expect(found).toBeInstanceOf(Person);
+  });
+
+  it("by GID with only: restriction with match subclass", async () => {
+    const childGid = GlobalID.create(new PersonChild("1"));
+    const found = await Locator.locate(childGid, { only: Person as unknown as LocatorModel });
+    expect(found).toBeInstanceOf(PersonChild);
   });
 
   it("by GID with only: restriction with no match", async () => {
-    const gid = GlobalID.create(new FakePerson("5"));
-    const found = await Locator.locate(gid, { only: FakeAccount as unknown as LocatorModel });
+    const found = await Locator.locate(personGid, {
+      only: CompositePrimaryKeyModel as unknown as LocatorModel,
+    });
     expect(found).toBeNull();
   });
 
   it("by GID with only: restriction by multiple types", async () => {
-    const gid = GlobalID.create(new FakePerson("5"));
-    const found = await Locator.locate(gid, {
-      only: [FakeAccount as unknown as LocatorModel, FakePerson as unknown as LocatorModel],
+    const found = await Locator.locate(personGid, {
+      only: [
+        CompositePrimaryKeyModel as unknown as LocatorModel,
+        Person as unknown as LocatorModel,
+      ],
     });
-    expect(found).toBeInstanceOf(FakePerson);
+    expect(found).toBeInstanceOf(Person);
   });
 
-  it("returns null for invalid input or unknown class", async () => {
-    expect(await Locator.locate("not-a-gid")).toBeNull();
+  it("by many GIDs of one class", async () => {
+    const found = await Locator.locateMany([
+      GlobalID.create(new Person("1")),
+      GlobalID.create(new Person("2")),
+    ]);
+    expect(found).toHaveLength(2);
+    expect((found[0] as Person).id).toBe("1");
+    expect((found[1] as Person).id).toBe("2");
+  });
+
+  it("by many GIDs of a UUID pk class", async () => {
+    const found = await Locator.locateMany([uuidGid, uuidGid]);
+    expect(found).toHaveLength(2);
+    expect((found[0] as PersonUuid).id).toBe(UUID);
+  });
+
+  it("by many GIDs of a UUID pk class with ignore missing", async () => {
+    const gids = [uuidGid, GlobalID.create(new PersonUuid("missing")), uuidGid];
+    const found = await Locator.locateMany(gids, { ignoreMissing: true });
+    expect(found).toHaveLength(2);
+  });
+
+  it("#locate_many by composite primary key GIDs of the same class", async () => {
+    const records = [
+      new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
+      new CompositePrimaryKeyModel(["tenant-key-value2", "id-value2"]),
+    ];
+    const found = await Locator.locateMany(records.map((r) => GlobalID.create(r)));
+    expect(found).toHaveLength(2);
+    expect((found[0] as CompositePrimaryKeyModel).id).toEqual(["tenant-key-value", "id-value"]);
+    expect((found[1] as CompositePrimaryKeyModel).id).toEqual(["tenant-key-value2", "id-value2"]);
+  });
+
+  it("#locate_many by composite primary key GIDs of different classes", async () => {
+    const records = [
+      GlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"])),
+      GlobalID.create(new Person("1")),
+    ];
+    const found = await Locator.locateMany(records);
+    expect(found).toHaveLength(2);
+    expect(found[0]).toBeInstanceOf(CompositePrimaryKeyModel);
+    expect(found[1]).toBeInstanceOf(Person);
+  });
+
+  it("by many GIDs of mixed classes", async () => {
+    const found = await Locator.locateMany([
+      GlobalID.create(new Person("1")),
+      GlobalID.create(new PersonChild("1")),
+      GlobalID.create(new Person("2")),
+    ]);
+    expect(found).toHaveLength(3);
+    expect((found[0] as Person).id).toBe("1");
+    expect(found[1]).toBeInstanceOf(PersonChild);
+    expect((found[2] as Person).id).toBe("2");
+  });
+
+  it("by many GIDs with only: restriction to match subclass", async () => {
+    const found = await Locator.locateMany(
+      [
+        GlobalID.create(new Person("1")),
+        GlobalID.create(new PersonChild("1")),
+        GlobalID.create(new Person("2")),
+      ],
+      { only: PersonChild as unknown as LocatorModel },
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toBeInstanceOf(PersonChild);
+  });
+
+  it("by SGID", async () => {
+    const found = (await Locator.locateSigned(personSgid, { verifier })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("id");
+  });
+
+  it("by SGID of a composite primary key model", async () => {
+    const found = (await Locator.locateSigned(cpkSgid, { verifier })) as CompositePrimaryKeyModel;
+    expect(found).toBeInstanceOf(CompositePrimaryKeyModel);
+    expect(found.id).toEqual(["tenant-key-value", "id-value"]);
+  });
+
+  it("by SGID with only: restriction with match", async () => {
+    const found = await Locator.locateSigned(personSgid, {
+      verifier,
+      only: Person as unknown as LocatorModel,
+    });
+    expect(found).toBeInstanceOf(Person);
+  });
+
+  it("by SGID with only: restriction with match subclass", async () => {
+    const sgid = SignedGlobalID.create(new PersonChild("1"), { verifier });
+    const found = await Locator.locateSigned(sgid, {
+      verifier,
+      only: Person as unknown as LocatorModel,
+    });
+    expect(found).toBeInstanceOf(PersonChild);
+  });
+
+  it("by SGID with only: restriction with no match", async () => {
+    const found = await Locator.locateSigned(personSgid, {
+      verifier,
+      only: CompositePrimaryKeyModel as unknown as LocatorModel,
+    });
+    expect(found).toBeNull();
+  });
+
+  it("by SGID with only: restriction by multiple types", async () => {
+    const found = await Locator.locateSigned(personSgid, {
+      verifier,
+      only: [
+        CompositePrimaryKeyModel as unknown as LocatorModel,
+        Person as unknown as LocatorModel,
+      ],
+    });
+    expect(found).toBeInstanceOf(Person);
+  });
+
+  it("by many SGIDs of one class", async () => {
+    const sgids = [
+      SignedGlobalID.create(new Person("1"), { verifier }),
+      SignedGlobalID.create(new Person("2"), { verifier }),
+    ];
+    const found = await Locator.locateManySigned(sgids, { verifier });
+    expect(found).toHaveLength(2);
+    expect((found[0] as Person).id).toBe("1");
+    expect((found[1] as Person).id).toBe("2");
+  });
+
+  it("by many SGIDs of the same composite primary key class", async () => {
+    const sgids = [
+      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]), {
+        verifier,
+      }),
+      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value2", "id-value2"]), {
+        verifier,
+      }),
+    ];
+    const found = await Locator.locateManySigned(sgids, { verifier });
+    expect(found).toHaveLength(2);
+  });
+
+  it("by many SGIDs of mixed classes", async () => {
+    const sgids = [
+      SignedGlobalID.create(new Person("1"), { verifier }),
+      SignedGlobalID.create(new PersonChild("1"), { verifier }),
+      SignedGlobalID.create(new Person("2"), { verifier }),
+    ];
+    const found = await Locator.locateManySigned(sgids, { verifier });
+    expect(found).toHaveLength(3);
+  });
+
+  it("by many SGIDs of composite primary key model mixed with other models", async () => {
+    const sgids = [
+      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]), {
+        verifier,
+      }),
+      SignedGlobalID.create(new Person("1"), { verifier }),
+    ];
+    const found = await Locator.locateManySigned(sgids, { verifier });
+    expect(found).toHaveLength(2);
+    expect(found[0]).toBeInstanceOf(CompositePrimaryKeyModel);
+    expect(found[1]).toBeInstanceOf(Person);
+  });
+
+  it("by many SGIDs with only: restriction to match subclass", async () => {
+    const sgids = [
+      SignedGlobalID.create(new Person("1"), { verifier }),
+      SignedGlobalID.create(new PersonChild("1"), { verifier }),
+      SignedGlobalID.create(new Person("2"), { verifier }),
+    ];
+    const found = await Locator.locateManySigned(sgids, {
+      verifier,
+      only: PersonChild as unknown as LocatorModel,
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0]).toBeInstanceOf(PersonChild);
+  });
+
+  it("by GID string", async () => {
+    const found = (await Locator.locate(personGid.toString())) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("id");
+  });
+
+  it("by SGID string", async () => {
+    const found = (await Locator.locateSigned(personSgid.toString(), { verifier })) as Person;
+    expect(found).toBeInstanceOf(Person);
+  });
+
+  it("by many SGID strings with for: restriction to match purpose", async () => {
+    const tokens = [
+      SignedGlobalID.create(new Person("1"), { verifier, for: "adoption" }).toString(),
+      SignedGlobalID.create(new PersonChild("1"), { verifier }).toString(),
+      SignedGlobalID.create(new PersonChild("2"), { verifier, for: "adoption" }).toString(),
+    ];
+    const found = await Locator.locateManySigned(tokens, {
+      verifier,
+      for: "adoption",
+      only: PersonChild as unknown as LocatorModel,
+    });
+    expect(found).toHaveLength(1);
+    expect((found[0] as PersonChild).id).toBe("2");
+  });
+
+  it("by to_param encoding", async () => {
+    const found = (await Locator.locate(personGid.toParam())) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("id");
+  });
+
+  it("by to_param encoding for a composite primary key model", async () => {
+    const found = (await Locator.locate(cpkGid.toParam())) as CompositePrimaryKeyModel;
+    expect(found).toBeInstanceOf(CompositePrimaryKeyModel);
+    expect(found.id).toEqual(["tenant-key-value", "id-value"]);
+  });
+
+  it("by non-GID returns nil", async () => {
+    expect(await Locator.locate("This is not a GID")).toBeNull();
+  });
+
+  it("by non-SGID returns nil", async () => {
+    expect(await Locator.locateSigned("This is not a SGID", { verifier })).toBeNull();
+  });
+
+  it("by invalid GID URI returns nil", async () => {
+    expect(await Locator.locate("http://app/Person/1")).toBeNull();
+    expect(await Locator.locate("gid://Person/1")).toBeNull();
+    expect(await Locator.locate("gid://app/Person")).toBeNull();
+    // Scalar-PK model with composite-form id — exercises modelIdIsValid arity.
+    expect(await Locator.locate("gid://app/Person/1/2")).toBeNull();
+  });
+
+  it("locating by a GID URI with a mismatching model_id returns nil", async () => {
+    // 4 cases mirroring Rails: composite-id over-supply, under-supply, partial.
+    expect(
+      await Locator.locate(
+        "gid://app/CompositePrimaryKeyModel/tenant-key-value/id-value/something_else",
+      ),
+    ).toBeNull();
+    expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/")).toBeNull();
+    expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value")).toBeNull();
+  });
+});
+
+// ─── Non-Rails coverage (regressions / edge cases not in Rails suite) ──────
+
+describe("Locator (non-Rails coverage)", () => {
+  beforeEach(() => {
+    setApp(TEST_APP);
+    setModelFinder((name) => REGISTRY[name]);
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+  });
+
+  it("returns null when model class isn't registered", async () => {
     expect(await Locator.locate("gid://bcx/UnknownModel/1")).toBeNull();
   });
 
   it("propagates errors from find (Rails parity — find raises RecordNotFound)", async () => {
-    await expect(Locator.locate("gid://bcx/FakePerson/missing")).rejects.toThrow();
+    await expect(Locator.locate("gid://bcx/Person/missing")).rejects.toThrow();
   });
 
-  it("locate_many returns records in input order", async () => {
-    const gids = ["gid://bcx/FakePerson/3", "gid://bcx/FakeAccount/1", "gid://bcx/FakePerson/2"];
-    const found = await Locator.locateMany(gids);
-    expect(found).toHaveLength(3);
-    expect((found[0] as FakePerson).id).toBe("3");
-    expect((found[1] as FakeAccount).id).toBe("1");
-    expect((found[2] as FakePerson).id).toBe("2");
-  });
-
-  it("locate_many with only: filters by class", async () => {
-    const gids = ["gid://bcx/FakePerson/1", "gid://bcx/FakeAccount/1"];
-    const found = await Locator.locateMany(gids, {
-      only: FakePerson as unknown as LocatorModel,
-    });
-    expect(found).toHaveLength(1);
-    expect(found[0]).toBeInstanceOf(FakePerson);
-  });
-
-  it("locate_many with ignoreMissing skips missing records", async () => {
-    const gids = ["gid://bcx/FakePerson/1", "gid://bcx/FakePerson/missing"];
-    const found = await Locator.locateMany(gids, { ignoreMissing: true });
-    expect(found).toHaveLength(1);
-    expect((found[0] as FakePerson).id).toBe("1");
-  });
-});
-
-describe("locateMany with custom primaryKey and slash-containing composite ids", () => {
-  class UuidModel {
-    static name = "UuidModel";
-    static primaryKey = "uuid";
-    uuid: string;
-    constructor(uuid: string) {
-      this.uuid = uuid;
+  it("locateMany with ignoreMissing throws if where() lacks toArray", async () => {
+    class BadWhereModel {
+      static primaryKey = "id";
+      id: string;
+      constructor(id: string) {
+        this.id = id;
+      }
+      static async find(id: unknown): Promise<BadWhereModel | BadWhereModel[]> {
+        return Array.isArray(id)
+          ? id.map((i) => new BadWhereModel(String(i)))
+          : new BadWhereModel(String(id));
+      }
+      static where(): { someOtherMethod?: () => void } {
+        return {};
+      }
     }
-    static async find(id: unknown): Promise<UuidModel | UuidModel[]> {
-      return Array.isArray(id)
-        ? id.map((i) => new UuidModel(String(i)))
-        : new UuidModel(String(id));
-    }
-  }
-  class CpkModel {
-    static name = "CpkModel";
-    static primaryKey: string[] = ["tenant", "key"];
-    id: string[];
-    constructor(id: string[]) {
-      this.id = id;
-    }
-    static async find(id: unknown): Promise<CpkModel | CpkModel[]> {
-      const arr = id as unknown[];
-      // Batch find of multiple composite ids vs. single composite id —
-      // distinguish by whether the first element is an array.
-      if (Array.isArray(arr[0])) return arr.map((i) => new CpkModel((i as string[]).map(String)));
-      return new CpkModel((arr as string[]).map(String));
-    }
-  }
-
-  beforeEach(() => {
-    setApp("bcx");
-    setModelFinder(
-      (name) =>
-        ({ UuidModel, CpkModel })[name as "UuidModel" | "CpkModel"] as unknown as LocatorModel,
-    );
-  });
-  afterEach(() => {
-    _resetApp();
-    _resetModelFinder();
-  });
-
-  it("indexes records by their primaryKey property, not hard-coded id", async () => {
-    const found = await Locator.locateMany(["gid://bcx/UuidModel/abc", "gid://bcx/UuidModel/def"]);
-    expect(found).toHaveLength(2);
-    expect((found[0] as UuidModel).uuid).toBe("abc");
-    expect((found[1] as UuidModel).uuid).toBe("def");
-  });
-
-  it("composite ids with internal slashes don't collide on join", async () => {
-    // ['a/b', 'c'] and ['a', 'b/c'] both join to 'a/b/c' under the old key.
-    const g1 = "gid://bcx/CpkModel/a%2Fb/c";
-    const g2 = "gid://bcx/CpkModel/a/b%2Fc";
-    const found = await Locator.locateMany([g1, g2]);
-    expect(found).toHaveLength(2);
-    expect((found[0] as CpkModel).id).toEqual(["a/b", "c"]);
-    expect((found[1] as CpkModel).id).toEqual(["a", "b/c"]);
-  });
-});
-
-describe("locateMany ignoreMissing without toArray on the relation", () => {
-  class BadWhereModel {
-    static name = "BadWhereModel";
-    static primaryKey = "id";
-    id: string;
-    constructor(id: string) {
-      this.id = id;
-    }
-    static async find(id: unknown): Promise<BadWhereModel | BadWhereModel[]> {
-      if (Array.isArray(id)) return id.map((i) => new BadWhereModel(String(i)));
-      return new BadWhereModel(String(id));
-    }
-    // Returns a relation object missing .toArray — should trigger the
-    // explicit throw rather than silently returning [].
-    static where(): { someOtherMethod?: () => void } {
-      return {};
-    }
-  }
-
-  beforeEach(() => {
-    setApp("bcx");
+    Object.defineProperty(BadWhereModel, "name", { value: "BadWhereModel" });
     setModelFinder((name) =>
       name === "BadWhereModel" ? (BadWhereModel as unknown as LocatorModel) : undefined,
     );
-  });
-  afterEach(() => {
-    _resetApp();
-    _resetModelFinder();
-  });
-
-  it("throws a clear error instead of silently returning []", async () => {
     await expect(
       Locator.locateMany(["gid://bcx/BadWhereModel/1"], { ignoreMissing: true }),
     ).rejects.toThrow(/toArray/);
@@ -224,12 +431,12 @@ describe("locateMany ignoreMissing without toArray on the relation", () => {
 
 describe("Locator without model finder", () => {
   beforeEach(() => {
-    setApp("bcx");
+    setApp(TEST_APP);
     _resetModelFinder();
   });
   afterEach(() => _resetApp());
 
   it("returns null when no finder is registered", async () => {
-    expect(await Locator.locate("gid://bcx/FakePerson/1")).toBeNull();
+    expect(await Locator.locate("gid://bcx/Person/1")).toBeNull();
   });
 });

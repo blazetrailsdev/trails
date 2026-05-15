@@ -9,7 +9,7 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-6b)
+### Parity scoreboard (after GID-6c)
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
@@ -17,7 +17,7 @@ brings the practical 100% to 56/56 api / 149/149 tests.
 | Signal       | Current          | 100% target (pre-skip) | Gap          |
 | ------------ | ---------------- | ---------------------- | ------------ |
 | api:compare  | 19 / 59 (32.2%)  | 59 / 59                | 40 methods   |
-| test:compare | 67 / 158 (42.4%) | 158 / 158              | 91 tests     |
+| test:compare | 95 / 158 (60.1%) | 158 / 158              | 63 tests     |
 | files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
 | files (test) | 5 / 8            | 8 / 8                  | 3 test files |
 
@@ -38,8 +38,8 @@ Per-file test:compare:
 | `uri_gid_test.rb`               | 27    | 30    | 90% |
 | `global_identification_test.rb` | 5     | 6     | 83% |
 | `signed_global_id_test.rb`      | 17    | 24    | 71% |
+| `global_locator_test.rb`        | 33    | 59    | 56% |
 | `global_id_test.rb`             | 13    | 26    | 50% |
-| `global_locator_test.rb`        | 5     | 59    | 8%  |
 | `verifier_test.rb`              | 0     | 4     | 0%  |
 | `pattern_matching_test.rb`      | 0     | 2     | 0%  |
 | `railtie_test.rb`               | 0     | 7     | 0%  |
@@ -76,9 +76,20 @@ remaining 7 need `expires_in` class-level config (GID-8), `model_class`
 backwards-compat with legacy self-validated metadata (out of scope).
 `verifier.test.ts` ships with GID-11 once a Verifier wrapper exists.
 
-**GID-6c** (~250 LOC): expand `global-locator.test.ts` from 13 smoke tests
-to the full 59-test Rails mirror. Most depend on Locator features added in
-GID-9 (cross-app locators, BaseLocator).
+**GID-6c** — open in [#1644](https://github.com/blazetrailsdev/trails/pull/1644); expanded `global-locator.test.ts` to 37 tests across the
+GlobalLocatorTest mirror covering `Locator.locate` / `locateMany` /
+`locateSigned` / `locateManySigned` with `only:` / `ignoreMissing:` /
+`for:` permutations plus subclass, UUID, composite-PK fixture models.
+Added the Rails `BaseLocator#model_id_is_valid?` arity check on
+`Locator.locate` (modelId arity must match primaryKey arity) — closes
+the "locating by a GID URI with a mismatching model_id" Ruby test.
+**33/59** match (56%). The 26 remaining Ruby tests need: module-based
+`only:` filters (4 tests, TS has no Ruby modules → permanent skip);
+eager-loading `includes:` (3 tests, AR feature out of GlobalID scope
+→ permanent skip); `Locator.use(app, locator)` per-app locators (~10
+tests, **GID-9**); `app locator is case insensitive` / `locator name
+cannot have underscore` (**GID-9**); `ScopedRecordLocatingTest`
+(model.unscoped block helper, **GID-9**).
 
 ### GID-7 — `URI::GID` class wrapping (~120 LOC)
 
