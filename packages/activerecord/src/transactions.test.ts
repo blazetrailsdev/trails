@@ -2083,7 +2083,8 @@ describe("TransactionTest", () => {
     });
 
     it("does not call clearCacheBang for unrelated errors", async () => {
-      const spy = vi.spyOn(adapter as Required<DatabaseAdapter>, "clearCacheBang");
+      const innerAdapter = (adapter as any).innerAdapter ?? adapter;
+      const spy = vi.spyOn(innerAdapter as Required<DatabaseAdapter>, "clearCacheBang");
       await expect(
         transaction(Account, async () => {
           throw new Error("unrelated");
@@ -2275,15 +2276,14 @@ describe("SchemaAdapter TM delegation", () => {
 
   it("setup() inside a TM transaction does not corrupt the SavepointTransaction lifecycle", async () => {
     // SchemaAdapter.setup() calls execDdlWithSavepoint (direct createSavepoint on inner,
-    // bypassing TM). After Phase 1, TM may have an open frame when setup fires inside a
-    // test transaction. This test confirms TM's commit() on the SavepointTransaction
-    // releases its own name without interfering with the already-released DDL savepoints.
-    //
-    // DDL savepoints are released eagerly; TM never tracks them.
+    // bypassing TM intentionally — DDL savepoints are released eagerly and TM never
+    // tracks them). After Phase 1, setup() runs inside withinNewTransaction, so TM
+    // already has an open frame when DDL savepoints are issued. This test confirms:
+    //   - setup() fires inside the outer transaction (via the first Item.create() call)
+    //   - requiresNew:true creates a real SavepointTransaction on top of the outer frame
+    //   - TM's commit() releases its own savepoint name without touching the already-
+    //     released DDL savepoints; no error escapes.
     const testAdapter = createTestAdapter();
-    // withinNewTransaction delegates to inner (SQLite has AbstractAdapter TM)
-    // and a nested transaction (requiresNew: true) creates a SavepointTransaction.
-    // Verify the outer and inner transactions both complete without error.
     class Item extends Base {
       static {
         this.attribute("name", "string");
@@ -2291,21 +2291,25 @@ describe("SchemaAdapter TM delegation", () => {
       }
     }
 
-    let outerCommitted = false;
-    let innerCommitted = false;
+    let outerCount = 0;
+    let innerCount = 0;
 
     await transaction(Item, async () => {
-      outerCommitted = true;
+      // This create triggers setup() → DDL CREATE TABLE inside the outer TM frame.
+      await Item.create({ name: "outer" });
+      outerCount = (await Item.count()) as number;
+
       await transaction(
         Item,
         async () => {
-          innerCommitted = true;
+          await Item.create({ name: "inner" });
+          innerCount = (await Item.count()) as number;
         },
         { requiresNew: true },
       );
     });
 
-    expect(outerCommitted).toBe(true);
-    expect(innerCommitted).toBe(true);
+    expect(outerCount).toBeGreaterThanOrEqual(1);
+    expect(innerCount).toBeGreaterThanOrEqual(2);
   });
 });

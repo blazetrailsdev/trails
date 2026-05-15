@@ -345,6 +345,11 @@ let _ddlSpCounter = 0;
  */
 async function execDdlWithSavepoint(inner: any, sql: string): Promise<void> {
   const useSp = isPg() && ((inner.openTransactions ?? 0) > 0 || inner.inTransaction);
+  // TM uses lazy materialization: openTransactions>0 doesn't mean BEGIN was
+  // sent. If we issue SAVEPOINT now PG errors with "SAVEPOINT can only be
+  // used in transaction blocks". Force materialization so the BEGIN is on
+  // the wire before SAVEPOINT.
+  if (useSp) await inner.materializeTransactions?.();
   const sp = useSp ? `_ddl_sp_${++_ddlSpCounter}` : "";
   try {
     if (useSp) await inner.createSavepoint(sp);
@@ -688,6 +693,9 @@ class SchemaAdapter implements DatabaseAdapter {
       // can rollback the failed statement and retry after auto-creating the
       // missing table/column.
       const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
+      // Force TM materialization (BEGIN on the wire) before SAVEPOINT — TM uses
+      // lazy materialization so openTransactions>0 alone doesn't mean BEGIN was sent.
+      if (useSp) await this.materializeTransactions();
       const sp = useSp ? `_sr_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -733,6 +741,7 @@ class SchemaAdapter implements DatabaseAdapter {
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
       const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
+      if (useSp) await this.materializeTransactions();
       const sp = useSp ? `_sr_m_${attempt}` : "";
       try {
         if (useSp) await this.inner.createSavepoint(sp);
@@ -905,6 +914,11 @@ class SchemaAdapter implements DatabaseAdapter {
     opts: { isolation?: string | null; joinable?: boolean },
     fn: (tx?: unknown) => Promise<T> | T,
   ): Promise<T> {
+    // Run setup() before entering TM — same invariant as beginTransaction().
+    // Without this, pending cleanup/DDL could run while TM already has an open
+    // frame: on PG execDdlWithSavepoint would issue SAVEPOINT before BEGIN;
+    // on MySQL, DDL inside a transaction causes an implicit commit.
+    await this.setup();
     return (this.inner as any).withinNewTransaction(opts, fn);
   }
 
