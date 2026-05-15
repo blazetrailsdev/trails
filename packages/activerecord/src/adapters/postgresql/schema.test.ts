@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
+import { makeThingModels, makeThing5Model } from "./schema-ar-models.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -193,9 +194,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("habtm table name with schema", () => {
-      // BLOCKED: needs-ar-model — Song/Album HABTM models with schema-qualified table names
-      // ROOT-CAUSE: test requires AR model layer (Song.create, album.songs, Song.includes) + music schema setup
-      // SCOPE: needs full HABTM + AR model infrastructure beyond adapter-only tests
+      // BLOCKED: needs-includes-references — Song/Album HABTM with schema-qualified table names
+      // ROOT-CAUSE: includes(:albums).where("albums.id": id) requires auto-promotion to eager_load
+      // (references mechanism); joins(:albums).pluck also needs HABTM join SQL wired for music schema
+      // SCOPE: needs includes→eager_load auto-promotion + HABTM joins infrastructure
     });
 
     it("drop schema with nonexisting schema", async () => {
@@ -285,20 +287,44 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
     });
 
-    it.skip("where with qualified schema name", () => {
-      // BLOCKED: needs-ar-model — Thing1.where("test_schema.things.name": "thing1")
-      // ROOT-CAUSE: test requires AR model (Thing1, tableName="test_schema.things") + relation where() path
-      // SCOPE: needs full AR model layer + where() with qualified column predicate
+    it("where with qualified schema name", async () => {
+      const { Thing1 } = await makeThingModels(adapter);
+      await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      const names = (
+        await (Thing1 as any).where({ "test_schema.things.name": "thing1" }).toArray()
+      ).map((r: any) => r.name);
+      expect(names).toEqual(["thing1"]);
     });
-    it.skip("pluck with qualified schema name", () => {
-      // BLOCKED: needs-ar-model — Thing1.pluck(:"test_schema.things.name")
-      // ROOT-CAUSE: test requires AR model (Thing1) + relation pluck() with qualified column
-      // SCOPE: needs full AR model layer
+    it("pluck with qualified schema name", async () => {
+      const { Thing1 } = await makeThingModels(adapter);
+      await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      const names = await (Thing1 as any).pluck("test_schema.things.name");
+      expect(names).toEqual(["thing1"]);
     });
-    it.skip("classes with qualified schema name", () => {
-      // BLOCKED: needs-ar-model — Thing1/Thing2/Thing3/Thing4 models with schema-qualified table names
-      // ROOT-CAUSE: test requires 4 AR models with different qualified table_name settings + count/create
-      // SCOPE: needs full AR model layer
+    it("classes with qualified schema name", async () => {
+      const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels(adapter);
+      expect(await (Thing1 as any).count()).toBe(0);
+      expect(await (Thing2 as any).count()).toBe(0);
+      expect(await (Thing3 as any).count()).toBe(0);
+      expect(await (Thing4 as any).count()).toBe(0);
+      await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      expect(await (Thing1 as any).count()).toBe(1);
+      expect(await (Thing2 as any).count()).toBe(0);
+      expect(await (Thing3 as any).count()).toBe(0);
+      expect(await (Thing4 as any).count()).toBe(0);
+      await (Thing2 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      expect(await (Thing1 as any).count()).toBe(1);
+      expect(await (Thing2 as any).count()).toBe(1);
+      expect(await (Thing3 as any).count()).toBe(0);
+      expect(await (Thing4 as any).count()).toBe(0);
+      await (Thing3 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      expect(await (Thing3 as any).count()).toBe(1);
+      expect(await (Thing4 as any).count()).toBe(0);
+      await (Thing4 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
+      expect(await (Thing1 as any).count()).toBe(1);
+      expect(await (Thing2 as any).count()).toBe(1);
+      expect(await (Thing3 as any).count()).toBe(1);
+      expect(await (Thing4 as any).count()).toBe(1);
     });
     it("raise on unquoted schema name", async () => {
       // $user without surrounding single quotes is invalid in SET search_path TO (PG
@@ -450,11 +476,36 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.currentSchema()).toBe("public");
     });
 
-    it.skip("prepared statements with multiple schemas", () => {
-      // BLOCKED: needs-ar-model — Thing5.create + Thing5.count with schema_search_path swapped between schemas
-      // ROOT-CAUSE: test requires AR model (Thing5, tableName="things") with search_path toggled between
-      // SCHEMA_NAME and SCHEMA2_NAME; needs full AR model layer + connection.schema_search_path= setter
-      // SCOPE: needs AR model layer + schema_search_path scoped to AR Base connection
+    it("prepared statements with multiple schemas", async () => {
+      const Thing5 = makeThing5Model(adapter);
+      // Load schema within a transaction to pin all queries to one connection.
+      // Without this, the pool may route `columns("things")` to a fresh
+      // connection without the search path set, returning 0 columns and causing
+      // DEFAULT VALUES inserts that silently drop all attributes.
+      try {
+        await adapter.beginTransaction();
+        await adapter.setSchemaSearchPath(SCHEMA_NAME);
+        await (Thing5 as any).loadSchema();
+        await adapter.commitTransaction();
+      } catch (e) {
+        await adapter.rollbackTransaction();
+        throw e;
+      }
+      for (const schema of [SCHEMA_NAME, SCHEMA2_NAME]) {
+        await adapter.setSchemaSearchPath(schema);
+        await (Thing5 as any).create({
+          id: 1,
+          name: `thing inside ${schema}`,
+          email: "thing1@localhost",
+        });
+      }
+      for (const schema of [SCHEMA_NAME, SCHEMA2_NAME]) {
+        await adapter.setSchemaSearchPath(schema);
+        expect(await (Thing5 as any).count()).toBe(1);
+        const row = await (Thing5 as any).where({ id: 1 }).first();
+        expect(row?.name).toBe(`thing inside ${schema}`);
+      }
+      await adapter.setSchemaSearchPath("'$user', public");
     });
 
     it("schema exists?", async () => {
@@ -742,10 +793,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(tbls).toContain("articles");
     });
 
-    it.skip("Active Record basics", () => {
-      // BLOCKED: needs-ar-model — requires AR model with tableName in "my.schema" (dot-containing schema name)
-      // ROOT-CAUSE: test exercises AR model CRUD (create/find/update) against a table in a schema named "my.schema"
-      // SCOPE: needs AR model layer + special quoting for dot-in-schema-name table references
+    it("Active Record basics", async () => {
+      await adapter.setSchemaSearchPath('"my.schema"');
+      await adapter.createTable("articles", async (t) => {
+        t.string("title");
+      });
+      const { Base } = await import("../../index.js");
+      class Article extends Base {
+        static {
+          this.tableName = '"my.schema".articles';
+          this.adapter = adapter as any;
+        }
+      }
+      await Article.loadSchema();
+      await (Article as any).create({ title: "zOMG, welcome to my blorgh!" });
+      const welcome = await (Article as any).last();
+      expect(welcome.title).toBe("zOMG, welcome to my blorgh!");
     });
   });
 

@@ -176,6 +176,20 @@ describe("TableTest", () => {
     expect(users.star.value).toBe('"users".*');
   });
 
+  it("star splits schema-qualified name", () => {
+    expect(new Table("test_schema.things").star.value).toBe('"test_schema"."things".*');
+  });
+
+  it("star preserves quoted table name with dot", () => {
+    expect(new Table('test_schema."things.table"').star.value).toBe(
+      '"test_schema"."things.table".*',
+    );
+  });
+
+  it("star preserves quoted schema name with dot", () => {
+    expect(new Table('"my.schema".articles').star.value).toBe('"my.schema"."articles".*');
+  });
+
   it("alias references use the alias in SQL", () => {
     const u = new Table("users", { as: "u" });
     const result = u.project(u.get("name")).toSql();

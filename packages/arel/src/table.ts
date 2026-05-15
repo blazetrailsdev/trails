@@ -6,6 +6,7 @@ import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
+import { quoteSchemaQualifiedName } from "./visitors/split-schema-qualified-name.js";
 
 /** Structural duck-type for Rails' `@klass.attribute_aliases`.
  *  Kept minimal so arel does not import activerecord. */
@@ -90,7 +91,7 @@ export class Table extends Node {
   }
 
   get star(): SqlLiteral {
-    return new SqlLiteral(`"${this.name}".*`);
+    return new SqlLiteral(`${quoteSchemaQualifiedName(this.name)}.*`);
   }
 
   /**

@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
+import { makeSchemaThingModel } from "./schema-ar-models.js";
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";
@@ -78,10 +79,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("sequence schema caching", () => {
-      // BLOCKED: needs-ar-model — SchemaThing AR model (schema_things table) requires full AR model layer
-      // ROOT-CAUSE: test exercises SchemaThing.new/save! through the model layer; no AR model infrastructure in adapter tests
-      // SCOPE: needs AR model setup similar to packages/activerecord/src/adapters/postgresql/active-schema.test.ts pattern
+    it("sequence schema caching", async () => {
+      const SchemaThing = makeSchemaThingModel(adapter);
+      // Load schema once via user1's session (where schema_things is visible)
+      await adapter.sessionAuth(USERS[0]);
+      await SchemaThing.loadSchema();
+      await adapter.sessionAuth("default");
+      for (const u of USERS) {
+        await adapter.sessionAuth(u);
+        const st1 = await (SchemaThing as any).create({ name: "TEST1" });
+        expect(st1.id).toBeDefined();
+        const st2 = new (SchemaThing as any)({ id: 5, name: "TEST2" });
+        await st2.save();
+        expect(st2.id).toBe(5);
+        await adapter.sessionAuth("default");
+      }
     });
 
     it("tables in current schemas", async () => {

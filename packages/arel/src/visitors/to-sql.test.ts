@@ -1785,6 +1785,20 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
     expect(sql).toContain('"users"."id"');
   });
 
+  it("default quoter: schema-qualified name is split and each part double-quoted", () => {
+    const t = new Table("test_schema.things");
+    const sql = new Visitors.ToSql().compile(t.project(t.star).ast);
+    expect(sql).toContain('"test_schema"."things".*');
+    expect(sql).toContain('FROM "test_schema"."things"');
+  });
+
+  it("default quoter: quoted table name with dot is preserved as single identifier", () => {
+    const t = new Table('test_schema."things.table"');
+    const sql = new Visitors.ToSql().compile(t.project(t.star).ast);
+    expect(sql).toContain('"test_schema"."things.table".*');
+    expect(sql).toContain('FROM "test_schema"."things.table"');
+  });
+
   it("stub quoter: quoteTableName output appears in compiled SQL", () => {
     const stubQuoter: Visitors.ArelQuoter = {
       quoteTableName: (name) => `<<${name}>>`,
