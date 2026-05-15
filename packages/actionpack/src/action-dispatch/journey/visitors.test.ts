@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "./parser.js";
-import { Cat, Symbol as SymbolNode } from "./nodes/node.js";
+import { Cat, Or, Symbol as SymbolNode, Literal } from "./nodes/node.js";
 import {
   Each,
   String as StringVisitor,
@@ -30,16 +30,22 @@ describe("ActionDispatch::Journey::Visitors::String", () => {
   it("round-trips star", () => roundTrip("/*foo"));
   it("round-trips or", () => roundTrip("a|b|c"));
   it("round-trips complex", () => roundTrip("/sprockets.js(.:format)"));
+
+  it("Or separators are positional, not identity-based", () => {
+    // Same Literal instance used twice — separator must still be emitted.
+    const lit = new Literal("a");
+    const tree = new Or([lit, lit]);
+    expect(StringVisitor.INSTANCE.accept(tree, "")).toBe("a|a");
+  });
 });
 
 describe("ActionDispatch::Journey::Visitors::Each", () => {
-  it("visits every node pre-order", () => {
+  it("visits every node in pre-order", () => {
+    // `/:foo` parses as Cat(Slash, Symbol). Pre-order = CAT, SLASH, SYMBOL.
     const tree = new Parser().parse("/:foo");
     const seen: string[] = [];
     Each.INSTANCE.accept(tree, (n) => seen.push(n.type));
-    expect(seen).toContain("CAT");
-    expect(seen).toContain("SLASH");
-    expect(seen).toContain("SYMBOL");
+    expect(seen).toEqual(["CAT", "SLASH", "SYMBOL"]);
   });
 });
 
@@ -87,6 +93,18 @@ describe("ActionDispatch::Journey::Visitors::FormatBuilder", () => {
     const tree = new Parser().parse("/*path");
     const format = new FormatBuilder().accept(tree);
     expect(format.evaluate({ path: "a/b/c" })).toBe("/a/b/c");
+  });
+
+  it("optional group drops to empty when its parameter is missing", () => {
+    const tree = new Parser().parse("/posts(.:format)");
+    const format = new FormatBuilder().accept(tree);
+    expect(format.evaluate({})).toBe("/posts");
+    expect(format.evaluate({ format: "json" })).toBe("/posts.json");
+  });
+
+  it("throws on OR (alternation) nodes — Rails routes don't use OR for path-building", () => {
+    const tree = new Parser().parse("a|b");
+    expect(() => new FormatBuilder().accept(tree)).toThrow(/OR/);
   });
 });
 

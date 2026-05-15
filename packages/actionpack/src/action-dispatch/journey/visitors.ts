@@ -273,6 +273,10 @@ export class FormatBuilder extends Visitor {
     if (symbol === "controller") return [Format.requiredPath(symbol)];
     return [Format.requiredSegment(symbol)];
   }
+
+  protected override visitOR(_n: Node): FormatPart[] {
+    throw new Error("FormatBuilder does not support OR (alternation) nodes");
+  }
 }
 
 /**
@@ -301,12 +305,11 @@ export class String extends FunctionalVisitor<string> {
 
   override nary(node: Node, seed: string): string {
     const children = node.children();
-    const last = children[children.length - 1];
     let acc = seed;
-    for (const c of children) {
+    children.forEach((c, i) => {
       acc = this.visit(c, acc);
-      if (c !== last) acc += "|";
-    }
+      if (i < children.length - 1) acc += "|";
+    });
     return acc;
   }
 
