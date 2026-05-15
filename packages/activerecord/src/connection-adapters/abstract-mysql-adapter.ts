@@ -1495,11 +1495,26 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   removeIndexForAlter(
     tableName: string,
-    columnName?: string | string[],
+    columnNameOrOptions?: string | string[] | Record<string, unknown>,
     options: Record<string, unknown> = {},
   ): string {
+    // Accept both the Rails-style (columnName, options) and the bulk-recorder
+    // options-object form (options) where the second arg carries {column?, name?}.
+    let columnName: string | string[] | undefined;
+    let opts: Record<string, unknown>;
+    if (
+      columnNameOrOptions != null &&
+      typeof columnNameOrOptions === "object" &&
+      !Array.isArray(columnNameOrOptions)
+    ) {
+      opts = columnNameOrOptions;
+      columnName = opts.column as string | string[] | undefined;
+    } else {
+      columnName = columnNameOrOptions as string | string[] | undefined;
+      opts = options;
+    }
     const indexName =
-      (options.name as string | undefined) ??
+      (opts.name as string | undefined) ??
       (columnName
         ? `index_${tableName}_on_${Array.isArray(columnName) ? columnName.join("_and_") : columnName}`
         : undefined);

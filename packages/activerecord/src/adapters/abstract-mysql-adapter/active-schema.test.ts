@@ -113,10 +113,26 @@ describeIfMysql("Mysql2Adapter", () => {
         /^CREATE TABLE `people` \(INDEX `index_people_on_last_name` USING btree \(`last_name`\(10\)\)\)/,
       );
     });
-    it.skip("index in bulk change", () => {
-      // BLOCKED: adapter-mysql — changeTable bulk-mode not implemented for MySQL
-      // ROOT-CAUSE: AbstractMysqlAdapter bulk change_table path missing
-      // SCOPE: Slot D (bulk change-table ALTER coalescing)
+    it("index in bulk change", async () => {
+      for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
+        const sqls = await captureSql(() =>
+          adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+            return t.index("last_name", { type });
+          }),
+        );
+        expect(sqls[0]).toBe(
+          `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`,
+        );
+      }
+
+      const sqls = await captureSql(() =>
+        adapter.schemaStatements().changeTable("people", { bulk: true }, (t) => {
+          return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
+        }),
+      );
+      expect(sqls[0]).toBe(
+        "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY",
+      );
     });
 
     it("drop table", async () => {
@@ -169,15 +185,29 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(sqls[0]).toBe("DROP TABLE `otherdb`.`people`, `otherdb`.`sobrinho`");
     });
 
-    it.skip("add timestamps", () => {
-      // BLOCKED: adapter-mysql — requires a real MySQL connection (with_real_execute scope)
-      // ROOT-CAUSE: addTimestamps needs a live table to add columns to; captureSql-only harness insufficient
-      // SCOPE: Slot D (live-table tests)
+    it("add timestamps", async () => {
+      const ss = adapter.schemaStatements();
+      try {
+        await ss.createTable("delete_me", { force: true });
+        await ss.addTimestamps("delete_me", { null: true });
+        expect(await ss.columnExists("delete_me", "updated_at")).toBe(true);
+        expect(await ss.columnExists("delete_me", "created_at")).toBe(true);
+      } finally {
+        await ss.dropTable("delete_me", { ifExists: true });
+      }
     });
-    it.skip("remove timestamps", () => {
-      // BLOCKED: adapter-mysql — requires a real MySQL connection (with_real_execute scope)
-      // ROOT-CAUSE: removeTimestamps needs a live table; captureSql-only harness insufficient
-      // SCOPE: Slot D (live-table tests)
+    it("remove timestamps", async () => {
+      const ss = adapter.schemaStatements();
+      try {
+        await ss.createTable("delete_me", { force: true }, (t) => {
+          return t.timestamps({ null: true });
+        });
+        await ss.removeTimestamps("delete_me");
+        expect(await ss.columnExists("delete_me", "updated_at")).toBe(false);
+        expect(await ss.columnExists("delete_me", "created_at")).toBe(false);
+      } finally {
+        await ss.dropTable("delete_me", { ifExists: true });
+      }
     });
     it("indexes in create", async () => {
       const sqls = await captureSql(() =>

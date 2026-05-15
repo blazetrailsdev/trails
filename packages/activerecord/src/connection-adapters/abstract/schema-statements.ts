@@ -28,6 +28,7 @@ import {
   type ColumnType,
   type ColumnOptions,
   type IdHashOptions,
+  type SchemaStatementsLike,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { quote } from "./quoting.js";
@@ -630,9 +631,51 @@ export class SchemaStatements {
     await this.dropTable(tableName);
   }
 
-  async changeTable(tableName: string, fn?: (t: Table) => void | Promise<void>): Promise<void> {
-    const table = new Table(tableName, this);
-    if (fn) await fn(table);
+  async changeTable(
+    tableName: string,
+    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: Table) => void | Promise<void>,
+  ): Promise<void> {
+    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
+    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+
+    const supportsBulk =
+      typeof (this.adapter as any).supportsBulkAlter === "function" &&
+      (this.adapter as any).supportsBulkAlter() === true;
+
+    if (options.bulk && supportsBulk) {
+      const ops: Array<[string, string, ...unknown[]]> = [];
+      // Mirrors Rails' CommandRecorder#method_missing: records any DDL method call into ops
+      // so bulkChangeTable can coalesce or fall back. Read-only predicates delegate to the
+      // real SchemaStatements so Table#isColumnExists / isIndexExists etc. work in bulk blocks.
+      // Using a Proxy handles adapter-specific methods (e.g. PgTable#addUniqueConstraint)
+      // without enumerating them statically.
+      const predicates = new Set([
+        "columnExists",
+        "indexExists",
+        "foreignKeyExists",
+        "isCheckConstraintExists",
+        "primaryKey",
+      ]);
+      const ss = this;
+      const recorder = new Proxy({} as SchemaStatementsLike, {
+        get(_target, prop: string) {
+          if (predicates.has(prop)) {
+            return (ss as any)[prop].bind(ss);
+          }
+          return (...args: unknown[]) => {
+            ops.push([prop, ...(args as [string, ...unknown[]])]);
+            return Promise.resolve();
+          };
+        },
+      });
+      const bulkTable = this.updateTableDefinition(tableName, recorder as any);
+      if (callback) await callback(bulkTable);
+      await this.bulkChangeTable(tableName, ops);
+    } else {
+      const table = this.updateTableDefinition(tableName, this);
+      if (callback) await callback(table);
+    }
   }
 
   async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1441,9 +1484,17 @@ export class SchemaStatements {
     const nonCombinable: Array<() => Promise<void>> = [];
 
     for (const [command, table, ...arguments_] of operations) {
-      const forAlterMethod = (this as any)[`${command}ForAlter`];
+      // Prefer adapter-specific *ForAlter over the generic SchemaStatements one — mirrors Rails
+      // where bulk_change_table and all *_for_alter methods live on the same adapter object.
+      const forAlterTarget =
+        typeof (this.adapter as any)[`${command}ForAlter`] === "function"
+          ? (this.adapter as any)
+          : typeof (this as any)[`${command}ForAlter`] === "function"
+            ? (this as any)
+            : null;
+      const forAlterMethod = forAlterTarget ? forAlterTarget[`${command}ForAlter`] : null;
       if (typeof forAlterMethod === "function") {
-        const result = forAlterMethod.call(this, table, ...arguments_);
+        const result = await forAlterMethod.call(forAlterTarget, table, ...arguments_);
         const results = Array.isArray(result) ? result : [result];
         for (const r of results) {
           if (typeof r === "string") {
