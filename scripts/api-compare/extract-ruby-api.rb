@@ -35,18 +35,21 @@ PACKAGE_DIRS =
           "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
   end
 
-# Cache gate: vendor/sources.lock.json's mtime tracks every fetched source —
-# a re-fetch updates it, an unchanged fetch leaves it alone. Skip the ~8s
-# Ripper pass when the output is newer than the lockfile. Honours
-# `API_COMPARE_FORCE=1` for the rare case where the extractor itself was
-# modified and you want a fresh manifest.
+# Cache gate: invalidate on either (a) a re-fetch (lockfile mtime bumped) or
+# (b) a registry edit (sources.ts mtime bumped — covers compareApi flips,
+# libPath edits, source add/remove). The output is current only when it's
+# newer than BOTH signals. Honours `API_COMPARE_FORCE=1` for the rare case
+# where the extractor itself was modified and you want a fresh manifest.
 output_path = File.join(OUTPUT_DIR, "rails-api.json")
 lockfile_path = ENV.fetch("LOCKFILE_PATH") do
   abort "extract-ruby-api.rb: LOCKFILE_PATH env var not set. Caller must export " \
         "it (e.g. LOCKFILE_PATH=\"$ROOT/vendor/sources.lock.json\")."
 end
+sources_ts_path = File.join(File.dirname(lockfile_path), "sources.ts")
 if ENV["API_COMPARE_FORCE"] != "1" && File.exist?(output_path) &&
-   File.exist?(lockfile_path) && File.mtime(output_path) >= File.mtime(lockfile_path)
+   File.exist?(lockfile_path) && File.exist?(sources_ts_path) &&
+   File.mtime(output_path) >= File.mtime(lockfile_path) &&
+   File.mtime(output_path) >= File.mtime(sources_ts_path)
   puts "Rails manifest #{output_path} is up to date (set API_COMPARE_FORCE=1 to regenerate)"
   exit 0
 end
