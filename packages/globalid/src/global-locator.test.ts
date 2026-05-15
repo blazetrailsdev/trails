@@ -185,6 +185,43 @@ describe("locateMany with custom primaryKey and slash-containing composite ids",
   });
 });
 
+describe("locateMany ignoreMissing without toArray on the relation", () => {
+  class BadWhereModel {
+    static name = "BadWhereModel";
+    static primaryKey = "id";
+    id: string;
+    constructor(id: string) {
+      this.id = id;
+    }
+    static async find(id: unknown): Promise<BadWhereModel | BadWhereModel[]> {
+      if (Array.isArray(id)) return id.map((i) => new BadWhereModel(String(i)));
+      return new BadWhereModel(String(id));
+    }
+    // Returns a relation object missing .toArray — should trigger the
+    // explicit throw rather than silently returning [].
+    static where(): { someOtherMethod?: () => void } {
+      return {};
+    }
+  }
+
+  beforeEach(() => {
+    setApp("bcx");
+    setModelFinder((name) =>
+      name === "BadWhereModel" ? (BadWhereModel as unknown as LocatorModel) : undefined,
+    );
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+  });
+
+  it("throws a clear error instead of silently returning []", async () => {
+    await expect(
+      Locator.locateMany(["gid://bcx/BadWhereModel/1"], { ignoreMissing: true }),
+    ).rejects.toThrow(/toArray/);
+  });
+});
+
 describe("Locator without model finder", () => {
   beforeEach(() => {
     setApp("bcx");

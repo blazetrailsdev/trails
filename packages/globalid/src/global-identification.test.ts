@@ -145,6 +145,20 @@ describe("Locator.locateSigned + locateManySigned", () => {
     expect((found[0] as Person).id).toBe("1");
   });
 
+  it("accepts SignedGlobalID instances directly (no toString needed)", async () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(new Person("4"), { verifier });
+    const sgid2 = SignedGlobalID.create(new Person("5"), { verifier });
+    // locateSigned with a SignedGlobalID instance, not a string.
+    const found = (await Locator.locateSigned(sgid, { verifier })) as Person;
+    expect(found.id).toBe("4");
+    // locateManySigned with an array of SignedGlobalID instances.
+    const many = await Locator.locateManySigned([sgid, sgid2], { verifier });
+    expect(many).toHaveLength(2);
+    expect((many[0] as Person).id).toBe("4");
+    expect((many[1] as Person).id).toBe("5");
+  });
+
   it("locate_many_signed locates the valid subset", async () => {
     const verifier = makeVerifier();
     const wrongVerifier = new MessageVerifier("other", { digest: "sha256", url_safe: true });
