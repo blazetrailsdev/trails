@@ -66,7 +66,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const limit = options.limit as number | null | undefined;
     switch (type) {
       case "float":
-        return limit != null ? `FLOAT(${limit})` : "FLOAT";
+        return `float(${limit ?? 24})`;
       case "integer":
         return integerToSql(limit);
       case "text":
@@ -80,12 +80,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
         return `varchar(${limit ?? 255})`;
       case "datetime":
       case "timestamp": {
+        const base = type === "timestamp" ? "timestamp" : "datetime";
         const p = options.precision;
         if (p != null && !(p >= 0 && p <= 6))
           throw new ArgumentError(
-            `No datetime type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
           );
-        return p != null ? `datetime(${p})` : "datetime";
+        return p != null ? `${base}(${p})` : base;
       }
       default:
         return super.typeToSql(type, options);
