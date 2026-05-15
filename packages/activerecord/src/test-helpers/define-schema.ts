@@ -194,11 +194,11 @@ export async function defineSchema(
     const raw = schema[table];
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    const createOpts: Record<string, unknown> = {};
-    if (pk === false) createOpts["id"] = false;
+    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
+    if (pk === false) createOpts.id = false;
     else if (Array.isArray(pk)) {
-      createOpts["primaryKey"] = pk;
-      createOpts["id"] = false;
+      createOpts.primaryKey = pk;
+      createOpts.id = false;
     }
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
