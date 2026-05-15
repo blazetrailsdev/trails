@@ -31,10 +31,10 @@
  *   });
  */
 
-import { Request } from "../actiondispatch/request.js";
-import { Response } from "../actiondispatch/response.js";
+import { Request } from "../actiondispatch/http/request.js";
+import { Response } from "../actiondispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
-import { FlashHash } from "../actiondispatch/flash.js";
+import { FlashHash } from "../actiondispatch/middleware/flash.js";
 import { RouteSet } from "../actiondispatch/routing/route-set.js";
 import type { Metal } from "./metal.js";
 

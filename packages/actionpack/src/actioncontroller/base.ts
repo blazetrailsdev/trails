@@ -8,7 +8,7 @@
 import { getFs, getPath, getCrypto, Notifications } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
-import { FlashHash } from "../actiondispatch/flash.js";
+import { FlashHash } from "../actiondispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";

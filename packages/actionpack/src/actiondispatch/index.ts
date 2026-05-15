@@ -16,8 +16,8 @@ export {
   unescapeUri,
 } from "./routing/index.js";
 
-export { Request } from "./request.js";
-export { Response, type CookieOptions } from "./response.js";
+export { Request } from "./http/request.js";
+export { Response, type CookieOptions } from "./http/response.js";
 export {
   Parameters,
   ParameterMissing,
@@ -34,17 +34,17 @@ export {
   PermanentCookieJar,
   type CookieJarOptions,
   type SetCookieOptions,
-} from "./cookies.js";
+} from "./middleware/cookies.js";
 export { SSL, type SSLOptions, type HSTSOptions } from "./middleware/ssl.js";
 export {
   HostAuthorization,
   type HostAuthorizationOptions,
 } from "./middleware/host-authorization.js";
 export { MiddlewareStack } from "./middleware/stack.js";
-export { MimeType } from "./mime-type.js";
-export { ContentSecurityPolicy, type CSPSource } from "./content-security-policy.js";
+export { MimeType } from "./http/mime-type.js";
+export { ContentSecurityPolicy, type CSPSource } from "./http/content-security-policy.js";
 export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
-export { FlashHash } from "./flash.js";
+export { FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export {
   RequestForgeryProtection,
@@ -57,8 +57,8 @@ export {
   PermissionsPolicy,
   type PermissionSource,
   type DirectiveName,
-} from "./permissions-policy.js";
-export { UploadedFile, type UploadedFileOptions } from "./uploaded-file.js";
+} from "./http/permissions-policy.js";
+export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
 export {
   BasicAuth,
@@ -68,4 +68,4 @@ export {
   type TokenAuthCredentials,
   type DigestAuthParams,
 } from "./http-authentication.js";
-export { ExceptionWrapper } from "./exception-wrapper.js";
+export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
