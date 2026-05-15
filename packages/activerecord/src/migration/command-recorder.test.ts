@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CommandRecorder } from "./command-recorder.js";
+import { CommandRecorder, RecorderTableProxy } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 
 describe("CommandRecorder", () => {
@@ -389,6 +389,74 @@ describe("CommandRecorder", () => {
       expect(new CommandRecorder().findJoinTableName("cats", "dogs", { tableName: "pets" })).toBe(
         "pets",
       );
+    });
+  });
+
+  describe("invert change column", () => {
+    it("throws IrreversibleMigration", () => {
+      const recorder = new CommandRecorder();
+      expect(() => recorder.inverseOf("changeColumn", ["table", "column", "string", {}])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+  });
+
+  describe("invert change table (non-bulk)", () => {
+    it("reverts string + rename inside change_table block", async () => {
+      const recorder = new CommandRecorder();
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", {}, async (t) => {
+          t.string("name");
+          t.rename("kind", "cultivar");
+        });
+      });
+      // Reversed order and inverted: renameColumn first, then removeColumn
+      expect(recorder.commands).toHaveLength(2);
+      const [first, second] = recorder.commands;
+      expect(first.cmd).toBe("renameColumn");
+      expect(first.args).toEqual(["fruits", "cultivar", "kind"]);
+      expect(second.cmd).toBe("removeColumn");
+      expect(second.args[0]).toBe("fruits");
+      expect(second.args[1]).toBe("name");
+    });
+
+    it("raises IrreversibleMigration when remove lacks type", async () => {
+      const recorder = new CommandRecorder();
+      await expect(
+        recorder.revert(async () => {
+          await recorder.changeTable("fruits", {}, async (t) => {
+            t.remove("kind"); // no type → not reversible
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+  });
+
+  describe("bulk invert change table", () => {
+    it("records two changeTable commands from revert + revert-of-revert", async () => {
+      const delegate = { supportsBulkAlter: () => true };
+      const recorder = new CommandRecorder(delegate);
+
+      const block = async (t: RecorderTableProxy) => {
+        t.string("name");
+        t.rename("kind", "cultivar");
+      };
+
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", { bulk: true }, block);
+      });
+
+      await recorder.revert(async () => {
+        await recorder.revert(async () => {
+          await recorder.changeTable("fruits", { bulk: true }, block);
+        });
+      });
+
+      expect(recorder.commands).toHaveLength(2);
+      expect(recorder.commands[0].cmd).toBe("changeTable");
+      expect(recorder.commands[0].args[0]).toBe("fruits");
+      expect(recorder.commands[1].cmd).toBe("changeTable");
+      expect(recorder.commands[1].args[0]).toBe("fruits");
     });
   });
 });

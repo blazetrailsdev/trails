@@ -421,10 +421,41 @@ describe("InvertibleMigrationTest", () => {
     /* check constraints not implemented */
   });
 
-  it.skip("migrate revert change table", () => {
-    // BLOCKED: migration — migration runner gap in invertible-migration
-    // ROOT-CAUSE: migration.ts#Migrator or MigrationContext not fully implementing Rails migration semantics
-    // SCOPE: ~50–150 LOC fix in migration.ts; affects ~4–30 tests in invertible-migration.test.ts
+  it("migrate revert change table", async () => {
+    // Create horses table with remind_at column
+    class CreateHorses extends Migration {
+      async change() {
+        await this.createTable("horses", (t) => {
+          t.string("content");
+          t.datetime("remind_at");
+        });
+      }
+    }
+
+    class ChangeHorsesTable extends Migration {
+      async change() {
+        await this.changeTable("horses", async (t) => {
+          await t.string("name");
+          await t.remove("remind_at", { type: "datetime" });
+        });
+      }
+    }
+
+    async function hasColumn(tbl: string, col: string): Promise<boolean> {
+      const rows = await adapter.execute(`PRAGMA table_info("${tbl}")`);
+      return rows.some((r: any) => r.name === col);
+    }
+
+    await makeMigration(new CreateHorses()).up();
+    expect(await hasColumn("horses", "remind_at")).toBe(true);
+
+    const cm = makeMigration(new ChangeHorsesTable());
+    await cm.up();
+    expect(await hasColumn("horses", "remind_at")).toBe(false);
+    expect(await hasColumn("horses", "name")).toBe(true);
+
+    await cm.down();
+    expect(await hasColumn("horses", "remind_at")).toBe(true);
   });
 });
 

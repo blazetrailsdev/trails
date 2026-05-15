@@ -27,6 +27,10 @@ export class CommandRecorder {
     return this._reverting;
   }
 
+  set reverting(value: boolean) {
+    this._reverting = value;
+  }
+
   get commands(): Array<{ cmd: string; args: unknown[] }> {
     return [...this._commands];
   }
@@ -76,12 +80,41 @@ export class CommandRecorder {
   }
 
   /**
-   * Record a change_table block.
+   * Record a change_table block. When a callback is given, operations inside
+   * the block are individually recorded so they can be inverted.  With
+   * `bulk: true` the operations are captured into a sub-recorder and stored as
+   * a single batched command (mirrors the Rails bulk alter path).
    *
    * Mirrors: ActiveRecord::Migration::CommandRecorder#change_table
    */
-  changeTable(tableName: string, options: Record<string, unknown> = {}): void {
-    this.record("changeTable", [tableName, options]);
+  async changeTable(
+    tableName: string,
+    options: Record<string, unknown> = {},
+    fn?: (t: RecorderTableProxy) => Promise<void> | void,
+  ): Promise<void> {
+    if (!fn) {
+      this.record("changeTable", [tableName, options]);
+      return;
+    }
+
+    const supportsBulk =
+      typeof (this._delegate as any)?.supportsBulkAlter === "function" &&
+      (this._delegate as any).supportsBulkAlter() === true;
+
+    if (options["bulk"] && supportsBulk) {
+      // Bulk path: sub-recorder captures commands, parent stores a single
+      // changeTable entry that invertChangeTable knows how to flip.
+      const sub = new CommandRecorder(this._delegate);
+      sub.reverting = this._reverting;
+      const proxy = new RecorderTableProxy(tableName, sub);
+      await fn(proxy);
+      this._commands.push({ cmd: "changeTable", args: [tableName, sub.commands] });
+    } else {
+      // Non-bulk: route operations directly through this recorder so the
+      // enclosing revert() block can invert them individually.
+      const proxy = new RecorderTableProxy(tableName, this);
+      await fn(proxy);
+    }
   }
 
   /**
@@ -363,6 +396,23 @@ export class CommandRecorder {
   }
 
   /** @internal */
+  invertChangeColumn(_args: unknown[]): [string, unknown[]] {
+    throw new IrreversibleMigration(
+      "change_column is not reversible. Use change_column_default or change_column_null instead.",
+    );
+  }
+
+  /** @internal */
+  invertChangeTable(args: unknown[]): [string, unknown[]] {
+    const [tableName, subCommands] = args as [string, Array<{ cmd: string; args: unknown[] }>];
+    const inverted = [...subCommands].reverse().map(({ cmd, args: subArgs }) => {
+      const [iCmd, iArgs] = this._dispatchInvert(cmd, subArgs);
+      return { cmd: iCmd, args: iArgs };
+    });
+    return ["changeTable", [tableName, inverted]];
+  }
+
+  /** @internal */
   invertTransaction(args: unknown[]): [string, unknown[]] {
     throw new IrreversibleMigration(
       "This migration uses transaction, which is not automatically reversible.",
@@ -555,5 +605,96 @@ export class CommandRecorder {
       return (method as (args: unknown[]) => [string, unknown[]]).call(this, args);
     }
     throw new IrreversibleMigration(`${cmd} is not reversible`);
+  }
+}
+
+/**
+ * Table proxy used inside CommandRecorder#changeTable blocks. Routes each
+ * Table-style method call to recorder.record() so the parent recorder (or
+ * revert block) can capture and optionally invert the individual operations.
+ *
+ * Mirrors: the Table object yielded by CommandRecorder#change_table in Rails
+ * (non-bulk path: `yield delegate.update_table_definition(table_name, self)`).
+ */
+export class RecorderTableProxy {
+  constructor(
+    private _tableName: string,
+    private _recorder: CommandRecorder,
+  ) {}
+
+  private _col(name: string, type: string, options: Record<string, unknown>): void {
+    this._recorder.record("addColumn", [this._tableName, name, type, options]);
+  }
+
+  string(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "string", options);
+  }
+  text(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "text", options);
+  }
+  integer(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "integer", options);
+  }
+  float(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "float", options);
+  }
+  decimal(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "decimal", options);
+  }
+  boolean(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "boolean", options);
+  }
+  date(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "date", options);
+  }
+  datetime(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "datetime", options);
+  }
+  bigint(name: string, options: Record<string, unknown> = {}): void {
+    this._col(name, "bigint", options);
+  }
+
+  rename(oldName: string, newName: string): void {
+    this._recorder.record("renameColumn", [this._tableName, oldName, newName]);
+  }
+
+  remove(name: string, options: Record<string, unknown> = {}): void {
+    const args: unknown[] = [this._tableName, name];
+    if (options["type"]) {
+      args.push(options["type"]);
+      const rest = Object.fromEntries(Object.entries(options).filter(([k]) => k !== "type"));
+      if (Object.keys(rest).length > 0) args.push(rest);
+    }
+    this._recorder.record("removeColumn", args);
+  }
+
+  change(name: string, type: string, options: Record<string, unknown> = {}): void {
+    this._recorder.record("changeColumn", [this._tableName, name, type, options]);
+  }
+
+  changeDefault(name: string, value: unknown): void {
+    this._recorder.record("changeColumnDefault", [this._tableName, name, value]);
+  }
+
+  changeNull(name: string, nullable: boolean, defaultValue?: unknown): void {
+    const args: unknown[] = [this._tableName, name, nullable];
+    if (defaultValue !== undefined) args.push(defaultValue);
+    this._recorder.record("changeColumnNull", args);
+  }
+
+  index(columns: string | string[], options: Record<string, unknown> = {}): void {
+    this._recorder.record("addIndex", [this._tableName, columns, options]);
+  }
+
+  removeIndex(options: Record<string, unknown> = {}): void {
+    this._recorder.record("removeIndex", [this._tableName, options]);
+  }
+
+  timestamps(options: Record<string, unknown> = {}): void {
+    this._recorder.record("addTimestamps", [this._tableName, options]);
+  }
+
+  removeTimestamps(options: Record<string, unknown> = {}): void {
+    this._recorder.record("removeTimestamps", [this._tableName, options]);
   }
 }
