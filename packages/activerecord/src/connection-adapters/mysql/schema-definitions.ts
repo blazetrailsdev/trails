@@ -6,7 +6,6 @@
  *          ActiveRecord::ConnectionAdapters::MySQL::ColumnMethods (module)
  */
 
-import { NotImplementedError } from "../../errors.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -153,6 +152,24 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   /** @internal */
+  protected override validColumnDefinitionOptions(): string[] {
+    return super
+      .validColumnDefinitionOptions()
+      .concat(["autoIncrement", "charset", "as", "unsigned", "first", "after", "stored"]);
+  }
+
+  /** @internal */
+  protected override integerLikePrimaryKeyType(
+    type: ColumnType,
+    options: ColumnOptions,
+  ): ColumnType {
+    if (options.autoIncrement !== false) {
+      options.autoIncrement = true;
+    }
+    return type;
+  }
+
+  /** @internal */
   static override defineColumnMethods(...columnTypes: string[]): void {
     for (const type of columnTypes) {
       if (!(type in this.prototype)) {
@@ -193,28 +210,4 @@ export class Table extends AbstractTable {
   override async primaryKey(): Promise<string | null> {
     return super.primaryKey();
   }
-}
-
-/** @internal */
-function validColumnDefinitionOptions(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#valid_column_definition_options is not implemented",
-  );
-}
-
-/** @internal */
-function aliasedTypes(name: any, fallback: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#aliased_types is not implemented",
-  );
-}
-
-/** @internal */
-function integerLikePrimaryKeyType(type: any, options: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql/schema_definitions.rb cluster=mysql-charset-collation
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::MySQL::TableDefinition#integer_like_primary_key_type is not implemented",
-  );
 }

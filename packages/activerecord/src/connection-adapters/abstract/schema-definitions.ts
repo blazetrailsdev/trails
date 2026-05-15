@@ -206,6 +206,7 @@ export interface ColumnOptions {
   unique?: boolean;
   primaryKey?: boolean;
   array?: boolean;
+  charset?: string;
   collation?: string;
   comment?: string;
   ifExists?: boolean;
@@ -561,14 +562,14 @@ export class TableDefinition {
   readonly charset?: string;
   readonly collation?: string;
   readonly compositePrimaryKey?: string[];
-  private _id: boolean | PrimaryKeyType;
+  private _id: boolean | PrimaryKeyType | Record<string, unknown>;
   private _adapterName: "sqlite" | "postgres" | "mysql";
   protected _adapter: SchemaQuoter;
 
   constructor(
     tableName: string,
     tdOptions: {
-      id?: boolean | PrimaryKeyType;
+      id?: boolean | PrimaryKeyType | Record<string, unknown>;
       primaryKey?: string | string[] | false;
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter?: SchemaQuoter;
@@ -608,9 +609,19 @@ export class TableDefinition {
     }
 
     if (this._id !== false) {
-      const pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
-      const pkOpts: Record<string, unknown> = { primaryKey: true };
-      if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+      let pkType: ColumnType;
+      let pkOpts: ColumnOptions;
+      if (typeof this._id === "object" && this._id !== null) {
+        // Hash form: id: { type: "string", collation: "utf8mb4_bin" }
+        // Mirrors Rails: set_primary_key merges id.except(:type) into options
+        const { type: idType, ...idRest } = this._id as { type?: string; [k: string]: unknown };
+        pkType = ((idType as string) ?? "primary_key") as ColumnType;
+        pkOpts = { primaryKey: true, ...(idRest as Partial<ColumnOptions>) };
+      } else {
+        pkType = (typeof this._id === "string" ? this._id : "primary_key") as ColumnType;
+        pkOpts = { primaryKey: true };
+        if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
+      }
       this.columns.push(this.newColumnDefinition("id", pkType, pkOpts));
     }
   }

@@ -86,7 +86,7 @@ export class SchemaStatements {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid";
+          id?: boolean | "uuid" | Record<string, unknown>;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -102,7 +102,7 @@ export class SchemaStatements {
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
     let options: {
-      id?: boolean | "uuid";
+      id?: boolean | "uuid" | Record<string, unknown>;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;

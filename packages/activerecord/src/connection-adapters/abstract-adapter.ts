@@ -167,7 +167,7 @@ export interface AbstractAdapter {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid";
+          id?: boolean | "uuid" | Record<string, unknown>;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
