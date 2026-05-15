@@ -26,9 +26,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it.skip("marshal dump", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-associations.test.ts
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
   });
 
   it("through association with joins", async () => {
@@ -5617,14 +5615,65 @@ describe("HasManyThroughAssociationsTest", () => {
     await expect((owner as any).sbang_items.appendBang(item)).rejects.toThrow(RecordInvalid);
   });
 
-  it.skip("save returns falsy when join record has errors", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-associations.test.ts
+  it("save returns falsy when join record has errors", async () => {
     // Rails: c = Category.new(name: "Fishing", authors: [Author.first]); assert_not c.save
-    // Requires autosave-through support: saving a new record with pre-set through
-    // associations must attempt join record creation and propagate failures to the
-    // parent save() returning false — not yet implemented
+    // Pre-populating the through-association's target on a new owner mirrors
+    // Rails' constructor-form collection writer; autosave then attempts to
+    // create the join record, whose validation fails, so owner.save() is falsy.
+    class FbangJoin extends Base {
+      static {
+        this.attribute("fbang_owner_id", "integer");
+        this.attribute("fbang_item_id", "integer");
+        this.adapter = adapter;
+        this.validate((r: any) => {
+          r.errors.add("base", "Invalid Join");
+        });
+      }
+    }
+    class FbangItem extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class FbangOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("FbangJoin", FbangJoin);
+    registerModel("FbangItem", FbangItem);
+    registerModel("FbangOwner", FbangOwner);
+    Associations.belongsTo.call(FbangJoin, "fbang_item", {
+      className: "FbangItem",
+      foreignKey: "fbang_item_id",
+    });
+    Associations.hasMany.call(FbangOwner, "fbang_joins", {
+      className: "FbangJoin",
+      foreignKey: "fbang_owner_id",
+    });
+    Associations.hasMany.call(FbangOwner, "fbang_items", {
+      className: "FbangItem",
+      through: "fbang_joins",
+      source: "fbang_item",
+    });
+
+    const item = await FbangItem.create({ name: "A" });
+    const owner = new FbangOwner();
+    (owner as any).name = "Fishing";
+    // Pre-populate the through-association target so autosave attempts join
+    // creation when the new owner is saved — mirrors Rails' constructor-form
+    // collection writer `Category.new(name:, authors: [author])`.
+    (owner as any)._cachedAssociations = (owner as any)._cachedAssociations ?? new Map();
+    (owner as any)._cachedAssociations.set("fbang_items", [item]);
+
+    const result = await owner.save();
+    expect(result).toBeFalsy();
+    // Owner row may have been written before autosave failure surfaces, but the
+    // failing join record must not be persisted (Rails: c.save returns false).
+    const joins = await FbangJoin.all().toArray();
+    expect(joins).toHaveLength(0);
   });
   it("preloading empty through association via joins", async () => {
     class HmtEmptyThrOwner extends Base {

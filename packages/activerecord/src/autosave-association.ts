@@ -504,7 +504,14 @@ async function _insertCollectionRecord(
   }
   if (inst && typeof inst.insertRecord === "function") {
     inst.setInverseInstance?.(child);
-    return !!(await inst.insertRecord(child, false, false));
+    // Mirrors Rails save_collection_association branching: with `autosave:
+    // true` the records were already validated during the validation phase
+    // and we pass `validate: false`; without `autosave` (the default), we
+    // pass `validate: true` so a failing join record surfaces here and
+    // owner.save returns false (has_many_through_associations_test.rb
+    // `save returns falsy when join record has errors`).
+    const validate = !assoc.options.autosave;
+    return !!(await inst.insertRecord(child, validate, false));
   }
   return _insertCollectionRecordFallback(record, assoc, child);
 }
@@ -1063,22 +1070,28 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
         return aroundSaveCollectionAssociation.call(record, proceed);
       });
     }
-    const collectionName = reflection.name;
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
+    // Mirrors Rails: save_collection_association runs for every collection
+    // association unless `autosave: false` opts out. The option's true-form
+    // gates additional behavior (validating already-persisted records,
+    // destroying marked-for-destruction children); its absence still
+    // propagates inserts of new children so owner.save surfaces failures —
+    // see autosave_association.rb `save_collection_association`.
+    const collectionName = reflection.name;
     afterCreate(model, async (record: any) => {
       const assocDef = (record.constructor as any)._associations?.find(
         (a: any) => a.name === collectionName,
       );
-      if (!assocDef?.options?.autosave) return;
+      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
     afterUpdate(model, async (record: any) => {
       const assocDef = (record.constructor as any)._associations?.find(
         (a: any) => a.name === collectionName,
       );
-      if (!assocDef?.options?.autosave) return;
+      if (assocDef?.options?.autosave === false) return;
       if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
     });
   } else if (isHasOne) {

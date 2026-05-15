@@ -30,9 +30,12 @@ export class CollectionAssociation extends Association {
     for (const callbackName of CALLBACKS) {
       this.defineCallback(model, callbackName, name, options);
     }
-    if (options.autosave) {
-      addAutosaveAssociationCallbacks(model, reflection);
-    }
+    // Mirrors Rails AutosaveAssociation::AssociationBuilderExtension.build —
+    // save_collection_association is registered for every collection
+    // association regardless of the `autosave:` option. The option only
+    // gates extra behavior inside save_collection_association; insert-of-new
+    // children must always propagate so failures surface on owner.save.
+    addAutosaveAssociationCallbacks(model, reflection);
   }
 
   static override defineExtensions(model: any, name: string, block?: (...args: any[]) => any): any {
