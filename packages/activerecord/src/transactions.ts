@@ -196,7 +196,11 @@ async function _transactionFallback<T>(
   let result: T;
   try {
     if (nested) {
-      const spName = `active_record_${++_savepointCounter}`;
+      // Distinct prefix from the TransactionManager's `active_record_${stack.length}`
+      // naming so a fallback savepoint can't collide with a TM-allocated one on
+      // the same connection (which otherwise lets the TM RELEASE consume the
+      // fallback's savepoint, leaving its later RELEASE to error out).
+      const spName = `active_record_fallback_${++_savepointCounter}`;
       await adapter.materializeTransactions?.();
       await adapter.createSavepoint(spName);
       try {
