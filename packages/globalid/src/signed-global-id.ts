@@ -20,8 +20,10 @@ export interface SignedGlobalIDOptions {
   for?: string;
   /** Alias of `for` kept for backward compatibility. */
   purpose?: string;
-  expiresIn?: number;
-  expiresAt?: Temporal.Instant;
+  /** Number of seconds until expiration. `null` explicitly disables expiration (Rails: `expires_in: nil`). */
+  expiresIn?: number | null;
+  /** Explicit expiration time. `null` explicitly disables expiration (Rails: `expires_at: nil`). */
+  expiresAt?: Temporal.Instant | null;
   verifier: MessageVerifier;
   /** Custom GID query params (any extra keys become URI params). */
   [key: string]: unknown;
@@ -197,8 +199,11 @@ function verifyToken(
 function pickExpiration(
   options: Pick<SignedGlobalIDOptions, "expiresAt" | "expiresIn">,
 ): Temporal.Instant | undefined {
-  if (options.expiresAt !== undefined) return options.expiresAt;
-  if (options.expiresIn !== undefined) {
+  // Rails: passing `expires_in: nil` or `expires_at: nil` explicitly disables
+  // expiration. Treat both null and undefined as "absent" so callers can use
+  // null to turn it off (matches Rails' `expires_in: nil` semantics).
+  if (options.expiresAt != null) return options.expiresAt;
+  if (options.expiresIn != null) {
     const ms = Math.round(options.expiresIn * 1000);
     return Temporal.Now.instant().add({ milliseconds: ms });
   }

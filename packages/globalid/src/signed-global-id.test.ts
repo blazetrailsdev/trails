@@ -109,33 +109,43 @@ describe("SignedGlobalIDExpirationTest", () => {
 
   it("passing expires_in less than a second is not expired", () => {
     const verifier = makeVerifier();
-    // Use a sub-second value to exercise the fractional-second path through
-    // pickExpiration (Math.round(0.5 * 1000) = 500ms). Without time mocking
-    // we can only verify the not-yet-expired half here; the expired half is
-    // covered by 'returns null for expired token (expiresAt in the past)'.
+    // Sub-second value exercises the fractional path through pickExpiration
+    // (Math.round(0.5 * 1000) = 500ms). 500ms is plenty of cushion vs.
+    // typical test runtime (<100ms); we don't mock time so this could
+    // theoretically race under pathological CI load.
     const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 0.5 });
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
   });
 
   it("passing expires_in nil turns off expiration checking", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(person(5), { verifier });
-    // No expiresIn / expiresAt = no expiration.
+    // Explicitly pass null (not undefined / omitted) to verify Rails parity:
+    // `expires_in: nil` means "no expiration", NOT "expire in 0ms".
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: null });
     expect(sgid.expiresAt).toBeUndefined();
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
   });
 
   it("passing expires_at sets expiration date", () => {
     const verifier = makeVerifier();
-    const future = Temporal.Now.instant().add({ seconds: 3600 });
+    // Use a millisecond-precision instant so the round-trip is exact
+    // (serialization uses smallestUnit: "millisecond" so sub-ms precision
+    // is intentionally lost).
+    const future = Temporal.Instant.fromEpochMilliseconds(
+      Math.floor(Temporal.Now.instant().epochMilliseconds + 3_600_000),
+    );
     const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: future });
-    expect(sgid.expiresAt).toBeDefined();
     expect(Temporal.Instant.compare(sgid.expiresAt!, future)).toBe(0);
+    // Round-trip: the expiresAt survives serialization/parsing.
+    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
+    expect(parsed!.expiresAt).toBeDefined();
+    expect(parsed!.expiresAt!.epochMilliseconds).toBe(future.epochMilliseconds);
   });
 
   it("passing nil expires_at turns off expiration checking", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: undefined });
+    // Explicitly null (Rails parity, as with expires_in).
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: null });
     expect(sgid.expiresAt).toBeUndefined();
   });
 
@@ -156,6 +166,16 @@ describe("SignedGlobalIDExpirationTest", () => {
     const verifier = makeVerifier();
     const past = Temporal.Now.instant().add({ milliseconds: -1000 });
     const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: past });
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+  });
+
+  it("returns null for token expired via expires_in (already-elapsed)", () => {
+    const verifier = makeVerifier();
+    // Negative expiresIn produces an expiresAt in the past — guarantees the
+    // expiresIn codepath actually drives expiration enforcement (without this
+    // test, every other expires_in test would pass even if expiresIn were
+    // silently ignored).
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: -1 });
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
   });
 });
