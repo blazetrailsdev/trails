@@ -161,8 +161,8 @@ describe("DelegatedTypeTest", () => {
   it("association uuid", () => {
     // Mirrors Rails PostgreSQLDelegatedTypeTest#test_association_uuid.
     // UUID PK accessor naming: delegatedType with primaryKey: "uuid" and
-    // foreignKey: "entryable_uuid" generates `uuid_message_uuid` / `uuid_comment_uuid`
-    // accessors (${singular}_${primaryKey}) instead of the default `_id` suffix.
+    // foreignKey: "entryable_uuid" generates `uuidMessageUuid` / `uuidCommentUuid`
+    // accessors (camelCase of ${singular}_${primaryKey}) instead of the default `Id` suffix.
     class UuidEntry extends Base {
       static {
         this.attribute("entryable_uuid", "string");
