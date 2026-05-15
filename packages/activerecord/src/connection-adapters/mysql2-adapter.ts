@@ -9,6 +9,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { Version } from "./abstract-adapter.js";
 import {
+  AdapterTimeout,
   MismatchedForeignKey,
   NoDatabaseError,
   NotImplementedError,
@@ -204,6 +205,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   protected override _onStatementLimitChanged(value: number): void {
     if (this._conn) this._statementPools.get(this._conn)?.setMaxSize(value);
+  }
+
+  /**
+   * Mirrors `Mysql2Adapter#translate_exception`. Promotes a driver-level
+   * read-timeout (a node-mysql2 error with no MySQL errno) to
+   * `AdapterTimeout`. Everything else falls through to the
+   * AbstractMysqlAdapter mapping, which handles the statement-timeout
+   * codes (`ER_QUERY_TIMEOUT` / `ER_FILSORT_ABORT`).
+   */
+  protected override _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (isMysql2DriverTimeout(e)) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new AdapterTimeout(msg, { sql, binds, cause: e });
+    }
+    return super._translateException(e, sql, binds);
   }
 
   /**
@@ -1706,19 +1722,29 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 }
 
+/**
+ * Detect a node-mysql2 driver-level timeout (no positive MySQL errno).
+ * Mirrors Rails' `exception.is_a?(Mysql2::Error::TimeoutError) && !exception.error_number`
+ * — the node driver surfaces these as `code === 'PROTOCOL_SEQUENCE_TIMEOUT'`
+ * or `code === 'ETIMEDOUT'`. A non-positive `errno` (e.g. libuv's
+ * negative `-ETIMEDOUT`) counts as "no MySQL errno", matching Rails'
+ * `!error_number` predicate which is true for nil and unset values.
+ *
+ * @internal
+ */
+function isMysql2DriverTimeout(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const errno = (e as { errno?: number }).errno;
+  if (typeof errno === "number" && errno > 0) return false;
+  const code = (e as { code?: string }).code;
+  return code === "PROTOCOL_SEQUENCE_TIMEOUT" || code === "ETIMEDOUT";
+}
+
 /** @internal */
 function reconnect(): never {
   // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
-  );
-}
-
-/** @internal */
-function translateException(exception: any, message?: any, sql?: any, binds?: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#translate_exception is not implemented",
   );
 }
 

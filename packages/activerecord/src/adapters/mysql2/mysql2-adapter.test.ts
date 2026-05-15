@@ -8,12 +8,16 @@ import {
   MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
 import {
+  AdapterTimeout,
   InvalidForeignKey,
   MismatchedForeignKey,
   NotNullViolation,
+  QueryAborted,
   RecordNotUnique,
+  StatementTimeout,
   ValueTooLong,
 } from "../../errors.js";
+import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -295,15 +299,39 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(error.cause).toBeInstanceOf(Error);
     });
 
-    it.skip("read timeout exception", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("read timeout exception", () => {
+      // Mirrors: test_read_timeout_exception. The node-mysql2 driver surfaces
+      // a read_timeout-tripped query as an Error with code
+      // 'PROTOCOL_SEQUENCE_TIMEOUT' and no MySQL errno. Fabricate the same
+      // shape and feed it through translateException to assert the mapping.
+      const driverErr = Object.assign(new Error("read ETIMEDOUT"), {
+        code: "PROTOCOL_SEQUENCE_TIMEOUT",
+      });
+      const translated = adapter.translateException(driverErr, {
+        sql: "SELECT SLEEP(2)",
+        binds: [],
+      });
+      expect(translated).toBeInstanceOf(AdapterTimeout);
+      expect(translated).toBeInstanceOf(QueryAborted);
+      expect((translated as AdapterTimeout).cause).toBe(driverErr);
+      expect((translated as AdapterTimeout).sql).toBe("SELECT SLEEP(2)");
     });
-    it.skip("statement timeout error codes", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("statement timeout error codes", () => {
+      // Mirrors: test_statement_timeout_error_codes. ER_QUERY_TIMEOUT (3024)
+      // and ER_FILSORT_ABORT (1028) both map to StatementTimeout.
+      for (const errno of [
+        AbstractMysqlAdapter.ER_QUERY_TIMEOUT,
+        AbstractMysqlAdapter.ER_FILSORT_ABORT,
+      ]) {
+        const driverErr = Object.assign(new Error("fail"), { errno });
+        const translated = adapter.translateException(driverErr, {
+          sql: "SELECT 1",
+          binds: [],
+        });
+        expect(translated).toBeInstanceOf(StatementTimeout);
+        expect(translated).toBeInstanceOf(QueryAborted);
+        expect((translated as StatementTimeout).cause).toBe(driverErr);
+      }
     });
     it.skip("database timezone changes synced to connection", () => {
       // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter

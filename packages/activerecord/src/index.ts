@@ -231,6 +231,8 @@ export {
   SerializationFailure,
   Deadlocked,
   LockWaitTimeout,
+  StatementTimeout,
+  AdapterTimeout,
   QueryCanceled,
   RangeError,
   AssociationTypeMismatch,

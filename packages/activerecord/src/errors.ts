@@ -294,6 +294,28 @@ export class LockWaitTimeout extends StatementInvalid {
   }
 }
 
+/** Mirrors `ActiveRecord::StatementTimeout`. */
+export class StatementTimeout extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "StatementTimeout";
+  }
+}
+
+/** Mirrors `ActiveRecord::AdapterTimeout`. */
+export class AdapterTimeout extends QueryAborted {
+  constructor(
+    message?: string,
+    options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "AdapterTimeout";
+  }
+}
+
 /** Mirrors `ActiveRecord::QueryCanceled`. */
 export class QueryCanceled extends QueryAborted {
   constructor(

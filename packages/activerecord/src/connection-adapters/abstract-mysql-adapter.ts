@@ -20,6 +20,7 @@ import {
   RecordNotUnique,
   SQLWarning,
   StatementInvalid,
+  StatementTimeout,
   ValueTooLong,
   sqlTypeToMigrationKeyword,
 } from "../errors.js";
@@ -106,6 +107,7 @@ const ER_LOCK_DEADLOCK = 1213;
 const ER_LOCK_WAIT_TIMEOUT = 1205;
 const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
+const ER_FILSORT_ABORT = 1028;
 const ER_TABLE_EXISTS = 1050;
 
 // Function defaults emitted without DEFAULT_GENERATED in Extra (e.g. CURRENT_TIMESTAMP on
@@ -981,6 +983,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly ER_LOCK_WAIT_TIMEOUT = ER_LOCK_WAIT_TIMEOUT;
   static readonly ER_QUERY_INTERRUPTED = ER_QUERY_INTERRUPTED;
   static readonly ER_QUERY_TIMEOUT = ER_QUERY_TIMEOUT;
+  static readonly ER_FILSORT_ABORT = ER_FILSORT_ABORT;
   static readonly ER_TABLE_EXISTS = ER_TABLE_EXISTS;
 
   /**
@@ -1180,6 +1183,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         return new NotNullViolation(msg, { sql, binds, cause });
       case ER_DATA_TOO_LONG:
         return new ValueTooLong(msg, { sql, binds, cause });
+      case ER_QUERY_TIMEOUT:
+      case ER_FILSORT_ABORT:
+        return new StatementTimeout(msg, { sql, binds, cause });
       default:
         // Driver errors expose a positive MySQL errno and usually a
         // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
