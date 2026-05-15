@@ -1077,14 +1077,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _raiseOnTypeMismatch(records: T[]): void {
     const opts = this._assocDef.options;
+    // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
+    if (opts.polymorphic) return;
     const className =
       (opts.className as string | undefined) ?? camelize(singularize(this._assocName));
-    let klass: typeof Base | null = null;
-    try {
-      klass = resolveAssocClass(this._record, this._assocName, className);
-    } catch {
-      return;
-    }
+    const klass = resolveAssocClass(this._record, this._assocName, className);
     for (const record of records) {
       if (record == null || !(record instanceof klass)) {
         const actual =
