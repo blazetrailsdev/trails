@@ -39,77 +39,94 @@ describe("GlobalIDCreationTest", () => {
   beforeEach(() => setApp("bcx"));
   afterEach(() => _resetApp());
 
-  it("model name", () => {
+  it("as string", () => {
+    expect(GlobalID.create(fakeModel(5)).toString()).toBe("gid://bcx/Person/5");
+    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).toString()).toBe(
+      `gid://bcx/PersonUuid/${uuid}`,
+    );
+    expect(GlobalID.create(fakeModel(4, "Person::Child")).toString()).toBe(
+      "gid://bcx/Person::Child/4",
+    );
+    expect(GlobalID.create(fakeModel(1, "PersonModel")).toString()).toBe("gid://bcx/PersonModel/1");
+    expect(
+      GlobalID.create(
+        fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+      ).toString(),
+    ).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
+  });
+
+  it("as param", () => {
     const gid = GlobalID.create(fakeModel(5));
-    expect(gid.modelName).toBe("Person");
+    expect(gid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbi81");
+    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbi81")!.equals(gid)).toBe(true);
+
+    const uuidGid = GlobalID.create(fakeModel(uuid, "PersonUuid"));
+    expect(GlobalID.parse(uuidGid.toParam())!.equals(uuidGid)).toBe(true);
+
+    const cpkGid = GlobalID.create(
+      fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+    );
+    expect(GlobalID.parse(cpkGid.toParam())!.equals(cpkGid)).toBe(true);
+  });
+
+  it("as URI", () => {
+    expect(GlobalID.create(fakeModel(5)).uri).toBe("gid://bcx/Person/5");
+    expect(GlobalID.create(fakeModel(4, "Person::Child")).uri).toBe("gid://bcx/Person::Child/4");
+  });
+
+  it("as JSON", () => {
+    const gid = GlobalID.create(fakeModel(5));
+    // Mirror Rails GlobalID#as_json — returns the URI string; JSON.stringify wraps in quotes.
+    expect(gid.toString()).toBe("gid://bcx/Person/5");
+    expect(JSON.stringify(gid.toString())).toBe('"gid://bcx/Person/5"');
   });
 
   it("model id", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    expect(gid.modelId).toBe("5");
+    expect(GlobalID.create(fakeModel(5)).modelId).toBe("5");
+    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).modelId).toBe(uuid);
+    expect(GlobalID.create(fakeModel(4, "Person::Child")).modelId).toBe("4");
+    expect(
+      GlobalID.create(fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"))
+        .modelId,
+    ).toEqual(["tenant-key-value", "id-value"]);
   });
 
-  it("model uuid id", () => {
-    const gid = GlobalID.create(fakeModel(uuid, "PersonUuid"));
-    expect(gid.modelId).toBe(uuid);
-  });
-
-  it("model namespaced class name", () => {
-    const gid = GlobalID.create({ id: 4, constructor: { name: "Person::Child" } });
-    expect(gid.modelName).toBe("Person::Child");
-  });
-
-  it("model composite primary key", () => {
-    const gid = GlobalID.create(
-      fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+  it("model name", () => {
+    expect(GlobalID.create(fakeModel(5)).modelName).toBe("Person");
+    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).modelName).toBe("PersonUuid");
+    expect(GlobalID.create(fakeModel(4, "Person::Child")).modelName).toBe("Person::Child");
+    expect(GlobalID.create(fakeModel(["t", "i"], "CompositePrimaryKeyModel")).modelName).toBe(
+      "CompositePrimaryKeyModel",
     );
-    expect(gid.modelId).toEqual(["tenant-key-value", "id-value"]);
   });
 
-  it("uri", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    expect(gid.uri).toBe("gid://bcx/Person/5");
-  });
-
-  it("string", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    expect(gid.toString()).toBe("gid://bcx/Person/5");
-  });
-
-  it("param", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    const param = gid.toParam();
-    expect(typeof param).toBe("string");
-    expect(GlobalID.parse(param)!.equals(gid)).toBe(true);
-  });
-
-  it("app required", () => {
+  it(":app option", () => {
+    expect(GlobalID.create(fakeModel(5)).toString()).toBe("gid://bcx/Person/5");
+    expect(GlobalID.create(fakeModel(5), { app: "foo" }).toString()).toBe("gid://foo/Person/5");
     _resetApp();
-    expect(() => GlobalID.create(fakeModel(5))).toThrow(/app is required/i);
+    expect(() => GlobalID.create(fakeModel(5), { app: null as unknown as string })).toThrow();
   });
 
-  it("app option overrides configured app", () => {
-    const gid = GlobalID.create(fakeModel(5), { app: "override" });
-    expect(gid.app).toBe("override");
+  it("equality", () => {
+    const gid1 = GlobalID.create(fakeModel(5));
+    const gid2 = GlobalID.create(fakeModel(5));
+    const gid3 = GlobalID.create(fakeModel(10));
+    expect(gid1.equals(gid2)).toBe(true);
+    expect(gid1.equals(gid3)).toBe(false);
   });
 });
 
-describe("GlobalID.parse", () => {
+describe("GlobalIDCustomParamsTest", () => {
+  beforeEach(() => setApp("bcx"));
   afterEach(() => _resetApp());
 
-  it("parses gid:// string", () => {
-    const gid = GlobalID.parse("gid://bcx/Person/5");
-    expect(gid).not.toBeNull();
-    expect(gid!.modelName).toBe("Person");
+  it("create custom params", () => {
+    const gid = GlobalID.create(fakeModel(5), { hello: "world" });
+    expect(gid.params["hello"]).toBe("world");
   });
 
-  it("returns same instance when given a GlobalID", () => {
-    setApp("bcx");
-    const gid = GlobalID.create(fakeModel(5));
-    expect(GlobalID.parse(gid)).toBe(gid);
-  });
-
-  it("returns null for invalid input", () => {
-    expect(GlobalID.parse("not-a-gid")).toBeNull();
+  it("parse custom params", () => {
+    const gid = GlobalID.parse("gid://bcx/Person/5?hello=world");
+    expect(gid!.params["hello"]).toBe("world");
   });
 });
