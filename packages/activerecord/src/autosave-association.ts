@@ -17,7 +17,7 @@ import type { AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
-import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
+import { afterCreate, afterUpdate, afterValidation, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
@@ -976,7 +976,9 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 
 /** @internal */
 export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any): void {
-  if (typeof klass.prototype?.[name] === "function") return;
+  if (!klass.prototype) return;
+  // Mirrors Ruby method_defined?(name, false) — check only the immediate class prototype.
+  if (Object.prototype.hasOwnProperty.call(klass.prototype, name)) return;
   if (klass.prototype) {
     klass.prototype[name] = function (this: any) {
       this._alreadyCalled ??= Object.create(null);
@@ -1012,6 +1014,9 @@ export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) 
 }
 
 const _AUTOSAVE_AROUND_SAVE_KEY = Symbol.for("blazetrails.autosaveAroundSaveRegistered");
+const _ensureNoDuplicateErrorsRegistered = Symbol.for(
+  "blazetrails.ensureNoDuplicateErrorsRegistered",
+);
 
 /**
  * Registers save callbacks for an association declared with `autosave: true`.
@@ -1028,11 +1033,10 @@ const _AUTOSAVE_AROUND_SAVE_KEY = Symbol.for("blazetrails.autosaveAroundSaveRegi
 export function addAutosaveAssociationCallbacks(model: any, reflection: any): void {
   const saveMethod = `autosaveAssociatedRecordsFor_${reflection.name}`;
   // Mirrors Rails' `define_non_cyclic_method` early-return: if the method is
-  // already defined on the model, all callbacks for this association are already
-  // registered — calling again would duplicate the after_create/after_update/
-  // before_save lambdas. Rails deduplicates by registering named callbacks
-  // (method symbol); we guard the entire registration block instead.
-  if (typeof model.prototype?.[saveMethod] === "function") return;
+  // already defined on the model's own prototype, all callbacks for this
+  // association are already registered — calling again would duplicate the
+  // after_create/after_update/before_save lambdas.
+  if (Object.prototype.hasOwnProperty.call(model.prototype ?? {}, saveMethod)) return;
   const isCollection: boolean =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -1049,7 +1053,7 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
   if (isCollection) {
     // around_save runs only once per model regardless of how many collection
     // autosave associations are declared — mirrors Rails' dedup via symbol.
-    if (!(model as any)[_AUTOSAVE_AROUND_SAVE_KEY]) {
+    if (!Object.prototype.hasOwnProperty.call(model, _AUTOSAVE_AROUND_SAVE_KEY)) {
       Object.defineProperty(model, _AUTOSAVE_AROUND_SAVE_KEY, {
         value: true,
         configurable: true,
@@ -1115,7 +1119,9 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
 function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
-  if (typeof klass.prototype?.[validationName] === "function") return;
+  if (!klass.prototype) return;
+  // Mirrors method_defined?(name, false) — only skip if defined on this exact class.
+  if (Object.prototype.hasOwnProperty.call(klass.prototype, validationName)) return;
   const isCol =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -1133,6 +1139,16 @@ function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
   } else {
     defineNonCyclicMethod(klass, validationName, function (this: any) {
       return validateBelongsToAssociation.call(this, reflection);
+    });
+  }
+  // Mirrors Rails: after_validation :_ensure_no_duplicate_errors (once per class).
+  // Own-property check mirrors the same pattern as the validation method guard above —
+  // a subclass inheriting the flag from its parent does NOT inherit the registered
+  // after_validation callback if its chains COW'd before the parent registration.
+  if (!Object.prototype.hasOwnProperty.call(klass, _ensureNoDuplicateErrorsRegistered)) {
+    klass[_ensureNoDuplicateErrorsRegistered] = true;
+    afterValidation(klass, (record: any) => {
+      _ensureNoDuplicateErrors.call(record);
     });
   }
 }

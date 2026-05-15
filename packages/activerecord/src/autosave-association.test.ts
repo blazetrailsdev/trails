@@ -2458,13 +2458,43 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(saveCount).toBe(1);
   });
 
-  it.skip("cyclic autosaves do not add multiple validations", () => {
-    // BLOCKED: requires afterValidation :_ensure_no_duplicate_errors wiring
-    // The Rails fixture has ShipWithoutNestedAttributes with TWO validates(:name, presence: true)
-    // callbacks + Prisoner belongs_to :ship (autosave: true). The dedup fires via
-    // after_validation :_ensure_no_duplicate_errors registered in defineAutosaveValidationCallbacks.
-    // Our implementation defines _ensureNoDuplicateErrors but never registers it via afterValidation.
-    // Unblocking requires: model.afterValidation(() => _ensureNoDuplicateErrors.call(model)) wiring.
+  it("cyclic autosaves do not add multiple validations", () => {
+    // ShipWithoutNestedAttributes: has_many :prisoners (no autosave), two presence validators.
+    // Prisoner: belongs_to :ship (autosave: true). Cyclic: prisoner.valid? calls ship.valid? again.
+    // _ensureNoDuplicateErrors (after_validation) deduplicates to exactly 1 error for :name.
+    class ShipCyclic extends Base {
+      static {
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+        this.validates("name", { presence: true });
+      }
+    }
+    class PrisonerCyclic extends Base {
+      static {
+        this.attribute("ship_id", "integer");
+      }
+    }
+    registerModel("ShipCyclic", ShipCyclic);
+    registerModel("PrisonerCyclic", PrisonerCyclic);
+    Associations.hasMany.call(ShipCyclic, "prisoners", { className: "PrisonerCyclic" });
+    Associations.belongsTo.call(PrisonerCyclic, "ship", {
+      className: "ShipCyclic",
+      autosave: true,
+      inverseOf: "prisoners",
+    });
+    // Wire _ensureNoDuplicateErrors as after_validation on ShipCyclic (mirrors Rails'
+    // AssociationBuilderExtension.build → add_autosave_association_callbacks).
+    const prisonersRef = ShipCyclic.reflectOnAssociation("prisoners");
+    addAutosaveAssociationCallbacks(ShipCyclic, prisonersRef);
+
+    const ship = new ShipCyclic({ name: "" });
+    const prisoner = new PrisonerCyclic({});
+    // Wire cached associations so _loadedAssociation finds them without a DB hit.
+    cacheAssoc(ship, "prisoners", [prisoner]);
+    cacheAssoc(prisoner, "ship", ship);
+
+    expect(ship.isValid()).toBe(false);
+    expect(ship.errors.where("name")).toHaveLength(1);
   });
 });
 
