@@ -3232,6 +3232,7 @@ export class Relation<T extends Base> {
           cursor: cursorArr,
           order: (order ?? "asc") as any,
           batchLimit: batchSize,
+          load,
         })) {
           const batchRel = self._clone();
           const tuples = (batchRows as any[]).map((r) =>
@@ -4958,6 +4959,7 @@ export class Relation<T extends Base> {
     cursor: string | string[];
     order: "asc" | "desc" | ("asc" | "desc")[];
     batchLimit: number;
+    load?: boolean;
   }): AsyncGenerator<T[]> {
     return _batchOnUnloadedRelation({ relation: this, ...opts });
   }

@@ -619,15 +619,18 @@ describe("EachTest", () => {
         this.adapter = adp;
       }
     }
+    await Post.create({ title: "a" });
+    const batches: any[][] = [];
     let threw = false;
     try {
-      for await (const _b of Post.order("title").findInBatches({ batchSize: 1 })) {
-        /* noop */
+      for await (const batch of Post.order("title").findInBatches({ batchSize: 1 })) {
+        batches.push(batch);
       }
     } catch {
       threw = true;
     }
     expect(threw).toBe(false);
+    expect(batches.length).toBe(1);
   });
 
   it.skip("find in batches should use any column as primary key when start is not specified", () => {

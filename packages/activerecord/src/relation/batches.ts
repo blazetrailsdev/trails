@@ -187,6 +187,7 @@ export async function* batchOnUnloadedRelation(opts: {
   cursor: string | string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
   batchLimit: number;
+  load?: boolean;
 }): AsyncGenerator<any[]> {
   const { relation, cursor, batchLimit } = opts;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
@@ -208,7 +209,7 @@ export async function* batchOnUnloadedRelation(opts: {
             lastValues,
             batchOrders.map(([, ord]) => (ord === "desc" ? "lt" : "gt")),
           );
-    const rows = await batchRelation.toArray();
+    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursorArr)).toArray();
     if (rows.length === 0) break;
     yield rows;
     if (rows.length < batchLimit) break;
