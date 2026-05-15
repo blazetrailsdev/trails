@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
-import { makeThingModels, makeThing5Model } from "./schema-ar-models.js";
+import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -80,6 +80,14 @@ async function setupSchemas(adapter: PostgreSQLAdapter) {
   await adapter.exec(
     `CREATE TABLE ${SCHEMA_NAME}.${UNMATCHED_PK_TABLE_NAME} (id integer NOT NULL DEFAULT nextval('${SCHEMA_NAME}.${UNMATCHED_SEQUENCE_NAME}'::regclass), CONSTRAINT unmatched_pkey PRIMARY KEY (id))`,
   );
+  await adapter.exec(`CREATE SCHEMA IF NOT EXISTS music`);
+  await adapter.exec(`CREATE TABLE music.songs (id serial primary key)`);
+  await adapter.exec(
+    `CREATE TABLE music.albums (id serial primary key, deleted boolean default false)`,
+  );
+  await adapter.exec(
+    `CREATE TABLE music.albums_songs (album_id integer, song_id integer, PRIMARY KEY (album_id, song_id))`,
+  );
 }
 
 async function teardownSchemas(adapter: PostgreSQLAdapter) {
@@ -88,6 +96,7 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema("test_schema3", { ifExists: true, cascade: true });
   await adapter.dropSchema("some_schema", { ifExists: true, cascade: true });
   await adapter.dropSchema("my_other_schema", { ifExists: true, cascade: true });
+  await adapter.dropSchema("music", { ifExists: true, cascade: true });
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -193,11 +202,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(after).not.toContain("some_schema");
     });
 
-    it.skip("habtm table name with schema", () => {
-      // BLOCKED: needs-includes-references — Song/Album HABTM with schema-qualified table names
-      // ROOT-CAUSE: includes(:albums).where("albums.id": id) requires auto-promotion to eager_load
-      // (references mechanism); joins(:albums).pluck also needs HABTM join SQL wired for music schema
-      // SCOPE: needs includes→eager_load auto-promotion + HABTM joins infrastructure
+    it("habtm table name with schema", async () => {
+      const { Song, Album, cleanup } = makeSongAlbumModels(adapter);
+      try {
+        await (Song as any).loadSchema();
+        await (Album as any).loadSchema();
+        const song = await (Song as any).create({});
+        const album = await (Album as any).create({});
+        await song.albums.push(album);
+        const found = await (Song as any).joins("albums").where({ "albums.id": album.id }).first();
+        expect(found.id).toBe(song.id);
+        const albumIds1 = await (Song as any).joins("albums").pluck("albums.id");
+        expect(albumIds1).toEqual([album.id]);
+        const albumIds2 = await (Song as any).joins("albums").pluck("music.albums.id");
+        expect(albumIds2).toEqual([album.id]);
+      } finally {
+        cleanup();
+      }
     });
 
     it("drop schema with nonexisting schema", async () => {

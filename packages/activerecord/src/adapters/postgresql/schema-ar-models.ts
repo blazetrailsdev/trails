@@ -3,7 +3,8 @@
  * Each factory builds fresh subclasses so tests are isolated from each other
  * and from the global model registry.
  */
-import { Base } from "../../index.js";
+import { Base, registerModel, modelRegistry } from "../../index.js";
+import { Associations } from "../../associations.js";
 import type { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
 
 type ModelCtor = typeof Base;
@@ -60,4 +61,40 @@ export function makeSchemaThingModel(adapter: PostgreSQLAdapter): ModelCtor {
     }
   }
   return SchemaThing as unknown as ModelCtor;
+}
+
+/**
+ * Song/Album models for habtm-with-schema tests.
+ * Returns cleanup function to remove the models from the registry.
+ */
+export function makeSongAlbumModels(adapter: PostgreSQLAdapter): {
+  Song: ModelCtor;
+  Album: ModelCtor;
+  cleanup: () => void;
+} {
+  class Song extends Base {
+    static {
+      this.tableName = "music.songs";
+      this.adapter = adapter as any;
+    }
+  }
+  class Album extends Base {
+    static {
+      this.tableName = "music.albums";
+      this.adapter = adapter as any;
+    }
+  }
+  // Rails: derive_join_table_name("music.songs", "music.albums") → "music.albums_songs"
+  Associations.hasAndBelongsToMany.call(Song, "albums", { joinTable: "music.albums_songs" });
+  registerModel("Song", Song);
+  registerModel("Album", Album);
+  return {
+    Song: Song as unknown as ModelCtor,
+    Album: Album as unknown as ModelCtor,
+    cleanup: () => {
+      modelRegistry.delete("Song");
+      modelRegistry.delete("Album");
+      modelRegistry.delete("Song::HABTM_Albums");
+    },
+  };
 }

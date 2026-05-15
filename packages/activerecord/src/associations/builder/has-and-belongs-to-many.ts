@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { beforeDestroy } from "../../callbacks.js";
 import * as Reflection from "../../reflection.js";
+import { CollectionAssociation } from "./collection-association.js";
 
 /**
  * Builder for has_and_belongs_to_many associations. Internally creates
@@ -217,6 +218,7 @@ export class HasAndBelongsToMany {
       model,
     );
     Reflection.addReflection(model, name, habtmReflection as any);
+    CollectionAssociation.defineAccessors(model, name);
   }
 }
 

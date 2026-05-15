@@ -2678,7 +2678,8 @@ export class Relation<T extends Base> {
         // can't be reliably predicted — use positional fallback (return null).
         if (c.includes("(")) return null;
         // Table-qualified or quoted identifiers: extract the last plain identifier segment.
-        const dotMatch = c.match(/(?:["`]?\w+["`]?\.)? *["`]?(\w+)["`]?\s*$/);
+        // Handles 1, 2, or 3-part names: col, table.col, schema.table.col.
+        const dotMatch = c.match(/(?:["`]?\w+["`]?\.)*["`]?(\w+)["`]?\s*$/);
         if (dotMatch) return dotMatch[1];
         return c;
       }
@@ -2686,6 +2687,7 @@ export class Relation<T extends Base> {
       return null;
     });
     const manager = table.project(...projections);
+    this._applyJoinsToManager(manager);
     this._applyWheresToManager(manager, table);
     this._applyOrderToManager(manager, table);
 
