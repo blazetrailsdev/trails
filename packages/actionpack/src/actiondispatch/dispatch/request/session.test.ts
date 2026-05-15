@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Session, type SessionStore } from "./session.js";
+import { Session, type SessionStore } from "../../request/session.js";
 
 function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = {}): SessionStore {
   const exists = opts.exists ?? true;
