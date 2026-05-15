@@ -14,24 +14,41 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const root = "packages/activerecord/src";
-// Scan both *.test.ts files and shared test-helper modules, since helpers
-// like encryption/test-helpers.ts define model factories used by tests
-// under AR_NO_AUTO_SCHEMA=1. Helper files don't call defineSchema
-// themselves (the tests that consume them do), so we only flag a helper
-// when no sibling test file imports it AND ensures schema — but at minimum
-// surfacing them lets the migrator see what factories still need wiring.
-const files = execSync(
-  `find ${root} \\( -name '*.test.ts' -o -name 'test-helpers.ts' -o -path '*/test-helpers/*.ts' \\) -type f`,
-  { encoding: "utf8" },
-)
+// Scan every .ts file under src/. In trails, nothing in production code
+// extends `Base` directly (Base IS the library class), so any file that
+// matches the `extends Base` pattern is by definition test or test-helper
+// infrastructure that participates in the schema lifecycle. The shared
+// helpers (encryption/test-helpers.ts, test-fixtures.ts, adapters/.../
+// schema-ar-models.ts, etc.) get flagged the same way as *.test.ts files.
+//
+// A helper flagged here doesn't necessarily fail under AR_NO_AUTO_SCHEMA=1
+// on its own — it fails when a consuming test runs without setting up
+// schema for the helper's models. The audit is intentionally conservative:
+// it surfaces every place a model class is declared without a sibling
+// defineSchema, leaving wiring decisions to the migrator. The actual
+// Phase 5 completion gate is `AR_NO_AUTO_SCHEMA=1 pnpm vitest run` going
+// green; this script is a best-effort triage aid, not a soundness proof.
+const allTs = execSync(`find ${root} -name '*.ts' -type f`, { encoding: "utf8" })
   .trim()
   .split("\n")
-  .filter(Boolean)
-  // The schema helper itself defines defineSchema and contains literal
-  // mentions; exclude it (and its test) so the audit doesn't flag its own
-  // implementation file.
-  .filter((f) => !f.endsWith("/test-helpers/define-schema.ts"))
-  .filter((f) => !f.endsWith("/test-helpers/drop-all-tables.ts"));
+  .filter(Boolean);
+
+const files = allTs.filter((f) => {
+  // The schema helper and the drop helper legitimately reference these
+  // identifiers in their own implementations — skip them.
+  if (f.endsWith("/test-helpers/define-schema.ts")) return false;
+  if (f.endsWith("/test-helpers/drop-all-tables.ts")) return false;
+  // Static fixture files used as compiler inputs by the type-virtualization
+  // / tsc-wrapper test rigs aren't consumed as live models by Vitest —
+  // they exist to be parsed/emitted, not executed against an adapter.
+  if (/\/__fixtures__\//.test(f)) return false;
+  if (/\/type-virtualization\/fixtures\//.test(f)) return false;
+  // model-codegen.ts emits class strings; its matches are inside templates
+  // that the comment/string stripper handles, but excluding it explicitly
+  // is cheaper and clearer.
+  if (f.endsWith("/model-codegen.ts")) return false;
+  return true;
+});
 
 /**
  * Strip line comments, block comments, and string literals so a commented-
@@ -51,10 +68,13 @@ function stripCommentsAndStrings(src: string): string {
 const offenders: string[] = [];
 for (const f of files) {
   const src = stripCommentsAndStrings(readFileSync(f, "utf8"));
-  // Match both named declarations (`class Foo extends Base`) and anonymous
-  // class expressions (`class extends Base` — typically assigned to a const
-  // or returned from a factory, as in encryption/test-helpers.ts).
-  if (!/class(?:\s+\w+)?\s+extends\s+Base\b/.test(src)) continue;
+  // Match named declarations (`class Foo extends Base`), anonymous class
+  // expressions (`class extends Base` — typically returned from a factory),
+  // and qualified / cast forms (`class Foo extends (FreshBase as typeof
+  // Base)`, `class Contact extends (targets.Base as any)`). The character
+  // class `[^{(]` after the optional `(` keeps us from greedily reaching
+  // into a class body if no Base reference exists.
+  if (!/class(?:\s+\w+)?\s+extends\s+\(?[^{(]*?\bBase\b/.test(src)) continue;
   if (/\bdefineSchema\s*\(/.test(src)) continue;
   offenders.push(f);
 }
