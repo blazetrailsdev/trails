@@ -214,7 +214,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertRemoveColumn(args: unknown[]): [string, unknown[]] {
-    if (args.length <= 2) {
+    if (typeof args[2] !== "string") {
       throw new IrreversibleMigration("remove_column is only reversible if given a type.");
     }
     return ["addColumn", args];
