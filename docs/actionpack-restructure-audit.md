@@ -2,7 +2,7 @@
 
 Audit of `packages/actionpack/src/` directory layout against
 `actionpack/lib/` in Rails source
-(`scripts/api-compare/.rails-source/actionpack/lib/`). Method-level
+(`vendor/rails/actionpack/lib/`). Method-level
 parity is tracked elsewhere
 ([actioncontroller-100-percent.md](actioncontroller-100-percent.md),
 [actiondispatch-100-percent.md](actiondispatch-100-percent.md)) — this
@@ -28,7 +28,7 @@ infrastructure files only**.
 | top-level loaders (`abstract_controller.rb`, `action_controller.rb`, `action_dispatch.rb`, `action_pack.rb`) | 4                   | 0 (re-exports via `index.ts` files)                | n/a                    | Rails `lib/<name>.rb` requires; we use `index.ts` barrels per dir.                                                                                                                                                              |
 | **Total Rails .rb under `actionpack/lib/`**                                                                  | **154**             | **84 TS files**                                    | **~55% files present** | ~45% of Rails source files have **no corresponding TS file**.                                                                                                                                                                   |
 
-Source: `find scripts/api-compare/.rails-source/actionpack/lib -name '*.rb'`
+Source: `find vendor/rails/actionpack/lib -name '*.rb'`
 (154 files), `find packages/actionpack/src -name '*.ts' ! -name '*.test.ts'`
 (84 files including `index.ts`).
 
@@ -673,4 +673,4 @@ Headline:
 Status: **plan draft 2026-05-14**. Update headline counts when each
 wave merges. Source of truth for raw numbers is
 `find packages/actionpack/src -name '*.ts' ! -name '*.test.ts'` vs
-`find scripts/api-compare/.rails-source/actionpack/lib -name '*.rb'`.
+`find vendor/rails/actionpack/lib -name '*.rb'`.
