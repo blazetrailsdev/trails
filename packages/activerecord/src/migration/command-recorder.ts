@@ -103,7 +103,6 @@ export class CommandRecorder {
       // Bulk path: sub-recorder captures commands, parent stores a single
       // changeTable entry that invertChangeTable knows how to flip.
       const sub = new CommandRecorder(this._delegate);
-      sub.reverting = this._reverting;
       const proxy = new RecorderTableProxy(tableName, sub);
       await callback(proxy);
       this._commands.push({ cmd: "changeTable", args: [tableName, sub.commands] });
@@ -122,7 +121,16 @@ export class CommandRecorder {
    */
   async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
     for (const { cmd, args } of this._commands) {
-      if (typeof migration[cmd] === "function") {
+      // Bulk changeTable stores [tableName, subCommands[]]. Replay each
+      // sub-command individually rather than forwarding the array as an arg.
+      if (cmd === "changeTable" && Array.isArray(args[1])) {
+        const subCmds = args[1] as Array<{ cmd: string; args: unknown[] }>;
+        for (const { cmd: sub, args: subArgs } of subCmds) {
+          if (typeof migration[sub] === "function") {
+            await migration[sub](...subArgs);
+          }
+        }
+      } else if (typeof migration[cmd] === "function") {
         await migration[cmd](...args);
       }
     }
@@ -682,6 +690,11 @@ export class RecorderTableProxy {
         colArgs.push(options["type"]);
         const rest = Object.fromEntries(Object.entries(options).filter(([k]) => k !== "type"));
         if (Object.keys(rest).length > 0) colArgs.push(rest);
+      } else if (Object.keys(options).length > 0) {
+        // Forward options (e.g. ifExists) even without type so replay semantics
+        // are preserved. Inversion will still raise IrreversibleMigration since
+        // args.length <= 2 (table + col, no type positional arg).
+        colArgs.push(options);
       }
       this._recorder.record("removeColumn", colArgs);
     }
