@@ -88,6 +88,8 @@ export default defineConfig(
       "packages/activerecord/src/connection-handling.ts",
       // MigrationProxy uses createRequire for synchronous file loading — Node-only
       "packages/activerecord/src/deprecator.ts",
+      // Migrator.fromDir scans filesystem and uses pathToFileURL for ESM import — Node-only
+      "packages/activerecord/src/migration.ts",
     ],
     rules: {
       "blazetrails/no-node-builtins": "error",

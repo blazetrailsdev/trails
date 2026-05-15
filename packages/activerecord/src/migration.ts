@@ -1,4 +1,4 @@
-import { getFs, getPath, Logger, getEnv } from "@blazetrails/activesupport";
+import { getFs, getPath, Logger, getEnv, camelize } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -2019,6 +2019,8 @@ export interface MigrationProxy {
   version: string;
   name: string;
   filename?: string;
+  /** Mirrors: ActiveRecord::MigrationProxy#scope — engine name for copied engine migrations */
+  scope?: string;
   migration: () => MigrationLike | Promise<MigrationLike>;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#basename */
   basename?(): string;
@@ -2462,6 +2464,39 @@ export class Migrator {
     _paths?: string[],
   ): Migrator {
     return new Migrator(adapter, migrations);
+  }
+
+  /**
+   * Build a Migrator by scanning `dir` for migration files, mirroring
+   * Rails' `MigrationContext.new(dir, schema_migration, internal_metadata)`.
+   *
+   * Each discovered file becomes a `MigrationProxy` whose `migration` factory
+   * dynamically imports the file (ESM `import()`).
+   *
+   * Mirrors: ActiveRecord::MigrationContext#migrations (the discovery half)
+   */
+  static fromDir(dir: string, adapter: DatabaseAdapter): Migrator {
+    const helper = new Migrator(adapter, []);
+    const files = helper.migrationFiles([dir]);
+    const proxies: MigrationProxy[] = [];
+    for (const file of files) {
+      const parsed = helper.parseMigrationFilename(file);
+      if (!parsed) continue;
+      const [version, rawName, scope] = parsed;
+      const name = camelize(rawName);
+      proxies.push({
+        version,
+        name,
+        filename: file,
+        scope: scope || undefined,
+        migration: async () => {
+          const { pathToFileURL } = await import("node:url");
+          const mod = await import(pathToFileURL(file).href);
+          return (mod.default ?? mod[name]) as MigrationLike;
+        },
+      });
+    }
+    return new Migrator(adapter, proxies);
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
