@@ -10,9 +10,14 @@ class FakePerson {
   constructor(id: string) {
     this.id = id;
   }
-  static async find(id: unknown): Promise<FakePerson> {
+  // find(scalar) → single; find(array) → batch (Rails parity).
+  static async find(id: unknown): Promise<FakePerson | FakePerson[]> {
+    if (Array.isArray(id)) {
+      if (id.some((p) => p === "missing")) throw new Error("not found");
+      return id.map((i) => new FakePerson(String(i)));
+    }
     if (id === "missing") throw new Error("not found");
-    return new FakePerson(Array.isArray(id) ? id.map(String).join("/") : String(id));
+    return new FakePerson(String(id));
   }
   static where(conds: Record<string, unknown>): { toArray(): Promise<FakePerson[]> } {
     const ids = conds["id"] as unknown[];
@@ -31,7 +36,8 @@ class FakeAccount {
   constructor(id: string) {
     this.id = id;
   }
-  static async find(id: unknown): Promise<FakeAccount> {
+  static async find(id: unknown): Promise<FakeAccount | FakeAccount[]> {
+    if (Array.isArray(id)) return id.map((i) => new FakeAccount(String(i)));
     return new FakeAccount(String(id));
   }
 }
@@ -84,10 +90,13 @@ describe("GlobalLocatorTest", () => {
     expect(found).toBeInstanceOf(FakePerson);
   });
 
-  it("returns null for invalid input or unknown class or missing record", async () => {
+  it("returns null for invalid input or unknown class", async () => {
     expect(await Locator.locate("not-a-gid")).toBeNull();
     expect(await Locator.locate("gid://bcx/UnknownModel/1")).toBeNull();
-    expect(await Locator.locate("gid://bcx/FakePerson/missing")).toBeNull();
+  });
+
+  it("propagates errors from find (Rails parity — find raises RecordNotFound)", async () => {
+    await expect(Locator.locate("gid://bcx/FakePerson/missing")).rejects.toThrow();
   });
 
   it("locate_many returns records in input order", async () => {

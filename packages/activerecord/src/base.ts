@@ -1,5 +1,9 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp as _getGlobalIdApp, buildGid as _buildGid } from "@blazetrails/globalid";
+import {
+  getApp as _getGlobalIdApp,
+  buildGid as _buildGid,
+  Locator as _Locator,
+} from "@blazetrails/globalid";
 import type {
   GlobalIDModel,
   SignedGlobalID as SignedGlobalIDType,
@@ -2865,12 +2869,11 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.find_global_id (via GlobalID::Locator.locate)
    */
-  static async findGlobalId(
+  static findGlobalId(
     input: string | import("@blazetrails/globalid").GlobalID,
     options?: import("@blazetrails/globalid").LocateOptions,
   ): Promise<unknown | null> {
-    const gid = await import("@blazetrails/globalid");
-    return gid.Locator.locate(input, options);
+    return _Locator.locate(input, options);
   }
 
   // valuesAt / assignAttributes extracted to persistence.ts.

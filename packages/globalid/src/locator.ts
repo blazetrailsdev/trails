@@ -4,6 +4,7 @@ import { GlobalID } from "./global-id.js";
 export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
+  /** Single-id form returns a record; array form returns an ordered array. */
   find(id: unknown): Promise<unknown> | unknown;
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
@@ -34,7 +35,13 @@ export function _resetModelFinder(): void {
 
 /** Mirrors: GlobalID::Locator */
 export class Locator {
-  /** Mirrors: Locator.locate(gid, options) */
+  /**
+   * Mirrors: Locator.locate(gid, options).
+   * Returns null if the GID is invalid, the model class isn't registered, or
+   * the `only:` filter rejects it. Errors from `klass.find` propagate (Rails
+   * raises RecordNotFound; use `locateMany` with `ignoreMissing` for graceful
+   * missing-record handling).
+   */
   static async locate(
     gid: string | GlobalID,
     options: LocateOptions = {},
@@ -44,12 +51,8 @@ export class Locator {
     const klass = lookupClass(parsed.modelName);
     if (!klass) return null;
     if (!isAllowed(klass, options.only)) return null;
-    try {
-      const record = await klass.find(parsed.modelId);
-      return record ?? null;
-    } catch {
-      return null;
-    }
+    const record = await klass.find(parsed.modelId);
+    return record ?? null;
   }
 
   /** Mirrors: Locator.locate_many(gids, options) */
@@ -119,16 +122,9 @@ async function findRecords(
     const records = await (rel.toArray ? rel.toArray() : []);
     return Array.isArray(records) ? records : [];
   }
-  const found = await Promise.all(
-    ids.map(async (id) => {
-      try {
-        return await klass.find(id);
-      } catch {
-        return undefined;
-      }
-    }),
-  );
-  return found.filter((r): r is unknown => r !== undefined);
+  // Rails: model_class.find(ids) — single batch call returning an array.
+  const result = await klass.find(ids);
+  return Array.isArray(result) ? result : [result];
 }
 
 function idKey(id: unknown): string {
