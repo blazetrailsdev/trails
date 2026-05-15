@@ -6,11 +6,44 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, Relation } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter;
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, {
+    posts: {
+      title: "string",
+      published: "boolean",
+      body: "string",
+      status: "string",
+      category: "string",
+      order_val: "integer",
+      postId: "integer",
+      views: "integer",
+      visible: "boolean",
+      blog_id: "integer",
+      mentor_id: "integer",
+      active: "boolean",
+    },
+    animals: { name: "string", type: "string" },
+    dogs: { name: "string", type: "string", active: "boolean" },
+    articles: {
+      title: "string",
+      visible: "boolean",
+      order_val: "integer",
+      blog_id: "integer",
+      published: "boolean",
+      category: "string",
+    },
+    comments: { body: "string" },
+    devs: { name: "string", salary: "integer", mentor_id: "integer" },
+    dev2s: { name: "string", salary: "integer", mentor_id: "integer" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 // ==========================================================================
