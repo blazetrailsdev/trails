@@ -2846,12 +2846,9 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#to_sgid
    */
-  async toSgid(options?: {
-    app?: string;
-    purpose?: string;
-    expiresIn?: number;
-    expiresAt?: Temporal.Instant;
-  }): Promise<SignedGlobalIDType> {
+  async toSgid(
+    options?: Omit<import("@blazetrails/globalid").SignedGlobalIDOptions, "verifier">,
+  ): Promise<SignedGlobalIDType> {
     const [SgidMod, SignedIdModule] = await Promise.all([loadSgid(), loadSignedId()]);
     const verifier = SignedIdModule.signedIdVerifier(this.constructor as typeof Base);
     return SgidMod.SignedGlobalID.create(this as GlobalIDModel, { ...options, verifier });
@@ -2862,12 +2859,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#to_sgid_param
    */
-  async toSgidParam(options?: {
-    app?: string;
-    purpose?: string;
-    expiresIn?: number;
-    expiresAt?: Temporal.Instant;
-  }): Promise<string> {
+  async toSgidParam(options?: Parameters<Base["toSgid"]>[0]): Promise<string> {
     return (await this.toSgid(options)).toParam();
   }
 
@@ -3621,10 +3613,13 @@ _setGlobalIdModelFinder((name: string) => {
   const fromAssoc = _gidModelRegistry.get(name);
   if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
   // STI subclasses inherit their parent's adapter, so they don't trigger the
-  // adapter setter that populates _modelsByName. They're tracked via
-  // Base.descendants when registerSubclass() has been called on them.
+  // adapter setter that populates _modelsByName. Walk Base.descendants once
+  // and cache the match into _modelsByName so subsequent lookups are O(1).
   for (const klass of Base.descendants) {
-    if (klass.name === name) return klass as unknown as _LocatorModel;
+    if (klass.name === name) {
+      Base._modelsByName.set(name, klass as typeof Base);
+      return klass as unknown as _LocatorModel;
+    }
   }
   return undefined;
 });

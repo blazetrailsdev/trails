@@ -123,7 +123,7 @@ export class Locator {
    */
   static async locateSigned(sgid: string, options: LocateSignedOptions): Promise<unknown | null> {
     const parsed = SignedGlobalID.parse(sgid, {
-      purpose: options.for,
+      for: options.for,
       verifier: options.verifier,
     });
     if (!parsed) return null;

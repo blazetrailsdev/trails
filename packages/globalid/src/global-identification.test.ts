@@ -3,7 +3,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { toGlobalId, toGid, toSignedGlobalId, toSgid, toSgidParam } from "./identification.js";
+import { toGlobalId, toGid, toGidParam, toSignedGlobalId, toSgid } from "./identification.js";
 import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
 function makeVerifier(): MessageVerifier {
@@ -57,15 +57,26 @@ describe("GlobalIdentificationTest", () => {
 
   it("creates a signed Global ID with purpose", () => {
     const verifier = makeVerifier();
-    const a = toSignedGlobalId.call(new Person("1"), { verifier, purpose: "login" });
+    const a = toSignedGlobalId.call(new Person("1"), { verifier, for: "login" });
     expect(a.purpose).toBe("login");
+    // Round-trip verifies the purpose only when caller passes matching for:.
+    const token = a.toString();
+    expect(SignedGlobalID.parse(token, { verifier, for: "login" })).not.toBeNull();
+    expect(SignedGlobalID.parse(token, { verifier, for: "other" })).toBeNull();
   });
 
   it("creates a signed Global ID with custom params", () => {
     const verifier = makeVerifier();
-    const token = toSgidParam.call(new Person("1"), { verifier });
-    const parsed = SignedGlobalID.parse(token, { verifier });
-    expect(parsed!.uri).toBe("gid://bcx/Person/1");
+    const sgid = toSignedGlobalId.call(new Person("1"), { verifier, db: "primary" });
+    expect(sgid.uri).toContain("?db=primary");
+    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
+    expect(parsed!.uri).toContain("?db=primary");
+  });
+
+  it("toGidParam round-trips through GlobalID.parse", () => {
+    const p = new Person("5");
+    const parsed = GlobalID.parse(toGidParam.call(p));
+    expect(parsed!.modelId).toBe("5");
   });
 });
 
@@ -85,6 +96,17 @@ describe("Locator.locateSigned + locateManySigned", () => {
     const found = (await Locator.locateSigned(sgid.toString(), { verifier })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe("7");
+  });
+
+  it("locate_signed finds a record by purpose-scoped SGID when for: matches", async () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(new Person("9"), { verifier, for: "login" });
+    const found = (await Locator.locateSigned(sgid.toString(), {
+      verifier,
+      for: "login",
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("9");
   });
 
   it("locate_signed returns null for invalid signature or purpose mismatch", async () => {

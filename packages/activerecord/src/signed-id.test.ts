@@ -380,6 +380,23 @@ describe("Base.findSignedGlobalId", () => {
     setApp("MyApp");
     await expect(Base.findSignedGlobalIdBang("invalid-token")).rejects.toThrow(RecordNotFound);
   });
+
+  it("toSignedGlobalId is an alias of toSgid (same URI + purpose)", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ id: 7 });
+    const a = await u.toSignedGlobalId({ for: "login" });
+    const b = await u.toSgid({ for: "login" });
+    expect(a.uri).toBe(b.uri);
+    expect(a.purpose).toBe(b.purpose);
+    expect(a.purpose).toBe("login");
+  });
 });
 
 describe("signedId / findSigned / findSignedBang", () => {
