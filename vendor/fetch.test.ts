@@ -66,6 +66,20 @@ describe("vendor/fetch.ts parseArgs", () => {
     expect(JSON.parse(out)).toEqual(testPathsManifest());
   });
 
+  it("--print-lib-paths emits valid JSON matching libPathsManifest()", async () => {
+    // Mirror of the --print-test-paths integration test for wave-6's
+    // LIB_PATHS_JSON pipeline (extract-ruby-api.rb).
+    const { execFileSync } = await import("node:child_process");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const out = execFileSync("pnpm", ["-s", "tsx", join(here, "fetch.ts"), "--print-lib-paths"], {
+      encoding: "utf8",
+    });
+    const { libPathsManifest } = await import("./sources.js");
+    expect(JSON.parse(out)).toEqual(libPathsManifest());
+  });
+
   it("rejects unknown flags", () => {
     expect(() => parseArgs(["--bogus"])).toThrow(/unknown flag: --bogus/);
   });
