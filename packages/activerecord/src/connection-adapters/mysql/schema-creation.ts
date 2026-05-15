@@ -88,6 +88,33 @@ export class SchemaCreation extends AbstractSchemaCreation {
           );
         return p != null ? `${base}(${p})` : base;
       }
+      case "time": {
+        const p = options.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No time type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        return p != null ? `time(${p})` : "time";
+      }
+      case "date":
+        return "date";
+      case "bigint":
+        return "bigint";
+      case "decimal": {
+        const p = options.precision;
+        const s = options.scale;
+        if (p != null && s != null) return `decimal(${p},${s})`;
+        if (p != null) return `decimal(${p})`;
+        if (s != null)
+          throw new ArgumentError(
+            "Error adding decimal column: precision cannot be empty if scale is specified",
+          );
+        return "decimal";
+      }
+      case "boolean":
+        return "tinyint(1)";
+      case "json":
+        return "json";
       default:
         return super.typeToSql(type, options);
     }
