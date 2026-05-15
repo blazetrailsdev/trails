@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { StatementInvalid } from "../../errors.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -212,7 +213,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           "sql",
           [1],
         ),
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(StatementInvalid);
     });
     it.skip("schema change with prepared stmt", () => {
       // BLOCKED: needs-prepared-statements — requires adapter.preparedStatements=true path
@@ -303,7 +304,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // $user without surrounding single quotes is invalid in SET search_path TO (PG
       // treats $user as a dollar-quoted string start with no closing tag → syntax error).
       // Rails schema_search_path= uses direct interpolation, so this raises StatementInvalid.
-      await expect(adapter.setSchemaSearchPath("$user,public")).rejects.toThrow();
+      await expect(adapter.setSchemaSearchPath("$user,public")).rejects.toBeInstanceOf(
+        StatementInvalid,
+      );
     });
     it("without schema search path", async () => {
       await adapter.setSchemaSearchPath("public");

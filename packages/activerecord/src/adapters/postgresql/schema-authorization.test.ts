@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { StatementInvalid } from "../../errors.js";
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";
@@ -44,12 +45,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema invisible", async () => {
       await adapter.sessionAuth("default");
-      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toThrow();
+      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toBeInstanceOf(
+        StatementInvalid,
+      );
     });
 
     it("session auth=", async () => {
       await adapter.sessionAuth("DEFAULT");
-      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toThrow();
+      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toBeInstanceOf(
+        StatementInvalid,
+      );
     });
 
     it("setting auth clears stmt cache", async () => {
