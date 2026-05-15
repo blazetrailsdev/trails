@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
+import { association } from "../../associations.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -209,7 +210,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await (Album as any).loadSchema();
         const song = await (Song as any).create({});
         const album = await (Album as any).create({});
-        await song.albums.push(album);
+        await association(song, "albums").push(album);
         const found = await (Song as any).joins("albums").where({ "albums.id": album.id }).first();
         expect(found.id).toBe(song.id);
         const albumIds1 = await (Song as any).joins("albums").pluck("albums.id");
