@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, association, registerModel, AssociationRelation } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("AssociationRelation", () => {
@@ -31,8 +32,18 @@ describe("AssociationRelation", () => {
 
   ArBlog.hasMany("arPosts", { className: "ArPost" });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      ar_blogs: { name: "string" },
+      ar_posts: { title: "string", published: "boolean", ar_blog_id: "integer" },
+      ar_validated_blogs: { name: "string" },
+      ar_validated_posts: { title: "string", ar_validated_blog_id: "integer" },
+      ar_strict_blogs: { name: "string" },
+      ar_strict_posts: { title: "string", ar_strict_blog_id: "integer" },
+      ar_inv_blogs: { name: "string" },
+      ar_inv_posts: { title: "string", ar_inv_blog_id: "integer" },
+    });
     ArBlog.adapter = adapter;
     ArPost.adapter = adapter;
     registerModel(ArBlog);

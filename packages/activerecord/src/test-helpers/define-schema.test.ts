@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { defineSchema } from "./define-schema.js";
+import { defineSchema, type ColumnSpec } from "./define-schema.js";
 
 let adapter: DatabaseAdapter;
 
@@ -84,6 +84,145 @@ describe("defineSchema", () => {
         y: { x_id: { type: "integer", references: "x" } },
       }),
     ).rejects.toThrow(/circular reference/);
+  });
+
+  describe("wrapped { columns, primaryKey } shape", () => {
+    it("composite primary key produces a PRIMARY KEY constraint over the named columns", async () => {
+      await defineSchema(adapter, {
+        comp: {
+          columns: { shop_id: "integer", order_number: "integer", name: "string" },
+          primaryKey: ["shop_id", "order_number"],
+        },
+      });
+      // Both rows differ in (shop_id, order_number) → both insert.
+      await adapter.executeMutation(
+        `INSERT INTO "comp" ("shop_id","order_number","name") VALUES (1,1,'a'),(1,2,'b')`,
+      );
+      // Same composite key → should reject.
+      await expect(
+        adapter.executeMutation(
+          `INSERT INTO "comp" ("shop_id","order_number","name") VALUES (1,1,'dup')`,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("single-element primaryKey array names a non-id PK column (also NOT NULL)", async () => {
+      // The wrapper's documented form for a single-column non-`id` PK is
+      // `primaryKey: [name]` — cover that path so regressions don't slip
+      // past the composite-key test below.
+      await defineSchema(adapter, {
+        single_pk: { columns: { code: "string", label: "string" }, primaryKey: ["code"] },
+      });
+      await adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES ('a','x')`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES ('a','y')`),
+      ).rejects.toThrow();
+      await expect(
+        adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES (NULL,'z')`),
+      ).rejects.toThrow();
+      const rows = (await adapter.execute(`SELECT * FROM "single_pk"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows).toHaveLength(1);
+      // No auto `id` column when wrapper.primaryKey is set.
+      expect("id" in rows[0]).toBe(false);
+    });
+
+    it("composite primary key columns are NOT NULL (matches Rails; SQLite quirk-proof)", async () => {
+      await defineSchema(adapter, {
+        cpk_nn: {
+          columns: { a: "integer", b: "integer", name: "string" },
+          primaryKey: ["a", "b"],
+        },
+      });
+      // SQLite otherwise accepts NULLs in composite-PK columns; we forbid it.
+      await expect(
+        adapter.executeMutation(`INSERT INTO "cpk_nn" ("a","b","name") VALUES (NULL,1,'x')`),
+      ).rejects.toThrow();
+      await expect(
+        adapter.executeMutation(`INSERT INTO "cpk_nn" ("a","b","name") VALUES (1,NULL,'x')`),
+      ).rejects.toThrow();
+    });
+
+    it("primaryKey: false creates a table with no primary key (no auto id column)", async () => {
+      await defineSchema(adapter, {
+        no_pk: { columns: { tag: "string" }, primaryKey: false },
+      });
+      // No "id" column present.
+      await adapter.executeMutation(`INSERT INTO "no_pk" ("tag") VALUES ('x')`);
+      const rows = (await adapter.execute(`SELECT * FROM "no_pk"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows).toHaveLength(1);
+      expect("id" in rows[0]).toBe(false);
+    });
+
+    it("STI columns map with a 'type' column is recognised as the wrapper shape", async () => {
+      // Regression: an earlier discriminator looked for `type` inside the
+      // `columns` value to reject ColumnSpec object shapes, which made STI
+      // wrappers (columns: { type: "string", ... }) misclassify as legacy
+      // and silently drop the primaryKey directive.
+      await defineSchema(adapter, {
+        sti: {
+          columns: { type: "string", name: "string" },
+          primaryKey: false,
+        },
+      });
+      await adapter.executeMutation(`INSERT INTO "sti" ("type","name") VALUES ('Dog','Rex')`);
+      const rows = (await adapter.execute(`SELECT * FROM "sti"`)) as Array<Record<string, unknown>>;
+      expect(rows[0]["type"]).toBe("Dog");
+      expect("id" in rows[0]).toBe(false);
+    });
+
+    it("legacy table with columns both named 'columns' and 'primaryKey' stays legacy (primaryKey is not wrapper-shaped)", async () => {
+      // primaryKey here is a column name with a ColumnSpec value, not a
+      // string[]/false marker. The discriminator must validate the
+      // primaryKey value's shape before treating the table as a wrapper.
+      await defineSchema(adapter, {
+        legacy_pk_col: {
+          columns: { type: "string" },
+          primaryKey: "string",
+        } as unknown as Record<string, ColumnSpec>,
+      });
+      await adapter.executeMutation(
+        `INSERT INTO "legacy_pk_col" ("columns","primaryKey") VALUES ('a','b')`,
+      );
+      const rows = (await adapter.execute(`SELECT * FROM "legacy_pk_col"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows[0]["columns"]).toBe("a");
+      expect(rows[0]["primaryKey"]).toBe("b");
+    });
+
+    it("legacy single-column table named 'columns' with object ColumnSpec stays legacy", async () => {
+      // Corner case: `{ columns: { type: "string" } }` is structurally
+      // indistinguishable from a wrapper with one column named `type` if
+      // the discriminator only inspects `columns`. Requiring `primaryKey`
+      // on the wrapper means a legacy ColumnSpec-object shape like this
+      // unambiguously stays legacy.
+      await defineSchema(adapter, {
+        reports2: { columns: { type: "string" } },
+      });
+      await adapter.executeMutation(`INSERT INTO "reports2" ("columns") VALUES ('hi')`);
+      const rows = (await adapter.execute(`SELECT * FROM "reports2"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows[0]["columns"]).toBe("hi");
+    });
+
+    it("does not mis-classify a legacy column literally named 'columns'", async () => {
+      // The discriminator must require `columns` to be an object map (not a
+      // ColumnSpec string/object) — otherwise a legacy table with a column
+      // called "columns" would be parsed as the wrapper shape.
+      await defineSchema(adapter, {
+        reports: { columns: "string", count: "integer" },
+      });
+      await adapter.executeMutation(`INSERT INTO "reports" ("columns","count") VALUES ('hello',1)`);
+      const rows = (await adapter.execute(`SELECT * FROM "reports"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows[0]["columns"]).toBe("hello");
+    });
   });
 
   it("dropExisting drops first then creates", async () => {

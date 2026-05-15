@@ -2,16 +2,28 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasManyThrough } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter;
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, {
+    hmt_tags: { name: "string" },
+    hmt_taggings: { post_id: "integer", tag_id: "integer" },
+    hmt_posts: { title: "string" },
+    tags: { name: "string" },
+    taggings: { post_id: "integer", tag_id: "integer" },
+    posts: { title: "string" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 // ==========================================================================

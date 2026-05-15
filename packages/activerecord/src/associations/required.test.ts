@@ -2,16 +2,37 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter = createTestAdapter();
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, {
+    authors: { name: "string" },
+    books: { title: "string", author_id: "integer" },
+    r_authors: { name: "string" },
+    r_books: { title: "string", author_id: "integer" },
+    r_writers: { name: "string" },
+    r_novels: { title: "string", writer_id: "integer" },
+    // RAUser/RAProfile etc. tableize as ra_*, rh_*, rm_* (consecutive-caps
+    // collapse per Rails' String#underscore; see packages/activesupport
+    // inflector). The same key columns map through.
+    ra_users: { name: "string" },
+    ra_profiles: { bio: "string", r_a_user_id: "integer" },
+    rh_users: { name: "string" },
+    rh_profiles: { bio: "string", r_h_user_id: "integer" },
+    rm_users: { name: "string" },
+    rm_profiles: { bio: "string", r_m_user_id: "integer" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 describe("RequiredAssociationsTest", () => {

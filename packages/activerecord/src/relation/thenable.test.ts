@@ -2,14 +2,20 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Base, Relation, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("Thenable", () => {
   let adapter: DatabaseAdapter;
   let ThenableUser: typeof Base;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      thenable_users: { name: "string", active: "integer" },
+      thenable_posts: { title: "string" },
+      thenable_comments: { body: "string", thenable_post_id: "integer" },
+    });
     ThenableUser = class ThenableUser extends Base {
       static {
         this.attribute("id", "integer");

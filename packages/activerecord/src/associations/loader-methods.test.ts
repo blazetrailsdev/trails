@@ -12,6 +12,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
@@ -46,8 +47,13 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoAuthor.hasOne("loProfile", { className: "LoProfile" });
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      lo_authors: { name: "string" },
+      lo_posts: { title: "string", lo_author_id: "integer" },
+      lo_profiles: { bio: "string", lo_author_id: "integer" },
+    });
     LoAuthor.adapter = adapter;
     LoPost.adapter = adapter;
     LoProfile.adapter = adapter;

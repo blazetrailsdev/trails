@@ -23,6 +23,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
@@ -42,8 +43,13 @@ describe("CollectionProxy#count — non-through fast path", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      cpc_authors: { name: "string" },
+      cpc_posts: { cpc_author_id: "integer", title: "string" },
+      cpc_comments: { cpc_post_id: "integer", body: "string" },
+    });
     CpcAuthor.adapter = adapter;
     CpcPost.adapter = adapter;
     registerModel("CpcAuthor", CpcAuthor);

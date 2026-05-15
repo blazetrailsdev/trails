@@ -6,17 +6,22 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("ModulesTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      accounts: { name: "string" },
+      billing_accounts: { name: "string" },
+      app_billing_accounts: { name: "string" },
+      accounts_archive: { name: "string" },
+      accounts_archive_v2: { name: "string" },
+      vehicles: { type: "string" },
+      posts: { title: "string", author_id: "integer" },
+    });
   });
 
   it.skip("module spanning associations", () => {

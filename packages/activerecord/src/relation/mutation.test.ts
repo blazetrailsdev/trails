@@ -6,17 +6,16 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 describe("RelationMutationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", author: "string" },
+    });
   });
 
   function makeModel() {

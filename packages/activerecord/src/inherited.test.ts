@@ -11,7 +11,10 @@ beforeAll(() => {
   adapter = createTestAdapter();
 });
 beforeEach(async () => {
-  await defineSchema(adapter, { parents: { name: "string" } });
+  await defineSchema(adapter, {
+    parents: { name: "string" },
+    children: { name: "string" },
+  });
 });
 afterAll(async () => {
   await dropAllTables(adapter);

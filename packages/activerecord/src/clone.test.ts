@@ -2,20 +2,25 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+beforeEach(async () => {
+  adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    topics: { title: "string", author_name: "string" },
+    posts: { title: "string" },
+    users: { name: "string" },
+  });
+});
 
 describe("CloneTest", () => {
   it("persisted", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -32,7 +37,6 @@ describe("CloneTest", () => {
   });
 
   it("shallow", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -47,7 +51,6 @@ describe("CloneTest", () => {
   });
 
   it("stays frozen", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -60,7 +63,6 @@ describe("CloneTest", () => {
   });
 
   it("freezing a cloned model does not freeze clone", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -77,7 +79,6 @@ describe("CloneTest", () => {
 
 describe("CloneTest", () => {
   it("clone preserves frozen state", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -92,7 +93,6 @@ describe("CloneTest", () => {
   });
 
   it("clone of frozen record is not frozen", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -111,7 +111,6 @@ describe("CloneTest", () => {
 
 describe("Base#clone", () => {
   it("creates a shallow clone preserving id and persisted state", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -127,7 +126,6 @@ describe("Base#clone", () => {
   });
 
   it("clone is independent from original", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");

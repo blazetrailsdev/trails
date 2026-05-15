@@ -26,7 +26,25 @@ export type ColumnSpec =
       primary?: boolean;
     };
 
-export type TableSchema = Record<string, ColumnSpec>;
+export interface WrappedTableSchema {
+  columns: Record<string, ColumnSpec>;
+  /**
+   * Table-level primary key. `string[]` builds a composite PK constraint
+   * over the listed columns (which are also marked NOT NULL, matching
+   * Rails semantics — SQLite otherwise lets NULLs slip through composite
+   * PKs). `false` builds the table without a PK. A single-string form is
+   * intentionally not supported — pass `[name]` for a single-column
+   * non-`id` primary key.
+   *
+   * Required: this is the disambiguator that separates the wrapper shape
+   * from the legacy `Record<colName, ColumnSpec>` shape. Without it, a
+   * legacy single-column table whose column happens to be named `columns`
+   * (with an object ColumnSpec) is structurally indistinguishable from a
+   * wrapper. If you don't need to override the PK, use the legacy shape.
+   */
+  primaryKey: string[] | false;
+}
+export type TableSchema = Record<string, ColumnSpec> | WrappedTableSchema;
 export type Schema = Record<string, TableSchema>;
 
 export interface DefineSchemaOpts {
@@ -34,10 +52,54 @@ export interface DefineSchemaOpts {
 }
 
 /** @internal */
+const WRAPPER_KEYS = new Set(["columns", "primaryKey"]);
+
+/** @internal */
+function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
+  // The wrapper and the legacy `Record<colName, ColumnSpec>` shape both
+  // permit a key called `columns`, so discrimination needs an unambiguous
+  // signal. We use the presence of `primaryKey` — the wrapper's sole
+  // purpose is to set a table-level PK, so making it required also
+  // collapses the only ambiguity: a legacy single-column table
+  // `{ columns: { type: "string" } }` is structurally identical to a
+  // wrapper with one column named `type`, but it cannot have `primaryKey`,
+  // so it stays unambiguously legacy.
+  //
+  // Rule:
+  //   1. `primaryKey` is present.
+  //   2. `columns` is present and an object map.
+  //   3. No other top-level keys.
+  if (!table || typeof table !== "object") return false;
+  if (!("primaryKey" in table)) return false;
+  const pk = (table as { primaryKey?: unknown }).primaryKey;
+  // Validate primaryKey is the wrapper-shaped value; otherwise this is a
+  // legacy table that happens to have a column called `primaryKey`.
+  if (pk !== false && !Array.isArray(pk)) return false;
+  if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
+  const candidate = (table as { columns?: unknown }).columns;
+  if (!candidate || typeof candidate !== "object") return false;
+  for (const key of Object.keys(table)) {
+    if (!WRAPPER_KEYS.has(key)) return false;
+  }
+  return true;
+}
+
+/** @internal */
+function columnsOf(table: TableSchema): Record<string, ColumnSpec> {
+  return isWrappedSchema(table) ? table.columns : (table as Record<string, ColumnSpec>);
+}
+
+/** @internal */
+function primaryKeyOf(table: TableSchema): string[] | false | undefined {
+  return isWrappedSchema(table) ? table.primaryKey : undefined;
+}
+
+/** @internal */
 function resolveReferences(schema: Schema): string[] {
   const refs = new Map<string, Set<string>>();
-  for (const [table, columns] of Object.entries(schema)) {
+  for (const [table, raw] of Object.entries(schema)) {
     refs.set(table, new Set());
+    const columns = columnsOf(raw);
     for (const spec of Object.values(columns)) {
       if (typeof spec === "object" && spec.references) {
         if (spec.references in schema && spec.references !== table) {
@@ -131,8 +193,17 @@ export async function defineSchema(
   }
 
   for (const table of order) {
-    const columns = schema[table];
-    await ss.createTable(table, (t) => {
+    const raw = schema[table];
+    const columns = columnsOf(raw);
+    const pk = primaryKeyOf(raw);
+    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
+    if (pk === false) createOpts.id = false;
+    else if (Array.isArray(pk)) {
+      createOpts.primaryKey = pk;
+      createOpts.id = false;
+    }
+    const compositePkCols = Array.isArray(pk) ? new Set(pk) : null;
+    await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
         const primitive: PrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
         const arType = typeMap[primitive];
@@ -141,7 +212,16 @@ export async function defineSchema(
           if (spec.limit !== undefined) options["limit"] = spec.limit;
           if (spec.null !== undefined) options["null"] = spec.null;
           if (spec.default !== undefined) options["default"] = spec.default;
-          if (spec.primary) options["primaryKey"] = true;
+          if (spec.primary && pk === undefined) {
+            options["primaryKey"] = true;
+          }
+        }
+        // Columns participating in a composite PK are NOT NULL, matching
+        // Rails semantics. SQLite otherwise lets NULLs into composite-PK
+        // columns (long-known quirk), which would let invalid fixtures
+        // persist.
+        if (compositePkCols?.has(colName)) {
+          options["null"] = false;
         }
         // MySQL DATETIME without precision = DATETIME(0), which rejects fractional
         // seconds. Default to DATETIME(6) so test schemas accept microseconds.

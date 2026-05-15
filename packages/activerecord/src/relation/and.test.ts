@@ -6,23 +6,22 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+beforeEach(async () => {
+  adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    posts: { title: "string", body: "string", author: "string" },
+    users: { name: "string", role: "string", active: "boolean" },
+  });
+});
 
 // ==========================================================================
 // AndTest — targets relation/and_test.rb
 // ==========================================================================
 describe("AndTest", () => {
-  let adapter: DatabaseAdapter;
-
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("and combines two relations", () => {
     class Post extends Base {
       static {
@@ -39,11 +38,6 @@ describe("AndTest", () => {
 });
 
 describe("AndTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
@@ -80,7 +74,6 @@ describe("AndTest", () => {
 
 describe("and()", () => {
   it("combines two relations with AND", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -102,11 +95,6 @@ describe("and()", () => {
 });
 
 describe("Relation And (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   it("and merges where conditions", async () => {
     class User extends Base {
       static {
