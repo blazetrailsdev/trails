@@ -3,6 +3,14 @@
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+import { defineFixtures } from "../../test-helpers/define-fixtures.js";
+
+async function currentDatabase(adapter: Mysql2Adapter): Promise<string> {
+  const rows = (await adapter.execute("SELECT DATABASE() AS db")) as Array<{ db: string }>;
+  return rows[0]!.db;
+}
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -47,22 +55,91 @@ describeIfMysql("Mysql2Adapter", () => {
       }
     });
 
-    it.skip("schema", () => {
-      // BLOCKED: slot-c-fixtures — requires posts table (qualified db.table_name)
-      // loaded by Slot C fixture infrastructure; not present in base test DB
+    it("schema", async () => {
+      await defineSchema(adapter, {
+        posts: { title: "string", body: "text", type: "string" },
+      });
+      try {
+        class Post extends Base {
+          static _tableName = "posts";
+        }
+        Post.attribute("id", "integer");
+        Post.attribute("title", "string");
+        Post.attribute("body", "text");
+        Post.adapter = adapter;
+        await defineFixtures(adapter, Post, {
+          welcome: { title: "Welcome to the weblog", body: "Such a lovely day", type: "Post" },
+        });
+
+        const db = await currentDatabase(adapter);
+        class OmgPost extends Base {
+          static _tableName = `${db}.posts`;
+        }
+        OmgPost.inheritanceColumn = "disabled";
+        OmgPost.attribute("id", "integer");
+        OmgPost.attribute("title", "string");
+        OmgPost.adapter = adapter;
+
+        const first = await (OmgPost as any).first();
+        expect(first).toBeTruthy();
+      } finally {
+        await adapter.dropTable("posts", { ifExists: true });
+      }
     });
 
-    it.skip("primary key", () => {
-      // BLOCKED: slot-c-fixtures — requires topics fixture table from Slot C
+    it("primary key", async () => {
+      await defineSchema(adapter, { topics: { title: "string" } });
+      try {
+        expect(await adapter.primaryKey("topics")).toBe("id");
+      } finally {
+        await adapter.dropTable("topics", { ifExists: true });
+      }
     });
 
-    it.skip("data source exists", () => {
-      // BLOCKED: slot-c-fixtures — requires topics fixture table from Slot C
+    it("data source exists?", async () => {
+      await defineSchema(adapter, { topics: { title: "string" } });
+      try {
+        const db = await currentDatabase(adapter);
+        // Rails passes @omgpost.table_name, which is the qualified `db.topics` form.
+        expect(await adapter.dataSourceExists(`${db}.topics`)).toBe(true);
+      } finally {
+        await adapter.dropTable("topics", { ifExists: true });
+      }
     });
 
-    it.skip("dump indexes", () => {
-      // BLOCKED: slot-c-fixtures — requires key_tests fixture table from Slot C
-      // (index_key_tests_on_snack/pizza = btree, index_key_tests_on_awesome = fulltext)
+    it("data source exists wrong schema", async () => {
+      const db = await currentDatabase(adapter);
+      expect(await adapter.dataSourceExists(`${db}.zomg`)).toBe(false);
+    });
+
+    it("dump indexes", async () => {
+      await adapter.dropTable("key_tests", { ifExists: true });
+      try {
+        await adapter.createTable("key_tests", { force: true }, (t: any) => {
+          t.string("awesome");
+          t.string("pizza");
+          t.string("snack");
+        });
+        await adapter.addIndex("key_tests", ["snack"], { name: "index_key_tests_on_snack" });
+        await adapter.addIndex("key_tests", ["pizza"], { name: "index_key_tests_on_pizza" });
+        await adapter.addIndex("key_tests", ["awesome"], {
+          name: "index_key_tests_on_awesome",
+          type: "fulltext",
+        });
+        const indexes = (await adapter.indexes("key_tests")).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
+        expect(indexes).toHaveLength(3);
+        const byName = (n: string) => indexes.find((i) => i.name === n)!;
+        expect(byName("index_key_tests_on_snack").using).toBe("btree");
+        expect(byName("index_key_tests_on_snack").type).toBeUndefined();
+        expect(byName("index_key_tests_on_pizza").using).toBe("btree");
+        expect(byName("index_key_tests_on_pizza").type).toBeUndefined();
+        expect(byName("index_key_tests_on_awesome").using).toBeUndefined();
+        expect(byName("index_key_tests_on_awesome").type).toBe("fulltext");
+      } finally {
+        await adapter.dropTable("key_tests", { ifExists: true });
+      }
     });
 
     it("drop temporary table", async () => {
