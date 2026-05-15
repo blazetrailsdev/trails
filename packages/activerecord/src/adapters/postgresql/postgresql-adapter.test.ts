@@ -373,17 +373,45 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.disableExtension("citext", { force: "cascade" });
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
-    it.skip("prepared statements", async () => {
-      // BLOCKED: Verifying pg_prepared_statements state not yet implemented.
+    it("prepared statements", async () => {
+      adapter.preparedStatements = true;
+      await adapter.beginDbTransaction();
+      try {
+        await adapter.execute("SELECT $1::integer AS n", [1]);
+        const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
+        expect(rows.length).toBeGreaterThan(0);
+      } finally {
+        await adapter.rollback();
+      }
     });
-    it.skip("prepared statements with multiple binds", async () => {
-      // BLOCKED: Same as "prepared statements" — pg_prepared_statements verification.
+    it("prepared statements with multiple binds", async () => {
+      adapter.preparedStatements = true;
+      await adapter.beginDbTransaction();
+      try {
+        await adapter.execute("SELECT $1::integer + $2::integer AS n", [1, 2]);
+        const rows = await adapter.execute("SELECT name FROM pg_prepared_statements");
+        expect(rows.length).toBeGreaterThan(0);
+      } finally {
+        await adapter.rollback();
+      }
     });
-    it.skip("prepared statements disabled", async () => {
-      // BLOCKED: See adapters/postgresql/prepared-statements-disabled.test.ts.
+    it("prepared statements disabled", async () => {
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, preparedStatements: false });
+      try {
+        expect(a.preparedStatements).toBe(false);
+        const result = await a.execute("SELECT 1 AS n");
+        expect(result[0]["n"]).toBe(1);
+      } finally {
+        await a.close();
+      }
     });
-    it.skip("default prepared statements", async () => {
-      // BLOCKED: preparedStatements defaults to true but not yet tested standalone.
+    it("default prepared statements", async () => {
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        expect(a.preparedStatements).toBe(true);
+      } finally {
+        await a.close();
+      }
     });
 
     // ── Bind parameter rewriting + type round-trip ──────────────────────
