@@ -13,6 +13,7 @@ import {
 } from "./associations/errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import type { AssociationDefinition } from "./associations.js";
+import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
 
@@ -334,18 +335,26 @@ export function validateAssociations(record: Base, context?: ValidationContextAr
       for (const child of records) {
         if (typeof child.isDestroyed === "function" && child.isDestroyed()) continue;
         if (isMarkedForDestruction(child)) continue;
-        if (!child.isNewRecord() && !child.changed) continue;
-
+        // Mirrors Rails `association_valid?` + `custom_validation_context?`:
+        // only pass the context to the child if it is truly custom (not :create/:update).
+        // _validationContext is already restored by this point, so we check the context
+        // parameter directly rather than calling customValidationContext().
+        const childContext: ValidationContextArg | undefined =
+          context != null && context !== "create" && context !== "update" ? context : undefined;
+        // Rails association_valid? always validates; error propagation uses `|| context`
+        // to include all errors for custom contexts even on unchanged persisted children
+        // (autosave_association.rb:380-388). Skip only when no custom context.
+        if (!child.isNewRecord() && !child.changed && !childContext) continue;
         let isChildValid: boolean;
         if (assoc.type === "belongsTo") {
           _setValidatingBelongsToFor(record, assoc, true);
           try {
-            isChildValid = typeof child.isValid === "function" ? child.isValid(context) : true;
+            isChildValid = typeof child.isValid === "function" ? child.isValid(childContext) : true;
           } finally {
             _setValidatingBelongsToFor(record, assoc, false);
           }
         } else {
-          isChildValid = typeof child.isValid === "function" ? child.isValid(context) : true;
+          isChildValid = typeof child.isValid === "function" ? child.isValid(childContext) : true;
         }
 
         if (!isChildValid) {
@@ -535,8 +544,46 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   }
   if (childRecord.isNewRecord() || childRecord.changed) {
     const ctor = record.constructor as typeof Base;
-    const foreignKey = assoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-    const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
+    // Mirrors Rails save_has_one_association: use the reflection's resolved FK
+    // (handles queryConstraints via deriveFkQueryConstraints when available).
+    const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
+    // reflection.foreignKey resolves queryConstraints-derived FK columns;
+    // fall back to the raw option or the default scalar FK.
+    const foreignKey: string | string[] =
+      (reflection && reflection.foreignKey != null ? reflection.foreignKey : null) ??
+      assoc.options.foreignKey ??
+      `${underscore(ctor.name)}_id`;
+    // Mirrors Rails compute_primary_key (autosave_association.rb:576-587).
+    // Use the reflection (when available) so the normalized queryConstraints option
+    // (array FKs are moved there by the reflection constructor) is visible to branch 2.
+    const explicitPk = assoc.options.primaryKey;
+    let primaryKey: string | string[];
+    if (explicitPk) {
+      primaryKey = explicitPk;
+    } else {
+      const candidatePk = computePrimaryKey.call(
+        record as unknown as AutosaveAssociationHost,
+        reflection ?? assoc,
+      );
+      // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
+      // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
+      // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
+      // so CPK models with explicit composite FKs still pair correctly.
+      primaryKey =
+        !Array.isArray(candidatePk) && Array.isArray(foreignKey) ? ctor.primaryKey : candidatePk;
+    }
+    // Mirrors Rails composite_primary_key? collapse (autosave_association.rb:582-585):
+    // collapse only when the PK array IS the class composite primary key (not a QC-derived
+    // list). QC branch returns early before reaching composite_primary_key? in Rails,
+    // so we gate on Array.isArray(ctor.primaryKey) — QC models typically keep scalar PK.
+    if (
+      !explicitPk &&
+      Array.isArray(ctor.primaryKey) &&
+      Array.isArray(primaryKey) &&
+      !Array.isArray(foreignKey)
+    ) {
+      if ((primaryKey as string[]).includes("id")) primaryKey = "id";
+    }
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
       if (primaryKey.length !== foreignKey.length) {
         throw new CompositePrimaryKeyMismatchError(
@@ -898,7 +945,20 @@ export function computePrimaryKey(
   reflection: any,
 ): string | string[] {
   if (reflection.options?.primaryKey) return reflection.options.primaryKey;
-  const ctor = this.constructor;
+  const ctor = this.constructor as typeof Base & {
+    primaryKey?: string | string[];
+    _hasQueryConstraints?: boolean;
+    _queryConstraintsList?: string[] | null;
+  };
+  // Mirrors Rails autosave_association.rb:579-587
+  if (reflection.options?.queryConstraints) {
+    const qcl = queryConstraintsList.call(ctor as any);
+    if (qcl) return qcl;
+  }
+  if (hasQueryConstraints.call(ctor as any) && !reflection.options?.foreignKey) {
+    const qcl = queryConstraintsList.call(ctor as any);
+    if (qcl) return qcl;
+  }
   if (Array.isArray(ctor.primaryKey)) {
     const pk: string[] = ctor.primaryKey;
     return pk.includes("id") ? "id" : pk;
