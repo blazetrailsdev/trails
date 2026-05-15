@@ -22,6 +22,7 @@
     "api:compare": "bash scripts/api-compare/run.sh",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
     "api:moves": "pnpm tsx scripts/api-compare/moves.ts",
+    "api:extra": "pnpm tsx scripts/api-compare/extra-surface.ts",
     "lint:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "test:compare": "bash scripts/test-compare/run.sh",
     "test:stubs": "pnpm test:compare -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
