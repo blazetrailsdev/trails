@@ -315,12 +315,17 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
 
     const merged = (walkerResult as unknown as { merge: (o: unknown) => Relation<T> }).merge(this);
     const target = merged as unknown as ComposeFields;
-    const overlay = this as unknown as ComposeFields;
+    const overlay = this as unknown as ComposeFields & { _reordering?: boolean };
     const overlayOrders = overlay._orderClauses ?? [];
     const overlayRawOrders = overlay._rawOrderClauses ?? [];
     const overlaySelects = overlay._selectColumns ?? [];
+    const isReordering = overlay._reordering ?? false;
 
-    if (overlayRawOrders.length > 0 && overlayOrders.length === 0) {
+    if (isReordering) {
+      // `reorder()` signals "replace, don't append": use overlay's orders only.
+      target._orderClauses = [...overlayOrders];
+      target._rawOrderClauses = [...overlayRawOrders];
+    } else if (overlayRawOrders.length > 0 && overlayOrders.length === 0) {
       // `inOrderOf(column, values)` is the only `_rawOrderClauses`
       // producer today; it CLEARS `_orderClauses` to express
       // "replace existing order with this CASE order"

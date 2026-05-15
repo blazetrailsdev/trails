@@ -104,6 +104,7 @@ interface QueryMethodsHost {
   _whereClause: WhereClause;
   _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string }>;
   _rawOrderClauses: string[];
+  _reordering: boolean;
   _limitValue: number | null;
   _offsetValue: number | null;
   _selectColumns: any[] | null;
@@ -429,6 +430,7 @@ function reorderBang(
 ): any {
   this._orderClauses = [];
   this._rawOrderClauses = [];
+  this._reordering = true;
   let i = 0;
   while (i < args.length) {
     const arg = args[i];

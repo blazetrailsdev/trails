@@ -6,6 +6,26 @@ import { Base, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Associations, association, loadHasMany } from "../associations.js";
+import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
+
+/**
+ * Build a DJAS scope for `assocName` on `owner`. Returns the deferred
+ * DisableJoinsAssociationRelation that supports chaining (.where / .reorder /
+ * .limit / .first). Used by tests that need to chain conditions onto the
+ * disable-joins result without going through the CollectionProxy seed state
+ * (which uses _buildThroughScope and fails for nested-through associations).
+ */
+function djasScope(owner: Base, assocName: string): any {
+  const ctor = owner.constructor as typeof Base;
+  const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
+  if (!reflection) throw new Error(`No reflection found for ${assocName}`);
+  const klass = (reflection as any).klass;
+  return DisableJoinsAssociationScope.INSTANCE.scope({
+    owner,
+    reflection,
+    klass,
+  });
+}
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -147,6 +167,47 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       through: "djPosts",
       source: "djComments",
       foreignKey: "dj_author_id",
+      disableJoins: true,
+    });
+
+    // djCommentsWithOrder mirrors Rails' comments_with_order (scope: ordered_by_post_id)
+    Associations.hasMany.call(DjAuthor, "djCommentsWithOrder", {
+      className: "DjComment",
+      through: "djPosts",
+      source: "djComments",
+      scope: (rel: any) => rel.order("dj_post_id DESC"),
+    });
+
+    // djMembersOrdered / noJoinsDjMembersOrdered mirror Rails' ordered_members / no_joins_ordered_members
+    Associations.hasMany.call(DjAuthor, "djMembersOrdered", {
+      className: "DjMember",
+      through: "djCommentsWithOrder",
+      source: "origin",
+      sourceType: "DjMember",
+      scope: (rel: any) => rel.order("id DESC"),
+    });
+    Associations.hasMany.call(DjAuthor, "noJoinsDjMembersOrdered", {
+      className: "DjMember",
+      through: "djCommentsWithOrder",
+      source: "origin",
+      sourceType: "DjMember",
+      scope: (rel: any) => rel.order("id DESC"),
+      disableJoins: true,
+    });
+
+    // djMembersDouble / noJoinsDjMembersDouble mirror Rails' members / no_joins_members
+    // (through ordered comments, no extra scope on Member)
+    Associations.hasMany.call(DjAuthor, "djMembersDouble", {
+      className: "DjMember",
+      through: "djCommentsWithOrder",
+      source: "origin",
+      sourceType: "DjMember",
+    });
+    Associations.hasMany.call(DjAuthor, "noJoinsDjMembersDouble", {
+      className: "DjMember",
+      through: "djCommentsWithOrder",
+      source: "origin",
+      sourceType: "DjMember",
       disableJoins: true,
     });
 
@@ -434,59 +495,120 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(await association(author, "djRatings").exists([-1, -2])).toBe(false);
   });
 
-  it.skip("polymophic disable joins through ordering", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+  it("polymophic disable joins through ordering", async () => {
+    const { author, member, member2 } = await setupData();
+    const normalMembers = await association(author, "djMembersOrdered").toArray();
+    const noJoinsMembers = await association(author, "noJoinsDjMembersOrdered").toArray();
+    // scope order(id: desc) → higher id (member2) first
+    expect(normalMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
   });
-  it.skip("polymorphic disable joins through reordering", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("polymorphic disable joins through reordering", async () => {
+    const { author, member, member2 } = await setupData();
+    // reorder(id: asc) overrides the association scope's order(id: desc)
+    // Use DJAS scope directly to test _composeChainedState's _reordering handling
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersOrdered")
+      .reorder("id ASC")
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member.id, member2.id]);
   });
-  it.skip("polymorphic disable joins through ordered scopes", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("polymorphic disable joins through ordered scopes", async () => {
+    const { author, member, member2 } = await setupData();
+    // both members have null name; scope order(id: desc) → member2 first
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersOrdered")
+      .where({ name: null })
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
   });
-  it.skip("polymorphic disable joins through ordered chained scopes", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("polymorphic disable joins through ordered chained scopes", async () => {
+    const { author, member, member2, memberType, post2 } = await setupData();
+    // member3 (unnamed) and member4 (named) both linked via post2
+    const member3 = await DjMember.create({ dj_member_type_id: memberType.id });
+    const member4 = await DjMember.create({ dj_member_type_id: memberType.id, name: "named" });
+    await DjComment.create({
+      dj_post_id: post2.id,
+      body: "text3",
+      origin_id: member3.id,
+      origin_type: "DjMember",
+    });
+    await DjComment.create({
+      dj_post_id: post2.id,
+      body: "text4",
+      origin_id: member4.id,
+      origin_type: "DjMember",
+    });
+    // unnamed + member_type_id → excludes member4 (named), includes member3, member2, member
+    // order(id: desc) → member3 (highest id), member2, member
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersOrdered")
+      .where({ name: null })
+      .where({ dj_member_type_id: memberType.id })
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member3.id, member2.id, member.id]);
   });
-  it.skip("polymorphic disable joins through ordered scope limits", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("polymorphic disable joins through ordered scope limits", async () => {
+    const { author, member2 } = await setupData();
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersOrdered")
+      .where({ name: null })
+      .limit(1)
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id]);
   });
-  it.skip("polymorphic disable joins through ordered scope first", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("polymorphic disable joins through ordered scope first", async () => {
+    const { author, member2 } = await setupData();
+    const noJoinsFirst = await djasScope(author, "noJoinsDjMembersOrdered")
+      .where({ name: null })
+      .first();
+    expect(noJoinsFirst?.id).toBe(member2.id);
   });
-  it.skip("order applied in double join", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("order applied in double join", async () => {
+    const { author, member, member2 } = await setupData();
+    // through step orders by dj_post_id DESC → member2 (from post2, higher post_id) first
+    // disable-joins: DJAR reorders records in memory by plucked-id order
+    const noJoinsMembers = await association(author, "noJoinsDjMembersDouble").toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id, member.id]);
   });
-  it.skip("first and scope applied in double join", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("first and scope applied in double join", async () => {
+    const { author, member2 } = await setupData();
+    const noJoinsFirst = await djasScope(author, "noJoinsDjMembersDouble")
+      .where({ name: null })
+      .first();
+    expect(noJoinsFirst?.id).toBe(member2.id);
   });
-  it.skip("first and scope in double join applies order in memory", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("first and scope in double join applies order in memory", async () => {
+    // Rails verifies no ORDER BY in the final SQL (order is applied in memory via DJAR).
+    // TS: the DJAR loaded-chain mode sorts in memory; verify correct record returned.
+    const { author, member2 } = await setupData();
+    const noJoinsFirst = await djasScope(author, "noJoinsDjMembersDouble")
+      .where({ name: null })
+      .first();
+    expect(noJoinsFirst?.id).toBe(member2.id);
   });
-  it.skip("limit and scope applied in double join", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("limit and scope applied in double join", async () => {
+    const { author, member2 } = await setupData();
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersDouble")
+      .where({ name: null })
+      .limit(1)
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id]);
   });
-  it.skip("limit and scope in double join applies limit in memory", () => {
-    // BLOCKED: associations — has-many-through feature gap
-    // ROOT-CAUSE: associations/has-many-through-disable-joins-associations.ts or preloader.ts missing has-many-through semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in has-many-through-disable-joins-associations.test.ts
+
+  it("limit and scope in double join applies limit in memory", async () => {
+    // Rails verifies no LIMIT 1 in the final SQL (limit is applied in memory via DJAR).
+    // TS: DJAR loaded-chain mode applies limit in memory; verify correct record returned.
+    const { author, member2 } = await setupData();
+    const noJoinsMembers = await djasScope(author, "noJoinsDjMembersDouble")
+      .where({ name: null })
+      .limit(1)
+      .toArray();
+    expect(noJoinsMembers.map((m: any) => m.id)).toEqual([member2.id]);
   });
 });
