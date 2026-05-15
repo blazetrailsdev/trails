@@ -400,13 +400,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override async execQuery(
     sql: string,
-    name: string = "SQL",
-    binds: unknown[] = [],
-    options: { prepare?: boolean } = {},
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean },
   ): Promise<Result> {
     await this.materializeTransactions();
     const driverSql = this.mysqlQuote(sql);
-    const driverBinds = this.mysqlBinds(binds);
+    const driverBinds = this.mysqlBinds(binds ?? []);
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
@@ -419,7 +419,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       let conn: mysql.PoolConnection | undefined;
       try {
         conn = await this.getConn();
-        const prepare = options.prepare ?? this._shouldPrepare(conn, binds);
+        const prepare = options?.prepare ?? this._shouldPrepare(conn, binds ?? []);
         if (prepare) this._trackPrepared(conn, driverSql);
         const [rawResult] = prepare
           ? await conn.execute(driverSql, driverBinds as any[])
