@@ -106,6 +106,22 @@ describe("defineSchema", () => {
       ).rejects.toThrow();
     });
 
+    it("composite primary key columns are NOT NULL (matches Rails; SQLite quirk-proof)", async () => {
+      await defineSchema(adapter, {
+        cpk_nn: {
+          columns: { a: "integer", b: "integer", name: "string" },
+          primaryKey: ["a", "b"],
+        },
+      });
+      // SQLite otherwise accepts NULLs in composite-PK columns; we forbid it.
+      await expect(
+        adapter.executeMutation(`INSERT INTO "cpk_nn" ("a","b","name") VALUES (NULL,1,'x')`),
+      ).rejects.toThrow();
+      await expect(
+        adapter.executeMutation(`INSERT INTO "cpk_nn" ("a","b","name") VALUES (1,NULL,'x')`),
+      ).rejects.toThrow();
+    });
+
     it("primaryKey: false creates a table with no primary key (no auto id column)", async () => {
       await defineSchema(adapter, {
         no_pk: { columns: { tag: "string" }, primaryKey: false },

@@ -14,10 +14,24 @@ import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const root = "packages/activerecord/src";
-const files = execSync(`find ${root} -name '*.test.ts' -type f`, { encoding: "utf8" })
+// Scan both *.test.ts files and shared test-helper modules, since helpers
+// like encryption/test-helpers.ts define model factories used by tests
+// under AR_NO_AUTO_SCHEMA=1. Helper files don't call defineSchema
+// themselves (the tests that consume them do), so we only flag a helper
+// when no sibling test file imports it AND ensures schema — but at minimum
+// surfacing them lets the migrator see what factories still need wiring.
+const files = execSync(
+  `find ${root} \\( -name '*.test.ts' -o -name 'test-helpers.ts' -o -path '*/test-helpers/*.ts' \\) -type f`,
+  { encoding: "utf8" },
+)
   .trim()
   .split("\n")
-  .filter(Boolean);
+  .filter(Boolean)
+  // The schema helper itself defines defineSchema and contains literal
+  // mentions; exclude it (and its test) so the audit doesn't flag its own
+  // implementation file.
+  .filter((f) => !f.endsWith("/test-helpers/define-schema.ts"))
+  .filter((f) => !f.endsWith("/test-helpers/drop-all-tables.ts"));
 
 /**
  * Strip line comments, block comments, and string literals so a commented-

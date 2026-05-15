@@ -29,10 +29,12 @@ export type ColumnSpec =
 export interface WrappedTableSchema {
   columns: Record<string, ColumnSpec>;
   /**
-   * Table-level primary key. `string[]` builds a composite PK constraint and
-   * suppresses the auto-`id` column. `false` builds the table without a PK.
-   * `string` is not supported — use the matching column with `primary: true`
-   * via the legacy shape, or pass `[name]` for a single-column composite.
+   * Table-level primary key. `string[]` builds a composite PK constraint
+   * over the listed columns (which are also marked NOT NULL, matching
+   * Rails semantics — SQLite otherwise lets NULLs slip through composite
+   * PKs). `false` builds the table without a PK. A single-string form is
+   * intentionally not supported — pass `[name]` for a single-column
+   * non-`id` primary key.
    *
    * Required: this is the disambiguator that separates the wrapper shape
    * from the legacy `Record<colName, ColumnSpec>` shape. Without it, a
@@ -200,6 +202,7 @@ export async function defineSchema(
       createOpts.primaryKey = pk;
       createOpts.id = false;
     }
+    const compositePkCols = Array.isArray(pk) ? new Set(pk) : null;
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
         const primitive: PrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
@@ -212,6 +215,13 @@ export async function defineSchema(
           if (spec.primary && pk === undefined) {
             options["primaryKey"] = true;
           }
+        }
+        // Columns participating in a composite PK are NOT NULL, matching
+        // Rails semantics. SQLite otherwise lets NULLs into composite-PK
+        // columns (long-known quirk), which would let invalid fixtures
+        // persist.
+        if (compositePkCols?.has(colName)) {
+          options["null"] = false;
         }
         // MySQL DATETIME without precision = DATETIME(0), which rejects fractional
         // seconds. Default to DATETIME(6) so test schemas accept microseconds.
