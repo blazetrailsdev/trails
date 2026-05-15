@@ -144,9 +144,11 @@ function computeTargetOrder(currentNodes, expectedOrder) {
   });
   if (mappedIdxByName.size === 0) return currentNodes;
 
-  // Target: expectedOrder ∩ present, in expectedOrder; then unmapped in
-  // current order. Duplicate names (rare; e.g. overload getters) keep
-  // their current relative order via the index map.
+  // Target: for each expected name, take ALL same-named nodes (in their
+  // current relative order) and place them together at the manifest
+  // position. Keeps getter/setter pairs and TS overload signatures
+  // grouped — splitting them would corrupt the class.
+  // Then append remaining unmapped nodes in their current order.
   const used = new Array(currentNodes.length).fill(false);
   const target = [];
   for (const name of expectedOrder) {
@@ -155,7 +157,6 @@ function computeTargetOrder(currentNodes, expectedOrder) {
       if (names[i] === name) {
         target.push(currentNodes[i]);
         used[i] = true;
-        break;
       }
     }
   }

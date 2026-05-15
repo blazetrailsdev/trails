@@ -55,6 +55,13 @@ export class SelectManager extends TreeManager {
   }
 
   /**
+   * Mirrors: Arel::SelectManager `alias limit= take` (select_manager.rb).
+   */
+  set limit(value: number | Node | null) {
+    this.take(value);
+  }
+
+  /**
    * Return the current WHERE conditions.
    *
    * Mirrors: Arel::SelectManager#constraints
@@ -71,6 +78,13 @@ export class SelectManager extends TreeManager {
    */
   get offset(): Offset["expr"] | null {
     return (this.ast.offset as Offset | null)?.expr ?? null;
+  }
+
+  /**
+   * Mirrors: Arel::SelectManager `alias offset= skip` (select_manager.rb).
+   */
+  set offset(value: number | Node | null) {
+    this.skip(value);
   }
 
   /**
@@ -245,6 +259,16 @@ export class SelectManager extends TreeManager {
    */
   get projections(): Node[] {
     return [...this.core.projections];
+  }
+
+  /**
+   * Replace all projections.
+   *
+   * Mirrors: Arel::SelectManager#projections=
+   */
+  set projections(value: Node[]) {
+    this.core.projections.length = 0;
+    this.core.projections.push(...value);
   }
 
   /**
@@ -436,16 +460,6 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * Replace all projections.
-   *
-   * Mirrors: Arel::SelectManager#projections=
-   */
-  set projections(value: Node[]) {
-    this.core.projections.length = 0;
-    this.core.projections.push(...value);
-  }
-
-  /**
    * RIGHT OUTER JOIN.
    */
   rightOuterJoin(table: Node | string, onCondition?: Node): this {
@@ -499,23 +513,9 @@ export class SelectManager extends TreeManager {
     return this.core.source.right.length;
   }
 
-  /**
-   * Mirrors: Arel::SelectManager `alias limit= take` (select_manager.rb).
-   */
-  set limit(value: number | Node | null) {
-    this.take(value);
-  }
-
   /** @internal */
   get taken(): Limit["expr"] | null {
     return this.limit;
-  }
-
-  /**
-   * Mirrors: Arel::SelectManager `alias offset= skip` (select_manager.rb).
-   */
-  set offset(value: number | Node | null) {
-    this.skip(value);
   }
 
   /**

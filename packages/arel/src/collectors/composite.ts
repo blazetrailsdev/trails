@@ -26,6 +26,13 @@ export class Composite {
     return true;
   }
 
+  set retryable(value: boolean) {
+    if ("retryable" in this.left)
+      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
+    if ("retryable" in this.right)
+      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
+  }
+
   constructor(left: CollectorLike, right: CollectorLike) {
     this.left = left;
     this.right = right;
@@ -55,12 +62,5 @@ export class Composite {
     this.left.append(str);
     this.right.append(str);
     return this;
-  }
-
-  set retryable(value: boolean) {
-    if ("retryable" in this.left)
-      (this.left as CollectorLike & { retryable: boolean }).retryable = value;
-    if ("retryable" in this.right)
-      (this.right as CollectorLike & { retryable: boolean }).retryable = value;
   }
 }

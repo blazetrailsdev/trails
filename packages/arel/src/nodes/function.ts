@@ -14,6 +14,10 @@ export class Function extends NodeExpression {
     return this._alias;
   }
 
+  set alias(value: Node | string | null) {
+    this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
+  }
+
   constructor(expressions: Node[], aliasNode: Node | string | null = null) {
     super();
     this.expressions = expressions;
@@ -24,10 +28,6 @@ export class Function extends NodeExpression {
   as(aliasName: string): this {
     this.alias = aliasName;
     return this;
-  }
-
-  set alias(value: Node | string | null) {
-    this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

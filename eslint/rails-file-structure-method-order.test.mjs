@@ -86,6 +86,31 @@ tester.run("rails-file-structure-method-order", rule, {
       errors: [{ messageId: "outOfOrder" }],
       output: `class X {\n  first() {}\n  second() {}\n  third() {}\n}\n`,
     },
+    // Duplicate-named members (getter/setter pairs, TS overload
+    // signatures) stay grouped under reorder. The manifest lists each
+    // name once; all same-named nodes travel together to that position.
+    {
+      filename: classFile,
+      code:
+        `class X {\n` +
+        `  get third() { return 3; }\n` +
+        `  set third(v) {}\n` +
+        `  get first() { return 1; }\n` +
+        `  set first(v) {}\n` +
+        `  get second() { return 2; }\n` +
+        `  set second(v) {}\n` +
+        `}\n`,
+      errors: [{ messageId: "outOfOrder" }],
+      output:
+        `class X {\n` +
+        `  get first() { return 1; }\n` +
+        `  set first(v) {}\n` +
+        `  get second() { return 2; }\n` +
+        `  set second(v) {}\n` +
+        `  get third() { return 3; }\n` +
+        `  set third(v) {}\n` +
+        `}\n`,
+    },
     // Unmapped helper stays at the end after reordering.
     {
       filename: classFile,

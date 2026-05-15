@@ -42,21 +42,21 @@ export class StatementMethods {
     this.ast.key = Array.isArray(key) ? key.map((k) => buildQuoted(k)) : buildQuoted(key);
   }
 
+  get key(): unknown {
+    return this.ast.key;
+  }
+
   set wheres(exprs: Node[]) {
     this.ast.wheres = exprs;
+  }
+
+  get wheres(): Node[] {
+    return this.ast.wheres ?? [];
   }
 
   where(this: StatementMethodsHost, expr: Node): unknown {
     (this.ast.wheres ??= []).push(expr);
     return this;
-  }
-
-  get key(): unknown {
-    return this.ast.key;
-  }
-
-  get wheres(): Node[] {
-    return this.ast.wheres ?? [];
   }
 }
 
