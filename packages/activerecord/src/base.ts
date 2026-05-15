@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp as _getGlobalIdApp } from "@blazetrails/globalid";
+import { getApp as _getGlobalIdApp, buildGid as _buildGid } from "@blazetrails/globalid";
 import type {
   GlobalIDModel,
   SignedGlobalID as SignedGlobalIDType,
@@ -2809,17 +2809,18 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#to_gid
    *
-   * When no app is configured the fallback URI has the form
-   * `gid://ClassName/id` (non-standard; GID-3 will require setApp before
-   * producing a parseable URI::GID).
+   * Requires setApp() from \@blazetrails/globalid to be called first;
+   * throws when no app is configured.
    */
   toGid(): string {
     const ctor = this.constructor as typeof Base;
     const app = _getGlobalIdApp();
-    if (app) {
-      return `gid://${app}/${ctor.name}/${this.id}`;
+    if (!app) {
+      throw new Error(
+        "An app is required to create a GlobalID. Call setApp() from @blazetrails/globalid before using toGid().",
+      );
     }
-    return `gid://${ctor.name}/${this.id}`;
+    return _buildGid(app, ctor.name, this.id);
   }
 
   /**

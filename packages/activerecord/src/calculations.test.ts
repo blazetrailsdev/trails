@@ -24,6 +24,7 @@ import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
+import { setApp, _resetApp } from "@blazetrails/globalid";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -6968,17 +6969,22 @@ describe("CalculationsTest", () => {
 
   // Rails guide: to_gid — GlobalID
   it("toGid returns a GlobalID-like URI", async () => {
-    const adapter = createTestAdapter();
-    class User extends Base {
-      static {
-        this._tableName = "users";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
+    setApp("TestApp");
+    try {
+      const adapter = createTestAdapter();
+      class User extends Base {
+        static {
+          this._tableName = "users";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.adapter = adapter;
+        }
       }
+      const u = await User.create({ name: "Alice" });
+      expect(u.toGid()).toContain("gid://TestApp/User/");
+    } finally {
+      _resetApp();
     }
-    const u = await User.create({ name: "Alice" });
-    expect(u.toGid()).toContain("gid://User/");
   });
 
   // Rails guide: column_defaults
