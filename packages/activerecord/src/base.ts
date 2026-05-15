@@ -2558,6 +2558,27 @@ export class Base extends Model {
           : rawId;
       if (!Array.isArray(ctor.primaryKey) && this.id === null) {
         this._attributes.set(ctor.primaryKey, insertedId);
+      } else if (
+        Array.isArray(ctor.primaryKey) &&
+        insertedId != null &&
+        (ctor.adapter as any).supportsInsertReturning?.()
+      ) {
+        // For composite-PK models with IDENTITY columns on adapters that use
+        // RETURNING (PG with use_insert_returning? = true), write back the
+        // DB-generated value to the first null PK column.
+        //
+        // Rails does this via _returning_columns_for_insert + _create_record
+        // write-back using named RETURNING columns. Our executeMutation
+        // always appends `RETURNING id`, so this only works when the IDENTITY
+        // column in the composite PK is named "id". A proper follow-up should
+        // implement _returningColumnsForInsert and pass explicit returning:
+        // column names to execInsert so the result can be mapped by name.
+        for (const pkCol of ctor.primaryKey) {
+          if (this._readAttribute(pkCol) == null) {
+            this._attributes.set(pkCol, insertedId);
+            break;
+          }
+        }
       }
     });
   }
