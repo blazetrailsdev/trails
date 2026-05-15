@@ -3061,7 +3061,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<void> {
     const opts = typeof options === "function" ? {} : options;
     const callback = typeof options === "function" ? options : fn;
-    const table = new SimpleTableBuilder();
+    const table = new SimpleTableBuilder(this);
     if (opts.id !== false) {
       if (typeof opts.id === "string" && opts.id === "uuid") {
         table.column("id", "uuid default gen_random_uuid() primary key");
@@ -5180,6 +5180,8 @@ export type IndexDefinition = PgIndexDefinition;
 class SimpleTableBuilder {
   private _columns: { name: string; type: string }[] = [];
 
+  constructor(private _adapter: PostgreSQLAdapter) {}
+
   column(name: string, type: string): void {
     this._columns.push({ name, type });
   }
@@ -5238,17 +5240,11 @@ class SimpleTableBuilder {
   }
 
   virtual(name: string, options: { type?: string; as?: string; stored?: boolean } = {}): void {
-    const pgTypes: Record<string, string> = {
-      string: "character varying",
-      text: "text",
-      integer: "integer",
-      bigint: "bigint",
-      float: "double precision",
-      boolean: "boolean",
-      date: "date",
-      datetime: "timestamp without time zone",
-    };
-    const pgType = pgTypes[options.type ?? "string"] ?? options.type ?? "character varying";
+    // Delegate type resolution to the adapter so precision/scale/limit and custom aliases
+    // stay consistent with the addColumn virtual branch (single source of truth).
+    const pgType = this._adapter.typeToSql(options.type ?? "string", {});
+    // Rails: if options[:as] is absent, no GENERATED clause is added (plain column).
+    // add_column_options_bang wraps the whole block in `if as = options[:as]`.
     if (!options.as) {
       this._columns.push({ name, type: pgType });
       return;
