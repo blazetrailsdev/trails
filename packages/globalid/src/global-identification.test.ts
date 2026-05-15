@@ -3,7 +3,14 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { toGlobalId, toGid, toGidParam, toSignedGlobalId, toSgid } from "./identification.js";
+import {
+  toGlobalId,
+  toGid,
+  toGidParam,
+  toSignedGlobalId,
+  toSgid,
+  toSgidParam,
+} from "./identification.js";
 import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
 function makeVerifier(): MessageVerifier {
@@ -78,6 +85,15 @@ describe("GlobalIdentificationTest", () => {
     const parsed = GlobalID.parse(toGidParam.call(p));
     expect(parsed!.modelId).toBe("5");
   });
+
+  it("toSgidParam returns a verifiable token", () => {
+    const verifier = makeVerifier();
+    const token = toSgidParam.call(new Person("2"), { verifier });
+    expect(typeof token).toBe("string");
+    const parsed = SignedGlobalID.parse(token, { verifier });
+    expect(parsed).not.toBeNull();
+    expect(parsed!.uri).toBe("gid://bcx/Person/2");
+  });
 });
 
 describe("Locator.locateSigned + locateManySigned", () => {
@@ -115,6 +131,18 @@ describe("Locator.locateSigned + locateManySigned", () => {
     const sgid = SignedGlobalID.create(new Person("7"), { verifier: v1, purpose: "login" });
     expect(await Locator.locateSigned(sgid.toString(), { verifier: v2 })).toBeNull();
     expect(await Locator.locateSigned(sgid.toString(), { verifier: v1, for: "signup" })).toBeNull();
+  });
+
+  it("locate_many_signed filters by for: purpose", async () => {
+    const verifier = makeVerifier();
+    const matching = SignedGlobalID.create(new Person("1"), { verifier, for: "login" });
+    const mismatched = SignedGlobalID.create(new Person("2"), { verifier, for: "signup" });
+    const found = await Locator.locateManySigned([matching.toString(), mismatched.toString()], {
+      verifier,
+      for: "login",
+    });
+    expect(found).toHaveLength(1);
+    expect((found[0] as Person).id).toBe("1");
   });
 
   it("locate_many_signed locates the valid subset", async () => {

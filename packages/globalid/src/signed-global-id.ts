@@ -8,6 +8,9 @@ export type { GlobalIDModel };
 
 const DEFAULT_PURPOSE = "default";
 
+/** Option keys that are NOT forwarded as GID URI params. @internal */
+const KNOWN_SGID_KEYS = new Set(["app", "for", "purpose", "expiresIn", "expiresAt", "verifier"]);
+
 export interface SignedGlobalIDOptions {
   app?: string;
   /** Rails-canonical purpose option. */
@@ -71,10 +74,9 @@ export class SignedGlobalID {
     }
     const modelName = model.constructor.name;
     // Rails: arbitrary options beyond the known SGID keys become GID URI params.
-    const KNOWN = new Set(["app", "for", "purpose", "expiresIn", "expiresAt", "verifier"]);
     const filteredParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(options)) {
-      if (!KNOWN.has(k) && v != null) filteredParams[k] = String(v);
+      if (!KNOWN_SGID_KEYS.has(k) && v != null) filteredParams[k] = String(v);
     }
     const uri = buildGid(
       app,

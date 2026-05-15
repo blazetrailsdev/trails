@@ -381,6 +381,26 @@ describe("Base.findSignedGlobalId", () => {
     await expect(Base.findSignedGlobalIdBang("invalid-token")).rejects.toThrow(RecordNotFound);
   });
 
+  it("findSignedGlobalId honors for: purpose scoping", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ id: 3 });
+    const sgid = await u.toSgid({ for: "share" });
+    const token = sgid.toString();
+    // Matching for: locates the record.
+    const found = (await Base.findSignedGlobalId(token, { for: "share" })) as User;
+    expect(found.id).toBe(3);
+    // Mismatching for: returns null (purpose-scoped tokens are the SGID
+    // security boundary).
+    expect(await Base.findSignedGlobalId(token, { for: "other" })).toBeNull();
+  });
+
   it("toSignedGlobalId is an alias of toSgid (same URI + purpose)", async () => {
     setApp("MyApp");
     const adapter = freshAdapter();

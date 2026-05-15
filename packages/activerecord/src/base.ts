@@ -3613,12 +3613,15 @@ _setGlobalIdModelFinder((name: string) => {
   const fromAssoc = _gidModelRegistry.get(name);
   if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
   // STI subclasses inherit their parent's adapter, so they don't trigger the
-  // adapter setter that populates _modelsByName. Walk Base.descendants once
-  // and cache the match into _modelsByName so subsequent lookups are O(1).
-  for (const klass of Base.descendants) {
-    if (klass.name === name) {
-      Base._modelsByName.set(name, klass as typeof Base);
-      return klass as unknown as _LocatorModel;
+  // adapter setter. registerSubclass(klass) attaches them to their direct
+  // parent's _subclasses, not to Base — so we walk descendants of every
+  // model in _modelsByName, not just Base.descendants. Cache for O(1) repeat.
+  for (const root of Base._modelsByName.values()) {
+    for (const klass of root.descendants) {
+      if (klass.name === name) {
+        Base._modelsByName.set(name, klass as typeof Base);
+        return klass as unknown as _LocatorModel;
+      }
     }
   }
   return undefined;
