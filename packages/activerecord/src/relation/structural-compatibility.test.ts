@@ -6,19 +6,24 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+let adapter: DatabaseAdapter;
+
+beforeEach(async () => {
+  adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    posts: { title: "string", score: "integer" },
+    users: { name: "string" },
+  });
+});
 
 // ==========================================================================
 // StructuralCompatibilityTest — targets relation/structural_compatibility_test.rb
 // ==========================================================================
 describe("StructuralCompatibilityTest", () => {
   it("structurally compatible returns true for same model", () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -32,11 +37,6 @@ describe("StructuralCompatibilityTest", () => {
 });
 
 describe("StructuralCompatibilityTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
-  });
-
   function makeModel() {
     class Post extends Base {
       static {
@@ -78,7 +78,6 @@ describe("StructuralCompatibilityTest", () => {
 
 describe("structurallyCompatible", () => {
   it("returns true for relations of the same model", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -91,7 +90,6 @@ describe("structurallyCompatible", () => {
   });
 
   it("returns false for relations of different models", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }

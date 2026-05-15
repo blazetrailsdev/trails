@@ -6,11 +6,42 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, Range, RecordNotFound } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter;
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  const postCols = {
+    title: "string" as const,
+    published: "boolean" as const,
+    salary: "integer" as const,
+    author: "string" as const,
+  };
+  await defineSchema(_adapter, {
+    developers: { name: "string", salary: "integer" },
+    posts: { title: "string", author: "string", published: "boolean" },
+    ro_posts: postCols,
+    dro_posts: postCols,
+    sf_posts: postCols,
+    sff_posts: postCols,
+    sfl_posts: postCols,
+    sc_posts: postCols,
+    sds_posts: postCols,
+    sfa_posts: postCols,
+    scnt_posts: postCols,
+    sj_posts: postCols,
+    nrs_posts: postCols,
+    ann_posts: postCols,
+    ann_unscoped_posts: postCols,
+    animals: { type: "string", name: "string" },
+    cats: { type: "string", name: "string" },
+    dogs: { type: "string", name: "string" },
+    categories: { name: "string" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 describe("RelationScopingTest", () => {

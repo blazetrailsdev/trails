@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("Relation#where — composite-key form", () => {
@@ -28,8 +29,18 @@ describe("Relation#where — composite-key form", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      comp_orders: {
+        columns: {
+          shop_id: "integer",
+          order_number: "integer",
+          name: "string",
+        },
+        primaryKey: ["shop_id", "order_number"],
+      },
+    });
     CompOrder.adapter = adapter;
     // No registerModel() — this test only exercises where /
     // whereNot / PredicateBuilder directly; nothing resolves

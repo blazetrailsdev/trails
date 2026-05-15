@@ -1,10 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import type { DatabaseAdapter } from "../adapter.js";
+
+let adapter: DatabaseAdapter;
+
+beforeEach(async () => {
+  adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    arel_posts: { title: "string" },
+    posts: { title: "string" },
+  });
+});
 
 describe("DelegationTest", () => {
   it("not respond to arel method", () => {
-    const adapter = createTestAdapter();
     class ArelPost extends Base {
       static {
         this._tableName = "arel_posts";
@@ -18,7 +29,6 @@ describe("DelegationTest", () => {
 
   describe("QueryingMethodsDelegationTest", () => {
     it("delegate querying methods", async () => {
-      const adapter = createTestAdapter();
       class Post extends Base {
         static {
           this.attribute("title", "string");
@@ -38,7 +48,6 @@ describe("DelegationTest", () => {
 
   describe("DelegationCachingTest", () => {
     it("delegation doesn't override methods defined in other relation subclasses", () => {
-      const adapter = createTestAdapter();
       class Post extends Base {
         static {
           this.attribute("title", "string");

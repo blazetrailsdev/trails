@@ -15,6 +15,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("Association scope cache", () => {
@@ -38,8 +39,13 @@ describe("Association scope cache", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      cache_authors: { name: "string" },
+      cache_posts: { cache_author_id: "integer", title: "string" },
+      cache_comments: { cache_post_id: "integer", body: "string" },
+    });
     CacheAuthor.adapter = adapter;
     CachePost.adapter = adapter;
     CacheComment.adapter = adapter;

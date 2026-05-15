@@ -6,11 +6,20 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter;
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, {
+    posts: { title: "string", author: "string" },
+    items: { name: "string", status: "string" },
+    users: { name: "string", age: "integer", active: "boolean" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 describe("RelationMergingTest", () => {

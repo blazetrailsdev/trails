@@ -7,11 +7,39 @@ import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter = createTestAdapter();
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  const authorCols = { name: "string" as const };
+  const postCols = {
+    title: "string" as const,
+    author_id: "integer" as const,
+    category_id: "integer" as const,
+    score: "integer" as const,
+  };
+  await defineSchema(_adapter, {
+    posts: postCols,
+    authors: authorCols,
+    articles: postCols,
+    art_authors: authorCols,
+    art_categories: { name: "string" },
+    jb_posts: { title: "string", jb_author_id: "integer" },
+    jb_authors: authorCols,
+    lj_posts: { title: "string", lj_author_id: "integer" },
+    lj_authors: authorCols,
+    lo_posts: { title: "string", lo_author_id: "integer" },
+    lo_authors: authorCols,
+    ma_posts: postCols,
+    ma_authors: authorCols,
+    ma_categories: { name: "string" },
+    rr_posts: postCols,
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 describe("WhereChainTest", () => {

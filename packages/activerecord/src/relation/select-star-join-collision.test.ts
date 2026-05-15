@@ -21,6 +21,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("SELECT * column collision in joined relations", () => {
@@ -40,8 +41,12 @@ describe("SELECT * column collision in joined relations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      ssj_users: { name: "string" },
+      ssj_friendships: { ssj_user_id: "integer", ssj_friend_id: "integer" },
+    });
     SsjUser.adapter = adapter;
     SsjFriendship.adapter = adapter;
     registerModel("SsjUser", SsjUser);

@@ -15,11 +15,28 @@ import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
+let _adapter: DatabaseAdapter;
+beforeEach(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, {
+    posts: {
+      title: "string",
+      author: "string",
+      status: "string",
+      updated_at: "datetime",
+      author_id: "integer",
+    },
+    items: { name: "string", status: "string", active: "boolean" },
+    users: { name: "string", active: "boolean" },
+    delete_all_authors: { name: "string" },
+    delete_all_posts: { title: "string", author_id: "integer" },
+  });
+});
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return _adapter;
 }
 
 // ==========================================================================

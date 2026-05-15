@@ -7,6 +7,7 @@ import { Base, registerModel, loadHabtm } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -17,8 +18,14 @@ function freshAdapter(): DatabaseAdapter {
 describe("has_and_belongs_to_many", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      tags: { name: "string" },
+      developers: { name: "string" },
+      projects: { name: "string" },
+    });
   });
 
   it("loads associated records through a join table", async () => {
