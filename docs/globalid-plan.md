@@ -9,7 +9,7 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-6a)
+### Parity scoreboard (after GID-6b)
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
@@ -17,7 +17,7 @@ brings the practical 100% to 56/56 api / 149/149 tests.
 | Signal       | Current          | 100% target (pre-skip) | Gap          |
 | ------------ | ---------------- | ---------------------- | ------------ |
 | api:compare  | 19 / 59 (32.2%)  | 59 / 59                | 40 methods   |
-| test:compare | 55 / 158 (34.8%) | 158 / 158              | 103 tests    |
+| test:compare | 67 / 158 (42.4%) | 158 / 158              | 91 tests     |
 | files (api)  | 4 / 5            | 5 / 5                  | verifier.ts  |
 | files (test) | 5 / 8            | 8 / 8                  | 3 test files |
 
@@ -37,8 +37,8 @@ Per-file test:compare:
 | ------------------------------- | ----- | ----- | --- |
 | `uri_gid_test.rb`               | 27    | 30    | 90% |
 | `global_identification_test.rb` | 5     | 6     | 83% |
+| `signed_global_id_test.rb`      | 17    | 24    | 71% |
 | `global_id_test.rb`             | 13    | 26    | 50% |
-| `signed_global_id_test.rb`      | 5     | 24    | 21% |
 | `global_locator_test.rb`        | 5     | 59    | 8%  |
 | `verifier_test.rb`              | 0     | 4     | 0%  |
 | `pattern_matching_test.rb`      | 0     | 2     | 0%  |
@@ -66,9 +66,15 @@ implementations already exist. Ship the mirrored test suites:
   (GID-6c) once GID-9 lands the Locator class hierarchy.
 - test:compare moved 10 → 55 (6.3% → 34.8%).
 
-**GID-6b** (~180 LOC): expand `signed-global-id.test.ts` to mirror
-`signed_global_id_test.rb` (24 tests) + new `verifier.test.ts` (4 tests once
-GID-10 lands a Verifier wrapper to test against).
+**GID-6b** — restructured `signed-global-id.test.ts` to mirror the four
+Ruby `*Test` classes (`SignedGlobalIDTest`, `SignedGlobalIDPurposeTest`,
+`SignedGlobalIDExpirationTest`, `SignedGlobalIDCustomParamsTest`). Added
+minimal impl: `SignedGlobalID#modelId` / `#modelName` / `#params`
+getters, `#equals(other)`, `#inspect()`. **17/24** match (71%); the
+remaining 7 need `expires_in` class-level config (GID-8), `model_class`
+(Locator), `SignedGlobalID.new(uri, options)` constructor form, or are
+backwards-compat with legacy self-validated metadata (out of scope).
+`verifier.test.ts` ships with GID-11 once a Verifier wrapper exists.
 
 **GID-6c** (~250 LOC): expand `global-locator.test.ts` from 13 smoke tests
 to the full 59-test Rails mirror. Most depend on Locator features added in

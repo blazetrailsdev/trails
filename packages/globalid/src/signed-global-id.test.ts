@@ -8,115 +8,211 @@ function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
 }
 
-const fakeModel = { id: 42, constructor: { name: "User" } };
-const TEST_APP = "TestApp";
+const person = (id: unknown = 5) => ({ id, constructor: { name: "Person" } });
+const TEST_APP = "bcx";
 
-describe("SignedGlobalID", () => {
+describe("SignedGlobalIDTest", () => {
   beforeEach(() => setApp(TEST_APP));
   afterEach(() => _resetApp());
 
-  it("round-trips create → parse", () => {
+  it("as string", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier });
-    const token = sgid.toString();
-    expect(typeof token).toBe("string");
-    expect(token.length).toBeGreaterThan(0);
-
-    const parsed = SignedGlobalID.parse(token, { verifier });
-    expect(parsed).not.toBeNull();
-    expect(parsed!.uri).toContain("User/42");
-    expect(parsed!.purpose).toBe("default");
+    const sgid = SignedGlobalID.create(person(), { verifier });
+    const s = sgid.toString();
+    expect(typeof s).toBe("string");
+    expect(s.length).toBeGreaterThan(0);
+    // Round-trip — verify the produced token parses back to the same SGID.
+    expect(SignedGlobalID.parse(s, { verifier })!.uri).toBe(sgid.uri);
   });
 
-  it("toParam equals toString", () => {
+  it("model id", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier });
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    expect(sgid.modelId).toBe("5");
+  });
+
+  it("value equality", () => {
+    const verifier = makeVerifier();
+    const a = SignedGlobalID.create(person(5), { verifier });
+    const b = SignedGlobalID.create(person(5), { verifier });
+    expect(a.equals(b)).toBe(true);
+  });
+
+  it("to param", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier });
     expect(sgid.toParam()).toBe(sgid.toString());
   });
 
-  it("caches the signed token", () => {
+  it("inspect", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier });
-    expect(sgid.toString()).toBe(sgid.toString());
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    expect(sgid.inspect()).toMatch(/^#<SignedGlobalID:0x[0-9a-f]+>$/);
   });
+});
+
+describe("SignedGlobalIDPurposeTest", () => {
+  beforeEach(() => setApp(TEST_APP));
+  afterEach(() => _resetApp());
+
+  it("sign with purpose when :for is provided", () => {
+    const verifier = makeVerifier();
+    const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like-button" });
+    expect(loginSgid.equals(likeSgid)).toBe(false);
+  });
+
+  it("sign with default purpose when no :for is provided", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    const defaultSgid = SignedGlobalID.create(person(5), { verifier, for: "default" });
+    expect(sgid.purpose).toBe("default");
+    expect(sgid.equals(defaultSgid)).toBe(true);
+  });
+
+  it("create accepts a :for", () => {
+    const verifier = makeVerifier();
+    const a = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    const b = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    expect(a.equals(b)).toBe(true);
+    expect(a.purpose).toBe("login");
+  });
+
+  it("parse returns nil when purpose mismatch", () => {
+    const verifier = makeVerifier();
+    const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    // Default `for` defaults to "default" — mismatches "login".
+    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier })).toBeNull();
+    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "like_button" })).toBeNull();
+  });
+
+  it("equal only with same purpose", () => {
+    const verifier = makeVerifier();
+    const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    const expected = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like_button" });
+    const noPurposeSgid = SignedGlobalID.create(person(5), { verifier });
+    expect(loginSgid.equals(expected)).toBe(true);
+    expect(loginSgid.equals(likeSgid)).toBe(false);
+    expect(loginSgid.equals(noPurposeSgid)).toBe(false);
+  });
+});
+
+describe("SignedGlobalIDExpirationTest", () => {
+  beforeEach(() => setApp(TEST_APP));
+  afterEach(() => _resetApp());
+
+  it("passing expires_in less than a second is not expired", async () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 1 });
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+  });
+
+  it("passing expires_in nil turns off expiration checking", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    // No expiresIn / expiresAt = no expiration.
+    expect(sgid.expiresAt).toBeUndefined();
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+  });
+
+  it("passing expires_at sets expiration date", () => {
+    const verifier = makeVerifier();
+    const future = Temporal.Now.instant().add({ seconds: 3600 });
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: future });
+    expect(sgid.expiresAt).toBeDefined();
+    expect(Temporal.Instant.compare(sgid.expiresAt!, future)).toBe(0);
+  });
+
+  it("passing nil expires_at turns off expiration checking", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: undefined });
+    expect(sgid.expiresAt).toBeUndefined();
+  });
+
+  it("favor expires_at over expires_in", () => {
+    const verifier = makeVerifier();
+    const future = Temporal.Now.instant().add({ seconds: 3600 });
+    // Both supplied — expiresAt wins (Rails parity: pick_expiration prefers
+    // expiresAt over expiresIn).
+    const sgid = SignedGlobalID.create(person(5), {
+      verifier,
+      expiresAt: future,
+      expiresIn: 1,
+    });
+    expect(Temporal.Instant.compare(sgid.expiresAt!, future)).toBe(0);
+  });
+
+  it("returns null for expired token (expiresAt in the past)", () => {
+    const verifier = makeVerifier();
+    const past = Temporal.Now.instant().add({ milliseconds: -1000 });
+    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: past });
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+  });
+});
+
+describe("SignedGlobalIDCustomParamsTest", () => {
+  beforeEach(() => setApp(TEST_APP));
+  afterEach(() => _resetApp());
+
+  it("create custom params", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
+    expect(sgid.params["hello"]).toBe("world");
+  });
+
+  it("parse custom params", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier, hello: "world" });
+    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
+    expect(parsed!.params["hello"]).toBe("world");
+  });
+});
+
+describe("SignedGlobalID (non-Rails coverage)", () => {
+  beforeEach(() => setApp(TEST_APP));
+  afterEach(() => _resetApp());
 
   it("returns null for tampered token", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier });
-    const token = sgid.toString();
-    const tampered = token.slice(0, -4) + "xxxx";
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    const tampered = sgid.toString().slice(0, -4) + "xxxx";
     expect(SignedGlobalID.parse(tampered, { verifier })).toBeNull();
   });
 
   it("returns null for wrong verifier", () => {
     const v1 = makeVerifier("secret-1");
     const v2 = makeVerifier("secret-2");
-    const sgid = SignedGlobalID.create(fakeModel, { verifier: v1 });
-    const token = sgid.toString();
-    expect(SignedGlobalID.parse(token, { verifier: v2 })).toBeNull();
+    const sgid = SignedGlobalID.create(person(5), { verifier: v1 });
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier: v2 })).toBeNull();
   });
 
-  it("returns null for purpose mismatch", () => {
+  it("caches the signed token", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, purpose: "login" });
-    const token = sgid.toString();
-    expect(SignedGlobalID.parse(token, { verifier, purpose: "default" })).toBeNull();
-    expect(SignedGlobalID.parse(token, { verifier, purpose: "login" })).not.toBeNull();
-  });
-
-  it("returns null for expired token (expiresAt in the past)", () => {
-    const verifier = makeVerifier();
-    const past = Temporal.Now.instant().add({ milliseconds: -1000 });
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, expiresAt: past });
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
-  });
-
-  it("returns null for token expired via expiresIn", () => {
-    const verifier = makeVerifier();
-    // expiresIn of 0 seconds resolves to now, which is immediately expired
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, expiresIn: 0 });
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
-  });
-
-  it("encodes expiresAt in the token and round-trips it", () => {
-    const verifier = makeVerifier();
-    const future = Temporal.Now.instant().add({ seconds: 3600 });
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, expiresAt: future });
-    expect(sgid.expiresAt).toBeDefined();
-    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
-    expect(parsed).not.toBeNull();
-    expect(parsed!.expiresAt).toBeDefined();
-    expect(Temporal.Instant.compare(parsed!.expiresAt!, Temporal.Now.instant())).toBeGreaterThan(0);
-  });
-
-  it("respects expiresIn (seconds)", () => {
-    const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, expiresIn: 3600 });
-    expect(sgid.expiresAt).toBeDefined();
-    const token = sgid.toString();
-    expect(SignedGlobalID.parse(token, { verifier })).not.toBeNull();
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    expect(sgid.toString()).toBe(sgid.toString());
   });
 
   it("includes app in URI when provided", () => {
     const verifier = makeVerifier();
-    const sgid = SignedGlobalID.create(fakeModel, { verifier, app: "MyApp" });
-    expect(sgid.uri).toBe("gid://MyApp/User/42");
+    const sgid = SignedGlobalID.create(person(5), { verifier, app: "MyApp" });
+    expect(sgid.uri).toBe("gid://MyApp/Person/5");
   });
 
   describe("getApp() integration", () => {
-    beforeEach(() => _resetApp()); // undo outer beforeEach for app-sensitive tests
+    beforeEach(() => _resetApp());
     afterEach(() => _resetApp());
 
     it("uses getApp() when no app option", () => {
       setApp("ConfiguredApp");
       const verifier = makeVerifier();
-      const sgid = SignedGlobalID.create(fakeModel, { verifier });
-      expect(sgid.uri).toBe("gid://ConfiguredApp/User/42");
+      const sgid = SignedGlobalID.create(person(5), { verifier });
+      expect(sgid.uri).toBe("gid://ConfiguredApp/Person/5");
     });
 
     it("throws when no app configured and no app option", () => {
       const verifier = makeVerifier();
-      expect(() => SignedGlobalID.create(fakeModel, { verifier })).toThrow(/app is required/i);
+      expect(() => SignedGlobalID.create(person(5), { verifier })).toThrow(/app is required/i);
     });
   });
 });

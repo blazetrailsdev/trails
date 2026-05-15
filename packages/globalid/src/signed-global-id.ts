@@ -1,7 +1,7 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
-import { buildGid } from "./uri/gid.js";
+import { buildGid, parseGid } from "./uri/gid.js";
 import type { GlobalIDModel } from "./global-id.js";
 
 export type { GlobalIDModel };
@@ -121,6 +121,38 @@ export class SignedGlobalID {
 
   toParam(): string {
     return this.toString();
+  }
+
+  /** Mirrors: GlobalID#model_id (inherited by SignedGlobalID). */
+  get modelId(): string | string[] {
+    return parseGid(this.uri).modelId;
+  }
+
+  /** Mirrors: GlobalID#model_name (inherited by SignedGlobalID). */
+  get modelName(): string {
+    return parseGid(this.uri).modelName;
+  }
+
+  /** Mirrors: GlobalID#params (inherited by SignedGlobalID). */
+  get params(): Record<string, string> {
+    return parseGid(this.uri).params;
+  }
+
+  /** Mirrors: SignedGlobalID#== — equal iff URI and purpose match. */
+  equals(other: SignedGlobalID): boolean {
+    return (
+      other instanceof SignedGlobalID && this.uri === other.uri && this.purpose === other.purpose
+    );
+  }
+
+  /** Mirrors: SignedGlobalID#inspect — `#<SignedGlobalID:0x...>`. */
+  inspect(): string {
+    // 16 hex digits is enough to look like an object id; Rails uses the
+    // actual VM pointer but TS has no equivalent.
+    const id = Math.floor(Math.random() * 0xffffffffffff)
+      .toString(16)
+      .padStart(12, "0");
+    return `#<SignedGlobalID:0x${id}>`;
   }
 
   /** @internal */
