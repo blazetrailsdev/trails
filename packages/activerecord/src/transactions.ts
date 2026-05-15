@@ -135,13 +135,15 @@ export async function transaction<T>(
   const adapter = modelClass.adapter;
 
   // If the adapter supports the full TransactionManager path, use it.
-  // Also check adapter.inTransaction to detect external transactions
-  // (e.g., fixtures) that TransactionManager doesn't know about — fall
-  // through to the fallback which handles nesting via savepoints.
-  if (
-    typeof (adapter as any).withinNewTransaction === "function" &&
-    !(currentTransaction() === null && adapter.inTransaction)
-  ) {
+  //
+  // Invariant (TM unification, Phase 3): the only way to begin a transaction
+  // on a trails adapter is through TM. Raw `BEGIN` via `exec()` is reserved
+  // for migrations. Transactional fixtures (see test-helpers/
+  // with-transactional-fixtures.ts) route through `transactionManager.
+  // beginTransaction()` so the TM stack is the single source of truth — no
+  // "external transaction" guard is needed here. The fallback path below is
+  // dead for all in-use adapters and slated for removal in Phase 2.
+  if (typeof (adapter as any).withinNewTransaction === "function") {
     // No per-adapter lock needed: TransactionManager's join-or-savepoint
     // logic handles concurrent callers. The second caller either joins the
     // existing transaction (if joinable) or creates a SavepointTransaction.

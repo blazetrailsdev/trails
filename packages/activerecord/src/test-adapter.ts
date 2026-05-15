@@ -1093,11 +1093,11 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner.clearCacheBang?.();
   }
   get inTransaction(): boolean {
-    // Async-chain-aware (see currentTransaction comment). transactions.ts:142
-    // uses adapter.inTransaction in the duck-type check; if we returned true
-    // for foreign chains, that caller would route to _transactionFallback,
-    // bypass the outer mutex, and run as a nested savepoint inside the
-    // unrelated chain's transaction.
+    // Async-chain-aware (see currentTransaction comment).
+    // withTransactionReturningStatus still uses adapter.inTransaction in its
+    // external-transaction check; if we returned true for foreign chains,
+    // that caller would bypass the outer mutex and run as a nested savepoint
+    // inside the unrelated chain's transaction.
     if (!this._txVisible()) return false;
     return this.inner.inTransaction;
   }
