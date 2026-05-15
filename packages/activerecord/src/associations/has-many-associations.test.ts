@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   SubclassNotFound,
   Base,
@@ -6227,7 +6228,16 @@ describe("HasManyAssociationsTest", () => {
     await proxy.load();
     expect(proxy.loaded).toBe(true);
     // many() on a loaded proxy reads target.length — no extra query
-    expect(await proxy.many()).toBe(true);
+    const sqlQueries: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e: any) => {
+      if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
+    });
+    try {
+      expect(await proxy.many()).toBe(true);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(sqlQueries).toHaveLength(0);
     expect(proxy.loaded).toBe(true);
   });
   it("subsequent calls to many should use query", async () => {
@@ -6344,7 +6354,16 @@ describe("HasManyAssociationsTest", () => {
     await proxy.load();
     expect(proxy.loaded).toBe(true);
     // loaded → isNone reads target.length, no extra query
-    expect(await proxy.isNone()).toBe(false);
+    const sqlQueries: string[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e: any) => {
+      if (e?.payload?.sql) sqlQueries.push(e.payload.sql);
+    });
+    try {
+      expect(await proxy.isNone()).toBe(false);
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(sqlQueries).toHaveLength(0);
   });
   it("calling none should defer to collection if using a block", async () => {
     class NoneBlkAuthor extends Base {

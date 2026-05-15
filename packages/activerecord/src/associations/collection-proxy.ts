@@ -1376,7 +1376,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async many(predicate?: (record: T) => boolean): Promise<boolean> {
     if (predicate !== undefined) {
       const records = await this.loadTarget();
-      return records.filter(predicate).length > 1;
+      let matched = 0;
+      for (const r of records) {
+        if (predicate(r) && ++matched > 1) return true;
+      }
+      return false;
     }
     return (await this.count()) > 1;
   }
@@ -1392,7 +1396,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
     if (predicate !== undefined) {
       const records = await this.loadTarget();
-      return records.filter(predicate).length === 0;
+      for (const r of records) {
+        if (predicate(r)) return false;
+      }
+      return true;
     }
     return (await this.count()) === 0;
   }
