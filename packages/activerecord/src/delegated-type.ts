@@ -55,7 +55,7 @@ export function delegatedType(
   const foreignKey = options.foreignKey ?? `${role}_id`;
   const foreignType = options.foreignType ?? `${role}_type`;
   const primaryKey = options.primaryKey ?? "id";
-  const config = { ...options, foreignKey, foreignType };
+  const config = { ...options, foreignKey, foreignType, primaryKey };
 
   // Rails: belongs_to role, **options.merge(polymorphic: true)
   // (Rails also accepts an optional scope proc; we omit it as there's no proc equivalent)
