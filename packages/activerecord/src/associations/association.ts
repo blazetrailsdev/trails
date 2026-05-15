@@ -247,6 +247,13 @@ export class Association {
    * this to look at the polymorphic_type field on the owner.
    */
   get klass(): typeof Base {
+    // Use the rich reflection's klass getter when available — it does
+    // namespace-relative resolution, matching Rails' compute_type walk.
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
+    };
+    const richKlass = ctor._reflectOnAssociation?.(this.reflection.name)?.klass;
+    if (richKlass) return richKlass;
     const className =
       this.reflection.options.className ?? camelize(singularize(this.reflection.name));
     return resolveModel(className);

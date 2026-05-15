@@ -181,6 +181,30 @@ export function resolveModel(name: string): typeof Base {
 }
 
 /**
+ * Resolve the target model for an association using the rich reflection's
+ * namespace-aware klass when available, falling back to flat resolveModel.
+ * Skips `.klass` for polymorphic associations (checked via `isPolymorphic()`)
+ * because polymorphic reflections intentionally throw on `.klass` access.
+ * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
+ * @internal
+ */
+export function resolveAssocClass(record: Base, assocName: string, className: string): typeof Base {
+  const ctor = record.constructor as typeof Base & {
+    _reflectOnAssociation?: (
+      name: string,
+    ) => { klass?: typeof Base; isPolymorphic?: () => boolean } | null;
+  };
+  const refl = ctor._reflectOnAssociation?.(assocName);
+  // Skip .klass for polymorphic associations — it throws by design.
+  // All other errors (e.g. not-an-AR-subclass) must propagate.
+  if (refl && !refl.isPolymorphic?.()) {
+    const richKlass = refl.klass;
+    if (richKlass) return richKlass;
+  }
+  return resolveModel(className);
+}
+
+/**
  * Validate that an inverse_of association exists on the target model.
  * Throws InverseOfAssociationNotFoundError if not found.
  */
@@ -610,7 +634,7 @@ export async function loadBelongsTo(
       // Resolve target class from instance if available, otherwise from options.
       const targetModel =
         (cached?.constructor as typeof Base | undefined) ??
-        resolveModel(options.className ?? camelize(assocName));
+        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && cached) {
@@ -624,7 +648,7 @@ export async function loadBelongsTo(
     if (options.inverseOf && !options.polymorphic) {
       const targetModel =
         (preloaded?.constructor as typeof Base | undefined) ??
-        resolveModel(options.className ?? camelize(assocName));
+        resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
     if (options.inverseOf && preloaded) {
@@ -653,7 +677,7 @@ export async function loadBelongsTo(
     className = options.className ?? camelize(assocName);
   }
 
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
 
   if (options.inverseOf && !options.polymorphic) {
     validateInverseOf(targetModel, assocName, options.inverseOf);
@@ -776,7 +800,7 @@ export async function loadHasOne(
   const className = options.className ?? camelize(assocName);
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
 
   if (options.inverseOf) {
     validateInverseOf(targetModel, assocName, options.inverseOf);
@@ -975,7 +999,7 @@ export async function loadHasMany(
   const className = options.className ?? camelize(singularize(assocName));
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
 
   if (options.inverseOf) {
     validateInverseOf(targetModel, assocName, options.inverseOf);
@@ -1158,7 +1182,7 @@ export function buildHasManyRelation(
   const conditions = computeHasManyWhere(record, assocName, options);
   if (conditions === null) return null;
   const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
   let rel = targetModel.all().where(conditions);
   if (options.scope) rel = options.scope(rel);
   return rel;
@@ -1215,7 +1239,7 @@ export async function loadHasManyThrough(
 
   // Resolve the target model
   const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
 
   // The source defaults to the singularized association name
   const sourceName = options.source ?? singularize(assocName);
@@ -1224,7 +1248,7 @@ export async function loadHasManyThrough(
   // push sourceType filtering into the through query
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-  const throughModel = resolveModel(throughClassName);
+  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
   const throughModelAssocs: AssociationDefinition[] = throughModel._associations ?? [];
   const sourceAssoc =
     throughModelAssocs.find((a) => a.name === sourceName) ??
@@ -1690,7 +1714,7 @@ export function buildThroughAssociation(
   // Build intermediate record with owner FK
   const throughClassName =
     throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-  const throughModel = resolveModel(throughClassName);
+  const throughModel = resolveAssocClass(record, throughAssoc.name, throughClassName);
   const ownerFk = ownerFkOption as string;
   const ownerPk = ownerPkOption as string;
   const throughAttrs: Record<string, unknown> = {};

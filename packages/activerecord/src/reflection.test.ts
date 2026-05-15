@@ -20,14 +20,17 @@ import {
   AggregateReflection,
   AssociationReflection,
   registerModel,
+  modelRegistry,
+  association,
   composedOf,
 } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, resolveAssocClass } from "./associations.js";
 import { Table } from "@blazetrails/arel";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { UnknownPrimaryKey } from "./errors.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -1295,9 +1298,7 @@ describe("ReflectionTest", () => {
     expect(ref.validate).toBe(false);
   });
   it.skip("symbol for class name", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+    // UNPORTED: Ruby Symbol type for className has no JS equivalent.
   });
   it("class for class name", () => {
     class Firm extends Base {
@@ -1321,10 +1322,29 @@ describe("ReflectionTest", () => {
       }),
     ).toThrow(/expecting a string/);
   });
-  it.skip("class for source type", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+  it("class for source type", () => {
+    class NsTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NsPost extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NsTag", NsTag);
+    registerModel("NsPost", NsPost);
+    expect(() =>
+      Associations.hasMany.call(NsTag, "taggedPosts", {
+        through: "taggings",
+        source: "taggable",
+        // @ts-expect-error sourceType must be a string, not a class
+        sourceType: NsPost,
+      }),
+    ).toThrow(ArgumentError);
   });
   it("join table with common prefix", () => {
     class CatalogCategory extends Base {
@@ -1439,24 +1459,16 @@ describe("ReflectionTest", () => {
     expect(ref!.name).toBe("books");
   });
   it.skip("reflect on missing source assocation raise exception", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+    // BLOCKED: Hotel/Chef fixture models + check_validity! not yet ported — Slot C.
   });
   it.skip("name error from incidental code is not converted to name error for association", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
   });
   it.skip("automatic inverse suppresses name error for association", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
   });
   it.skip("automatic inverse does not suppress name error from incidental code", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
+    // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.
   });
 
   it("has one and belongs to should find inverse automatically", () => {
@@ -1988,7 +2000,7 @@ describe("ReflectionTest", () => {
     const ref = reflectOnAssociation(Orphan, "ghosts");
     expect(ref).not.toBeNull();
     // "Ghost" is not registered, so accessing klass should throw
-    expect(() => ref!.klass).toThrow(/Could not find model 'Ghost'/);
+    expect(() => ref!.klass).toThrow(/not found in registry/);
   });
 
   it("reflection klass not found with pointer to non existent class name", () => {
@@ -2001,7 +2013,7 @@ describe("ReflectionTest", () => {
     Associations.hasMany.call(Orphan2, "items", { className: "NonExistentModel" });
     const ref = reflectOnAssociation(Orphan2, "items");
     expect(ref).not.toBeNull();
-    expect(() => ref!.klass).toThrow(/Could not find model 'NonExistentModel'/);
+    expect(() => ref!.klass).toThrow(/not found in registry/);
   });
 
   it("reflection klass requires ar subclass", () => {
@@ -2023,6 +2035,18 @@ describe("ReflectionTest", () => {
     expect(ref).not.toBeNull();
     // klass should return a class that extends Base
     expect(ref!.klass).toBe(Child);
+
+    // Non-AR subclass registered under a different name raises ArgumentError
+    class NotAModel {}
+    modelRegistry.set("NotAModel", NotAModel as unknown as typeof Base);
+    try {
+      Associations.hasMany.call(Parent, "notModels", { className: "NotAModel" });
+      const badRef = reflectOnAssociation(Parent, "notModels");
+      expect(() => badRef!.klass).toThrow(ArgumentError);
+      expect(() => badRef!.klass).toThrow(/not an ActiveRecord::Base subclass/);
+    } finally {
+      modelRegistry.delete("NotAModel");
+    }
   });
 
   it("reflection klass with same demodularized name", () => {
@@ -2044,6 +2068,36 @@ describe("ReflectionTest", () => {
     Associations.hasMany.call(Project, "tasks", {});
     const ref = reflectOnAssociation(Project, "tasks");
     expect(ref!.klass).toBe(Task);
+  });
+
+  it("reflection klass demodulize top-level-first resolution", () => {
+    // Rails _klass: when demodulize(activeRecord.name) == className,
+    // top-level ::ClassName is tried before namespace-relative lookup.
+    const adp = freshAdapter();
+    class TopUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class NsAdminUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    // Top-level "User" and namespaced "Admin::User" are both in the registry.
+    registerModel("User", TopUser);
+    registerModel("Admin::User", NsAdminUser);
+    // NsAdminUser.demodulize("Admin::User") == "User" == className("user")
+    // → _klass tries ::User first → resolves to top-level TopUser
+    Associations.hasOne.call(NsAdminUser, "user", {});
+    const ref = reflectOnAssociation(NsAdminUser, "user");
+    expect(ref!.klass).toBe(TopUser);
+    // When className is explicitly qualified it bypasses the demodulize path
+    Associations.hasOne.call(NsAdminUser, "adminUser", { className: "Admin::User" });
+    const nsRef = reflectOnAssociation(NsAdminUser, "adminUser");
+    expect(nsRef!.klass).toBe(NsAdminUser);
   });
 
   it("aggregation reflection", () => {
@@ -2074,11 +2128,90 @@ describe("ReflectionTest", () => {
     expect(addr.city).toBe("Springfield");
   });
 
-  it.skip("association reflection in modules", () => {
-    // BLOCKED: associations — reflection feature gap (macros / options inspection)
-    // ROOT-CAUSE: reflection.ts#AggregateReflection or ThroughReflection missing Rails parity
-    // SCOPE: ~50 LOC in reflection.ts; affects ~31 tests in reflection.test.ts
-    // Requires module/namespace support
+  it("association reflection in modules", () => {
+    const adp = freshAdapter();
+    class NsBizFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class NsBizClient extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
+    }
+    class NsBillingAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.adapter = adp;
+      }
+    }
+    class NsBillingFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    class NsBillingNestedFirm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adp;
+      }
+    }
+    registerModel("MyApplication::Business::Firm", NsBizFirm);
+    registerModel("MyApplication::Business::Client", NsBizClient);
+    registerModel("MyApplication::Billing::Account", NsBillingAccount);
+    registerModel("MyApplication::Billing::Firm", NsBillingFirm);
+    registerModel("MyApplication::Billing::Nested::Firm", NsBillingNestedFirm);
+
+    // Unqualified "Client" resolves namespace-relative from MyApplication::Business::Firm
+    Associations.hasMany.call(NsBizFirm, "clientsOfFirm", { className: "Client" });
+    const firmRef = reflectOnAssociation(NsBizFirm, "clientsOfFirm");
+    expect(firmRef!.klass).toBe(NsBizClient);
+    expect(firmRef!.className).toBe("Client");
+
+    // Fully qualified class_name resolves absolutely
+    Associations.belongsTo.call(NsBillingAccount, "firm", {
+      className: "MyApplication::Business::Firm",
+    });
+    const acctFirmRef = reflectOnAssociation(NsBillingAccount, "firm");
+    expect(acctFirmRef!.klass).toBe(NsBizFirm);
+    expect(acctFirmRef!.className).toBe("MyApplication::Business::Firm");
+
+    // Unqualified "Firm" resolves namespace-relative from MyApplication::Billing::Account
+    Associations.belongsTo.call(NsBillingAccount, "unqualifiedBillingFirm", { className: "Firm" });
+    const unqualRef = reflectOnAssociation(NsBillingAccount, "unqualifiedBillingFirm");
+    expect(unqualRef!.klass).toBe(NsBillingFirm);
+
+    // Partially qualified "Nested::Firm" resolves namespace-relative
+    Associations.belongsTo.call(NsBillingAccount, "nestedUnqualifiedBillingFirm", {
+      className: "Nested::Firm",
+    });
+    const nestedRef = reflectOnAssociation(NsBillingAccount, "nestedUnqualifiedBillingFirm");
+    expect(nestedRef!.klass).toBe(NsBillingNestedFirm);
+
+    // Absolute reference with leading "::" bypasses namespace walk
+    Associations.belongsTo.call(NsBillingAccount, "absoluteFirm", {
+      className: "::MyApplication::Business::Firm",
+    });
+    const absRef = reflectOnAssociation(NsBillingAccount, "absoluteFirm");
+    expect(absRef!.klass).toBe(NsBizFirm);
+
+    // Runtime: resolveAssocClass uses the reflection layer for namespace-aware
+    // resolution — verifies the actual loading path, not only ref.klass
+    const firmInstance = NsBizFirm.new({ name: "Acme" });
+    expect(resolveAssocClass(firmInstance, "clientsOfFirm", "Client")).toBe(NsBizClient);
+
+    // CollectionProxy build path: proxy.model and proxy.build() use the
+    // namespace-aware resolved class, catching regressions where ref.klass
+    // resolves but the build/load path hits the wrong target.
+    const proxy = association<InstanceType<typeof NsBizClient>>(firmInstance, "clientsOfFirm");
+    expect((proxy as any).model).toBe(NsBizClient);
+    const built = proxy.build({ name: "Acme Client" });
+    expect(built).toBeInstanceOf(NsBizClient);
   });
 
   it("has and belongs to many reflection", () => {

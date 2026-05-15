@@ -351,19 +351,48 @@ export class MacroReflection extends AbstractReflection {
     return this._klassCache;
   }
 
+  /** @internal */
+  protected activeRecordRegistryName(): string {
+    const ar = this.activeRecord as any;
+    if (Object.prototype.hasOwnProperty.call(ar, "_registryKeys")) {
+      // Filter to keys that actually point to this class (not inherited superclass aliases),
+      // then prefer the most deeply namespaced key so that a model registered as both
+      // "Author" and "Admin::Author" resolves associations relative to "Admin::Author".
+      const matching = (ar._registryKeys as string[]).filter(
+        (k) => modelRegistry.get(k) === this.activeRecord,
+      );
+      if (matching.length > 0) {
+        return matching.reduce((best, k) =>
+          (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
+        );
+      }
+    }
+    return this.activeRecord.name;
+  }
+
   _klass(className: string): typeof Base {
-    // Rails uses this for namespace-aware resolution (tries ::ClassName
-    // before Module::ClassName). Our model registry is flat, so this
-    // delegates directly to computeClass. When namespace support is
-    // added, this should try top-level resolution first.
+    // Rails: when active_record.name.demodulize == class_name, try ::ClassName
+    // (absolute top-level) first, then fall back to namespace-relative lookup.
+    const arName = this.activeRecordRegistryName();
+    const lastSegment = arName.includes("::") ? arName.split("::").pop()! : arName;
+    if (lastSegment === className) {
+      try {
+        return this.computeClass(`::${className}`);
+      } catch (e) {
+        // Rails: rescue NameError only — let ArgumentError (invalid subclass) propagate.
+        if (e instanceof ArgumentError) throw e;
+        // fall through to namespace-relative lookup
+      }
+    }
     return this.computeClass(className);
   }
 
   computeClass(name: string): typeof Base {
-    const resolved = modelRegistry.get(name);
+    const lookupName = name.startsWith("::") ? name.slice(2) : name;
+    const resolved = modelRegistry.get(lookupName);
     if (!resolved) {
       throw new Error(
-        `Could not find model '${name}' in model registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${lookupName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
       );
     }
     return resolved;
@@ -629,7 +658,11 @@ export class AssociationReflection extends MacroReflection {
     } catch (e: unknown) {
       // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
       // Only swallow model-not-found errors from computeClass, re-raise anything else
-      if (e instanceof Error && e.message.startsWith("Could not find model")) {
+      if (
+        e instanceof Error &&
+        e.message.startsWith("Model ") &&
+        e.message.includes("not found in registry")
+      ) {
         reflection = false;
       } else {
         throw e;
@@ -883,9 +916,46 @@ export class AssociationReflection extends MacroReflection {
 
   computeClass(name: string): typeof Base {
     if (this.isPolymorphic()) {
-      throw new Error("Polymorphic associations do not support computing the class.");
+      throw new ArgumentError("Polymorphic associations do not support computing the class.");
     }
-    return super.computeClass(name);
+
+    const isAbsolute = name.startsWith("::");
+    const simpleName = isAbsolute ? name.slice(2) : name;
+
+    if (!isAbsolute) {
+      // Namespace-relative walk: mirrors Ruby's compute_type candidate list.
+      // For activeRecord registered as "A::B::C", tries "A::B::C::Name",
+      // "A::B::Name", "A::Name" before falling through to top-level "Name".
+      const arName = this.activeRecordRegistryName();
+      if (arName.includes("::")) {
+        const segments = arName.split("::");
+        for (let i = segments.length; i > 0; i--) {
+          const candidate = [...segments.slice(0, i), simpleName].join("::");
+          const resolved = modelRegistry.get(candidate);
+          if (resolved) {
+            if (!(resolved as any)._isActiveRecordBase) {
+              throw new ArgumentError(
+                `The ${candidate} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+              );
+            }
+            return resolved;
+          }
+        }
+      }
+    }
+
+    const resolved = modelRegistry.get(simpleName);
+    if (!resolved) {
+      throw new Error(
+        `Model '${simpleName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
+      );
+    }
+    if (!(resolved as any)._isActiveRecordBase) {
+      throw new ArgumentError(
+        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+      );
+    }
+    return resolved;
   }
 
   get strictLoading(): boolean {
@@ -1079,6 +1149,10 @@ export class ThroughReflection extends AbstractReflection {
   constructor(delegate: AssociationReflection) {
     super();
     this._delegate = delegate;
+    const sourceTypeVal = delegate.options.sourceType;
+    if (typeof sourceTypeVal === "function") {
+      throw new ArgumentError("A class was passed to `:sourceType` but we are expecting a string.");
+    }
   }
 
   get name(): string {

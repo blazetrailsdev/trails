@@ -222,6 +222,18 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
   {
+    testFile: "reflection_test.rb",
+    tests: [
+      "symbol for class name",
+      "name error from incidental code is not converted to name error for association",
+      "automatic inverse suppresses name error for association",
+      "automatic inverse does not suppress name error from incidental code",
+    ],
+    reason:
+      "Ruby Symbol type for class_name and const_missing hook for NameError discrimination " +
+      "have no JavaScript equivalent.",
+  },
+  {
     testFile: "modules_test.rb",
     tests: [
       "module spanning associations",

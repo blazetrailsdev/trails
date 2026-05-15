@@ -35,6 +35,7 @@ import { getInheritanceColumn, findStiClass } from "../inheritance.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   resolveModel,
+  resolveAssocClass,
   fireAssocCallbacks,
   buildHasManyRelation,
   loadHasMany,
@@ -283,7 +284,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
     const className = assocDef.options.className ?? camelize(singularize(assocName));
-    const targetModel = resolveModel(className) as typeof Base;
+    // Prefer the rich reflection's klass so namespace-relative resolution applies.
+    const ownerCtor = record.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
+    };
+    const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
+    const targetModel = richKlass ?? (resolveModel(className) as typeof Base);
     super(targetModel, targetModel.arelTable);
     this._record = record;
     this._assocName = assocName;
@@ -325,7 +331,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           `Through association "${assocDef.options.through}" not found on ${ctor.name}`,
         );
       }
-      resolveModel(className); // throws if the target model isn't registered
       // No try/catch: if `_buildThroughScope()` throws, the caller
       // sees the real error (composite-PK mismatch, join resolution
       // failure, etc.) instead of a silently `none`-coerced proxy.
@@ -634,7 +639,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _buildRaw(attrs: Record<string, unknown> = {}): Base {
     const ctor = this._record.constructor as typeof Base;
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
     const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
 
     // Polymorphic "as" option
@@ -651,7 +655,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       buildAttrs[`${underscore(asName)}_type`] = ctor.name;
     }
 
-    let targetModel = resolveModel(className);
+    let targetModel = this.model as typeof Base;
 
     // STI: if a type attribute is provided, resolve to the correct subclass
     const inheritanceCol = getInheritanceColumn(targetModel);
@@ -664,8 +668,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-    let targetModel = resolveModel(className);
+    let targetModel = this.model as typeof Base;
 
     const inheritanceCol = getInheritanceColumn(targetModel);
     if (inheritanceCol && attrs[inheritanceCol]) {
@@ -997,7 +1000,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     if (Array.isArray(ownerFk)) {
       throw new Error(
@@ -1148,7 +1151,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
     const pkValue = this._record._readAttribute(primaryKey as string);
@@ -1184,7 +1187,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const primaryKey = throughAssoc.options.primaryKey ?? ctor.primaryKey;
     if (Array.isArray(primaryKey)) {
       throw new Error(
@@ -1408,8 +1411,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const entries = Object.entries(conditions as Record<string, unknown>);
         return records.some((r) => entries.every(([k, v]) => r.readAttribute(k) === v));
       }
-      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-      const targetModel = resolveModel(className);
+      const targetModel = this.model as typeof Base;
       const pk = targetModel.primaryKey;
       if (Array.isArray(pk)) {
         throw new Error(
@@ -1592,8 +1594,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#ids=
    */
   async setIds(ids: (number | string)[]): Promise<void> {
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-    const targetModel = resolveModel(className);
+    const targetModel = this.model as typeof Base;
     const cleanIds = ids.filter((id) => id !== null && id !== undefined && id !== "");
     const records = (await Promise.all(cleanIds.map((id) => targetModel.find(Number(id))))) as T[];
     await this.replace(records);
@@ -1673,8 +1674,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const rel = buildHasManyRelation(this._record, this._assocName, this._assocDef.options);
     if (rel === null) {
-      const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-      const targetModel = resolveModel(className);
+      const targetModel = this.model as typeof Base;
       let emptyRel = (targetModel as any).all();
       if (this._assocDef.options.scope) {
         emptyRel = this._assocDef.options.scope(emptyRel);
@@ -1720,13 +1720,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
 
-    const className = this._assocDef.options.className ?? camelize(singularize(this._assocName));
-    const targetModel = resolveModel(className);
+    const targetModel = this.model as typeof Base;
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
 
     const throughClassName =
       throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveModel(throughClassName);
+    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
     const throughModelAssocs: AssociationDefinition[] = (throughModel as any)._associations ?? [];
     const sourceAssoc =
       throughModelAssocs.find((a) => a.name === sourceName) ??
