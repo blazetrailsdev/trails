@@ -16,7 +16,11 @@ import { Associations, setBelongsTo, association, loadHasManyThrough } from "./a
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
+import {
+  markForDestruction,
+  isMarkedForDestruction,
+  computePrimaryKey,
+} from "./autosave-association.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -596,11 +600,43 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* cpk not fully supported */
   });
-  it.skip("has one cpk has one autosave with id", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* cpk not fully supported */
+  it("has one cpk has one autosave with id", async () => {
+    // Rails: test "has_one cpk has_one autosave with id" — when the parent has a CPK
+    // and the has_one uses a non-composite single-column FK, autosave should propagate
+    // the "id" component of the composite PK into the child's FK column.
+    class CpkOrderPk extends Base {
+      static {
+        this.attribute("shop_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("status", "string");
+        this.primaryKey = ["shop_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkBookFk extends Base {
+      static {
+        this.attribute("order_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CpkOrderPk", CpkOrderPk);
+    registerModel("CpkBookFk", CpkBookFk);
+    // has_one with single-column FK on CPK parent (like OrderWithPrimaryKeyAssociatedBook)
+    Associations.hasOne.call(CpkOrderPk, "cpkBookFk", {
+      className: "CpkBookFk",
+      foreignKey: "order_id",
+      autosave: true,
+    });
+    const order = new CpkOrderPk({ shop_id: 5, id: 7, status: "open" });
+    const book = new CpkBookFk({ title: "My Book" });
+    cacheAssoc(order, "cpkBookFk", book);
+    const saved = await order.save();
+    expect(saved).toBe(true);
+    expect(order.isNewRecord()).toBe(false);
+    expect(book.isNewRecord()).toBe(false);
+    // autosave propagates the "id" component of the composite PK into book.order_id
+    expect(book.order_id).toBe(7);
   });
   it("assign ids for through a belongs to", async () => {
     class AidFirm extends Base {
@@ -1213,11 +1249,39 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     expect(errors).toBeDefined();
   });
 
-  it.skip("should not ignore different error messages on the same attribute", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* error merging details */
+  it("should not ignore different error messages on the same attribute", async () => {
+    // Rails: test "should not ignore different error messages on the same attribute"
+    // When multiple validators fire on the same child attribute, all messages
+    // should be merged onto the parent under the dotted attribute key.
+    const innerAdapter = freshAdapter();
+    class DualValidShip extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = innerAdapter;
+        this.validates("name", { presence: true });
+        this.validates("name", { format: { with: /\w/ } });
+      }
+    }
+    class DualPirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = innerAdapter;
+      }
+    }
+    registerModel("DualPirate", DualPirate);
+    registerModel("DualValidShip", DualValidShip);
+    Associations.hasOne.call(DualPirate, "dualValidShip", { autosave: true });
+    const pirate = await DualPirate.create({ catchphrase: "Yarr" });
+    const ship = new DualValidShip({ name: "" });
+    cacheAssoc(pirate, "dualValidShip", ship);
+    const valid = await pirate.isValid();
+    expect(valid).toBe(false);
+    const errMap = (pirate as any).errors.messages;
+    const msgs: string[] =
+      errMap.get("dualValidShip.name") ?? errMap.get("dual_valid_ship.name") ?? [];
+    expect(msgs).toContain("can't be blank");
+    expect(msgs).toContain("is invalid");
   });
 
   it("should still allow to bypass validations on the associated model", async () => {
@@ -1238,11 +1302,64 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     expect(saved).toBe(true);
   });
 
-  it.skip("should allow to bypass validations on associated models at any depth", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* deep nesting not tested */
+  it("should allow to bypass validations on associated models at any depth", async () => {
+    // Rails: test "should allow to bypass validations on associated models at any depth"
+    // save(validate: false) should skip validation on the parent and all nested records.
+    const innerAdapter = freshAdapter();
+    class DeepPart extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("ship_id", "integer");
+        this.adapter = innerAdapter;
+        this.validates("name", { presence: true });
+      }
+    }
+    class DeepShip extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("pirate_id", "integer");
+        this.adapter = innerAdapter;
+        this.validates("name", { presence: true });
+      }
+    }
+    class DeepPirate extends Base {
+      static {
+        this.attribute("catchphrase", "string");
+        this.adapter = innerAdapter;
+        this.validates("catchphrase", { presence: true });
+      }
+    }
+    registerModel("DeepPirate", DeepPirate);
+    registerModel("DeepShip", DeepShip);
+    registerModel("DeepPart", DeepPart);
+    Associations.hasOne.call(DeepPirate, "deepShip", { autosave: true });
+    Associations.hasMany.call(DeepShip, "deepParts", { autosave: true });
+
+    const pirate = await DeepPirate.create({ catchphrase: "Yarr" });
+    const ship = await DeepShip.create({ name: "Pearl", pirate_id: pirate.id });
+    const part1 = await DeepPart.create({ name: "part 0", ship_id: ship.id });
+    const part2 = await DeepPart.create({ name: "part 1", ship_id: ship.id });
+
+    pirate.catchphrase = "";
+    ship.name = "";
+    part1.name = "";
+    part2.name = "";
+    cacheAssoc(pirate, "deepShip", ship);
+    cacheAssoc(ship, "deepParts", [part1, part2]);
+
+    const saved = await pirate.save({ validate: false });
+    expect(saved).toBe(true);
+    // Reload and verify all empty strings were persisted (validations bypassed at every depth)
+    const reloadedPirate = await DeepPirate.find(pirate.id as number);
+    expect(reloadedPirate.catchphrase).toBe("");
+    const reloadedShip = await DeepShip.find(ship.id as number);
+    expect(reloadedShip.name).toBe("");
+    // Parts must also be saved with blank names — a regression where has_many autosave
+    // doesn't propagate validate:false would leave them with their original names.
+    const reloadedPart1 = await DeepPart.find(part1.id as number);
+    const reloadedPart2 = await DeepPart.find(part2.id as number);
+    expect(reloadedPart1.name).toBe("");
+    expect(reloadedPart2.name).toBe("");
   });
   it("should still raise an ActiveRecordRecord Invalid exception if we want that", async () => {
     const { Pirate, Ship } = makeModels();
@@ -1937,11 +2054,90 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(ship.pirate_id).toBe(pirate.id);
   });
 
-  it.skip("autosave does not pass through non custom validation contexts", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* needs custom validation contexts on autosave */
+  it("autosave does not pass through non custom validation contexts", async () => {
+    // Rails: test "autosave does not pass through non custom validation contexts"
+    // When autosave validates an associated record, it should NOT pass the owner's
+    // standard (:create/:update) validation context — only custom contexts propagate.
+    const innerAdapter = freshAdapter();
+    class Person extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = innerAdapter;
+        // :create-only validation — should not fire when context is :update
+        this.validate(
+          function (record: any) {
+            if (record.first_name !== "cool") {
+              record.errors.add("first_name", "not cool");
+            }
+          },
+          { on: "create" },
+        );
+      }
+    }
+    class Reference extends Base {
+      static {
+        this.attribute("person_id", "integer");
+        this.adapter = innerAdapter;
+      }
+    }
+    registerModel("Person", Person);
+    registerModel("Reference", Reference);
+    Associations.belongsTo.call(Reference, "person", {
+      autosave: true,
+      className: "Person",
+      foreignKey: "person_id",
+    });
+
+    const person = await Person.create({ first_name: "cool" });
+    // Change to "nah" — still valid because on:create validator doesn't run in :update context
+    person.first_name = "nah";
+    expect(await person.isValid()).toBe(true);
+
+    // autosave through reference should also be valid —
+    // autosave uses the owner's _validationContext (nil → not custom) so person is validated
+    // in its default :update context, where the :create-only validator is skipped.
+    const ref = new Reference({ person });
+    cacheAssoc(ref, "person", person);
+    const valid = await ref.isValid();
+    expect(valid).toBe(true);
+  });
+
+  it("custom validation context is applied to unchanged persisted children", async () => {
+    // Rails association_valid? always validates; the `|| context` guard in error
+    // propagation (autosave_association.rb:384) means custom contexts fire even
+    // on unchanged persisted children, unlike the default :create/:update skip.
+    const innerAdapter = freshAdapter();
+    class Widget extends Base {
+      static {
+        this.attribute("status", "string");
+        this.attribute("owner_id", "integer");
+        this.adapter = innerAdapter;
+        this.validates("status", { presence: true, on: "publish" } as any);
+      }
+    }
+    class Owner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = innerAdapter;
+      }
+    }
+    registerModel("Widget", Widget);
+    registerModel("Owner", Owner);
+    Associations.hasMany.call(Owner, "widgets", { autosave: true });
+
+    const owner = await Owner.create({ name: "Alice" });
+    // Create a persisted, unchanged widget with a blank status
+    const widget = await Widget.create({ status: "", owner_id: owner.id });
+    cacheAssoc(owner, "widgets", [widget]);
+
+    // Default context: widget is unchanged → skipped → owner is valid
+    const defaultValid = await owner.isValid();
+    expect(defaultValid).toBe(true);
+
+    // Custom context "publish": unchanged widget must be validated too, and its
+    // presence validator fires → owner is invalid
+    const publishValid = await owner.isValid("publish" as any);
+    expect(publishValid).toBe(false);
   });
 
   it("autosave collection association callbacks get called once", async () => {
@@ -3573,5 +3769,233 @@ describe("ChangedForAutosaveTest", () => {
     // Should not stack overflow
     expect(a.changedForAutosave()).toBe(false);
     expect(b.changedForAutosave()).toBe(false);
+  });
+});
+
+describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
+  // When a class has queryConstraints and the has_one uses an explicit composite FK,
+  // assoc.options.foreignKey is the composite array. The reflection normalizes it
+  // into options.queryConstraints internally. computePrimaryKey(reflection) therefore
+  // hits branch 2 and returns queryConstraintsList — pairing with the composite FK.
+  it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
+    const adapter = freshAdapter();
+    class QcOwner extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        (this as any)._queryConstraintsList = ["tenant_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+        this.adapter = adapter;
+      }
+    }
+    class QcChild extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("qc_owner_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcOwner", QcOwner);
+    registerModel("QcChild", QcChild);
+    // Explicit composite FK — assoc.options.foreignKey = ["tenant_id","qc_owner_id"].
+    // The old scalar-guard skipped computePrimaryKey → used ctor.primaryKey = "id" → mismatch.
+    // The fixed code calls computePrimaryKey(reflection) which, via branch 2 (reflection
+    // normalizes array FK into queryConstraints), returns queryConstraintsList = ["tenant_id","id"].
+    Associations.hasOne.call(QcOwner, "qcChild", {
+      className: "QcChild",
+      foreignKey: ["tenant_id", "qc_owner_id"],
+      autosave: true,
+    });
+    const owner = new QcOwner({ tenant_id: 5, id: 11, name: "Corp" });
+    const child = new QcChild({ title: "Doc" });
+    (owner as any)._cachedAssociations = new Map([["qcChild", child]]);
+    const saved = await owner.save();
+    expect(saved).toBe(true);
+    expect(child.isNewRecord()).toBe(false);
+    // PK ["tenant_id","id"] zipped with FK ["tenant_id","qc_owner_id"]:
+    // child.tenant_id ← owner.tenant_id = 5, child.qc_owner_id ← owner.id = 11
+    expect(child.tenant_id).toBe(5);
+    expect(child.qc_owner_id).toBe(11);
+  });
+
+  it("does not collapse QC-derived PK array via the 'id' rule for scalar FK", async () => {
+    // Guard against the bug where the composite_primary_key? collapse was applied to QC
+    // arrays. If QC list is ["tenant_id","id"] and FK is scalar "tenant_id", the old code
+    // would collapse to "id" and assign owner.id into child.tenant_id — wrong.
+    // With the fix (gate on Array.isArray(ctor.primaryKey)), QC arrays are not collapsed;
+    // instead the composite/scalar mismatch path is reached. In a properly configured
+    // association both FK and PK would be composite, so no-mismatch is the happy path.
+    // This test confirms the collapse does NOT fire for QC-derived PK arrays.
+    const adapter = freshAdapter();
+    class QcNoCollapse extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("value", "string");
+        // QC list — ctor.primaryKey remains scalar "id"
+        (this as any)._queryConstraintsList = ["tenant_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+        this.adapter = adapter;
+      }
+    }
+    class QcNoCollapseChild extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("qc_no_collapse_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcNoCollapse", QcNoCollapse);
+    registerModel("QcNoCollapseChild", QcNoCollapseChild);
+    // Explicit composite FK — reflection normalizes array FK to queryConstraints.
+    // computePrimaryKey branch 2 returns QC list ["tenant_id","id"].
+    // Array PK + array FK → composite pairing (no "id" collapse).
+    Associations.hasOne.call(QcNoCollapse, "qcNoCollapseChild", {
+      className: "QcNoCollapseChild",
+      foreignKey: ["tenant_id", "qc_no_collapse_id"],
+      autosave: true,
+    });
+    const owner = new QcNoCollapse({ tenant_id: 9, id: 77, value: "v" });
+    const child = new QcNoCollapseChild({ label: "l" });
+    (owner as any)._cachedAssociations = new Map([["qcNoCollapseChild", child]]);
+    const saved = await owner.save();
+    expect(saved).toBe(true);
+    expect(child.isNewRecord()).toBe(false);
+    // PK ["tenant_id","id"] paired with FK ["tenant_id","qc_no_collapse_id"]:
+    // child.tenant_id ← owner.tenant_id = 9, child.qc_no_collapse_id ← owner.id = 77
+    expect(child.tenant_id).toBe(9);
+    expect(child.qc_no_collapse_id).toBe(77);
+  });
+
+  // When a class has queryConstraints and the has_one has no explicit FK,
+  // the reflection derives a composite FK array via deriveFkQueryConstraints.
+  // The PK must also be the queryConstraintsList (not just ctor.primaryKey)
+  // so composite FK and composite PK are paired and assigned correctly.
+  // This exercises the "no explicit FK → computePrimaryKey → QC branch" path.
+  it("uses queryConstraintsList as PK when class has_query_constraints? and no explicit FK", async () => {
+    const adapter = freshAdapter();
+    class QcTenant extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        // Simulate a model with query_constraints [:tenant_id, :id]
+        (this as any)._queryConstraintsList = ["tenant_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+        this.adapter = adapter;
+      }
+    }
+    class QcTenantRecord extends Base {
+      static {
+        this.attribute("tenant_id", "integer");
+        this.attribute("qc_tenant_id", "integer");
+        this.attribute("note", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QcTenant", QcTenant);
+    registerModel("QcTenantRecord", QcTenantRecord);
+    // No explicit foreignKey. Associations.hasOne registers a reflection via addReflection,
+    // so _reflectOnAssociation finds it. reflection.foreignKey calls deriveFkQueryConstraints:
+    // QcTenant has queryConstraints ["tenant_id","id"] and primaryKey "id", so the FK becomes
+    // ["tenant_id","qc_tenant_record_id"] — but QcTenantRecord only has "qc_tenant_id".
+    // With no explicit FK option, computePrimaryKey (no-FK branch) returns QC list ["tenant_id","id"].
+    // The scalar-FK collapse then applies: includes("id") → "id" — but the reflection-derived FK
+    // may be composite. In this inline test the attribute "qc_tenant_id" is present, so the
+    // deriveFkQueryConstraints result falls back to the simpler scalar "qc_tenant_id" path.
+    // Core assertion: autosave assigns rec.qc_tenant_id ← tenant._readAttribute("id") = 42.
+    Associations.hasOne.call(QcTenant, "qcTenantRecord", { autosave: true });
+    const tenant = new QcTenant({ tenant_id: 7, id: 42, name: "Acme" });
+    const rec = new QcTenantRecord({ note: "hello" });
+    (tenant as any)._cachedAssociations = new Map([["qcTenantRecord", rec]]);
+    const saved = await tenant.save();
+    expect(saved).toBe(true);
+    expect(rec.isNewRecord()).toBe(false);
+    // computePrimaryKey → QC list ["tenant_id","id"] → scalar collapse "id" → rec.qc_tenant_id = 42
+    expect(rec.qc_tenant_id).toBe(42);
+  });
+});
+
+describe("computePrimaryKey", () => {
+  // Unit tests for the computePrimaryKey helper, which mirrors
+  // Rails autosave_association.rb:576-587 (compute_primary_key).
+
+  function makeRecord(opts: {
+    primaryKey?: string | string[];
+    queryConstraintsList?: string[];
+    hasQueryConstraints?: boolean;
+  }): any {
+    return {
+      constructor: {
+        primaryKey: opts.primaryKey ?? "id",
+        _queryConstraintsList: opts.queryConstraintsList ?? null,
+        _hasQueryConstraints: opts.hasQueryConstraints ?? false,
+      },
+    };
+  }
+
+  it("returns explicit reflection primaryKey option as-is", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey.call(record, { options: { primaryKey: "custom_id" } });
+    expect(result).toBe("custom_id");
+  });
+
+  it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
+    // Mirrors: elsif reflection.options[:query_constraints] && (qcl = record.class.query_constraints_list)
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["tenant_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, { options: { queryConstraints: true } });
+    expect(result).toEqual(["tenant_id", "id"]);
+  });
+
+  it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
+    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toEqual(["shop_id", "id"]);
+  });
+
+  it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
+    // Mirrors: elsif record.class.has_query_constraints? && !reflection.options[:foreign_key]
+    // — the !:foreign_key guard prevents queryConstraintsList from being used.
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey.call(record, {
+      options: { foreignKey: "order_id" },
+    });
+    expect(result).toBe("id");
+  });
+
+  it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
+    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
+    const record = makeRecord({ primaryKey: ["shop_id", "id"] });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toBe("id");
+  });
+
+  it("returns full composite PK when CPK has no 'id' column", () => {
+    // Mirrors: composite_primary_key? branch — primary_key.include?("id") ? "id" : primary_key
+    const record = makeRecord({ primaryKey: ["shop_id", "status"] });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toEqual(["shop_id", "status"]);
+  });
+
+  it("returns class primary key for non-composite, non-constrained record", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey.call(record, { options: {} });
+    expect(result).toBe("id");
   });
 });
