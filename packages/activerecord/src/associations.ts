@@ -188,8 +188,14 @@ export function resolveModel(name: string): typeof Base {
  * Non-polymorphic errors (e.g. not-an-AR-subclass) propagate unchanged.
  * @internal
  */
-export function resolveAssocClass(record: Base, assocName: string, className: string): typeof Base {
-  const ctor = record.constructor as typeof Base & {
+export function resolveAssocClass(
+  recordOrClass: Base | typeof Base,
+  assocName: string,
+  className: string,
+): typeof Base {
+  const ctor = (
+    typeof recordOrClass === "function" ? recordOrClass : recordOrClass.constructor
+  ) as typeof Base & {
     _reflectOnAssociation?: (
       name: string,
     ) => { klass?: typeof Base; isPolymorphic?: () => boolean } | null;
