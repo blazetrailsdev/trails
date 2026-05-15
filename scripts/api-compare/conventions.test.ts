@@ -123,6 +123,10 @@ describe("rubyFileToTs", () => {
     expect(rubyFileToTs("railtie.rb", "activerecord")).toBe("trailtie.ts");
   });
 
+  it("maps action_controller/railtie.rb to trailtie.ts via FILE_OVERRIDES", () => {
+    expect(rubyFileToTs("railtie.rb", "actioncontroller")).toBe("trailtie.ts");
+  });
+
   it("does not rewrite railties paths for other packages", () => {
     expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("railties/some-file.ts");
   });

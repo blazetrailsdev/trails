@@ -341,8 +341,8 @@ sub-files:
 
 ### Wave 5 closed — conventions.ts mapping for the trailties exception
 
-Verified mapping already present at
-`scripts/api-compare/conventions.ts:41`
+Verified mapping already present in
+`scripts/api-compare/conventions.ts`
 (`"actioncontroller:railties/": "trailties/"` in
 `DIR_PREFIX_OVERRIDES`). The only Rails source file under that path
 (`railties/helpers.rb`) defines just `inherited`, which is in `SKIP`,
