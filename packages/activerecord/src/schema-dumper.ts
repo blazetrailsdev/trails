@@ -20,6 +20,7 @@ import type { SchemaStatements } from "./connection-adapters/abstract/schema-sta
 import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
 import { SchemaMigration } from "./schema-migration.js";
+import { Duration } from "@blazetrails/activesupport";
 
 // Lazy-load schema-introspection to break the static cycle
 // (schema-dumper -> schema-introspection -> schema-statements ->
@@ -320,6 +321,11 @@ export function cleanRawPgExpression(raw: string): unknown {
  */
 export function cleanDefault(raw: unknown): unknown {
   if (raw === null || raw === undefined) return raw;
+  // Interval/Duration round-trips through schema dump as its ISO-8601 form.
+  // Without this branch, Duration.toString() yields seconds — e.g. P3Y →
+  // "94670856" — and the numeric coercion below would emit `default: 94670856`.
+  // Mirrors Rails OID::Interval#type_cast_for_schema → serialize(value).inspect.
+  if (raw instanceof Duration) return raw.iso8601();
   const str = String(raw);
 
   // Delegate raw PG expressions (contain a type cast or are expression defaults)
