@@ -669,17 +669,6 @@ export class CollectionAssociation extends Association {
 
 /** @internal */
 function transaction(assoc: CollectionAssociation, block: () => Promise<void>): Promise<void> {
-  // Rails wraps replace_records in transaction { ... } for all associations.
-  // DEVIATION: HABTM skips the wrapper because our fallback transaction path
-  // and the TM path use independent savepoint counters.  When the test
-  // environment has an external transaction (adapter.inTransaction=true,
-  // currentTransaction()=null), persistReplace uses the fallback (creates
-  // SAVEPOINT active_record_N).  insertAll inside then calls
-  // executeMutation→materializeTransactions via the TM path, which can
-  // consume that savepoint.  Root fix belongs in the TM/fallback counter
-  // coordination — tracked as a follow-up.  HABTM join inserts via
-  // insertAll are atomic SQL statements so skipping the wrapper is safe.
-  if ((assoc.reflection as any).type === "hasAndBelongsToMany") return block();
   // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
   const klass = (assoc.reflection as any).klass ?? assoc.klass;
   if (klass && typeof (klass as any).transaction === "function") {

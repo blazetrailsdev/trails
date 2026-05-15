@@ -107,7 +107,7 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
 async function insertHabtmRecord(
   assoc: HasManyThroughAssociation,
   record: Base,
-  _validate: boolean,
+  validate: boolean,
   raise: boolean,
 ): Promise<boolean> {
   const ctor = assoc.owner.constructor as any;
@@ -134,12 +134,10 @@ async function insertHabtmRecord(
     [ownerFk as string]: pkValue,
     [sourceFk]: (record as any)._readAttribute?.(targetPk) ?? (record as any)[targetPk],
   };
-  // Use insertAll (no callbacks/no nested transaction) so we don't create a
-  // second savepoint inside persistReplace's outer transaction — which causes
-  // "SAVEPOINT active_record_N does not exist" on MySQL/MariaDB when the TM
-  // and the fallback path use independent savepoint counters.
-  const count = await throughModel.insertAll([joinAttrs]);
-  if (!count) {
+  // Rails: new(record_to_save_attributes(record)).save(validate: validate)
+  const joinRecord = new (throughModel as any)(joinAttrs);
+  const saved = await joinRecord.save({ validate });
+  if (!saved) {
     if (raise) throw new Error(`Failed to create join record for ${assocDef.name}`);
     return false;
   }
