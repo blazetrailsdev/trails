@@ -409,7 +409,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const driverBinds = this.mysqlBinds(binds ?? []);
     const payload: Record<string, unknown> = {
       sql: driverSql,
-      name,
+      name: name ?? "SQL",
       binds: driverBinds,
       type_casted_binds: typeCastedBinds(driverBinds),
       connection: this,
@@ -441,7 +441,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           payload.exception_object = e;
           throw e;
         }
-        if (!conn) throw e;
         const { error: translated, connReleased } = await this._translateAndEnrich(
           e,
           driverSql,
