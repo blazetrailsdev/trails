@@ -2,6 +2,9 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
 import { buildGid } from "./uri/gid.js";
+import type { GlobalIDModel } from "./global-id.js";
+
+export type { GlobalIDModel };
 
 const DEFAULT_PURPOSE = "default";
 
@@ -16,11 +19,6 @@ export interface SignedGlobalIDOptions {
 export interface ParseOptions {
   purpose?: string;
   verifier: MessageVerifier;
-}
-
-export interface GlobalIDModel {
-  id: unknown;
-  constructor: { name: string };
 }
 
 /** @internal */
