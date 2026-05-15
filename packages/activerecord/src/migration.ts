@@ -1630,7 +1630,16 @@ export class MigrationContext {
     this._columns.set(name, cols);
     this._columnMeta.set(name, meta);
 
-    // Create indexes from table definition
+    // Create indexes from table definition — skip for adapters that emit them inline in CREATE TABLE
+    const adapterWithIndexInCreate = this.adapter as { supportsIndexesInCreate?: () => boolean };
+    if (adapterWithIndexInCreate.supportsIndexesInCreate?.()) {
+      for (const idx of td.indexes) {
+        const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
+        if (!this._indexes.has(name)) this._indexes.set(name, []);
+        this._indexes.get(name)!.push({ ...idx, name: indexName, orders: {} });
+      }
+      return;
+    }
     for (const idx of td.indexes) {
       const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
       const ordersMap: Record<string, string> =

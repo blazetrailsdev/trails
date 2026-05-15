@@ -1075,6 +1075,13 @@ class SchemaAdapter implements DatabaseAdapter {
     );
   }
 
+  supportsIndexesInCreate(): boolean {
+    return (
+      (this.inner as { supportsIndexesInCreate?: () => boolean }).supportsIndexesInCreate?.() ??
+      false
+    );
+  }
+
   supportsAdvisoryLocks(): boolean {
     return (
       (this.inner as { supportsAdvisoryLocks?: () => boolean }).supportsAdvisoryLocks?.() ?? false

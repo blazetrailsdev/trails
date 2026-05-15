@@ -504,6 +504,12 @@ export interface DatabaseAdapter {
   supportsCommentsInCreate?(): boolean;
 
   /**
+   * Whether the adapter supports inline INDEX clauses inside CREATE TABLE.
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_indexes_in_create?
+   */
+  supportsIndexesInCreate?(): boolean;
+
+  /**
    * Set or clear the comment on a table after it has been created.
    * Called by SchemaStatements#createTable when supportsComments() is true but
    * supportsCommentsInCreate() is false. The second parameter is `string | null`

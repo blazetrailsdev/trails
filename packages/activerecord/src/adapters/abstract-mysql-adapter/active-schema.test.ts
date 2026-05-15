@@ -90,10 +90,28 @@ describeIfMysql("Mysql2Adapter", () => {
       );
     });
 
-    it.skip("index in create", () => {
-      // BLOCKED: adapter-mysql — createTable callback form needed + index-in-create emission
-      // ROOT-CAUSE: MySQL createTable does not wire up inline INDEX clauses from TableDefinition.index()
-      // SCOPE: Slot C (mysql DDL parity)
+    it("index in create", async () => {
+      for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
+        const sqls = await captureSql(() =>
+          adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+            t.index(["last_name"], { type });
+          }),
+        );
+        expect(sqls[0]).toMatch(
+          new RegExp(
+            `^CREATE TABLE \`people\` \\(${type} INDEX \`index_people_on_last_name\` \\(\`last_name\`\\)\\)`,
+          ),
+        );
+      }
+
+      const sqls = await captureSql(() =>
+        adapter.schemaStatements().createTable("people", { id: false }, (t) => {
+          t.index(["last_name"], { length: { last_name: 10 }, using: "btree" });
+        }),
+      );
+      expect(sqls[0]).toMatch(
+        /^CREATE TABLE `people` \(INDEX `index_people_on_last_name` USING btree \(`last_name`\(10\)\)\)/,
+      );
     });
     it.skip("index in bulk change", () => {
       // BLOCKED: adapter-mysql — changeTable bulk-mode not implemented for MySQL
@@ -161,10 +179,21 @@ describeIfMysql("Mysql2Adapter", () => {
       // ROOT-CAUSE: removeTimestamps needs a live table; captureSql-only harness insufficient
       // SCOPE: Slot D (live-table tests)
     });
-    it.skip("indexes in create", () => {
-      // BLOCKED: adapter-mysql — createTable TEMPORARY + AS SELECT not implemented
-      // ROOT-CAUSE: createTable options.temporary and options.as not wired in MysqlSchemaCreation
-      // SCOPE: Slot C (mysql DDL parity)
+    it("indexes in create", async () => {
+      const sqls = await captureSql(() =>
+        adapter
+          .schemaStatements()
+          .createTable(
+            "temp",
+            { temporary: true, as: "SELECT id, name, zip FROM a_really_complicated_query" },
+            (t) => {
+              t.index(["zip"]);
+            },
+          ),
+      );
+      expect(sqls[0]).toMatch(
+        /^CREATE TEMPORARY TABLE `temp` \(INDEX `index_temp_on_zip` \(`zip`\)\) AS SELECT id, name, zip FROM a_really_complicated_query/,
+      );
     });
   });
 });
