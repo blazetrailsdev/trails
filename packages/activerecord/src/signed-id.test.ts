@@ -306,6 +306,33 @@ describe("toGid", () => {
   });
 });
 
+describe("Base.findGlobalId", () => {
+  afterEach(() => _resetApp());
+
+  it("locates a record by its toGid() URI via the AR model registry", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const found = (await Base.findGlobalId(u.toGid())) as User;
+    expect(found).toBeInstanceOf(User);
+    expect(found.id).toBe(u.id);
+    expect(found.name).toBe("Alice");
+  });
+
+  it("returns null for an unknown model class", async () => {
+    setApp("MyApp");
+    const found = await Base.findGlobalId("gid://MyApp/NoSuchModel/1");
+    expect(found).toBeNull();
+  });
+});
+
 describe("signedId / findSigned / findSignedBang", () => {
   it("generates a signed ID for a persisted record", async () => {
     const adapter = freshAdapter();

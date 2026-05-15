@@ -165,9 +165,6 @@ importers:
 
   packages/globalid:
     dependencies:
-      '@blazetrails/activerecord':
-        specifier: workspace:*
-        version: link:../activerecord
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
