@@ -279,7 +279,7 @@ describe("SignedIdTest", () => {
 describe("toGid", () => {
   afterEach(() => _resetApp());
 
-  it("returns a GlobalID URI with the configured app", async () => {
+  it("returns a GlobalID-like URI", async () => {
     setApp("MyApp");
     const adapter = freshAdapter();
     class User extends Base {

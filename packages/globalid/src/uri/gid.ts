@@ -135,9 +135,12 @@ function parseQueryParams(qs: string | undefined): Record<string, string> {
   return result;
 }
 
-/** CGI.escape equivalent: space→`+`, other non-unreserved→`%XX`. @internal */
+// encodeURIComponent leaves ~!*'() unescaped; CGI.escape percent-encodes them.
+/** CGI.escape equivalent: space→`+`, all non-unreserved chars→`%XX`. @internal */
 function cgiEscape(s: string): string {
-  return encodeURIComponent(s).replace(/%20/g, "+");
+  return encodeURIComponent(s)
+    .replace(/%20/g, "+")
+    .replace(/[~!*'()]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 }
 
 /** CGI.unescape equivalent: `+`→space, `%XX`→char. @internal */

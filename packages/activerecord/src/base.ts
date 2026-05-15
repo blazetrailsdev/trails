@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { getApp as _getGlobalIdApp } from "@blazetrails/globalid";
+import { getApp as _getGlobalIdApp, buildGid as _buildGid } from "@blazetrails/globalid";
 import type {
   GlobalIDModel,
   SignedGlobalID as SignedGlobalIDType,
@@ -2820,7 +2820,7 @@ export class Base extends Model {
         "An app is required to create a GlobalID. Call setApp() from @blazetrails/globalid before using toGid().",
       );
     }
-    return `gid://${app}/${ctor.name}/${this.id}`;
+    return _buildGid(app, ctor.name, this.id);
   }
 
   /**

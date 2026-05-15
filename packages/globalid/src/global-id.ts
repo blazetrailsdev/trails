@@ -63,7 +63,8 @@ export class GlobalID {
       return new GlobalID(gid, parseGid(gid));
     } catch {
       try {
-        const decoded = atob(gid.replace(/-/g, "+").replace(/_/g, "/"));
+        const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
+        const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
         return new GlobalID(decoded, parseGid(decoded));
       } catch {
         return null;
