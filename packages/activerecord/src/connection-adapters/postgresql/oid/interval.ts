@@ -37,11 +37,9 @@ export class Interval extends ValueType<Duration> {
         return Duration.parse(value);
       } catch {
         // Mirrors Rails: rescue ISO8601Parser::ParsingError → nil. Our
-        // PG adapter sets `intervalstyle = iso_8601` per session so AVG
-        // and SELECT interval results arrive in ISO 8601 form. (Note:
-        // pg_get_expr does NOT honour intervalstyle for interval defaults
-        // — that path needs separate handling, see the deferred
-        // "schema dump with default value" test in interval.test.ts.)
+        // PG adapter sets `intervalstyle = iso_8601` per session so AVG,
+        // SELECT, and pg_get_expr default expressions all arrive in ISO
+        // 8601 form — Duration.parse handles them directly.
         return null;
       }
     }

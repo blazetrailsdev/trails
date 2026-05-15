@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -115,19 +116,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((avg as Duration).iso8601()).toBe("P3Y2M");
     });
 
-    it.skip("schema dump with default value", async () => {
-      // BLOCKED: pg_get_expr returns the interval default as a bare numeric
-      //   (e.g. "94670856") even with `intervalstyle = iso_8601` set on the
-      //   session — the SET only affects SELECT/aggregate output, not the
-      //   pg_attrdef-stored expression text reconstructed by pg_get_expr.
-      // ROOT-CAUSE: splitPgDefault matches the bare numeric branch and
-      //   passes "94670856" to Interval.deserialize, which Duration.parse
-      //   rejects (not ISO 8601). The Column ends up with literal=null but
-      //   the dumper falls back to the raw value and emits `default: 94670856`.
-      // SCOPE: needs a coordinated fix in splitPgDefault (cast-aware
-      //   numeric→Duration conversion for interval columns) plus matching
-      //   adjustments in Interval.castValue/serialize so the seconds form
-      //   round-trips. ~50 LOC, deferred to a focused follow-up.
+    it("schema dump with default value", async () => {
+      // Mirrors Rails test_schema_dump_with_default_value: the default
+      // value "P3Y" should round-trip through schema dump as
+      //   t.interval "default_term", default: "P3Y"
+      const output = await SchemaDumper.dumpTableSchema(adapter, "interval_data_types");
+      // Rails dumps as `t.interval "default_term", default: "P3Y"`; our DSL
+      // emits intervals via the generic `t.column(...)` helper, so accept
+      // either spelling so long as the default round-trips as "P3Y".
+      expect(output).toMatch(
+        /t\.(?:interval|column)\("default_term",\s*"interval"(?:\([^)]*\))?,\s*\{[^}]*default:\s*"P3Y"/,
+      );
     });
   });
 });
