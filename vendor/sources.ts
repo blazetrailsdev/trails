@@ -1,3 +1,6 @@
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 // Upstream Ruby source registry.
 //
 // Single source of truth for which upstream gems we mirror, where to fetch
@@ -16,12 +19,21 @@ export interface GitOrigin {
 }
 
 export interface PackageEntry {
-  /** Logical package key; surfaces in api-compare's PACKAGES. */
+  /** Logical package key; surfaces in api-compare's PACKAGES when compareApi !== false. */
   name: string;
   /** Path relative to the source's vendored root. */
   libPath: string;
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
   testPath?: string;
+  /**
+   * Default true. Set to false to vendor the source (so test-compare or other
+   * tooling can read it) without including it in the api-compare PACKAGES
+   * derivation. rack and globalid are vendored today but not yet api-compared
+   * — extract-ruby-api.rb's PACKAGE_DIRS doesn't have entries for them. A
+   * future wave wires them in and removes this flag (see post-merge findings
+   * on PRs #1561 / #1578).
+   */
+  compareApi?: boolean;
 }
 
 export interface UpstreamSource {
@@ -104,7 +116,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/rack/rack.git",
       ref: "v3.1.14",
     },
-    packages: [{ name: "rack", libPath: "lib", testPath: "test" }],
+    packages: [{ name: "rack", libPath: "lib", testPath: "test", compareApi: false }],
   },
   {
     name: "globalid",
@@ -113,7 +125,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/rails/globalid.git",
       ref: "v1.3.0",
     },
-    packages: [{ name: "globalid", libPath: "lib", testPath: "test" }],
+    packages: [{ name: "globalid", libPath: "lib", testPath: "test", compareApi: false }],
   },
 ];
 
@@ -148,3 +160,49 @@ export function validateSources(sources: readonly UpstreamSource[]): void {
 }
 
 validateSources(SOURCES);
+
+const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Absolute path to a vendored package's `lib` (default) or `test` dir, e.g.
+ * `resolvePath("activerecord")` → `/.../vendor/rails/activerecord/lib/active_record`.
+ * Throws if the package isn't in SOURCES, or if `kind` is "test" but the
+ * package has no `testPath`.
+ */
+export function resolvePath(packageName: string, kind: "lib" | "test" = "lib"): string {
+  for (const source of SOURCES) {
+    for (const pkg of source.packages) {
+      if (pkg.name !== packageName) continue;
+      if (kind === "test") {
+        if (!pkg.testPath) {
+          throw new Error(`vendor/sources.ts: package "${packageName}" has no testPath`);
+        }
+        return resolve(VENDOR_DIR, source.name, pkg.testPath);
+      }
+      return resolve(VENDOR_DIR, source.name, pkg.libPath);
+    }
+  }
+  throw new Error(`vendor/sources.ts: no package named "${packageName}"`);
+}
+
+/**
+ * Names of packages eligible for api-compare's PACKAGES list — every package
+ * across all sources whose compareApi flag isn't explicitly set to false.
+ * Wave 4: feeds scripts/api-compare/config.ts so PACKAGES becomes derived
+ * instead of a hand-maintained literal that drifts from SOURCES.
+ */
+export function apiComparePackages(): string[] {
+  return SOURCES.flatMap((s) => s.packages)
+    .filter((p) => p.compareApi !== false)
+    .map((p) => p.name);
+}
+
+/**
+ * Absolute path to a vendored source's clone root, e.g.
+ * `vendoredRoot("rails")` → `/.../vendor/rails`. Throws on unknown name.
+ */
+export function vendoredRoot(sourceName: string): string {
+  const found = SOURCES.find((s) => s.name === sourceName);
+  if (!found) throw new Error(`vendor/sources.ts: no source named "${sourceName}"`);
+  return join(VENDOR_DIR, sourceName);
+}

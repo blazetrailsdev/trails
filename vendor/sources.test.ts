@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { SOURCES, type UpstreamSource, validateSources } from "./sources.js";
+import {
+  apiComparePackages,
+  resolvePath,
+  SOURCES,
+  type UpstreamSource,
+  validateSources,
+  vendoredRoot,
+} from "./sources.js";
 
 describe("vendor/sources.ts", () => {
   it("loads without throwing (wave 1 invariant holds)", () => {
@@ -34,7 +41,9 @@ describe("vendor/sources.ts", () => {
     const rack = SOURCES.find((s) => s.name === "rack");
     expect(rack).toBeDefined();
     expect(rack!.origin.ref).toBe("v3.1.14");
-    expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib", testPath: "test" }]);
+    expect(rack!.packages).toEqual([
+      { name: "rack", libPath: "lib", testPath: "test", compareApi: false },
+    ]);
   });
 
   it("declares the globalid source (wave 3)", () => {
@@ -45,7 +54,9 @@ describe("vendor/sources.ts", () => {
       url: "https://github.com/rails/globalid.git",
       ref: "v1.3.0",
     });
-    expect(gid!.packages).toEqual([{ name: "globalid", libPath: "lib", testPath: "test" }]);
+    expect(gid!.packages).toEqual([
+      { name: "globalid", libPath: "lib", testPath: "test", compareApi: false },
+    ]);
   });
 
   it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
@@ -102,6 +113,61 @@ describe("vendor/sources.ts", () => {
       },
     ];
     expect(() => validateSources(bad)).toThrow(/duplicate package name "shared"/);
+  });
+
+  it("resolvePath returns absolute lib path for a known package", () => {
+    const p = resolvePath("activerecord");
+    expect(p.endsWith("vendor/rails/activerecord/lib/active_record")).toBe(true);
+  });
+
+  it("resolvePath('test') returns absolute test path", () => {
+    const p = resolvePath("activerecord", "test");
+    expect(p.endsWith("vendor/rails/activerecord/test/cases")).toBe(true);
+  });
+
+  it("resolvePath throws for unknown package", () => {
+    expect(() => resolvePath("nope")).toThrow(/no package named "nope"/);
+  });
+
+  it("resolvePath throws when test requested for package without testPath", () => {
+    expect(() => resolvePath("abstractcontroller", "test")).toThrow(/no testPath/);
+  });
+
+  it("vendoredRoot returns absolute source root", () => {
+    expect(vendoredRoot("rails").endsWith("vendor/rails")).toBe(true);
+  });
+
+  it("vendoredRoot throws for unknown source", () => {
+    expect(() => vendoredRoot("nope")).toThrow(/no source named "nope"/);
+  });
+
+  it("apiComparePackages excludes compareApi:false entries (rack, globalid)", () => {
+    const pkgs = apiComparePackages();
+    expect(pkgs).not.toContain("rack");
+    expect(pkgs).not.toContain("globalid");
+    expect(pkgs).toContain("activerecord");
+    expect(pkgs).toContain("abstractcontroller");
+  });
+
+  it("apiComparePackages returns exactly the historic 9-entry api-compare set", () => {
+    // Bulletproofs against a future PR that accidentally toggles compareApi on
+    // an api-compared package, or adds/drops a Rails subgem from SOURCES
+    // without updating extract-ruby-api.rb. If extract-ruby-api.rb's PACKAGE_DIRS
+    // gets derived from SOURCES (a future wave), this assertion needs to grow
+    // with it — that's the intended forcing function.
+    expect(apiComparePackages().sort()).toEqual(
+      [
+        "abstractcontroller",
+        "actioncontroller",
+        "actiondispatch",
+        "actionview",
+        "activemodel",
+        "activerecord",
+        "activesupport",
+        "arel",
+        "trailties",
+      ].sort(),
+    );
   });
 
   it("validateSources rejects missing libPath", () => {

@@ -1,20 +1,18 @@
 import * as path from "path";
 
+import { apiComparePackages } from "../../vendor/sources.js";
+
 export const SCRIPT_DIR = __dirname;
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 export const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-export const PACKAGES = [
-  "arel",
-  "activemodel",
-  "activerecord",
-  "activesupport",
-  "actiondispatch",
-  "actioncontroller",
-  "abstractcontroller",
-  "actionview",
-  "trailties",
-];
+/**
+ * Derived from vendor/sources.ts (single source of truth). Package entries
+ * with `compareApi: false` (rack, globalid today) are filtered out — they're
+ * vendored for test-compare but not yet wired into extract-ruby-api.rb.
+ * A future wave wires them in and the filter naturally goes away.
+ */
+export const PACKAGES = apiComparePackages();
 
 /** Override package → directory mapping when they differ */
 export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
