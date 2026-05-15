@@ -339,30 +339,35 @@ sub-files:
   `actiondispatch/testing/assertions/{response,routing}.ts`.
 - Add `actiondispatch/testing/assertions.ts` aggregator + index.
 
-### Wave 5 — conventions.ts mapping for the trailties exception (~10 LOC)
+### Wave 5 closed — conventions.ts mapping for the trailties exception
 
-The original audit prescribed renaming `actioncontroller/trailties/` →
-`actioncontroller/railties/`. **Reversed (2026-05-14).** `trailties`
-is a deliberate project-wide naming convention: trails railties are
-not `Rails::Railtie` subclasses (different lifecycle, different
-surface), and `scripts/api-compare/conventions.ts:32` already encodes
-the precedent (`activerecord:railtie.rb` → `trailtie.ts`).
+Verified mapping already present in
+`scripts/api-compare/conventions.ts`
+(`"actioncontroller:railties/": "trailties/"` in
+`DIR_PREFIX_OVERRIDES`). The only Rails source file under that path
+(`railties/helpers.rb`) defines just `inherited`, which is in `SKIP`,
+so api:compare has nothing to verify. Closed as no-op; bundled with
+Wave 6 to avoid a doc-only PR.
 
-Action: add a directory-level entry to
-`scripts/api-compare/conventions.ts` so Rails'
-`action_controller/railties/...` paths resolve to our
-`actioncontroller/trailties/...`. Mechanical edit; bundle into Wave 6
-or open standalone.
+### Wave 6 closed — action-dispatch top-level infra files
 
-### Wave 6 — new infra stubs (P3) (1 PR, ~150 LOC)
+Created as real implementations from Rails source (no stubs, per
+project policy):
 
-Add empty/stub-then-implemented files for top-level concerns. Each
-should be either implemented or annotated as "deferred":
-
-- `actiondispatch/railtie.ts`
-- `actiondispatch/deprecator.ts`
-- `actiondispatch/log-subscriber.ts`
-- `actiondispatch/constants.ts`
+- `action-dispatch/deprecator.ts` — `Deprecation` instance for
+  actionpack (mirrors `ActionDispatch.deprecator`).
+- `action-dispatch/log-subscriber.ts` — `LogSubscriber` with
+  `redirect(event)` matching Rails' single subscribed handler.
+- `action-dispatch/constants.ts` — Rack 3 lowercase header constants
+  (the Rack 2 branch in Rails' `constants.rb` is omitted; trails
+  targets Rack 3 only).
+- `action-dispatch/railtie.ts` — **deferred**. Rails'
+  `action_dispatch/railtie.rb` wires 30+ config defaults into classes
+  that don't exist on the trails side yet (`Http::URL.secure_protocol=`,
+  `ParamBuilder.ignore_leading_brackets=`, `QueryParser`,
+  `Cookies::CookieJar.always_write_cookie=`, etc.). Shipping a class
+  with no real initializers would be a stub; adding it now would call
+  setters on phantom classes. Open when the consuming classes land.
 
 Do **not** add empty stubs for `system_testing/` — it's intentionally
 not ported (see Known divergences). `journey/` gets its own wave; do
