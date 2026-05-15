@@ -3,6 +3,7 @@ import {
   getApp as _getGlobalIdApp,
   buildGid as _buildGid,
   Locator as _Locator,
+  GlobalID as _GlobalIDCtor,
 } from "@blazetrails/globalid";
 import type {
   GlobalIDModel,
@@ -2870,6 +2871,23 @@ export class Base extends Model {
     return (await this.toSgid(options)).toParam();
   }
 
+  /** Mirrors: Identification#to_global_id — returns a GlobalID instance. */
+  toGlobalId(
+    options?: import("@blazetrails/globalid").GlobalIDOptions,
+  ): import("@blazetrails/globalid").GlobalID {
+    return _GlobalIDCtor.create(this as unknown as GlobalIDModel, options);
+  }
+
+  /** Mirrors: Identification#to_gid_param — base64url-encoded GID. */
+  toGidParam(options?: import("@blazetrails/globalid").GlobalIDOptions): string {
+    return this.toGlobalId(options).toParam();
+  }
+
+  /** Mirrors: Identification#to_signed_global_id — alias of toSgid. */
+  async toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): Promise<SignedGlobalIDType> {
+    return this.toSgid(options);
+  }
+
   /**
    * Find a record by its GlobalID URI string (or GlobalID instance).
    * Returns null if the GID is invalid, the model class isn't registered, or
@@ -2883,6 +2901,26 @@ export class Base extends Model {
     options?: import("@blazetrails/globalid").LocateOptions,
   ): Promise<unknown | null> {
     return _Locator.locate(input, options);
+  }
+
+  /** Mirrors: ActiveRecord::Base.find_signed_global_id — uses signedIdVerifier(this). */
+  static async findSignedGlobalId(
+    input: string,
+    options?: { for?: string; only?: import("@blazetrails/globalid").LocateOptions["only"] },
+  ): Promise<unknown | null> {
+    const SignedIdModule = await loadSignedId();
+    const verifier = SignedIdModule.signedIdVerifier(this);
+    return _Locator.locateSigned(input, { ...options, verifier });
+  }
+
+  /** Mirrors: ActiveRecord::Base.find_signed_global_id! — throws on miss. */
+  static async findSignedGlobalIdBang(
+    input: string,
+    options?: { for?: string; only?: import("@blazetrails/globalid").LocateOptions["only"] },
+  ): Promise<unknown> {
+    const found = await this.findSignedGlobalId(input, options);
+    if (found == null) throw new RecordNotFound("Couldn't find SignedGlobalID");
+    return found;
   }
 
   // valuesAt / assignAttributes extracted to persistence.ts.
@@ -3582,5 +3620,11 @@ _setGlobalIdModelFinder((name: string) => {
   if (fromBase) return fromBase as unknown as _LocatorModel;
   const fromAssoc = _gidModelRegistry.get(name);
   if (fromAssoc) return fromAssoc as unknown as _LocatorModel;
+  // STI subclasses inherit their parent's adapter, so they don't trigger the
+  // adapter setter that populates _modelsByName. They're tracked via
+  // Base.descendants when registerSubclass() has been called on them.
+  for (const klass of Base.descendants) {
+    if (klass.name === name) return klass as unknown as _LocatorModel;
+  }
   return undefined;
 });

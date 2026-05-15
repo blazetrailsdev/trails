@@ -333,6 +333,33 @@ describe("Base.findGlobalId", () => {
   });
 });
 
+describe("Base.findSignedGlobalId", () => {
+  beforeEach(() => setSignedIdVerifierSecret("blazetrails-test-secret"));
+  afterEach(() => _resetApp());
+
+  it("locates a record by SignedGlobalID token", async () => {
+    setApp("MyApp");
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Bob" });
+    const sgid = await u.toSgid();
+    const found = (await Base.findSignedGlobalId(sgid.toString())) as User;
+    expect(found).toBeInstanceOf(User);
+    expect(found.id).toBe(u.id);
+  });
+
+  it("findSignedGlobalIdBang throws RecordNotFound for invalid token", async () => {
+    setApp("MyApp");
+    await expect(Base.findSignedGlobalIdBang("invalid-token")).rejects.toThrow(RecordNotFound);
+  });
+});
+
 describe("signedId / findSigned / findSignedBang", () => {
   it("generates a signed ID for a persisted record", async () => {
     const adapter = freshAdapter();

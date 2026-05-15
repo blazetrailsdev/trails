@@ -1,4 +1,6 @@
 import { GlobalID } from "./global-id.js";
+import { SignedGlobalID } from "./signed-global-id.js";
+import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 
 /** Duck-typed model interface; globalid stays AR-agnostic. */
 export interface LocatorModel {
@@ -20,6 +22,13 @@ export interface LocateOptions {
    * this option, a missing record causes `find` to throw.
    */
   ignoreMissing?: boolean;
+}
+
+export interface LocateSignedOptions extends LocateOptions {
+  /** Purpose to verify against (Rails: `for:`). */
+  for?: string;
+  /** Verifier to validate the SGID signature. */
+  verifier: MessageVerifier;
 }
 
 /** Lookup function: given a model name, return the class (or undefined). */
@@ -106,6 +115,37 @@ export class Locator {
     }
     return result;
   }
+
+  /**
+   * Mirrors: Locator.locate_signed(sgid, options).
+   * Parses the SGID with the supplied verifier; returns null on invalid
+   * signature, expired token, purpose mismatch, or unknown model class.
+   */
+  static async locateSigned(sgid: string, options: LocateSignedOptions): Promise<unknown | null> {
+    const parsed = SignedGlobalID.parse(sgid, {
+      purpose: options.for,
+      verifier: options.verifier,
+    });
+    if (!parsed) return null;
+    return Locator.locate(parsed.uri, options);
+  }
+
+  /**
+   * Mirrors: Locator.locate_many_signed(sgids, options).
+   * Filters out invalid/expired SGIDs and locates the rest. Empty array if
+   * none verify.
+   */
+  static async locateManySigned(sgids: string[], options: LocateSignedOptions): Promise<unknown[]> {
+    const uris: string[] = [];
+    for (const s of sgids) {
+      const parsed = SignedGlobalID.parse(s, {
+        purpose: options.for,
+        verifier: options.verifier,
+      });
+      if (parsed) uris.push(parsed.uri);
+    }
+    return Locator.locateMany(uris, options);
+  }
 }
 
 function lookupClass(name: string): LocatorModel | undefined {
@@ -129,12 +169,18 @@ async function findRecords(
   ids: unknown[],
   options: LocateOptions,
 ): Promise<unknown[]> {
-  // Composite primary keys don't have a single column to filter by, so fall
-  // through to the batch find path even with ignoreMissing.
+  // Composite primary keys would need where(cols, tuples) — Rails relation
+  // form not yet supported by our AR layer. Fall through to find(ids), which
+  // raises on missing; CPK + ignoreMissing is a known limitation.
   if (options.ignoreMissing && klass.where && !Array.isArray(klass.primaryKey)) {
     const pkKey = klass.primaryKey ?? "id";
     const rel = klass.where({ [pkKey]: ids });
-    const records = await (rel.toArray ? rel.toArray() : []);
+    if (!rel.toArray) {
+      throw new Error(
+        "LocatorModel.where() returned a relation without .toArray() — required for ignoreMissing.",
+      );
+    }
+    const records = await rel.toArray();
     return Array.isArray(records) ? records : [];
   }
   // Rails: model_class.find(ids) — single batch call returning an array.
