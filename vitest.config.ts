@@ -14,6 +14,43 @@ const SHARED_EXCLUDE = [
   "packages/*/dx-tests/**",
 ];
 
+// Adapter-specific test files must not load on a mismatched TEST_ADAPTER run.
+// Shared tests that route through `createTestAdapter` + `SchemaAdapter` will
+// drop tables that adapter-specific files (which construct their own adapter
+// directly) assume stick around for the duration of a describe. See
+// docs/shared-adapter-test-suite-plan.md Phase 1.
+const TEST_ADAPTER = process.env.TEST_ADAPTER ?? "sqlite3";
+const ADAPTER_SPECIFIC_EXCLUDE = [
+  ...(TEST_ADAPTER !== "postgresql"
+    ? [
+        "packages/activerecord/src/adapters/postgresql/**",
+        "packages/activerecord/src/connection-adapters/postgresql/**",
+        "packages/activerecord/src/connection-adapters/postgresql-*.test.ts",
+        "packages/activerecord/src/tasks/postgresql-*.test.ts",
+      ]
+    : []),
+  ...(TEST_ADAPTER !== "mysql2"
+    ? [
+        "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
+        "packages/activerecord/src/adapters/mysql2/**",
+        "packages/activerecord/src/connection-adapters/mysql/**",
+        "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
+        "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.test.ts",
+        "packages/activerecord/src/connection-adapters/mysql-*.test.ts",
+        "packages/activerecord/src/tasks/mysql-*.test.ts",
+      ]
+    : []),
+  ...(TEST_ADAPTER !== "sqlite3"
+    ? [
+        "packages/activerecord/src/adapters/sqlite3/**",
+        "packages/activerecord/src/adapters/sqlite3-*.test.ts",
+        "packages/activerecord/src/connection-adapters/sqlite3/**",
+        "packages/activerecord/src/connection-adapters/sqlite3-*.test.ts",
+        "packages/activerecord/src/tasks/sqlite-*.test.ts",
+      ]
+    : []),
+];
+
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
 const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
 
@@ -93,7 +130,7 @@ export default defineConfig({
         test: {
           name: "activerecord",
           include: ["packages/activerecord/src/**/*.test.ts"],
-          exclude: SHARED_EXCLUDE,
+          exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup.ts",
