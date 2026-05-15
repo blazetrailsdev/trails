@@ -5,7 +5,7 @@
  */
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
-    "Scoped order is ignored, it's forced to be batch order." as const;
+    "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
 
   static readonly DEFAULT_BATCH_SIZE = 1000;
 }
@@ -118,10 +118,16 @@ export function buildBatchOrders(
 
 /** @internal */
 export function actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
-  if (errorOnIgnore) {
+  const raise =
+    errorOnIgnore !== undefined ? errorOnIgnore : activeRecordConfig.errorOnIgnoredOrder;
+  if (raise) {
     throw new Error(Batches.ORDER_IGNORE_MESSAGE);
   }
 }
+
+export const activeRecordConfig = {
+  errorOnIgnoredOrder: false,
+};
 
 /** @internal */
 export function batchOnLoadedRelation(opts: {
@@ -174,28 +180,24 @@ export function compareValuesForOrder(
 }
 
 /** @internal */
-export async function batchOnUnloadedRelation(opts: {
+export async function* batchOnUnloadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
-  load: boolean;
   cursor: string | string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
-  useRanges: boolean | undefined;
-  remaining: number;
   batchLimit: number;
-}): Promise<any[]> {
+  load?: boolean;
+}): AsyncGenerator<any[]> {
   const { relation, cursor, batchLimit } = opts;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  // Base relation: apply start/finish limits once. Per iteration, derive from this
-  // base plus only the single cursor-advance condition — matching Rails' approach
-  // of calling batch_condition(relation, ...) where `relation` is the original
-  // scoped relation, not the previous iteration's batch_relation.
+  // Apply start/finish limits once on the base relation; advance cursor per
+  // iteration — matching Rails' batch_condition(relation, ...) pattern where
+  // `relation` is always the original scoped relation, not the previous batch.
   const baseRelation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders).limit(
     batchLimit,
   );
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
-  const results: any[] = [];
   let lastValues: unknown[] | null = null;
   while (true) {
     const batchRelation =
@@ -207,11 +209,10 @@ export async function batchOnUnloadedRelation(opts: {
             lastValues,
             batchOrders.map(([, ord]) => (ord === "desc" ? "lt" : "gt")),
           );
-    const rows = await batchRelation.toArray();
+    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursorArr)).toArray();
     if (rows.length === 0) break;
-    results.push(rows);
+    yield rows;
     if (rows.length < batchLimit) break;
     lastValues = recordCursorValues(rows[rows.length - 1], cursor);
   }
-  return results;
 }
