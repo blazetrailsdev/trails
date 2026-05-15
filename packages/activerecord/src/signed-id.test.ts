@@ -2,11 +2,11 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, RecordNotFound } from "./index.js";
 import { setSignedIdVerifierSecret, signedIdVerifier } from "./signed-id.js";
-import { SignedGlobalID } from "@blazetrails/globalid/signed-global-id";
+import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -277,7 +277,10 @@ describe("SignedIdTest", () => {
 });
 
 describe("toGid", () => {
-  it("returns a GlobalID-like URI", async () => {
+  afterEach(() => _resetApp());
+
+  it("returns a GlobalID URI with the configured app", async () => {
+    setApp("MyApp");
     const adapter = freshAdapter();
     class User extends Base {
       static {
@@ -287,7 +290,19 @@ describe("toGid", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    expect(u.toGid()).toBe(`gid://User/${u.id}`);
+    expect(u.toGid()).toBe(`gid://MyApp/User/${u.id}`);
+  });
+
+  it("throws when no app is configured", async () => {
+    const adapter = freshAdapter();
+    class User extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ id: 1 });
+    expect(() => u.toGid()).toThrow(/app is required/i);
   });
 });
 
@@ -388,7 +403,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const u = await User.create({ name: "Dave" });
-    const sgid = await u.toSgid({ purpose: "test" });
+    const sgid = await u.toSgid({ purpose: "test", app: "TestApp" });
     expect(sgid.purpose).toBe("test");
     expect(sgid.uri).toContain(`/${u.id}`);
     const parsed = SignedGlobalID.parse(sgid.toParam(), {
@@ -409,8 +424,8 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const u = await User.create({ name: "Eve" });
-    const token = await u.toSgidParam();
+    const token = await u.toSgidParam({ app: "TestApp" });
     expect(typeof token).toBe("string");
-    expect(token).toBe((await u.toSgid()).toParam());
+    expect(token).toBe((await u.toSgid({ app: "TestApp" })).toParam());
   });
 });

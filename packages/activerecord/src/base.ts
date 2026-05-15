@@ -2816,10 +2816,12 @@ export class Base extends Model {
   toGid(): string {
     const ctor = this.constructor as typeof Base;
     const app = _getGlobalIdApp();
-    if (app) {
-      return `gid://${app}/${ctor.name}/${this.id}`;
+    if (!app) {
+      throw new Error(
+        "An app is required to create a GlobalID. Call setApp() from @blazetrails/globalid before using toGid().",
+      );
     }
-    return `gid://${ctor.name}/${this.id}`;
+    return `gid://${app}/${ctor.name}/${this.id}`;
   }
 
   /**
