@@ -562,7 +562,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: aliasAttribute in insertAll / upsertAll
   });
   it.skip("insert all and upsert all with sti", () => {
-    // BLOCKED: STI — insert_all.rb: STI type-column handling
+    // BLOCKED: fixture — test requires the Rails Category / SpecialCategory STI fixture
+    // hierarchy (categories table with `type` discriminator); no STI routing gap (insertAll /
+    // upsertAll set the type column via the existing STI dispatch); gap is missing test fixtures
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
