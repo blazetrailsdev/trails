@@ -12,7 +12,11 @@ import { FlashHash } from "../actiondispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../actiondispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";
-import type { ActionCallback, AroundCallback, CallbackOptions } from "./abstract-controller.js";
+import type {
+  ActionCallback,
+  AroundCallback,
+  CallbackOptions,
+} from "../abstractcontroller/callbacks.js";
 import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../actiondispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";

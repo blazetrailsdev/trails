@@ -1,13 +1,14 @@
 /**
- * AbstractController::ActionNotFound
+ * AbstractController::Error
  *
- * Raised when an action cannot be found for the given controller.
- * @see https://api.rubyonrails.org/classes/AbstractController/ActionNotFound.html
+ * Base error class for AbstractController errors.
+ * @internal
+ * @see https://api.rubyonrails.org/classes/AbstractController/Error.html
  */
 
-export class ActionNotFound extends Error {
-  constructor(message: string) {
+export class AbstractControllerError extends Error {
+  constructor(message?: string) {
     super(message);
-    this.name = "ActionNotFound";
+    this.name = "AbstractControllerError";
   }
 }

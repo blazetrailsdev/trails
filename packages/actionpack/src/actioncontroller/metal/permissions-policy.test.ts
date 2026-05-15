@@ -5,7 +5,7 @@ import {
   permissionsPolicy,
   type PermissionsPolicyBlock,
 } from "./permissions-policy.js";
-import type { CallbackOptions } from "../abstract-controller.js";
+import type { CallbackOptions } from "../../abstractcontroller/callbacks.js";
 
 describe("applyPermissionsPolicy", () => {
   it("removes existing header when policy is false", () => {

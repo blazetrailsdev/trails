@@ -13,8 +13,14 @@ import type {
   CallbackEntry,
 } from "./callbacks.js";
 export type { ActionCallback, AroundCallback, CallbackOptions } from "./callbacks.js";
-import { ActionNotFound } from "./error.js";
-export { ActionNotFound } from "./error.js";
+
+/** Raised when an action cannot be found for the given controller. */
+export class ActionNotFound extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActionNotFound";
+  }
+}
 
 export class AbstractController {
   /** The action currently being processed. */

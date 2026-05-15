@@ -5,7 +5,7 @@
  * response accessors and basic status/header management.
  */
 
-import { AbstractController } from "./abstract-controller.js";
+import { AbstractController } from "../abstractcontroller/base.js";
 import { Request } from "../actiondispatch/http/request.js";
 import { Response } from "../actiondispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";

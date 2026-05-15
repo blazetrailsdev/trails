@@ -6,3 +6,4 @@ export {
   type CallbackOptions,
 } from "./base.js";
 export type { CallbackEntry } from "./callbacks.js";
+export { AbstractControllerError } from "./error.js";
