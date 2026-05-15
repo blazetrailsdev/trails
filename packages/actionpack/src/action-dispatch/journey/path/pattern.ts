@@ -11,6 +11,15 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Escape characters that would be significant inside a `[…]` character class.
+ * Distinct from `escapeRegex` because the metacharacter set is different
+ * (e.g. `.` and `+` are literals inside a class, but `]` and `-` are not).
+ */
+function escapeCharClass(s: string): string {
+  return s.replace(/[\]\\^-]/g, "\\$&");
+}
+
 function regexUnion(re: RegExp | RegExp[]): string {
   const arr = Array.isArray(re) ? re : [re];
   return arr.map((r) => r.source).join("|");
@@ -24,20 +33,29 @@ function regexUnion(re: RegExp | RegExp[]): string {
  *
  * - `g`/`y` are filtered: they change matching semantics in ways that
  *   would break Pattern's anchored regex.
+ * - `m` is filtered for the outer Pattern regex: it changes `^`/`$` to
+ *   match line boundaries, which would break our `^…$` anchoring (Rails'
+ *   `\A…\Z` is unaffected by `/m`). Use `outer: false` when computing
+ *   flags for a contained-source RegExp (e.g. requirementsForMissingKeysCheck)
+ *   to keep `m`.
  * - `u` and `v` are mutually exclusive. If any source uses `v`, `v` wins
- *   (it's the superset); otherwise `u` is preserved when present so
- *   Unicode property escapes (`\p{…}`) remain valid.
- * - `i`/`m`/`s`/`d` are passed through.
+ *   (it's the superset); otherwise `u` is preserved so Unicode property
+ *   escapes (`\p{…}`) remain valid.
+ * - `i`/`s`/`d` are passed through.
  */
-function combinedFlagsFor(values: ReadonlyArray<RegExp | RegExp[]>): string {
+function combinedFlagsFor(
+  values: ReadonlyArray<RegExp | RegExp[]>,
+  opts: { outer?: boolean } = {},
+): string {
+  const outer = opts.outer ?? true;
   const seen = new Set<string>();
   for (const v of values) {
     const arr = Array.isArray(v) ? v : [v];
     for (const r of arr) for (const f of r.flags) seen.add(f);
   }
   const out: string[] = [];
-  for (const f of "imsd") if (seen.has(f)) out.push(f);
-  // `v` supersedes `u`; never include both.
+  for (const f of "isd") if (seen.has(f)) out.push(f);
+  if (!outer && seen.has("m")) out.push("m");
   if (seen.has("v")) out.push("v");
   else if (seen.has("u")) out.push("u");
   return out.join("");
@@ -60,7 +78,7 @@ export class AnchoredRegexp extends Visitor {
     super();
     this._separator = separator;
     this._matchers = matchers;
-    this._separatorRe = `([^${separator}]+)`;
+    this._separatorRe = `([^${escapeCharClass(separator)}]+)`;
   }
 
   override accept(node: Node): RegExp {

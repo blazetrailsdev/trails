@@ -122,6 +122,20 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
     expect(p.isMatch("/page/loVE/aaron")).toBe(true);
   });
 
+  it("does not lift /m flag — would break ^/$ anchoring", () => {
+    // If /m leaked to the outer regex, `^/page/foo$` would match
+    // "anything\n/page/foo" because ^/$ would become line-anchored.
+    const p = buildPath("/page/foo", { ignored: /x/m });
+    expect(p.isMatch("xxx\n/page/foo")).toBe(false);
+    expect(p.isMatch("/page/foo")).toBe(true);
+  });
+
+  it("escapes char-class metacharacters in separators", () => {
+    // Separators containing `]`, `-`, `^`, or `\` would have produced
+    // invalid regex / unintended ranges before escapeCharClass landed.
+    expect(() => buildPath("/:foo", { foo: /.+/ }, "]^-\\", true)).not.toThrow();
+  });
+
   it("propagates /u flag so Unicode property escapes compile", () => {
     // \p{Letter} requires the /u flag — would throw without flag lifting.
     const p = buildPath("/page/:name", { name: /\p{Letter}+/u });
