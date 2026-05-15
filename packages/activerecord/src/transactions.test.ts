@@ -2301,8 +2301,7 @@ describe("SchemaAdapter TM delegation", () => {
   // this.inner.createSavepoint directly — bypassing TM intentionally.
   // After Phase 1, TM may have an open frame when setup() fires inside a
   // test transaction. This test confirms that:
-  //   1. SchemaAdapter satisfies the withinNewTransaction duck-type check,
-  //      so transaction() takes the TM path (not _transactionFallback).
+  //   1. SchemaAdapter routes transaction() through TM.
   //   2. setup() triggered inside a transaction (via DDL recovery) doesn't
   //      interfere with the enclosing SavepointTransaction: TM's commit()
   //      releases the SavepointTransaction's own savepoint name, not the

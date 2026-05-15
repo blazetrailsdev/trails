@@ -13,33 +13,9 @@ import {
   peekCallbackChain as asPeekCallbackChain,
   type AsyncContext,
 } from "@blazetrails/activesupport";
-import { PreparedStatementCacheExpired, Rollback, TransactionIsolationError } from "./errors.js";
+import { Rollback } from "./errors.js";
 export { Rollback };
 
-/**
- * Mirrors Rails' `TransactionManager#after_failure_actions`: when a
- * transaction fails with `PreparedStatementCacheExpired`, clear the
- * cached prepared statements on the current connection so subsequent
- * statements re-PREPARE. The error itself re-raises unchanged —
- * Rails does NOT retry the body.
- *
- * This helper is only used by the fallback transaction path below
- * (for adapters that don't route through TransactionManager, like
- * the test adapter). `TransactionManager` has its own
- * `_afterFailureActions` implementation in
- * `connection-adapters/abstract/transaction.ts`.
- *
- * Reference: activerecord/lib/active_record/connection_adapters/
- * abstract/transaction.rb `TransactionManager#after_failure_actions`.
- */
-function _afterFailureActions(
-  adapter: import("./adapter.js").DatabaseAdapter,
-  error: unknown,
-): void {
-  if (error instanceof PreparedStatementCacheExpired) {
-    adapter.clearCacheBang?.();
-  }
-}
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
@@ -59,27 +35,6 @@ function getTransactionStorage(): AsyncContext<Transaction | null> {
   }
   return _transactionStorage;
 }
-
-// Per-adapter mutex: serializes outermost transactions for the fallback path.
-// Matches Rails where each thread gets its own connection.
-const _adapterLocks = new WeakMap<object, Promise<void>>();
-
-async function acquireAdapterLock(adapter: object): Promise<() => void> {
-  while (_adapterLocks.has(adapter)) {
-    await _adapterLocks.get(adapter);
-  }
-  let release!: () => void;
-  const lock = new Promise<void>((resolve) => {
-    release = () => {
-      _adapterLocks.delete(adapter);
-      resolve();
-    };
-  });
-  _adapterLocks.set(adapter, lock);
-  return release;
-}
-
-let _savepointCounter = 0;
 
 /**
  * Get the currently active transaction, if any.
@@ -122,10 +77,10 @@ export function afterAllTransactionsCommit(fn: () => void | Promise<void>): void
  *
  * Mirrors: ActiveRecord::Base.transaction
  *
- * When the adapter has a TransactionManager (via withinNewTransaction),
- * delegates through the database-statements transaction function which
+ * Delegates through the database-statements transaction function which
  * routes through TransactionManager for proper Rails-style transaction
- * lifecycle. Falls back to direct adapter calls for simple adapters.
+ * lifecycle. Every trails adapter routes transactions through TM
+ * (post TM Phase 3 unification).
  */
 export async function transaction<T>(
   modelClass: typeof Base,
@@ -134,118 +89,27 @@ export async function transaction<T>(
 ): Promise<T | undefined> {
   const adapter = modelClass.adapter;
 
-  // Invariant: every trails adapter begins transactions through TM. The
-  // only legitimate raw `BEGIN` (via `exec()` / `executeMutation`) is
-  // reserved for migrations performing DDL. Transactional fixtures route
-  // through `adapter.beginTransaction()` → TM, so the previously needed
-  // `inTransaction && currentTransaction() === null` "external BEGIN"
-  // bypass is gone (TM Phase 3 unification).
-  if (typeof (adapter as any).withinNewTransaction === "function") {
-    // No per-adapter lock needed: TransactionManager's join-or-savepoint
-    // logic handles concurrent callers. The second caller either joins the
-    // existing transaction (if joinable) or creates a SavepointTransaction.
-    // Locking here would deadlock because withinNewTransaction runs
-    // commit/rollback callbacks before returning.
-    const result = await dbTransaction.call(
-      adapter as any,
-      async (userTx?: unknown) => {
-        let internalTx: Transaction;
-        if (userTx instanceof Transaction) {
-          internalTx = userTx;
-        } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
-          internalTx = (userTx as any)._internalTransaction;
-        } else {
-          const tmCurrent = (adapter as any).currentTransaction?.();
-          internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
-        }
-        return getTransactionStorage().run(internalTx, () => fn(internalTx));
-      },
-      {
-        requiresNew: options?.requiresNew,
-        isolation: options?.isolation,
-        joinable: options?.joinable,
-      },
-    );
-    return result as T | undefined;
-  }
-
-  // Fallback for simple adapters without TransactionManager:
-  // manage transaction lifecycle and callbacks directly.
-  return _transactionFallback(adapter, fn, options);
-}
-
-async function _transactionFallback<T>(
-  adapter: import("./adapter.js").DatabaseAdapter,
-  fn: (tx: Transaction) => Promise<T>,
-  options?: { isolation?: string },
-): Promise<T | undefined> {
-  if (options?.isolation) {
-    throw new TransactionIsolationError(
-      `Transaction isolation level '${options.isolation}' is not yet supported`,
-    );
-  }
-
-  const tx = new Transaction(adapter);
-  // Also check TM's openTransactions so lazy (unmaterialized) transactions are
-  // detected even when adapter.inTransaction is still false.
-  const nested =
-    currentTransaction() !== null || (adapter.openTransactions ?? 0) > 0 || adapter.inTransaction;
-  let releaseLock = nested ? null : await acquireAdapterLock(adapter);
-
-  let result: T;
-  try {
-    if (nested) {
-      // Distinct prefix from the TransactionManager's `active_record_${stack.length}`
-      // naming so a fallback savepoint can't collide with a TM-allocated one on
-      // the same connection (which otherwise lets the TM RELEASE consume the
-      // fallback's savepoint, leaving its later RELEASE to error out).
-      const spName = `active_record_fallback_${++_savepointCounter}`;
-      await adapter.materializeTransactions?.();
-      await adapter.createSavepoint(spName);
-      try {
-        result = await getTransactionStorage().run(tx, () => fn(tx));
-        await adapter.releaseSavepoint(spName);
-      } catch (error) {
-        try {
-          await adapter.rollbackToSavepoint(spName);
-        } catch {}
-        releaseLock?.();
-        releaseLock = null;
-        await tx.rollback();
-        await tx.runAfterRollbackCallbacks();
-        _afterFailureActions(adapter, error);
-        if (error instanceof Rollback) return undefined;
-        throw error;
+  const result = await dbTransaction.call(
+    adapter as any,
+    async (userTx?: unknown) => {
+      let internalTx: Transaction;
+      if (userTx instanceof Transaction) {
+        internalTx = userTx;
+      } else if (userTx && (userTx as any)._internalTransaction instanceof Transaction) {
+        internalTx = (userTx as any)._internalTransaction;
+      } else {
+        const tmCurrent = (adapter as any).currentTransaction?.();
+        internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(adapter);
       }
-    } else {
-      await adapter.beginTransaction();
-      try {
-        result = await getTransactionStorage().run(tx, () => fn(tx));
-        await adapter.commit();
-      } catch (error) {
-        try {
-          await adapter.rollback();
-        } catch {}
-        releaseLock?.();
-        releaseLock = null;
-        await tx.rollback();
-        await tx.runAfterRollbackCallbacks();
-        _afterFailureActions(adapter, error);
-        if (error instanceof Rollback) return undefined;
-        throw error;
-      }
-    }
-    await tx.commit();
-    releaseLock?.();
-    releaseLock = null;
-    await tx.runAfterCommitCallbacks();
-    return result;
-  } catch (error) {
-    if (error instanceof Rollback) return undefined;
-    throw error;
-  } finally {
-    releaseLock?.();
-  }
+      return getTransactionStorage().run(internalTx, () => fn(internalTx));
+    },
+    {
+      requiresNew: options?.requiresNew,
+      isolation: options?.isolation,
+      joinable: options?.joinable,
+    },
+  );
+  return result as T | undefined;
 }
 
 /**
@@ -674,13 +538,6 @@ export async function withTransactionReturningStatus<T>(
 ): Promise<T> {
   const modelClass = this.constructor as typeof Base;
 
-  // Capture whether this is the outermost withTransactionReturningStatus for this
-  // record BEFORE rememberTransactionRecordState initializes _startTransactionState.
-  // Used by the !hasTransactionManager fallback to avoid double-registering callbacks
-  // when update() wraps save() — both call withTransactionReturningStatus, but only
-  // the outermost should schedule committedBang/rolledbackBang.
-  const isOutermostWtrs = (this as any)._startTransactionState == null;
-
   // rememberTransactionRecordState also sets _newRecordBeforeLastCommit.
   const snapshot = rememberTransactionRecordState.call(this);
 
@@ -690,29 +547,15 @@ export async function withTransactionReturningStatus<T>(
   r._transactionAction = undefined;
 
   let status: T;
-  let rolledBack = false;
 
   // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-  // inTransaction covers external transactions (e.g. fixtures) that
-  // TransactionManager doesn't track — same condition used in transaction().
   const adapter = modelClass.adapter;
   const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
-  // TransactionManager path is only active when withinNewTransaction exists AND
-  // we're not in the external-transaction fallback (adapter.inTransaction &&
-  // currentTransaction() === null causes transaction() to use the fallback).
-  const hasTransactionManager =
-    typeof (adapter as any).withinNewTransaction === "function" &&
-    !(currentTransaction() === null && adapter.inTransaction);
 
   await transaction(modelClass, async (tx) => {
     // Enroll record with the TransactionManager so it fires committedBang/
     // rolledbackBang after the transaction commits or rolls back.
-    if (hasTransactionManager) {
-      await addToTransaction.call(
-        this,
-        !hadOuterTransaction || hasTransactionalCallbacks.call(this),
-      );
-    }
+    await addToTransaction.call(this, !hadOuterTransaction || hasTransactionalCallbacks.call(this));
 
     tx.afterRollback(async () => {
       restoreTransactionRecordState.call(this, snapshot);
@@ -721,43 +564,10 @@ export async function withTransactionReturningStatus<T>(
     status = await fn();
     // Ruby truthiness: only false/nil trigger rollback (0, "" are truthy in Ruby)
     if (status === false || status == null) {
-      rolledBack = true;
       throw new Rollback();
     }
     return status;
   });
-
-  // For adapters without a TransactionManager, addToTransaction is a no-op,
-  // so we must schedule callbacks manually.
-  if (!hasTransactionManager) {
-    if (!rolledBack) {
-      const outerTx = currentTransaction();
-      if (outerTx) {
-        // Only register commit/rollback callbacks from the outermost
-        // withTransactionReturningStatus for this record. When update() wraps
-        // save() in its own wTRS, the inner save wTRS runs inside an
-        // intermediate fallback transaction that commits successfully — without
-        // this guard the inner wTRS would register afterCommit(committedBang) on
-        // that intermediate tx, prematurely clearing _triggerUpdateCallback and
-        // preventing after_rollback callbacks from firing on the outer rollback.
-        if (isOutermostWtrs) {
-          outerTx.afterCommit(async () => await committedBang.call(this));
-          outerTx.afterRollback(async () => {
-            // Fire callbacks before restoring state — rolledbackBang needs
-            // isPersisted()/isDestroyed() to reflect what happened during the
-            // transaction, not the pre-transaction state. Matches Rails where
-            // rolledback! fires during rollback, restore runs in ensure.
-            await rolledbackBang.call(this);
-            restoreTransactionRecordState.call(this, snapshot);
-          });
-        }
-      } else {
-        await committedBang.call(this);
-      }
-    } else {
-      await rolledbackBang.call(this);
-    }
-  }
 
   return status!;
 }

@@ -79,10 +79,7 @@ let _setupLock: Promise<void> | null = null;
 
 // Per-inner-adapter mutex for outermost withinNewTransaction calls. Rails uses
 // `connection.lock.synchronize` to serialize concurrent transactions on a
-// shared connection; the `_transactionFallback` path in `transactions.ts` has
-// the equivalent via `_adapterLocks` (Phase 2 will delete that fallback).
-// SchemaAdapter no longer takes the fallback path after Phase 1, so it loses
-// the fallback's serialization. Concurrent `Promise.all([Model.create, ...])`
+// shared connection. Concurrent `Promise.all([Model.create, ...])`
 // callers would otherwise corrupt the TM stack on the shared inner adapter.
 // This mutex restores serialization for that case.
 //
@@ -1093,11 +1090,9 @@ class SchemaAdapter implements DatabaseAdapter {
     this.inner.clearCacheBang?.();
   }
   get inTransaction(): boolean {
-    // Async-chain-aware (see currentTransaction comment). transactions.ts:142
-    // uses adapter.inTransaction in the duck-type check; if we returned true
-    // for foreign chains, that caller would route to _transactionFallback,
-    // bypass the outer mutex, and run as a nested savepoint inside the
-    // unrelated chain's transaction.
+    // Async-chain-aware (see currentTransaction comment): hide the inner
+    // adapter's transaction state from foreign async chains so callers from
+    // unrelated chains don't observe a transaction they aren't part of.
     if (!this._txVisible()) return false;
     return this.inner.inTransaction;
   }

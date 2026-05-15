@@ -985,12 +985,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it.skip("assign ids", async () => {
-    // BLOCKED: transactions — fallback path savepoint lifecycle leak on PG/MySQL
-    // ROOT-CAUSE: HABTM idsWriter→persistReplace routes through _transactionFallback;
-    //   SAVEPOINT lifecycle leaks across error boundaries (PG 25P02, MariaDB orphan
-    //   RELEASE). Passes on SQLite which tolerates aborted savepoints.
-    // SCOPE: docs/tm-unification-plan.md — phases 1-4 (route all adapters through TM,
-    //   delete _transactionFallback, remove HABTM workarounds)
+    // BLOCKED: transactions — savepoint lifecycle leak on PG/MySQL
+    // ROOT-CAUSE: HABTM idsWriter→persistReplace SAVEPOINT lifecycle leaks across
+    //   error boundaries (PG 25P02, MariaDB orphan RELEASE). Passes on SQLite which
+    //   tolerates aborted savepoints.
     const dev = new Developer({ name: "AssignIdsDev", salary: 60000 });
     const p1 = await Project.create({ name: "AI1" });
     const p2 = await Project.create({ name: "AI2" });

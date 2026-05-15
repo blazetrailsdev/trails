@@ -725,8 +725,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async beginTransaction(): Promise<void> {
     // Force materialization (_lazy: false) so _inTransaction is set immediately.
-    // The _transactionFallback path in transactions.ts checks adapter.inTransaction
-    // to decide savepoint-vs-begin; lazy BEGIN causes it to double-BEGIN.
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
