@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { StatementInvalid } from "../../errors.js";
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -192,9 +193,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("habtm table name with schema", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — Song/Album HABTM models with schema-qualified table names
+      // ROOT-CAUSE: test requires AR model layer (Song.create, album.songs, Song.includes) + music schema setup
+      // SCOPE: needs full HABTM + AR model infrastructure beyond adapter-only tests
     });
 
     it("drop schema with nonexisting schema", async () => {
@@ -202,15 +203,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       await expect(adapter.dropSchema("idontexist", { ifExists: true })).resolves.not.toThrow();
     });
 
-    it.skip("raise wrapped exception on bad prepare", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("raise wrapped exception on bad prepare", async () => {
+      // Rails: PG adapter rejects `?` (MySQL placeholder) → StatementInvalid.
+      // Our adapter rewrites `?` → `$1`, so we ensure the error by querying a table
+      // that can never exist in the test schema.
+      await expect(
+        adapter.execQuery(
+          "select * from _schema_test_nonexistent_table_xyz where id = ?",
+          "sql",
+          [1],
+        ),
+      ).rejects.toBeInstanceOf(StatementInvalid);
     });
     it.skip("schema change with prepared stmt", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-prepared-statements — requires adapter.preparedStatements=true path
+      // ROOT-CAUSE: test exercises schema changes invalidating prepared statement cache; our adapter
+      // doesn't expose a prepared_statements toggle in the test helper
+      // SCOPE: needs AdapterPool prepared-statements mode wired in schema test setup
     });
 
     it("data source exists?", async () => {
@@ -277,24 +286,27 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("where with qualified schema name", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — Thing1.where("test_schema.things.name": "thing1")
+      // ROOT-CAUSE: test requires AR model (Thing1, tableName="test_schema.things") + relation where() path
+      // SCOPE: needs full AR model layer + where() with qualified column predicate
     });
     it.skip("pluck with qualified schema name", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — Thing1.pluck(:"test_schema.things.name")
+      // ROOT-CAUSE: test requires AR model (Thing1) + relation pluck() with qualified column
+      // SCOPE: needs full AR model layer
     });
     it.skip("classes with qualified schema name", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — Thing1/Thing2/Thing3/Thing4 models with schema-qualified table names
+      // ROOT-CAUSE: test requires 4 AR models with different qualified table_name settings + count/create
+      // SCOPE: needs full AR model layer
     });
-    it.skip("raise on unquoted schema name", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("raise on unquoted schema name", async () => {
+      // $user without surrounding single quotes is invalid in SET search_path TO (PG
+      // treats $user as a dollar-quoted string start with no closing tag → syntax error).
+      // Rails schema_search_path= uses direct interpolation, so this raises StatementInvalid.
+      await expect(adapter.setSchemaSearchPath("$user,public")).rejects.toBeInstanceOf(
+        StatementInvalid,
+      );
     });
     it("without schema search path", async () => {
       await adapter.setSchemaSearchPath("public");
@@ -439,9 +451,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("prepared statements with multiple schemas", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — Thing5.create + Thing5.count with schema_search_path swapped between schemas
+      // ROOT-CAUSE: test requires AR model (Thing5, tableName="things") with search_path toggled between
+      // SCHEMA_NAME and SCHEMA2_NAME; needs full AR model layer + connection.schema_search_path= setter
+      // SCOPE: needs AR model layer + schema_search_path scoped to AR Base connection
     });
 
     it("schema exists?", async () => {
@@ -484,10 +497,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.indexNameExists(qualifiedTable, newName)).toBe(true);
     });
 
-    it.skip("dumping schemas", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("dumping schemas", async () => {
+      // Must use adapter.createSchemaDumper() to get PgSchemaDumper so schemas()
+      // override runs. SchemaDumper.dump(adapter) uses the base class and skips it.
+      const output = await adapter.createSchemaDumper(adapter).dump();
+      expect(output).not.toMatch(/createSchema\("public"\)/);
+      expect(output).toMatch(/createSchema\("test_schema"\)/);
+      expect(output).toMatch(/createSchema\("test_schema2"\)/);
     });
   });
 
@@ -501,10 +517,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.dropSchema("my_schema", { ifExists: true, cascade: true });
     });
 
-    it.skip("dump foreign key targeting different schema", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+    it("dump foreign key targeting different schema", async () => {
+      try {
+        await adapter.exec(
+          `CREATE TABLE my_schema.trains (id serial primary key, name varchar(50))`,
+        );
+        await adapter.exec(`CREATE TABLE wagons (id serial primary key, train_id integer)`);
+        await adapter.addForeignKey("wagons", "my_schema.trains");
+        const lines: string[] = [];
+        await adapter.createSchemaDumper(adapter).foreignKeys("wagons", lines);
+        const output = lines.join("\n");
+        // FK name "fk_rails_wagons_train_id" is not a 10-hex pattern so it's exported;
+        // match just the table arguments, allowing optional trailing options.
+        expect(output).toMatch(/addForeignKey\("wagons", "my_schema\.trains"/);
+      } finally {
+        await adapter.exec(`DROP TABLE IF EXISTS wagons`);
+        await adapter.exec(`DROP TABLE IF EXISTS my_schema.trains`);
+      }
     });
 
     it("create foreign key same schema", async () => {
@@ -714,9 +743,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("Active Record basics", () => {
-      // BLOCKED: adapter-pg — PostgreSQL-specific adapter gap in schema
-      // ROOT-CAUSE: connection-adapters/postgresql/schema.ts missing or incomplete Rails parity
-      // SCOPE: ~50–200 LOC fix in connection-adapters/postgresql/schema.ts; affects ~10–47 tests in schema.test.ts
+      // BLOCKED: needs-ar-model — requires AR model with tableName in "my.schema" (dot-containing schema name)
+      // ROOT-CAUSE: test exercises AR model CRUD (create/find/update) against a table in a schema named "my.schema"
+      // SCOPE: needs AR model layer + special quoting for dot-in-schema-name table references
     });
   });
 
