@@ -28,6 +28,7 @@ import {
   type ColumnType,
   type ColumnOptions,
   type IdHashOptions,
+  type SchemaStatementsLike,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
 import { quote } from "./quoting.js";
@@ -630,9 +631,58 @@ export class SchemaStatements {
     await this.dropTable(tableName);
   }
 
-  async changeTable(tableName: string, fn?: (t: Table) => void | Promise<void>): Promise<void> {
-    const table = new Table(tableName, this);
-    if (fn) await fn(table);
+  async changeTable(
+    tableName: string,
+    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: Table) => void | Promise<void>,
+  ): Promise<void> {
+    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
+    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+
+    const supportsBulk =
+      typeof (this.adapter as any).supportsBulkAlter === "function" &&
+      (this.adapter as any).supportsBulkAlter() === true;
+
+    if (options.bulk && supportsBulk) {
+      const ops: Array<[string, string, ...unknown[]]> = [];
+      const unsupported = (name: string) => () =>
+        Promise.reject(new Error(`${name} is not supported in bulk changeTable`));
+      const recorder: SchemaStatementsLike = {
+        addIndex: (t, cols, opts) => {
+          ops.push(["addIndex", t, cols, opts ?? {}]);
+          return Promise.resolve();
+        },
+        addColumn: (t, name, type, opts) => {
+          ops.push(["addColumn", t, name, type, opts ?? {}]);
+          return Promise.resolve();
+        },
+        removeColumn: (t, name, type, opts) => {
+          ops.push(["removeColumn", t, name, type ?? undefined, opts ?? {}]);
+          return Promise.resolve();
+        },
+        renameColumn: (t, old_, new_) => {
+          ops.push(["renameColumn", t, old_, new_]);
+          return Promise.resolve();
+        },
+        addTimestamps: (t, opts) => {
+          ops.push(["addTimestamps", t, opts ?? {}]);
+          return Promise.resolve();
+        },
+        removeTimestamps: (t) => {
+          ops.push(["removeTimestamps", t]);
+          return Promise.resolve();
+        },
+        removeIndex: unsupported("removeIndex"),
+        addReference: unsupported("addReference"),
+        removeReference: unsupported("removeReference"),
+      };
+      const bulkTable = new Table(tableName, recorder as any);
+      if (callback) await callback(bulkTable);
+      await this.bulkChangeTable(tableName, ops);
+    } else {
+      const table = new Table(tableName, this);
+      if (callback) await callback(table);
+    }
   }
 
   async renameIndex(_tableName: string, oldName: string, newName: string): Promise<void> {

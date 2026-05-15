@@ -280,7 +280,11 @@ export interface AbstractAdapter {
     fn?: (t: TableDefinition) => void,
   ): Promise<void>;
   dropJoinTable(table1: string, table2: string, options?: Record<string, unknown>): Promise<void>;
-  changeTable(tableName: string, fn?: (t: Table) => void | Promise<void>): Promise<void>;
+  changeTable(
+    tableName: string,
+    fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: Table) => void | Promise<void>,
+  ): Promise<void>;
   tableAliasFor(tableName: string): string;
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
