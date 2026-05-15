@@ -410,7 +410,7 @@ jobs:
       - name: Extract Ruby API
         run: cd scripts/api-compare && RAILS_DIR=$(pnpm -s -C ../.. vendor:fetch --print-paths rails) ruby extract-ruby-api.rb
       - name: Extract Ruby tests
-        run: cd scripts/test-compare && RAILS_DIR=$(pnpm -s -C ../.. vendor:fetch --print-paths rails) RACK_DIR=$(pnpm -s -C ../.. vendor:fetch --print-paths rack) GLOBALID_DIR=$(pnpm -s -C ../.. vendor:fetch --print-paths globalid) ruby extract-ruby-tests.rb
+        run: cd scripts/test-compare && TEST_PATHS_JSON=$(pnpm -s -C ../.. vendor:fetch --print-test-paths) ruby extract-ruby-tests.rb
       - name: API comparison
         run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)

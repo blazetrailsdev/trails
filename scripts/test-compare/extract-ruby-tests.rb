@@ -15,33 +15,28 @@ require "pathname"
 require "time"
 
 SCRIPT_DIR = File.dirname(__FILE__)
-RAILS_DIR = ENV.fetch("RAILS_DIR") do
-  abort "extract-ruby-tests.rb: RAILS_DIR env var not set. Caller must export " \
-        "it via `RAILS_DIR=$(pnpm -s vendor:fetch --print-paths rails)`."
-end
-RACK_DIR = ENV.fetch("RACK_DIR") do
-  abort "extract-ruby-tests.rb: RACK_DIR env var not set. Caller must export " \
-        "it via `RACK_DIR=$(pnpm -s vendor:fetch --print-paths rack)`."
-end
-GLOBALID_DIR = ENV.fetch("GLOBALID_DIR") do
-  abort "extract-ruby-tests.rb: GLOBALID_DIR env var not set. Caller must export " \
-        "it via `GLOBALID_DIR=$(pnpm -s vendor:fetch --print-paths globalid)`."
-end
 OUTPUT_DIR = File.join(SCRIPT_DIR, "output")
 
-# Map packages to their test directories
-PACKAGE_TEST_DIRS = {
-  "arel"          => File.join(RAILS_DIR, "activerecord", "test", "cases", "arel"),
-  "activemodel"   => File.join(RAILS_DIR, "activemodel", "test", "cases"),
-  "activerecord"  => File.join(RAILS_DIR, "activerecord", "test", "cases"),
-  "activesupport" => File.join(RAILS_DIR, "activesupport", "test"),
-  "rack"          => File.join(RACK_DIR, "test"),
-  "actiondispatch" => File.join(RAILS_DIR, "actionpack", "test"),
-  "actioncontroller" => File.join(RAILS_DIR, "actionpack", "test"),
-  "actionview" => File.join(RAILS_DIR, "actionview", "test"),
-  "trailties" => File.join(RAILS_DIR, "railties", "test"),
-  "globalid" => File.join(GLOBALID_DIR, "test", "cases"),
-}
+# PACKAGE_TEST_DIRS is fed by the caller via TEST_PATHS_JSON (a JSON map of
+# {package_name: absolute_test_dir}). Built by vendor/fetch.ts --print-test-paths
+# from vendor/sources.ts so this Ruby script doesn't carry a parallel package
+# table that drifts from the registry.
+TEST_PATHS_JSON = ENV.fetch("TEST_PATHS_JSON") do
+  abort "extract-ruby-tests.rb: TEST_PATHS_JSON env var not set. Caller must export " \
+        "it via `TEST_PATHS_JSON=$(pnpm -s vendor:fetch --print-test-paths)`."
+end
+PACKAGE_TEST_DIRS =
+  begin
+    parsed = JSON.parse(TEST_PATHS_JSON)
+    unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+      abort "extract-ruby-tests.rb: TEST_PATHS_JSON must be a JSON object of " \
+            "{string: string}; got #{parsed.class}. Re-run vendor:fetch --print-test-paths."
+    end
+    parsed
+  rescue JSON::ParserError => e
+    abort "extract-ruby-tests.rb: TEST_PATHS_JSON is not valid JSON (#{e.message}). " \
+          "If you set it manually, re-run via `TEST_PATHS_JSON=$(pnpm -s vendor:fetch --print-test-paths)`."
+  end
 
 # Files/directories to skip (infrastructure, not actual tests)
 SKIP_PATTERNS = [
@@ -526,14 +521,11 @@ end
 # ---- Main ----
 
 def run
-  unless File.directory?(RAILS_DIR)
-    abort "Rails source not found at #{RAILS_DIR}. Run `pnpm vendor:fetch` first."
-  end
-  unless File.directory?(RACK_DIR)
-    abort "Rack source not found at #{RACK_DIR}. Run `pnpm vendor:fetch` first."
-  end
-  unless File.directory?(GLOBALID_DIR)
-    abort "GlobalID source not found at #{GLOBALID_DIR}. Run `pnpm vendor:fetch` first."
+  # Validate per-package paths (the JSON manifest may include paths the user
+  # hasn't fetched yet, e.g. a fresh checkout that skipped pnpm vendor:fetch).
+  PACKAGE_TEST_DIRS.each do |pkg, dir|
+    next if File.directory?(dir)
+    abort "Test directory for #{pkg} not found at #{dir}. Run `pnpm vendor:fetch` first."
   end
 
   Dir.mkdir(OUTPUT_DIR) unless File.directory?(OUTPUT_DIR)
@@ -545,11 +537,6 @@ def run
   }
 
   PACKAGE_TEST_DIRS.each do |pkg_name, pkg_dir|
-    unless File.directory?(pkg_dir)
-      puts "Skipping #{pkg_name}: directory not found at #{pkg_dir}"
-      next
-    end
-
     extractor = TestExtractor.new
 
     # Find test files, excluding arel tests from the activerecord package

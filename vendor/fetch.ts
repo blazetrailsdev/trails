@@ -14,6 +14,10 @@
 //                         a normal fetch if the old dir is absent.
 //   --print-paths:        no fetch; print absolute path of every source,
 //                         one per line. With <name>: print just that one.
+//   --print-test-paths:   no fetch; print JSON map {package: absolute_test_dir}
+//                         for every package with a testPath and
+//                         compareTests !== false. Used by extract-ruby-tests.rb
+//                         via the TEST_PATHS_JSON env var.
 
 import { execFile, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -23,7 +27,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-import { SOURCES, type UpstreamSource } from "./sources.js";
+import { SOURCES, testPathsManifest, type UpstreamSource } from "./sources.js";
 
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");
@@ -189,20 +193,31 @@ function printPaths(filter: string | undefined): void {
   }
 }
 
+function printTestPaths(): void {
+  process.stdout.write(JSON.stringify(testPathsManifest()) + "\n");
+}
+
 export interface ParsedArgs {
   sourceFilter?: string;
   refresh: boolean;
   migrate: boolean;
   printPaths: { active: boolean; name?: string };
+  printTestPaths: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
-  const out: ParsedArgs = { refresh: false, migrate: false, printPaths: { active: false } };
+  const out: ParsedArgs = {
+    refresh: false,
+    migrate: false,
+    printPaths: { active: false },
+    printTestPaths: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--source") out.sourceFilter = argv[++i];
     else if (a === "--refresh") out.refresh = true;
     else if (a === "--migrate") out.migrate = true;
+    else if (a === "--print-test-paths") out.printTestPaths = true;
     else if (a === "--print-paths") {
       const next = argv[i + 1];
       out.printPaths = {
@@ -219,6 +234,10 @@ async function main(argv: string[]): Promise<void> {
 
   if (args.printPaths.active) {
     printPaths(args.printPaths.name);
+    return;
+  }
+  if (args.printTestPaths) {
+    printTestPaths();
     return;
   }
 

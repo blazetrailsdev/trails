@@ -3,6 +3,7 @@ import {
   apiComparePackages,
   resolvePath,
   SOURCES,
+  testPathsManifest,
   type UpstreamSource,
   validateSources,
   vendoredRoot,
@@ -55,7 +56,7 @@ describe("vendor/sources.ts", () => {
       ref: "v1.3.0",
     });
     expect(gid!.packages).toEqual([
-      { name: "globalid", libPath: "lib", testPath: "test", compareApi: false },
+      { name: "globalid", libPath: "lib", testPath: "test/cases", compareApi: false },
     ]);
   });
 
@@ -168,6 +169,30 @@ describe("vendor/sources.ts", () => {
         "trailties",
       ].sort(),
     );
+  });
+
+  it("testPathsManifest returns absolute test dirs for the wave-5 set", () => {
+    const m = testPathsManifest();
+    // Same set as extract-ruby-tests.rb's pre-wave-5 PACKAGE_TEST_DIRS:
+    // 9 Rails+Rack packages + globalid (compareTests defaults to true).
+    // abstractcontroller has no testPath; rack tests live at the source root.
+    expect(Object.keys(m).sort()).toEqual(
+      [
+        "actioncontroller",
+        "actiondispatch",
+        "actionview",
+        "activemodel",
+        "activerecord",
+        "activesupport",
+        "arel",
+        "globalid",
+        "rack",
+        "trailties",
+      ].sort(),
+    );
+    expect(m["activerecord"].endsWith("vendor/rails/activerecord/test/cases")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/test")).toBe(true);
+    expect(m["globalid"].endsWith("vendor/globalid/test/cases")).toBe(true);
   });
 
   it("validateSources rejects missing libPath", () => {
