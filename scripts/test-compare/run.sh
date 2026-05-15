@@ -36,11 +36,11 @@ fi
 if [[ "$CACHE_HIT" -eq 0 ]]; then
   # Single tsx invocation fetches every source registered in vendor/sources.ts.
   pnpm -s vendor:fetch
-  # Vendored sources always land at $ROOT/vendor/<name> — no need to shell
-  # out to tsx three times just to print the same paths.
-  RAILS_DIR="$ROOT/vendor/rails" \
-    RACK_DIR="$ROOT/vendor/rack" \
-    GLOBALID_DIR="$ROOT/vendor/globalid" \
+  # Per-package test paths come from vendor/sources.ts via --print-test-paths
+  # (single JSON map). The Ruby script no longer needs RAILS_DIR / RACK_DIR /
+  # GLOBALID_DIR — adding a new source is one entry in vendor/sources.ts and
+  # the manifest grows automatically.
+  TEST_PATHS_JSON="$(pnpm -s vendor:fetch --print-test-paths)" \
     ruby "$DIR/extract-ruby-tests.rb"
   pnpm tsx "$DIR/extract-ts-tests.ts"
 fi
