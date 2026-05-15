@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env -S npx tsx
 /**
  * Surface TypeScript files whose public API has drifted *beyond* their Rails
  * counterpart — the inverse of `api:compare`.
@@ -564,12 +564,12 @@ function pickPalette(): { palette: Palette; colored: boolean } {
 }
 
 /**
- * Right-pad a colored cell to a target visible width. `colorCount` either
- * returns plain `String(n)` (no color) or wraps it in ANSI escapes that
- * vary in length — small novel counts (<5) get no color and large ones
- * get red+bold+reset (13 invisible chars). Padding off the colored string
- * with a fixed boost misaligns the table for low-count rows. Compute the
- * gap from `String(n).length` so every row matches.
+ * Left-pad a colored numeric cell to a target visible width. `colorCount`
+ * either returns plain `String(n)` (no color) or wraps it in ANSI escapes
+ * that vary in length — small novel counts (<5) get no color and large
+ * ones get red+bold+reset (13 invisible chars). Padding off the colored
+ * string with a fixed boost misaligns the table for low-count rows.
+ * Compute the gap from `String(n).length` so every row right-aligns.
  */
 function padNumCell(n: number, colored: string, width: number): string {
   const visible = String(n).length;
