@@ -1989,9 +1989,13 @@ describe("DefaultScopingTest", () => {
     }
     const dev = await Dev.create({ name: "Eileen", mentor_id: 1 });
     const spy = vi.spyOn(adapter as any, "executeMutation");
-    await dev.update({ name: "Not Eileen" });
-    const updateSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /UPDATE/i.test(s));
-    spy.mockRestore();
+    let updateSql: string | undefined;
+    try {
+      await dev.update({ name: "Not Eileen" });
+      updateSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /UPDATE/i.test(s));
+    } finally {
+      spy.mockRestore();
+    }
     expect(updateSql).toMatch(/mentor_id/);
   });
 
@@ -2006,9 +2010,13 @@ describe("DefaultScopingTest", () => {
     }
     const dev = await Dev2.create({ name: "Eileen", mentor_id: 1 });
     const spy = vi.spyOn(adapter as any, "executeMutation");
-    await dev.destroy();
-    const deleteSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /DELETE/i.test(s));
-    spy.mockRestore();
+    let deleteSql: string | undefined;
+    try {
+      await dev.destroy();
+      deleteSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /DELETE/i.test(s));
+    } finally {
+      spy.mockRestore();
+    }
     expect(deleteSql).toMatch(/mentor_id/);
   });
 });
