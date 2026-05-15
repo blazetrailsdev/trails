@@ -138,11 +138,73 @@ function parseIpAddr(value: string): IPAddr | null {
     return new IPAddr(address, Number(prefixStr));
   }
   if (isIpv6(address)) {
-    if (prefixStr == null) return new IPAddr(address, 128);
+    const canonical = canonicalizeIpv6(address);
+    if (prefixStr == null) return new IPAddr(canonical, 128);
     if (!isValidPrefix(prefixStr, 128)) return null;
-    return new IPAddr(address, Number(prefixStr));
+    return new IPAddr(canonical, Number(prefixStr));
   }
   return null;
+}
+
+/**
+ * Canonicalize an IPv6 address to its RFC 5952 form. Ruby's `IPAddr#to_s`
+ * always emits the canonical form (lowercase hex, no leading zeros per group,
+ * longest run of zero groups compressed to `::`, leftmost run on ties, only
+ * when the run is ≥ 2 groups). IPv4-tailed forms (`::ffff:192.168.0.1`) are
+ * converted to all-hex form to match Ruby (`::ffff:c0a8:1`).
+ *
+ * Without this, two textually different inputs that parse to the same address
+ * (e.g. `2001:DB8::1` vs `2001:db8:0:0:0:0:0:1`) would compare unequal in
+ * `isChanged`, marking the attribute spuriously dirty. PG normalizes on
+ * round-trip, so DB-loaded rows are unaffected — this matters only for
+ * manually-assigned values before save.
+ */
+function canonicalizeIpv6(value: string): string {
+  let head = value;
+  const lastColon = value.lastIndexOf(":");
+  if (lastColon !== -1 && value.slice(lastColon + 1).includes(".")) {
+    const tail = value.slice(lastColon + 1);
+    const [a, b, c, d] = tail.split(".").map(Number);
+    const h1 = ((a << 8) | b).toString(16);
+    const h2 = ((c << 8) | d).toString(16);
+    head = `${value.slice(0, lastColon + 1)}${h1}:${h2}`;
+  }
+
+  let groups: string[];
+  if (head.includes("::")) {
+    const [left, right] = head.split("::");
+    const l = left === "" ? [] : left.split(":");
+    const r = right === "" ? [] : right.split(":");
+    const missing = 8 - l.length - r.length;
+    groups = [...l, ...Array(missing).fill("0"), ...r];
+  } else {
+    groups = head.split(":");
+  }
+
+  groups = groups.map((g) => parseInt(g, 16).toString(16));
+
+  let bestStart = -1;
+  let bestLen = 0;
+  let curStart = -1;
+  let curLen = 0;
+  for (let i = 0; i <= groups.length; i++) {
+    if (i < groups.length && groups[i] === "0") {
+      if (curStart === -1) curStart = i;
+      curLen++;
+    } else {
+      if (curLen > bestLen) {
+        bestStart = curStart;
+        bestLen = curLen;
+      }
+      curStart = -1;
+      curLen = 0;
+    }
+  }
+
+  if (bestLen < 2) return groups.join(":");
+  const before = groups.slice(0, bestStart).join(":");
+  const after = groups.slice(bestStart + bestLen).join(":");
+  return `${before}::${after}`;
 }
 
 /**
