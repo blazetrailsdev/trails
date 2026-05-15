@@ -4,8 +4,12 @@ import {
   buildGid as _buildGid,
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,
+  SignedGlobalID as _SignedGlobalIDType,
 } from "@blazetrails/globalid";
-import type { SignedGlobalID as _SignedGlobalIDType } from "@blazetrails/globalid/signed-global-id";
+// _SignedGlobalIDType is imported from the barrel so Locator.locateSigned's
+// parameter type stays nominally identical. Going through the
+// `/signed-global-id` subpath produces a distinct SignedGlobalID class under
+// src/ vs dist/ resolution (private fields are nominal in TS).
 
 /**
  * Options accepted by {@link Base.toSgid} / {@link Base.toSignedGlobalId} /
