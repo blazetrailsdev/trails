@@ -60,32 +60,27 @@ export class CollectionAssociation extends Association {
    * Loads records by the given IDs and replaces the collection.
    */
   async idsWriter(ids: unknown[]): Promise<void> {
-    if (!this.owner.isNewRecord() && !this.isLoaded()) {
-      await this.loadTarget();
-    }
-    const filteredIds = (ids ?? []).filter((id) => id != null && id !== "");
+    const Klass = this.klass as any;
+    const pk = Klass.primaryKey ?? "id";
+    const filteredIds = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
+
     if (filteredIds.length === 0) {
       this.replace([]);
-    } else {
-      const Klass = this.klass as any;
-      const pk = Klass.primaryKey ?? "id";
-
-      if (Array.isArray(pk)) {
-        const found = await Promise.all(
-          filteredIds.map(async (id) => {
-            const conditions: Record<string, unknown> = {};
-            const idParts = Array.isArray(id) ? id : [id];
-            pk.forEach((col: string, i: number) => {
-              conditions[col] = idParts[i];
-            });
-            return Klass.findBy(conditions);
-          }),
-        );
-        this.replace(found.filter((r): r is Base => r != null));
-      } else if (typeof Klass.where === "function") {
-        const records: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
-        this.replace(records);
-      }
+    } else if (Array.isArray(pk)) {
+      const found = await Promise.all(
+        filteredIds.map(async (id) => {
+          const conditions: Record<string, unknown> = {};
+          const idParts = Array.isArray(id) ? id : [id];
+          pk.forEach((col: string, i: number) => {
+            conditions[col] = idParts[i];
+          });
+          return Klass.findBy(conditions);
+        }),
+      );
+      this.replace(found.filter((r): r is Base => r != null));
+    } else if (typeof Klass.where === "function") {
+      const records: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
+      this.replace(records);
     }
     await this.persistReplace();
   }

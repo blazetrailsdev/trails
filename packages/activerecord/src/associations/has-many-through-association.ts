@@ -39,6 +39,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * no-ops setOwnerAttributes for through and just calls `record.save`),
    * then creates/saves the join row via the through association.
    */
+  // Rails uses scope.pluck(*reflection.association_primary_key) where `scope`
+  // is a JOIN-aware AssociationScope relation.  Our `scope()` only builds a
+  // direct-FK WHERE clause, which produces "no such column: target.owner_id"
+  // for through/HABTM associations.  Load via doAsyncFindTarget (which
+  // correctly uses the join-table path) and cache the PKs instead.
   override async idsReader(): Promise<unknown[]> {
     if (this.isLoaded()) {
       return this.target.map((r) => this.primaryKeyValue(r));
