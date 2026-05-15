@@ -57,12 +57,14 @@ const files = allTs.filter((f) => {
  * identifier-presence matching.
  */
 function stripCommentsAndStrings(src: string): string {
+  // Strings first — otherwise a `//` inside a URL or other quoted literal
+  // would be mistaken for a line comment and chop off the rest of the line.
   return src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "")
     .replace(/`(?:\\.|[^`\\])*`/g, "``")
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
 }
 
 const offenders: string[] = [];

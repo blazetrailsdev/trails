@@ -106,6 +106,28 @@ describe("defineSchema", () => {
       ).rejects.toThrow();
     });
 
+    it("single-element primaryKey array names a non-id PK column (also NOT NULL)", async () => {
+      // The wrapper's documented form for a single-column non-`id` PK is
+      // `primaryKey: [name]` — cover that path so regressions don't slip
+      // past the composite-key test below.
+      await defineSchema(adapter, {
+        single_pk: { columns: { code: "string", label: "string" }, primaryKey: ["code"] },
+      });
+      await adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES ('a','x')`);
+      await expect(
+        adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES ('a','y')`),
+      ).rejects.toThrow();
+      await expect(
+        adapter.executeMutation(`INSERT INTO "single_pk" ("code","label") VALUES (NULL,'z')`),
+      ).rejects.toThrow();
+      const rows = (await adapter.execute(`SELECT * FROM "single_pk"`)) as Array<
+        Record<string, unknown>
+      >;
+      expect(rows).toHaveLength(1);
+      // No auto `id` column when wrapper.primaryKey is set.
+      expect("id" in rows[0]).toBe(false);
+    });
+
     it("composite primary key columns are NOT NULL (matches Rails; SQLite quirk-proof)", async () => {
       await defineSchema(adapter, {
         cpk_nn: {
