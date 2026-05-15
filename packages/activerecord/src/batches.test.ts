@@ -733,20 +733,74 @@ describe("EachTest", () => {
     // ROOT-CAUSE fixed: cursor option supported; needs Subscriber test fixture
   });
 
-  it.skip("in_batches should return no records if the limit is 0 and load is ", () => {
-    // ROOT-CAUSE fixed: inBatches now supports composite PK and limit option
+  it("in_batches should return no records if the limit is 0 and load is ", async () => {
+    const adp = freshAdapter();
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+      }
+    }
+    for (let i = 0; i < 3; i++) await Post.create({ title: `post-${i}` });
+    let total = 0;
+    for await (const batch of Post.limit(0).inBatches({ batchSize: 1 })) {
+      total += (await batch.count()) as number;
+    }
+    expect(total).toBe(0);
   });
 
   it.skip(".find_each respects table alias", () => {
     // ROOT-CAUSE fixed: findEach no longer throws on CPK; table alias needs Relation.create test infra
   });
 
-  it.skip(".in_batches should start from the start option when using composite primary key", () => {
-    // ROOT-CAUSE fixed: inBatches start option works with composite PKs
+  it(".in_batches should start from the start option when using composite primary key", async () => {
+    const adp = freshAdapter();
+    class Order extends Base {
+      static {
+        this.primaryKey = ["shopId", "id"];
+        this.attribute("shopId", "integer");
+        this.attribute("id", "integer");
+        this.adapter = adp;
+      }
+    }
+    await Order.create({ shopId: 1, id: 1 });
+    await Order.create({ shopId: 1, id: 2 });
+    await Order.create({ shopId: 1, id: 3 });
+    const second = (await Order.all().toArray())[1];
+    const startId = [second.readAttribute("shopId"), second.readAttribute("id")];
+    let firstBatch: any = null;
+    for await (const rel of Order.inBatches({ batchSize: 1, start: startId })) {
+      firstBatch = rel;
+      break;
+    }
+    expect(firstBatch).not.toBeNull();
+    const record = (await firstBatch.toArray())[0];
+    expect(record.readAttribute("id")).toBe(second.readAttribute("id"));
   });
 
-  it.skip(".in_batches should end at the finish option when using composite primary key", () => {
-    // ROOT-CAUSE fixed: inBatches finish option works with composite PKs
+  it(".in_batches should end at the finish option when using composite primary key", async () => {
+    const adp = freshAdapter();
+    class Order extends Base {
+      static {
+        this.primaryKey = ["shopId", "id"];
+        this.attribute("shopId", "integer");
+        this.attribute("id", "integer");
+        this.adapter = adp;
+      }
+    }
+    await Order.create({ shopId: 1, id: 1 });
+    await Order.create({ shopId: 1, id: 2 });
+    await Order.create({ shopId: 1, id: 3 });
+    const allOrders = await Order.all().toArray();
+    const secondToLast = allOrders[allOrders.length - 2];
+    const finishId = [secondToLast.readAttribute("shopId"), secondToLast.readAttribute("id")];
+    const batches: any[] = [];
+    for await (const rel of Order.inBatches({ batchSize: 1, finish: finishId })) {
+      batches.push(rel);
+    }
+    const lastBatch = batches[batches.length - 1];
+    const records = await lastBatch.toArray();
+    expect(records[records.length - 1].readAttribute("id")).toBe(secondToLast.readAttribute("id"));
   });
 });
 

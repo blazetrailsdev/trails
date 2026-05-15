@@ -3221,6 +3221,38 @@ export class Relation<T extends Base> {
 
     const batchOrders = _buildBatchOrders(cursorArr, order as any);
 
+    let remaining: number | null = null;
+    let effectiveBatchSize = batchSize;
+    if (this._limitValue !== null) {
+      remaining = this._limitValue;
+      if (remaining === 0) {
+        return new BatchEnumerator(async function* () {}, batchSize);
+      }
+      if (remaining < effectiveBatchSize) effectiveBatchSize = remaining;
+    }
+
+    if (this._loaded) {
+      const loadedBatches = _batchOnLoadedRelation({
+        relation: this,
+        start,
+        finish,
+        cursor: cursorArr,
+        order: (order ?? "asc") as any,
+        batchLimit: effectiveBatchSize,
+      });
+      return new BatchEnumerator(async function* () {
+        for (const batchRows of loadedBatches) {
+          const batchRel = self._clone();
+          batchRel._orderClauses = batchOrders.map(
+            ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+          );
+          (batchRel as any)._records = batchRows;
+          (batchRel as any)._loaded = true;
+          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
+        }
+      }, effectiveBatchSize);
+    }
+
     return new BatchEnumerator(
       async function* () {
         const rel = self._clone();
@@ -3232,10 +3264,14 @@ export class Relation<T extends Base> {
           finish,
           cursor: cursorArr,
           order: (order ?? "asc") as any,
-          batchLimit: batchSize,
+          batchLimit: effectiveBatchSize,
           load,
+          remaining,
         })) {
           const batchRel = self._clone();
+          batchRel._orderClauses = batchOrders.map(
+            ([col, dir]) => [col, dir] as [string, "asc" | "desc"],
+          );
           const tuples = (batchRows as any[]).map((r) =>
             cursorArr.map((c) => (r as any).readAttribute(c)),
           );
@@ -3255,7 +3291,7 @@ export class Relation<T extends Base> {
           yield stripThenable(batchRel);
         }
       } as () => AsyncGenerator<LoadedRelation<Relation<T>>>,
-      batchSize,
+      effectiveBatchSize,
     );
   }
 

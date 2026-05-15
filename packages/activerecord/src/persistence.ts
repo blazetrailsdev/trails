@@ -243,6 +243,9 @@ export async function _updateRecord(
     um.where(table.get(col).eq(val));
   }
 
+  const defaultConstraint = buildDefaultConstraint.call(this as any);
+  if (defaultConstraint != null) um.where(defaultConstraint as any);
+
   const adapter = (this as any).adapter;
   if (typeof adapter.update === "function") {
     return adapter.update(um);
@@ -267,6 +270,9 @@ export async function _deleteRecord(
   for (const [col, val] of Object.entries(constraints)) {
     dm.where(table.get(col).eq(val));
   }
+
+  const defaultConstraint = buildDefaultConstraint.call(this as any);
+  if (defaultConstraint != null) dm.where(defaultConstraint as any);
 
   const adapter = (this as any).adapter;
   if (typeof adapter.delete === "function") {
@@ -1379,14 +1385,14 @@ function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown
 }
 
 /** @internal */
-function buildDefaultConstraint(this: {
+export function buildDefaultConstraint(this: {
   defaultScopes?: { allQueries: boolean; scope: (rel: any) => any }[];
   defaultScoped(
     scope?: any,
     options?: { allQueries?: boolean | null },
-  ): { whereClause: { isEmpty(): boolean; ast: unknown } };
+  ): { _whereClause: { isEmpty(): boolean; ast: unknown } };
 }): unknown {
   if (!this.defaultScopes?.some((s) => s.allQueries)) return undefined;
-  const defaultWhereClause = this.defaultScoped(undefined, { allQueries: true }).whereClause;
+  const defaultWhereClause = this.defaultScoped(undefined, { allQueries: true })._whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }

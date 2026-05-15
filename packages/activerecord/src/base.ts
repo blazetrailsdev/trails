@@ -2665,6 +2665,8 @@ export class Base extends Model {
         um.where(table.get(lockCol).eq(Number(rawVersion) || 0));
       }
     }
+    const updateDefaultConstraint = _Persistence.buildDefaultConstraint.call(ctor as any);
+    if (updateDefaultConstraint != null) um.where(updateDefaultConstraint as any);
 
     const umVisitor = ctor.adapter.arelVisitor;
     this._pendingOperation = ctor.adapter
@@ -2705,6 +2707,8 @@ export class Base extends Model {
             dm.where(table.get(lockCol).eq(Number(currentVersion) || 0));
           }
         }
+        const destroyDefaultConstraint = _Persistence.buildDefaultConstraint.call(ctor as any);
+        if (destroyDefaultConstraint != null) dm.where(destroyDefaultConstraint as any);
 
         const affected = await ctor.adapter.execDelete(dm.toSql(), `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected === 0) {

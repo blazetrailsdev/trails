@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, Relation } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
@@ -1976,5 +1976,47 @@ describe("DefaultScopingTest", () => {
     const allQueriesSql = (Article as any).defaultScoped(base, { allQueries: true }).toSql();
     expect(allQueriesSql).not.toContain("visible");
     expect(allQueriesSql).toContain("blog_id");
+  });
+
+  it("default_scope_with_all_queries_runs_on_update", async () => {
+    class Dev extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("mentor_id", "integer");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ mentor_id: 1 }), { allQueries: true });
+      }
+    }
+    const dev = await Dev.create({ name: "Eileen", mentor_id: 1 });
+    const spy = vi.spyOn(adapter as any, "executeMutation");
+    let updateSql: string | undefined;
+    try {
+      await dev.update({ name: "Not Eileen" });
+      updateSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /UPDATE/i.test(s));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(updateSql).toMatch(/mentor_id/);
+  });
+
+  it("default_scope_with_all_queries_runs_on_destroy", async () => {
+    class Dev2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("mentor_id", "integer");
+        this.adapter = adapter;
+        this.defaultScope((rel: any) => rel.where({ mentor_id: 1 }), { allQueries: true });
+      }
+    }
+    const dev = await Dev2.create({ name: "Eileen", mentor_id: 1 });
+    const spy = vi.spyOn(adapter as any, "executeMutation");
+    let deleteSql: string | undefined;
+    try {
+      await dev.destroy();
+      deleteSql = spy.mock.calls.map((c) => c[0] as string).find((s) => /DELETE/i.test(s));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(deleteSql).toMatch(/mentor_id/);
   });
 });
