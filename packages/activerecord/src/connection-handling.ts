@@ -235,7 +235,7 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = WRITING_ROLE, shard = "default" } = options;
+  const { role = WRITING_ROLE, shard = defaultShard.call(this) } = options;
   const preventWrites = role === READING_ROLE || !!options.preventWrites;
   appendToConnectedToStack({
     role,

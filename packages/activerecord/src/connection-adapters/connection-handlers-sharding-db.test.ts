@@ -1,8 +1,29 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
-import { currentRole } from "../core.js";
+import { currentRole, connectedToStack } from "../core.js";
+
+function withBaseConfigs(
+  raw: Record<string, unknown>,
+  fn: () => void,
+  opts: { defaultEnv?: string } = {},
+): void {
+  const prevConfigs = (Base as any).configurations;
+  const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
+  const prevCurrent = (DatabaseConfigurations as any).current;
+  if (opts.defaultEnv) DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+  (Base as any).configurations = raw;
+  try {
+    fn();
+  } finally {
+    (Base as any).configurations = prevConfigs;
+    DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+    (DatabaseConfigurations as any).current = prevCurrent;
+    Base.connectionHandler.clearAllConnectionsBang();
+  }
+}
 
 describe("ConnectionHandlersShardingDbTest", () => {
   afterEach(() => {
@@ -15,11 +36,93 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it.skip("establishing a connection in connected to block uses current role and shard", () => {
     // BLOCKED: connection-pool — needs file-backed DB; establish_connection inside connected_to
   });
-  it.skip("establish connection using 3 levels config", () => {
-    // BLOCKED: connection-pool — shard config lookup + pool name assertions; Slot C-b
+  it("establish connection using 3 levels config", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: ":memory:" },
+          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
+        },
+      },
+      () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "primary", reading: "primary" },
+            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one" },
+          },
+        });
+
+        const basePool = Base.connectionHandler.retrieveConnectionPool("Base");
+        const defaultPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          shard: "default",
+        });
+
+        expect((Base.connectionHandler as any).getPoolManager("Base")!.shardNames).toEqual([
+          "default",
+          "shard_one",
+        ]);
+        expect(basePool).toBe(defaultPool);
+        expect(defaultPool!.dbConfig.name).toBe("primary");
+
+        const shardOnePool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          shard: "shard_one",
+        });
+        expect(shardOnePool).not.toBeUndefined();
+        expect(shardOnePool!.dbConfig.name).toBe("primary_shard_one");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
-  it.skip("establish connection using 3 levels config with shards and replica", () => {
-    // BLOCKED: connection-pool — shard config lookup + pool name assertions; Slot C-b
+  it("establish connection using 3 levels config with shards and replica", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: ":memory:" },
+          primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
+          primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        },
+      },
+      () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "primary", reading: "primary_replica" },
+            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+          },
+        });
+
+        const defaultWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          shard: "default",
+        });
+        const baseWritingPool = Base.connectionHandler.retrieveConnectionPool("Base");
+        expect(baseWritingPool).toBe(defaultWritingPool);
+        expect(defaultWritingPool!.dbConfig.name).toBe("primary");
+
+        const defaultReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "reading",
+          shard: "default",
+        });
+        const baseReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "reading",
+        });
+        expect(baseReadingPool).toBe(defaultReadingPool);
+        expect(defaultReadingPool!.dbConfig.name).toBe("primary_replica");
+
+        const shardOneWritingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          shard: "shard_one",
+        });
+        expect(shardOneWritingPool).not.toBeUndefined();
+        expect(shardOneWritingPool!.dbConfig.name).toBe("primary_shard_one");
+
+        const shardOneReadingPool = Base.connectionHandler.retrieveConnectionPool("Base", {
+          role: "reading",
+          shard: "shard_one",
+        });
+        expect(shardOneReadingPool).not.toBeUndefined();
+        expect(shardOneReadingPool!.dbConfig.name).toBe("primary_shard_one_replica");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("switching connections via handler", () => {
@@ -77,8 +180,40 @@ describe("ConnectionHandlersShardingDbTest", () => {
     }
   });
 
-  it.skip("retrieves proper connection with nested connected to", () => {
-    // BLOCKED: connection-pool — nested shard switching; Slot C-b
+  it("retrieves proper connection with nested connected to", () => {
+    withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: ":memory:" },
+          primary_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+          primary_shard_one: { adapter: "sqlite3", database: ":memory:" },
+          primary_shard_one_replica: { adapter: "sqlite3", database: ":memory:", replica: true },
+        },
+      },
+      () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "primary", reading: "primary_replica" },
+            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+          },
+        });
+
+        Base.connectedTo({ role: "reading", shard: "shard_one" }, () => {
+          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+
+          Base.connectedTo({ role: "writing" }, () => {
+            expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one");
+          });
+
+          Base.connectedTo({ role: "reading", shard: "default" }, () => {
+            expect(Base.connectionPool().dbConfig.name).toBe("primary_replica");
+          });
+
+          expect(Base.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+        });
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("connected to raises without a shard or role", () => {
@@ -105,14 +240,80 @@ describe("ConnectionHandlersShardingDbTest", () => {
     expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
   });
 
-  it.skip("calling connected to on a non existent shard raises", () => {
-    // BLOCKED: connection-pool — Slot C-b
+  it("calling connected to on a non existent shard raises", () => {
+    withBaseConfigs(
+      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
+      () => {
+        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        let error: any;
+        try {
+          Base.connectedTo({ role: "reading", shard: "foo" }, () => {
+            Base.connectionPool();
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe(
+          "No database connection defined for 'foo' shard and 'reading' role.",
+        );
+        expect(error.connectionName).toBe("Base");
+        expect(error.shard).toBe("foo");
+        expect(error.role).toBe("reading");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
-  it.skip("calling connected to on a non existent role for shard raises", () => {
-    // BLOCKED: connection-pool — Slot C-b
+  it("calling connected to on a non existent role for shard raises", () => {
+    withBaseConfigs(
+      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
+      () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "arunit", reading: "arunit" },
+            shard_one: { writing: "arunit", reading: "arunit" },
+          },
+        });
+        let error: any;
+        try {
+          Base.connectedTo({ role: "non_existent", shard: "shard_one" }, () => {
+            Base.connectionPool();
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe(
+          "No database connection defined for 'shard_one' shard and 'non_existent' role.",
+        );
+        expect(error.connectionName).toBe("Base");
+        expect(error.shard).toBe("shard_one");
+        expect(error.role).toBe("non_existent");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
-  it.skip("calling connected to on a default role for non existent shard raises", () => {
-    // BLOCKED: connection-pool — Slot C-b
+  it("calling connected to on a default role for non existent shard raises", () => {
+    withBaseConfigs(
+      { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
+      () => {
+        Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        let error: any;
+        try {
+          Base.connectedTo({ shard: "foo" }, () => {
+            Base.connectionPool();
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe("No database connection defined for 'foo' shard.");
+        expect(error.connectionName).toBe("Base");
+        expect(error.shard).toBe("foo");
+        expect(error.role).toBe("writing");
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("cannot swap shards while prohibited", () => {
@@ -164,6 +365,30 @@ describe("ConnectionHandlersShardingDbTest", () => {
       expect(SomeOtherBase.defaultShard()).toBe("default");
     } finally {
       Base.connectionHandler.clearAllConnectionsBang();
+    }
+  });
+
+  it("connectingTo uses the class defaultShard when shard is omitted", () => {
+    class ShardedAbstractBase extends Base {
+      static override abstractClass = true;
+    }
+    try {
+      ShardedAbstractBase.connectsTo({
+        shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
+      });
+    } finally {
+      Base.connectionHandler.clearAllConnectionsBang();
+    }
+    expect(ShardedAbstractBase.defaultShard()).toBe("not_default");
+
+    ShardedAbstractBase.connectingTo({ role: "writing" });
+    try {
+      expect(ShardedAbstractBase.connectedToQ({ role: "writing", shard: "not_default" })).toBe(
+        true,
+      );
+    } finally {
+      // pop the stack entry added by connectingTo
+      connectedToStack().pop();
     }
   });
 
