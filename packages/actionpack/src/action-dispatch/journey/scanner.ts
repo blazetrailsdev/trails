@@ -18,6 +18,8 @@ export class Scanner {
   private _pos = 0;
   private _length = 0;
 
+  constructor() {}
+
   scanSetup(str: string): void {
     this._str = str;
     this._pos = 0;
@@ -41,6 +43,7 @@ export class Scanner {
     return this.lastString().replace(/\\/g, "");
   }
 
+  /** @internal */
   private _scan(): Token | null {
     const ch = this._str[this._pos];
     const staticTok = STATIC_TOKENS[ch];
@@ -71,6 +74,7 @@ export class Scanner {
     return "LITERAL";
   }
 
+  /** @internal */
   private _nextByteIsNotAToken(): boolean {
     const next = this._str[this._pos + 1];
     return next === undefined || STATIC_TOKENS[next] === undefined;
