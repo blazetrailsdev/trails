@@ -37,6 +37,37 @@ describe("vendor/sources.ts", () => {
     expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib", testPath: "test" }]);
   });
 
+  it("declares the globalid source (wave 3)", () => {
+    const gid = SOURCES.find((s) => s.name === "globalid");
+    expect(gid).toBeDefined();
+    expect(gid!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/rails/globalid.git",
+      ref: "v1.3.0",
+    });
+    expect(gid!.packages).toEqual([{ name: "globalid", libPath: "lib", testPath: "test" }]);
+  });
+
+  it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
+    // Catches the failure mode "added to sources.ts, forgot pnpm vendor:fetch":
+    // the committed lockfile would be missing the new source's SHA, leaving
+    // every fresh checkout to write a different SHA on first fetch and break
+    // reproducibility. Reading via fs (not import) so this test doesn't pin
+    // a stale require-cache copy if someone runs vendor:fetch mid-suite.
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const lock = JSON.parse(readFileSync(join(here, "sources.lock.json"), "utf8")) as {
+      sources: Record<string, { ref: string; sha: string }>;
+    };
+    for (const source of SOURCES) {
+      const entry = lock.sources[source.name];
+      expect(entry, `missing lockfile entry for ${source.name}`).toBeDefined();
+      expect(entry.ref, `lockfile ref drift for ${source.name}`).toBe(source.origin.ref);
+    }
+  });
+
   it("contains every scripts/api-compare/config.ts PACKAGES key (parity for wave 4 derivation)", async () => {
     // Wave 4 will derive PACKAGES from SOURCES. SOURCES may legitimately
     // contain extras not in PACKAGES (e.g. "rack" — vendored for test-compare

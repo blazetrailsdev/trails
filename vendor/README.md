@@ -15,12 +15,13 @@ schema-parity tooling.
 
 ## Status
 
-| Wave | Status  | What landed                                                                       |
-| ---- | ------- | --------------------------------------------------------------------------------- |
-| 1    | this PR | schema + rails-only `SOURCES` list                                                |
-| 2    | pending | `fetch.ts`, `sources.lock.json`, rack entry, migrate `.rails-source/.rack-source` |
-| 3    | pending | globalid entry (git clone of `rails/globalid`)                                    |
-| 4    | pending | `api-compare` reads from `resolvePath`; derive `PACKAGES`                         |
-| 5    | pending | `test-compare` reads from `resolvePath`                                           |
-| 6    | pending | globalid wired through both compares                                              |
-| 7    | pending | doc + memory sweep; generate parity Gemfile from `SOURCES`                        |
+| Wave | Status  | What landed                                                                        |
+| ---- | ------- | ---------------------------------------------------------------------------------- |
+| 1    | merged  | schema + rails-only `SOURCES` list (#1559)                                         |
+| 2a   | merged  | `fetch.ts` + lockfile + rack entry + parallel fetch (#1561)                        |
+| 2b   | merged  | consumers cut over; old `.rails-source/.rack-source` retired (#1563)               |
+| 3    | this PR | globalid entry (git clone of `rails/globalid`); `scripts/globalid-source/` deleted |
+| 4    | pending | `api-compare` derives `PACKAGES` from `SOURCES`; rack/globalid api-compare wiring  |
+| 5    | pending | `test-compare` reads from `resolvePath`                                            |
+| 6    | pending | globalid quoted test count + final wiring confirmation                             |
+| 7    | pending | doc + memory sweep; generate parity Gemfile from `SOURCES`                         |

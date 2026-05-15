@@ -1,5 +1,9 @@
 {
   "sources": {
+    "globalid": {
+      "ref": "v1.3.0",
+      "sha": "a10102196ceaa9ffec3744eda857ebe421a57134"
+    },
     "rack": {
       "ref": "v3.1.14",
       "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
