@@ -8,6 +8,15 @@ export interface DelegatedTypeOptions {
   types: string[];
   foreignKey?: string;
   foreignType?: string;
+  /**
+   * Primary key column on the delegated-type target models.
+   * Defaults to "id". Set to "uuid" (or another column name) when the
+   * target models use a non-integer primary key — e.g.
+   * `delegatedType(Entry, "entryable", { types: [...], primaryKey: "uuid", foreignKey: "entryable_uuid" })`.
+   * Mirrors Rails' `:primary_key` option, which controls the name of the
+   * generated `${singular}_${primaryKey}` accessor on each type.
+   */
+  primaryKey?: string;
 }
 
 /**
@@ -45,6 +54,7 @@ export function delegatedType(
 ): void {
   const foreignKey = options.foreignKey ?? `${role}_id`;
   const foreignType = options.foreignType ?? `${role}_type`;
+  const primaryKey = options.primaryKey ?? "id";
   const config = { ...options, foreignKey, foreignType };
 
   // Rails: belongs_to role, **options.merge(polymorphic: true)
@@ -113,8 +123,18 @@ export function delegatedType(
       configurable: true,
     });
 
-    // Accessor: entry.message → returns the record if type matches
+    // Accessor: entry.message → returns the FK value if type matches
     Object.defineProperty(modelClass.prototype, snakeName, {
+      get(this: Base) {
+        if (this.readAttribute(foreignType) !== typeName) return null;
+        return this.readAttribute(foreignKey);
+      },
+      configurable: true,
+    });
+
+    // FK accessor: entry.message_id (or entry.message_uuid for UUID PKs) → returns FK if type matches
+    // Mirrors Rails' define_method("#{singular}_#{primary_key}") { public_send(role_id) if public_send(query) }
+    Object.defineProperty(modelClass.prototype, `${snakeName}_${primaryKey}`, {
       get(this: Base) {
         if (this.readAttribute(foreignType) !== typeName) return null;
         return this.readAttribute(foreignKey);
