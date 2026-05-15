@@ -81,8 +81,9 @@ export class AnchoredRegexp extends Visitor {
 
   protected override visitSTAR(node: Node): string {
     const inner = (node as Star).left as Node;
-    const re = this._matchers[inner.toSym()];
-    return re ? `(${regexUnion(re)})` : "(.+)";
+    const name = inner.toSym();
+    if (!Object.hasOwn(this._matchers, name)) return "(.+)";
+    return `(${regexUnion(this._matchers[name]!)})`;
   }
 
   protected override visitOR(node: Node): string {
