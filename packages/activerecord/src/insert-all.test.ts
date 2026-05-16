@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
 import { adapterType, createTestAdapter } from "./test-adapter.js";
@@ -193,10 +193,10 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Existing", author: "Author" });
-    const supports = (
-      adapter as { supportsInsertConflictTarget?: () => boolean }
-    ).supportsInsertConflictTarget?.();
-    if (supports) {
+    // Read from adapterType, not adapter.supportsInsertConflictTarget(): PG's
+    // implementation reads databaseVersion synchronously, which throws before
+    // the first connection has populated the version cache.
+    if (supportsConflictTarget) {
       await Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" });
       const found = await Book.find(b.id);
       expect(found.title).toBe("Updated");
@@ -1070,15 +1070,19 @@ describe("InsertAll async uniqueIndexes regression", () => {
         }
       }
 
-      const captured: string[] = [];
-      const orig = adapter.executeMutation.bind(adapter);
-      (adapter as any).executeMutation = (sql: string, ...rest: unknown[]) => {
-        captured.push(sql);
-        return (orig as any)(sql, ...rest);
-      };
-
-      await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });
-      const upsertSql = captured.find((s) => s.includes("ON CONFLICT"));
+      // vi.spyOn passes through to the original by default and records calls;
+      // mockRestore in finally guarantees the patched method is restored even
+      // if the upsert throws, so the adapter never leaks a spied method.
+      const spy = vi.spyOn(adapter, "executeMutation");
+      let upsertSql: string | undefined;
+      try {
+        await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });
+        upsertSql = spy.mock.calls
+          .map((c) => c[0] as string)
+          .find((s) => s.includes("ON CONFLICT"));
+      } finally {
+        spy.mockRestore();
+      }
       expect(upsertSql).toBeDefined();
       expect(upsertSql).toMatch(/ON CONFLICT \("key"\) WHERE "active"/);
     },
