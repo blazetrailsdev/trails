@@ -20,7 +20,7 @@ import {
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache } from "./schema-cache.js";
+import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -759,6 +759,23 @@ export class AbstractAdapter implements Quoting {
       if (poolConfig) poolConfig.schemaCache = this._schemaCache;
     }
     return this._schemaCache;
+  }
+
+  /**
+   * One-arg `indexes(tableName)` form of the schema cache. Pool-backed
+   * adapters reuse the pool's BoundSchemaReflection; standalone adapters
+   * (tests, bare adapters) wrap themselves as the pool so SchemaCache
+   * methods that need a pool handle can still call back into this adapter.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
+   */
+  get schemaCacheBound(): BoundSchemaReflection {
+    const pool = this.pool as { schemaCache?: BoundSchemaReflection } | null;
+    if (pool?.schemaCache instanceof BoundSchemaReflection) return pool.schemaCache;
+    return BoundSchemaReflection.forLoneConnection(
+      new SchemaReflection(null, this.schemaCache),
+      this,
+    );
   }
 
   checkIfWriteQuery(sql: string): void {

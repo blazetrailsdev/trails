@@ -745,6 +745,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.databaseVersion.gte("3.24.0");
   }
 
+  override supportsInsertConflictTarget(): boolean {
+    return this.supportsInsertOnConflict();
+  }
+
   override supportsConcurrentConnections(): boolean {
     return !this._memoryDatabase;
   }

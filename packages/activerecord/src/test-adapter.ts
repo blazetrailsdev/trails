@@ -1235,6 +1235,19 @@ class SchemaAdapter implements DatabaseAdapter {
     );
   }
 
+  supportsInsertConflictTarget(): boolean {
+    return (
+      (
+        this.inner as { supportsInsertConflictTarget?: () => boolean }
+      ).supportsInsertConflictTarget?.() ?? false
+    );
+  }
+
+  async getDatabaseVersion(): Promise<unknown> {
+    const inner = this.inner as { getDatabaseVersion?: () => Promise<unknown> };
+    return inner.getDatabaseVersion?.();
+  }
+
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const inner = this.inner as {
       getAdvisoryLock?: (id: number | bigint | string) => Promise<boolean>;
