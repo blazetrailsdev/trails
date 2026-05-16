@@ -49,12 +49,15 @@ export class GlobalID {
     const modelName = model.constructor.name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
     const uri = buildGid(app, modelName, model.id, params);
-    // Skip re-parsing — buildGid encoded the components we already have.
-    // Mirror GID.build's normalization: composite PKs stay as a string[],
-    // primitives stringify.
-    const modelId: string | string[] = Array.isArray(model.id)
-      ? model.id.map((p) => String(p))
-      : String(model.id ?? "");
+    // Skip the parseGid round-trip — mirror its modelId normalization
+    // here: stringify with `?? ""` (matching buildGid), filter empty
+    // segments, collapse to a single string when arity = 1. buildGid
+    // guarantees the segment is non-empty overall (throws otherwise),
+    // so `parts` is always at least one element here.
+    const idParts = (Array.isArray(model.id) ? model.id : [model.id])
+      .map((p) => String(p ?? ""))
+      .filter((p) => p.length > 0);
+    const modelId: string | string[] = idParts.length === 1 ? idParts[0] : idParts;
     const components: GidComponents = {
       app,
       modelName,
