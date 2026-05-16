@@ -1,0 +1,82 @@
+name: Setup pnpm
+description: Picks hosted vs self-hosted pnpm + cache strategy.
+
+# Hosted runners: install pnpm via action-setup + use GitHub's Actions Cache
+# service for the pnpm store (current behavior).
+#
+# Self-hosted runners: use the preinstalled pnpm from the runner image, pin
+# store-dir to the persistent mounted volume, and skip cache: pnpm so no
+# tarballs traverse the WAN. Context: a prior incident on the home runner
+# burned ~1 TB WAN egress over 36 h because actions/setup-node's pnpm cache
+# pulled the store tarball from GitHub's hosted cache service on every job.
+#
+# Branch selection uses runner.environment != 'github-hosted' so an
+# empty/missing value fails open to the self-hosted branch — surfaces as a
+# loud "no cache" CI run rather than silently fetching from GitHub's cache.
+#
+# Third-party actions are pinned by SHA, not tag, so a retag can't change CI
+# without a PR. There is no Dependabot/Renovate config in this repo yet;
+# SHA bumps are manual until one is added.
+
+inputs:
+  pnpm-version:
+    description: pnpm version. Hosted installs this; self-hosted asserts the preinstalled pnpm matches.
+    required: false
+    default: "10.27.0"
+  node-version:
+    description: Node.js version for setup-node.
+    required: false
+    default: "22"
+  store-dir:
+    description: pnpm store-dir on self-hosted runners. Must be inside the mounted persistent volume.
+    required: false
+    default: /home/runner/.local/share/pnpm/store
+
+runs:
+  using: composite
+  steps:
+    - if: runner.environment == 'github-hosted'
+      uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+    - if: runner.environment == 'github-hosted'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+
+    # setup-node first so the pnpm sanity check below runs under the same
+    # Node the install/build steps will use. If the runner image's system
+    # Node differs from inputs.node-version, validating pnpm under the
+    # wrong Node could spuriously fail (or worse, succeed for the wrong
+    # reason). No `cache: pnpm` — the whole point of the self-hosted path
+    # is to avoid GitHub's hosted cache service.
+    - if: runner.environment != 'github-hosted'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - if: runner.environment != 'github-hosted'
+      shell: bash
+      env:
+        EXPECTED: ${{ inputs.pnpm-version }}
+        STORE_DIR: ${{ inputs.store-dir }}
+      run: |
+        set -euo pipefail
+        if ! command -v pnpm >/dev/null 2>&1; then
+          echo "::error::self-hosted runner has no preinstalled pnpm on PATH — rebuild the runner image"
+          exit 1
+        fi
+        # Capture exit status separately: `pnpm --version` can find pnpm on
+        # PATH but fail to execute (e.g. broken Node install), leaving
+        # ACTUAL empty. Report that distinctly from a version mismatch.
+        if ! ACTUAL=$(pnpm --version 2>&1); then
+          echo "::error::pnpm is on PATH but failed to run: $ACTUAL"
+          exit 1
+        fi
+        if [ "$ACTUAL" != "$EXPECTED" ]; then
+          echo "::error::self-hosted runner has pnpm $ACTUAL; expected $EXPECTED"
+          exit 1
+        fi
+        # pnpm config writes to ~/.npmrc, which is OUTSIDE the mounted
+        # volume — re-run every job. Cheap no-op when already set.
+        pnpm config set store-dir "$STORE_DIR"
