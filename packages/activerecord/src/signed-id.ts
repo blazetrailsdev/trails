@@ -89,7 +89,7 @@ export function signedId(
   options?: { purpose?: string; expiresIn?: number; expiresAt?: Temporal.Instant },
 ): string {
   if (!instance.isPersisted()) {
-    throw new Error("Cannot generate a signed_id for a new record");
+    throw new Error("Cannot get a signed_id for a new record");
   }
   const ctor = instance.constructor as typeof Base;
   const verifier = signedIdVerifier(ctor);

@@ -533,7 +533,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = new User({ name: "Alice" });
-    await expect(user.signedId()).rejects.toThrow("Cannot generate a signed_id for a new record");
+    await expect(user.signedId()).rejects.toThrow("Cannot get a signed_id for a new record");
   });
 
   it("findSigned recovers the record from its signed ID", async () => {
