@@ -243,6 +243,16 @@ export class Pattern {
     this._separators = separators;
     this.anchored = anchored;
     this.names = ast.names;
+    // Mirror Rails `ast.requirements = …`: push single-RegExp requirements
+    // onto each symbol (and `*name` star) node's `.regexp` so the GTG sees
+    // the user's char-class (e.g. `:filename` with `/(.+)/` matches dotted
+    // segments). Skip array-form (regex union) requirements — those are
+    // pattern-level only.
+    const flat: Record<string, RegExp> = {};
+    for (const [k, v] of Object.entries(requirements)) {
+      if (v instanceof RegExp) flat[k] = v;
+    }
+    if (Object.keys(flat).length > 0) ast.requirements = flat;
   }
 
   buildFormatter(): Format {

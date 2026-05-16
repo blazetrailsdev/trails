@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "../parser.js";
 import { Ast } from "../ast.js";
+import { Symbol as SymbolNode } from "../nodes/node.js";
 import { Pattern } from "./pattern.js";
 
 const SEPARATORS = "/.?";
@@ -267,5 +268,19 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
   it("test_requirements_for_missing_keys_check_memoization", () => {
     const p = buildPath("/page/:name", { name: /test/ });
     expect(p.requirementsForMissingKeysCheck).toBe(p.requirementsForMissingKeysCheck);
+  });
+
+  it("Pattern pushes RegExp requirements into the SymbolNode for GTG widening", () => {
+    // Mirrors Rails `ast.requirements = …` — the symbol's effective regex
+    // becomes the user-supplied requirement so the GTG accepts characters
+    // (e.g. `.`) that the default `[^./?]+` char-class would reject.
+    const tree = new Parser().parse("/posts/:filename");
+    const ast = new Ast(tree, true);
+    new Pattern(ast, { filename: /(.+)/ }, "/.?", true);
+    const symbol = ast.terminals.find(
+      (n): n is SymbolNode => n instanceof SymbolNode && n.name === "filename",
+    );
+    expect(symbol).toBeInstanceOf(SymbolNode);
+    expect(symbol!.regexp.source).toBe("(.+)");
   });
 });

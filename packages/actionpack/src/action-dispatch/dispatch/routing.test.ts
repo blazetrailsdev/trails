@@ -1266,11 +1266,7 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognize("GET", "/posts/123-abc")!.params.id).toBe("123-abc");
   });
 
-  // BLOCKED: requires Journey GTG to widen its symbol char-class based on
-  // requirement regex (Rails' filename: /(.+)/ pattern). Until then, dotted
-  // captures via custom requirements only work for routes that land in
-  // `customRoutes` (non-anchored or non-requirements-anchored).
-  it.skip("named character classes in regexp constraints", () => {
+  it("named character classes in regexp constraints", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/purchases/:token/:filename", {
