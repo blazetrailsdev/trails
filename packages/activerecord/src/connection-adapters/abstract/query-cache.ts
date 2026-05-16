@@ -1,6 +1,9 @@
 import { Notifications } from "@blazetrails/activesupport";
 import { typeCastedBinds, type DatabaseStatementsHost } from "./database-statements.js";
-import { executionContextId } from "./connection-pool/execution-context.js";
+import {
+  executionContextId,
+  registerContextExitHook,
+} from "./connection-pool/execution-context.js";
 
 const DEFAULT_MAX_SIZE = 100;
 
@@ -113,7 +116,31 @@ export class QueryCacheRegistry {
     }
     this._caches.clear();
   }
+
+  deleteStore(key: string): void {
+    this._caches.delete(key);
+  }
 }
+
+/**
+ * Module-level registry of live ConnectionPoolConfigurations. Wired so the
+ * execution-context exit hook in `withExecutionContext` can evict each pool's
+ * per-context Store, mirroring Rails' GC of `IsolatedExecutionState.context`.
+ */
+const ACTIVE_CACHE_CONFIGS = new Set<WeakRef<ConnectionPoolConfiguration>>();
+
+function evictQueryCacheStoresForContext(contextId: string): void {
+  for (const ref of ACTIVE_CACHE_CONFIGS) {
+    const cfg = ref.deref();
+    if (!cfg) {
+      ACTIVE_CACHE_CONFIGS.delete(ref);
+      continue;
+    }
+    cfg.deleteStore(contextId);
+  }
+}
+
+registerContextExitHook(evictQueryCacheStoresForContext);
 
 /**
  * Host interface for QueryCache connection-level mixin methods.
@@ -151,10 +178,20 @@ export class ConnectionPoolConfiguration {
     } else {
       this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
     }
+    ACTIVE_CACHE_CONFIGS.add(new WeakRef(this));
+  }
+
+  /** @internal */
+  deleteStore(contextId: string): void {
+    this._threadQueryCaches.deleteStore(contextId);
   }
 
   checkoutAndVerify(connection: QueryCacheHost): QueryCacheHost {
-    connection._queryCache = this.queryCache;
+    // Mirrors Rails' `connection.query_cache ||= query_cache`: only assign if
+    // the connection has no cache yet. Checkin nulls `_queryCache`, so this
+    // is equivalent to an unconditional set in steady state — but matches
+    // Rails for callers that wire a Store directly before pool adoption.
+    if (!connection._queryCache) connection._queryCache = this.queryCache;
     return connection;
   }
 

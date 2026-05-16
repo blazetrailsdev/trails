@@ -1389,4 +1389,74 @@ describe("ConnectionPoolConfiguration query cache", () => {
       });
     });
   });
+
+  describe("pool-level enable/disable propagation", () => {
+    it("enableQueryCacheBang on the pool flips the checked-out connection's Store", () => {
+      const pool = makePool(1);
+      pool.enableQueryCacheBang();
+      const conn = pool.checkout();
+      const qc = (conn as unknown as { _queryCache: Store | null })._queryCache!;
+      expect(qc.enabled).toBe(true);
+      pool.disableQueryCacheBang();
+      expect(qc.enabled).toBe(false);
+      pool.checkin(conn);
+    });
+
+    it("withQueryCache enables for the duration of fn and clears on exit", async () => {
+      const pool = makePool(1);
+      let observed: Store | null = null;
+      await pool.withQueryCache(async () => {
+        const conn = pool.checkout();
+        observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
+        expect(observed!.enabled).toBe(true);
+        await observed!.computeIfAbsent("SELECT 1", async () => [{ x: 1 }]);
+        expect(observed!.size).toBe(1);
+        pool.checkin(conn);
+      });
+      expect(observed!.enabled).toBe(false);
+      expect(observed!.size).toBe(0);
+    });
+  });
+
+  describe("queryCacheMaxSize wiring", () => {
+    it("threads dbConfig.queryCache through to the Store's max size", () => {
+      const dbConfig = new HashConfig("test", "primary", {
+        adapter: "sqlite3",
+        database: "test.db",
+        pool: 1,
+        reapingFrequency: null,
+        queryCache: 7,
+      });
+      const pc = new PoolConfig(
+        new ConnectionDescriptor("primary"),
+        dbConfig,
+        "writing",
+        "default",
+        { adapterFactory: createTestAdapter },
+      );
+      const pool = new ConnectionPool(pc);
+      const max = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
+      expect(max).toBe(7);
+    });
+  });
+
+  describe("execution-context exit eviction", () => {
+    it("evicts the per-context Store from _threadQueryCaches when the context exits", async () => {
+      const pool = makePool(1);
+      const registry = (
+        pool as unknown as {
+          _cacheConfig: { _threadQueryCaches: { _caches: Map<string, Store> } };
+        }
+      )._cacheConfig._threadQueryCaches;
+
+      let seenSize = -1;
+      await withExecutionContext(async () => {
+        const conn = pool.checkout();
+        pool.checkin(conn);
+        seenSize = registry._caches.size;
+      });
+      expect(seenSize).toBeGreaterThan(0);
+      expect(registry._caches.size).toBe(0);
+    });
+  });
 });

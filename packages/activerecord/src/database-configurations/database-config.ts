@@ -20,7 +20,7 @@ export interface DatabaseConfigOptions {
   checkoutTimeout?: number | string;
   idleTimeout?: number | string | null;
   reapingFrequency?: number | string | null;
-  queryCache?: boolean | "enabled" | "disabled";
+  queryCache?: boolean | "enabled" | "disabled" | number;
   migrationsPaths?: string | string[];
   schemaCachePath?: string;
   schemaDump?: string | false | null;
