@@ -39,7 +39,8 @@ describe("MySQL quoting — quote", () => {
   it("quotes strings with MySQL-specific escapes (\\n, \\0, \\Z, \\\\)", () => {
     expect(quote("a\nb")).toBe("'a\\nb'");
     expect(quote("null\0byte")).toBe("'null\\0byte'");
-    expect(quote("with 'quote'")).toBe("'with ''quote'''");
+    expect(quote("with 'quote'")).toBe("'with \\'quote\\''");
+    expect(quote('a "double" quote')).toBe("'a \\\"double\\\" quote'");
   });
 });
 

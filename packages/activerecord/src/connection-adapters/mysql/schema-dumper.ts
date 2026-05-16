@@ -34,6 +34,11 @@ interface MysqlColumn extends ColumnInfo {
 
 interface MysqlAdapterLike {
   tableOptions(tableName: string): Promise<Record<string, string>>;
+  /**
+   * Returns column → pre-`.inspect`'d generation_expression for each
+   * virtual/generated column in `tableName`. Empty object when none.
+   */
+  virtualColumnExpressions?(tableName: string): Promise<Record<string, string>>;
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
@@ -56,6 +61,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     // schemaCollation can suppress per-column collation that matches the table default.
     if (Object.hasOwn(opts, "collation")) {
       this.tableCollationCache[tableName] = opts["collation"];
+    }
+    if (this.connection.virtualColumnExpressions) {
+      const exprs = await this.connection.virtualColumnExpressions(tableName);
+      if (Object.keys(exprs).length > 0) this.virtualExpressionCache[tableName] = exprs;
     }
     return opts;
   }

@@ -477,11 +477,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async charset(): Promise<string> {
-    return "";
+    return (await this.showVariable("character_set_database")) ?? "";
   }
 
   async collation(): Promise<string> {
-    return "";
+    return (await this.showVariable("collation_database")) ?? "";
   }
 
   async tableComment(tableName: string): Promise<string | null> {
@@ -510,9 +510,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.getDatabaseVersion();
     this.schemaStatements().validateIndexLengthBang(tableName, newName);
     if (!this.supportsRenameIndex()) {
-      throw new Error(
-        "renameIndex requires MySQL >= 5.7.6 or MariaDB >= 10.5.2; upgrade your server to use this feature",
-      );
+      // Mirrors Rails AbstractAdapter#rename_index super path: drop the
+      // existing index and recreate under the new name.
+      const idx = (
+        await (this as unknown as { indexes(t: string): Promise<unknown[]> }).indexes(tableName)
+      ).find((i) => (i as { name?: string }).name === oldName) as
+        | { name: string; columns: string[]; unique: boolean }
+        | undefined;
+      if (!idx) return;
+      await (
+        this as unknown as {
+          addIndex(t: string, c: string[], o: Record<string, unknown>): Promise<void>;
+        }
+      ).addIndex(tableName, idx.columns, { name: newName, unique: idx.unique });
+      await (
+        this as unknown as { removeIndex(t: string, o: { name: string }): Promise<void> }
+      ).removeIndex(tableName, { name: oldName });
+      return;
     }
     await this._execMutation(
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME INDEX ` +
