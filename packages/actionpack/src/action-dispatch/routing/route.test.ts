@@ -85,6 +85,19 @@ describe("Route", () => {
       expect(route.match("GET", "/")).not.toBeNull();
       expect(route.match("GET", "/en")).not.toBeNull();
     });
+
+    it("handles all-optional paths with non-`/:` groups (e.g. dot-prefix format)", () => {
+      // `(/:locale)(.:format)` is all-optional but the second group starts
+      // with `.` rather than `/:`. The balanced-paren scan should still
+      // classify this as all-optional and restore the leading `/(`.
+      const route = new Route("GET", "(/:locale)(.:format)", "x", "y");
+      expect(route.match("GET", "/")).not.toBeNull();
+      expect(route.match("GET", "/en")).not.toBeNull();
+      const m = route.match("GET", "/en.json");
+      expect(m).not.toBeNull();
+      expect(m!.params["locale"]).toBe("en");
+      expect(m!.params["format"]).toBe("json");
+    });
   });
 
   describe("pathParamNames", () => {
