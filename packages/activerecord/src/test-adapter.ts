@@ -653,6 +653,18 @@ class SchemaAdapter implements DatabaseAdapter {
     return this.inner.schemaStatements(this);
   }
 
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): unknown {
+    const inner = this.inner as unknown as {
+      createTableDefinition?(n: string, o: Record<string, unknown>): unknown;
+    };
+    if (typeof inner.createTableDefinition !== "function") {
+      throw new Error(
+        `SchemaAdapter.createTableDefinition: wrapped ${this.inner.adapterName} does not implement createTableDefinition()`,
+      );
+    }
+    return inner.createTableDefinition(name, options);
+  }
+
   get pool(): unknown {
     return this.inner?.pool ?? this.inner;
   }

@@ -391,6 +391,18 @@ export class QueryCacheAdapter implements DatabaseAdapter {
     );
   }
 
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): unknown {
+    const inner = this.inner as {
+      createTableDefinition?(n: string, o: Record<string, unknown>): unknown;
+    };
+    if (typeof inner.createTableDefinition === "function") {
+      return inner.createTableDefinition(name, options);
+    }
+    throw new Error(
+      `QueryCacheAdapter.createTableDefinition: wrapped ${this.inner.adapterName} does not implement createTableDefinition()`,
+    );
+  }
+
   quoteTableName(name: string): string {
     const inner = this.inner as { quoteTableName?: (n: string) => string };
     if (typeof inner.quoteTableName === "function") return inner.quoteTableName(name);

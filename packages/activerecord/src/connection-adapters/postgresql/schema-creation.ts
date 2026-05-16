@@ -27,8 +27,7 @@ import { Utils } from "./utils.js";
  * Rails VIRTUAL-unsupported error when `stored` is falsy.
  *
  * Mirrors the `as` / `stored` branch of `PostgreSQL::SchemaCreation#add_column_options!`.
- * Single source of truth shared by the visitor, `PostgreSQLAdapter#addColumn`,
- * and `SimpleTableBuilder#virtual`.
+ * Single source of truth shared by the visitor and `PostgreSQLAdapter#addColumn`.
  *
  * @internal
  */

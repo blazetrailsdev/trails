@@ -3030,10 +3030,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }
   }
 
-  // createJoinTable override: bypasses the callback-first createTable API by
-  // routing through schemaStatements().createTable, which uses the abstract
-  // options-first form and builds a real TableDefinition with correct column
-  // options (null: false) and full DSL support for the definer callback.
   async createJoinTable(
     table1: string,
     table2: string,
@@ -3053,35 +3049,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const mergedColOpts = { null: false, index: false, ...columnOptions };
     const t1Ref = this.referenceNameForTable(table1);
     const t2Ref = this.referenceNameForTable(table2);
-    const ss = this.schemaStatements(this as unknown as DatabaseAdapter);
-    await ss.createTable(joinName, { ...tableOpts, id: false }, (td) => {
+    await this.createTable(joinName, { ...tableOpts, id: false }, (td) => {
       td.references(t1Ref, mergedColOpts);
       td.references(t2Ref, mergedColOpts);
-      if (definer) definer(td as unknown as AbstractTableDefinition);
+      if (definer) definer(td);
     });
-  }
-
-  // SimpleTableBuilder is narrower than TableDefinition; suppress the override error.
-  // @ts-expect-error TS2416
-  async createTable(
-    tableName: string,
-    options: { id?: boolean | "uuid" } | ((t: SimpleTableBuilder) => void) = {},
-    fn?: (t: SimpleTableBuilder) => void,
-  ): Promise<void> {
-    const opts = typeof options === "function" ? {} : options;
-    const callback = typeof options === "function" ? options : fn;
-    const table = new SimpleTableBuilder(this);
-    if (opts.id !== false) {
-      if (typeof opts.id === "string" && opts.id === "uuid") {
-        table.column("id", "uuid default gen_random_uuid() primary key");
-      } else {
-        table.column("id", "serial primary key");
-      }
-    }
-    if (callback) callback(table);
-    const quotedTable = this.quoteTableName(tableName);
-    const columnDefs = table.getColumns().map((c) => `${this.quoteIdentifier(c.name)} ${c.type}`);
-    await this.exec(`CREATE TABLE ${quotedTable} (${columnDefs.join(", ")})`);
   }
 
   async addColumn(
@@ -4587,7 +4559,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    return new PgTableDefinition(name, options);
+    const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
+    return new PgTableDefinition(name, { ...rest, adapter: this });
   }
 
   /** @internal */
@@ -5174,82 +5147,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 }
 
 export type IndexDefinition = PgIndexDefinition;
-
-class SimpleTableBuilder {
-  private _columns: { name: string; type: string }[] = [];
-
-  constructor(private _adapter: PostgreSQLAdapter) {}
-
-  column(name: string, type: string): void {
-    this._columns.push({ name, type });
-  }
-
-  string(name: string, options: { default?: string } = {}): void {
-    let type = "character varying";
-    if (options.default !== undefined) {
-      const escaped = options.default.replace(/'/g, "''");
-      type += ` DEFAULT '${escaped}'`;
-    }
-    this._columns.push({ name, type });
-  }
-
-  text(name: string): void {
-    this._columns.push({ name, type: "text" });
-  }
-
-  integer(name: string): void {
-    this._columns.push({ name, type: "integer" });
-  }
-
-  int4range(name: string): void {
-    this._columns.push({ name, type: "int4range" });
-  }
-
-  int8range(name: string): void {
-    this._columns.push({ name, type: "int8range" });
-  }
-
-  numrange(name: string): void {
-    this._columns.push({ name, type: "numrange" });
-  }
-
-  daterange(name: string): void {
-    this._columns.push({ name, type: "daterange" });
-  }
-
-  tsrange(name: string): void {
-    this._columns.push({ name, type: "tsrange" });
-  }
-
-  tstzrange(name: string): void {
-    this._columns.push({ name, type: "tstzrange" });
-  }
-
-  boolean(name: string, options: { default?: boolean } = {}): void {
-    let type = "boolean";
-    if (options.default !== undefined) type += ` DEFAULT ${options.default}`;
-    this._columns.push({ name, type });
-  }
-
-  datetime(name: string, options: { null?: boolean } = {}): void {
-    let type = "timestamp without time zone";
-    if (options.null === false) type += " NOT NULL";
-    this._columns.push({ name, type });
-  }
-
-  virtual(name: string, options: { type?: string; as?: string; stored?: boolean } = {}): void {
-    // Mirrors Rails PG `new_column_definition`: resolve `:virtual` → real type,
-    // append the GENERATED clause via the shared helper. When `as` is absent
-    // the helper returns "" (Rails: a plain column).
-    const pgType = this._adapter.typeToSql(options.type ?? "string", {});
-    const generatedClause = _pgGeneratedClause(name, options.as, options.stored);
-    this._columns.push({ name, type: `${pgType}${generatedClause}` });
-  }
-
-  getColumns(): { name: string; type: string }[] {
-    return this._columns;
-  }
-}
 
 /**
  * A prepared-statement entry tracked in the per-client pool. `name` is

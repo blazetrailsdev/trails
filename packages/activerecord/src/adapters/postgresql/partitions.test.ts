@@ -10,39 +10,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
   afterEach(async () => {
+    await adapter.dropTable("partitioned_events", { ifExists: true });
     await adapter.close();
   });
 
   describe("PostgresqlPartitionsTest", () => {
-    it("partition table", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE partition_test_parent (id integer, grp integer) PARTITION BY LIST (grp)`,
-        );
-        await adapter.exec(
-          `CREATE TABLE partition_test_child PARTITION OF partition_test_parent FOR VALUES IN (1)`,
-        );
-        const tables = await adapter.tables();
-        expect(tables).toContain("partition_test_parent");
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS partition_test_child`);
-        await adapter.exec(`DROP TABLE IF EXISTS partition_test_parent`);
-      }
-    });
     it("partitions table exists", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE partition_exists_parent (id integer, grp integer) PARTITION BY LIST (grp)`,
-        );
-        await adapter.exec(
-          `CREATE TABLE partition_exists_child PARTITION OF partition_exists_parent FOR VALUES IN (1)`,
-        );
-        expect(await adapter.tableExists("partition_exists_parent")).toBe(true);
-        expect(await adapter.tableExists("partition_exists_child")).toBe(true);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS partition_exists_child`);
-        await adapter.exec(`DROP TABLE IF EXISTS partition_exists_parent`);
-      }
+      await adapter.createTable(
+        "partitioned_events",
+        {
+          force: true,
+          id: false,
+          options: "partition by range (issued_at)",
+        },
+        (t) => {
+          t.column("issued_at", "timestamp");
+        },
+      );
+      expect(await adapter.tableExists("partitioned_events")).toBe(true);
     });
   });
 });

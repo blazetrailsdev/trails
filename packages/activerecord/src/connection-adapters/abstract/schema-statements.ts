@@ -147,7 +147,14 @@ export class SchemaStatements {
       return;
     }
 
-    const td = new TableDefinition(name, {
+    // Rails: `td = create_table_definition(...)` — dispatches to the adapter's
+    // dialect-specific TableDefinition (e.g. PostgreSQL::TableDefinition with
+    // range/hstore/jsonb column methods).
+    const td = (
+      this.adapter as unknown as {
+        createTableDefinition(n: string, o: Record<string, unknown>): TableDefinition;
+      }
+    ).createTableDefinition(name, {
       ...options,
       adapterName: this.adapterName,
       adapter: this.adapter,
