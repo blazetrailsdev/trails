@@ -118,8 +118,11 @@ export class InsertAll {
   }
 
   async execute(): Promise<number> {
-    if (this.inserts.length === 0) return 0;
+    // Resolve uniqueBy before the empty-batch shortcut so the Rails guard
+    // (insert_all.rb#initialize validates uniqueBy in the constructor before
+    // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
+    if (this.inserts.length === 0) return 0;
     const dialect = this.connection.adapterName;
     const builder = new Builder(this, dialect);
     return this.connection.executeMutation(builder.toSql());
