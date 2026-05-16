@@ -26,6 +26,12 @@ describe("MySQL quoting — quote", () => {
     expect(quote(BigInt("9007199254740993"))).toBe("9007199254740993");
   });
 
+  it("quotes non-finite numbers as strings", () => {
+    expect(quote(Number.POSITIVE_INFINITY)).toBe("'Infinity'");
+    expect(quote(Number.NEGATIVE_INFINITY)).toBe("'-Infinity'");
+    expect(quote(NaN)).toBe("'NaN'");
+  });
+
   it("throws on Date — Date is no longer accepted", () => {
     expect(() => quote(new Date())).toThrow(TypeError);
   });
