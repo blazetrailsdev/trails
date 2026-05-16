@@ -2993,17 +2993,77 @@ describe("AssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toEqual([2, 7]);
   });
-  it.skip("append composite foreign key has many association with autosave", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* fixture-dependent */
+  it("append composite foreign key has many association with autosave", async () => {
+    const adapter = freshAdapter();
+    class AsCpkOwner extends Base {
+      static {
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class AsCpkItem extends Base {
+      static {
+        this.attribute("owner_region_id", "integer");
+        this.attribute("owner_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("AsCpkOwner", AsCpkOwner);
+    registerModel("AsCpkItem", AsCpkItem);
+    Associations.hasMany.call(AsCpkOwner, "asCpkItems", {
+      className: "AsCpkItem",
+      foreignKey: ["owner_region_id", "owner_id"],
+    });
+    const owner = await AsCpkOwner.create({ region_id: 1, id: 10, name: "Owner" });
+    const item = new AsCpkItem({ label: "New" });
+    expect(item.isNewRecord()).toBe(true);
+    const proxy = association(owner, "asCpkItems");
+    await proxy.push(item);
+    expect(item.isPersisted()).toBe(true);
+    expect(item.owner_region_id).toBe(1);
+    expect(item.owner_id).toBe(10);
   });
-  it.skip("assign composite foreign key belongs to association with autosave", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* fixture-dependent */
+  it("assign composite foreign key belongs to association with autosave", async () => {
+    const adapter = freshAdapter();
+    class AsCpkParent extends Base {
+      static {
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class AsCpkChild extends Base {
+      static {
+        this.attribute("parent_region_id", "integer");
+        this.attribute("parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("AsCpkParent", AsCpkParent);
+    registerModel("AsCpkChild", AsCpkChild);
+    Associations.belongsTo.call(AsCpkChild, "asCpkParent", {
+      foreignKey: ["parent_region_id", "parent_id"],
+      className: "AsCpkParent",
+      autosave: true,
+    });
+    const child = await AsCpkChild.create({ label: "Child" });
+    const parent = new AsCpkParent({ region_id: 2, id: 30, name: "Parent" });
+    expect(parent.isNewRecord()).toBe(true);
+    setBelongsTo(child, "asCpkParent", parent, {
+      foreignKey: ["parent_region_id", "parent_id"],
+      className: "AsCpkParent",
+    });
+    await child.save();
+    expect(parent.isPersisted()).toBe(true);
+    expect(child.parent_region_id).toBe(2);
+    expect(child.parent_id).toBe(30);
   });
   it.skip("append composite has many through association", () => {
     // BLOCKED: associations — collection/singular feature gap

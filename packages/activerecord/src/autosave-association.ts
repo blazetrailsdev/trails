@@ -651,7 +651,8 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
     // Rails save_belongs_to_association:544-547 — when destroying the
     // associated record, null out the FK on self first so the owner save
     // doesn't keep a dangling reference.
-    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
+    const foreignKey =
+      assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
     const fkList: string[] = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
     for (const key of fkList) record._writeAttribute(key, null);
     if (!assocRecord.isNewRecord()) await assocRecord.destroy();
@@ -671,7 +672,8 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
       _setAutosavingBelongsToFor(record, assoc, false);
     }
 
-    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
+    const foreignKey =
+      assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
     const primaryKey =
       assoc.options.primaryKey ?? (assocRecord.constructor as typeof Base).primaryKey ?? "id";
     if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
