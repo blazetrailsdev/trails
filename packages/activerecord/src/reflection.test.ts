@@ -1346,6 +1346,32 @@ describe("ReflectionTest", () => {
       }),
     ).toThrow(ArgumentError);
   });
+  it("plain function for class name does not raise (only ES classes are rejected)", () => {
+    // Rails check is `options[option_name].class == Class`; in JS we
+    // distinguish classes via Function.prototype.toString, so a non-class
+    // callable must pass through (e.g. a lambda producing a string name).
+    class HostA extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TargetA extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("HostA", HostA);
+    registerModel("TargetA", TargetA);
+    const fn = function namedFactory() {
+      return "TargetA";
+    };
+    expect(() =>
+      // @ts-expect-error className typed as string; here we exercise the runtime guard
+      Associations.hasMany.call(HostA, "targetAs", { className: fn }),
+    ).not.toThrow();
+  });
   it("join table with common prefix", () => {
     class CatalogCategory extends Base {
       static {
