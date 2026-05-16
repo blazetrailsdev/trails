@@ -2,6 +2,11 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
 import { buildGid, parseGid, type GidComponents } from "./uri/gid.js";
+// LAZY-IMPORT CYCLE: signed-global-id ↔ global-id ↔ locator. The `GlobalID`
+// and `isOrExtends` runtime values are only referenced inside method bodies
+// below; don't promote those references to module level — native ESM throws
+// ReferenceError (TDZ) for an uninitialized imported binding accessed during
+// the initial circular evaluation.
 import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
 import { lookupClass, type LocatorModel } from "./locator.js";
 
@@ -248,8 +253,10 @@ export class SignedGlobalID {
   /**
    * @internal Mirrors verify_with_legacy_self_validated_metadata — Rails
    * 1.3.0 still parses SGIDs issued before the verifier-validated form.
-   * Trails has no legacy SGIDs to read; documented as out of scope in the
-   * GlobalID plan, so this always returns null. Kept for api:compare parity.
+   * Trails has no legacy SGIDs to read; the corresponding Ruby test
+   * `parse is backwards compatible with the self validated metadata` is
+   * on the permanent skip list (`scripts/api-compare/unported-files.ts`).
+   * This implementation always returns null; kept for api:compare parity.
    */
   static verifyWithLegacySelfValidatedMetadata(
     _sgid: string,
