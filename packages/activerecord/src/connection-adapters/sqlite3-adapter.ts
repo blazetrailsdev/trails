@@ -1397,7 +1397,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // no FTS shadow tables).
       const { schema, bare } = this._splitTableName(name);
       const rows = (await this.execute(
-        `SELECT name FROM pragma_table_list WHERE schema = ${sqliteQuoteStringLiteral(schema)} AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(bare)} AND type IN ('table','view')`,
+        `SELECT name FROM pragma_table_list WHERE schema = ${sqliteQuoteStringLiteral(schema)} COLLATE NOCASE AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(bare)} AND type IN ('table','view')`,
         [],
         "SCHEMA",
       )) as Array<{ name: string }>;
