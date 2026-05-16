@@ -187,7 +187,11 @@ export class ConnectionPoolConfiguration {
   }
 
   checkoutAndVerify(connection: QueryCacheHost): QueryCacheHost {
-    connection._queryCache = this.queryCache;
+    // Mirrors Rails' `connection.query_cache ||= query_cache`: only assign if
+    // the connection has no cache yet. Checkin nulls `_queryCache`, so this
+    // is equivalent to an unconditional set in steady state — but matches
+    // Rails for callers that wire a Store directly before pool adoption.
+    if (!connection._queryCache) connection._queryCache = this.queryCache;
     return connection;
   }
 

@@ -416,18 +416,23 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Enable the query cache for the duration of `fn`, then disable and clear
-   * it on exit. Used by request middleware / job adapters to bracket a unit
-   * of work with caching enabled. Trails-specific helper — Rails wraps the
-   * equivalent via `QueryCache::ExecutorHooks`.
+   * Enable the query cache for the duration of `fn`. If the cache wasn't
+   * previously enabled, clear it on exit. Mirrors Rails'
+   * `ActiveRecord::QueryCache.cache(&block)`:
+   *
+   *     was_enabled = pool.query_cache_enabled
+   *     begin
+   *       pool.enable_query_cache(&block)
+   *     ensure
+   *       pool.clear_query_cache unless was_enabled
+   *     end
    */
   async withQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
-    this.enableQueryCacheBang();
+    const wasEnabled = this.queryCacheEnabled;
     try {
-      return await fn();
+      return await this.enableQueryCache(fn);
     } finally {
-      this.disableQueryCacheBang();
-      this.clearQueryCache();
+      if (!wasEnabled) this.clearQueryCache();
     }
   }
 
