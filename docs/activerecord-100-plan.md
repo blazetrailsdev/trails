@@ -12,26 +12,34 @@ For workflow + BLOCKED-annotation vocab + audit conventions, see [`test-compare-
 
 ## Story count
 
-~80 actionable batches, ~17.5k LOC. Batches numbered sequentially; the next-to-ship is the lowest-numbered open batch.
+~99 queued batches, ~17.5k LOC. Batches numbered sequentially; the next-to-ship is the lowest-numbered open batch. test:compare standing at 6568/7885 (83.3%) per snapshot above. GitHub is the source of truth for which batches have PRs in flight — search `feat(activerecord): batch N` in open PRs.
 
 The `as any` legacy-cast cleanup sweep has been **superseded by `docs/activerecord-type-audit.md`** — the type-audit's 4-wave plan covers the same `(record as any)._readAttribute` / `.save` / `.destroy` removals more precisely. The 2 `bug-suspected` candidates remain in batches below for surgical verification.
 
 ---
 
-## In-flight batches
+## Queued batches
 
-These have agents currently working.
+Bundled work-PR slots ready to spawn. Items removed as batches ship.
 
-### Batch 2 — PG virtual-column emit pipeline (~110 LOC, risk: medium) — #1726 OPEN
+### Batch 2 — PG virtual-column emit pipeline (~110 LOC, risk: medium)
 
-**Theme:** One Rails source surface — `postgresql/schema-statements.rb` columnSpec + `schema_dumper.rb#emit_table`. Items mutually unblock the same un-skip set (test_non_persisted_column, test_change_table, test_schema_dumping).
+**Theme:** One Rails source surface — `postgresql/schema-statements.rb` columnSpec + `schema_dumper.rb#emit_table`. Unblocks test_non_persisted_column, test_change_table, test_schema_dumping.
 
 - ~15–30 LOC — Route `addColumn` through `schemaCreation.accept(AddColumnDefinition)`; fix `visitColumnDefinition` to call `addColumnOptionsBang` instead of `addColumnOptions`.
 - ~30–80 LOC — Rewire `emitTable` to use connection-adapter `columnSpec` / `prepareColumnOptions`.
-- ~20 LOC — Emit non-PK column `defaultFunction` as `default: () => "fn()"` in `emitTable`, mirroring the PK path. Unblocks function-default round-tripping for all non-PK columns.
+- ~20 LOC — Emit non-PK column `defaultFunction` as `default: () => "fn()"` in `emitTable`, mirroring the PK path.
 - ~30 LOC — Make `SchemaDumper.dumpTableSchema(adapter, ...)` instantiate the adapter's `createSchemaDumper()` class rather than the base.
 
-### Batch 10 — Reflection Slot A + B + Rails-name parity (~115 LOC, risk: low) — #1722 OPEN
+### Batch 3 — PG schema-dump table/partition polish (~80 LOC, risk: low)
+
+**Sequencing:** Depends on Batch 2 (#1726). Spawn after #1726 merges.
+
+- ~30 LOC — Wire `tableOptions()` into `schema-dumper.ts:emitTable`. Requires making the dump loop async.
+- ~30 LOC — PG table comment schema dump: forward `adapterTableOpts.comment` in `emitTable`; add `COMMENT ON TABLE` emission after `createTable`.
+- ~20 LOC — PARTITION BY schema dump: 2 `BLOCKED: adapter-pg` partition tests in `SchemaCreateTableOptionsTest` flow through the same `fetchTableOptions → options:` path; need `tablePartitionDefinition` wired correctly + test bodies.
+
+### Batch 10 — Reflection Slot A + B + Rails-name parity (~115 LOC, risk: low)
 
 **Theme:** Single Rails source `reflection.rb`.
 
@@ -42,48 +50,6 @@ These have agents currently working.
 - ~5 LOC — `UnknownPrimaryKey` message format and no-arg constructor.
 - ~10 LOC — `AbstractReflection#checkValidityOfInverseBang` uses `(this as any).inverseName?.()`. Protected accessor would be cleaner.
 - ~3 LOC — `joinScope` in `AbstractReflection` throws plain `Error`.
-
-### Batch 13 — Autosave fidelity sweep A (~95 LOC, risk: low) — #1730 OPEN
-
-**Theme:** Single Rails source `autosave_association.rb` — small C/F-series guards + post-#1678 leftover dispatch + autosaveBelongsTo dead-code removal.
-
----
-
-## Recently merged batches
-
-For reference. Body removed (see git log + the PR).
-
-| Batch | Title                                               | PR    |
-| ----- | --------------------------------------------------- | ----- |
-| 1     | PG createTable signature harmonization              | #1709 |
-| 4     | PG index option parse + emit (Schema Slot C)        | #1710 |
-| 5     | PG interval round-trip (interval[] + binary parser) | #1727 |
-| 6     | PG-only type registration + citext aftermath        | #1718 |
-| 7     | PG infinity + time-zone wiring                      | #1711 |
-| 8     | MySQL warnings + quoting + init fidelity            | #1723 |
-| 9     | Autosave + has-one Rails-divergence                 | #1712 |
-| 11    | Query-cache Phases 2–3 wiring                       | #1713 |
-| 12    | Insert-all conflict-target + IndexDefinition        | #1720 |
-| 14    | Fixtures schema-gap closures                        | #1715 |
-
-Other recent closures folded back into queued-batches list:
-
-- Batch 84 (SignedId Relation methods) — closed by #1694.
-- Batch 85 (Unknown-triage Slot D afterCommit refinements) — closed by #1705.
-
----
-
-## Queued batches
-
-Bundled work-PR slots ready to spawn. Items removed as batches ship.
-
-### Batch 3 — PG schema-dump table/partition polish (~80 LOC, risk: low)
-
-**Sequencing:** Depends on Batch 2 (#1726). Spawn after #1726 merges.
-
-- ~30 LOC — Wire `tableOptions()` into `schema-dumper.ts:emitTable`. Requires making the dump loop async.
-- ~30 LOC — PG table comment schema dump: forward `adapterTableOpts.comment` in `emitTable`; add `COMMENT ON TABLE` emission after `createTable`.
-- ~20 LOC — PARTITION BY schema dump: 2 `BLOCKED: adapter-pg` partition tests in `SchemaCreateTableOptionsTest` flow through the same `fetchTableOptions → options:` path; need `tablePartitionDefinition` wired correctly + test bodies.
 
 ### Batch 14 — Autosave E-series CPK + nested-attributes (~80 LOC, risk: low)
 
@@ -112,18 +78,10 @@ Bundled work-PR slots ready to spawn. Items removed as batches ship.
 
 - ~80 LOC — Rewrite the two "indexed errors should be properly translated" tests against a real I18n backend.
 
-### Batch 18 — Reflection call-site sweep — mostly shipped, ~15 LOC residual
-
-Audit `batch-18-reflection-call-site-20260516T211122Z.md` found 3 of 5 items already closed by prior PRs:
-
-- `resolveModel(className)` call-site sweep — closed by #1582.
-- `associations/builder/belongs-to.ts` counter-cache `resolveModel` — closed by #1670.
-- HABTM builder ThroughReflection registration — closed by #1672.
-
-**Residual (~15 LOC), fold into next adjacent slot:**
+### Batch 18 — Reflection residual cleanup (~35 LOC, risk: low)
 
 - ~5 LOC — Delete dead `createReflection` in `reflection.ts:1772` (now-stale asymmetry vs `Reflection.create`).
-- ~30 LOC — Deeply nested through-association resolution in `CollectionProxy._buildThroughScope` (through-a-through beyond one level). Not exercised by tests today; keep as standalone followup.
+- ~30 LOC — Deeply nested through-association resolution in `CollectionProxy._buildThroughScope` (through-a-through beyond one level). Not exercised by tests today.
 
 Watchpoint: the `_invalidateAssociationIds → assocInstance.reset()` widening fires for every through-association push.
 
@@ -193,14 +151,6 @@ Watchpoint: the `_invalidateAssociationIds → assocInstance.reset()` widening f
 - ~40 LOC (D) — Upgrade remaining size/empty stubs in `has-many-associations.test.ts` (lines ~1691–1791).
 - ~5 LOC (A) — Add connection/adapter identity to `LoaderQuery.hashKey()` for multi-DB grouping isolation.
 - ~80–120 LOC (C) — Implement `Relation#includes!`/`Relation#references!` infra for Rails-faithful `through_scope` path.
-
-### Batch 27 — HMT post-#1714 composite (~80 LOC, risk: low)
-
-**Theme:** Composite-FK clean-up at the through-association edges.
-
-- ~30–60 LOC — Through-assoc `options.queryConstraints` PK/FK separation. `_throughOwnerAttrs` would read non-existent attrs off the owner when user passes `options.queryConstraints` on through assoc without `options.primaryKey`.
-- ~10 LOC — Target-side composite throws in `_buildThroughScope` (`Array.isArray(targetFk)` / `Array.isArray(targetModel.primaryKey)`).
-- ~20 LOC — Dedicated polymorphic-through `it.todo`/`it.skip` with `BLOCKED:` annotation for composite-owner polymorphic-through if/when use case emerges.
 
 ### Batch 28 — HMT Slot E nested-through JoinDependency (~180 LOC, risk: medium)
 
@@ -299,14 +249,6 @@ Watchpoint: the `_invalidateAssociationIds → assocInstance.reset()` widening f
 - ~10 LOC — "updating auto increment" MySQL skip → move to MySQL adapter suite.
 - ~30 LOC — `Migration.changeTable` delegate to `CommandRecorder.changeTable` in recording mode.
 
-### Batch 41 — Migration older B/C/E small fidelity (~50 LOC, risk: low)
-
-- ~5 LOC (C) — `MigrationProxy` interface: add `scope?: string` field.
-- ~5 LOC (B) — `TableDefinition.toSql()` default switch reject empty/whitespace column types upfront.
-- ~10 LOC (E) — Document `InternalMetadata#tableExists()` short-circuit deviation with `@internal`.
-- ~10 LOC (B) — Forward `currentDatabase()` + advisory-lock helpers from `SchemaAdapter` to inner adapter in test-adapter.ts.
-- ~20 LOC (B/C) — Unify `MigrationContext.tableNamePrefix`/`tableNameSuffix` two-sources-of-truth (instance fields vs `_arConfig` registry).
-
 ### Batch 42 — Migration older B/E larger items (~130 LOC, risk: medium)
 
 - ~20 LOC (E) — `MigrationContext.fromPath(dir)` factory wrapping `migrationFiles` + `parseMigrationFilename` + camelize → `MigrationProxy[]`.
@@ -318,14 +260,6 @@ Watchpoint: the `_invalidateAssociationIds → assocInstance.reset()` widening f
 
 - ~50–80 LOC — Wire `adapterFactory` inside `connectsTo` (`connection-handling.ts`) so pools established via `connectsTo` can create real connections.
 - 3 "swapping shards in a multi threaded environment" tests → move to `skip-list.ts` (~5 LOC).
-
-### Batch 44 — Connection-pool smaller fidelity B+C (~35 LOC, risk: low)
-
-- ~3 LOC (C) — `connectingTo` shard default should use `this.defaultShard()` instead of hardcoded `"default"`.
-- ~5 LOC (B) — Friendlier error when `Base.configurations` is non-standard object without `toH`.
-- ~10 LOC (B) — Track `defaultShard` on the class inside `connectsTo`.
-- ~15 LOC (B) — `connectsTo` should call Rails' `resolve_config_for_connection(database_key)` to set `_connectionSpecificationName` as a side effect.
-- ~2 LOC (C) — `isPreventingWrites()` class-name string match can drift if class is renamed but pool registered under different owner-name.
 
 ### Batch 45 — Connection-pool sync #1473 leak audit (~105 LOC, risk: medium-high)
 
@@ -342,15 +276,6 @@ Watchpoint: the `_invalidateAssociationIds → assocInstance.reset()` widening f
 - ~10 LOC — Extend `scripts/test-compare/extract-ts-tests.ts` to parse `it.skipIf(expr)("name", fn)` callable form.
 - ~30–50 LOC — `MySQLAnsiQuotesTest` un-skip: adapter-level `setSessionVariable` (or expose `execute("SET SESSION sql_mode='ANSI_QUOTES'")` cleanly) plus a `reconnect!` test hook. Also touches parser/quoting path for double-quoted identifiers under ANSI_QUOTES. Add `lessons_students`/`students` schema for `foreign_keys` test + a `topics` table for `primary_key` test.
 - ~5 LOC — `Mysql2Adapter.currentDatabase()` override (currently inherits abstract's empty `""`). Mirrors PG's `postgresql-adapter.ts:4218`.
-
-### Batch 47 — MySQL table-options polish (~100 LOC, risk: low)
-
-- ~5 LOC — `extractSchemaQualifiedName` equivalent so `tableComment()` (and other `information_schema` queries) handle `schema.table` names.
-- ~10 LOC — `TableDefinition` constructor: treat `primaryKey === false` same as `id: false`; treat `primaryKey: "name"` as custom PK column name.
-- ~15 LOC — `MigrationContext.createTable` `_columnMeta` composite-PK tracking.
-- ~15 LOC — `tableCollationCache` lazy population via `SHOW TABLE STATUS LIKE ...`.
-- ~25 LOC — Composite PK column order divergence: `schema-dumper.ts:emitTable` uses declaration order from `SHOW FULL FIELDS`; Rails uses `@connection.primary_key(table)` (`seq_in_index` order). Override in `mysql/schema-dumper.ts`.
-- ~30 LOC — Override `createTableDefinition` in `AbstractMysqlAdapter` to return a `MySQL::TableDefinition`.
 
 ### Batch 48 — MySQL active-schema Slot D + MariaDB indexes() (~140 LOC, risk: medium)
 
@@ -558,14 +483,6 @@ Plus `schema change with prepared stmt` remains skipped (needs `adapter.prepared
 
 - ~30 LOC — `MigrationContext.createTable` passes abstract `TableDefinition` to the callback; `t.exclusionConstraint`/`t.uniqueConstraint` aren't callable from schema-file blocks. Rails emits them inline. Fix: instantiate `PgTableDefinition` when `adapterName === "postgres"`, then exclusion/unique constraints can move inline. Closes the Sweep D Item 1 partial-ship.
 
-### Batch 79 — Transactions Slot D wTRS fixture ports (~50 LOC, risk: low)
-
-- ~10 LOC — Un-skip `write attribute after rollback` (`transactions.test.ts` ~1664); same Topic fixture as `read attribute after rollback`, trivial port.
-- ~15 LOC — Un-skip `test_assign_custom_primary_key_after_rollback` (unblocked by wTRS fix tracked separately).
-- ~10 LOC — `restore previously new record after double save` — needs `_startTransactionState` snapshot timing fix (deferred).
-- ~5 LOC — `scripts/test-compare/normalize-skips.ts` `transaction-isolation.test.ts` entry: replace stale "GVL" wording with PG-required gating.
-- ~10 LOC — `primaryKey = "movieid"` should auto-declare the attribute so callers don't need redundant `attribute("movieid", "integer")` (DX gap).
-
 ### Batch 80 — Transactions wTRS + update-setter fidelity (~55 LOC, risk: medium)
 
 - ~10 LOC — Un-skip `test_read_attribute_with_custom_primary_key_after_rollback` + `test_write_attribute_with_custom_primary_key_after_rollback` (same Movie fixture).
@@ -576,14 +493,6 @@ Plus `schema change with prepared stmt` remains skipped (needs `adapter.prepared
 ### Batch 81 — Transactions dirty-tracking new-record rollback (~50 LOC, risk: high)
 
 - ~50 LOC — Dirty-tracking for new-record rollback: `topic.changes["title"]` returns `undefined` instead of `[null, "Jeff"]` after rollback. Root cause deeper than sweep A's guard fix — `state.attributes` snapshot in `rememberTransactionRecordState` captures user-written values, so `redetectChanges` produces no diff. Fix: snapshot _DB-original_ values (null for unsaved new records), or add separate DB-original tracking.
-
-### Batch 82 — Unknown-triage Slot A annotation refresh (~200 LOC, tests-only)
-
-Re-tag all 89 `BLOCKED: unknown` annotations into the controlled vocabulary, moving the Ruby-only language-semantics ones (`modules.test.ts` x7, `mixin.test.ts` x2, `base.test.ts` x1 — `Module#prepend`, `singleton_class`, `Module#ancestors`, constant-path lookup) to `PERMANENT-SKIP` form in `unported-files.ts`. Foundational; unblocks downstream slot-sizing.
-
-### Batch 83 — Unknown-triage Slot B insert-all (~250 LOC, risk: medium)
-
-**64 of the 89 have stale "`MemoryAdapter accepts any attrs"` comments** that mislead the audit — there is no `MemoryAdapter`; the test setup uses `SchemaAdapter` wrapping a real driver. `InsertAll` impl is at 100% per `api:compare`. Real work: scrub stale comments, investigate what's actually skipped, rewrite test bodies to assert against real-adapter behavior.
 
 ### Batch 86 — Unknown-triage deferred (~230 LOC, risk: medium)
 
@@ -623,14 +532,16 @@ Mechanical: add to `scripts/api-compare/unported-files.ts` as `PERMANENT-SKIP`.
 
 **Risk:** Medium — touches every WHERE clause in the suite. Files (Option A): `predicate-builder/basic-object-handler.ts`, `predicate-builder/range-handler.ts`, `arel/src/visitors/to-sql.ts#visitBindParam`, plus `scripts/parity/fixtures/ar-01/`, `ar-52/`, `ar-65/`.
 
-### Batch 91 — SQLite Slot A + B (~50 LOC, risk: low)
+### Batch 91 — SQLite Slot A + B (~50 LOC bundled, risk: low)
+
+**Theme:** `sqlite-adapter.ts` strict opt-in + `dataSourceExists()` alignment with `tableExists()` `pragma_table_list` path.
 
 - ~5 LOC — Add `strict` field to `SqliteOpenConfig` in `activesupport/src/sqlite-adapter.ts`.
-- ~20 LOC — better-sqlite3 DQS toggle: when upstream exposes `sqlite3_db_config`, pass `strict` through `Database.Options` in `sqlite-drivers/better-sqlite3.ts:openDatabase`.
-- ~15 LOC — `dataSourceExists()` in `sqlite3-adapter.ts` still uses the old `sqlite_master`-based query, while `tableExists()` was updated to `pragma_table_list` in #1459. Align `dataSourceExists()`.
+- ~20 LOC — better-sqlite3 DQS toggle: pass `strict` through `Database.Options` in `sqlite-drivers/better-sqlite3.ts:openDatabase` when upstream exposes `sqlite3_db_config`.
+- ~15 LOC — `dataSourceExists()` in `sqlite3-adapter.ts` still uses the old `sqlite_master`-based query; align with `tableExists()` `pragma_table_list` path.
 - ~10 LOC — Extract `assertLogged` from `sqlite3-adapter.test.ts` to a shared `packages/activerecord/src/adapters/sqlite3/test-helper.ts`.
 
-Known limitation: `strict_strings_by_default` is a no-op in current driver — better-sqlite3 compiles with `SQLITE_DQS=0`. Documented inline.
+Known limitation: `strict_strings_by_default` is a no-op in current driver — better-sqlite3 compiles with `SQLITE_DQS=0`. Document inline.
 
 ### Batch 92 — Has-one Slots C+D scope merge + eager (~260 LOC, risk: medium)
 
@@ -719,6 +630,80 @@ Documented but unfixable: Hyphenated chain names — `beforeMy-save` isn't a val
 
 - **Process improvement** — `_`-prefix renames on Rails-named methods silently drop them from `api:compare` surface. Consider extending the `rails-private-jsdoc` ESLint rule to flag `_`-prefixed methods whose Rails counterpart is non-underscored. Permanent guardrail against the regression class.
 
+### Batch 109 — Insert-all annotation sharpening + UnknownAttributeError + bang wrappers (~270 LOC)
+
+Followup from #1741. Combines impl + triage.
+
+- ~10 LOC — Extend `insert-all.ts#verifyAttributes` to reject keys not in `model.attributeNames`, throwing `UnknownAttributeError`. Unblocks `insert-all.test.ts:738` + 2 "clear error message when a column does not exist" tests.
+- ~6 LOC — Add `insertAllBang`/`upsertAllBang` class-level wrappers in `querying.ts` mirroring `insertAll`/`upsertAll`.
+- ~250 LOC — Sharpen remaining ~60 single-line `BLOCKED:` annotations in `insert-all.test.ts` into BLOCKED/ROOT-CAUSE/SCOPE format. Clusters: timestamps (~15 tests, shared cause: no implicit `created_at`/`updated_at` in `insert-all.ts#mapKeyWithValue`), RETURNING (~4, pg-only), readonly (~3, no `_readonlyAttributes` filter), schema/index (~7).
+
+### Batch 110 — MySQL TableDefinition#toSql → schemaCreation.accept (~150 LOC, risk: medium)
+
+Followup from #1736. **Blocks re-introducing** `AbstractMysqlAdapter.createTableDefinition` override (Batch 47 item 6 reverted because dropping AUTO_INCREMENT broke MariaDB CI).
+
+- ~80–150 LOC — Route `TableDefinition#toSql()` through `schemaCreation.accept(...)` (Arel-style visitor). Today only `addColumn`/`addIndex`/`changeColumn` go through visitor on MySQL; `createTable` still uses abstract toSql() switch that never inspects `options.autoIncrement`. Once toSql goes through `MysqlSchemaCreation`, visitor handles autoIncrement correctly. PG has same shape but `PgTableDefinition`'s abstract toSql() emits `SERIAL PRIMARY KEY` directly so bug doesn't surface there.
+- ~5 LOC — Re-add `AbstractMysqlAdapter.createTableDefinition` override (`return new MysqlTableDefinition(name, rest)` with adapter/adapterName stripped) once the above lands. Plumbing already there from `13ed839c4` in #1736.
+
+### Batch 111 — Transactions wTRS double-save snapshot fix (~30 LOC, risk: medium)
+
+Followup from #1742. Currently skipped: `restore previously new record after double save` (`transactions.test.ts:~1167`).
+
+**Research needed first:** In Rails, between save#1 and save#2 inside the same outer user tx (no inner savepoint), is `@_previously_new_record` mutated, or only at commit time? If commit-only, per-call snapshot is fine. If mutated, fix:
+
+- ~30 LOC — Replace closure snapshot in `transactions.ts#withTransactionReturningStatus` with `_restoreTransactionRecordState` reading `_startTransactionState` directly, guarded by level so savepoint rollbacks still target the right state. Alt: only register `afterRollback` hook when `wasOutermostState` (i.e. `!r._startTransactionState` before `remember`); verify nested savepoints still get their own restore.
+
+### Batch 112 — Connection-pool [self] semantics alignment (~45 LOC, risk: medium)
+
+Followup from #1735. Closes the primary-abstract-without-`connectsTo` leak documented inline at `abstract-adapter.ts:735`.
+
+- ~30 LOC — Align `withRoleAndShard`/`connectingTo`/`connectedToMany` to Rails' `[self]` semantics: push `[self]`, resolve `connection_class_for_self` at read time via `klasses.include?(...)`. Update `core.ts#matchesStack` + `AbstractAdapter#isPreventingWrites` to walk at read time too.
+- ~10 LOC — `core.ts#matchesStack:336` uses `k.name === "Base"` string match. Switch to `_isActiveRecordBase` own-property marker for consistency once above lands.
+- ~5 LOC — Add `connectionSpecificationName` reader test pinning the new "primary class → 'Base'" branch (`connection-handling.ts:~373`).
+
+### Batch 113 — Phase 5 large root files (calculations + persistence) (~350 LOC, split if needed)
+
+Followup from #1734 (Phase 5 root cluster B). Continues the async `freshAdapter` + `defineSchema` pattern.
+
+- ~150 LOC — `calculations.test.ts` (~101 freshAdapter sites, 7596 LOC). Schema map large (Account, Company, Firm + test-local variants).
+- ~200 LOC — `persistence.test.ts` (~141 sites, 4789 LOC). Schema surface bigger. May split if test bodies need async upgrades beyond call sites.
+
+### Batch 114 — Phase 5 root attribute-methods cluster (~330 LOC, split if needed)
+
+Followup from #1737. Continue Phase 5 with attribute-methods family.
+
+- ~250 LOC — `attribute-methods.test.ts` (~79 sites, 1872 LOC). Likely splits along inner describes.
+- ~150 LOC — `attributes.test.ts` (~58 sites, 835 LOC). Single-PR sized.
+- ~80 LOC — `attribute-methods/` subtree (`query.test.ts`, `read.test.ts`, `write.test.ts`, `time-zone-conversion.test.ts`). Bundle as one PR.
+
+### Batch 115 — Phase 5 enum.test.ts (~250 LOC, may split)
+
+Followup from #1737. Largest remaining root offender (#1737 closed the surrounding cluster).
+
+- ~250 LOC — `enum.test.ts` (~77 freshAdapter sites, 2018 LOC).
+
+### Batch 116 — hstore + before-type-cast aliases (~50 LOC, risk: low)
+
+Followup from #1740 (Batch 82).
+
+- ~30 LOC — Port 3 hstore `store_accessor` tests (hstore_test.rb:118/136/157): `test_with_store_accessors`, `test_duplication_with_store_accessors`, `test_changes_with_store_accessors`. `storeAccessor` is implemented; just need bodies. Verify per-accessor dirty aliases (`<accessor>_changed?`, `_was`, `_change`) wired first (+~10 LOC `store.ts` if not).
+- ~20 LOC — Per-attribute `<attr>_before_type_cast` alias method generation. Generic `readAttributeBeforeTypeCast(name)` is implemented (`attribute-methods/before-type-cast.ts:21`), but Rails generates per-attribute aliases via `define_method`. Add to `attribute-methods.ts` generation pipeline. Unblocks hstore "cast value on write" + all `<attr>_before_type_cast` tests across types.
+
+### Batch 117 — Migration follow-ups: properTableName + Migration.copy (~130 LOC, risk: low)
+
+Followup from #1733.
+
+- ~10 LOC — `Migration.properTableName` (`migration.ts:1334`) add `name.respond_to?(:table_name)` early-return (Rails `migration.rb:1119-1125`). Add a test that passes a model class.
+- ~80–120 LOC — Flesh out `Migration.copy` (`migration.ts:1350`) to honor engine `scope` on `MigrationProxy`: emit `${version}_${name.underscore}.${scope}.rb`, support `on_skip`/`on_copy` callbacks (migration.rb:1066-1108). Today the TS stub just `copyFileSync`s — the `MigrationProxy.scope` field is present-but-unused on the copy path.
+
+### Batch 118 — HMT polymorphic-through composite owner guard (~110 LOC, risk: medium)
+
+Followup from #1732. `collection-proxy.ts` has an `it.skip` documented in #1732.
+
+- ~60 LOC — Polymorphic-through with composite owner PK: require explicit single-column `primaryKey:` option on polymorphic-through; validate in `Reflection` (or `_throughOwnerPolymorphic`) rejecting composite `primaryKey:` with `ConfigurationError`; flip the `it.skip` to a real assertion.
+- ~20 LOC — Audit `_throughOwnerCols` `options.queryConstraints` FK branch (`collection-proxy.ts:~1042`) for reachability. Likely dead post-`Reflection` constructor's rewrite to reflection-level `queryConstraints`. Either delete or add a fixture exercising it.
+- ~30 LOC — Sweep `has-one-through-association.ts` for analogous composite-PK/FK throws still raising plain `Error`. Align with the `ConfigurationError` HMT now uses.
+
 ---
 
 ## Doc-hygiene + infra followups
@@ -726,6 +711,8 @@ Documented but unfixable: Hyphenated chain names — `beforeMy-save` isn't a val
 - **Decision** — Root `Gemfile` / `Gemfile.lock`: globalid workstream or not? Currently untracked-and-ambiguous.
 - **Follow-up PR** — Run `sync-stats` refresh and clear "pending" disclaimer on README Data Layer Parity test-percentage.
 - **~30 LOC** — `postgresql/temporal-type-parsers.ts` still has one eager `import pg from "pg"` (the last per `browser-compat-plan.md`). Move to lazy registry. Blocks browser-bundle smoke tests.
+- **~1 LOC** — `scripts/api-compare/unported-files.ts:480` has a pre-existing `className` type error.
+- **Sweep** — Audit `grep "PERMANENT:" scripts/` for tooling missing the `PERMANENT-SKIP:` form (the canonical marker per `docs/test-compare-100-plan.md`).
 
 ---
 
