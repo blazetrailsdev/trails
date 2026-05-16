@@ -7,6 +7,7 @@ import {
   resolveModelForTable,
 } from "./define-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { Base } from "../base.js";
 
 function makeAdapter(): DatabaseAdapter {
   return {
@@ -217,12 +218,13 @@ describe("defineFixtures", () => {
 
     // Post instance with a known ID
     const postId = fixtureId("welcome");
-    class Post {
-      static tableName = "posts";
-      static primaryKey = "id";
-      id = postId;
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+      }
     }
     const postInstance = new Post();
+    (postInstance as any).id = postId;
 
     // Tagging model with a polymorphic belongs_to :taggable reflection
     const taggingId = fixtureId("welcome_tag");
@@ -305,6 +307,23 @@ describe("defineFixtures", () => {
 
     await expect(
       defineFixtures(adapter, Tagging, { bad: { taggable: ref("posts", "welcome") as any } }),
+    ).rejects.toThrow(/polymorphic association.*model instance/);
+  });
+
+  it("polymorphic ref: non-Base class instance is rejected (no duck typing)", async () => {
+    // Guards the narrowing from regressing to the old constructor !== Object
+    // duck-typed check, which would have happily accepted any class instance.
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+    class NotBase {
+      id = 42;
+    }
+    await expect(
+      defineFixtures(adapter, Tagging, { bad: { taggable: new NotBase() as any } }),
     ).rejects.toThrow(/polymorphic association.*model instance/);
   });
 
