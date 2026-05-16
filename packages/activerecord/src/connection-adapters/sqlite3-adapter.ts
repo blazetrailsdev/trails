@@ -1390,25 +1390,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async dataSourceExists(name: string): Promise<boolean> {
     if (name.includes(".")) {
-      // Schema-qualified name (e.g. "aux.widgets") — pragma_table_list does
-      // not accept a schema scope, so fall back to the attached catalog.
-      // Mirror the bare-name exclusions so qualified and unqualified callers
-      // agree on names like `aux.sqlite_sequence`.
-      const { sqliteMaster, bare } = this._sqliteMasterFor(name);
-      if (bare === "sqlite_sequence" || bare === "sqlite_schema") return false;
-      // sqlite_master stores virtual tables as type='table' with sql LIKE
-      // 'CREATE VIRTUAL%', and FTS/shadow tables with sql IS NULL. The
-      // pragma_table_list path filters those out as 'virtual'/'shadow', so
-      // mirror that here to keep the two branches in agreement.
+      // Schema-qualified name (e.g. "aux.widgets"). pragma_table_list returns
+      // rows for every attached schema and exposes the schema name as a
+      // column, so we can scope by it directly — keeping the qualified and
+      // bare-name branches on the same exclusion semantics (no virtuals,
+      // no FTS shadow tables, no sqlite_* internals).
+      const dot = name.indexOf(".");
+      const schema = name.slice(0, dot);
+      const bare = name.slice(dot + 1);
       const rows = (await this.execute(
-        `SELECT 1 AS one FROM ${sqliteMaster}
-         WHERE type IN ('table','view')
-           AND name=${sqliteQuoteStringLiteral(bare)}
-           AND sql IS NOT NULL
-           AND sql NOT LIKE 'CREATE VIRTUAL%'`,
+        `SELECT name FROM pragma_table_list WHERE schema = ${sqliteQuoteStringLiteral(schema)} AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(bare)} AND type IN ('table','view')`,
         [],
         "SCHEMA",
-      )) as Array<{ one: number }>;
+      )) as Array<{ name: string }>;
       return rows.length > 0;
     }
     const rows = (await this.execute(
