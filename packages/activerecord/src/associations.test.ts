@@ -2353,17 +2353,79 @@ describe("AssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.id).toEqual([1, 5]);
   });
-  it.skip("querying by whole associated records using query constraints", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("querying by whole associated records using query constraints", async () => {
+    const adapter = freshAdapter();
+    class QwarBlogPost extends Base {
+      static {
+        this._tableName = "qwar_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["blog_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class QwarComment extends Base {
+      static {
+        this._tableName = "qwar_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.primaryKey = ["blog_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QwarBlogPost", QwarBlogPost);
+    registerModel("QwarComment", QwarComment);
+    Associations.hasMany.call(QwarBlogPost, "qwarComments", {
+      className: "QwarComment",
+      primaryKey: ["blog_id", "id"],
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    await QwarBlogPost.create({ blog_id: 1, id: 10, title: "Post 1" });
+    await QwarBlogPost.create({ blog_id: 2, id: 20, title: "Post 2" });
+    await QwarBlogPost.create({ blog_id: 3, id: 30, title: "Other" });
+    const c1 = await QwarComment.create({ blog_id: 1, blog_post_id: 10, id: 100, body: "A" });
+    const c2 = await QwarComment.create({ blog_id: 2, blog_post_id: 20, id: 200, body: "B" });
+    const posts = await QwarBlogPost.where({ qwarComments: [c1, c2] }).toArray();
+    expect(posts.map((p: any) => p.title).sort()).toEqual(["Post 1", "Post 2"]);
   });
-  it.skip("querying by single associated record works using query constraints", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("querying by single associated record works using query constraints", async () => {
+    const adapter = freshAdapter();
+    class QsarBlogPost extends Base {
+      static {
+        this._tableName = "qsar_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.primaryKey = ["blog_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class QsarComment extends Base {
+      static {
+        this._tableName = "qsar_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.primaryKey = ["blog_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    registerModel("QsarBlogPost", QsarBlogPost);
+    registerModel("QsarComment", QsarComment);
+    Associations.hasMany.call(QsarBlogPost, "qsarComments", {
+      className: "QsarComment",
+      primaryKey: ["blog_id", "id"],
+      foreignKey: ["blog_id", "blog_post_id"],
+    });
+    await QsarBlogPost.create({ blog_id: 1, id: 10, title: "Post 1" });
+    await QsarBlogPost.create({ blog_id: 2, id: 20, title: "Post 2" });
+    const c2 = await QsarComment.create({ blog_id: 2, blog_post_id: 20, id: 200, body: "B" });
+    const posts = await QsarBlogPost.where({ qsarComments: c2 }).toArray();
+    expect(posts.map((p: any) => p.title)).toEqual(["Post 2"]);
   });
   it("querying by relation with composite key", async () => {
     const adapter = freshAdapter();
@@ -2575,11 +2637,44 @@ describe("AssociationsTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* needs composite key / query constraints support */
   });
-  it.skip("preloads model with query constraints by explicitly configured fk and pk", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("preloads model with query constraints by explicitly configured fk and pk", async () => {
+    const adapter = freshAdapter();
+    class PmqcBlogPost extends Base {
+      static {
+        this._tableName = "pmqc_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PmqcComment extends Base {
+      static {
+        this._tableName = "pmqc_comments";
+        this.attribute("blog_id", "integer");
+        this.attribute("blog_post_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+        (this as any)._queryConstraintsList = ["blog_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    registerModel("PmqcBlogPost", PmqcBlogPost);
+    registerModel("PmqcComment", PmqcComment);
+    // belongs_to with explicit single FK/PK — bypasses query_constraints derivation.
+    Associations.belongsTo.call(PmqcComment, "pmqcBlogPostById", {
+      foreignKey: "blog_post_id",
+      primaryKey: "id",
+      className: "PmqcBlogPost",
+    });
+    const post = await PmqcBlogPost.create({ blog_id: 1, id: 10, title: "Great post" });
+    await PmqcComment.create({ blog_id: 1, blog_post_id: 10, id: 100, body: "hi" });
+    const comments = await PmqcComment.where({ id: 100 }).includes("pmqcBlogPostById").toArray();
+    expect(comments).toHaveLength(1);
+    const cached = (comments[0] as any)._preloadedAssociations?.get("pmqcBlogPostById");
+    expect(cached).not.toBeNull();
+    expect((cached as any).title).toBe("Great post");
   });
   it("append composite foreign key has many association", async () => {
     const adapter = freshAdapter();
