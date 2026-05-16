@@ -2,6 +2,10 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
 import { buildGid, parseGid, type GidComponents } from "./uri/gid.js";
+// LAZY-IMPORT CYCLE: signed-global-id ↔ global-id ↔ locator. The `GlobalID`
+// and `isOrExtends` runtime values are only referenced inside method bodies
+// below; don't promote those references to module level — they'd observe
+// `undefined` during the initial circular load.
 import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
 import { lookupClass, type LocatorModel } from "./locator.js";
 
@@ -110,7 +114,7 @@ export class SignedGlobalID {
         "An app is required to create a SignedGlobalID. Pass the :app option or call setApp() from @blazetrails/globalid.",
       );
     }
-    const modelName = model.constructor.name;
+    const modelName = (model.constructor as { name: string }).name;
     // Rails: arbitrary options beyond the known SGID keys become GID URI params.
     const filteredParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(options)) {

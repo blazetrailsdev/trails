@@ -502,16 +502,12 @@ describe("GlobalLocatorTest", () => {
       name === "PersonNoPk" ? (PersonNoPk as unknown as LocatorModel) : REGISTRY[name],
     );
 
-    const gid = GlobalID.create(
-      new PersonNoPk("id") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const gid = GlobalID.create(new PersonNoPk("id"));
     const found = (await Locator.locate(gid)) as PersonNoPk;
     expect(found).toBeInstanceOf(PersonNoPk);
     expect(found.id).toBe("id");
 
-    const gid2 = GlobalID.create(
-      new PersonNoPk("id2") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const gid2 = GlobalID.create(new PersonNoPk("id2"));
     const many = (await Locator.locateMany([gid, gid2])) as PersonNoPk[];
     expect(many).toHaveLength(2);
 

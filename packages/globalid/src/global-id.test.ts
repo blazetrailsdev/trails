@@ -3,10 +3,12 @@ import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
-const fakeModel = (id: unknown, name = "Person") => ({
-  id,
-  constructor: { name },
-});
+// Synthetic GlobalIDModel — overrides `constructor.name` without building a
+// real class. Cast because TS types Object.constructor as Function (which
+// would conflict with `{ name }`); the runtime code reads `.name` off the
+// constructor regardless of identity.
+const fakeModel = (id: unknown, name = "Person") =>
+  ({ id, constructor: { name } }) as unknown as { id: unknown };
 
 // ─── Fixture models for find / model_class tests ───────────────────────────
 
@@ -80,9 +82,7 @@ describe("GlobalIDParamEncodedTest", () => {
     // Rails: GlobalID.find(@gid.to_param) — class-level convenience that
     // parses and locates in one step. Trails has Locator.locate(gid) for
     // the same flow.
-    const gid = GlobalID.create(
-      new Person("id") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const gid = GlobalID.create(new Person("id"));
     const parsed = GlobalID.parse(gid.toParam())!;
     const found = (await parsed.find()) as Person;
     expect(found).toBeInstanceOf(Person);
@@ -182,15 +182,8 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("model class", () => {
-    expect(
-      GlobalID.create(new Person("5") as unknown as { id: unknown; constructor: { name: string } })
-        .modelClass,
-    ).toBe(Person);
-    expect(
-      GlobalID.create(
-        new PersonUuid(uuid) as unknown as { id: unknown; constructor: { name: string } },
-      ).modelClass,
-    ).toBe(PersonUuid);
+    expect(GlobalID.create(new Person("5")).modelClass).toBe(Person);
+    expect(GlobalID.create(new PersonUuid(uuid)).modelClass).toBe(PersonUuid);
     expect(GlobalID.create(fakeModel(1, "PersonModel")).modelClass).toBe(PersonModel);
     expect(GlobalID.create(fakeModel(["t", "i"], "CompositePrimaryKeyModel")).modelClass).toBe(
       CompositePrimaryKeyModel,
@@ -198,27 +191,21 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find", async () => {
-    const personGid = GlobalID.create(
-      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const personGid = GlobalID.create(new Person("5"));
     const found = (await personGid.find()) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe("5");
   });
 
   it("find with class", async () => {
-    const personGid = GlobalID.create(
-      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const personGid = GlobalID.create(new Person("5"));
     const found = (await personGid.find({ only: Person as unknown as LocatorModel })) as Person;
     expect(found).toBeInstanceOf(Person);
     expect(found.id).toBe("5");
   });
 
   it("find with class no match", async () => {
-    const personGid = GlobalID.create(
-      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const personGid = GlobalID.create(new Person("5"));
     class Unrelated {}
     expect(await personGid.find({ only: Unrelated as unknown as LocatorModel })).toBeNull();
   });
@@ -243,9 +230,7 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with multiple class", async () => {
-    const personGid = GlobalID.create(
-      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const personGid = GlobalID.create(new Person("5"));
     class Other {}
     const found = (await personGid.find({
       only: [Other as unknown as LocatorModel, Person as unknown as LocatorModel],
@@ -254,9 +239,7 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with multiple class no match", async () => {
-    const personGid = GlobalID.create(
-      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
-    );
+    const personGid = GlobalID.create(new Person("5"));
     class A {}
     class B {}
     expect(

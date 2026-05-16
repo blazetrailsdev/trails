@@ -1,3 +1,8 @@
+// LAZY-IMPORT CYCLE: locator ↔ global-id ↔ signed-global-id. GlobalID and
+// SignedGlobalID are only referenced inside class/method bodies below
+// (e.g. `GlobalID.parse(...)` inside `Locator.locate`); don't add a
+// module-level `const X = GlobalID.something` — it'd observe `undefined`
+// during the initial circular load.
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";

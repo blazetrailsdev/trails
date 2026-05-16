@@ -7,6 +7,11 @@ import {
   type GidComponents,
 } from "./uri/gid.js";
 import { Locator, lookupClass, type LocateOptions, type LocatorModel } from "./locator.js";
+// LAZY-IMPORT CYCLE: global-id ↔ signed-global-id ↔ locator. Safe because
+// every cross-module reference below happens inside a method body (runtime),
+// not at class-body init time. Do NOT add module-level `const X = SignedGlobalID.foo`
+// or similar — those would observe `SignedGlobalID === undefined` during the
+// initial circular load.
 import { SignedGlobalID } from "./signed-global-id.js";
 
 /**
@@ -20,9 +25,18 @@ export function isOrExtends(klass: LocatorModel, base: { prototype: object }): b
   return typeof proto === "object" && proto !== null && proto instanceof (base as never);
 }
 
+/**
+ * Duck-typed model accepted by `GlobalID.create` / `SignedGlobalID.create`.
+ *
+ * Only `id` is part of the interface contract; the model name is read
+ * from `(model.constructor as Function).name` at runtime. The earlier
+ * `constructor: { name: string }` field made every test fixture need
+ * an `as unknown as ...` cast — TS types `instance.constructor` as
+ * `Function`, which doesn't structurally satisfy `{ name: string }`
+ * even though Function has a `name` property.
+ */
 export interface GlobalIDModel {
   id: unknown;
-  constructor: { name: string };
 }
 
 export interface GlobalIDOptions {
@@ -65,7 +79,7 @@ export class GlobalID {
     for (const [k, v] of Object.entries(rest)) {
       if (v != null) filteredParams[k] = String(v);
     }
-    const modelName = model.constructor.name;
+    const modelName = (model.constructor as { name: string }).name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
     const uri = buildGid(app, modelName, model.id, params);
     const components: GidComponents = {
