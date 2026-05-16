@@ -548,23 +548,37 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
 
+  // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
+  // Must precede the marked_for_destruction branch (Rails:482) so an
+  // already-destroyed child isn't re-destroyed.
+  if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
+    return true;
   if (isMarkedForDestruction(childRecord)) {
     if (!childRecord.isNewRecord()) await childRecord.destroy();
     return true;
   }
-  // Rails save_has_one_association — gate via record.changed_for_autosave?
-  // (autosave_association.rb:487 / 275) so dirty nested children also trigger
-  // a save, not only direct attribute changes.
-  if (
-    childRecord.isNewRecord() ||
-    (typeof (childRecord as any).changedForAutosave === "function"
+  // Rails save_has_one_association:487 — gate via
+  // `(autosave && record.changed_for_autosave?) || _record_changed?(reflection, record, pk)`.
+  // autosave is always true on this path (gated in autosaveAssociation), so the
+  // first leg reduces to `record.changed_for_autosave?` and we add Rails'
+  // _record_changed? (FK / inverse-polymorphic / will-save-change) leg too.
+  const ctor = record.constructor as typeof Base;
+  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
+  // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
+  // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
+  const pkSpec = reflection
+    ? computePrimaryKey.call(record as unknown as AutosaveAssociationHost, reflection)
+    : (ctor.primaryKey ?? "id");
+  const pkArr: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
+  const pkForChangeCheck = pkArr.map((k) => record._readAttribute(k));
+  const changedForSave =
+    typeof (childRecord as any).changedForAutosave === "function"
       ? (childRecord as any).changedForAutosave()
-      : (childRecord as any).changed)
-  ) {
-    const ctor = record.constructor as typeof Base;
-    // Mirrors Rails save_has_one_association: use the reflection's resolved FK
-    // (handles queryConstraints via deriveFkQueryConstraints when available).
-    const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
+      : !!(childRecord as any).changed;
+  const recordChanged = reflection
+    ? is_recordChanged(reflection, childRecord, pkForChangeCheck)
+    : childRecord.isNewRecord();
+  if (changedForSave || recordChanged) {
     // reflection.foreignKey resolves queryConstraints-derived FK columns;
     // fall back to the raw option or the default scalar FK.
     const foreignKey: string | string[] =
@@ -626,6 +640,19 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     // after FK assignment, before save (autosave_association.rb:497).
     inst?.setInverseInstance?.(childRecord);
 
+    // Rails save_has_one_association:500-501 — skip the save when the inverse
+    // belongs_to is currently autosaving (prevents mutual-save infinite loops).
+    const inverse =
+      typeof reflection?.inverseOf === "function"
+        ? reflection.inverseOf()
+        : (reflection?.inverseOf ?? null);
+    if (
+      inverse &&
+      typeof (childRecord as any).isAutosavingBelongsToFor === "function" &&
+      (childRecord as any).isAutosavingBelongsToFor(inverse)
+    )
+      return true;
+
     // Rails: record.save(validate: !autosave). autosaveHasOne only runs
     // for autosave-enabled reflections (gated in autosaveAssociation), so
     // !autosave is always false → validate: false.
@@ -646,6 +673,9 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
   const associated = inst?.target;
   if (!associated || Array.isArray(associated) || !(associated instanceof Object)) return true;
   const assocRecord = associated as Base;
+  // Rails save_belongs_to_association:541 — `if record && !record.destroyed?`.
+  if (typeof (assocRecord as any).isDestroyed === "function" && (assocRecord as any).isDestroyed())
+    return true;
 
   if (isMarkedForDestruction(assocRecord)) {
     // Rails save_belongs_to_association:544-547 — when destroying the
@@ -658,7 +688,13 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
     if (!assocRecord.isNewRecord()) await assocRecord.destroy();
     return true;
   }
-  if (assocRecord.isNewRecord() || assocRecord.changed) {
+  // Rails save_belongs_to_association:549 — `record.new_record? || (autosave && record.changed_for_autosave?)`.
+  // autosave is always true on this path (gated in autosaveAssociation).
+  const beChangedForSave =
+    typeof (assocRecord as any).changedForAutosave === "function"
+      ? (assocRecord as any).changedForAutosave()
+      : !!(assocRecord as any).changed;
+  if (assocRecord.isNewRecord() || beChangedForSave) {
     _setAutosavingBelongsToFor(record, assoc, true);
     try {
       // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
@@ -772,7 +808,11 @@ export function validateHasOneAssociation(this: AutosaveAssociationHost, reflect
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
-  if (!(record.changedForAutosave?.() ?? false)) return;
+  // Rails autosave_association.rb:332 — `record.changed_for_autosave? || custom_validation_context?`.
+  const customCtx =
+    typeof (this as any).customValidationContext === "function" &&
+    (this as any).customValidationContext();
+  if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
   // Mirrors Rails: skip if the inverse belongs_to is currently validating or autosaving
   // to prevent infinite mutual-validation loops.
   const inverse =
@@ -795,7 +835,11 @@ export function validateBelongsToAssociation(this: AutosaveAssociationHost, refl
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
-  if (!(record.changedForAutosave?.() ?? false)) return;
+  // Rails autosave_association.rb:346 — `record.changed_for_autosave? || custom_validation_context?`.
+  const customCtx =
+    typeof (this as any).customValidationContext === "function" &&
+    (this as any).customValidationContext();
+  if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
     isAssociationValid(reflection, record, this, inst);
