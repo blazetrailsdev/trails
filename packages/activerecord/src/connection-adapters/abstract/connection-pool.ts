@@ -19,7 +19,12 @@ import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import type { TransactionManager } from "./transaction.js";
-import { ConnectionPoolConfiguration, QueryCache, type QueryCacheHost } from "./query-cache.js";
+import {
+  ConnectionPoolConfiguration,
+  QueryCache,
+  type QueryCacheHost,
+  type Store,
+} from "./query-cache.js";
 import { executionContextId } from "./connection-pool/execution-context.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
@@ -239,7 +244,9 @@ export class ConnectionPool implements ReapablePool {
     this.checkoutTimeout = this.dbConfig.checkoutTimeout;
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
-    this._cacheConfig = new ConnectionPoolConfiguration();
+    this._cacheConfig = new ConnectionPoolConfiguration(
+      normalizeQueryCacheConfig(this.dbConfig.queryCache),
+    );
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
@@ -368,11 +375,68 @@ export class ConnectionPool implements ReapablePool {
     return this._migrationContext;
   }
 
-  // --- Pool state ---
+  // --- Query cache (delegated to ConnectionPoolConfiguration) ---
+  //
+  // Rails wires ConnectionPool with `include QueryCache::ConnectionPoolConfiguration`.
+  // Trails composes via the `_cacheConfig` field; these forwarders give the
+  // pool the same surface so connection-level QueryCache mixin methods
+  // (cache, enableQueryCacheBang, ...) can detect `this.pool.<method>` and
+  // delegate.
+
+  get queryCache(): Store {
+    return this._cacheConfig.queryCache;
+  }
+
+  get queryCacheEnabled(): boolean {
+    return this._cacheConfig.queryCacheEnabled;
+  }
 
   get dirtiesQueryCache(): boolean {
-    return true;
+    return this._cacheConfig.dirtiesQueryCache;
   }
+
+  enableQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
+    return this._cacheConfig.enableQueryCache(fn);
+  }
+
+  disableQueryCache<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
+    return this._cacheConfig.disableQueryCache(fn, options);
+  }
+
+  enableQueryCacheBang(): void {
+    this._cacheConfig.enableQueryCacheBang();
+  }
+
+  disableQueryCacheBang(): void {
+    this._cacheConfig.disableQueryCacheBang();
+  }
+
+  clearQueryCache(): void {
+    this._cacheConfig.clearQueryCache();
+  }
+
+  /**
+   * Enable the query cache for the duration of `fn`. If the cache wasn't
+   * previously enabled, clear it on exit. Mirrors Rails'
+   * `ActiveRecord::QueryCache.cache(&block)`:
+   *
+   *     was_enabled = pool.query_cache_enabled
+   *     begin
+   *       pool.enable_query_cache(&block)
+   *     ensure
+   *       pool.clear_query_cache unless was_enabled
+   *     end
+   */
+  async withQueryCache<T>(fn: () => T | Promise<T>): Promise<T> {
+    const wasEnabled = this.queryCacheEnabled;
+    try {
+      return await this.enableQueryCache(fn);
+    } finally {
+      if (!wasEnabled) this.clearQueryCache();
+    }
+  }
+
+  // --- Pool state ---
 
   get activeConnection(): DatabaseAdapter | null {
     return this._connectionLease().connection;
@@ -507,11 +571,11 @@ export class ConnectionPool implements ReapablePool {
       if (this._connections && !this._connections.includes(pin.connection)) {
         this._connections.push(pin.connection);
       }
-      (pin.connection as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+      this._cacheConfig.checkoutAndVerify(pin.connection as unknown as QueryCacheHost);
       return pin.connection;
     }
     const conn = this._acquireConnection();
-    (conn as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+    this._cacheConfig.checkoutAndVerify(conn as unknown as QueryCacheHost);
     return conn;
   }
 
@@ -524,12 +588,12 @@ export class ConnectionPool implements ReapablePool {
       if (this._connections && !this._connections.includes(pin.connection)) {
         this._connections.push(pin.connection);
       }
-      (pin.connection as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+      this._cacheConfig.checkoutAndVerify(pin.connection as unknown as QueryCacheHost);
       return pin.connection;
     }
     const conn = this._tryAcquire();
     if (conn) {
-      (conn as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+      this._cacheConfig.checkoutAndVerify(conn as unknown as QueryCacheHost);
       return conn;
     }
 
@@ -551,7 +615,7 @@ export class ConnectionPool implements ReapablePool {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
     this._checkedOut.add(c);
-    (c as unknown as QueryCacheHost)._queryCache = this._cacheConfig.queryCache;
+    this._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
     return c;
   }
 
@@ -931,6 +995,21 @@ export class ConnectionPool implements ReapablePool {
   }
 }
 
+/**
+ * Map `DatabaseConfig#queryCache` to the shape ConnectionPoolConfiguration
+ * expects. Rails' initializer case-matches on `0/false/Integer/nil`; trails'
+ * public config type also accepts the documented "enabled"/"disabled"
+ * strings, which Rails would never see as raw values. Normalize them so a
+ * pool configured with `queryCache: "disabled"` actually disables storage
+ * instead of falling through to DEFAULT_MAX_SIZE.
+ */
+function normalizeQueryCacheConfig(raw: unknown): number | false | null | undefined {
+  if (raw === "disabled" || raw === false || raw === 0) return false;
+  if (raw === "enabled" || raw === true || raw == null) return raw as null | undefined;
+  if (typeof raw === "number") return raw;
+  return undefined;
+}
+
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
   const c = conn as Partial<TransactionAwareConnection>;
   return (
@@ -1302,7 +1381,7 @@ function checkoutAndVerify(pool: Pool, c: DatabaseAdapter): DatabaseAdapter {
     const cleanable = c as unknown as { cleanBang?: () => void; clean?: () => void };
     if (typeof cleanable.cleanBang === "function") cleanable.cleanBang();
     else cleanable.clean?.();
-    (c as unknown as QueryCacheHost)._queryCache = pool._cacheConfig.queryCache;
+    pool._cacheConfig.checkoutAndVerify(c as unknown as QueryCacheHost);
     return c;
   } catch (err) {
     pool.remove(c);
