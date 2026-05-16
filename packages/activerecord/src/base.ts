@@ -1,7 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
-  getApp as _getGlobalIdApp,
-  buildGid as _buildGid,
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,
   SignedGlobalID as _SignedGlobalIDType,
@@ -2814,22 +2812,16 @@ export class Base extends Model {
   // slice extracted to persistence.ts.
 
   /**
-   * Return a GlobalID URI for this record.
+   * Return a GlobalID for this record.
    *
-   * Mirrors: ActiveRecord::Base#to_gid
-   *
-   * Requires setApp() from \@blazetrails/globalid to be called first;
-   * throws when no app is configured.
+   * Mirrors: ActiveRecord::Base#to_gid — alias of to_global_id; returns a
+   * GlobalID instance. Requires setApp() from \@blazetrails/globalid to be
+   * called first.
    */
-  toGid(): string {
-    const ctor = this.constructor as typeof Base;
-    const app = _getGlobalIdApp();
-    if (!app) {
-      throw new Error(
-        "An app is required to create a GlobalID. Call setApp() from @blazetrails/globalid before using toGid().",
-      );
-    }
-    return _buildGid(app, ctor.name, this.id);
+  toGid(
+    options?: import("@blazetrails/globalid").GlobalIDOptions,
+  ): import("@blazetrails/globalid").GlobalID {
+    return this.toGlobalId(options);
   }
 
   /**

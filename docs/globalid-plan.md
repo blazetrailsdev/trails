@@ -175,19 +175,11 @@ the only purpose key (Rails-canonical: `options.fetch :for, DEFAULT_PURPOSE`).
 format and untouched. Breaking: callers passing `{ purpose: "..." }` must
 switch to `{ for: "..." }`.
 
-### GID-10b — Unify `Base.toGid()` to return GlobalID instance (~80 LOC, breaking)
+### GID-10b — Unify `Base.toGid()` to return GlobalID instance — **done**
 
-Rails has `to_gid` as an alias of `to_global_id`; both return a GlobalID
-instance. Trails currently has `toGid()` returning the URI string and
-`toGlobalId()` returning the instance — a divergence inherited from GID-1.
-Unify:
-
-- `Base.toGid()` returns a GlobalID instance (alias of `Base.toGlobalId()`).
-- Audit call sites in tests for `expect(u.toGid()).toBe("gid://...")` and
-  rewrite to `.toString()` or `.uri`. Known sites: `signed-id.test.ts`,
-  `calculations.test.ts`. AR's `signed-global-id.ts` may inline-use the
-  string form — switch to `.toString()`.
-- Update CLAUDE.md and any guide docs referencing the string form.
+`Base.toGid()` is now an alias of `Base.toGlobalId()` and returns a
+GlobalID instance, matching Rails' `to_gid → to_global_id` alias.
+Breaking: callers expecting a URI string need `.toString()` or `.uri`.
 
 ### GID-10c — Global `SignedGlobalID.verifier` — **done (shipped in GID-8)**
 

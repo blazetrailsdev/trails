@@ -6981,7 +6981,7 @@ describe("CalculationsTest", () => {
         }
       }
       const u = await User.create({ name: "Alice" });
-      expect(u.toGid()).toContain("gid://TestApp/User/");
+      expect(u.toGid().toString()).toContain("gid://TestApp/User/");
     } finally {
       _resetApp();
     }
