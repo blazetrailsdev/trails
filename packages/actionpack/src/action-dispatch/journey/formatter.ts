@@ -1,3 +1,4 @@
+import { isPlainObject, toParam } from "@blazetrails/activesupport";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
 
@@ -293,10 +294,6 @@ function pairKey(k: string, v: unknown): string {
   return JSON.stringify([k, v ?? null]);
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
 function isPresent(v: unknown): boolean {
   if (v == null) return false;
   if (v === false) return false;
@@ -310,18 +307,6 @@ function toS(v: unknown): string {
   return v == null ? "" : String(v);
 }
 
-function toParam(v: unknown): unknown {
-  if (v == null) return v;
-  if (
-    typeof v === "object" &&
-    "toParam" in v &&
-    typeof (v as { toParam: unknown }).toParam === "function"
-  ) {
-    return (v as { toParam(): unknown }).toParam();
-  }
-  return String(v);
-}
-
 function rubyInspectHash(entries: [string, unknown][]): string {
   const parts = entries.map(([k, v]) => `:${k}=>${rubyInspect(v)}`);
   return `{${parts.join(", ")}}`;
@@ -333,7 +318,22 @@ function rubyInspectArray(arr: readonly unknown[]): string {
 
 function rubyInspect(v: unknown): string {
   if (v == null) return "nil";
-  if (typeof v === "string") return `"${v}"`;
+  if (typeof v === "string") return `"${escapeRubyString(v)}"`;
   if (typeof v === "symbol") return `:${v.description ?? ""}`;
   return String(v);
+}
+
+function escapeRubyString(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const code = ch.charCodeAt(0);
+    if (ch === "\\") out += "\\\\";
+    else if (ch === '"') out += '\\"';
+    else if (ch === "\n") out += "\\n";
+    else if (ch === "\r") out += "\\r";
+    else if (ch === "\t") out += "\\t";
+    else if (code < 0x20) out += `\\x${code.toString(16).padStart(2, "0").toUpperCase()}`;
+    else out += ch;
+  }
+  return out;
 }
