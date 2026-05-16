@@ -86,7 +86,11 @@ export class Router {
 
   recognize(
     req: RouterRequest,
-    block: (route: Route, parameters: Record<string, unknown>) => void,
+    // Block return is `unknown` so expression-bodied callbacks like
+    // `(r) => arr.push(r.name)` (which return a number) remain type-
+    // compatible with the previous `() => void` signature. Only an
+    // explicit `=== true` signals short-circuit.
+    block: (route: Route, parameters: Record<string, unknown>) => unknown,
   ): void {
     for (const { match, parameters, route } of this._findRoutes(req)) {
       if (!route.path.anchored) {
@@ -96,7 +100,9 @@ export class Router {
         req.pathInfo = post;
       }
       const merged: Record<string, unknown> = { ...route.defaults, ...parameters };
-      block(route, merged);
+      // JS callbacks can't `return` from the caller's frame the way Ruby
+      // blocks can; returning `true` from the block signals "stop iterating".
+      if (block(route, merged) === true) return;
     }
   }
 

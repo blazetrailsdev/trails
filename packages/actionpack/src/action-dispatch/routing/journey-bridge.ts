@@ -85,33 +85,25 @@ export function journeyRecognize(
     pathParameters: {},
   };
   let result: JourneyMatch | null = null;
-  try {
-    router.recognize(req, (journeyRoute) => {
-      const local = JOURNEY_TO_LOCAL.get(journeyRoute);
-      if (!local) return;
-      // Re-match against the pattern so we get *only* captured segments —
-      // the parameters Router.recognize yields are merged with defaults,
-      // which leaks defaults into optional captures (e.g. /posts(/:id)
-      // with defaults={id:"1"} matching /posts).
-      const match = journeyRoute.path.match(pathInfo);
-      const params: Record<string, string> = {};
-      if (match) {
-        for (const [name, value] of Object.entries(match.namedCaptures)) {
-          if (value != null) params[name] = unescapeUri(value);
-        }
+  router.recognize(req, (journeyRoute) => {
+    const local = JOURNEY_TO_LOCAL.get(journeyRoute);
+    if (!local) return;
+    // Re-match against the pattern so we get *only* captured segments —
+    // the parameters Router.recognize yields are merged with defaults,
+    // which leaks defaults into optional captures (e.g. /posts(/:id)
+    // with defaults={id:"1"} matching /posts).
+    const match = journeyRoute.path.match(pathInfo);
+    const params: Record<string, string> = {};
+    if (match) {
+      for (const [name, value] of Object.entries(match.namedCaptures)) {
+        if (value != null) params[name] = unescapeUri(value);
       }
-      result = { route: local, params };
-      // Router.recognize iterates all matches; short-circuit so large route
-      // sets aren't fully walked after the first hit.
-      throw STOP;
-    });
-  } catch (e) {
-    if (e !== STOP) throw e;
-  }
+    }
+    result = { route: local, params };
+    return true; // stop iterating after the first hit
+  });
   return result;
 }
-
-const STOP = Symbol("journey-bridge-stop");
 
 function stripAnchors(source: string): string {
   let s = source;
