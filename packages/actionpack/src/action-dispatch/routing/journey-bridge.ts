@@ -35,24 +35,28 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
     const requestMethodMatch = !verb || verb === "ALL" ? undefined : [VerbMatchers.for(verb)];
     const name = r.name ?? `__r${i}`;
     // controller/action are authoritative on the local Route; user defaults
-    // must not overwrite them.
-    const journeyRoute = new JourneyRoute({
-      name,
-      // Seam routes are recognize-only; calling serve() here is a programming
-      // error — fail loudly instead of returning an empty 200.
-      app: {
-        serve: () => {
-          throw new Error(
-            `Journey-bridge route '${name}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
-          );
-        },
+    // must not overwrite them. Precedence is the insertion index so
+    // Router.recognize's precedence sort preserves RouteSet order.
+    journeyRoutes.addRoute(name, {
+      makeRoute: (routeName, index) => {
+        const journeyRoute = new JourneyRoute({
+          name: routeName,
+          app: {
+            serve: () => {
+              throw new Error(
+                `Journey-bridge route '${routeName}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
+              );
+            },
+          },
+          path: pattern,
+          defaults: { ...r.defaults, controller: r.controller, action: r.action },
+          requestMethodMatch,
+          precedence: index,
+        });
+        JOURNEY_TO_LOCAL.set(journeyRoute, r);
+        return journeyRoute;
       },
-      path: pattern,
-      defaults: { ...r.defaults, controller: r.controller, action: r.action },
-      requestMethodMatch,
     });
-    JOURNEY_TO_LOCAL.set(journeyRoute, r);
-    journeyRoutes.addRoute(name, { makeRoute: () => journeyRoute });
   }
   return new JourneyRouter(journeyRoutes);
 }
@@ -69,24 +73,28 @@ export function journeyRecognize(
     pathParameters: {},
   };
   let result: JourneyMatch | null = null;
-  router.recognize(req, (journeyRoute, parameters) => {
-    if (result) return;
-    const local = JOURNEY_TO_LOCAL.get(journeyRoute);
-    if (!local) return;
-    // Router.recognize merges route.defaults into parameters; for parity with
-    // the local matcher's MatchedRoute shape, keep only path captures. Pick
-    // by the pattern's name set so captures sharing a default key (e.g.
-    // /:controller/:action) survive.
-    const captureNames = new Set(journeyRoute.path.names);
-    const params: Record<string, string> = {};
-    for (const name of captureNames) {
-      const v = parameters[name];
-      if (v != null) params[name] = String(v);
-    }
-    result = { route: local, params };
-  });
+  try {
+    router.recognize(req, (journeyRoute, parameters) => {
+      const local = JOURNEY_TO_LOCAL.get(journeyRoute);
+      if (!local) return;
+      const captureNames = new Set(journeyRoute.path.names);
+      const params: Record<string, string> = {};
+      for (const name of captureNames) {
+        const v = parameters[name];
+        if (v != null) params[name] = String(v);
+      }
+      result = { route: local, params };
+      // Router.recognize iterates all matches; short-circuit so large route
+      // sets aren't fully walked after the first hit.
+      throw STOP;
+    });
+  } catch (e) {
+    if (e !== STOP) throw e;
+  }
   return result;
 }
+
+const STOP = Symbol("journey-bridge-stop");
 
 function regexpRequirements(c: Record<string, unknown>): Record<string, RegExp> {
   const out: Record<string, RegExp> = {};
