@@ -2288,7 +2288,7 @@ describe("BasicsTest", () => {
     await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
   });
   it.skip("respect internal encoding", () => {
-    // BLOCKED: unknown — Ruby-only: tests Encoding.default_internal (EUC-JP) on column names; JS has no string encoding model
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-encoding
   });
   it("non valid identifier column name", async () => {
     class Weird extends Base {
@@ -2394,7 +2394,7 @@ describe("BasicsTest", () => {
     expect(u.name).toBe("");
   });
   it.skip("default in local time", () => {
-    // BLOCKED: unknown — with_env_tz: requires process-level TZ change (ENV["TZ"]); Node.js does not support changing the system TZ after startup
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — env-tz
   });
   it("default in utc", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
@@ -2437,10 +2437,10 @@ describe("BasicsTest", () => {
     });
   });
   it.skip("switching default time zone", () => {
-    // BLOCKED: unknown — with_env_tz: toggles default_timezone between :local and :utc using process-level TZ; Node.js does not support this
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — env-tz
   });
   it.skip("mutating time objects", () => {
-    // BLOCKED: unknown — with_env_tz: reads Default.new.fixed_time in local TZ, calls .utc; requires process-level TZ change
+    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — env-tz
   });
   it.skip("connection in local time", () => {
     // BLOCKED: connection-pool — establish_connection: requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config

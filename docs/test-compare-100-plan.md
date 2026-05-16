@@ -93,7 +93,7 @@ For permanently-not-portable tests (Ruby-only — Marshal/YAML/GVL/fork/Rake/dbc
 // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — <category>
 ```
 
-Categories: `marshal`, `yaml`, `psych`, `gvl`, `fork`, `rake`, `pty`, `dbconsole`, `message-pack`, `future_result`.
+Categories: `marshal`, `yaml`, `psych`, `gvl`, `fork`, `rake`, `pty`, `dbconsole`, `message-pack`, `future_result`, `ruby-encoding`, `env-tz`, `protected-params`, `ruby-module-semantics`. List is non-exhaustive — add new kebab-case slugs as needed. (`future_result` is a legacy snake_case slug retained as-is; prefer kebab-case for new slugs.)
 
 ---
 
@@ -122,6 +122,7 @@ Categories: `marshal`, `yaml`, `psych`, `gvl`, `fork`, `rake`, `pty`, `dbconsole
 | `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                                                                                                                                                                                                            |
 | `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                                                                                                                                                                                                           |
 | `BLOCKED: range`           | pg/range type behavior                                                                                                                                                                                                                                                |
+| `BLOCKED: store`           | `Base.store` / `store_accessor` DSL — per-key getters/setters over a hash-typed column (hstore/json/yaml)                                                                                                                                                             |
 | `BLOCKED: unknown`         | Could not categorize from context; needs human triage                                                                                                                                                                                                                 |
 
 Adding a new category: pick a kebab-case slug, document in this table.
