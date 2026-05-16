@@ -1566,6 +1566,7 @@ describe("TestRoutingMapper", () => {
     expect(route.match("GET", "/en/posts")!.params.locale).toBe("en");
   });
 
+  // BLOCKED: same Pattern leading-optional-group regex bug as above.
   it.skip("optional scoped root hierarchy", () => {
     const r1 = new Route("GET", "(/:locale)/posts", "posts", "index");
     const r2 = new Route("GET", "(/:locale)/posts/:id", "posts", "show");

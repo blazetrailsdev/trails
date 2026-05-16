@@ -150,12 +150,19 @@ export class Route {
   }
 
   match(method: string, requestPath: string): MatchedRoute | null {
+    // Verb fast-path: skip Journey router construction when the verb can
+    // be rejected up front. HEAD falls through to GET routes (Journey
+    // handles the HEAD→GET fallback inside `_matchHeadRoutes`).
+    const m = method.toUpperCase();
+    if (this.verb !== "ALL" && this.verb !== m && !(m === "HEAD" && this.verb === "GET")) {
+      return null;
+    }
     if (this._journeyRouter === null) {
       this._journeyRouter = buildJourneyRouter([this]);
     }
-    const m = journeyRecognize(this._journeyRouter, method, requestPath);
-    if (!m) return null;
-    return { route: this, params: m.params };
+    const match = journeyRecognize(this._journeyRouter, method, requestPath);
+    if (!match) return null;
+    return { route: this, params: match.params };
   }
 
   /**
