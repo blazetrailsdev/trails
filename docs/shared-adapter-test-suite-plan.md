@@ -95,6 +95,13 @@ exclude: [
 
 ## Phase 2 — Transactional fixtures as the default reset strategy
 
+**Phase 2a closed (#1632)** — primitive `withTransactionalFixtures` helper shipped, opt-in only. Default `setupFiles` wire-up is **Phase 2b**, blocked on Phase 3 codemod migrating files to schema-in-beforeAll.
+
+**Phase 2a followups:**
+
+- ~100 LOC — MySQL canary for the helper (smoke test only exercised sqlite3 default leg; PG matrix surfaced a real bug — `INTEGER PRIMARY KEY` only autoincrements on SQLite — caught and fixed mid-review).
+- ~50 LOC — Expose `exec`/`execute` on public `DatabaseAdapter` surface (consumers currently need `as unknown as AdapterWithExec` cast). DX gap affecting every consumer of the new helper.
+
 **Goal:** wrap each shared test in `BEGIN` / `ROLLBACK` so schema setup
 runs once per file and per-test reset is effectively free.
 
