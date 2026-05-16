@@ -10,6 +10,8 @@ import {
 import { Version } from "./abstract-adapter.js";
 import {
   AdapterTimeout,
+  ConnectionFailed,
+  ConnectionNotEstablished,
   MismatchedForeignKey,
   NoDatabaseError,
   NotImplementedError,
@@ -22,6 +24,7 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
+import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
@@ -203,6 +206,28 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // without us leaking entries.
   private _statementPools = new WeakMap<mysql.PoolConnection, Mysql2StatementPool>();
 
+  /**
+   * The timezone applied to result rows for the most recent query. Mirrors
+   * the Ruby mysql2 driver's `query_options[:database_timezone]`, which
+   * Rails' `Mysql2Adapter#perform_query` re-syncs to
+   * `ActiveRecord.default_timezone` before each query so a runtime change to
+   * the global default takes effect on the next statement (no reconnect).
+   *
+   * Updated by {@link _syncDatabaseTimezone} from the perform-query path.
+   */
+  databaseTimezone: "utc" | "local" = "utc";
+
+  /**
+   * Refresh {@link databaseTimezone} from the global default. Called from
+   * the perform-query path so a `withTimezoneConfig({ default: "local" })`
+   * block is observable on the very next query — matching Rails'
+   * `raw_connection.query_options[:database_timezone] = default_timezone`
+   * line in `Mysql2Adapter#perform_query`.
+   */
+  private _syncDatabaseTimezone(): void {
+    this.databaseTimezone = getDefaultTimezone();
+  }
+
   protected override _onStatementLimitChanged(value: number): void {
     if (this._conn) this._statementPools.get(this._conn)?.setMaxSize(value);
   }
@@ -218,6 +243,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (isMysql2DriverTimeout(e)) {
       const msg = e instanceof Error ? e.message : String(e);
       return new AdapterTimeout(msg, { sql, binds, cause: e });
+    }
+    if (isMysql2ConnectionError(e)) {
+      // Mirrors `Mysql2Adapter#translate_exception`'s
+      // `Mysql2::Error::ConnectionError` branch: a "MySQL client is not
+      // connected" message is promoted to ConnectionNotEstablished;
+      // everything else in this family is ConnectionFailed.
+      const msg = (e as Error).message;
+      if (AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg)) {
+        return new ConnectionNotEstablished(msg, { cause: e });
+      }
+      return new ConnectionFailed(msg, { sql, binds, cause: e });
     }
     return super._translateException(e, sql, binds);
   }
@@ -421,6 +457,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     options?: { prepare?: boolean },
   ): Promise<Result> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
     const payload: Record<string, unknown> = {
@@ -597,6 +634,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     // payload records the exact values sent to mysql2 so LogSubscriber /
@@ -660,6 +698,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     const payload: Record<string, unknown> = {
@@ -823,6 +862,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
+    // Rails' MySQL::DatabaseStatements#explain runs through internal_exec_query
+    // and therefore through perform_query, which re-syncs the database timezone.
+    this._syncDatabaseTimezone();
     const conn = await this.getConn();
     try {
       const clause = this._explainStatementClause(options);
@@ -856,6 +898,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Execute raw SQL (for DDL and other non-query statements).
    */
   async exec(sql: string): Promise<void> {
+    this._syncDatabaseTimezone();
     const conn = await this.getConn();
     try {
       await conn.query(this.mysqlQuote(sql));
@@ -1736,6 +1779,39 @@ function isMysql2DriverTimeout(e: unknown): boolean {
   if (typeof errno === "number" && errno > 0) return false;
   const code = (e as { code?: string }).code;
   return code === "PROTOCOL_SEQUENCE_TIMEOUT" || code === "ETIMEDOUT";
+}
+
+/**
+ * Detect a node-mysql2 error that mirrors Ruby's
+ * `Mysql2::Error::ConnectionError` family — driver-level connection-loss
+ * conditions surfaced without a positive MySQL errno. These include
+ * socket-level failures (`ECONNRESET` / `ECONNREFUSED` / `EPIPE` /
+ * `ENOTFOUND` / `EHOSTUNREACH` / `ENETUNREACH`),
+ * mysql2 protocol errors after the connection died
+ * (`PROTOCOL_CONNECTION_LOST`, `PROTOCOL_ENQUEUE_AFTER_QUIT`,
+ * `PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR`, `PROTOCOL_ENQUEUE_HANDSHAKE_TWICE`),
+ * and the pool-closed sentinel (`POOL_CLOSED`).
+ *
+ * @internal
+ */
+function isMysql2ConnectionError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const errno = (e as { errno?: number }).errno;
+  if (typeof errno === "number" && errno > 0) return false;
+  const code = (e as { code?: string }).code;
+  return (
+    code === "PROTOCOL_CONNECTION_LOST" ||
+    code === "PROTOCOL_ENQUEUE_AFTER_QUIT" ||
+    code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
+    code === "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE" ||
+    code === "POOL_CLOSED" ||
+    code === "ECONNRESET" ||
+    code === "ECONNREFUSED" ||
+    code === "ENOTFOUND" ||
+    code === "EHOSTUNREACH" ||
+    code === "ENETUNREACH" ||
+    code === "EPIPE"
+  );
 }
 
 /** @internal */

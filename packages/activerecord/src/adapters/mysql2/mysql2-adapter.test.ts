@@ -1,18 +1,27 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/mysql2_adapter_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysql,
   Mysql2Adapter,
   MYSQL_TEST_URL,
+  withDbWarningsAction,
 } from "../abstract-mysql-adapter/test-helper.js";
+import { withTimezoneConfig } from "../../test-helper.js";
 import {
   AdapterTimeout,
+  ConnectionFailed,
+  ConnectionNotEstablished,
+  DatabaseAlreadyExists,
+  Deadlocked,
   InvalidForeignKey,
+  LockWaitTimeout,
   MismatchedForeignKey,
   NotNullViolation,
   QueryAborted,
+  QueryCanceled,
+  RangeError as ARRangeError,
   RecordNotUnique,
   StatementTimeout,
   ValueTooLong,
@@ -20,12 +29,100 @@ import {
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
 
+// Fabricated-error translate_exception checks. These don't touch a live
+// MySQL server (they feed Object.assign(new Error(...), { errno/code })
+// straight into translateException), so they live outside describeIfMysql
+// to keep coverage on dev machines without MySQL installed.
+describe("Mysql2Adapter#translateException (fabricated errors)", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(() => {
+    adapter = new Mysql2Adapter({ _fakeConnection: true });
+  });
+  afterEach(async () => {
+    await adapter.close().catch(() => {});
+  });
+
+  it("translates connection-loss errnos to ConnectionFailed", () => {
+    // Mirrors AbstractMysqlAdapter#translate_exception cases for
+    // ER_CONNECTION_KILLED / ER_SERVER_SHUTDOWN / CR_SERVER_GONE_ERROR /
+    // CR_SERVER_LOST / ER_CLIENT_INTERACTION_TIMEOUT.
+    for (const errno of [
+      AbstractMysqlAdapter.ER_CONNECTION_KILLED,
+      AbstractMysqlAdapter.ER_SERVER_SHUTDOWN,
+      AbstractMysqlAdapter.CR_SERVER_GONE_ERROR,
+      AbstractMysqlAdapter.CR_SERVER_LOST,
+      AbstractMysqlAdapter.ER_CLIENT_INTERACTION_TIMEOUT,
+    ]) {
+      const driverErr = Object.assign(new Error("conn lost"), { errno });
+      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      expect(translated).toBeInstanceOf(ConnectionFailed);
+      expect((translated as ConnectionFailed).cause).toBe(driverErr);
+    }
+  });
+
+  it("translates ER_LOCK_DEADLOCK / ER_LOCK_WAIT_TIMEOUT / ER_QUERY_INTERRUPTED / ER_OUT_OF_RANGE / ER_DB_CREATE_EXISTS", () => {
+    const cases: Array<[number, new (...a: any[]) => Error]> = [
+      [AbstractMysqlAdapter.ER_LOCK_DEADLOCK, Deadlocked],
+      [AbstractMysqlAdapter.ER_LOCK_WAIT_TIMEOUT, LockWaitTimeout],
+      [AbstractMysqlAdapter.ER_QUERY_INTERRUPTED, QueryCanceled],
+      [AbstractMysqlAdapter.ER_OUT_OF_RANGE, ARRangeError],
+      [AbstractMysqlAdapter.ER_DB_CREATE_EXISTS, DatabaseAlreadyExists],
+    ];
+    for (const [errno, klass] of cases) {
+      const driverErr = Object.assign(new Error("fail"), { errno });
+      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      expect(translated).toBeInstanceOf(klass);
+      expect((translated as Error & { cause?: unknown }).cause).toBe(driverErr);
+    }
+  });
+
+  it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", () => {
+    // Mirrors Mysql2Adapter#translate_exception's ConnectionError branch
+    // AND AbstractMysqlAdapter#translate_exception's `when nil` branch.
+    const codedErr = Object.assign(new Error("MySQL client is not connected"), {
+      code: "PROTOCOL_CONNECTION_LOST",
+    });
+    expect(adapter.translateException(codedErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+      ConnectionNotEstablished,
+    );
+    const plainErr = new Error("MySQL client is not connected");
+    expect(adapter.translateException(plainErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+      ConnectionNotEstablished,
+    );
+  });
+
+  it("translates node-mysql2 connection codes to ConnectionFailed", () => {
+    for (const code of [
+      "PROTOCOL_CONNECTION_LOST",
+      "PROTOCOL_ENQUEUE_AFTER_QUIT",
+      "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR",
+      "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE",
+      "POOL_CLOSED",
+      "ECONNRESET",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EHOSTUNREACH",
+      "ENETUNREACH",
+      "EPIPE",
+    ]) {
+      const driverErr = Object.assign(new Error("connection lost"), { code });
+      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      expect(translated).toBeInstanceOf(ConnectionFailed);
+    }
+  });
+});
+
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = new Mysql2Adapter(MYSQL_TEST_URL);
   });
   afterEach(async () => {
+    // Restore any console / logger spies installed by the warning-handler
+    // tests so a throw before the inner mockRestore() can't leak the stub
+    // into subsequent suites — matches the cleanup pattern in
+    // adapters/abstract-mysql-adapter/warnings.test.ts.
+    vi.restoreAllMocks();
     await adapter.close();
   });
 
@@ -333,20 +430,93 @@ describeIfMysql("Mysql2Adapter", () => {
         expect((translated as StatementTimeout).cause).toBe(driverErr);
       }
     });
-    it.skip("database timezone changes synced to connection", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("database timezone changes synced to connection", async () => {
+      // Mirrors: test_database_timezone_changes_synced_to_connection. The Ruby
+      // mysql2 driver carries `query_options[:database_timezone]` on the raw
+      // socket; trails surfaces the same via `adapter.databaseTimezone`,
+      // re-synced from the global default in the perform-query path so a
+      // runtime `withTimezoneConfig` flip takes effect on the next statement.
+      await adapter.execute("SELECT 1");
+      expect(adapter.databaseTimezone).toBe("utc");
+      await withTimezoneConfig({ default: "local" }, async () => {
+        await adapter.execute("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
+        // execQuery and executeMutation are also on the perform-query path
+        // and must re-sync — guard against accidental removal.
+        adapter.databaseTimezone = "utc";
+        await adapter.execQuery("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
+        adapter.databaseTimezone = "utc";
+        await adapter.executeMutation("DO 1");
+        expect(adapter.databaseTimezone).toBe("local");
+        adapter.databaseTimezone = "utc";
+        await adapter.exec("DO 1");
+        expect(adapter.databaseTimezone).toBe("local");
+        adapter.databaseTimezone = "utc";
+        await adapter.explain("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
+      });
+      await adapter.execute("SELECT 1");
+      expect(adapter.databaseTimezone).toBe("utc");
     });
-    it.skip("warnings do not change returned value of exec update", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+
+    it("warnings do not change returned value of exec update", async () => {
+      // Mirrors: test_warnings_do_not_change_returned_value_of_exec_update.
+      // Pin a single pool connection via beginTransaction so SET SESSION
+      // sql_mode='' carries over to the warning-producing UPDATE (DDL on
+      // MySQL auto-commits, so the table persists even on rollback).
+      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.executeMutation(
+          `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
+        );
+        await adapter.executeMutation(`SET SESSION sql_mode=''`);
+        await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        // Spy is restored by the outer afterEach via vi.restoreAllMocks().
+        await withDbWarningsAction("log", async () => {
+          // `id > (0+'foo')` triggers a "Truncated incorrect DOUBLE value" warning;
+          // under db_warnings_action=:log that warning is logged, not raised, and
+          // must not corrupt the affected-row count returned by executeMutation.
+          const affected = await adapter.executeMutation(
+            `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
+          );
+          expect(affected).toBe(1);
+        });
+        // The warning handler must have actually fired — otherwise this
+        // test would silently still pass on a regression that disconnected
+        // executeMutation from _handleWarningsOn.
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        await adapter.rollback().catch(() => {});
+        await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      }
     });
-    it.skip("warnings do not change returned value of exec delete", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+
+    it("warnings do not change returned value of exec delete", async () => {
+      // Mirrors: test_warnings_do_not_change_returned_value_of_exec_delete.
+      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.executeMutation(
+          `CREATE TABLE warn_posts_d (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
+        );
+        await adapter.executeMutation(`SET SESSION sql_mode=''`);
+        await adapter.executeMutation(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        // Spy is restored by the outer afterEach via vi.restoreAllMocks().
+        await withDbWarningsAction("log", async () => {
+          const affected = await adapter.executeMutation(
+            `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
+          );
+          expect(affected).toBe(1);
+        });
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        await adapter.rollback().catch(() => {});
+        await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
+      }
     });
   });
 });

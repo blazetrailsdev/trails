@@ -13,10 +13,17 @@ import type { AdapterName, ExplainOption } from "../adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
+  ConnectionFailed,
+  ConnectionNotEstablished,
+  DatabaseAlreadyExists,
   DatabaseVersionError,
+  Deadlocked,
   InvalidForeignKey,
+  LockWaitTimeout,
   MismatchedForeignKey,
   NotNullViolation,
+  QueryCanceled,
+  RangeError as ARRangeError,
   RecordNotUnique,
   SQLWarning,
   StatementInvalid,
@@ -109,6 +116,12 @@ const ER_QUERY_INTERRUPTED = 1317;
 const ER_QUERY_TIMEOUT = 3024;
 const ER_FILSORT_ABORT = 1028;
 const ER_TABLE_EXISTS = 1050;
+const ER_DB_CREATE_EXISTS = 1007;
+const ER_SERVER_SHUTDOWN = 1053;
+const ER_CONNECTION_KILLED = 1927;
+const CR_SERVER_GONE_ERROR = 2006;
+const CR_SERVER_LOST = 2013;
+const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
 // Function defaults emitted without DEFAULT_GENERATED in Extra (e.g. CURRENT_TIMESTAMP on
 // datetime columns). Used by renameColumnForAlter to emit them unquoted in the CHANGE clause.
@@ -985,6 +998,22 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly ER_QUERY_TIMEOUT = ER_QUERY_TIMEOUT;
   static readonly ER_FILSORT_ABORT = ER_FILSORT_ABORT;
   static readonly ER_TABLE_EXISTS = ER_TABLE_EXISTS;
+  static readonly ER_DB_CREATE_EXISTS = ER_DB_CREATE_EXISTS;
+  static readonly ER_SERVER_SHUTDOWN = ER_SERVER_SHUTDOWN;
+  static readonly ER_CONNECTION_KILLED = ER_CONNECTION_KILLED;
+  static readonly CR_SERVER_GONE_ERROR = CR_SERVER_GONE_ERROR;
+  static readonly CR_SERVER_LOST = CR_SERVER_LOST;
+  static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
+
+  /**
+   * Mirrors the message regex Rails' `Mysql2Adapter#translate_exception`
+   * uses to distinguish `ConnectionNotEstablished` from `ConnectionFailed`
+   * when a `Mysql2::Error::ConnectionError` arrives. Centralized so the
+   * abstract `when nil` branch and the Mysql2Adapter `ConnectionError`
+   * branch cannot drift if mysql2 changes the wording.
+   * @internal
+   */
+  static readonly CLIENT_NOT_CONNECTED_RE = /MySQL client is not connected/i;
 
   /**
    * Boolean MySQL EXPLAIN flags. MySQL 8.0.18+ supports `EXPLAIN
@@ -1162,7 +1191,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const errno = (e as { errno?: number }).errno;
     const msg = e.message;
     const cause = e;
+    if (typeof errno !== "number") {
+      // Mirrors Rails' `when nil` branch — driver errors without a MySQL
+      // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
+      // generic Error) get promoted to ConnectionNotEstablished when the
+      // message indicates the client lost the server handshake.
+      if (AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg)) {
+        return new ConnectionNotEstablished(msg, { cause });
+      }
+    }
     switch (errno) {
+      case ER_DB_CREATE_EXISTS:
+        return new DatabaseAlreadyExists(msg, { sql, binds, cause });
       case ER_DUP_ENTRY:
         return new RecordNotUnique(msg, { sql, binds, cause });
       case ER_NO_REFERENCED_ROW:
@@ -1183,9 +1223,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         return new NotNullViolation(msg, { sql, binds, cause });
       case ER_DATA_TOO_LONG:
         return new ValueTooLong(msg, { sql, binds, cause });
+      case ER_OUT_OF_RANGE:
+        return new ARRangeError(msg, { sql, binds, cause });
+      case ER_LOCK_DEADLOCK:
+        return new Deadlocked(msg, { sql, binds, cause });
+      case ER_LOCK_WAIT_TIMEOUT:
+        return new LockWaitTimeout(msg, { sql, binds, cause });
       case ER_QUERY_TIMEOUT:
       case ER_FILSORT_ABORT:
         return new StatementTimeout(msg, { sql, binds, cause });
+      case ER_QUERY_INTERRUPTED:
+        return new QueryCanceled(msg, { sql, binds, cause });
+      case ER_CONNECTION_KILLED:
+      case ER_SERVER_SHUTDOWN:
+      case CR_SERVER_GONE_ERROR:
+      case CR_SERVER_LOST:
+      case ER_CLIENT_INTERACTION_TIMEOUT:
+        return new ConnectionFailed(msg, { sql, binds, cause });
       default:
         // Driver errors expose a positive MySQL errno and usually a
         // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
