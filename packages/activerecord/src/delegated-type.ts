@@ -1,5 +1,6 @@
 import type { Base } from "./base.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
+import { camelize, inquiry, singularize, tableize, underscore } from "@blazetrails/activesupport";
+import { resolveModel } from "./associations.js";
 
 /**
  * Configuration for a delegated type.
@@ -38,14 +39,14 @@ const delegatedTypeRegistry = new WeakMap<
  *   });
  *
  * This adds:
- *   - entry.entryableClass      → the class of the delegated type
- *   - entry.entryableName       → lowercase type name (e.g. "message")
- *   - entry.isMessage()         → type predicate
- *   - entry.isComment()         → type predicate
- *   - Entry.messages()          → scope (returns Relation)
- *   - Entry.comments()          → scope (returns Relation)
- *   - entry.message             → accessor (returns the associated record)
- *   - entry.buildMessage(attrs) → builder method
+ *   - entry.entryableClass         → current foreign_type string (Rails-divergence: Rails returns the constantized class; pre-existing from #1583)
+ *   - entry.entryableName          → StringInquirer (e.g. inquiry("message"))
+ *   - entry.isMessage()            → type predicate
+ *   - entry.isComment()            → type predicate
+ *   - Entry.messages()             → scope (returns Relation)
+ *   - Entry.comments()             → scope (returns Relation)
+ *   - entry.message                → accessor (associated record via belongs_to)
+ *   - entry.buildEntryable(attrs)  → role-level builder for the current type
  */
 export function delegatedType(
   modelClass: typeof Base,
@@ -97,22 +98,62 @@ export function delegatedType(
     configurable: true,
   });
 
-  // Add instance method: delegatedName (e.g. entryableName)
+  // Add instance method: delegatedName (e.g. entryableName).
+  // Rails: public_send("#{role}_class").model_name.singular.inquiry —
+  // returns an ActiveSupport::StringInquirer so callers can do
+  // entryable_name.message?. We derive the same string value directly from
+  // foreign_type (underscore + tr("/","_"), matching ModelName#singular)
+  // rather than routing through `${role}Class`, which currently returns
+  // the foreign_type string instead of the constantized class (Rails
+  // divergence pre-existing from #1583).
   Object.defineProperty(modelClass.prototype, `${role}Name`, {
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;
       if (!typeName) return null;
-      return typeName.toLowerCase().replace(/.*::/, "");
+      // Rails: model_name.singular == name.underscore.tr("/", "_").
+      // "Access::NoticeMessage" → "access/notice_message" → "access_notice_message".
+      const singular = underscore(typeName).replace(/\//g, "_");
+      return inquiry(singular);
     },
     configurable: true,
   });
 
-  // For each type, add predicates, scopes, accessors, and builder methods
-  for (const typeName of options.types) {
-    const snakeName = underscore(typeName);
+  // Role-level builder: entry.buildEntryable(attrs) builds a new record of
+  // the currently-set foreign_type and assigns it via the polymorphic
+  // belongs_to writer (which also fills foreign_type/foreign_key).
+  // Rails: define_method "build_#{role}" { |*params| public_send("#{role}=", public_send("#{role}_class").new(*params)) }
+  Object.defineProperty(modelClass.prototype, `build${camelize(role, true)}`, {
+    value: function (this: Base, attrs: Record<string, unknown> = {}): Base {
+      const typeName = this.readAttribute(foreignType) as string | null;
+      if (!typeName) {
+        throw new Error(`Cannot build${camelize(role, true)}: ${foreignType} is not set`);
+      }
+      const TargetClass = resolveModel(typeName);
+      const instance = new (TargetClass as unknown as new (a: Record<string, unknown>) => Base)(
+        attrs,
+      );
+      (this as unknown as Record<string, unknown>)[role] = instance;
+      return instance;
+    },
+    writable: true,
+    configurable: true,
+  });
 
-    // Type predicate: isMessage(), isComment()
-    Object.defineProperty(modelClass.prototype, `is${typeName}`, {
+  // For each type, add predicates, scopes, and accessors.
+  // Rails: scope_name = type.tableize.tr("/", "_"); singular = scope_name.singularize
+  // Namespaced types like "Access::NoticeMessage" tableize to "access/notice_messages",
+  // then "/" → "_" gives "access_notice_messages" (a valid scope/method name).
+  for (const typeName of options.types) {
+    const scopeSnake = tableize(typeName).replace(/\//g, "_");
+    const singularSnake = singularize(scopeSnake);
+    const scopeName = camelize(scopeSnake, false);
+    const singularName = camelize(singularSnake, false);
+    // Predicate camelizes the singular scope name so it tracks Rails' query
+    // method (which is "#{singular}?"). "Access::NoticeMessage" → isAccessNoticeMessage().
+    const predicateSuffix = camelize(singularSnake, true);
+
+    // Type predicate: isMessage(), isAccessNoticeMessage()
+    Object.defineProperty(modelClass.prototype, `is${predicateSuffix}`, {
       value: function (this: Base): boolean {
         return this.readAttribute(foreignType) === typeName;
       },
@@ -120,11 +161,8 @@ export function delegatedType(
       configurable: true,
     });
 
-    // Also add a snake_case predicate style: message?, comment? → we use isX
-
-    // Scope: Model.messages(), Model.comments()
-    const pluralName = snakeName + "s";
-    Object.defineProperty(modelClass, pluralName, {
+    // Scope: Model.messages(), Model.accessNoticeMessages()
+    Object.defineProperty(modelClass, scopeName, {
       value: function (this: typeof Base) {
         return this.where({ [foreignType]: typeName });
       },
@@ -132,37 +170,25 @@ export function delegatedType(
       configurable: true,
     });
 
-    // Accessor: entry.message → returns the FK value if type matches
-    Object.defineProperty(modelClass.prototype, snakeName, {
+    // Accessor: entry.message → returns the associated record via the
+    // polymorphic belongs_to reader when type matches, otherwise null.
+    // Rails: define_method(singular) { public_send(role) if public_send(query) }
+    Object.defineProperty(modelClass.prototype, singularName, {
       get(this: Base) {
         if (this.readAttribute(foreignType) !== typeName) return null;
-        return this.readAttribute(foreignKey);
+        return (this as unknown as Record<string, unknown>)[role];
       },
       configurable: true,
     });
 
-    // FK accessor: entry.messageId (or entry.uuidMessageUuid for UUID PKs) → returns FK if type matches
-    // Mirrors Rails' define_method("#{singular}_#{primary_key}") { public_send(role_id) if public_send(query) }
-    // Name is camelCase of `${snakeName}_${primaryKey}` (e.g. "message_id" → "messageId").
-    const fkAccessorName = camelize(`${snakeName.replace(/\//g, "_")}_${primaryKey}`, false);
+    // FK accessor: entry.messageId (or entry.uuidMessageUuid for UUID PKs).
+    // Rails: define_method("#{singular}_#{primary_key}") { public_send(role_id) if public_send(query) }
+    const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
     Object.defineProperty(modelClass.prototype, fkAccessorName, {
       get(this: Base) {
         if (this.readAttribute(foreignType) !== typeName) return null;
         return this.readAttribute(foreignKey);
       },
-      configurable: true,
-    });
-
-    // Builder method: entry.buildMessage(attrs) → sets type and returns
-    Object.defineProperty(modelClass.prototype, `build${typeName}`, {
-      value: function (this: Base, attrs: Record<string, unknown> = {}): Base {
-        this.writeAttribute(foreignType, typeName);
-        for (const [k, v] of Object.entries(attrs)) {
-          this.writeAttribute(k, v);
-        }
-        return this;
-      },
-      writable: true,
       configurable: true,
     });
   }
