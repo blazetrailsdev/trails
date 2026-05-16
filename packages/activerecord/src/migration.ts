@@ -1656,10 +1656,11 @@ export class MigrationContext {
       return;
     }
     for (const idx of td.indexes) {
-      const ordersMap: Record<string, string> | undefined =
+      const rawOrders =
         typeof idx.orders === "string"
           ? Object.fromEntries(idx.columns.map((c) => [c, idx.orders as string]))
           : idx.orders;
+      const ordersMap = rawOrders && Object.keys(rawOrders).length > 0 ? rawOrders : undefined;
       await this.addIndex(name, idx.columns, {
         unique: idx.unique,
         name: idx.name,
@@ -2037,7 +2038,11 @@ export class MigrationContext {
   }> {
     const idxs = this._indexes.get(tableName);
     if (!idxs) return [];
-    return idxs.map((i) => ({ ...i, columns: [...i.columns] }));
+    return idxs.map((i) => ({
+      ...i,
+      columns: [...i.columns],
+      include: i.include ? [...i.include] : undefined,
+    }));
   }
 }
 
