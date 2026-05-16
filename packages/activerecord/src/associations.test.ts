@@ -3065,23 +3065,261 @@ describe("AssociationsTest", () => {
     expect(child.parent_region_id).toBe(2);
     expect(child.parent_id).toBe(30);
   });
-  it.skip("append composite has many through association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* fixture-dependent */
+  it("append composite has many through association", async () => {
+    const adapter = freshAdapter();
+    class CpkThruDoc1 extends Base {
+      static {
+        this._tableName = "cpk_thru_doc1s";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruAppt1 extends Base {
+      static {
+        this._tableName = "cpk_thru_appt1s";
+        this.attribute("doctor_region_id", "integer");
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruPat1 extends Base {
+      static {
+        this._tableName = "cpk_thru_pat1s";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkThruDoc1, "appts", {
+      className: "CpkThruAppt1",
+      foreignKey: ["doctor_region_id", "doctor_id"],
+    });
+    Associations.belongsTo.call(CpkThruAppt1, "patient", {
+      className: "CpkThruPat1",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CpkThruDoc1, "patients", {
+      through: "appts",
+      className: "CpkThruPat1",
+      source: "patient",
+    });
+    registerModel("CpkThruDoc1", CpkThruDoc1);
+    registerModel("CpkThruAppt1", CpkThruAppt1);
+    registerModel("CpkThruPat1", CpkThruPat1);
+
+    const doc = await CpkThruDoc1.create({ region_id: 1, id: 7, name: "Dr A" });
+    // Another doctor that shares one PK component, to verify the composite
+    // through scope filters on BOTH columns rather than only the first.
+    const otherDoc = await CpkThruDoc1.create({ region_id: 2, id: 7, name: "Dr Other" });
+    const alice = await CpkThruPat1.create({ name: "Alice" });
+    const noise = await CpkThruPat1.create({ name: "Noise" });
+    await CpkThruAppt1.create({
+      doctor_region_id: 2,
+      doctor_id: 7,
+      patient_id: noise.id,
+    });
+    const proxy = association(doc, "patients");
+    await proxy.push(alice);
+
+    const joins = await CpkThruAppt1.all().where({ doctor_region_id: 1 }).toArray();
+    expect(joins).toHaveLength(1);
+    expect(joins[0].doctor_region_id).toBe(1);
+    expect(joins[0].doctor_id).toBe(7);
+    expect(joins[0].patient_id).toBe(alice.id);
+
+    // Reading through the proxy must exercise _buildThroughScope. It should
+    // return only Alice — not the noise row that shares doctor_id=7.
+    const loaded = await proxy.toArray();
+    expect(loaded.map((p: any) => p.name)).toEqual(["Alice"]);
+    const otherLoaded = await association(otherDoc, "patients").toArray();
+    expect(otherLoaded.map((p: any) => p.name)).toEqual(["Noise"]);
   });
-  it.skip("append composite has many through association with autosave", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* fixture-dependent */
+  it("append composite has many through association with autosave", async () => {
+    const adapter = freshAdapter();
+    class CpkThruDoc2 extends Base {
+      static {
+        this._tableName = "cpk_thru_doc2s";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruAppt2 extends Base {
+      static {
+        this._tableName = "cpk_thru_appt2s";
+        this.attribute("doctor_region_id", "integer");
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruPat2 extends Base {
+      static {
+        this._tableName = "cpk_thru_pat2s";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkThruDoc2, "appts", {
+      className: "CpkThruAppt2",
+      foreignKey: ["doctor_region_id", "doctor_id"],
+    });
+    Associations.belongsTo.call(CpkThruAppt2, "patient", {
+      className: "CpkThruPat2",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CpkThruDoc2, "patients", {
+      through: "appts",
+      className: "CpkThruPat2",
+      source: "patient",
+    });
+    registerModel("CpkThruDoc2", CpkThruDoc2);
+    registerModel("CpkThruAppt2", CpkThruAppt2);
+    registerModel("CpkThruPat2", CpkThruPat2);
+
+    const doc = await CpkThruDoc2.create({ region_id: 2, id: 9, name: "Dr B" });
+    // Unsaved patient — push should autosave it before creating the join row.
+    const bob = new CpkThruPat2({ name: "Bob" });
+    expect(bob.isNewRecord()).toBe(true);
+    const proxy = association(doc, "patients");
+    await proxy.push(bob);
+    expect(bob.isPersisted()).toBe(true);
+
+    const joins = await CpkThruAppt2.all().toArray();
+    expect(joins).toHaveLength(1);
+    expect(joins[0].doctor_region_id).toBe(2);
+    expect(joins[0].doctor_id).toBe(9);
+    expect(joins[0].patient_id).toBe(bob.id);
   });
-  it.skip("nullify composite has many through association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* fixture-dependent */
+  it("nullify composite has many through association", async () => {
+    const adapter = freshAdapter();
+    class CpkThruDoc3 extends Base {
+      static {
+        this._tableName = "cpk_thru_doc3s";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruAppt3 extends Base {
+      static {
+        this._tableName = "cpk_thru_appt3s";
+        this.attribute("doctor_region_id", "integer");
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruPat3 extends Base {
+      static {
+        this._tableName = "cpk_thru_pat3s";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkThruDoc3, "appts", {
+      className: "CpkThruAppt3",
+      foreignKey: ["doctor_region_id", "doctor_id"],
+    });
+    Associations.belongsTo.call(CpkThruAppt3, "patient", {
+      className: "CpkThruPat3",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CpkThruDoc3, "patients", {
+      through: "appts",
+      className: "CpkThruPat3",
+      source: "patient",
+    });
+    registerModel("CpkThruDoc3", CpkThruDoc3);
+    registerModel("CpkThruAppt3", CpkThruAppt3);
+    registerModel("CpkThruPat3", CpkThruPat3);
+
+    const doc = await CpkThruDoc3.create({ region_id: 3, id: 4, name: "Dr C" });
+    const p1 = await CpkThruPat3.create({ name: "Alice" });
+    const p2 = await CpkThruPat3.create({ name: "Bob" });
+    await CpkThruAppt3.create({ doctor_region_id: 3, doctor_id: 4, patient_id: p1.id });
+    await CpkThruAppt3.create({ doctor_region_id: 3, doctor_id: 4, patient_id: p2.id });
+
+    const proxy = association(doc, "patients");
+    const count = await proxy.deleteAll("nullify");
+    expect(count).toBe(2);
+    // Join rows removed, target patients still exist.
+    expect(await CpkThruAppt3.all().count()).toBe(0);
+    expect(await CpkThruPat3.all().count()).toBe(2);
+  });
+  it("delete single composite has many through join row", async () => {
+    // Covers _deleteThrough composite-aware findBy. Another owner shares one
+    // PK component to verify the join lookup ANDs across both columns.
+    const adapter = freshAdapter();
+    class CpkThruDoc4 extends Base {
+      static {
+        this._tableName = "cpk_thru_doc4s";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruAppt4 extends Base {
+      static {
+        this._tableName = "cpk_thru_appt4s";
+        this.attribute("doctor_region_id", "integer");
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruPat4 extends Base {
+      static {
+        this._tableName = "cpk_thru_pat4s";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkThruDoc4, "appts", {
+      className: "CpkThruAppt4",
+      foreignKey: ["doctor_region_id", "doctor_id"],
+    });
+    Associations.belongsTo.call(CpkThruAppt4, "patient", {
+      className: "CpkThruPat4",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CpkThruDoc4, "patients", {
+      through: "appts",
+      className: "CpkThruPat4",
+      source: "patient",
+    });
+    registerModel("CpkThruDoc4", CpkThruDoc4);
+    registerModel("CpkThruAppt4", CpkThruAppt4);
+    registerModel("CpkThruPat4", CpkThruPat4);
+
+    const doc = await CpkThruDoc4.create({ region_id: 5, id: 11, name: "Dr D" });
+    const otherDoc = await CpkThruDoc4.create({ region_id: 6, id: 11, name: "Dr E" });
+    const alice = await CpkThruPat4.create({ name: "Alice" });
+    await CpkThruAppt4.create({ doctor_region_id: 5, doctor_id: 11, patient_id: alice.id });
+    await CpkThruAppt4.create({ doctor_region_id: 6, doctor_id: 11, patient_id: alice.id });
+
+    const proxy = association(doc, "patients");
+    await proxy.delete(alice);
+
+    // Only the owning composite join row is removed.
+    const remaining = await CpkThruAppt4.all().toArray();
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].doctor_region_id).toBe(6);
+    expect(remaining[0].doctor_id).toBe(11);
+    // Target record itself is untouched, and the other owner still sees Alice.
+    expect(await CpkThruPat4.all().count()).toBe(1);
+    expect((await association(otherDoc, "patients").toArray()).map((p: any) => p.name)).toEqual([
+      "Alice",
+    ]);
   });
   it("belongs to with explicit composite foreign key", async () => {
     const adapter = freshAdapter();
