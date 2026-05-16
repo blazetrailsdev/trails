@@ -2016,7 +2016,7 @@ describe("BasicsTest", () => {
     expect(Account.tableName).toBe("accounts");
   });
   it.skip("utc as time zone", () => {
-    // BLOCKED: fixtures + with_env_tz — reads Topic.find(1).bonus_time after assigning "5:42:00AM" string; requires process-level TZ env var and Topic fixture data
+    // BLOCKED: fixture — with_env_tz: reads Topic.find(1).bonus_time after assigning "5:42:00AM" string; requires process-level TZ env var and Topic fixture data
   });
   it("utc as time zone and new", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
@@ -2288,7 +2288,7 @@ describe("BasicsTest", () => {
     await expect(post2.update({ author_id: author2.id })).rejects.toThrow(ReadonlyAttributeError);
   });
   it.skip("respect internal encoding", () => {
-    // BLOCKED: Ruby-only — tests Encoding.default_internal (EUC-JP) on column names; JS has no string encoding model
+    // BLOCKED: unknown — Ruby-only: tests Encoding.default_internal (EUC-JP) on column names; JS has no string encoding model
   });
   it("non valid identifier column name", async () => {
     class Weird extends Base {
@@ -2302,7 +2302,7 @@ describe("BasicsTest", () => {
     expect(reloaded.readAttribute("a$b")).toBe("value");
   });
   it.skip("attributes on dummy time", () => {
-    // BLOCKED: fixtures + with_env_tz — assigns "5:42:00AM" string to Topic.find(1).bonus_time; needs Topic fixture and process-level TZ change; then assert_equal using find_by, requiring DB
+    // BLOCKED: fixture — with_env_tz: assigns "5:42:00AM" string to Topic.find(1).bonus_time; needs Topic fixture and process-level TZ change; then assert_equal using find_by, requiring DB
   });
   it("attributes on dummy time with invalid time", async () => {
     const adp = freshAdapter();
@@ -2394,7 +2394,7 @@ describe("BasicsTest", () => {
     expect(u.name).toBe("");
   });
   it.skip("default in local time", () => {
-    // BLOCKED: with_env_tz — requires process-level TZ change (ENV["TZ"]); Node.js does not support changing the system TZ after startup
+    // BLOCKED: unknown — with_env_tz: requires process-level TZ change (ENV["TZ"]); Node.js does not support changing the system TZ after startup
   });
   it("default in utc", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
@@ -2437,16 +2437,16 @@ describe("BasicsTest", () => {
     });
   });
   it.skip("switching default time zone", () => {
-    // BLOCKED: with_env_tz — toggles default_timezone between :local and :utc using process-level TZ; Node.js does not support this
+    // BLOCKED: unknown — with_env_tz: toggles default_timezone between :local and :utc using process-level TZ; Node.js does not support this
   });
   it.skip("mutating time objects", () => {
-    // BLOCKED: with_env_tz — reads Default.new.fixed_time in local TZ, calls .utc; requires process-level TZ change
+    // BLOCKED: unknown — with_env_tz: reads Default.new.fixed_time in local TZ, calls .utc; requires process-level TZ change
   });
   it.skip("connection in local time", () => {
-    // BLOCKED: establish_connection — requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config
+    // BLOCKED: connection-pool — establish_connection: requires Base.establish_connection with per-connection default_timezone; SchemaAdapter does not support reconnecting with new config
   });
   it.skip("connection in utc time", () => {
-    // BLOCKED: establish_connection — same as "connection in local time"
+    // BLOCKED: connection-pool — establish_connection: same as "connection in local time"
   });
   it("column name properly quoted", () => {
     class User extends Base {

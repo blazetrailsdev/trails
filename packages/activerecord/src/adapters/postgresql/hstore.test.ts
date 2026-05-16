@@ -69,13 +69,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("default", async () => {
-      // BLOCKED: schema-statements — add_column with hstore default not yet wired
+      // BLOCKED: schema — add_column with hstore default not yet wired
       // ROOT-CAUSE: postgresql/schema-statements.ts addColumn does not call columnDefaults
       //   to resolve hstore defaults via the OID type map.
       // SCOPE: ~10 LOC in schema-statements.ts; add columnDefaults support for hstore columns.
     });
     it.skip("change column default with hstore", async () => {
-      // BLOCKED: schema-statements — changeColumnDefault for hstore-typed columns
+      // BLOCKED: schema — changeColumnDefault for hstore-typed columns
       // ROOT-CAUSE: changeColumnDefault in schema-statements.ts passes the value through quoteDefault
       //   without serializing hstore objects first.
       // SCOPE: ~10 LOC in connection-adapters/postgresql/schema-statements.ts.
@@ -169,18 +169,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("hstore with store accessors", async () => {
-      // BLOCKED: store-accessor — Base.store_accessor not implemented
+      // BLOCKED: unknown — store-accessor: Base.store_accessor not implemented
       // ROOT-CAUSE: store_accessor in base.ts does not generate per-key getters/setters that
       //   read/write sub-keys of a hstore attribute.
       // SCOPE: ~50 LOC in base.ts; pairs with the store DSL.
     });
     it.skip("hstore dirty tracking", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore dirty tracking" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore dirty tracking" in hstore_test.rb
       // ROOT-CAUSE: Placeholder with no Rails reference; cannot port faithfully.
       // SCOPE: Permanent skip-list candidate.
     });
     it.skip("hstore duplication", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore duplication" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore duplication" in hstore_test.rb
       // ROOT-CAUSE: Closest Rails match is test_duplication_with_store_accessors (store_accessor blocked).
       // SCOPE: Permanent skip-list candidate.
     });
@@ -196,7 +196,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((hstore as any).changed).toBe(false);
     });
     it.skip("hstore nested", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore nested" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore nested" in hstore_test.rb
       // ROOT-CAUSE: No Rails reference; cannot port faithfully.
       // SCOPE: Permanent skip-list candidate.
     });
@@ -350,12 +350,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(JSON.parse(rows[0].r as string)).toEqual({ a: "1", b: "2" });
     });
     it.skip("hstore populate", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore populate" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore populate" in hstore_test.rb
       // ROOT-CAUSE: No Rails reference; populate_record() is PG SQL, not an AR API.
       // SCOPE: Permanent skip-list candidate.
     });
     it.skip("hstore schema dump", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore schema dump" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore schema dump" in hstore_test.rb
       // ROOT-CAUSE: Closest Rails test is "schema dump with shorthand".
       // SCOPE: Permanent skip-list candidate.
     });
@@ -365,13 +365,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~30 LOC in migration.ts; unblocked after Wave 8 PR 46c.
     });
     it.skip("hstore gen random uuid", async () => {
-      // BLOCKED: test-name mismatch — not in hstore_test.rb; permanent skip-list candidate.
+      // BLOCKED: unknown — test-name mismatch: not in hstore_test.rb; permanent skip-list candidate.
     });
     it.skip("hstore gen random uuid default", async () => {
-      // BLOCKED: test-name mismatch — not in hstore_test.rb; permanent skip-list candidate.
+      // BLOCKED: unknown — test-name mismatch: not in hstore_test.rb; permanent skip-list candidate.
     });
     it.skip("hstore fixture", async () => {
-      // BLOCKED: test-name mismatch — no Rails test named "hstore fixture" in hstore_test.rb
+      // BLOCKED: unknown — test-name mismatch: no Rails test named "hstore fixture" in hstore_test.rb
       // ROOT-CAUSE: Rails fixtures are a test infrastructure feature with no direct TS port.
       // SCOPE: Permanent skip-list candidate.
     });
@@ -384,32 +384,32 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("disable enable hstore", () => {
-      // BLOCKED: schema-statements — enableExtension/disableExtension not implemented
+      // BLOCKED: schema — enableExtension/disableExtension not implemented
       // ROOT-CAUSE: adapter does not expose enableExtension("hstore") / disableExtension("hstore");
       //   Rails uses `@connection.enable_extension` / `@connection.disable_extension`.
       // SCOPE: ~20 LOC in connection-adapters/postgresql/schema-statements.ts.
     });
     it.skip("change table supports hstore", () => {
-      // BLOCKED: schema-statements — changeTable t.hstore not wired
+      // BLOCKED: schema — changeTable t.hstore not wired
       // ROOT-CAUSE: change_table DSL in schema-statements.ts does not register hstore as a column
       //   type that can be added via t.hstore(...).
       // SCOPE: ~10 LOC in schema-statements.ts; pairs with hstore migration support.
     });
     it.skip("cast value on write", () => {
-      // BLOCKED: attribute-methods — readAttributeBeforeTypeCast not implemented
+      // BLOCKED: unknown — attribute-methods: readAttributeBeforeTypeCast not implemented
       // ROOT-CAUSE: Rails test asserts `x.tags_before_type_cast` returns the pre-cast hash
       //   ({ "bool" => true, "number" => 5 }); we have no readAttributeBeforeTypeCast accessor.
       //   The save/reload assertions themselves would pass; only the before-type-cast step is blocked.
       // SCOPE: ~20 LOC in attribute-methods/read.ts; affects all `_before_type_cast` tests.
     });
     it.skip("with store accessors", () => {
-      // BLOCKED: store-accessor — Base.store_accessor not implemented
+      // BLOCKED: unknown — store-accessor: Base.store_accessor not implemented
       // ROOT-CAUSE: store_accessor in base.ts does not generate per-key getters/setters that
       //   read/write sub-keys of a hstore attribute.
       // SCOPE: ~50 LOC in base.ts; pairs with the store DSL.
     });
     it.skip("duplication with store accessors", () => {
-      // BLOCKED: store-accessor — same as "with store accessors"
+      // BLOCKED: unknown — store-accessor: same as "with store accessors"
       // ROOT-CAUSE: store_accessor must generate getters/setters before dup can propagate them.
       // SCOPE: ~50 LOC in base.ts (store_accessor) + verify dup copies attribute hash.
     });
@@ -419,7 +419,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: Permanent skip-list candidate; no faithful port is possible.
     });
     it.skip("changes with store accessors", () => {
-      // BLOCKED: store-accessor + dirty-tracking — both gaps must close first
+      // BLOCKED: unknown — store-accessor + dirty-tracking: both gaps must close first
       // ROOT-CAUSE: (1) store_accessor not implemented; (2) Attribute.changedInPlace() does not
       //   call type.isChangedInPlace() for mutable types.
       // SCOPE: ~50 LOC store_accessor + ~5 LOC attribute.ts changedInPlace delegation.
@@ -547,18 +547,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("hstore with serialized attributes", () => {
-      // BLOCKED: serialize-coder — Base.serialize({ coder: ... }) not implemented
+      // BLOCKED: serialization — serialize-coder: Base.serialize({ coder: ... }) not implemented
       // ROOT-CAUSE: Rails wraps the hstore attribute with a coder that implements .load/.dump;
       //   Base.serialize(col, coder:) in base.ts does not wire the encode/decode lifecycle.
       // SCOPE: ~50 LOC in base.ts serialize decorator + integration with attribute-set lifecycle.
     });
     it.skip("clone hstore with serialized attributes", () => {
-      // BLOCKED: serialize-coder — same as "hstore with serialized attributes"
+      // BLOCKED: serialization — serialize-coder: same as "hstore with serialized attributes"
       // ROOT-CAUSE: dup/clone of a coder-wrapped hstore also needs the coder path wired.
       // SCOPE: Unblocked automatically once "hstore with serialized attributes" passes.
     });
     it.skip("supports to unsafe h values", () => {
-      // BLOCKED: Ruby-specific — ActionController::Parameters#to_unsafe_h has no Node.js equivalent
+      // BLOCKED: unknown — Ruby-specific: ActionController::Parameters#to_unsafe_h has no Node.js equivalent
       // ROOT-CAUSE: Rails' ProtectedParams (ActionController::Parameters) exposes to_unsafe_h;
       //   there is no TS equivalent. The test verifies that hstore.serialize() accepts such objects.
       // SCOPE: Implement a ProtectedParams TS stub that exposes toUnsafeH() + wire in hstore.serialize().
@@ -576,7 +576,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("schema dump with shorthand", async () => {
-      // BLOCKED: schema-dumper — SchemaDumper does not emit t.hstore(...) for hstore columns
+      // BLOCKED: schema — SchemaDumper does not emit t.hstore(...) for hstore columns
       // ROOT-CAUSE: schema-dumper.ts maps column types to t.type() calls but does not have a
       //   shorthand mapping for hstore; it would emit a generic t.column() instead of t.hstore().
       //   Rails expects: `t.hstore "tags", default: {}`.

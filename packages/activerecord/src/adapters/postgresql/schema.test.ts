@@ -239,7 +239,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       ).rejects.toBeInstanceOf(StatementInvalid);
     });
     it.skip("schema change with prepared stmt", () => {
-      // BLOCKED: needs-prepared-statements — requires adapter.preparedStatements=true path
+      // BLOCKED: adapter-pg — requires adapter.preparedStatements=true path
       // ROOT-CAUSE: test exercises schema changes invalidating prepared statement cache; our adapter
       // doesn't expose a prepared_statements toggle in the test helper
       // SCOPE: needs AdapterPool prepared-statements mode wired in schema test setup
