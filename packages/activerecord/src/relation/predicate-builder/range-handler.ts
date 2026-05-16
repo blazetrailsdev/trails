@@ -31,15 +31,17 @@ export class RangeHandler {
 
   callNegated(attribute: Nodes.Attribute, value: Range): Nodes.Node {
     const [beginVal, endVal] = this._castBounds(attribute, value);
-    // Exclusive ranges with finite bounds negate to `(col < begin OR
-    // col >= end)` — `NOT (gteq AND lt)` would lose the explicit ordering
-    // that AR callers (and parity tests) match on. Non-finite numeric
-    // bounds (±Infinity, NaN) and null/undefined fall through to
-    // `.between(...).invert()` so Arel's collapsed-predicate inversion
-    // handles them.
-    const isFiniteBound = (v: unknown): boolean =>
-      v !== null && v !== undefined && (typeof v !== "number" || Number.isFinite(v));
-    if (value.excludeEnd && isFiniteBound(beginVal) && isFiniteBound(endVal)) {
+    const node = attribute.between({
+      begin: beginVal,
+      end: endVal,
+      excludeEnd: value.excludeEnd,
+    });
+    // When `between` returns an `And` (exclusive-end with both bounds
+    // non-open), prefer the explicit `(col < begin OR col >= end)` shape
+    // — `Not(And(gteq, lt))` would lose the ordering AR callers (and
+    // parity tests) match on. Branching on the node class rather than the
+    // bound values catches every non-open-ended case (incl. NaN bounds).
+    if (node instanceof Nodes.And) {
       return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
     }
     // Mirrors Rails WhereClause#invert: call `.invert()` on the Arel node so
@@ -47,9 +49,7 @@ export class RangeHandler {
     // `NotIn([])`) become canonical, instead of double-wrapping `Not(...)` over
     // a simpler form. For full BETWEEN this still yields `Not(Between(...))`
     // (Node#invert default), matching AR-level `where.not(col: 1..5)` exactly.
-    return attribute
-      .between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd })
-      .invert();
+    return node.invert();
   }
 
   private _castBounds(attribute: Nodes.Attribute, value: Range): [unknown, unknown] {
