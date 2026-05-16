@@ -32,13 +32,15 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
     const requirements = regexpRequirements(r.constraints);
     const pattern = new Pattern(ast, requirements, SEPARATORS, r.anchor);
     const verb = (r.verb || "").toUpperCase();
-    const requestMethodMatch = verb ? [VerbMatchers.for(verb)] : undefined;
+    const requestMethodMatch = !verb || verb === "ALL" ? undefined : [VerbMatchers.for(verb)];
     const name = r.name ?? `__r${i}`;
+    // controller/action are authoritative on the local Route; user defaults
+    // must not overwrite them.
     const journeyRoute = new JourneyRoute({
       name,
       app: { serve: () => [200, {}, []] },
       path: pattern,
-      defaults: { controller: r.controller, action: r.action, ...r.defaults },
+      defaults: { ...r.defaults, controller: r.controller, action: r.action },
       requestMethodMatch,
     });
     JOURNEY_TO_LOCAL.set(journeyRoute, r);
@@ -76,6 +78,8 @@ function regexpRequirements(c: Record<string, unknown>): Record<string, RegExp> 
   const out: Record<string, RegExp> = {};
   for (const [k, v] of Object.entries(c)) {
     if (v instanceof RegExp) out[k] = v;
+    // String constraints are anchored at both ends by the local matcher.
+    else if (typeof v === "string") out[k] = new RegExp(`^${v}$`);
   }
   return out;
 }
