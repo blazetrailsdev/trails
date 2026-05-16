@@ -96,8 +96,11 @@ export class SchemaCreation {
   }
 
   protected visitColumnDefinition(o: ColumnDefinition): string {
-    const sqlType = o.sqlType ?? this.typeToSql(o.type, o.options);
-    let sql = `${this.adapter.quoteIdentifier(o.name)} ${sqlType}`;
+    // Mirrors Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb):
+    // mutate `o.sql_type` so callers (e.g. `column_options(o) → column`)
+    // see the resolved SQL type when emitting DEFAULT clauses.
+    o.sqlType ??= this.typeToSql(o.type, o.options);
+    let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       sql = this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
     }

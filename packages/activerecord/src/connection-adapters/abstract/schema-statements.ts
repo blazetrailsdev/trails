@@ -1105,17 +1105,10 @@ export class SchemaStatements {
     ) {
       colOpts.precision = 6;
     }
-    // Mirrors Rails' AlterTable(td) construction so PG can normalize
-    // `type: :virtual` → `options[:type]` via `td.new_column_definition`.
-    const createAlterTable = (
-      this.adapter as unknown as {
-        createAlterTable?: (name: string) => AlterTable;
-      }
-    ).createAlterTable;
-    const at =
-      typeof createAlterTable === "function"
-        ? createAlterTable.call(this.adapter, tableName)
-        : new AlterTable(tableName);
+    // Mirrors Rails' AlterTable(td) construction so adapters can normalize
+    // adapter-specific types (e.g. PG `type: :virtual` → `options[:type]`)
+    // via `td.new_column_definition`.
+    const at = this.adapter.createAlterTable?.(tableName) ?? new AlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
   }

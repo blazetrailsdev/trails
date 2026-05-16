@@ -22,6 +22,16 @@ import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
 
 /**
+ * Narrowed host interface for the PG-specific schema-creation overrides:
+ * the adapter must expose `typeToSql` since the visitor delegates type
+ * resolution back to it (Rails parity).
+ * @internal
+ */
+interface PgTypeToSqlHost {
+  typeToSql(type: string, options?: Record<string, unknown>): string;
+}
+
+/**
  * Build the `GENERATED ALWAYS AS (...) STORED` suffix for a PostgreSQL
  * column. Returns `""` when no `as` expression is provided. Throws the
  * Rails VIRTUAL-unsupported error when `stored` is falsy.
@@ -52,21 +62,21 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /**
-   * Rails' `SchemaCreation` delegates `type_to_sql` to `@conn` (the adapter).
-   * Trails' abstract `SchemaCreation` carries its own simplified
-   * implementation, so PG must override to route back to the adapter's
-   * `typeToSql` — otherwise `pgDatetimeConfig.datetimeType` and
-   * `nativeDatabaseTypesOverrides` are bypassed.
+   * Rails' `SchemaCreation` delegates `type_to_sql` to `@conn` (the adapter,
+   * abstract/schema_creation.rb:14-20). Trails' abstract `SchemaCreation`
+   * carries its own simplified implementation, so PG must override to route
+   * back to the adapter's `typeToSql` — otherwise `pgDatetimeConfig.datetimeType`
+   * and `nativeDatabaseTypesOverrides` are bypassed.
    * @internal
    */
-  override typeToSql(type: Parameters<AbstractSchemaCreation["typeToSql"]>[0], options = {}) {
-    const adapter = this.adapter as unknown as {
-      typeToSql?: (t: string, o?: Record<string, unknown>) => string;
-    };
-    if (typeof adapter.typeToSql === "function") {
-      return adapter.typeToSql(type as string, options as Record<string, unknown>);
-    }
-    return super.typeToSql(type, options);
+  override typeToSql(
+    type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
+    options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
+  ): string {
+    return (this.adapter as unknown as PgTypeToSqlHost).typeToSql(
+      type as string,
+      options as Record<string, unknown>,
+    );
   }
 
   /** @internal */

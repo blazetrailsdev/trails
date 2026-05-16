@@ -1,5 +1,6 @@
 import type { Result } from "./result.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
+import type { AlterTable } from "./connection-adapters/abstract/schema-definitions.js";
 import type { Visitors } from "@blazetrails/arel";
 
 /**
@@ -533,6 +534,16 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_datetime_with_precision?
    */
   supportsDatetimeWithPrecision?(): boolean;
+
+  /**
+   * Build an `AlterTable` object for the given table. PG returns an
+   * AlterTable carrying a `TableDefinition` so `AlterTable#addColumn` can
+   * route through `new_column_definition` for adapter-specific
+   * normalization (virtual columns, etc).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table
+   */
+  createAlterTable?(name: string): AlterTable;
 
   /**
    * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.
