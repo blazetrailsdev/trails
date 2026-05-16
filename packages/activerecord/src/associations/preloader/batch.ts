@@ -15,11 +15,11 @@ export class Batch {
   private _preloaders: Preloader[];
   private _availableRecords: Map<typeof Base, Base[]>;
 
-  constructor(preloaders: Preloader[], availableRecords: Base[] = []) {
+  constructor(preloaders: Preloader[], availableRecords: (Base | Base[])[] = []) {
     this._preloaders = preloaders.filter((p) => !p.isEmpty());
     this._availableRecords = new Map();
     for (const record of availableRecords.flat()) {
-      const klass = record.constructor as typeof Base;
+      const klass = (record.constructor as typeof Base).baseClass;
       const existing = this._availableRecords.get(klass);
       if (existing) {
         existing.push(record);
@@ -36,7 +36,7 @@ export class Batch {
       const loaders = branches.flatMap((b) => b.runnableLoaders());
 
       for (const loader of loaders) {
-        const available = this._availableRecords.get(loader.klass);
+        const available = this._availableRecords.get(loader.klass.baseClass);
         loader.associateRecordsFromUnscoped(available);
       }
 
