@@ -268,7 +268,11 @@ export class HasAndBelongsToMany {
       typeof habtmOptions.scope === "function"
         ? (habtmOptions.scope as (...args: any[]) => any)
         : null;
-    const { through: _through, scope: _scope, ...habtmReflectionOptions } = habtmOptions;
+    // Keep `through:` in the options passed to Reflection.create so it wraps
+    // the HasAndBelongsToManyReflection in a ThroughReflection — mirrors
+    // Rails' `Builder::HasAndBelongsToMany`, which builds an internal
+    // has_many :through and registers the HABTM as a through reflection.
+    const { scope: _scope, ...habtmReflectionOptions } = habtmOptions;
     const habtmReflection = Reflection.create(
       "hasAndBelongsToMany" as any,
       name,

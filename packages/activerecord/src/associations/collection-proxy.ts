@@ -1099,7 +1099,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private _invalidateAssociationIds(): void {
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
-    if (assocInstance) (assocInstance as any)._associationIds = null;
+    if (assocInstance) {
+      (assocInstance as any)._associationIds = null;
+      // Mirrors Rails' `reset_scope` after insert_record — without it an
+      // instance that was previously loaded via the `record.collectionIds`
+      // reader keeps `loaded`/`target` from the pre-push fetch and returns
+      // stale data on the next read.
+      if (typeof (assocInstance as any).reset === "function") {
+        (assocInstance as any).reset();
+      }
+    }
   }
 
   private _raiseOnTypeMismatch(records: T[]): void {
