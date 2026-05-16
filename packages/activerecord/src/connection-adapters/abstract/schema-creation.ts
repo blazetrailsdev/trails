@@ -96,12 +96,17 @@ export class SchemaCreation {
   }
 
   protected visitColumnDefinition(o: ColumnDefinition): string {
-    // Mirrors Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb:34):
-    // unconditionally reassign `column.sql_type = type_to_sql(...)` so a
-    // re-accept after option changes recomputes the type, and so callers
-    // (`column_options(o) → column`) see the resolved SQL type when
-    // emitting DEFAULT clauses.
-    o.sqlType = this.typeToSql(o.type, o.options);
+    // Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb:34) does an
+    // unconditional `o.sql_type = type_to_sql(...)`. Trails diverges deliberately:
+    // PG/MySQL `TableDefinition` helpers (`t.bit`, `t.inet`, `t.bigserial`,
+    // `t.unsignedInteger`, `t.mediumblob`, ...) pre-populate `sqlType` with a
+    // dialect literal while keeping `type` as a generic semantic type because
+    // trails' `NATIVE_DATABASE_TYPES` map omits these aliases. Clobbering the
+    // pre-set sqlType would regress those helpers, so we honor the existing
+    // value when present and resolve only when missing. `column_options(o) →
+    // column` still sees the resolved SQL type because the helpers set it
+    // before the column reaches the visitor.
+    o.sqlType ??= this.typeToSql(o.type, o.options);
     let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       sql = this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);

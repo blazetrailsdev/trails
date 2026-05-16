@@ -1105,10 +1105,12 @@ export class SchemaStatements {
     ) {
       colOpts.precision = 6;
     }
-    // Mirrors Rails' AlterTable(td) construction so adapters can normalize
-    // adapter-specific types (e.g. PG `type: :virtual` → `options[:type]`)
-    // via `td.new_column_definition`.
-    const at = this.adapter.createAlterTable?.(tableName) ?? new AlterTable(tableName);
+    // Mirrors Rails' `build_add_column_definition` (abstract/schema_statements.rb:1697):
+    // `alter_table = create_alter_table(name); alter_table.add_column(...)`.
+    // Going through `this.createAlterTable` (rather than `this.adapter.createAlterTable`)
+    // statically routes to the SchemaStatements mixin's TableDefinition-carrying
+    // default, so adapter-specific column normalization is preserved by default.
+    const at = this.createAlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
   }
