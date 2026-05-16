@@ -118,6 +118,21 @@ export class SignedGlobalID {
   }
 
   /**
+   * Build a SignedGlobalID from a raw GID URI plus options.
+   *
+   * Mirrors: SignedGlobalID.new(uri, options) — the Rails initializer that
+   * `SignedGlobalIDPurposeTest > 'new accepts a :for'` exercises. Use
+   * {@link create} for the model-first entry point; use this when you
+   * already have a URI string and want the SGID wrapper.
+   */
+  static fromUri(uri: string, options: SignedGlobalIDOptions = {}): SignedGlobalID {
+    const verifier = SignedGlobalID.pickVerifier(options);
+    const purpose = SignedGlobalID.pickPurpose(options);
+    const expiresAt = pickExpiration(options);
+    return new SignedGlobalID(uri, purpose, expiresAt, verifier);
+  }
+
+  /**
    * Parse a signed SGID token. Returns null on invalid signature, expiration,
    * or purpose mismatch.
    *

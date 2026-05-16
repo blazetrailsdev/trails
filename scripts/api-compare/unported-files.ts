@@ -371,6 +371,37 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "class-based `only:` cases are covered by the matching non-module " +
       "tests in the same file.",
   },
+  // --- globalid: module-based `only:` filters on GlobalID#find (same as above) ---
+  {
+    testFile: "global_id_test.rb",
+    className: "GlobalIDCreationTest",
+    tests: [
+      "find with module",
+      "find with module no match",
+      "find with multiple module",
+      "find with multiple module no match",
+    ],
+    reason:
+      "Ruby `only:` accepts a Module to filter records whose class includes " +
+      "that module. TypeScript has no module-include relationship for " +
+      "classes; the class-based equivalents (`find with class`, `find with " +
+      "multiple class`) cover the same routing logic.",
+  },
+  // --- globalid: eager-loading `includes:` (AR feature, out of GlobalID scope) ---
+  {
+    testFile: "global_locator_test.rb",
+    className: "GlobalLocatorTest",
+    tests: [
+      "by GID with eager loading",
+      "by GID trying to eager load an unexisting relationship",
+      "by many GIDs with eager loading",
+      "by many GIDs trying to eager load an unexisting relationship",
+    ],
+    reason:
+      "Eager loading via `includes:` is an ActiveRecord feature that lives " +
+      "outside the GlobalID scope. The Locator forwards the option but " +
+      "globalid's own behavior is exercised by the non-eager variants.",
+  },
   // --- globalid: legacy self-validated SGID metadata + cross-class equality ---
   {
     testFile: "signed_global_id_test.rb",
