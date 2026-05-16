@@ -2,6 +2,9 @@
  * A single route entry, mirroring ActionDispatch::Journey::Route.
  */
 
+import { Parser } from "../journey/parser.js";
+import { Ast } from "../journey/ast.js";
+
 export interface RouteConstraints {
   [key: string]: string | RegExp;
 }
@@ -78,13 +81,54 @@ export class Route {
     this.anchor = options.anchor !== false;
 
     this.segments = parseSegments(this.path);
-    this.paramNames = this.segments
-      .filter((s): s is DynamicSegment | GlobSegment => s.type === "dynamic" || s.type === "glob")
-      .map((s) => s.name);
+    // Derive capture names from the Journey parser/AST — the same source
+    // the Journey bridge uses. Keeps the path-vs-request constraint split
+    // in lockstep with what `Pattern.names` will report, so escaped sigils
+    // (`\:`, `\(`, `\)`), bare `*`, embedded captures, and nested optional
+    // groups all classify identically.
+    this.paramNames = collectParamNamesFromJourneyAst(this.path);
   }
 
   get isRedirect(): boolean {
     return this.redirectTarget !== undefined;
+  }
+
+  /**
+   * Returns the path-capture (dynamic/glob) parameter names declared by
+   * this route, e.g. `["id"]` for `/posts/:id`. Returns a defensive copy
+   * so external callers can't mutate the route's internal classification.
+   */
+  get pathParamNames(): readonly string[] {
+    return this.paramNames.slice();
+  }
+
+  /**
+   * Constraints that apply to *request* attributes (subdomain, format,
+   * signed-in, etc.) rather than to path captures. Path-capture
+   * constraints are passed into the pattern requirements instead, so the
+   * Journey `Route#matches` request-constraint loop should not re-check
+   * them against undefined request properties.
+   */
+  get requestConstraints(): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    const paths = new Set<string>(this.paramNames);
+    for (const [k, v] of Object.entries(this.constraints)) {
+      if (!paths.has(k)) out[k] = v;
+    }
+    return out;
+  }
+
+  /**
+   * Constraints that apply to path captures (key matches a `:name` /
+   * `*name` segment). These become Journey pattern requirements.
+   */
+  get pathConstraints(): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    const paths = new Set<string>(this.paramNames);
+    for (const [k, v] of Object.entries(this.constraints)) {
+      if (paths.has(k)) out[k] = v;
+    }
+    return out;
   }
 
   /**
@@ -229,6 +273,20 @@ interface OptionalGroup {
 }
 
 type PathSegment = StaticSegment | DynamicSegment | GlobSegment | OptionalGroup;
+
+function collectParamNamesFromJourneyAst(path: string): string[] {
+  try {
+    const tree = new Parser().parse(path);
+    const ast = new Ast(tree, true);
+    // Preserve duplicates so this stays in lockstep with Pattern.names —
+    // e.g. `/:id/:id` keeps two captures. Constraint splitters that need
+    // uniqueness build their own Set.
+    return ast.names.slice();
+  } catch {
+    // Parser failure shouldn't crash the route table; fall back to no captures.
+    return [];
+  }
+}
 
 function parseSegments(path: string): PathSegment[] {
   const segments: PathSegment[] = [];
