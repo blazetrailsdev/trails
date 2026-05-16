@@ -1,6 +1,6 @@
 # ActiveRecord post-100% — fidelity tracker
 
-**Snapshot 2026-05-14:** `activerecord 4950/4958 methods (99.8%) | files: 275/275 | inheritance: 210/210 (100%) | activemodel 621/621 (100%)`. Public surface is closed; the 8 outstanding methods are residual privates.
+**Snapshot 2026-05-16:** `activerecord 4956/4958 methods (100% rounded) | files: 275/275 | inheritance: 210/210 (100%) | activemodel 621/621 (100%)`. Public surface is closed; the 2 outstanding methods are residual privates. test:compare currently at **6568/7885 tests (83.3%)**, 1296 skipped.
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 300; range 220–280).
 
@@ -63,12 +63,23 @@ These have agents currently working.
 
 For reference. Body removed (see git log + the PR).
 
-- Batch 5 — PG interval round-trip (~130 LOC) — #1727
-- Batch 7 — PG infinity + time-zone wiring — #1711
-- Batch 8 — MySQL warnings + quoting + init (~145 LOC) — #1723
-- Batch 11 — Query-cache Phases 2–3 wiring — #1713
-- Batch 12 — Insert-all + IndexDefinition (~90 LOC) — #1720
-- Batch 14 — Fixtures schema-gap closures — #1715
+| Batch | Title | PR |
+|------|-------|----|
+| 1 | PG createTable signature harmonization | #1709 |
+| 4 | PG index option parse + emit (Schema Slot C) | #1710 |
+| 5 | PG interval round-trip (interval[] + binary parser) | #1727 |
+| 6 | PG-only type registration + citext aftermath | #1718 |
+| 7 | PG infinity + time-zone wiring | #1711 |
+| 8 | MySQL warnings + quoting + init fidelity | #1723 |
+| 9 | Autosave + has-one Rails-divergence | #1712 |
+| 11 | Query-cache Phases 2–3 wiring | #1713 |
+| 12 | Insert-all conflict-target + IndexDefinition | #1720 |
+| 14 | Fixtures schema-gap closures | #1715 |
+
+Other recent closures folded back into queued-batches list:
+
+- Batch 84 (SignedId Relation methods) — closed by #1694.
+- Batch 85 (Unknown-triage Slot D afterCommit refinements) — closed by #1705.
 
 ---
 
@@ -572,12 +583,6 @@ Re-tag all 89 `BLOCKED: unknown` annotations into the controlled vocabulary, mov
 ### Batch 83 — Unknown-triage Slot B insert-all (~250 LOC, risk: medium)
 
 **64 of the 89 have stale "`MemoryAdapter accepts any attrs"` comments** that mislead the audit — there is no `MemoryAdapter`; the test setup uses `SchemaAdapter` wrapping a real driver. `InsertAll` impl is at 100% per `api:compare`. Real work: scrub stale comments, investigate what's actually skipped, rewrite test bodies to assert against real-adapter behavior.
-
-### Batch 84 — Unknown-triage Slot C SignedId relation methods (~20 LOC, risk: low)
-
-- ~20 LOC — `Relation.findSigned` / `Relation.findSignedBang` scoping wrappers (mirrors Rails `SignedId::RelationMethods`); un-skips 2 remaining `find signed record on relation` / `find signed record with a bang on relation` tests.
-
-### Batch 85 — Unknown-triage Slot D afterCommit refinements (~50 LOC, risk: medium)
 
 ### Batch 86 — Unknown-triage deferred (~230 LOC, risk: medium)
 
