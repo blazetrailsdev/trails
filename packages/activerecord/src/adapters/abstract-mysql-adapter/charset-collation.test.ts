@@ -53,20 +53,55 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(col?.collation).toBe("utf8mb4_bin");
     });
 
-    it.skip("change column with charset and collation", () => {
-      // BLOCKED: changeColumn not yet implemented (Slot B)
+    it("change column with charset and collation", async () => {
+      await adapter.addColumn("charset_collations", "description", "string", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      });
+      await adapter.changeColumn("charset_collations", "description", "text", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_general_ci",
+      });
+      const columns = await adapter.columns("charset_collations");
+      const col = columns.find((c) => c.name === "description");
+      expect(col?.type).toBe("text");
+      expect(col?.collation).toBe("utf8mb4_general_ci");
     });
 
-    it.skip("change column doesn't preserve collation for string to binary types", () => {
-      // BLOCKED: changeColumn not yet implemented (Slot B)
+    it("change column doesn't preserve collation for string to binary types", async () => {
+      await adapter.addColumn("charset_collations", "description", "string", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      });
+      await adapter.changeColumn("charset_collations", "description", "binary");
+      const columns = await adapter.columns("charset_collations");
+      const col = columns.find((c) => c.name === "description");
+      expect(col?.type).toBe("binary");
+      expect(col?.collation).toBeNull();
     });
 
-    it.skip("change column doesn't preserve collation for string to non-string types", () => {
-      // BLOCKED: changeColumn not yet implemented (Slot B)
+    it("change column doesn't preserve collation for string to non-string types", async () => {
+      await adapter.addColumn("charset_collations", "description", "string", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      });
+      await adapter.changeColumn("charset_collations", "description", "int");
+      const columns = await adapter.columns("charset_collations");
+      const col = columns.find((c) => c.name === "description");
+      expect(col?.type).toBe("integer");
+      expect(col?.collation).toBeNull();
     });
 
-    it.skip("change column preserves collation for string to text", () => {
-      // BLOCKED: changeColumn not yet implemented (Slot B)
+    it("change column preserves collation for string to text", async () => {
+      await adapter.addColumn("charset_collations", "description", "string", {
+        charset: "utf8mb4",
+        collation: "utf8mb4_unicode_ci",
+      });
+      await adapter.changeColumn("charset_collations", "description", "text");
+      const columns = await adapter.columns("charset_collations");
+      const col = columns.find((c) => c.name === "description");
+      expect(col?.type).toBe("text");
+      expect(col?.collation).toBe("utf8mb4_unicode_ci");
     });
   });
 });
