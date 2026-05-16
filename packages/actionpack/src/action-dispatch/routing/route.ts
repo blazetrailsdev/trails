@@ -4,6 +4,7 @@
 
 import { Parser } from "../journey/parser.js";
 import { Ast } from "../journey/ast.js";
+import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 
@@ -371,12 +372,43 @@ function parseSegments(path: string): PathSegment[] {
 }
 
 function normalizePath(p: string): string {
-  const stripped = p.replace(/^\/+|\/+$/g, "");
-  // Don't prepend `/` to a leading optional group: `(/:locale)/posts` must
-  // stay as-is so the `/` lives inside the optional. Prepending would
-  // produce `/(/:locale)/posts`, compiled to `^/(?:/...)?/posts$`, which
-  // requires either `//posts` (extra slash) or `/x/posts` (no plain match).
-  return stripped.startsWith("(") ? stripped : "/" + stripped;
+  // Mirrors Rails `ActionDispatch::Routing::Mapper.normalize_path`:
+  // first apply Journey's `Utils.normalize_path` (leading-`/`, collapse
+  // duplicate slashes, strip trailing, uppercase `%xx`), then swap `/(`
+  // → `(/` so leading optional groups keep the `/` *inside* the optional.
+  // The leading `/(` form is restored only when the entire path is
+  // composed of adjacent optional segments (root-style routes).
+  let path = journeyNormalizePath(p);
+  path = path.replace(/\/(\(+)\/?/g, "$1/");
+  if (isAllOptional(path)) {
+    path = path.replace(/^(\(+)\//, "/$1");
+  }
+  return path;
+}
+
+/**
+ * True when `path` consists only of adjacent balanced-paren optional
+ * groups (no top-level literal characters between them). Mirrors what
+ * Rails' Mapper.normalize_path treats as the "all-optional" shape —
+ * paths like `(/:locale)(.:format)` or `(/:a)(/:b)(/:c)`.
+ */
+function isAllOptional(path: string): boolean {
+  if (!path.startsWith("(")) return false;
+  let depth = 0;
+  for (let i = 0; i < path.length; i++) {
+    const ch = path[i];
+    if (ch === "(") {
+      depth++;
+    } else if (ch === ")") {
+      depth--;
+      if (depth < 0) return false;
+      // After closing a top-level group, only another `(` may follow
+      // (adjacent optional groups). Any literal between groups
+      // disqualifies the all-optional shape.
+      if (depth === 0 && i + 1 < path.length && path[i + 1] !== "(") return false;
+    }
+  }
+  return depth === 0;
 }
 
 function interpolateRedirect(template: string, params: Record<string, string>): string {
