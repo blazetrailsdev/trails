@@ -10,6 +10,8 @@ import {
 import { Version } from "./abstract-adapter.js";
 import {
   AdapterTimeout,
+  ConnectionFailed,
+  ConnectionNotEstablished,
   MismatchedForeignKey,
   NoDatabaseError,
   NotImplementedError,
@@ -241,6 +243,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (isMysql2DriverTimeout(e)) {
       const msg = e instanceof Error ? e.message : String(e);
       return new AdapterTimeout(msg, { sql, binds, cause: e });
+    }
+    if (isMysql2ConnectionError(e)) {
+      // Mirrors `Mysql2Adapter#translate_exception`'s
+      // `Mysql2::Error::ConnectionError` branch: a "MySQL client is not
+      // connected" message is promoted to ConnectionNotEstablished;
+      // everything else in this family is ConnectionFailed.
+      const msg = (e as Error).message;
+      if (/MySQL client is not connected/i.test(msg)) {
+        return new ConnectionNotEstablished(msg, { cause: e });
+      }
+      return new ConnectionFailed(msg, { sql, binds, cause: e });
     }
     return super._translateException(e, sql, binds);
   }
@@ -1762,6 +1775,35 @@ function isMysql2DriverTimeout(e: unknown): boolean {
   if (typeof errno === "number" && errno > 0) return false;
   const code = (e as { code?: string }).code;
   return code === "PROTOCOL_SEQUENCE_TIMEOUT" || code === "ETIMEDOUT";
+}
+
+/**
+ * Detect a node-mysql2 error that mirrors Ruby's
+ * `Mysql2::Error::ConnectionError` family — driver-level connection-loss
+ * conditions surfaced without a positive MySQL errno. These include
+ * socket-level failures (`ECONNRESET` / `ECONNREFUSED` / `EPIPE`),
+ * mysql2 protocol errors after the connection died
+ * (`PROTOCOL_CONNECTION_LOST`, `PROTOCOL_ENQUEUE_AFTER_QUIT`,
+ * `PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR`, `PROTOCOL_ENQUEUE_HANDSHAKE_TWICE`),
+ * and the pool-closed sentinel (`POOL_CLOSED`).
+ *
+ * @internal
+ */
+function isMysql2ConnectionError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const errno = (e as { errno?: number }).errno;
+  if (typeof errno === "number" && errno > 0) return false;
+  const code = (e as { code?: string }).code;
+  return (
+    code === "PROTOCOL_CONNECTION_LOST" ||
+    code === "PROTOCOL_ENQUEUE_AFTER_QUIT" ||
+    code === "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR" ||
+    code === "PROTOCOL_ENQUEUE_HANDSHAKE_TWICE" ||
+    code === "POOL_CLOSED" ||
+    code === "ECONNRESET" ||
+    code === "ECONNREFUSED" ||
+    code === "EPIPE"
+  );
 }
 
 /** @internal */
