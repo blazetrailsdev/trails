@@ -38,5 +38,18 @@ describe("Route", () => {
       const route = new Route("GET", "/a/:id/b/*rest", "x", "y");
       expect(route.pathParamNames).toEqual(["id", "rest"]);
     });
+
+    it("includes captures inside optional groups", () => {
+      const route = new Route("GET", "/posts(/:id)(.:format)", "posts", "show");
+      expect(route.pathParamNames).toEqual(expect.arrayContaining(["id", "format"]));
+    });
+
+    it("treats optional-group captures as path constraints", () => {
+      const route = new Route("GET", "/posts(/:id)", "posts", "show", {
+        constraints: { id: /\d+/ },
+      });
+      expect(route.pathConstraints).toEqual({ id: /\d+/ });
+      expect(route.requestConstraints).toEqual({});
+    });
   });
 });

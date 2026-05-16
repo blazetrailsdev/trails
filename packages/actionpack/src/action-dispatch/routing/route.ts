@@ -78,9 +78,7 @@ export class Route {
     this.anchor = options.anchor !== false;
 
     this.segments = parseSegments(this.path);
-    this.paramNames = this.segments
-      .filter((s): s is DynamicSegment | GlobSegment => s.type === "dynamic" || s.type === "glob")
-      .map((s) => s.name);
+    this.paramNames = collectParamNames(this.segments);
   }
 
   get isRedirect(): boolean {
@@ -266,6 +264,20 @@ interface OptionalGroup {
 }
 
 type PathSegment = StaticSegment | DynamicSegment | GlobSegment | OptionalGroup;
+
+function collectParamNames(segments: readonly PathSegment[]): string[] {
+  const out: string[] = [];
+  for (const s of segments) {
+    if (s.type === "dynamic" || s.type === "glob") {
+      out.push(s.name);
+    } else if (s.type === "optional") {
+      for (const child of s.children) {
+        if (child.type === "dynamic") out.push(child.name);
+      }
+    }
+  }
+  return out;
+}
 
 function parseSegments(path: string): PathSegment[] {
   const segments: PathSegment[] = [];
