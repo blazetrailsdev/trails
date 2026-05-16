@@ -548,13 +548,15 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
   const childRecord = child as Base;
 
+  // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
+  // Must precede the marked_for_destruction branch (Rails:482) so an
+  // already-destroyed child isn't re-destroyed.
+  if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
+    return true;
   if (isMarkedForDestruction(childRecord)) {
     if (!childRecord.isNewRecord()) await childRecord.destroy();
     return true;
   }
-  // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
-  if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
-    return true;
   // Rails save_has_one_association:487 — gate via
   // `(autosave && record.changed_for_autosave?) || _record_changed?(reflection, record, pk)`.
   // autosave is always true on this path (gated in autosaveAssociation), so the
