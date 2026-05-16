@@ -131,6 +131,24 @@ describe("Route", () => {
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
     });
 
+    it("ignores request-attribute constraints (only path captures are validated)", () => {
+      // `subdomain` is a request constraint, not a path capture. pathFor
+      // shouldn't validate path params against it (and shouldn't fail
+      // when an unrelated param happens to share the key).
+      const route = new Route("GET", "/posts/:id", "posts", "show", {
+        constraints: { id: /\d+/, subdomain: /^api$/ },
+      });
+      expect(route.pathFor({ id: "42" })).toBe("/posts/42");
+    });
+
+    it("honors string path constraints (Rails-shape anchored RegExp)", () => {
+      const route = new Route("GET", "/posts/:id", "posts", "show", {
+        constraints: { id: "\\d+" },
+      });
+      expect(() => route.pathFor({ id: "abc" })).toThrow(/Missing required parameter :id/);
+      expect(route.pathFor({ id: "42" })).toBe("/posts/42");
+    });
+
     it("does not lose a route param named __proto__", () => {
       // Plain-object hash inside pathFor() would route an own `__proto__`
       // assignment to the inherited setter, silently dropping it. Using a

@@ -247,10 +247,15 @@ export class Route {
       const tree = new Parser().parse(this.path);
       const ast = new Ast(tree, true);
       // Pass path-capture constraints into the Pattern so requirement
-      // checks (e.g. `id: /\d+/`) are honored at generation time.
-      const reqs: Record<string, RegExp> = {};
-      for (const [k, v] of Object.entries(this.constraints)) {
+      // checks (e.g. `id: /\d+/`) are honored at generation time. Use
+      // `pathConstraints` (not the raw `constraints`) so request-level
+      // constraints like `subdomain` don't accidentally validate
+      // unrelated params. Null-prototype map so a route capture named
+      // `__proto__` becomes an own requirement entry.
+      const reqs: Record<string, RegExp> = Object.create(null);
+      for (const [k, v] of Object.entries(this.pathConstraints)) {
         if (v instanceof RegExp) reqs[k] = v;
+        else if (typeof v === "string") reqs[k] = new RegExp(v);
       }
       const pattern = new Pattern(ast, reqs, PATHFOR_SEPARATORS, this.anchor);
       this._pathFormatter = pattern.buildFormatter();
@@ -275,6 +280,9 @@ export class Route {
     // Validate supplied path-capture values against the route's
     // requirement regexes (Rails Journey Formatter `missing_keys` check).
     for (const [name, re] of Object.entries(this._pathRequirements!)) {
+      // `Object.hasOwn` avoids inheriting prototype-chain values for
+      // optional captures named like `constructor`/`toString`.
+      if (!Object.hasOwn(params, name)) continue;
       const v = params[name];
       if (v != null && !re.test(String(v))) {
         throw new Error(
@@ -298,9 +306,10 @@ export class Route {
     // would munge them. When the slash-bearing capture is omitted (e.g.
     // it's inside an unsatisfied optional group), collapsing is safe.
     if (!suppliedSlashInPathPreservingCapture(params, this.path)) {
-      // Only collapse `/{2,}` runs from omitted optional groups; don't
-      // strip trailing slashes — those can be structural (e.g. `/posts/`
-      // is the correct output for `/posts/:id` with `{ id: "" }`).
+      // Collapse `/{2,}` runs left over from omitted optional groups
+      // (e.g. `(/:a)(/:b)` with `{ b: "x" }` → `//x` → `/x`). Trailing
+      // slashes are kept — they can be structural (e.g. `/posts/` is
+      // the correct output for `/posts/:id` with `{ id: "" }`).
       out = out.replace(/\/{2,}/g, "/");
     }
     return out;
@@ -362,8 +371,12 @@ function suppliedSlashInPathPreservingCapture(
   // Names of path-preserving captures declared by this route. Splat
   // (`*name`) is always path-preserving; the `:controller` symbol gets
   // special-cased by Journey's FormatBuilder.
+  // `\*name` is NOT escaped by Journey's scanner — only `\:`, `\(`, `\)`
+  // are literalized. So splat names are matched without a backslash
+  // exclusion. `:controller` likewise has no scanner-level escape for
+  // `*`/`:` mid-segment.
   const splatNames = new Set<string>();
-  for (const m of path.matchAll(/(?<!\\)\*([a-zA-Z_][a-zA-Z0-9_]*)/g)) {
+  for (const m of path.matchAll(/\*([a-zA-Z_][a-zA-Z0-9_]*)/g)) {
     splatNames.add(m[1]!);
   }
   const declaresController = /(?<!\\):controller\b/.test(path);
