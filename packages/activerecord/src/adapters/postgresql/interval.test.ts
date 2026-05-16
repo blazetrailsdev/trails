@@ -58,20 +58,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(columnMin.precision).toBe(3);
     });
 
-    it.skip("interval type", async () => {
-      // BLOCKED: model attribute lifecycle does not deserialize interval columns from row data
-      // ROOT-CAUSE: rows returned from PG SELECT contain interval as ISO8601 strings, but Base
-      //   does not route them through Interval.cast/castValue when materializing attributes —
-      //   the attribute reads back as null instead of a Duration.
-      // SCOPE: ~30–80 LOC — likely in attribute-set materialization or postgresql/oid type-map
-      //   wiring for interval result deserialization; see Slot B (round-trip).
+    it("interval type", async () => {
+      const sixYears = Duration.parse("P6Y5M4DT3H2M1S");
+      const oneYear = Duration.parse("P1Y2M3DT4H5M6.235S");
+      await IntervalDataType.createBang({
+        maximum_term: sixYears,
+        minimum_term: oneYear,
+        all_terms: [Duration.parse("P1M"), Duration.parse("P1Y"), Duration.parse("PT1H")],
+        legacy_term: "33 years",
+      });
+      const i = await IntervalDataType.last();
+      expect((i.maximum_term as Duration).iso8601()).toBe("P6Y5M4DT3H2M1S");
+      expect((i.minimum_term as Duration).iso8601()).toBe("P1Y2M3DT4H5M6.235S");
+      expect((i.default_term as Duration).iso8601()).toBe("P3Y");
+      expect(i.legacy_term).toBe("P33Y");
     });
 
     it("interval type cast from invalid string", async () => {
       const i = await IntervalDataType.createBang({ maximum_term: "1 year 2 minutes" });
       // Rails: invalid non-ISO string casts to nil before INSERT, so column is NULL.
-      // Verify at the SQL level so this can't be a false positive from the parallel
-      // row-read deserialization gap (see skipped "interval type" test).
+      // Verify at the SQL level (in addition to the reload assertion below) to pin
+      // the pre-INSERT cast independently of row-read deserialization.
       const rows = await adapter.execute(
         `SELECT maximum_term IS NULL AS is_null FROM interval_data_types WHERE id = $1`,
         [(i as any).id],
@@ -81,12 +88,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(i.maximum_term).toBeNull();
     });
 
-    it.skip("interval type cast from numeric", async () => {
-      // BLOCKED: same as "interval type" — reload() materializes interval column as null
-      //   instead of routing the ISO8601 row value through Interval.castValue.
-      // ROOT-CAUSE: postgresql interval result deserialization not wired into Base
-      //   attribute lifecycle on row reads.
-      // SCOPE: shares fix with "interval type"; see Slot B (round-trip).
+    it("interval type cast from numeric", async () => {
+      const i = await IntervalDataType.createBang({ minimum_term: 36000 });
+      await i.reload();
+      expect((i.minimum_term as Duration).iso8601()).toBe("PT10H");
     });
 
     it("interval type cast string and numeric from user", () => {
