@@ -4,6 +4,8 @@
 
 import { Parser } from "../journey/parser.js";
 import { Ast } from "../journey/ast.js";
+import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
+import type { Router as JourneyRouter } from "../journey/router.js";
 
 export interface RouteConstraints {
   [key: string]: string | RegExp;
@@ -61,6 +63,8 @@ export class Route {
 
   private readonly segments: PathSegment[];
   private readonly paramNames: string[];
+  /** @internal lazy single-route Journey router for match() */
+  private _journeyRouter: JourneyRouter | null = null;
 
   constructor(
     verb: string,
@@ -146,25 +150,12 @@ export class Route {
   }
 
   match(method: string, requestPath: string): MatchedRoute | null {
-    if (this.verb !== "ALL" && this.verb !== method.toUpperCase()) {
-      return null;
+    if (this._journeyRouter === null) {
+      this._journeyRouter = buildJourneyRouter([this]);
     }
-
-    const reqSegments = normalizePath(requestPath).split("/").filter(Boolean);
-
-    const params: Record<string, string> = {};
-    const result = matchSegments(
-      this.segments,
-      reqSegments,
-      0,
-      0,
-      params,
-      this.constraints,
-      this.anchor,
-    );
-    if (!result) return null;
-
-    return { route: this, params };
+    const m = journeyRecognize(this._journeyRouter, method, requestPath);
+    if (!m) return null;
+    return { route: this, params: m.params };
   }
 
   /**
@@ -357,137 +348,6 @@ function parseSegments(path: string): PathSegment[] {
   }
 
   return segments;
-}
-
-function matchSegments(
-  segments: PathSegment[],
-  reqSegments: string[],
-  segIdx: number,
-  reqIdx: number,
-  params: Record<string, string>,
-  constraints: RouteConstraints,
-  anchor: boolean,
-): boolean {
-  // Base case: consumed all route segments
-  if (segIdx >= segments.length) {
-    if (!anchor) return true; // unanchored: ok if extra segments remain
-    return reqIdx >= reqSegments.length;
-  }
-
-  const seg = segments[segIdx];
-
-  if (seg.type === "static") {
-    if (reqIdx >= reqSegments.length) return false;
-    if (reqSegments[reqIdx] !== seg.value) return false;
-    return matchSegments(
-      segments,
-      reqSegments,
-      segIdx + 1,
-      reqIdx + 1,
-      params,
-      constraints,
-      anchor,
-    );
-  }
-
-  if (seg.type === "dynamic") {
-    if (reqIdx >= reqSegments.length) return false;
-    const val = reqSegments[reqIdx];
-    const constraint = constraints[seg.name];
-    if (constraint) {
-      const re =
-        constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
-      if (!re.test(val)) return false;
-    }
-    params[seg.name] = val;
-    return matchSegments(
-      segments,
-      reqSegments,
-      segIdx + 1,
-      reqIdx + 1,
-      params,
-      constraints,
-      anchor,
-    );
-  }
-
-  if (seg.type === "glob") {
-    // Glob matches zero or more remaining segments (greedy)
-    // Try matching the rest of the route segments first
-    for (let take = reqSegments.length - reqIdx; take >= 0; take--) {
-      const saved = { ...params };
-      const globValue = reqSegments.slice(reqIdx, reqIdx + take).join("/");
-      params[seg.name] = globValue;
-      if (
-        matchSegments(segments, reqSegments, segIdx + 1, reqIdx + take, params, constraints, anchor)
-      ) {
-        return true;
-      }
-      // Restore params
-      Object.keys(params).forEach((k) => {
-        if (!(k in saved)) delete params[k];
-        else params[k] = saved[k];
-      });
-    }
-    return false;
-  }
-
-  if (seg.type === "optional") {
-    // Try matching with the optional group
-    const savedParams = { ...params };
-    let childReqIdx = reqIdx;
-    let matched = true;
-    for (const child of seg.children) {
-      if (child.type === "static") {
-        if (childReqIdx >= reqSegments.length || reqSegments[childReqIdx] !== child.value) {
-          matched = false;
-          break;
-        }
-        childReqIdx++;
-      } else if (child.type === "dynamic") {
-        if (childReqIdx >= reqSegments.length) {
-          matched = false;
-          break;
-        }
-        const val = reqSegments[childReqIdx];
-        const constraint = constraints[child.name];
-        if (constraint) {
-          const re =
-            constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
-          if (!re.test(val)) {
-            matched = false;
-            break;
-          }
-        }
-        params[child.name] = val;
-        childReqIdx++;
-      }
-    }
-
-    if (matched) {
-      if (
-        matchSegments(segments, reqSegments, segIdx + 1, childReqIdx, params, constraints, anchor)
-      ) {
-        return true;
-      }
-    }
-
-    // Try without the optional group
-    Object.keys(params).forEach((k) => {
-      if (!(k in savedParams)) delete params[k];
-      else params[k] = savedParams[k];
-    });
-    return matchSegments(segments, reqSegments, segIdx + 1, reqIdx, params, constraints, anchor);
-  }
-
-  return false;
-}
-
-function anchorRegExp(re: RegExp): RegExp {
-  let source = re.source;
-  if (!source.startsWith("^")) source = "^" + source;
-  if (!source.endsWith("$")) source = source + "$";
-  return new RegExp(source, re.flags);
 }
 
 function normalizePath(p: string): string {
