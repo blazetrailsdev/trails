@@ -593,11 +593,24 @@ export class AlterTable extends AbstractAlterTable {
   readonly exclusionConstraintAdds: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraintAdds: UniqueConstraintDefinition[] = [];
 
-  private _td: TableDefinition;
-
   constructor(td: TableDefinition) {
-    super(td.tableName);
-    this._td = td;
+    super(td);
+  }
+
+  /**
+   * Narrow inherited `_td` to PG's TableDefinition. PG `AlterTable` is
+   * always constructed with a TableDefinition (`createAlterTable` →
+   * `new AlterTable(td)`), so the assertion is informational; it fails
+   * loud if a caller ever resurrects the legacy string-only constructor.
+   * @internal
+   */
+  protected get _pgTd(): TableDefinition {
+    if (this._td == null) {
+      throw new Error(
+        "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
+      );
+    }
+    return this._td as TableDefinition;
   }
 
   validateConstraint(name: string): void {
@@ -606,12 +619,12 @@ export class AlterTable extends AbstractAlterTable {
 
   addExclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): void {
     this.exclusionConstraintAdds.push(
-      this._td.newExclusionConstraintDefinition(expression, options),
+      this._pgTd.newExclusionConstraintDefinition(expression, options),
     );
   }
 
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
-    this.uniqueConstraintAdds.push(this._td.newUniqueConstraintDefinition(columnName, options));
+    this.uniqueConstraintAdds.push(this._pgTd.newUniqueConstraintDefinition(columnName, options));
   }
 }
 

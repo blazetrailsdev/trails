@@ -234,14 +234,9 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
-    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
-      return;
-    }
-    const colDef = new ColumnDefinition(columnName, type, options);
-    const addDef = new AddColumnDefinition(colDef);
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} ${this.schemaCreation.accept(addDef)}`,
-    );
+    const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
+    if (!addColumnDef) return;
+    await this.adapter.executeMutation(this.schemaCreation.accept(addColumnDef));
   }
 
   async removeColumn(
@@ -1101,7 +1096,21 @@ export class SchemaStatements {
       return null;
     }
     const { ifNotExists: _, ...colOpts } = options;
-    const at = new AlterTable(tableName);
+    // Mirrors abstract/schema_statements.rb#build_add_column_definition:
+    // default datetime precision to 6 when the adapter supports it.
+    if (
+      this.adapter.supportsDatetimeWithPrecision?.() &&
+      type === "datetime" &&
+      !("precision" in colOpts)
+    ) {
+      colOpts.precision = 6;
+    }
+    // Mirrors Rails' `build_add_column_definition` (abstract/schema_statements.rb:1697):
+    // `alter_table = create_alter_table(name); alter_table.add_column(...)`.
+    // Going through `this.createAlterTable` (rather than `this.adapter.createAlterTable`)
+    // statically routes to the SchemaStatements mixin's TableDefinition-carrying
+    // default, so adapter-specific column normalization is preserved by default.
+    const at = this.createAlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
   }
@@ -1751,14 +1760,15 @@ export class SchemaStatements {
   }
 
   /**
+   * Mirrors Rails `abstract/schema_statements.rb:1705`:
+   * `AlterTable.new(create_table_definition(name))`. Passing the
+   * TableDefinition lets `AlterTable#addColumn` route through
+   * `td.newColumnDefinition` for adapter-specific type normalization
+   * (PG virtual → underlying type, MySQL aliases, etc.).
    * @internal
-   * Diverges from Rails: Rails wraps `AlterTable.new(create_table_definition(name))` so the
-   * alter table has access to the underlying TableDefinition. The TS AlterTable constructor
-   * was designed to take a name string directly; wrap a TableDefinition here once AlterTable
-   * is updated to match Rails' shape.
    */
   createAlterTable(name: string): AlterTable {
-    return new AlterTable(name);
+    return new AlterTable(this.createTableDefinition(name));
   }
 
   /** @internal */

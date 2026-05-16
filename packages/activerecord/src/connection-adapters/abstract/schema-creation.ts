@@ -96,10 +96,20 @@ export class SchemaCreation {
   }
 
   protected visitColumnDefinition(o: ColumnDefinition): string {
-    const sqlType = o.sqlType ?? this.typeToSql(o.type, o.options);
-    let sql = `${this.adapter.quoteIdentifier(o.name)} ${sqlType}`;
+    // Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb:34) does an
+    // unconditional `o.sql_type = type_to_sql(...)`. Trails diverges deliberately:
+    // PG/MySQL `TableDefinition` helpers (`t.bit`, `t.inet`, `t.bigserial`,
+    // `t.unsignedInteger`, `t.mediumblob`, ...) pre-populate `sqlType` with a
+    // dialect literal while keeping `type` as a generic semantic type because
+    // trails' `NATIVE_DATABASE_TYPES` map omits these aliases. Clobbering the
+    // pre-set sqlType would regress those helpers, so we honor the existing
+    // value when present and resolve only when missing. `column_options(o) →
+    // column` still sees the resolved SQL type because the helpers set it
+    // before the column reaches the visitor.
+    o.sqlType ??= this.typeToSql(o.type, o.options);
+    let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
-      sql = this.addColumnOptionsBang(sql, o.options);
+      sql = this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
     }
     return sql;
   }
@@ -204,8 +214,11 @@ export class SchemaCreation {
   }
 
   addColumnOptions(sql: string, options: ColumnOptions): string {
-    if (options.default !== undefined) {
-      sql += this.adapter.quoteDefaultExpression(options.default);
+    if (this.optionsIncludeDefault(options)) {
+      sql += this.adapter.quoteDefaultExpression(
+        options.default,
+        (options as Record<string, unknown>)["column"],
+      );
     }
     if (options.null === false) {
       sql += " NOT NULL";
@@ -217,6 +230,18 @@ export class SchemaCreation {
       sql += " PRIMARY KEY";
     }
     return sql;
+  }
+
+  /**
+   * Mirrors `options_include_default?` (abstract/schema_statements.rb:1517):
+   * `options.include?(:default) && !(options[:null] == false && options[:default].nil?)`.
+   * Use strict `=== null` to match Ruby's `.nil?` (which does not match
+   * `undefined`), keeping `{ default: undefined, null: false }` distinct
+   * from `{ default: nil, null: false }`.
+   */
+  protected optionsIncludeDefault(options: ColumnOptions): boolean {
+    if (!("default" in options)) return false;
+    return !(options.null === false && options.default === null);
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {

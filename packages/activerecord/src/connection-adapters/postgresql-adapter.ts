@@ -103,10 +103,7 @@ import {
   type ReferentialAction,
 } from "./abstract/schema-definitions.js";
 import { joinTableName as deriveJoinTableName } from "../migration/join-table.js";
-import {
-  SchemaCreation as PgSchemaCreation,
-  _pgGeneratedClause,
-} from "./postgresql/schema-creation.js";
+import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
@@ -2514,6 +2511,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return pgTypeCast(value);
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_default_expression.
+   * Routes through the array- and typeMap-aware `pgQuoteDefaultExpression`
+   * so DEFAULT clauses on array columns and OID-backed types serialize
+   * correctly.
+   */
+  override quoteDefaultExpression(value: unknown, column?: unknown): string {
+    const col = column as { sqlType?: string | null; type?: string; array?: boolean } | undefined;
+    return pgQuoteDefaultExpression(
+      value,
+      col != null
+        ? {
+            array: col.array === true,
+            sqlType: col.sqlType ?? col.type ?? null,
+          }
+        : null,
+      this.typeMap,
+    );
+  }
+
   columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string {
     const base = Array.isArray(columns) ? columns.join(", ") : columns;
     const visitor = this.arelVisitor;
@@ -3087,60 +3104,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async addColumn(
     tableName: string,
     columnName: string,
-    type: string,
-    options: {
+    // `ColumnType` already accepts arbitrary strings via its `(string & {})`
+    // branch — Rails passes adapter-specific types (`timestamptz`, enum
+    // type names, etc.) verbatim, so no cast is needed.
+    type: ColumnType,
+    options: ColumnOptions & {
       comment?: string | null;
-      default?: unknown;
-      null?: boolean;
-      array?: boolean;
-      limit?: number | null;
-      precision?: number | null;
-      scale?: number | null;
       ifNotExists?: boolean;
     } = {},
   ): Promise<void> {
-    const quotedTable = this.quoteTableName(tableName);
-    const quotedCol = this.quoteIdentifier(columnName);
-
-    // Mirrors Rails PG `new_column_definition`: when `type == :virtual`,
-    // resolve the real type from `options[:type]` and pass `as`/`stored`
-    // through to `add_column_options!`. All other options (`null`,
-    // `default`, `comment`) flow through the standard pipeline.
-    let effectiveType = type;
-    let generatedClause = "";
-    if (type === "virtual") {
-      const opts = options as Record<string, unknown>;
-      effectiveType = (opts["type"] as string | undefined) ?? "string";
-      generatedClause = _pgGeneratedClause(
-        columnName,
-        opts["as"] as string | undefined,
-        opts["stored"] as boolean | undefined,
-      );
-    }
-
-    const resolvedPrecision =
-      effectiveType === "datetime" && options.precision === undefined
-        ? 6
-        : (options.precision ?? undefined);
-    const pgType = this.typeToSql(effectiveType, {
-      ...options,
-      precision: resolvedPrecision,
-      limit: options.limit ?? undefined,
-      scale: options.scale ?? undefined,
-    });
-    let colSql = `${quotedCol} ${pgType}${generatedClause}`;
-    if (options.default !== undefined) {
-      const defaultClause = pgQuoteDefaultExpression(
-        options.default,
-        { array: options.array, sqlType: pgType },
-        this.typeMap,
-      );
-      colSql += options.default === null ? " DEFAULT NULL" : defaultClause;
-    }
-    if (options.null === false) colSql += " NOT NULL";
-    const ifNotExists = options.ifNotExists ? " IF NOT EXISTS" : "";
-    await this.exec(`ALTER TABLE ${quotedTable} ADD COLUMN${ifNotExists} ${colSql}`);
-    if (options.comment !== undefined) {
+    // Mirrors PostgreSQL::SchemaStatements#add_column: defer to the abstract
+    // implementation (which builds an AlterTable and accepts it through
+    // schema_creation), then propagate :comment via change_column_comment.
+    await super.addColumn(tableName, columnName, type, options);
+    if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
   }

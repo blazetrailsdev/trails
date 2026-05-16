@@ -1,5 +1,6 @@
 import type { Result } from "./result.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
+import type { AlterTable } from "./connection-adapters/abstract/schema-definitions.js";
 import type { Visitors } from "@blazetrails/arel";
 
 /**
@@ -524,6 +525,27 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_indexes_in_create?
    */
   supportsIndexesInCreate?(): boolean;
+
+  /**
+   * Whether the adapter supports `datetime` columns with sub-second precision.
+   * True for PostgreSQL, modern MySQL/MariaDB, and SQLite >= 3. Used by
+   * `buildAddColumnDefinition` to default `precision: 6` when none is given.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_datetime_with_precision?
+   */
+  supportsDatetimeWithPrecision?(): boolean;
+
+  /**
+   * Build an `AlterTable` object for the given table. The default
+   * (abstract `SchemaStatements`) wraps `createTableDefinition(name)` so
+   * `AlterTable#addColumn` routes through `td.newColumnDefinition` for
+   * adapter-specific normalization (PG virtual columns, MySQL type
+   * aliases, etc). Adapters that don't mix in `SchemaStatements` (e.g.
+   * direct mocks in tests) may omit it.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table
+   */
+  createAlterTable?(name: string): AlterTable;
 
   /**
    * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.

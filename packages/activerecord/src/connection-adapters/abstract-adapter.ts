@@ -486,7 +486,7 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteTableNameForAssignment(table, attr);
   }
 
-  quoteDefaultExpression(value: unknown): string {
+  quoteDefaultExpression(value: unknown, _column?: unknown): string {
     return abstractQuoteDefaultExpression(value);
   }
 

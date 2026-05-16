@@ -43,7 +43,7 @@ export interface Quoting {
   quoteTableNameForAssignment(table: string, attr: string): string;
 
   /** Mirrors: Quoting#quote_default_expression (DDL DEFAULT clause). */
-  quoteDefaultExpression(value: unknown): string;
+  quoteDefaultExpression(value: unknown, column?: unknown): string;
 
   /** Mirrors: Quoting#quoted_true. Abstract/PG/MySQL: `"TRUE"`; SQLite: `"1"`. */
   quotedTrue(): string;

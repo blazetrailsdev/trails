@@ -22,6 +22,16 @@ import { singularize, underscore } from "@blazetrails/activesupport";
 import { Utils } from "./utils.js";
 
 /**
+ * Narrowed host interface for the PG-specific schema-creation overrides:
+ * the adapter must expose `typeToSql` since the visitor delegates type
+ * resolution back to it (Rails parity: `delegate :type_to_sql, to: :@conn`).
+ * @internal
+ */
+export interface PgSchemaCreationHost extends SchemaQuoter {
+  typeToSql(type: string, options?: Record<string, unknown>): string;
+}
+
+/**
  * Build the `GENERATED ALWAYS AS (...) STORED` suffix for a PostgreSQL
  * column. Returns `""` when no `as` expression is provided. Throws the
  * Rails VIRTUAL-unsupported error when `stored` is falsy.
@@ -47,8 +57,25 @@ export function _pgGeneratedClause(
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  constructor(adapter?: SchemaQuoter) {
+  declare protected adapter: PgSchemaCreationHost;
+
+  constructor(adapter?: PgSchemaCreationHost) {
     super("postgres", adapter);
+  }
+
+  /**
+   * Rails' `SchemaCreation` delegates `type_to_sql` to `@conn` (the adapter,
+   * abstract/schema_creation.rb:14-20). Trails' abstract `SchemaCreation`
+   * carries its own simplified implementation, so PG must override to route
+   * back to the adapter's `typeToSql` — otherwise `pgDatetimeConfig.datetimeType`
+   * and `nativeDatabaseTypesOverrides` are bypassed.
+   * @internal
+   */
+  override typeToSql(
+    type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
+    options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
+  ): string {
+    return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
   }
 
   /** @internal */
@@ -212,7 +239,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
       if (options["default"] == null) {
         sql += `, ALTER COLUMN ${quotedName} DROP DEFAULT`;
       } else {
-        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"])}`;
+        // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
+        // quote_default_expression so array/typeMap-aware serialization
+        // is preserved on ALTER COLUMN SET DEFAULT.
+        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"], column)}`;
       }
     }
 
@@ -226,8 +256,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
     const col = this.adapter.quoteIdentifier(o.column.name);
+    // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
+    // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
-      o.default == null ? "DROP DEFAULT" : `SET${this.adapter.quoteDefaultExpression(o.default)}`;
+      o.default == null
+        ? "DROP DEFAULT"
+        : `SET${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 

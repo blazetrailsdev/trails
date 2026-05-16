@@ -207,7 +207,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.default == null && o.column.options.null === false) {
       sql += "DROP DEFAULT";
     } else {
-      sql += `SET${this.adapter.quoteDefaultExpression(o.default)}`;
+      sql += `SET${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     }
     return sql;
   }
@@ -314,10 +314,5 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected addSqlCommentBang(sql: string, comment: string | undefined): string {
     if (!comment) return sql;
     return `${sql} COMMENT ${mysqlQuoteString(comment)}`;
-  }
-
-  /** @internal */
-  private optionsIncludeDefault(options: MysqlColumnOptions): boolean {
-    return options.default !== undefined;
   }
 }
