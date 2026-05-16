@@ -19,3 +19,12 @@ export { toDot, type DotHost, type DotTransition } from "./nfa/dot.js";
 
 export * as GTG from "./gtg/index.js";
 export * as Path from "./path/index.js";
+
+export {
+  Route,
+  VerbMatchers,
+  type VerbMatcher,
+  type VerbRequest,
+  type RouteOptions,
+} from "./route.js";
+export { Routes, type Mapping } from "./routes.js";

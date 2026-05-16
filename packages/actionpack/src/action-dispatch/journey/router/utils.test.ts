@@ -45,4 +45,20 @@ describe("ActionDispatch::Journey::Router::Utils", () => {
   it("adds leading slash", () => {
     expect(normalizePath("foo")).toBe("/foo");
   });
+
+  it("escapes non-BMP code points as their real UTF-8 bytes, not surrogate halves", () => {
+    // 🚀 (U+1F680) is a surrogate pair in UTF-16. The /u flag on the escape
+    // regex makes it match as one code point so the encoder produces the
+    // actual 4-byte UTF-8 sequence (F0 9F 9A 80) instead of two U+FFFD bytes.
+    expect(escapeSegment("🚀")).toBe("%F0%9F%9A%80");
+  });
+
+  it("unescapes non-BMP UTF-8 sequences back to the original code point", () => {
+    expect(unescapeUri("%F0%9F%9A%80")).toBe("🚀");
+  });
+
+  it("round-trips non-BMP characters through escape/unescape", () => {
+    const s = "café — 🚀 — 中文";
+    expect(unescapeUri(escapeSegment(s))).toBe(s);
+  });
 });

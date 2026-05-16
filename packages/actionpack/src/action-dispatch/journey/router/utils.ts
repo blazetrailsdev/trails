@@ -21,10 +21,11 @@ export function normalizePath(path: string | null | undefined): string {
 
 // RFC 3986: UNRESERVED + SUB_DELIMS + `:` `@` keep their literal byte.
 // PATH adds `/`; FRAGMENT adds `/` and `?` (also `:` `@` which are already in).
-const UNSAFE_PATH = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/g;
-const UNSAFE_SEGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@]/g;
-const UNSAFE_FRAGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/?]/g;
-const ESCAPED = /%[a-zA-Z0-9]{2}/g;
+// `/u` so non-BMP characters match as a single code point rather than two
+// surrogate halves (which would percent-encode to U+FFFD bytes).
+const UNSAFE_PATH = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/gu;
+const UNSAFE_SEGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@]/gu;
+const UNSAFE_FRAGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/?]/gu;
 
 function pctEncodeByte(b: number): string {
   return "%" + b.toString(16).toUpperCase().padStart(2, "0");
@@ -56,7 +57,8 @@ export function escapeFragment(fragment: string): string {
 export function unescapeUri(uri: string): string {
   const bytes: number[] = [];
   const encoder = new TextEncoder();
-  for (let i = 0; i < uri.length; ) {
+  let i = 0;
+  while (i < uri.length) {
     if (uri[i] === "%" && i + 2 < uri.length) {
       const hex = uri.slice(i + 1, i + 3);
       if (/^[a-fA-F0-9]{2}$/.test(hex)) {
@@ -65,8 +67,11 @@ export function unescapeUri(uri: string): string {
         continue;
       }
     }
-    for (const b of encoder.encode(uri[i])) bytes.push(b);
-    i++;
+    // Walk by code point so non-BMP characters (surrogate pairs) get encoded
+    // as their real UTF-8 byte sequence, not two replacement surrogates.
+    const cp = uri.codePointAt(i)!;
+    for (const b of encoder.encode(String.fromCodePoint(cp))) bytes.push(b);
+    i += cp > 0xffff ? 2 : 1;
   }
   return new TextDecoder().decode(new Uint8Array(bytes));
 }
