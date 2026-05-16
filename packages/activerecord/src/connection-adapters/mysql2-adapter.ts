@@ -22,6 +22,7 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
+import { getDefaultTimezone } from "../type/internal/timezone.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
@@ -202,6 +203,28 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // checkin/checkout cycle. WeakMap lets mysql2.Pool reap connections
   // without us leaking entries.
   private _statementPools = new WeakMap<mysql.PoolConnection, Mysql2StatementPool>();
+
+  /**
+   * The timezone applied to result rows for the most recent query. Mirrors
+   * the Ruby mysql2 driver's `query_options[:database_timezone]`, which
+   * Rails' `Mysql2Adapter#perform_query` re-syncs to
+   * `ActiveRecord.default_timezone` before each query so a runtime change to
+   * the global default takes effect on the next statement (no reconnect).
+   *
+   * Updated by {@link _syncDatabaseTimezone} from the perform-query path.
+   */
+  databaseTimezone: "utc" | "local" = "utc";
+
+  /**
+   * Refresh {@link databaseTimezone} from the global default. Called from
+   * the perform-query path so a `withTimezoneConfig({ default: "local" })`
+   * block is observable on the very next query — matching Rails'
+   * `raw_connection.query_options[:database_timezone] = default_timezone`
+   * line in `Mysql2Adapter#perform_query`.
+   */
+  private _syncDatabaseTimezone(): void {
+    this.databaseTimezone = getDefaultTimezone();
+  }
 
   protected override _onStatementLimitChanged(value: number): void {
     if (this._conn) this._statementPools.get(this._conn)?.setMaxSize(value);
@@ -421,6 +444,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     options?: { prepare?: boolean },
   ): Promise<Result> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds ?? []);
     const payload: Record<string, unknown> = {
@@ -597,6 +621,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     // payload records the exact values sent to mysql2 so LogSubscriber /
@@ -660,6 +685,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     await this.materializeTransactions();
+    this._syncDatabaseTimezone();
     const driverSql = this.mysqlQuote(sql);
     const driverBinds = this.mysqlBinds(binds);
     const payload: Record<string, unknown> = {

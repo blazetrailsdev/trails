@@ -6,7 +6,9 @@ import {
   describeIfMysql,
   Mysql2Adapter,
   MYSQL_TEST_URL,
+  withDbWarningsAction,
 } from "../abstract-mysql-adapter/test-helper.js";
+import { withTimezoneConfig } from "../../test-helper.js";
 import {
   AdapterTimeout,
   InvalidForeignKey,
@@ -333,20 +335,70 @@ describeIfMysql("Mysql2Adapter", () => {
         expect((translated as StatementTimeout).cause).toBe(driverErr);
       }
     });
-    it.skip("database timezone changes synced to connection", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+    it("database timezone changes synced to connection", async () => {
+      // Mirrors: test_database_timezone_changes_synced_to_connection. The Ruby
+      // mysql2 driver carries `query_options[:database_timezone]` on the raw
+      // socket; trails surfaces the same via `adapter.databaseTimezone`,
+      // re-synced from the global default in the perform-query path so a
+      // runtime `withTimezoneConfig` flip takes effect on the next statement.
+      await adapter.execute("SELECT 1");
+      expect(adapter.databaseTimezone).toBe("utc");
+      await withTimezoneConfig({ default: "local" }, async () => {
+        await adapter.execute("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
+      });
+      await adapter.execute("SELECT 1");
+      expect(adapter.databaseTimezone).toBe("utc");
     });
-    it.skip("warnings do not change returned value of exec update", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+
+    it("warnings do not change returned value of exec update", async () => {
+      // Mirrors: test_warnings_do_not_change_returned_value_of_exec_update.
+      // Pin a single pool connection via beginTransaction so SET SESSION
+      // sql_mode='' carries over to the warning-producing UPDATE (DDL on
+      // MySQL auto-commits, so the table persists even on rollback).
+      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.executeMutation(
+          `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
+        );
+        await adapter.executeMutation(`SET SESSION sql_mode=''`);
+        await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
+        await withDbWarningsAction("log", async () => {
+          // `id > (0+'foo')` triggers a "Truncated incorrect DOUBLE value" warning;
+          // under db_warnings_action=:log that warning is logged, not raised, and
+          // must not corrupt the affected-row count returned by executeMutation.
+          const affected = await adapter.executeMutation(
+            `UPDATE warn_posts SET title = 'Updated' WHERE id > (0+'foo') LIMIT 1`,
+          );
+          expect(affected).toBe(1);
+        });
+      } finally {
+        await adapter.rollback().catch(() => {});
+        await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
+      }
     });
-    it.skip("warnings do not change returned value of exec delete", () => {
-      // BLOCKED: adapter-mysql — MySQL-specific adapter gap in mysql2-adapter
-      // ROOT-CAUSE: adapters/mysql2/mysql2-adapter.ts or abstract-mysql-adapter/mysql2-adapter.ts missing Rails parity
-      // SCOPE: ~50–150 LOC fix in adapters/mysql2/mysql2-adapter.ts; affects ~10–26 tests in mysql2-adapter.test.ts
+
+    it("warnings do not change returned value of exec delete", async () => {
+      // Mirrors: test_warnings_do_not_change_returned_value_of_exec_delete.
+      await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
+      await adapter.beginTransaction();
+      try {
+        await adapter.executeMutation(
+          `CREATE TABLE warn_posts_d (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
+        );
+        await adapter.executeMutation(`SET SESSION sql_mode=''`);
+        await adapter.executeMutation(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
+        await withDbWarningsAction("log", async () => {
+          const affected = await adapter.executeMutation(
+            `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
+          );
+          expect(affected).toBe(1);
+        });
+      } finally {
+        await adapter.rollback().catch(() => {});
+        await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
+      }
     });
   });
 });
