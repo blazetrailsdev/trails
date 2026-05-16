@@ -47,15 +47,14 @@ export class RangeHandler {
     ) {
       return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
     }
-    // Mirrors Rails' AR-level `where.not(col: 1..5)`: the predicate
-    // builder constructs `Between` then `where.not` wraps it in `Not`,
-    // yielding `NOT (col BETWEEN b AND e)`. Don't delegate to
-    // attribute.notBetween — that returns the predications.rb-aligned
-    // `(col < b OR col > e)` shape, which is the right Arel-level
-    // behavior but the wrong AR-level one.
-    return new Nodes.Not(
-      attribute.between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd }),
-    );
+    // Mirrors Rails WhereClause#invert: call `.invert()` on the Arel node so
+    // collapsed predicates (`lteq` → `gt`, `gteq` → `lt`, `In([])` →
+    // `NotIn([])`) become canonical, instead of double-wrapping `Not(...)` over
+    // a simpler form. For full BETWEEN this still yields `Not(Between(...))`
+    // (Node#invert default), matching AR-level `where.not(col: 1..5)` exactly.
+    return attribute
+      .between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd })
+      .invert();
   }
 
   private _castBounds(attribute: Nodes.Attribute, value: Range): [unknown, unknown] {
