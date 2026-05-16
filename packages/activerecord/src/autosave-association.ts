@@ -552,7 +552,15 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
     if (!childRecord.isNewRecord()) await childRecord.destroy();
     return true;
   }
-  if (childRecord.isNewRecord() || childRecord.changed) {
+  // Rails save_has_one_association — gate via record.changed_for_autosave?
+  // (autosave_association.rb:487 / 275) so dirty nested children also trigger
+  // a save, not only direct attribute changes.
+  if (
+    childRecord.isNewRecord() ||
+    (typeof (childRecord as any).changedForAutosave === "function"
+      ? (childRecord as any).changedForAutosave()
+      : (childRecord as any).changed)
+  ) {
     const ctor = record.constructor as typeof Base;
     // Mirrors Rails save_has_one_association: use the reflection's resolved FK
     // (handles queryConstraints via deriveFkQueryConstraints when available).
@@ -632,11 +640,20 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
 
 async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
+  // Rails save_belongs_to_association:538 — skip when the loaded target is
+  // stale (FK changed since the target was cached).
+  if (inst?.isStaleTarget?.()) return true;
   const associated = inst?.target;
   if (!associated || Array.isArray(associated) || !(associated instanceof Object)) return true;
   const assocRecord = associated as Base;
 
   if (isMarkedForDestruction(assocRecord)) {
+    // Rails save_belongs_to_association:544-547 — when destroying the
+    // associated record, null out the FK on self first so the owner save
+    // doesn't keep a dangling reference.
+    const foreignKey = assoc.options.foreignKey ?? `${underscore(assoc.name)}_id`;
+    const fkList: string[] = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+    for (const key of fkList) record._writeAttribute(key, null);
     if (!assocRecord.isNewRecord()) await assocRecord.destroy();
     return true;
   }
@@ -1154,6 +1171,14 @@ function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
       return validateBelongsToAssociation.call(this, reflection);
     });
   }
+  // Rails autosave_association.rb:231 calls `validate validationName` to
+  // register the per-association validator as a before_validate callback.
+  // Our `validateAssociations` (wired through `_validateAssociationsFn` /
+  // base.ts:3186) already iterates every association and invokes child
+  // validation in one pass, so registering klass.validate(validationName)
+  // here would fire the same child errors twice. The per-association
+  // validation methods are still defined on the prototype for Rails-shape
+  // parity; the dispatch path is just centralized rather than per-callback.
   // Mirrors Rails: after_validation :_ensure_no_duplicate_errors (once per class).
   // Own-property check mirrors the same pattern as the validation method guard above —
   // a subclass inheriting the flag from its parent does NOT inherit the registered
