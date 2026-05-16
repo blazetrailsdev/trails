@@ -79,7 +79,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     // fails and the fallback path is actually exercised.
     const prevKeyProvider = makeKeyProvider("prev-key-for-schemes-test-32bytes!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider }] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(freshAdapter());
+    const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
     const author = await Author.create({ name: "david" });
     const currentType = (Author as any).typeForAttribute("name") as EncryptedAttributeType;
@@ -103,7 +103,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.previous = [
       { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
     ] as SchemeOptions[];
-    const Author = makeEncryptedAuthor(freshAdapter());
+    const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
     const author = await withoutEncryption(() => Author.create({ name: "unencrypted author" }));
     const reloaded = await Author.find(author.id);
@@ -111,8 +111,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
   });
 
   it("use a custom encryptor", async () => {
-    const adp = freshAdapter();
-    const EncryptedAuthor1 = makeFreshModel(adp, { id: "integer", name: "string" });
+    const adp = await freshAdapter();
+    const EncryptedAuthor1 = await makeFreshModel(adp, { id: "integer", name: "string" });
     EncryptedAuthor1.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
@@ -125,8 +125,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
   it("support previous contexts", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const adp = freshAdapter();
-    const EncryptedAuthor2 = makeFreshModel(adp, { id: "integer", name: "string" });
+    const adp = await freshAdapter();
+    const EncryptedAuthor2 = await makeFreshModel(adp, { id: "integer", name: "string" });
     EncryptedAuthor2.encrypts("name", {
       encryptor: new TestEncryptor({ "2": "3" }),
       previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
@@ -140,7 +140,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const authorReloaded = await EncryptedAuthor2.find(author.id);
     expect(authorReloaded.encryptedAttribute("name")).toBe(true);
     // Write plaintext directly to DB (simulates an unencrypted legacy row).
-    const RawModel = makeFreshModel(adp, { id: "integer", name: "string" });
+    const RawModel = await makeFreshModel(adp, { id: "integer", name: "string" });
     RawModel._tableName = (EncryptedAuthor2 as any)._tableName;
     new RawModel();
     const rawRecord = await RawModel.find(author.id);
@@ -324,13 +324,13 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         { encryptor: prevEncryptor, deterministic: true } as SchemeOptions,
       ];
 
-      const adp = freshAdapter();
-      const Author = makeFreshModel(adp, { id: "integer", name: "string" });
+      const adp = await freshAdapter();
+      const Author = await makeFreshModel(adp, { id: "integer", name: "string" });
       Author.encrypts("name", { encryptor: currentEncryptor, deterministic: true, fixed: false });
       new Author();
 
       // Insert a row encrypted with the previous scheme directly (legacy row).
-      const Raw = makeFreshModel(adp, { id: "integer", name: "string" });
+      const Raw = await makeFreshModel(adp, { id: "integer", name: "string" });
       Raw._tableName = Author._tableName;
       new Raw();
       await Raw.create({ name: "alice_prev_cipher" });

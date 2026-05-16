@@ -30,7 +30,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
     // the system IS tolerant of plaintext). supportUnencryptedData = true
     // enables the plaintext-fallback path.
     Configurable.config.supportUnencryptedData = true;
-    const Post = makeEncryptedPost(freshAdapter());
+    const Post = makeEncryptedPost(await freshAdapter());
     new Post();
     const post = await withoutEncryption(() =>
       Post.create({ title: "The Starfleet is here!", body: "take cover!" }),
@@ -50,7 +50,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
     // supportUnencryptedData = false disables the plaintext fallback, so reading
     // an unencrypted column raises DecryptionError.
     Configurable.config.supportUnencryptedData = false;
-    const Post = makeEncryptedPost(freshAdapter());
+    const Post = makeEncryptedPost(await freshAdapter());
     new Post();
     const post = await withoutEncryption(() =>
       Post.create({ title: "The Starfleet is here!", body: "take cover!" }),

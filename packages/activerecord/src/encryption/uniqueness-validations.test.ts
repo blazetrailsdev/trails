@@ -61,7 +61,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work", async () => {
-    const Book = makeEncryptedBookWithDowncaseName(freshAdapter());
+    const Book = makeEncryptedBookWithDowncaseName(await freshAdapter());
     Book.validatesUniqueness("name");
     new Book();
 
@@ -75,14 +75,14 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // previousTypes, so the uniqueness query also searches for the unencrypted value.
     Configurable.config.supportUnencryptedData = true;
 
-    const adp = freshAdapter();
-    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    const adp = await freshAdapter();
+    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true });
     new Book();
 
     // Insert unencrypted "dune" directly (simulates a row that leaked plain text).
-    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
     RawBook._tableName = Book._tableName;
     new RawBook();
     await RawBook.create({ name: "dune" });
@@ -98,13 +98,13 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // supportUnencryptedData: false — so no plain-text fallback in previousTypes.
     Configurable.config.supportUnencryptedData = true;
 
-    const adp = freshAdapter();
-    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    const adp = await freshAdapter();
+    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: false });
     new Book();
 
-    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
     RawBook._tableName = Book._tableName;
     new RawBook();
     await RawBook.create({ name: "dune" });
@@ -120,13 +120,13 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // supportUnencryptedData: true — so the plain-text fallback IS included.
     Configurable.config.supportUnencryptedData = false;
 
-    const adp = freshAdapter();
-    const Book = makeFreshModel(adp, { id: "integer", name: "string" });
+    const adp = await freshAdapter();
+    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: true });
     new Book();
 
-    const RawBook = makeFreshModel(adp, { id: "integer", name: "string" });
+    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
     RawBook._tableName = Book._tableName;
     new RawBook();
     await RawBook.create({ name: "dune" });
@@ -141,7 +141,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     Configurable.config.supportUnencryptedData = false;
     Configurable.config.previous = [{ downcase: true, deterministic: true }];
 
-    const OldBook = makeFreshModel(freshAdapter(), { id: "integer", name: "string" });
+    const OldBook = await makeFreshModel(await freshAdapter(), { id: "integer", name: "string" });
     OldBook.validatesUniqueness("name");
     OldBook.encrypts("name", { deterministic: true, downcase: false });
     new OldBook();
@@ -159,7 +159,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     const prevKeyProvider = makeKeyProvider("prev-key-for-uniqueness-test-32b!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider, deterministic: true }];
 
-    const Book = makeEncryptedBook(freshAdapter()); // deterministic encrypted name
+    const Book = makeEncryptedBook(await freshAdapter()); // deterministic encrypted name
     Book.validatesUniqueness("name");
     new Book();
 

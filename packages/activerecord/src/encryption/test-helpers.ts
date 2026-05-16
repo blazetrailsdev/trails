@@ -7,6 +7,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -130,10 +131,43 @@ export function configureEncryption(
   }
 }
 
+export const AUTHOR_NAME_LIMIT = 100;
+
 // ─── Test adapter factory ─────────────────────────────────────────────────────
 
-export function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+/**
+ * Tables used by the makeEncrypted* factories below. Defined once so every
+ * encryption test gets the same shared schema after a single
+ * `installEncryptionSchema(adapter)` call — no per-file duplication.
+ *
+ * Table names are the AR inflection of each fixture class
+ * (e.g. EncryptedBook → encrypted_books). Columns mirror the
+ * `this.attribute(...)` calls in each factory; `id` is added by
+ * defineSchema's default primary key.
+ */
+const ENCRYPTION_SCHEMA: Schema = {
+  encrypted_posts: { title: "string", body: "string" },
+  encrypted_books: { name: { type: "string", default: "<untitled>" } },
+  encrypted_book_with_downcase_names: { name: "string" },
+  encrypted_book_ignore_cases: { name: "string", original_name: "string" },
+  encrypted_authors: { name: { type: "string", limit: AUTHOR_NAME_LIMIT } },
+  encrypted_book_with_custom_compressors: { name: "string" },
+  book_that_will_fail_to_encrypt_names: { name: "string" },
+  encrypted_traffic_light_with_store_states: { state: "json" },
+  encrypted_book_with_binaries: { logo: "binary" },
+  encrypted_book_with_serialized_first_binaries: { logo: "string" },
+  encrypted_book_with_serialized_second_binaries: { logo: "string" },
+  encrypted_book_with_binary_message_pack_serializeds: { logo: "binary" },
+};
+
+export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
+  await defineSchema(adapter, ENCRYPTION_SCHEMA);
+}
+
+export async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await installEncryptionSchema(adapter);
+  return adapter;
 }
 
 // ─── Model factories ──────────────────────────────────────────────────────────
@@ -146,10 +180,17 @@ export function freshAdapter(): DatabaseAdapter {
  */
 let _freshModelCounter = 0;
 
-export function makeFreshModel(adapter: DatabaseAdapter, attributes: Record<string, string>): any {
-  // Each call gets a unique table name via the counter. The class itself is
-  // anonymous (no unique class name), which is fine for test isolation.
+export async function makeFreshModel(
+  adapter: DatabaseAdapter,
+  attributes: Record<string, string>,
+): Promise<any> {
   const tableName = `fresh_model_${++_freshModelCounter}`;
+  const columns: Schema[string] = {};
+  for (const [name, type] of Object.entries(attributes)) {
+    if (name === "id") continue; // defineSchema adds id implicitly
+    (columns as Record<string, string>)[name] = type;
+  }
+  await defineSchema(adapter, { [tableName]: columns } as Schema);
   const klass = class extends Base {
     static {
       this._tableName = tableName;
@@ -216,8 +257,6 @@ export function makeEncryptedBookIgnoreCase(adapter: DatabaseAdapter) {
     }
   } as any;
 }
-
-export const AUTHOR_NAME_LIMIT = 100;
 
 export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
   return class EncryptedAuthor extends Base {

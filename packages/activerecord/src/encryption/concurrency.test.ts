@@ -22,7 +22,7 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   it("models can be encrypted and decrypted in different threads concurrently", async () => {
     // JS is single-threaded; this exercises concurrent async encrypt/decrypt operations
     // (multiple Promises in flight) to verify no shared-state corruption occurs.
-    const Book = makeEncryptedBook(freshAdapter());
+    const Book = makeEncryptedBook(await freshAdapter());
     new Book();
 
     const names = Array.from({ length: 10 }, (_, i) => `Concurrent Book ${i}`);
