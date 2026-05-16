@@ -523,7 +523,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       topics: { title: "string", content: "string" },
-      very_important_topics: { title: "string", content: "string" },
+      important_topics: { title: "string", content: "string" },
     });
   });
 

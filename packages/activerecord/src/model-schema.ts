@@ -8,7 +8,7 @@ import {
   typeRegistry,
   type Type,
 } from "@blazetrails/activemodel";
-import { isStiSubclass, getStiBase } from "./inheritance.js";
+import { isStiSubclass, getStiBase, isBaseClass, baseClass } from "./inheritance.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 
@@ -32,8 +32,11 @@ import { isWrappedType } from "./encryption/wrapped-type.js";
  */
 export function resolveTableName(this: typeof Base): string {
   if ((this as any)._tableName != null) return (this as any)._tableName;
-  if (isStiSubclass(this)) {
-    return resolveTableName.call(getStiBase(this));
+  // Rails compute_table_name: non-base subclasses always use base_class.table_name.
+  // This covers both STI hierarchies and any subclass of a non-abstract AR model.
+  if (!isBaseClass(this)) {
+    const base = baseClass.call(this);
+    if (base !== this) return resolveTableName.call(base);
   }
   const prefix = (this as any)._tableNamePrefix ?? "";
   const suffix = (this as any)._tableNameSuffix ?? "";
