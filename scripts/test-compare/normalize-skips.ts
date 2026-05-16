@@ -1105,8 +1105,8 @@ function annotateFile(src: string, relPath: string): string | null {
 
     const body = result.slice(adjMatchEnd, closePos);
 
-    // Skip if already annotated (BLOCKED: for temp gaps, PERMANENT: for ruby-only exclusions)
-    if (/BLOCKED:|PERMANENT:/.test(body)) continue;
+    // Skip if already annotated (BLOCKED: for temp gaps, PERMANENT-SKIP: for ruby-only exclusions)
+    if (/BLOCKED:|PERMANENT-SKIP:|PERMANENT:/.test(body)) continue;
 
     // Determine indentation of the skip call line
     const lineStart = result.lastIndexOf("\n", adjIndex) + 1;

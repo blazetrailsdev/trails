@@ -171,7 +171,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it.skip("hstore with store accessors", async () => {
       // BLOCKED: store
-      // ROOT-CAUSE: base.ts#store_accessor does not generate per-key getters/setters that
+      // ROOT-CAUSE: base.ts#storeAccessor does not generate per-key getters/setters that
       //   read/write sub-keys of a hstore attribute.
       // SCOPE: ~50 LOC in base.ts; affects ~5 store_accessor-gated tests across hstore/json/store.
     });
@@ -361,19 +361,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it.skip("cast value on write", () => {
       // BLOCKED: type
-      // ROOT-CAUSE: attribute-methods/read.ts: no readAttributeBeforeTypeCast accessor; Rails
-      //   test asserts `x.tags_before_type_cast` returns the pre-cast hash.
-      // SCOPE: ~20 LOC in attribute-methods/read.ts; affects all `_before_type_cast` tests.
+      // ROOT-CAUSE: attribute-methods/before-type-cast.ts provides readAttributeBeforeTypeCast(name),
+      //   but the per-attribute alias `<attr>_before_type_cast` (e.g. `x.tags_before_type_cast`)
+      //   is not generated; Rails defines it via define_method in AttributeMethods::BeforeTypeCast.
+      // SCOPE: ~20 LOC in attribute-methods.ts attribute-method generation; affects all
+      //   `<attr>_before_type_cast` tests across types.
     });
     it.skip("with store accessors", () => {
       // BLOCKED: store
-      // ROOT-CAUSE: base.ts#store_accessor does not generate per-key getters/setters.
+      // ROOT-CAUSE: base.ts#storeAccessor does not generate per-key getters/setters.
       // SCOPE: ~50 LOC in base.ts; affects ~5 store_accessor-gated tests.
     });
     it.skip("duplication with store accessors", () => {
       // BLOCKED: store
-      // ROOT-CAUSE: store_accessor must generate getters/setters before dup can propagate them.
-      // SCOPE: shares fix with "with store accessors"; verify dup copies attribute hash.
+      // ROOT-CAUSE: storeAccessor must generate getters/setters before dup can propagate them.
+      // SCOPE: ~50 LOC (shares fix with "with store accessors") + verify dup copies attribute hash.
     });
     it.skip("yaml round trip with store accessors", () => {
       // BLOCKED: serialization — Ruby YAML/Marshal round-trip, no Node.js equivalent
@@ -382,7 +384,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it.skip("changes with store accessors", () => {
       // BLOCKED: store
-      // ROOT-CAUSE: (1) base.ts#store_accessor not implemented; (2) Attribute.changedInPlace
+      // ROOT-CAUSE: (1) base.ts#storeAccessor not implemented; (2) Attribute.changedInPlace
       //   does not call type.isChangedInPlace() for mutable types.
       // SCOPE: ~50 LOC store_accessor + ~5 LOC attribute.ts changedInPlace delegation.
     });
