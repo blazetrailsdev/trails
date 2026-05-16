@@ -543,6 +543,17 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
     expect(found).toEqual([]);
   });
 
+  it("locate returns null for arity-mismatched GIDs even with a BlockLocator registered", async () => {
+    // Without the facade-level arity check, the registered BlockLocator
+    // would run on bad-arity GIDs (inconsistent with BaseLocator's
+    // modelIdIsValid filter, which returns null for them).
+    Locator.use("ba", () => {
+      throw new Error("should not be called — bad-arity GID must be filtered at the facade");
+    });
+    // Person has scalar primaryKey; composite-form id is bad arity.
+    expect(await Locator.locate("gid://ba/Person/1/2")).toBeNull();
+  });
+
   it("locateMany drops arity-mismatched GIDs before the first-app dispatch selection", async () => {
     // Bad-arity GID anchored at allowed[0] with a different app would
     // otherwise cause locateMany to filter to its app and lose the valid

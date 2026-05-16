@@ -128,9 +128,13 @@ export class BaseLocator {
     // Composite primary keys would need where(cols, tuples); Rails relation
     // form not yet supported by our AR layer. CPK + ignoreMissing falls
     // through to find(ids) (raises on missing) as a known limitation.
-    if (options.ignoreMissing && klass.where && !Array.isArray(klass.primaryKey)) {
-      const pkKey = (this.primaryKey(klass) ?? "id") as string;
-      const rel = klass.where({ [pkKey]: ids });
+    //
+    // Use this.primaryKey(klass) as the single source of truth for the PK
+    // shape — a subclass overriding primaryKey() must affect both the
+    // composite-key gate AND the where() key consistently.
+    const pk = this.primaryKey(klass);
+    if (options.ignoreMissing && klass.where && !Array.isArray(pk)) {
+      const rel = klass.where({ [pk]: ids });
       if (!rel.toArray) {
         throw new Error(
           "LocatorModel.where() returned a relation without .toArray() — required for ignoreMissing.",
@@ -240,6 +244,10 @@ export class Locator {
     const klass = lookupClass(parsed.modelName);
     if (!klass) return null;
     if (!Locator.findAllowed(klass, options.only)) return null;
+    // Arity-check at the facade so BlockLocator / custom LocatorLike dispatch
+    // doesn't run on a GID that BaseLocator would reject. Matches the
+    // mismatched-modelId-returns-null behavior across all locator kinds.
+    if (!modelIdArityMatches(klass, parsed.modelId)) return null;
     const locator = Locator.locatorFor(parsed);
     // Rails: options.except(:only) — the only: filter is the facade's
     // concern, not the per-locator one.
