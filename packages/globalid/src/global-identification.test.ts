@@ -128,7 +128,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
   it("locate_signed returns null for invalid signature or purpose mismatch", async () => {
     const v1 = makeVerifier();
     const v2 = new MessageVerifier("other", { digest: "sha256", url_safe: true });
-    const sgid = SignedGlobalID.create(new Person("7"), { verifier: v1, purpose: "login" });
+    const sgid = SignedGlobalID.create(new Person("7"), { verifier: v1, for: "login" });
     expect(await Locator.locateSigned(sgid.toString(), { verifier: v2 })).toBeNull();
     expect(await Locator.locateSigned(sgid.toString(), { verifier: v1, for: "signup" })).toBeNull();
   });

@@ -165,23 +165,15 @@ test:compare `global_locator_test.rb`: 33/59 → **37/59 (63%)** with the
 class`, `app locator is case insensitive`, `locator name cannot have
 underscore`). Overall test:compare: 98/158 → **102/158 (64.6%)**.
 
-### GID-10a — Drop `purpose:` option key (~40 LOC, breaking)
+### GID-10a — Drop `purpose:` option key — **done**
 
-Rails has never accepted `purpose:` as an option key — it only reads `for:`
-(`options.fetch :for, DEFAULT_PURPOSE`). `purpose` exists only as the
-internal `@purpose` attribute on the SGID instance. GID-2 introduced
-`purpose:` as a Trails-only option key; GID-5 added `for:` alongside it.
-Match Rails exactly:
-
-- Remove `purpose?: string` from `SignedGlobalIDOptions`, `ParseOptions`,
-  `LocateSignedOptions`, `ToSgidOptions`.
-- Remove the `options.for ?? options.purpose` fallbacks in
-  `SignedGlobalID.create`/`parse` and `Locator.locateSigned` /
-  `locateManySigned`.
-- `SignedGlobalID#purpose` (the instance accessor) stays — that mirrors
-  Rails' `attr_reader :purpose`.
-- Breaking change: any caller passing `{ purpose: "login" }` must switch
-  to `{ for: "login" }`.
+Removed the Trails-only `purpose:` option key from `SignedGlobalIDOptions`,
+`ParseOptions`, `LocateSignedOptions`, and `ToSgidOptions`. `for:` is now
+the only purpose key (Rails-canonical: `options.fetch :for, DEFAULT_PURPOSE`).
+`SignedGlobalID#purpose` (the instance accessor) stays — mirrors Rails'
+`attr_reader :purpose`. Internal verifier payload `purpose:` field is wire
+format and untouched. Breaking: callers passing `{ purpose: "..." }` must
+switch to `{ for: "..." }`.
 
 ### GID-10b — Unify `Base.toGid()` to return GlobalID instance (~80 LOC, breaking)
 

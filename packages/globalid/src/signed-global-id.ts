@@ -9,7 +9,12 @@ export type { GlobalIDModel };
 const DEFAULT_PURPOSE = "default";
 
 /** Option keys that are NOT forwarded as GID URI params. @internal */
-const KNOWN_SGID_KEYS = new Set(["app", "for", "purpose", "expiresIn", "expiresAt", "verifier"]);
+// Mirrors GlobalID.create's `options.except(:app, :verifier, :for)` plus
+// the SGID-specific expiration options. Any other key — including
+// `purpose` — flows through to URI params, matching Rails: SGID does
+// not reserve `purpose` as an option, only as the internal @purpose
+// attr set via pick_purpose(:for).
+const KNOWN_SGID_KEYS = new Set(["app", "for", "expiresIn", "expiresAt", "verifier"]);
 
 /** Monotonic counter for stable inspect() ids; mirrors Ruby's object_id. @internal */
 let _nextObjectId = 0;
@@ -20,10 +25,8 @@ let _classExpiresIn: number | null | undefined;
 
 export interface SignedGlobalIDOptions {
   app?: string;
-  /** Rails-canonical purpose option. */
+  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string;
-  /** Alias of `for` kept for backward compatibility. */
-  purpose?: string;
   /** Number of seconds until expiration. `null` explicitly disables expiration (Rails: `expires_in: nil`). */
   expiresIn?: number | null;
   /** Explicit expiration time. `null` explicitly disables expiration (Rails: `expires_at: nil`). */
@@ -35,10 +38,8 @@ export interface SignedGlobalIDOptions {
 }
 
 export interface ParseOptions {
-  /** Rails-canonical purpose option. */
+  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string;
-  /** Alias of `for` kept for backward compatibility. */
-  purpose?: string;
   /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
   verifier?: MessageVerifier;
 }
@@ -162,8 +163,8 @@ export class SignedGlobalID {
   }
 
   /** Mirrors: SignedGlobalID.pick_purpose. */
-  static pickPurpose(options: { for?: string; purpose?: string }): string {
-    return options.for ?? options.purpose ?? DEFAULT_PURPOSE;
+  static pickPurpose(options: { for?: string }): string {
+    return options.for ?? DEFAULT_PURPOSE;
   }
 
   // ─── Verify dispatch (Rails private class methods) ────────────────────────
