@@ -135,6 +135,49 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     },
   );
 
+  it("detects non-DEFAULT_GENERATED keyword defaults via SHOW CREATE TABLE and emits unquoted", async () => {
+    // e.g. older MySQL function defaults outside RENAME_FUNC_DEFAULT_RE: defaultType()
+    // parses SHOW CREATE TABLE and returns "function" for any bare keyword default.
+    const adapter = await makeAdapter("col", "");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "col",
+        Type: "varchar(36)",
+        Null: "YES",
+        Default: "MY_CUSTOM_FUNC",
+        Extra: "",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    adapter.createTableInfo = async () =>
+      "CREATE TABLE `users` (\n  `col` varchar(36) DEFAULT MY_CUSTOM_FUNC\n)";
+    adapter.quoteTableName = (s: string) => `\`${s}\``;
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(sql).toContain("DEFAULT MY_CUSTOM_FUNC");
+    expect(sql).not.toContain("DEFAULT 'MY_CUSTOM_FUNC'");
+  });
+
+  it("treats non-function keyword default as quoted string when SHOW CREATE TABLE shows quoted literal", async () => {
+    const adapter = await makeAdapter("col", "");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "col",
+        Type: "varchar(36)",
+        Null: "YES",
+        Default: "hello",
+        Extra: "",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    adapter.createTableInfo = async () =>
+      "CREATE TABLE `users` (\n  `col` varchar(36) DEFAULT 'hello'\n)";
+    adapter.quoteTableName = (s: string) => `\`${s}\``;
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(sql).toContain("DEFAULT 'hello'");
+  });
+
   it("wraps arbitrary DEFAULT_GENERATED expression in parens, not as a quoted string", async () => {
     // e.g. MySQL 8 expression defaults like `json_array()` that aren't in RENAME_FUNC_DEFAULT_RE.
     // newColumnFromField wraps these in () and sets defaultFunction — we must match.

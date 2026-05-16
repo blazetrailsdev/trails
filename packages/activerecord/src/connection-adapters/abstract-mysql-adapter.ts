@@ -63,7 +63,7 @@ import {
 } from "./abstract/schema-definitions.js";
 import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js";
 import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
-import { isRowFormatDynamicByDefault } from "./mysql/schema-statements.js";
+import { isRowFormatDynamicByDefault, defaultType } from "./mysql/schema-statements.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -1458,8 +1458,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // quoteDefaultExpression emits it unquoted: DEFAULT NOW(), not DEFAULT 'NOW()'.
     // Mirrors newColumnFromField: CURRENT_TIMESTAMP datetime cols and DEFAULT_GENERATED cols
     // always go through the function-default path; everything else only when RENAME_FUNC_DEFAULT_RE matches.
-    // RENAME_FUNC_DEFAULT_RE only applies to the non-DEFAULT_GENERATED path (e.g. CURRENT_TIMESTAMP
-    // on datetime columns, which MySQL emits without DEFAULT_GENERATED in Extra).
+    // RENAME_FUNC_DEFAULT_RE catches well-known keyword defaults without a DB round-trip;
+    // anything that isn't a literal digit-led default also gets a SHOW CREATE TABLE check
+    // via defaultType(), mirroring Rails' new_column_from_field broader function-default
+    // detection (mysql/schema_statements.rb:189-208).
     let colDefault: (() => string) | string | undefined;
     if (typeof rawDefault === "string") {
       if (extra === "default_generated") {
@@ -1468,9 +1470,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         const expr = rawDefault.startsWith("(") ? rawDefault : `(${rawDefault})`;
         colDefault = () => expr;
       } else if (RENAME_FUNC_DEFAULT_RE.test(rawDefault)) {
-        // Well-known keyword defaults on non-DEFAULT_GENERATED columns (e.g. CURRENT_TIMESTAMP
-        // on datetime): emit as-is, no parens.
+        // Well-known keyword defaults (e.g. CURRENT_TIMESTAMP): emit as-is, no parens.
         colDefault = () => rawDefault;
+      } else if (!/^\d/.test(rawDefault) && !rawDefault.startsWith("'")) {
+        // Broader function-default detection via SHOW CREATE TABLE — Rails' default_type
+        // returns :function for any DEFAULT followed by a bare keyword identifier.
+        const createInfo = await this.createTableInfo(tableName);
+        colDefault =
+          defaultType(createInfo, columnName) === "function" ? () => rawDefault : rawDefault;
       } else {
         colDefault = rawDefault;
       }

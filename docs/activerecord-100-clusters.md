@@ -400,10 +400,10 @@ These don't merit their own multi-slot cluster section.
 
 After #1555 moved belongs_to autosave into the `before_save` chain via `defineNonCyclicMethod`, the standalone `autosaveBelongsTo` function in `packages/activerecord/src/autosave-association.ts:375` and its `_autosavingRecords` add/delete calls are unreferenced. Delete the function body; keep the `_autosavingRecords` WeakSet (still used by `autosaveChildren`). Bundle into next fidelity sweep.
 
-### MySQL onUpdate followups (~30 LOC, from #1382)
+### MySQL onUpdate followups closed (#1402, follow-up bundle)
 
-- **`onUpdate` abstract leakage** — lives in abstract `ColumnOptions`/`addColumnOptions`; MySQL-specific option leaking into abstract layer. Move to MySQL override. Low risk in practice.
-- **Function-default detection narrowness** — `renameColumnForAlter` regex only covers `CURRENT_TIMESTAMP`. Bundled into small-followup sweep.
+- `onUpdate` abstract leakage closed in #1402 — `onUpdate` moved off abstract `ColumnOptions` onto `MysqlAddColumnOptions` in mysql/schema-creation.ts.
+- Function-default detection in `renameColumnForAlter` widened — non-DEFAULT_GENERATED defaults outside `RENAME_FUNC_DEFAULT_RE` now route through `defaultType(createTableInfo, columnName)`, mirroring Rails' `new_column_from_field` broader detection.
 
 ### Unported-list additions (~30 LOC bundled, 1 PR)
 
