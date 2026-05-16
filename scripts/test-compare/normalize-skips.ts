@@ -425,10 +425,11 @@ function categorize(relPath: string, describeName: string, testName: string): An
 
   if (p === "transaction-isolation.test.ts") {
     return {
-      blocked: "GVL — Ruby thread isolation semantics, no Node.js equivalent",
+      blocked:
+        "transactions — isolation-level semantics across concurrent connections, not implemented",
       rootCause:
-        "Node.js has no Thread.new / GVL concept; transaction isolation tests depend on concurrent threads",
-      scope: "~0 LOC fix; permanent skip-list.ts candidate",
+        "Tests assert visibility between two open connections under READ COMMITTED / REPEATABLE READ; our connection-pool checkout + per-connection isolation plumbing is not wired",
+      scope: "multi-PR effort across adapter + pool + transaction-manager",
     };
   }
 

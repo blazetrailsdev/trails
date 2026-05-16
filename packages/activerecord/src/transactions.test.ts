@@ -1671,8 +1671,17 @@ describe("TransactionTest", () => {
   it("dont restore new record in subsequent transaction", () => {
     expect(true).toBe(true);
   });
-  it("assign custom primary key after rollback", () => {
-    expect(true).toBe(true);
+  it("assign custom primary key after rollback", async () => {
+    const { Movie } = makeSQLiteMovie();
+    const movie = (await Movie.create({ name: "foo" })) as any;
+
+    await Movie.transaction(async () => {
+      await movie.save();
+      throw new Rollback();
+    });
+
+    movie.movieid = null;
+    expect(movie.movieid).toBeNull();
   });
   it("read attribute with custom primary key after rollback", async () => {
     const { Movie } = makeSQLiteMovie();
@@ -1685,8 +1694,17 @@ describe("TransactionTest", () => {
 
     expect(movie.readAttribute("movieid")).toBeNull();
   });
-  it("write attribute after rollback", () => {
-    expect(true).toBe(true);
+  it("write attribute after rollback", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const topic = (await Topic.create({})) as any;
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      throw new Rollback();
+    });
+
+    topic.writeAttribute("id", null);
+    expect(topic.id).toBeNull();
   });
   it("write attribute with custom primary key after rollback", async () => {
     const { Movie } = makeSQLiteMovie();
