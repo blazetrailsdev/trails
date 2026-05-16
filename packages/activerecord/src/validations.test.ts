@@ -6,17 +6,28 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA = {
+  topics: { title: "string", score: "integer" },
+  users: { name: "string", email: "string", invite_code: "string", reason: "string" },
+  items: { price: "integer" },
+  emails: { address: "string" },
+  permissions: { user_id: "integer", resource_id: "integer" },
+} as const;
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("ValidationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModel() {
@@ -206,7 +217,7 @@ describe("ValidationsTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("invite_code", "string");
-    User.adapter = freshAdapter();
+    User.adapter = await freshAdapter();
     User.validates("invite_code", { presence: true, on: "create" });
 
     // Can't create without invite_code
@@ -233,7 +244,7 @@ describe("ValidationsTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.attribute("reason", "string");
-    User.adapter = freshAdapter();
+    User.adapter = await freshAdapter();
     User.validates("reason", { presence: true, on: "update" });
 
     // Can create without reason
@@ -254,8 +265,8 @@ describe("ValidationsTest", () => {
 
 describe("ValidationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("validates before save", async () => {
@@ -351,8 +362,8 @@ describe("ValidationsTest", () => {
 
 describe("ValidationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("validate uniqueness", async () => {
