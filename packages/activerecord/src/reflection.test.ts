@@ -1347,9 +1347,13 @@ describe("ReflectionTest", () => {
     ).toThrow(ArgumentError);
   });
   it("plain function for class name does not raise (only ES classes are rejected)", () => {
-    // Rails check is `options[option_name].class == Class`; in JS we
-    // distinguish classes via Function.prototype.toString, so a non-class
-    // callable must pass through (e.g. a lambda producing a string name).
+    // Rails check is `options[option_name].class == Class` — only literal
+    // Class instances are rejected; a Proc or other callable passes through
+    // (it is not invoked as a factory, just not flagged here). We mirror
+    // that by matching `/^class[\s{]/` on Function.prototype.toString so
+    // plain functions are accepted at construction. Downstream resolution
+    // still expects a string and will fail later if the user passes a
+    // non-string — same as Rails.
     class HostA extends Base {
       static {
         this.attribute("name", "string");
