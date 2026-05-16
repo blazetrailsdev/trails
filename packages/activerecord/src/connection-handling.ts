@@ -6,7 +6,10 @@ import { getFsAsync, getPathAsync, getEnv } from "@blazetrails/activesupport";
 import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
-import { _setAdapterClassResolver } from "./database-configurations/database-config.js";
+import {
+  _setAdapterClassResolver,
+  type DatabaseConfig,
+} from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import {
   AdapterNotFound,
@@ -70,27 +73,24 @@ export function connectsTo(
 
   if (Object.keys(database).length > 0 && Object.keys(shards).length > 0) {
     throw new ArgumentError(
-      "`connectsTo` can only accept a `database` or `shards` argument, but not both.",
+      "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
     );
   }
 
   const connections: ConnectionPool[] = [];
-  // Mirrors: @shard_keys = shards.keys (before injecting :default for database: usage)
+  // Mirrors Rails' flow: capture @shard_keys before the default-merge, then
+  // inject {default: database} when no shards were given, then read
+  // shards.keys.first for default_shard from the post-merge map.
   (this as any)._shardKeys = Object.keys(shards);
-  const shardEntries = Object.keys(shards).length > 0 ? shards : { default: database };
-  // Mirrors: self.default_shard = shards.keys.first
-  (this as any)._defaultShard = Object.keys(shardEntries)[0] ?? "default";
+  const shardEntries: Record<string, Record<string, unknown>> = Object.keys(shards).length > 0
+    ? shards
+    : { default: database };
+  (this as any)._defaultShard = Object.keys(shardEntries)[0];
   (this as any).connectionClass = true;
-
-  const rawConfigs = (this as any).configurations;
-  const configs =
-    rawConfigs instanceof DatabaseConfigurations
-      ? rawConfigs
-      : DatabaseConfigurations.fromEnv(rawConfigs?.toH?.() ?? rawConfigs ?? {});
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
-      const dbConfig = configs.resolve(dbKey);
+      const dbConfig = resolveConfigForConnection.call(this, dbKey);
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,
@@ -364,10 +364,23 @@ export function removeConnection(this: typeof Base): void {
 }
 
 export function connectionSpecificationName(this: typeof Base): string {
-  if ((this as any)._connectionSpecificationName != null) {
+  // Check own property first to avoid prototype-static inheritance bleeding a
+  // value set on Base/ApplicationRecord into unrelated abstract subclasses.
+  // The recursive walk below handles cross-class inheritance explicitly.
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName") &&
+    (this as any)._connectionSpecificationName != null
+  ) {
     return (this as any)._connectionSpecificationName;
   }
   if (this.name === "Base") {
+    return "Base";
+  }
+  // Primary classes (Base/ApplicationRecord) store their pool under "Base"
+  // per PoolConfig#connectionDescriptor's normalization; reflect that here
+  // so leaseConnection() lookups hit the right pool when connectsTo hasn't
+  // run yet to plant _connectionSpecificationName.
+  if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "Base";
   }
   if ((this as any).connectionClassQ?.()) {
@@ -841,12 +854,51 @@ _setAdapterClassResolver(async (adapterName) => _loadAdapter(adapterName));
  *
  * @internal
  */
-export function resolveConfigForConnection(this: typeof Base, configOrEnv: unknown): unknown {
+export function resolveConfigForConnection(
+  this: typeof Base,
+  configOrEnv: unknown,
+): DatabaseConfig {
   if (!this.name) throw new Error("Anonymous class is not allowed.");
-  // Rails also sets self.connection_specification_name = connection_name as a side effect.
-  const connectionName = isPrimaryClass.call(this)
-    ? ((this as any)._baseClassName ?? this.name)
-    : this.name;
-  (this as any)._connectionSpecificationName = connectionName;
-  return (this as any).configurations?.resolve(configOrEnv) ?? configOrEnv;
+  // Mirrors Rails: connection_name = primary_class? ? Base.name : name, then
+  // self.connection_specification_name = connection_name. The primary class
+  // (Base/ApplicationRecord) stores its pool under "Base" — matching
+  // PoolConfig#connectionDescriptor's primary-class normalization — so
+  // subsequent connectionPool() lookups hit the right key. The reader uses
+  // an own-property check so writing here doesn't bleed through JS static
+  // inheritance into unrelated subclasses.
+  (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
+  return normalizeConfigurations(this).resolve(configOrEnv);
+}
+
+/**
+ * Normalize a class's `configurations` static into a DatabaseConfigurations
+ * instance. Mirror Rails' `Base.configurations.resolve(...)` entry point by
+ * always returning a real configurations object — string env names then
+ * surface AdapterNotSpecified with the available-configs hint instead of
+ * silently passing through.
+ *
+ * Not cached: `DatabaseConfigurations.fromEnv(...)` also folds in
+ * `DATABASE_URL`/`TRAILS_ENV` and updates `DatabaseConfigurations.current`,
+ * so a (class, rawConfigs) cache key would miss later env-state changes
+ * and leave `HashConfig.isPrimary()` consulting a stale registry.
+ * Rebuilding per resolve mirrors Rails' `Base.configurations.resolve(...)`
+ * and keeps the multi-shard `connectsTo` loop honest against later
+ * configuration or env shifts — `fromEnv` is a thin per-call build.
+ *
+ * @internal
+ */
+function normalizeConfigurations(klass: typeof Base): DatabaseConfigurations {
+  const rawConfigs = (klass as any).configurations;
+  if (rawConfigs instanceof DatabaseConfigurations) return rawConfigs;
+  if (rawConfigs && typeof rawConfigs === "object") {
+    // Guard the `toH` call: raw config maps can carry arbitrary top-level
+    // keys, so a non-function `toH` entry is real config data — not a
+    // hash-like accessor to unwrap. Mirrors the same guard used in
+    // `establishConnection`'s in-memory branch and in `test-databases.ts`.
+    const toH = (rawConfigs as { toH?: unknown }).toH;
+    const raw =
+      typeof toH === "function" ? (toH.call(rawConfigs) as RawConfigurations) : rawConfigs;
+    return DatabaseConfigurations.fromEnv(raw as RawConfigurations);
+  }
+  return DatabaseConfigurations.fromEnv({});
 }
