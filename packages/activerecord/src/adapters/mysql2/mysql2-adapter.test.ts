@@ -452,6 +452,9 @@ describeIfMysql("Mysql2Adapter", () => {
         adapter.databaseTimezone = "utc";
         await adapter.exec("DO 1");
         expect(adapter.databaseTimezone).toBe("local");
+        adapter.databaseTimezone = "utc";
+        await adapter.explain("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
       });
       await adapter.execute("SELECT 1");
       expect(adapter.databaseTimezone).toBe("utc");

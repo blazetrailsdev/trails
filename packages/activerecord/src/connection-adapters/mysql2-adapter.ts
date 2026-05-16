@@ -862,6 +862,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
+    // Rails' MySQL::DatabaseStatements#explain runs through internal_exec_query
+    // and therefore through perform_query, which re-syncs the database timezone.
+    this._syncDatabaseTimezone();
     const conn = await this.getConn();
     try {
       const clause = this._explainStatementClause(options);
