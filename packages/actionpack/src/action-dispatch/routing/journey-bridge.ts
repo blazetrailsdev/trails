@@ -38,7 +38,15 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
     // must not overwrite them.
     const journeyRoute = new JourneyRoute({
       name,
-      app: { serve: () => [200, {}, []] },
+      // Seam routes are recognize-only; calling serve() here is a programming
+      // error — fail loudly instead of returning an empty 200.
+      app: {
+        serve: () => {
+          throw new Error(
+            `Journey-bridge route '${name}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
+          );
+        },
+      },
       path: pattern,
       defaults: { ...r.defaults, controller: r.controller, action: r.action },
       requestMethodMatch,
@@ -65,9 +73,12 @@ export function journeyRecognize(
     if (result) return;
     const local = JOURNEY_TO_LOCAL.get(journeyRoute);
     if (!local) return;
+    // Router.recognize merges route.defaults into parameters; for parity with
+    // the local matcher's MatchedRoute shape, keep only path captures.
+    const defaultKeys = new Set(Object.keys(journeyRoute.defaults));
     const params: Record<string, string> = {};
     for (const [k, v] of Object.entries(parameters)) {
-      if (v != null) params[k] = String(v);
+      if (v != null && !defaultKeys.has(k)) params[k] = String(v);
     }
     result = { route: local, params };
   });
@@ -77,9 +88,15 @@ export function journeyRecognize(
 function regexpRequirements(c: Record<string, unknown>): Record<string, RegExp> {
   const out: Record<string, RegExp> = {};
   for (const [k, v] of Object.entries(c)) {
-    if (v instanceof RegExp) out[k] = v;
-    // String constraints are anchored at both ends by the local matcher.
-    else if (typeof v === "string") out[k] = new RegExp(`^${v}$`);
+    // Journey inlines `requirements[*].source` into an outer `^…$` regex, so
+    // we must strip embedded anchors from RegExp sources and never add them
+    // for string constraints — otherwise the anchor binds to the whole path.
+    if (v instanceof RegExp) {
+      const source = v.source.replace(/^\^/, "").replace(/\$$/, "");
+      out[k] = new RegExp(source, v.flags);
+    } else if (typeof v === "string") {
+      out[k] = new RegExp(v);
+    }
   }
   return out;
 }
