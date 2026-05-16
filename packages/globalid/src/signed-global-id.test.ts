@@ -13,6 +13,8 @@ function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
 }
 
+// Synthetic GlobalIDModel — both real instances and these literals satisfy
+// GlobalIDModel's `readonly constructor: { readonly name: string }`.
 const person = (id: unknown = 5) => ({ id, constructor: { name: "Person" } });
 const TEST_APP = "bcx";
 

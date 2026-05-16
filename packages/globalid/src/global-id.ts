@@ -7,6 +7,11 @@ import {
   type GidComponents,
 } from "./uri/gid.js";
 import { Locator, lookupClass, type LocateOptions, type LocatorModel } from "./locator.js";
+// LAZY-IMPORT CYCLE: global-id ↔ signed-global-id ↔ locator. Safe because
+// every cross-module reference below happens inside a method body (runtime),
+// not at class-body init time. Do NOT add module-level `const X = SignedGlobalID.foo`
+// or similar — native ESM throws ReferenceError (TDZ) for an uninitialized
+// imported binding accessed during the initial circular evaluation.
 import { SignedGlobalID } from "./signed-global-id.js";
 
 /**
@@ -20,9 +25,17 @@ export function isOrExtends(klass: LocatorModel, base: { prototype: object }): b
   return typeof proto === "object" && proto !== null && proto instanceof (base as never);
 }
 
+/**
+ * Duck-typed model accepted by `GlobalID.create` / `SignedGlobalID.create`.
+ *
+ * Requires `id` plus a constructor exposing a `name` string — both real
+ * class instances (whose `.constructor` is `Function`, which has `name`)
+ * and synthetic literal fixtures (`{ id, constructor: { name } }`)
+ * structurally satisfy the `{ readonly name: string }` shape.
+ */
 export interface GlobalIDModel {
   id: unknown;
-  constructor: { name: string };
+  readonly constructor: { readonly name: string };
 }
 
 export interface GlobalIDOptions {

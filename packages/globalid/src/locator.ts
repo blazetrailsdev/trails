@@ -1,3 +1,9 @@
+// LAZY-IMPORT CYCLE: locator ↔ global-id ↔ signed-global-id. GlobalID and
+// SignedGlobalID are only referenced inside class/method bodies below
+// (e.g. `GlobalID.parse(...)` inside `Locator.locate`); don't add a
+// module-level `const X = GlobalID.something` — native ESM throws
+// ReferenceError (TDZ) for an uninitialized imported binding accessed
+// during the initial circular evaluation.
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
