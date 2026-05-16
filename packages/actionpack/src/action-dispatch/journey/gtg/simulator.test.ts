@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { MatchData, Simulator, type GtgState, type TransitionTable } from "./simulator.js";
+import { MatchData, Simulator, type GtgState, type TransitionTableLike } from "./simulator.js";
 
-class FakeTable implements TransitionTable {
+class FakeTable implements TransitionTableLike {
   constructor(
     private readonly accept: ReadonlySet<number>,
     private readonly memos: Record<number, readonly unknown[]>,

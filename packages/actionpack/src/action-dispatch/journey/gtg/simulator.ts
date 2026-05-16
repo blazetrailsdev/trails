@@ -1,6 +1,6 @@
 export type GtgState = ReadonlyArray<readonly [state: number, dataIndex: number | null]>;
 
-export interface TransitionTable {
+export interface TransitionTableLike {
   move(state: GtgState, string: string, startIndex: number, endIndex: number): GtgState;
   memo(state: number): readonly unknown[];
   /** Rails: `accepting?(s)` */
@@ -22,9 +22,9 @@ const TOKEN = /([/.?]|[^/.?]+)/y;
 export class Simulator {
   static readonly INITIAL_STATE: GtgState = [[0, null]];
 
-  readonly tt: TransitionTable;
+  readonly tt: TransitionTableLike;
 
-  constructor(transitionTable: TransitionTable) {
+  constructor(transitionTable: TransitionTableLike) {
     this.tt = transitionTable;
   }
 
