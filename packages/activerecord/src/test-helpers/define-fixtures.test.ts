@@ -310,6 +310,23 @@ describe("defineFixtures", () => {
     ).rejects.toThrow(/polymorphic association.*model instance/);
   });
 
+  it("polymorphic ref: non-Base class instance is rejected (no duck typing)", async () => {
+    // Guards the narrowing from regressing to the old constructor !== Object
+    // duck-typed check, which would have happily accepted any class instance.
+    const adapter = makeAdapter();
+    const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);
+    const Tagging = makeModel("taggings", rows) as any;
+    Tagging._reflections = {
+      taggable: { macro: "belongsTo", isPolymorphic: () => true },
+    };
+    class NotBase {
+      id = 42;
+    }
+    await expect(
+      defineFixtures(adapter, Tagging, { bad: { taggable: new NotBase() as any } }),
+    ).rejects.toThrow(/polymorphic association.*model instance/);
+  });
+
   it("polymorphic ref: non-instance non-null value throws a clear error", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("bad"), { id: fixtureId("bad") }]]);

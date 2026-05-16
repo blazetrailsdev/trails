@@ -206,8 +206,9 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
       // Polymorphic belongs_to expansion: { taggable: instance } → taggable_type + taggable_id.
       // When the caller already provided explicit type/id columns, skip the association key
       // entirely (don't write it as a spurious column) — explicit values win.
-      // When neither explicit column is present, expand only actual model instances
-      // (constructor must be a non-Object function; plain/null-proto objects fall through).
+      // When neither explicit column is present, expand only real Base instances.
+      // Plain objects, null-proto objects, and non-Base class instances throw —
+      // ambiguous duck-typing was rejected in favour of a real `instanceof Base` check.
       // Polymorphic belongs_to: "col" is an association name, never a real column.
       // It must always be consumed here — falling through to `row[col] = val` would
       // attempt to INSERT a non-existent column and break fixture insertion.

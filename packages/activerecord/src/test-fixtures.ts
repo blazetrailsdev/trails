@@ -217,9 +217,14 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
   }
 
   // ── DevelopersProject (HABTM join model) ────────────────────────────
+  // Rails schema (test/schema/schema.rb:546): `create_table :developers_projects,
+  // id: false` — no synthetic PK; developer_id + project_id form the composite
+  // key. Declaring the CPK here matches Rails and lets the test-adapter keep
+  // the HABTM-driven CPK shape (see test-adapter.ts extractColumnsFromModels).
   class DevelopersProject extends Base {
     static {
       this._tableName = "developers_projects";
+      this._primaryKey = ["developer_id", "project_id"];
       this.attribute("developer_id", "integer");
       this.attribute("project_id", "integer");
       this.attribute("joined_on", "date");
