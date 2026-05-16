@@ -543,6 +543,27 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
     expect(found).toEqual([]);
   });
 
+  it("locateMany drops arity-mismatched GIDs before the first-app dispatch selection", async () => {
+    // Bad-arity GID anchored at allowed[0] with a different app would
+    // otherwise cause locateMany to filter to its app and lose the valid
+    // same-app GIDs that follow. parseAllowed's arity filter removes the
+    // bad entry first, so allowed[0] is a real candidate.
+    Locator.use("doomed-app", () => {
+      throw new Error("should not be called — bad-arity GID must be filtered first");
+    });
+    const found = await Locator.locateMany(
+      [
+        "gid://doomed-app/Person/1/2", // scalar-PK Person with composite-form id → bad arity
+        "gid://bcx/Person/3",
+        "gid://bcx/Person/4",
+      ],
+      {},
+    );
+    expect(found).toHaveLength(2);
+    expect((found[0] as Person).id).toBe("3");
+    expect((found[1] as Person).id).toBe("4");
+  });
+
   it("locateMany filters out mismatched-app GIDs (single-app dispatch invariant)", async () => {
     // Register an 'other-app' BlockLocator that would crash if asked to
     // resolve a 'bcx' GID. locateMany should keep only the first-GID-app

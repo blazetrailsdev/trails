@@ -147,10 +147,7 @@ export class BaseLocator {
   protected modelIdIsValid(gid: GlobalID): boolean {
     const klass = lookupClass(gid.modelName);
     if (!klass) return false;
-    const pk = this.primaryKey(klass);
-    const pkArity = Array.isArray(pk) ? pk.length : 1;
-    const idArity = Array.isArray(gid.modelId) ? gid.modelId.length : 1;
-    return idArity === pkArity;
+    return modelIdArityMatches(klass, gid.modelId, this.primaryKey(klass));
   }
 
   /** @internal Mirrors: BaseLocator#primary_key. */
@@ -339,7 +336,13 @@ export class Locator {
     });
   }
 
-  /** @internal Mirrors: Locator.parse_allowed. */
+  /**
+   * @internal Mirrors: Locator.parse_allowed. Extends Rails behavior by also
+   * filtering modelId-arity mismatches here (Rails defers that to
+   * BaseLocator#model_id_is_valid? at dispatch time). We filter early so the
+   * locateMany first-GID-app selection isn't anchored on a doomed entry,
+   * which would drop otherwise-valid same-app GIDs.
+   */
   static parseAllowed(gids: Array<string | GlobalID>, only?: LocateOptions["only"]): GlobalID[] {
     const result: GlobalID[] = [];
     for (const g of gids) {
@@ -348,6 +351,7 @@ export class Locator {
       const klass = lookupClass(parsed.modelName);
       if (!klass) continue;
       if (!Locator.findAllowed(klass, only)) continue;
+      if (!modelIdArityMatches(klass, parsed.modelId)) continue;
       result.push(parsed);
     }
     return result;
@@ -375,6 +379,17 @@ type Ctor = new (...args: never[]) => unknown;
 
 function recordIdProp(klass: LocatorModel): string {
   return Array.isArray(klass.primaryKey) ? "id" : (klass.primaryKey ?? "id");
+}
+
+/** True iff `modelId`'s arity matches `klass.primaryKey`'s arity. @internal */
+function modelIdArityMatches(
+  klass: LocatorModel,
+  modelId: unknown,
+  pk: string | string[] = klass.primaryKey ?? "id",
+): boolean {
+  const pkArity = Array.isArray(pk) ? pk.length : 1;
+  const idArity = Array.isArray(modelId) ? modelId.length : 1;
+  return idArity === pkArity;
 }
 
 function idKey(id: unknown): string {
