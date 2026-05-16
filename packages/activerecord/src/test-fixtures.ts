@@ -223,6 +223,7 @@ export function createFixtures(existingAdapter?: DatabaseAdapter): TestFixtures 
       this.attribute("developer_id", "integer");
       this.attribute("project_id", "integer");
       this.attribute("joined_on", "date");
+      this.attribute("access_level", "integer", { default: 1 });
       this.adapter = adapter;
     }
   }
