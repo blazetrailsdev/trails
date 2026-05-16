@@ -597,8 +597,19 @@ export class AlterTable extends AbstractAlterTable {
     super(td);
   }
 
-  /** @internal Narrow inherited `_td` to PG's TableDefinition. */
+  /**
+   * Narrow inherited `_td` to PG's TableDefinition. PG `AlterTable` is
+   * always constructed with a TableDefinition (`createAlterTable` →
+   * `new AlterTable(td)`), so the assertion is informational; it fails
+   * loud if a caller ever resurrects the legacy string-only constructor.
+   * @internal
+   */
   protected get _pgTd(): TableDefinition {
+    if (this._td == null) {
+      throw new Error(
+        "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
+      );
+    }
     return this._td as TableDefinition;
   }
 

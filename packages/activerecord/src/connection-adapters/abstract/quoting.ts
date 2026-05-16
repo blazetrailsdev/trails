@@ -163,7 +163,7 @@ export function quoteTableNameForAssignment(table: string, attr: string): string
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
  */
-export function quoteDefaultExpression(value: unknown): string {
+export function quoteDefaultExpression(value: unknown, _column?: unknown): string {
   if (value === undefined) return "";
   if (typeof value === "function") {
     const result = (value as () => unknown)();
