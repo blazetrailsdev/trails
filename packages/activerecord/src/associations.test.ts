@@ -8297,29 +8297,191 @@ describe("PreloaderTest", () => {
     expect(preloaded.name).not.toBe("Wrong");
   });
 
-  it.skip("preload has many association with composite foreign key", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite keys */
+  it("preload has many association with composite foreign key", async () => {
+    const adapter = freshAdapter();
+    class CfkHmAuthor extends Base {
+      static {
+        this._tableName = "cfk_hm_authors";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CfkHmPost extends Base {
+      static {
+        this._tableName = "cfk_hm_posts";
+        this.attribute("author_region_id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CfkHmAuthor, "cfkHmPosts", {
+      className: "CfkHmPost",
+      foreignKey: ["author_region_id", "author_id"],
+      primaryKey: ["region_id", "id"],
+    });
+    registerModel("CfkHmAuthor", CfkHmAuthor);
+    registerModel("CfkHmPost", CfkHmPost);
+
+    const a1 = await CfkHmAuthor.create({ region_id: 1, id: 1, name: "A1" });
+    const a2 = await CfkHmAuthor.create({ region_id: 1, id: 2, name: "A2" });
+    await CfkHmPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
+    await CfkHmPost.create({ author_region_id: 1, author_id: 1, title: "P2" });
+    await CfkHmPost.create({ author_region_id: 1, author_id: 2, title: "P3" });
+
+    const authors = await CfkHmAuthor.all().includes("cfkHmPosts").toArray();
+    expect(authors).toHaveLength(2);
+    const byName = new Map(authors.map((a) => [a.name, a]));
+    const a1Preloaded = (byName.get("A1") as any)._preloadedAssociations.get("cfkHmPosts");
+    const a2Preloaded = (byName.get("A2") as any)._preloadedAssociations.get("cfkHmPosts");
+    expect(a1Preloaded.map((p: any) => p.title).sort()).toEqual(["P1", "P2"]);
+    expect(a2Preloaded.map((p: any) => p.title)).toEqual(["P3"]);
   });
-  it.skip("preload belongs to association with composite foreign key", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite keys */
+
+  it("preload belongs to association with composite foreign key", async () => {
+    const adapter = freshAdapter();
+    class CfkBtAuthor extends Base {
+      static {
+        this._tableName = "cfk_bt_authors";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CfkBtPost extends Base {
+      static {
+        this._tableName = "cfk_bt_posts";
+        this.attribute("author_region_id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CfkBtPost, "cfkBtAuthor", {
+      className: "CfkBtAuthor",
+      foreignKey: ["author_region_id", "author_id"],
+    });
+    registerModel("CfkBtAuthor", CfkBtAuthor);
+    registerModel("CfkBtPost", CfkBtPost);
+
+    const a1 = await CfkBtAuthor.create({ region_id: 1, id: 1, name: "A1" });
+    const a2 = await CfkBtAuthor.create({ region_id: 1, id: 2, name: "A2" });
+    await CfkBtPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
+    await CfkBtPost.create({ author_region_id: 1, author_id: 2, title: "P2" });
+
+    const posts = await CfkBtPost.all().includes("cfkBtAuthor").toArray();
+    expect(posts).toHaveLength(2);
+    const byTitle = new Map(posts.map((p) => [p.title, p]));
+    expect((byTitle.get("P1") as any)._preloadedAssociations.get("cfkBtAuthor").name).toBe("A1");
+    expect((byTitle.get("P2") as any)._preloadedAssociations.get("cfkBtAuthor").name).toBe("A2");
   });
-  it.skip("preload loaded belongs to association with composite foreign key", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite keys */
+
+  it("preload loaded belongs to association with composite foreign key", async () => {
+    const adapter = freshAdapter();
+    class CfkLBtAuthor extends Base {
+      static {
+        this._tableName = "cfk_lbt_authors";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CfkLBtPost extends Base {
+      static {
+        this._tableName = "cfk_lbt_posts";
+        this.attribute("author_region_id", "integer");
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(CfkLBtPost, "cfkLBtAuthor", {
+      className: "CfkLBtAuthor",
+      foreignKey: ["author_region_id", "author_id"],
+    });
+    registerModel("CfkLBtAuthor", CfkLBtAuthor);
+    registerModel("CfkLBtPost", CfkLBtPost);
+
+    const a1 = await CfkLBtAuthor.create({ region_id: 1, id: 1, name: "A1" });
+    await CfkLBtPost.create({ author_region_id: 1, author_id: 1, title: "P1" });
+
+    // Load post and force-load the belongs_to first.
+    const posts = await CfkLBtPost.all().toArray();
+    await loadBelongsTo(posts[0], "cfkLBtAuthor", {
+      className: "CfkLBtAuthor",
+      foreignKey: ["author_region_id", "author_id"],
+    });
+
+    // Now run preload — should reuse the already-loaded record, not crash.
+    const reloaded = await CfkLBtPost.all().includes("cfkLBtAuthor").toArray();
+    expect(reloaded).toHaveLength(1);
+    const preloaded = (reloaded[0] as any)._preloadedAssociations.get("cfkLBtAuthor");
+    expect(preloaded).toBeDefined();
+    expect(preloaded.name).toBe("A1");
   });
-  it.skip("preload has many through association with composite query constraints", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite keys */
+
+  it("preload has many through association with composite query constraints", async () => {
+    const adapter = freshAdapter();
+    class CfkThruDoctor extends Base {
+      static {
+        this._tableName = "cfk_thru_doctors";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    class CfkThruAppt extends Base {
+      static {
+        this._tableName = "cfk_thru_appts";
+        this.attribute("doctor_region_id", "integer");
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CfkThruPatient extends Base {
+      static {
+        this._tableName = "cfk_thru_patients";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CfkThruDoctor, "cfkThruAppts", {
+      className: "CfkThruAppt",
+      foreignKey: ["doctor_region_id", "doctor_id"],
+    });
+    Associations.belongsTo.call(CfkThruAppt, "cfkThruPatient", {
+      className: "CfkThruPatient",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CfkThruDoctor, "cfkThruPatients", {
+      through: "cfkThruAppts",
+      className: "CfkThruPatient",
+      source: "cfkThruPatient",
+    });
+    registerModel("CfkThruDoctor", CfkThruDoctor);
+    registerModel("CfkThruAppt", CfkThruAppt);
+    registerModel("CfkThruPatient", CfkThruPatient);
+
+    const doc = await CfkThruDoctor.create({ region_id: 1, id: 1, name: "Dr A" });
+    const p1 = await CfkThruPatient.create({ name: "Alice" });
+    const p2 = await CfkThruPatient.create({ name: "Bob" });
+    await CfkThruAppt.create({ doctor_region_id: 1, doctor_id: 1, patient_id: p1.id });
+    await CfkThruAppt.create({ doctor_region_id: 1, doctor_id: 1, patient_id: p2.id });
+
+    const docs = await CfkThruDoctor.all().includes("cfkThruPatients").toArray();
+    expect(docs).toHaveLength(1);
+    const preloaded = (docs[0] as any)._preloadedAssociations.get("cfkThruPatients");
+    expect(preloaded.map((p: any) => p.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("preloads has many on model with a composite primary key through id attribute", async () => {
     const adapter = freshAdapter();
