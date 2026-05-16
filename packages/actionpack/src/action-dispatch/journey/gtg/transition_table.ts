@@ -12,6 +12,25 @@ function isDefaultExp(re: RegExp): boolean {
 }
 
 /**
+ * Anchor a per-symbol regex while preserving the original's flags (Rails'
+ * `/\A#{sym}\Z/` interpolation wraps with inline flag scopes that we can't
+ * emit in JS; the closest equivalent is hoisting flags to the outer regex).
+ *
+ * Wraps the source in `(?:…)` so anchoring binds around an alternation
+ * (`/^foo|bar$/` parses as `(^foo)|(bar$)` — wrong).
+ *
+ * `g`/`y` are filtered (they change matching semantics in ways that break
+ * a single-shot anchored test); `u` and `v` are mutually exclusive (`v`
+ * supersedes).
+ */
+function anchorPreservingFlags(re: RegExp): RegExp {
+  const flags = [...re.flags].filter((f) => "imsd".includes(f));
+  if (re.flags.includes("v")) flags.push("v");
+  else if (re.flags.includes("u")) flags.push("u");
+  return new RegExp(`^(?:${re.source})$`, flags.join(""));
+}
+
+/**
  * Generalized Transition table — the DFA produced by Builder. Implements the
  * `TransitionTableLike` shape that `Simulator` consumes. Mirrors Rails'
  * `ActionDispatch::Journey::GTG::TransitionTable`.
@@ -111,7 +130,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
         inner = new Map();
         map.set(from, inner);
       }
-      const anchored = isDefaultExp(sym) ? DEFAULT_EXP_ANCHORED : new RegExp(`^${sym.source}$`);
+      const anchored = isDefaultExp(sym) ? DEFAULT_EXP_ANCHORED : anchorPreservingFlags(sym);
       inner.set(anchored, to);
     } else {
       let inner = this._stringStates.get(from);

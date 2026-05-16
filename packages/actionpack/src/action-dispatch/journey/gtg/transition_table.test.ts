@@ -21,6 +21,28 @@ function simulatorFor(strings: string[]) {
   return new Simulator(tt(strings));
 }
 
+import { TransitionTable } from "./transition_table.js";
+
+describe("ActionDispatch::Journey::GTG::TransitionTable — set() regex anchoring", () => {
+  it("wraps alternation so anchors bind around the whole regex, not branches", () => {
+    const t = new TransitionTable();
+    t.set(0, 1, /foo|bar/);
+    // Token "xfooy" must NOT match — would have, with /^foo|bar$/ (parses as
+    // (^foo)|(bar$)).
+    const next = t.move([[0, null]], "xfooy", 0, 5);
+    // Only the "carry forward" self-loop entry, no transition to 1.
+    expect(next.some(([s]) => s === 1)).toBe(false);
+    // Real "foo" still matches.
+    expect(t.move([[0, null]], "foo", 0, 3).some(([s]) => s === 1)).toBe(true);
+  });
+
+  it("preserves /i flag on the stored regex", () => {
+    const t = new TransitionTable();
+    t.set(0, 1, /foo/i);
+    expect(t.move([[0, null]], "FOO", 0, 3).some(([s]) => s === 1)).toBe(true);
+  });
+});
+
 describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
   it("test_to_json", () => {
     const t = tt([
