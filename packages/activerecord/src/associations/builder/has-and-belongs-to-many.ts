@@ -207,8 +207,11 @@ export class HasAndBelongsToMany {
     // `habtm_reflection` (which keeps the full options) and the generated
     // through-`has_many` — join-key resolution (`_resolveHabtmJoin`,
     // `loadHabtm`) reads these directly off the public reflection.
-    // Spreading `...options` previously leaked `readonly`/`dependent`/
-    // `inverseOf` into through-hasMany semantics — Rails drops them.
+    // Spreading `...options` previously leaked `readonly`/`dependent`
+    // into through-hasMany semantics — Rails drops those. `inverseOf` IS
+    // retained because Rails' `habtm_reflection` is constructed with the
+    // full options hash (associations.rb:1871) and consumers in this
+    // codebase consult `reflection.options.inverseOf` for inverse caching.
     const HABTM_FORWARDED_KEYS = [
       "beforeAdd",
       "afterAdd",

@@ -1132,18 +1132,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    class TreasuresRichPeople extends Base {
-      static {
-        this.attribute("treasure_id", "integer");
-        this.attribute("rich_person_id", "integer");
-      }
-    }
     RichPerson.adapter = a2;
     Treasure.adapter = a2;
-    TreasuresRichPeople.adapter = a2;
     registerModel(RichPerson);
     registerModel(Treasure);
-    registerModel(TreasuresRichPeople);
     let rpValidations = 0;
     RichPerson.beforeValidation((r: any) => {
       rpValidations += 1;
@@ -1174,18 +1166,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    class TreasuresRichPeople2 extends Base {
-      static {
-        this.attribute("treasure_id", "integer");
-        this.attribute("rich_person_id", "integer");
-      }
-    }
     RichPerson2.adapter = a2;
     Treasure2.adapter = a2;
-    TreasuresRichPeople2.adapter = a2;
     registerModel(RichPerson2);
     registerModel(Treasure2);
-    registerModel(TreasuresRichPeople2);
     Associations.hasAndBelongsToMany.call(Treasure2, "rich_people", {
       className: "RichPerson2",
       joinTable: "treasures_rich_people2",
