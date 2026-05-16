@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { resolveModel, loadBelongsTo } from "../associations.js";
+import { resolveModel, loadBelongsTo, modelRegistry } from "../associations.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation } from "./belongs-to-association.js";
 
@@ -60,7 +60,18 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    */
   protected override replace(record: Base | null): void {
     const typeCol = this.foreignTypeName();
-    const typeName = record ? (record.constructor as any).name : null;
+    // Rails: writes record.class.polymorphic_name, which is the Ruby class
+    // name (including "::" for namespaced classes). JS class names can't
+    // contain "::", so deriving purely from `constructor.name` would
+    // clobber values like "Access::NoticeMessage" into "AccessNoticeMessage".
+    // Prefer a registered registry key for this class — using the same
+    // selection as MacroReflection#activeRecordRegistryName:
+    //   1. If the owner already has a *_type matching one of this class's
+    //      registry keys, preserve it (so delegated_type round-trips the
+    //      exact configured type string).
+    //   2. Otherwise pick the most deeply namespaced registry key.
+    //   3. Otherwise fall back to constructor.name.
+    const typeName = record ? this.polymorphicTypeName(record) : null;
     if (typeof (this.owner as any)._writeAttribute === "function") {
       (this.owner as any)._writeAttribute(typeCol, typeName);
     } else {
@@ -79,6 +90,27 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    */
   private foreignTypeName(): string {
     return `${underscore(this.reflection.name)}_type`;
+  }
+
+  /**
+   * Mirror of MacroReflection#activeRecordRegistryName plus a
+   * "preserve existing value" rule: when the owner already stores a
+   * foreign_type that points to this record's class, keep it (covers
+   * delegated_type round-trips where the configured type string is the
+   * source of truth). Otherwise prefer the most deeply namespaced
+   * registry key, falling back to constructor.name.
+   */
+  private polymorphicTypeName(record: Base): string {
+    const ctor = record.constructor as { name: string; _registryKeys?: string[] };
+    const matching = (ctor._registryKeys ?? []).filter((k) => modelRegistry.get(k) === ctor);
+    if (matching.length > 0) {
+      const existing = this.readForeignType();
+      if (existing && matching.includes(existing)) return existing;
+      return matching.reduce((best, k) =>
+        (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
+      );
+    }
+    return ctor.name;
   }
 
   private readForeignType(): string | null {
