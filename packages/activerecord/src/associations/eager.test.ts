@@ -1694,62 +1694,6 @@ describe("EagerAssociationTest", () => {
     expect(cats1).toHaveLength(1);
     expect(cats1[0].name).toBe("General");
   });
-  it("eager association loading with habtm and limit", async (ctx) => {
-    // MariaDB (CI MySQL adapter) rejects "LIMIT & IN/ALL/ANY/SOME subquery",
-    // which is exactly the path HABTM-as-hasMany takes through the
-    // subquery-limited eager load. Mirrors Rails' MysqlAdapter behavior;
-    // skip rather than attempt a hoist.
-    if ((adapter as any).adapterName === "mysql") {
-      ctx.skip();
-      return;
-    }
-    class EjlHabtmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    class EjlHabtmCategory extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.hasAndBelongsToMany.call(EjlHabtmPost, "ejlHabtmCategories", {
-      className: "EjlHabtmCategory",
-      joinTable: "ejl_habtm_categories_ejl_habtm_posts",
-    });
-    registerModel(EjlHabtmPost);
-    registerModel(EjlHabtmCategory);
-
-    const p1 = await EjlHabtmPost.create({ title: "P1" });
-    const p2 = await EjlHabtmPost.create({ title: "P2" });
-    const p3 = await EjlHabtmPost.create({ title: "P3" });
-    const tech = await EjlHabtmCategory.create({ name: "Technology" });
-    const gen = await EjlHabtmCategory.create({ name: "General" });
-
-    const { CollectionProxy } = await import("./collection-proxy.js");
-    const assoc = (EjlHabtmPost as any)._associations.find(
-      (a: any) => a.name === "ejlHabtmCategories",
-    )!;
-    await new CollectionProxy(p1, "ejlHabtmCategories", assoc).push(tech, gen);
-    await new CollectionProxy(p2, "ejlHabtmCategories", assoc).push(gen);
-    void p3;
-
-    // HABTM nodes coerce to assocType:"hasMany" so isLimitable=false, which
-    // routes through the subquery-limited path. Verify owner-side limit still
-    // produces the right owner count and that preloaded targets are intact.
-    const posts = await EjlHabtmPost.all()
-      .eagerLoad("ejlHabtmCategories")
-      .order("id", "asc")
-      .limit(2)
-      .toArray();
-    expect(posts).toHaveLength(2);
-    const cats0 = (posts[0] as any)._preloadedAssociations.get("ejlHabtmCategories");
-    const cats1 = (posts[1] as any)._preloadedAssociations.get("ejlHabtmCategories");
-    expect(cats0).toHaveLength(2);
-    expect(cats1).toHaveLength(1);
-  });
   it("eager association loading with habtm via preload", async () => {
     class PrHabtmPost extends Base {
       static {
@@ -2589,10 +2533,53 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("eager with has and belongs to many and limit", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager with has and belongs to many and limit", async () => {
+    // Rails: test_eager_with_has_and_belongs_to_many_and_limit
+    //   Post.all.merge!(includes: :categories, order: "posts.id", limit: 3).to_a
+    // Plain .includes (no .references) routes through the preloader, so the
+    // base SELECT carries the LIMIT and MariaDB's "LIMIT & IN subquery"
+    // restriction is not triggered.
+    class HabtmLimPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class HabtmLimCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasAndBelongsToMany.call(HabtmLimPost, "habtmLimCategories", {
+      className: "HabtmLimCategory",
+      joinTable: "habtm_lim_categories_habtm_lim_posts",
+    });
+    registerModel(HabtmLimPost);
+    registerModel(HabtmLimCategory);
+
+    const p1 = await HabtmLimPost.create({ title: "P1" });
+    const p2 = await HabtmLimPost.create({ title: "P2" });
+    const _p3 = await HabtmLimPost.create({ title: "P3" });
+    const tech = await HabtmLimCategory.create({ name: "Technology" });
+    const gen = await HabtmLimCategory.create({ name: "General" });
+
+    const { CollectionProxy } = await import("./collection-proxy.js");
+    const assoc = (HabtmLimPost as any)._associations.find(
+      (a: any) => a.name === "habtmLimCategories",
+    )!;
+    await new CollectionProxy(p1, "habtmLimCategories", assoc).push(tech, gen);
+    await new CollectionProxy(p2, "habtmLimCategories", assoc).push(gen);
+
+    const posts = await HabtmLimPost.all()
+      .includes("habtmLimCategories")
+      .order("id", "asc")
+      .limit(3)
+      .toArray();
+    expect(posts).toHaveLength(3);
+    expect((posts[0] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(2);
+    expect((posts[1] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(1);
+    expect((posts[2] as any)._preloadedAssociations.get("habtmLimCategories")).toHaveLength(0);
   });
   it.skip("has and belongs to many should not instantiate same records multiple times", () => {
     // BLOCKED: associations — eager-loading feature gap
