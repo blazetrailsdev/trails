@@ -2,7 +2,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
 import { buildGid, parseGid, type GidComponents } from "./uri/gid.js";
-import { GlobalID, type GlobalIDModel } from "./global-id.js";
+import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
 import { lookupClass, type LocatorModel } from "./locator.js";
 
 export type { GlobalIDModel };
@@ -318,10 +318,7 @@ export class SignedGlobalID {
         `Cannot resolve model class for ${this.modelName}. Register the class via setModelFinder.`,
       );
     }
-    if (
-      klass === (GlobalID as unknown as LocatorModel) ||
-      klass === (SignedGlobalID as unknown as LocatorModel)
-    ) {
+    if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
       throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
     return klass;
