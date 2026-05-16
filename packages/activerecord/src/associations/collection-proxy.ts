@@ -1096,7 +1096,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk as string];
 
-    // Mirror Reflection#activeRecordPrimaryKey (reflection.ts:780-796).
+    // Mirror Reflection#active_record_primary_key (reflection.rb:587-603).
+    // `options[:query_constraints]` describes the *foreign-key* shape on the
+    // join table — Rails never reuses it as the owner PK. The owner PK comes
+    // from the class-level `query_constraints_list`, falling back to the
+    // model's primaryKey when the option is set on the association but the
+    // owner class itself has no class-level constraints.
     let ownerPk: string | string[];
     if (throughAssoc.options.primaryKey !== undefined) {
       ownerPk = throughAssoc.options.primaryKey;
@@ -1105,9 +1110,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       throughAssoc.options.queryConstraints
     ) {
       ownerPk =
-        (throughAssoc.options.queryConstraints as string[] | undefined) ??
-        ownerQueryConstraintsList.call(ctor as any) ??
-        (ctor.primaryKey as string | string[]);
+        ownerQueryConstraintsList.call(ctor as any) ?? (ctor.primaryKey as string | string[]);
     } else if (
       // Rails' id-collapse: a scalar FK against a composite PK that includes
       // "id" pairs with the scalar "id" column (reflection.ts:791-793).
@@ -1222,8 +1225,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Create the join record
       const targetPk = (record.constructor as typeof Base).primaryKey;
       if (Array.isArray(targetPk)) {
-        throw new Error(
-          `Through associations do not support composite primary keys on target model for "${this._assocName}".`,
+        throw new ConfigurationError(
+          `Through association "${this._assocName}" does not support a composite primary key on the target model "${(record.constructor as typeof Base).name}" — the join row needs a single source FK column.`,
         );
       }
       const joinAttrs: Record<string, unknown> = {
@@ -2005,13 +2008,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (sourceAssocKind === "belongsTo") {
       const targetFk = sourceAssoc?.options?.foreignKey ?? `${underscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) {
-        throw new Error(
-          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        throw new ConfigurationError(
+          `Through association "${this._assocName}" does not support a composite foreign key on the source belongsTo — the target-side IN-subquery needs a single column.`,
         );
       }
       if (Array.isArray(targetModel.primaryKey)) {
-        throw new Error(
-          `CollectionProxy#scope does not support composite primary keys on target model for through associations on "${this._assocName}".`,
+        throw new ConfigurationError(
+          `Through association "${this._assocName}" does not support a composite primary key on the target model "${targetModel.name}" — the target-side IN-subquery needs a single column.`,
         );
       }
       const targetFkStr = targetFk;
@@ -2037,13 +2040,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         ? (sourceAssoc?.options?.foreignKey ?? `${underscore(sourceAsName)}_id`)
         : (sourceAssoc?.options?.foreignKey ?? `${underscore(throughClassName)}_id`);
       if (Array.isArray(sourceFk)) {
-        throw new Error(
-          `CollectionProxy#scope does not support composite foreign keys for through associations on "${this._assocName}".`,
+        throw new ConfigurationError(
+          `Through association "${this._assocName}" does not support a composite foreign key on the hasMany source — the target-side IN-subquery needs a single column.`,
         );
       }
       if (Array.isArray(throughModel.primaryKey)) {
-        throw new Error(
-          `CollectionProxy#scope does not support composite primary keys on through model for "${this._assocName}".`,
+        throw new ConfigurationError(
+          `Through association "${this._assocName}" does not support a composite primary key on the through model "${throughModel.name}" — the target-side IN-subquery needs a single column.`,
         );
       }
       const sourceFkStr = sourceFk;

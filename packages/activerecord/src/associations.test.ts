@@ -3321,6 +3321,73 @@ describe("AssociationsTest", () => {
       "Alice",
     ]);
   });
+  it("composite has many through raises ConfigurationError when target model has composite primary key", async () => {
+    // Mirrors the schema constraint behind the throws in _buildThroughScope
+    // and _pushThrough: the target-side IN-subquery / join row carry a single
+    // source FK column, so a composite primaryKey on the target model is
+    // unrepresentable. Promoted from plain Error to ConfigurationError so
+    // misconfiguration surfaces with the same error class as the rest of the
+    // through-association validations (reflection.ts:556-588).
+    const adapter = freshAdapter();
+    class CpkThruTgtDoc extends Base {
+      static {
+        this._tableName = "cpk_thru_tgt_docs";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruTgtAppt extends Base {
+      static {
+        this._tableName = "cpk_thru_tgt_appts";
+        this.attribute("doctor_id", "integer");
+        this.attribute("patient_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class CpkThruTgtPat extends Base {
+      static {
+        this._tableName = "cpk_thru_tgt_pats";
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.primaryKey = ["region_id", "id"];
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(CpkThruTgtDoc, "appts", {
+      className: "CpkThruTgtAppt",
+      foreignKey: "doctor_id",
+    });
+    Associations.belongsTo.call(CpkThruTgtAppt, "patient", {
+      className: "CpkThruTgtPat",
+      foreignKey: "patient_id",
+    });
+    Associations.hasMany.call(CpkThruTgtDoc, "patients", {
+      through: "appts",
+      className: "CpkThruTgtPat",
+      source: "patient",
+    });
+    registerModel("CpkThruTgtDoc", CpkThruTgtDoc);
+    registerModel("CpkThruTgtAppt", CpkThruTgtAppt);
+    registerModel("CpkThruTgtPat", CpkThruTgtPat);
+
+    const doc = await CpkThruTgtDoc.create({ id: 1, name: "Dr X" });
+    // _buildThroughScope runs eagerly when the CollectionProxy is built —
+    // composite target PK surfaces as a ConfigurationError at construction.
+    expect(() => association(doc, "patients")).toThrow(ConfigurationError);
+  });
+  it.skip("polymorphic-through with composite owner primary key", async () => {
+    // BLOCKED: associations — polymorphic-through uses a single
+    // `<as>_id`/`<as>_type` schema pair, so the join row can only carry a
+    // *scalar* owner identifier. When the owner has a composite primary key,
+    // `_throughOwnerPolymorphic` collapses to "id" (when present) or the
+    // first PK column, but there is no Rails-side schema convention for
+    // splitting a composite owner across the polymorphic columns. Needs an
+    // explicit `primaryKey:` option (single column) on the polymorphic-through
+    // association, plus validation that rejects a composite `primaryKey:`
+    // here. Tracked under Batch 27 HMT composite follow-ups.
+  });
   it("belongs to with explicit composite foreign key", async () => {
     const adapter = freshAdapter();
     class CfkOrder extends Base {
