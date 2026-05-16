@@ -5,7 +5,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  */
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import {
   Base,
   association,
@@ -22,6 +22,8 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 import { setApp, _resetApp } from "@blazetrails/globalid";
@@ -37,8 +39,26 @@ function freshAdapter(): DatabaseAdapter {
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      accounts: {
+        credit_limit: "integer",
+        credits: "integer",
+        firm_id: "integer",
+        name: "string",
+      },
+      posts: {
+        category: "string",
+        score: "integer",
+        status: "integer",
+        title: "string",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("should return nil as average", async () => {
@@ -505,12 +525,11 @@ describe("CalculationsTest", () => {
     expect(typeof result).toBe("object");
   });
   it("should generate valid sql with joins and group", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id")
@@ -521,12 +540,11 @@ describe("CalculationsTest", () => {
   });
 
   it("should order by grouped field", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").order("firm_id").toSql();
@@ -535,12 +553,11 @@ describe("CalculationsTest", () => {
   });
 
   it("should order by calculation", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").order("SUM(credit_limit) DESC").toSql();
@@ -549,11 +566,10 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct count with order and limit and offset", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.distinct().order("credit_limit").limit(5).offset(2).toSql();
@@ -563,12 +579,11 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct count with group by and order and limit", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.distinct().group("firm_id").order("firm_id").limit(5).toSql();
@@ -578,11 +593,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should sum expression", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -592,11 +606,10 @@ describe("CalculationsTest", () => {
   });
 
   it("sum expression returns zero when no records to sum", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sum = await Account.where({ credit_limit: -1 }).sum("credit_limit");
@@ -604,11 +617,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with where and order", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -618,11 +630,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with empty in", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -631,11 +642,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with from option", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -644,11 +654,10 @@ describe("CalculationsTest", () => {
   });
 
   it("sum with from option", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -657,11 +666,10 @@ describe("CalculationsTest", () => {
   });
 
   it("average with from option", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -671,11 +679,10 @@ describe("CalculationsTest", () => {
   });
 
   it("minimum with from option", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -685,11 +692,10 @@ describe("CalculationsTest", () => {
   });
 
   it("maximum with from option", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -699,11 +705,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count scoped select", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -712,11 +717,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with no parameters isnt deprecated", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -725,11 +729,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should sum with qualified name on loaded", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 75 });
@@ -738,11 +741,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count with group by qualified name on loaded", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1 });
@@ -753,11 +755,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate with invalid field", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     // Should generate SQL even for non-existent columns (runtime error from DB)
@@ -766,12 +767,11 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by summed field through association and having", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").having("SUM(credit_limit) > 10").toSql();
@@ -781,11 +781,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id").toSql();
@@ -793,11 +792,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table with group by", () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.joins("INNER JOIN firms ON firms.id = accounts.firm_id")
@@ -807,11 +805,10 @@ describe("CalculationsTest", () => {
     expect(sql).toContain("INNER JOIN");
   });
   it("pluck loaded relation", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "alpha" });
@@ -824,11 +821,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "first" });
@@ -837,12 +833,11 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation multiple columns", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("score", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "first", score: 42 });
@@ -853,11 +848,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids async on loaded relation", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "a" });
@@ -868,11 +862,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count manual select with count all", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "x" });
@@ -882,11 +875,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with qualified name on loaded", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "hello" });
@@ -895,12 +887,11 @@ describe("CalculationsTest", () => {
   });
 
   it("group by attribute with custom type", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("category", "string");
         this.attribute("score", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ category: "A", score: 1 });
@@ -911,11 +902,10 @@ describe("CalculationsTest", () => {
   });
 
   it("aggregate attribute on enum type", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("status", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ status: 0 });
@@ -925,11 +915,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck columns with same name", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Post.create({ title: "dup" });
@@ -1784,16 +1773,28 @@ describe("CalculationsTest", () => {
 // ==========================================================================
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      accounts: {
+        balance: "float",
+        credit_limit: "integer",
+        firm_id: "integer",
+        name: "string",
+      },
+      posts: { title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("should resolve aliased attributes", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 42 });
@@ -1802,11 +1803,10 @@ describe("CalculationsTest", () => {
   });
 
   it("sum should return valid values for decimals", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("balance", "float");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ balance: 1.5 });
@@ -1816,11 +1816,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by fields with table alias", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1 });
@@ -1830,11 +1829,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped with invalid field", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     // group by with no records returns empty object
@@ -1843,11 +1841,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should not perform joined include by default", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Post.all().toSql();
@@ -1855,11 +1852,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count scoped select with options", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -1869,11 +1865,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should count manual with count all", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -1883,11 +1878,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with too many parameters raises", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     // count() with no args should work fine
@@ -1897,11 +1891,10 @@ describe("CalculationsTest", () => {
   });
 
   it("maximum with not auto table name prefix if column included", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 10 });
@@ -1911,11 +1904,10 @@ describe("CalculationsTest", () => {
   });
 
   it("minimum with not auto table name prefix if column included", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 10 });
@@ -1925,11 +1917,10 @@ describe("CalculationsTest", () => {
   });
 
   it("sum with not auto table name prefix if column included", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 30 });
@@ -1939,12 +1930,11 @@ describe("CalculationsTest", () => {
   });
 
   it("sum with grouped calculation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
@@ -1955,11 +1945,10 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct is honored when used with count operation after group", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1 });
@@ -1969,11 +1958,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with empty in", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     // empty where-in should return empty
@@ -1982,11 +1970,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck type cast", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 42 });
@@ -1996,11 +1983,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck and distinct", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -2010,11 +1996,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck in relation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -2024,11 +2009,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with qualified column name", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 77 });
@@ -2037,11 +2021,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with selection clause", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 33 });
@@ -2050,11 +2033,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck replaces select clause", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 11 });
@@ -2064,11 +2046,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck loaded relation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 55 });
@@ -2080,11 +2061,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck loaded relation multiple columns", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 20 });
@@ -2095,11 +2075,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pick delegate to all", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 88 });
@@ -2108,11 +2087,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 99 });
@@ -2123,11 +2101,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation multiple columns", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 7 });
@@ -2136,11 +2113,10 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with order by virtual count attribute", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1 });
@@ -2151,11 +2127,10 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with limit", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1 });
@@ -2165,11 +2140,10 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with offset", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").offset(1).toSql();
@@ -2177,11 +2151,10 @@ describe("CalculationsTest", () => {
   });
 
   it("group by with limit and offset", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").limit(1).offset(1).toSql();
@@ -2190,11 +2163,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with line endings", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ name: "line\nend" });
@@ -2203,11 +2175,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with reserved words", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ name: "select" });
@@ -2216,11 +2187,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids on loaded relation with scope", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 10 });
@@ -2232,11 +2202,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with join", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2245,11 +2214,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2258,11 +2226,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes limit and empty result", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const ids = await Account.all().ids();
@@ -2270,11 +2237,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with includes limit and empty result", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const result = await Account.all().pluck("credit_limit");
@@ -2282,11 +2248,10 @@ describe("CalculationsTest", () => {
   });
 
   it("sum uses enumerable version when block is given", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 10 });
@@ -2297,11 +2262,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with block and column name raises an error", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2311,11 +2275,10 @@ describe("CalculationsTest", () => {
   });
 
   it("minimum and maximum on non numeric type", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2327,12 +2290,11 @@ describe("CalculationsTest", () => {
   });
 
   it("select avg with group by as virtual attribute with sql", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1, credit_limit: 100 });
@@ -2342,12 +2304,11 @@ describe("CalculationsTest", () => {
   });
 
   it("select avg with group by as virtual attribute with ar", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ firm_id: 1, credit_limit: 150 });
@@ -2356,11 +2317,10 @@ describe("CalculationsTest", () => {
   });
 
   it("async pluck none relation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50 });
@@ -2369,11 +2329,10 @@ describe("CalculationsTest", () => {
   });
 
   it("from option with table different than class", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.from("accounts").toSql();
@@ -2381,11 +2340,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should return decimal average if db returns such", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 1 });
@@ -2395,11 +2353,10 @@ describe("CalculationsTest", () => {
   });
 
   it("calculation with polymorphic relation", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 10 });
@@ -2408,11 +2365,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck columns with same name", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2421,11 +2377,10 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with join", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2434,12 +2389,11 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with multiple columns and selection clause", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 50, firm_id: 1 });
@@ -2449,11 +2403,10 @@ describe("CalculationsTest", () => {
   });
 
   it("count with aliased attribute", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     await Account.create({ credit_limit: 5 });
@@ -2462,12 +2415,11 @@ describe("CalculationsTest", () => {
   });
 
   it("having with strong parameters", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
         this.attribute("credit_limit", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").having("SUM(credit_limit) > 0").toSql();
@@ -2475,11 +2427,10 @@ describe("CalculationsTest", () => {
   });
 
   it("group alias is properly quoted", async () => {
-    const adp = freshAdapter();
     class Account extends Base {
       static {
         this.attribute("firm_id", "integer");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const sql = Account.group("firm_id").toSql();
