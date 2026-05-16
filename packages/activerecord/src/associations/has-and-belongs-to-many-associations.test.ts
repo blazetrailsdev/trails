@@ -28,6 +28,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   class Project extends Base {
     static {
       this.attribute("name", "string");
+      this.attribute("approved", "boolean");
+      this.attribute("featured", "boolean");
     }
   }
 
@@ -1077,16 +1079,34 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // SCOPE: collection-proxy.ts — transaction() delegation to target model
   });
 
-  it.skip("attributes are being set when initialized from habtm association with where clause", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: build() on a where-scoped collection does not pre-fill attributes from the where condition
-    // SCOPE: collection-proxy.ts — scope_attributes on build/new
+  it("attributes are being set when initialized from habtm association with where clause", async () => {
+    (Developer as any)._associations = [];
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      scope: (r: any) => r.where({ approved: true }),
+    });
+    const dev = await Developer.create({ name: "Scoped", salary: 100000 });
+    const proxy = association<Project>(dev, "projects");
+    const built = proxy.build({ name: "ScopedProj" });
+    expect((built as any).approved).toBe(true);
+    // User-supplied attrs win over the scope.
+    const override = proxy.build({ name: "Override", approved: false });
+    expect((override as any).approved).toBe(false);
   });
 
-  it.skip("attributes are being set when initialized from habtm association with multiple where clauses", () => {
-    // BLOCKED: associations — scope chain composition
-    // ROOT-CAUSE: build() on a multi-condition where scope does not pre-fill all scoped attributes
-    // SCOPE: collection-proxy.ts — scope_attributes merging for chained where conditions
+  it("attributes are being set when initialized from habtm association with multiple where clauses", async () => {
+    (Developer as any)._associations = [];
+    Associations.hasAndBelongsToMany.call(Developer, "projects", {
+      className: "Project",
+      joinTable: "developer_projects",
+      scope: (r: any) => r.where({ approved: true }).where({ featured: true }),
+    });
+    const dev = await Developer.create({ name: "Scoped2", salary: 100000 });
+    const proxy = association<Project>(dev, "projects");
+    const built = proxy.build({ name: "ScopedProj2" });
+    expect((built as any).approved).toBe(true);
+    expect((built as any).featured).toBe(true);
   });
 
   it("include method in has and belongs to many association should return true for instance added with build", async () => {

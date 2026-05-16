@@ -653,6 +653,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
 
     const buildAttrs: Record<string, unknown> = {
+      ...this._scopeForCreateAttrs(attrs),
       ...attrs,
       [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
@@ -681,7 +682,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       targetModel = findStiClass(targetModel, typeName);
     }
 
-    return new targetModel(attrs);
+    const merged = { ...this._scopeForCreateAttrs(attrs), ...attrs };
+    return new targetModel(merged);
+  }
+
+  // Mirrors Rails' Association#initialize_attributes: scope_for_create
+  // pre-fills attributes from where-conditions on the association scope,
+  // letting user-supplied attrs win.
+  private _scopeForCreateAttrs(userAttrs: Record<string, unknown>): Record<string, unknown> {
+    const sfc =
+      typeof (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
+        .scopeForCreate === "function"
+        ? (this as unknown as { scopeForCreate: () => Record<string, unknown> }).scopeForCreate()
+        : {};
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(sfc)) {
+      if (!Object.prototype.hasOwnProperty.call(userAttrs, k)) {
+        out[k] = v;
+      }
+    }
+    return out;
   }
 
   /**
