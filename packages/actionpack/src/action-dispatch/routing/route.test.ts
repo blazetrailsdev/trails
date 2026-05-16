@@ -33,6 +33,34 @@ describe("Route", () => {
     });
   });
 
+  describe("match() — path-only matcher", () => {
+    it("ignores request constraints since match() takes no request attributes", () => {
+      // Subdomain is a request constraint that would only be evaluated
+      // against a real request. Route#match takes (method, path) only,
+      // so it should still match by path despite the request constraint.
+      const route = new Route("GET", "/posts", "posts", "index", {
+        constraints: { subdomain: "api" },
+      });
+      expect(route.match("GET", "/posts")).not.toBeNull();
+    });
+
+    it("returns null without throwing when the path is unparseable", () => {
+      // Mirrors the Journey-parser swallow in collectParamNamesFromJourneyAst:
+      // a malformed path shouldn't crash the route table at match time.
+      const route = new Route("GET", "/posts/(unclosed", "posts", "show");
+      expect(() => route.match("GET", "/posts/anything")).not.toThrow();
+      expect(route.match("GET", "/posts/anything")).toBeNull();
+    });
+
+    it("still enforces path-capture constraints", () => {
+      const route = new Route("GET", "/posts/:id", "posts", "show", {
+        constraints: { id: /\d+/ },
+      });
+      expect(route.match("GET", "/posts/42")).not.toBeNull();
+      expect(route.match("GET", "/posts/abc")).toBeNull();
+    });
+  });
+
   describe("pathParamNames", () => {
     it("lists dynamic and glob captures in declaration order", () => {
       const route = new Route("GET", "/a/:id/b/*rest", "x", "y");

@@ -4,6 +4,8 @@
 
 import { Parser } from "../journey/parser.js";
 import { Ast } from "../journey/ast.js";
+import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
+import type { Router as JourneyRouter } from "../journey/router.js";
 
 export interface RouteConstraints {
   [key: string]: string | RegExp;
@@ -61,6 +63,10 @@ export class Route {
 
   private readonly segments: PathSegment[];
   private readonly paramNames: string[];
+  /** @internal lazy single-route Journey router for match() */
+  private _journeyRouter: JourneyRouter | null = null;
+  /** @internal true once we've discovered the path can't be parsed */
+  private _journeyRouterUnbuildable = false;
 
   constructor(
     verb: string,
@@ -146,25 +152,30 @@ export class Route {
   }
 
   match(method: string, requestPath: string): MatchedRoute | null {
-    if (this.verb !== "ALL" && this.verb !== method.toUpperCase()) {
+    // Verb fast-path: skip Journey router construction when the verb can
+    // be rejected up front. HEAD falls through to GET routes (Journey
+    // handles the HEAD→GET fallback inside `_matchHeadRoutes`).
+    const m = method.toUpperCase();
+    if (this.verb !== "ALL" && this.verb !== m && !(m === "HEAD" && this.verb === "GET")) {
       return null;
     }
-
-    const reqSegments = normalizePath(requestPath).split("/").filter(Boolean);
-
-    const params: Record<string, string> = {};
-    const result = matchSegments(
-      this.segments,
-      reqSegments,
-      0,
-      0,
-      params,
-      this.constraints,
-      this.anchor,
-    );
-    if (!result) return null;
-
-    return { route: this, params };
+    if (this._journeyRouterUnbuildable) return null;
+    if (this._journeyRouter === null) {
+      try {
+        // Path-only matcher: skip request constraints since match() takes
+        // no request attributes — preserves legacy matchSegments semantics
+        // where request constraints (subdomain, format, …) didn't apply.
+        this._journeyRouter = buildJourneyRouter([this], { skipRequestConstraints: true });
+      } catch {
+        // Mirrors collectParamNamesFromJourneyAst's swallow-and-cache policy:
+        // a malformed path shouldn't crash the route table at match time.
+        this._journeyRouterUnbuildable = true;
+        return null;
+      }
+    }
+    const match = journeyRecognize(this._journeyRouter, method, requestPath);
+    if (!match) return null;
+    return { route: this, params: match.params };
   }
 
   /**
@@ -359,139 +370,13 @@ function parseSegments(path: string): PathSegment[] {
   return segments;
 }
 
-function matchSegments(
-  segments: PathSegment[],
-  reqSegments: string[],
-  segIdx: number,
-  reqIdx: number,
-  params: Record<string, string>,
-  constraints: RouteConstraints,
-  anchor: boolean,
-): boolean {
-  // Base case: consumed all route segments
-  if (segIdx >= segments.length) {
-    if (!anchor) return true; // unanchored: ok if extra segments remain
-    return reqIdx >= reqSegments.length;
-  }
-
-  const seg = segments[segIdx];
-
-  if (seg.type === "static") {
-    if (reqIdx >= reqSegments.length) return false;
-    if (reqSegments[reqIdx] !== seg.value) return false;
-    return matchSegments(
-      segments,
-      reqSegments,
-      segIdx + 1,
-      reqIdx + 1,
-      params,
-      constraints,
-      anchor,
-    );
-  }
-
-  if (seg.type === "dynamic") {
-    if (reqIdx >= reqSegments.length) return false;
-    const val = reqSegments[reqIdx];
-    const constraint = constraints[seg.name];
-    if (constraint) {
-      const re =
-        constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
-      if (!re.test(val)) return false;
-    }
-    params[seg.name] = val;
-    return matchSegments(
-      segments,
-      reqSegments,
-      segIdx + 1,
-      reqIdx + 1,
-      params,
-      constraints,
-      anchor,
-    );
-  }
-
-  if (seg.type === "glob") {
-    // Glob matches zero or more remaining segments (greedy)
-    // Try matching the rest of the route segments first
-    for (let take = reqSegments.length - reqIdx; take >= 0; take--) {
-      const saved = { ...params };
-      const globValue = reqSegments.slice(reqIdx, reqIdx + take).join("/");
-      params[seg.name] = globValue;
-      if (
-        matchSegments(segments, reqSegments, segIdx + 1, reqIdx + take, params, constraints, anchor)
-      ) {
-        return true;
-      }
-      // Restore params
-      Object.keys(params).forEach((k) => {
-        if (!(k in saved)) delete params[k];
-        else params[k] = saved[k];
-      });
-    }
-    return false;
-  }
-
-  if (seg.type === "optional") {
-    // Try matching with the optional group
-    const savedParams = { ...params };
-    let childReqIdx = reqIdx;
-    let matched = true;
-    for (const child of seg.children) {
-      if (child.type === "static") {
-        if (childReqIdx >= reqSegments.length || reqSegments[childReqIdx] !== child.value) {
-          matched = false;
-          break;
-        }
-        childReqIdx++;
-      } else if (child.type === "dynamic") {
-        if (childReqIdx >= reqSegments.length) {
-          matched = false;
-          break;
-        }
-        const val = reqSegments[childReqIdx];
-        const constraint = constraints[child.name];
-        if (constraint) {
-          const re =
-            constraint instanceof RegExp ? anchorRegExp(constraint) : new RegExp(`^${constraint}$`);
-          if (!re.test(val)) {
-            matched = false;
-            break;
-          }
-        }
-        params[child.name] = val;
-        childReqIdx++;
-      }
-    }
-
-    if (matched) {
-      if (
-        matchSegments(segments, reqSegments, segIdx + 1, childReqIdx, params, constraints, anchor)
-      ) {
-        return true;
-      }
-    }
-
-    // Try without the optional group
-    Object.keys(params).forEach((k) => {
-      if (!(k in savedParams)) delete params[k];
-      else params[k] = savedParams[k];
-    });
-    return matchSegments(segments, reqSegments, segIdx + 1, reqIdx, params, constraints, anchor);
-  }
-
-  return false;
-}
-
-function anchorRegExp(re: RegExp): RegExp {
-  let source = re.source;
-  if (!source.startsWith("^")) source = "^" + source;
-  if (!source.endsWith("$")) source = source + "$";
-  return new RegExp(source, re.flags);
-}
-
 function normalizePath(p: string): string {
-  return "/" + p.replace(/^\/+|\/+$/g, "");
+  const stripped = p.replace(/^\/+|\/+$/g, "");
+  // Don't prepend `/` to a leading optional group: `(/:locale)/posts` must
+  // stay as-is so the `/` lives inside the optional. Prepending would
+  // produce `/(/:locale)/posts`, compiled to `^/(?:/...)?/posts$`, which
+  // requires either `//posts` (extra slash) or `/x/posts` (no plain match).
+  return stripped.startsWith("(") ? stripped : "/" + stripped;
 }
 
 function interpolateRedirect(template: string, params: Record<string, string>): string {

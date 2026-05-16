@@ -24,7 +24,22 @@ export interface JourneyMatch {
   params: Record<string, string>;
 }
 
-export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter {
+export interface BuildJourneyRouterOptions {
+  /**
+   * Skip request-attribute constraints (subdomain, format, etc.) on the
+   * synthesized Journey routes. Use for path-only matchers like
+   * `Route#match(method, path)` where the caller has no real request to
+   * evaluate request constraints against — otherwise `Route#matches`
+   * would reject every request because the constraint keys are undefined
+   * on the synthetic RouterRequest.
+   */
+  skipRequestConstraints?: boolean;
+}
+
+export function buildJourneyRouter(
+  routes: readonly LocalRoute[],
+  opts: BuildJourneyRouterOptions = {},
+): JourneyRouter {
   const journeyRoutes = new JourneyRoutes();
   for (let i = 0; i < routes.length; i++) {
     const r = routes[i]!;
@@ -54,7 +69,7 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
             },
           },
           path: pattern,
-          constraints: r.requestConstraints,
+          constraints: opts.skipRequestConstraints ? {} : r.requestConstraints,
           defaults: { ...r.defaults, controller: r.controller, action: r.action },
           requestMethodMatch,
           precedence: index,
