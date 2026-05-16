@@ -10,7 +10,6 @@
 
 import { NotImplementedError } from "../../errors.js";
 import {
-  AddColumnDefinition,
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
   Table as AbstractTable,
@@ -594,25 +593,13 @@ export class AlterTable extends AbstractAlterTable {
   readonly exclusionConstraintAdds: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraintAdds: UniqueConstraintDefinition[] = [];
 
-  private _td: TableDefinition;
-
   constructor(td: TableDefinition) {
-    super(td.tableName);
-    this._td = td;
+    super(td);
   }
 
-  /**
-   * Rails' `AlterTable#add_column` routes through `@td.new_column_definition`,
-   * which on PG strips `type: :virtual` to its underlying `options[:type]`.
-   * The abstract trails impl bypasses the TableDefinition; override here so
-   * `t.virtual(...)` inside `change_table` resolves correctly.
-   */
-  override addColumn(
-    name: string,
-    type: Parameters<TableDefinition["newColumnDefinition"]>[1],
-    options: Parameters<TableDefinition["newColumnDefinition"]>[2] = {},
-  ): void {
-    this.adds.push(new AddColumnDefinition(this._td.newColumnDefinition(name, type, options)));
+  /** @internal Narrow inherited `_td` to PG's TableDefinition. */
+  protected get _pgTd(): TableDefinition {
+    return this._td as TableDefinition;
   }
 
   validateConstraint(name: string): void {
@@ -621,12 +608,12 @@ export class AlterTable extends AbstractAlterTable {
 
   addExclusionConstraint(expression: string, options: ExclusionConstraintOptions = {}): void {
     this.exclusionConstraintAdds.push(
-      this._td.newExclusionConstraintDefinition(expression, options),
+      this._pgTd.newExclusionConstraintDefinition(expression, options),
     );
   }
 
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
-    this.uniqueConstraintAdds.push(this._td.newUniqueConstraintDefinition(columnName, options));
+    this.uniqueConstraintAdds.push(this._pgTd.newUniqueConstraintDefinition(columnName, options));
   }
 }
 

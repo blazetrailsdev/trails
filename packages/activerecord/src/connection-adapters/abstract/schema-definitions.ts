@@ -523,6 +523,15 @@ export class ReferenceDefinition {
  */
 export class AlterTable {
   readonly name: string;
+  /**
+   * Backing TableDefinition. Rails (`abstract/schema_definitions.rb:624`)
+   * constructs `AlterTable.new(td)` so `add_column` can route through
+   * `td.new_column_definition` for adapter-specific normalization. The
+   * legacy single-string constructor is retained for back-compat —
+   * callers that omit it lose dialect-specific column normalization.
+   * @internal
+   */
+  protected readonly _td?: TableDefinition;
   readonly adds: AddColumnDefinition[] = [];
   readonly foreignKeyAdds: ForeignKeyDefinition[] = [];
   readonly foreignKeyDrops: string[] = [];
@@ -534,12 +543,20 @@ export class AlterTable {
     defaultValue: unknown;
   }> = [];
 
-  constructor(name: string) {
-    this.name = name;
+  constructor(nameOrTd: string | TableDefinition) {
+    if (typeof nameOrTd === "string") {
+      this.name = nameOrTd;
+    } else {
+      this._td = nameOrTd;
+      this.name = nameOrTd.tableName;
+    }
   }
 
   addColumn(name: string, type: ColumnType, options: ColumnOptions = {}): void {
-    this.adds.push(new AddColumnDefinition(new ColumnDefinition(name, type, options)));
+    const colDef = this._td
+      ? this._td.newColumnDefinition(name, type, options)
+      : new ColumnDefinition(name, type, options);
+    this.adds.push(new AddColumnDefinition(colDef));
   }
 
   addForeignKey(fk: ForeignKeyDefinition): void {

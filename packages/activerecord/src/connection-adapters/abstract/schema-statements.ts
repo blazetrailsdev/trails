@@ -1758,14 +1758,15 @@ export class SchemaStatements {
   }
 
   /**
+   * Mirrors Rails `abstract/schema_statements.rb:1705`:
+   * `AlterTable.new(create_table_definition(name))`. Passing the
+   * TableDefinition lets `AlterTable#addColumn` route through
+   * `td.newColumnDefinition` for adapter-specific type normalization
+   * (PG virtual → underlying type, MySQL aliases, etc.).
    * @internal
-   * Diverges from Rails: Rails wraps `AlterTable.new(create_table_definition(name))` so the
-   * alter table has access to the underlying TableDefinition. The TS AlterTable constructor
-   * was designed to take a name string directly; wrap a TableDefinition here once AlterTable
-   * is updated to match Rails' shape.
    */
   createAlterTable(name: string): AlterTable {
-    return new AlterTable(name);
+    return new AlterTable(this.createTableDefinition(name));
   }
 
   /** @internal */

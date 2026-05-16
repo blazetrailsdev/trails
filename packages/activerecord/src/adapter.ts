@@ -536,10 +536,12 @@ export interface DatabaseAdapter {
   supportsDatetimeWithPrecision?(): boolean;
 
   /**
-   * Build an `AlterTable` object for the given table. PG returns an
-   * AlterTable carrying a `TableDefinition` so `AlterTable#addColumn` can
-   * route through `new_column_definition` for adapter-specific
-   * normalization (virtual columns, etc).
+   * Build an `AlterTable` object for the given table. The default
+   * (abstract `SchemaStatements`) wraps `createTableDefinition(name)` so
+   * `AlterTable#addColumn` routes through `td.newColumnDefinition` for
+   * adapter-specific normalization (PG virtual columns, MySQL type
+   * aliases, etc). Adapters that don't mix in `SchemaStatements` (e.g.
+   * direct mocks in tests) may omit it.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SchemaStatements#create_alter_table
    */
