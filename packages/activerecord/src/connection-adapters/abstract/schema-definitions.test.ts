@@ -115,6 +115,19 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
   });
 });
 
+describe("TableDefinition#primary_key option", () => {
+  it("treats primaryKey: false same as id: false", () => {
+    const td = new TableDefinition("t", { primaryKey: false });
+    expect(td.columns.find((c) => c.options.primaryKey)).toBeUndefined();
+  });
+
+  it("treats primaryKey: 'uuid' as a custom PK column name", () => {
+    const td = new TableDefinition("t", { primaryKey: "uuid" });
+    const pk = td.columns.find((c) => c.options.primaryKey);
+    expect(pk?.name).toBe("uuid");
+  });
+});
+
 describe("TableDefinition#integer_like_primary_key?", () => {
   it("newColumnDefinition preserves integer pk type in base class", () => {
     const td = new TableDefinition("t", { id: false });

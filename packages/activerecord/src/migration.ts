@@ -1646,15 +1646,25 @@ export class MigrationContext {
         scale?: number | null;
       }
     >();
-    if (options?.id !== false && !Array.isArray(options?.primaryKey) && options?.as == null) {
+    const compositePk =
+      Array.isArray(options?.primaryKey) && options.primaryKey.length > 0
+        ? new Set(options.primaryKey)
+        : null;
+    if (
+      options?.id !== false &&
+      !compositePk &&
+      options?.primaryKey !== false &&
+      options?.as == null
+    ) {
       const idType = typeof options?.id === "string" ? options.id : "integer";
-      meta.set("id", { type: idType, primaryKey: true });
+      const idName = typeof options?.primaryKey === "string" ? options.primaryKey : "id";
+      meta.set(idName, { type: idType, primaryKey: true });
     }
     for (const col of tdCols) {
-      if (col.name === "id" && meta.has("id")) continue;
+      if (meta.has(col.name)) continue;
       meta.set(col.name, {
         type: col.type,
-        primaryKey: col.options.primaryKey,
+        primaryKey: col.options.primaryKey || compositePk?.has(col.name) || undefined,
         null: col.options.null,
         default: col.options.default,
         limit: col.options.limit,

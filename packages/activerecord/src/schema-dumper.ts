@@ -854,6 +854,18 @@ export class SchemaDumper {
     return {};
   }
 
+  /**
+   * Hook for adapter subclasses to reorder the primary-key column list emitted
+   * inside `tableOpts.primaryKey` for composite PKs. Default: identity
+   * (preserve `SHOW COLUMNS` declaration order). MySQL overrides this to
+   * mirror Rails' `@connection.primary_key(table)`, which returns columns in
+   * `seq_in_index` order.
+   * @internal
+   */
+  protected orderPrimaryKeyColumns(_tableName: string, pkColumns: ColumnInfo[]): ColumnInfo[] {
+    return pkColumns;
+  }
+
   /** @internal */
   protected emitTable(
     lines: string[],
@@ -863,7 +875,10 @@ export class SchemaDumper {
     adapterTableOpts: Record<string, unknown> = {},
     inlineConstraints: string[] = [],
   ): void {
-    const pkColumns = columns.filter((c) => c.primaryKey);
+    const pkColumns = this.orderPrimaryKeyColumns(
+      tableName,
+      columns.filter((c) => c.primaryKey),
+    );
     const hasCompositePk = pkColumns.length > 1;
     const pkColumn = pkColumns[0];
     const hasId = !hasCompositePk && pkColumn?.name === "id";

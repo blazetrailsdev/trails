@@ -131,6 +131,32 @@ describe("MigrationTest", () => {
     expect(ctx.columnExists("users", "new_name")).toBe(true);
   });
 
+  it("tracks composite primary key columns in column metadata", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("memberships", { primaryKey: ["user_id", "group_id"] }, (t) => {
+      t.integer("user_id");
+      t.integer("group_id");
+      t.string("role");
+    });
+    const cols = ctx.columns("memberships");
+    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
+    expect(byName.user_id.primaryKey).toBe(true);
+    expect(byName.group_id.primaryKey).toBe(true);
+    expect(byName.role.primaryKey).toBeFalsy();
+    expect(cols.find((c) => c.name === "id")).toBeUndefined();
+  });
+
+  it("tracks custom primary key column name in column metadata", async () => {
+    const { ctx } = freshContext();
+    await ctx.createTable("widgets", { primaryKey: "uuid" }, (t) => {
+      t.string("name");
+    });
+    const cols = ctx.columns("widgets");
+    const pk = cols.find((c) => c.primaryKey);
+    expect(pk?.name).toBe("uuid");
+    expect(cols.find((c) => c.name === "id")).toBeUndefined();
+  });
+
   it("add index", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("users", {}, (t) => {

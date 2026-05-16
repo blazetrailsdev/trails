@@ -34,6 +34,9 @@ interface MysqlColumn extends ColumnInfo {
 
 interface MysqlAdapterLike {
   tableOptions(tableName: string): Promise<Record<string, string>>;
+  primaryKeys?(tableName: string): Promise<string[]>;
+  schemaQuery?(sql: string): Promise<Record<string, unknown>[]>;
+  quote?(value: unknown): string;
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
@@ -48,6 +51,15 @@ export class SchemaDumper extends AbstractSchemaDumper {
    */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
+  /**
+   * Per-table PK column order from `@connection.primary_key(table)` (MySQL returns
+   * columns in `seq_in_index` order). Used by `emitTable` to render
+   * `primaryKey: [...]` in index order rather than `SHOW FULL FIELDS` declaration
+   * order, matching Rails.
+   * @internal
+   */
+  primaryKeyOrderCache: Record<string, string[] | undefined> = Object.create(null);
+
   /** @internal */
   protected override async fetchTableOptions(tableName: string): Promise<Record<string, unknown>> {
     if (!this.connection) return {};
@@ -56,8 +68,32 @@ export class SchemaDumper extends AbstractSchemaDumper {
     // schemaCollation can suppress per-column collation that matches the table default.
     if (Object.hasOwn(opts, "collation")) {
       this.tableCollationCache[tableName] = opts["collation"];
+    } else {
+      await this.populateTableCollationFromStatus(tableName);
     }
     return opts;
+  }
+
+  /**
+   * Lazily fill `tableCollationCache` via `SHOW TABLE STATUS LIKE ...` when the
+   * cached `tableOptions` parse didn't surface a `COLLATE` clause (e.g. when the
+   * table uses the schema default and the dumper still needs to know that
+   * default in order to suppress per-column collation).
+   *
+   * Mirrors Rails' `MySQL::SchemaDumper#table_collation`, which falls back to
+   * `information_schema.tables.table_collation` when `SHOW CREATE TABLE` omits
+   * an explicit collation.
+   * @internal
+   */
+  protected async populateTableCollationFromStatus(tableName: string): Promise<void> {
+    if (Object.hasOwn(this.tableCollationCache, tableName)) return;
+    const conn = this.connection;
+    if (!conn?.schemaQuery || !conn.quote) return;
+    const rows = await conn.schemaQuery(`SHOW TABLE STATUS LIKE ${conn.quote(tableName)}`);
+    const collation = rows[0]?.["Collation"] as string | null | undefined;
+    if (typeof collation === "string" && collation.length > 0) {
+      this.tableCollationCache[tableName] = collation;
+    }
   }
 
   defaultPrimaryKeyType(): string {
@@ -131,6 +167,38 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (column.type === "datetime")
       return column.precision === 0 ? "nil" : super.schemaPrecision(column);
     return super.schemaPrecision(column);
+  }
+
+  /** @internal */
+  override async table(tableName: string, lines: string[]): Promise<void> {
+    if (this.connection?.primaryKeys) {
+      try {
+        this.primaryKeyOrderCache[tableName] = await this.connection.primaryKeys(tableName);
+      } catch {
+        // Live introspection is best-effort; fall through to declaration order.
+      }
+    }
+    await super.table(tableName, lines);
+  }
+
+  /** @internal */
+  protected override orderPrimaryKeyColumns(
+    tableName: string,
+    pkColumns: ColumnInfo[],
+  ): ColumnInfo[] {
+    const order = this.primaryKeyOrderCache[tableName];
+    if (!order || order.length === 0) return pkColumns;
+    const byName = new Map(pkColumns.map((c) => [c.name, c]));
+    const reordered: ColumnInfo[] = [];
+    for (const name of order) {
+      const col = byName.get(name);
+      if (col) {
+        reordered.push(col);
+        byName.delete(name);
+      }
+    }
+    for (const col of byName.values()) reordered.push(col);
+    return reordered;
   }
 
   /** @internal */

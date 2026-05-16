@@ -620,7 +620,16 @@ export class TableDefinition {
     if (Array.isArray(tdOptions.primaryKey) && tdOptions.primaryKey.length === 0) {
       throw new ArgumentError("primaryKey array must not be empty");
     }
-    this._id = hasCompositePk ? false : (tdOptions.id ?? true);
+    // primaryKey: false ⇒ same as id: false (no auto-PK column).
+    // primaryKey: "custom_name" ⇒ keep auto-PK but rename the column.
+    const pkFalse = tdOptions.primaryKey === false;
+    const pkNameOverride =
+      typeof tdOptions.primaryKey === "string" ? tdOptions.primaryKey : undefined;
+    if (hasCompositePk || pkFalse) {
+      this._id = false;
+    } else {
+      this._id = tdOptions.id ?? true;
+    }
     this.temporary = tdOptions.temporary ?? false;
     this.ifNotExists = tdOptions.ifNotExists ?? false;
     this.as = tdOptions.as;
@@ -653,7 +662,7 @@ export class TableDefinition {
         pkOpts = { primaryKey: true };
         if (tdOptions.default !== undefined) pkOpts.default = tdOptions.default;
       }
-      this.columns.push(this.newColumnDefinition("id", pkType, pkOpts));
+      this.columns.push(this.newColumnDefinition(pkNameOverride ?? "id", pkType, pkOpts));
     }
   }
 

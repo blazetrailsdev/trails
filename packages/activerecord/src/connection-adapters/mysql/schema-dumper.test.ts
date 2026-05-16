@@ -206,5 +206,47 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       expect(await (d as any).fetchTableOptions("users")).toEqual({});
     });
+
+    it("falls back to SHOW TABLE STATUS for collation when not in options", async () => {
+      const d = make();
+      d.connection = {
+        tableOptions: async () => ({ charset: "utf8mb4" }),
+        schemaQuery: async () => [{ Collation: "utf8mb4_general_ci" }],
+        quote: (v) => `'${String(v)}'`,
+      };
+      await (d as any).fetchTableOptions("users");
+      expect(d.tableCollationCache["users"]).toBe("utf8mb4_general_ci");
+    });
+  });
+
+  describe("orderPrimaryKeyColumns", () => {
+    it("reorders composite PK columns by primaryKeyOrderCache", () => {
+      const d = make();
+      d.primaryKeyOrderCache["t"] = ["b", "a"];
+      const result = (d as any).orderPrimaryKeyColumns("t", [
+        col({ name: "a" }),
+        col({ name: "b" }),
+      ]);
+      expect(result.map((c: { name: string }) => c.name)).toEqual(["b", "a"]);
+    });
+
+    it("preserves input order when cache is empty", () => {
+      const d = make();
+      const result = (d as any).orderPrimaryKeyColumns("t", [
+        col({ name: "a" }),
+        col({ name: "b" }),
+      ]);
+      expect(result.map((c: { name: string }) => c.name)).toEqual(["a", "b"]);
+    });
+
+    it("appends columns not present in cache", () => {
+      const d = make();
+      d.primaryKeyOrderCache["t"] = ["b"];
+      const result = (d as any).orderPrimaryKeyColumns("t", [
+        col({ name: "a" }),
+        col({ name: "b" }),
+      ]);
+      expect(result.map((c: { name: string }) => c.name)).toEqual(["b", "a"]);
+    });
   });
 });
