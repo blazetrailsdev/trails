@@ -1,10 +1,14 @@
 /**
- * `AbstractController::AssetPaths` — config slots for asset URL
- * generation. Rails uses `config_accessor :asset_host, :assets_dir, …`
- * which creates both class- and instance-level accessors. Trails uses
- * static fields with a `mixin()` applicator: callers pass the host
- * class and the slots are installed with `undefined` defaults so the
- * usual `Cls.assetHost = "…"` assignment Just Works at runtime.
+ * `AbstractController::AssetPaths` — config slot contract for asset
+ * URL generation. Rails uses `config_accessor :asset_host, :assets_dir,
+ * …` which creates both class- and instance-level accessors.
+ *
+ * Trails doesn't install anything at runtime: JS static-field
+ * inheritance already gives Rails-style propagation (reading an unset
+ * slot on a subclass walks to the parent transparently). The slots are
+ * exposed as a TypeScript contract via `AssetPathsHost` and an
+ * introspection list via `ASSET_PATH_SLOTS`. `applyAssetPaths(cls)`
+ * is a named no-op kept so call sites mirror Rails' include shape.
  *
  * @internal
  */
@@ -44,6 +48,10 @@ export interface AssetPathsHost {
  * `include AbstractController::AssetPaths` shape and serve as a
  * grep-able marker that the host opts into this slot contract.
  */
-export function applyAssetPaths(_cls: object): void {
-  // Intentionally empty — see docstring.
+export function applyAssetPaths<T extends new (...args: never[]) => unknown>(
+  _cls: T & Partial<AssetPathsHost>,
+): void {
+  // Intentionally empty — see docstring. The `Partial<AssetPathsHost>`
+  // bound surfaces the slot contract at call sites without requiring
+  // the host to pre-declare every slot.
 }
