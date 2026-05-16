@@ -287,6 +287,16 @@ describe("SignedGlobalIDCustomParamsTest", () => {
     const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
     expect(parsed!.params["hello"]).toBe("world");
   });
+
+  it("purpose key flows through as a URI param (not reserved)", () => {
+    // Rails GlobalID.create strips only (:app, :verifier, :for); any other
+    // key — including :purpose — flows through to URI params. The internal
+    // @purpose attr is set via pick_purpose(:for), not from this URI param.
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier, purpose: "vip" });
+    expect(sgid.params["purpose"]).toBe("vip");
+    expect(sgid.purpose).toBe("default");
+  });
 });
 
 describe("SignedGlobalID (non-Rails coverage)", () => {

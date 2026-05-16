@@ -19,10 +19,8 @@ import {
  */
 interface ToSgidOptions {
   app?: string;
-  /** Rails-canonical purpose option. */
+  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string;
-  /** Alias of `for` kept for backward compatibility. */
-  purpose?: string;
   expiresIn?: number;
   expiresAt?: Temporal.Instant;
   [key: string]: unknown;

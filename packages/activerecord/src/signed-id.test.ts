@@ -606,11 +606,11 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const u = await User.create({ name: "Dave" });
-    const sgid = await u.toSgid({ purpose: "test", app: "TestApp" });
+    const sgid = await u.toSgid({ for: "test", app: "TestApp" });
     expect(sgid.purpose).toBe("test");
     expect(sgid.uri).toContain(`/${u.id}`);
     const parsed = SignedGlobalID.parse(sgid.toParam(), {
-      purpose: "test",
+      for: "test",
       verifier: signedIdVerifier(User),
     });
     expect(parsed).not.toBeNull();

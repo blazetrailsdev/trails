@@ -38,8 +38,6 @@ export interface LocateOptions {
 export interface LocateSignedOptions extends LocateOptions {
   /** Purpose to verify against (Rails: `for:`). */
   for?: string;
-  /** Alias of `for` kept consistent with SignedGlobalIDOptions/ParseOptions. */
-  purpose?: string;
   /** Verifier to validate the SGID signature. */
   verifier: MessageVerifier;
 }
@@ -290,8 +288,10 @@ export class Locator {
     sgid: string | SignedGlobalID,
     options: LocateSignedOptions,
   ): Promise<unknown | null> {
-    const purpose = options.for ?? options.purpose;
-    const parsed = SignedGlobalID.parse(String(sgid), { for: purpose, verifier: options.verifier });
+    const parsed = SignedGlobalID.parse(String(sgid), {
+      for: options.for,
+      verifier: options.verifier,
+    });
     if (!parsed) return null;
     return Locator.locate(parsed.uri, options);
   }
@@ -301,10 +301,12 @@ export class Locator {
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,
   ): Promise<unknown[]> {
-    const purpose = options.for ?? options.purpose;
     const uris: string[] = [];
     for (const s of sgids) {
-      const parsed = SignedGlobalID.parse(String(s), { for: purpose, verifier: options.verifier });
+      const parsed = SignedGlobalID.parse(String(s), {
+        for: options.for,
+        verifier: options.verifier,
+      });
       if (parsed) uris.push(parsed.uri);
     }
     return Locator.locateMany(uris, options);
