@@ -6850,11 +6850,36 @@ describe("AssociationProxyTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
     /* Rails: Mocha stub test — no JS equivalent for this Ruby testing infrastructure check */
   });
-  it.skip("inverses get set of subsets of the association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* Rails: sets inverse_of on loaded records — needs inverse_of population on collection load */
+  it("inverses get set of subsets of the association", async () => {
+    // Rails: human.interests.where("1=1").first.human should not re-query —
+    // automatic inverse_of wires the parent onto each loaded child.
+    class IsHuman extends Base {
+      static {
+        this._tableName = "is_humans";
+        this.attribute("name", "string");
+        this.adapter = apAdapter;
+      }
+    }
+    class IsInterest extends Base {
+      static {
+        this._tableName = "is_interests";
+        this.attribute("topic", "string");
+        this.attribute("is_human_id", "integer");
+        this.adapter = apAdapter;
+      }
+    }
+    Associations.hasMany.call(IsHuman, "isInterests", { className: "IsInterest" });
+    Associations.belongsTo.call(IsInterest, "isHuman", { className: "IsHuman" });
+    registerModel("IsHuman", IsHuman);
+    registerModel("IsInterest", IsInterest);
+
+    const human = await IsHuman.create({ name: "Gordon" });
+    await IsInterest.create({ topic: "Trainspotting", is_human_id: (human as any).id });
+    const found = (await IsHuman.find((human as any).id)) as InstanceType<typeof IsHuman>;
+    const proxy = association(found, "isInterests");
+    const subset = await proxy.where("1=1").first();
+    expect(subset).not.toBeNull();
+    expect((subset as any)._cachedAssociations?.get("isHuman")).toBe(found);
   });
   it("pluck uses loaded target", async () => {
     const { APPost, APComment } = setupProxyModels();

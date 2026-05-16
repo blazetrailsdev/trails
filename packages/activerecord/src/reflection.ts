@@ -643,17 +643,33 @@ export class AssociationReflection extends MacroReflection {
   private automaticInverseOf(): string | null {
     if (!this.canFindInverseOfAutomatically(this)) return null;
 
-    const inverseName = this.options.as
+    const snakeInverseName = this.options.as
       ? underscore(this.options.as as string)
       : underscore(demodulize(this.activeRecord.name));
+    // Codebase convention is camelCase association names; Rails uses
+    // snake_case. Try both so automatic inverse detection works regardless
+    // of which form the user registered the inverse under.
+    const camelInverseName = camelize(snakeInverseName, false);
+    const candidateNames =
+      camelInverseName === snakeInverseName
+        ? [snakeInverseName]
+        : [camelInverseName, snakeInverseName];
 
-    let reflection: AssociationReflection | ThroughReflection | null | false;
+    let reflection: AssociationReflection | ThroughReflection | null | false = null;
     try {
-      reflection = this.klass._reflectOnAssociation(inverseName);
-
-      if (!reflection && this.activeRecord.automaticallyInvertPluralAssociations) {
-        const pluralInverseName = pluralize(inverseName);
-        reflection = this.klass._reflectOnAssociation(pluralInverseName);
+      const lookupNames: string[] = [...candidateNames];
+      if (this.activeRecord.automaticallyInvertPluralAssociations) {
+        for (const n of candidateNames) lookupNames.push(pluralize(n));
+      }
+      // Pick the first candidate whose reflection is a valid inverse. A
+      // hit on an invalid candidate (e.g. inverseOf:false, mismatched FK,
+      // wrong target class) must not shadow a later valid one.
+      for (const n of lookupNames) {
+        const r = this.klass._reflectOnAssociation(n);
+        if (r && this.validInverseReflection(r)) {
+          reflection = r;
+          break;
+        }
       }
     } catch (e: unknown) {
       // Rails: rescue NameError => error; raise unless error.name.to_s == class_name
