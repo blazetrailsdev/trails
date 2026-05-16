@@ -1696,7 +1696,7 @@ describe("TransactionTest", () => {
   });
   it("write attribute after rollback", async () => {
     const { Topic } = makeSQLiteTopic();
-    const topic = (await Topic.create({ title: "foo" })) as any;
+    const topic = (await Topic.create({})) as any;
 
     await Topic.transaction(async () => {
       await topic.save();
