@@ -5,7 +5,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, RecordNotFound, registerSubclass } from "./index.js";
-import { setSignedIdVerifierSecret, signedIdVerifier } from "./signed-id.js";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { setSignedIdVerifierSecret, setSignedIdVerifier, signedIdVerifier } from "./signed-id.js";
+import { UnknownPrimaryKey } from "./errors.js";
 import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
 import { createTestAdapter } from "./test-adapter.js";
@@ -111,8 +113,20 @@ describe("SignedIdTest", () => {
     expect(found).not.toBeNull();
   });
 
-  it.skip("find signed record with custom primary key", () => {
-    // BLOCKED: relation — signed_id_test.rb: findSigned with custom primary key
+  it("find signed record with custom primary key", async () => {
+    class Toy extends Base {
+      static {
+        this._primaryKey = "toy_id";
+        this.attribute("toy_id", "string");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Toy.create({ toy_id: "abc-123", name: "Block" });
+    const token = await t.signedId();
+    const found = await Toy.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("Block");
   });
 
   it("find signed record for single table inheritance (STI Models)", async () => {
@@ -134,12 +148,32 @@ describe("SignedIdTest", () => {
     expect(found!.name).toBe("Rex");
   });
 
-  it.skip("find signed record raises UnknownPrimaryKey when a model has no primary key", () => {
-    // BLOCKED: relation — signed_id_test.rb: UnknownPrimaryKey error on no-pk model
+  it("find signed record raises UnknownPrimaryKey when a model has no primary key", async () => {
+    class Matey extends Base {
+      static {
+        this._primaryKey = "";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    await expect(Matey.findSigned("this will not be even verified")).rejects.toThrow(
+      UnknownPrimaryKey,
+    );
   });
 
-  it.skip("find signed record with a bang with custom primary key", () => {
-    // BLOCKED: relation — signed_id_test.rb: findSignedBang with custom primary key
+  it("find signed record with a bang with custom primary key", async () => {
+    class Toy extends Base {
+      static {
+        this._primaryKey = "toy_id";
+        this.attribute("toy_id", "string");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const t = await Toy.create({ toy_id: "k-9", name: "Robot" });
+    const token = await t.signedId();
+    const found = await Toy.findSignedBang(token);
+    expect(found.name).toBe("Robot");
   });
 
   it("find signed record with a bang for single table inheritance (STI Models)", async () => {
@@ -198,12 +232,30 @@ describe("SignedIdTest", () => {
     );
   });
 
-  it.skip("fail to work without a signed_id_verifier_secret", () => {
-    // BLOCKED: relation — signed_id_test.rb: signedIdVerifierSecret config required
+  it("fail to work without a signed_id_verifier_secret", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "NoSecret" });
+    setSignedIdVerifierSecret(null);
+    try {
+      await expect(Promise.resolve().then(() => u.signedId())).rejects.toThrow(
+        /signed_id_verifier_secret|signed ids/i,
+      );
+    } finally {
+      setSignedIdVerifierSecret("blazetrails-test-secret");
+    }
   });
 
-  it.skip("fail to work without when signed_id_verifier_secret lambda is nil", () => {
-    // BLOCKED: relation — signed_id_test.rb: raises when verifier secret lambda returns nil
+  it("fail to work without when signed_id_verifier_secret lambda is nil", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "NilLambda" });
+    setSignedIdVerifierSecret(() => null);
+    try {
+      await expect(Promise.resolve().then(() => u.signedId())).rejects.toThrow(
+        /signed_id_verifier_secret|signed ids/i,
+      );
+    } finally {
+      setSignedIdVerifierSecret("blazetrails-test-secret");
+    }
   });
 
   it("always output url_safe", async () => {
@@ -216,8 +268,19 @@ describe("SignedIdTest", () => {
     expect(token.length).toBeGreaterThan(0);
   });
 
-  it.skip("use a custom verifier", () => {
-    // BLOCKED: relation — signed_id_test.rb: custom verifier via signedIdVerifier=
+  it("use a custom verifier", async () => {
+    const { User } = makeModel();
+    const customVerifier = new MessageVerifier("sekret", {
+      digest: "sha256",
+      url_safe: true,
+    });
+    setSignedIdVerifier(User as any, customVerifier);
+    expect(signedIdVerifier(User as any)).toBe(customVerifier);
+    const u = await User.create({ name: "Custom" });
+    const token = await u.signedId();
+    const found = await User.findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(u.id);
   });
 
   it("find signed record", async () => {
@@ -235,7 +298,8 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record on relation", () => {
-    // BLOCKED: relation — signed_id_test.rb: findSigned on Relation scope
+    // BLOCKED: feature — Relation.findSigned scoping wrapper (Rails SignedId::RelationMethods).
+    // Needs Relation.findSigned / findSignedBang that call scoping { model.findSigned(...) }.
   });
 
   it("find signed record with a bang", async () => {
@@ -252,7 +316,7 @@ describe("SignedIdTest", () => {
   });
 
   it.skip("find signed record with a bang on relation", () => {
-    // BLOCKED: relation — signed_id_test.rb: findSignedBang on Relation scope
+    // BLOCKED: feature — Relation.findSignedBang scoping wrapper (Rails SignedId::RelationMethods).
   });
 
   it("find signed record with purpose", async () => {
@@ -271,8 +335,12 @@ describe("SignedIdTest", () => {
     expect(wrongPurpose).toBeNull();
   });
 
-  it.skip("find signed record with a bang within expiration duration", () => {
-    // BLOCKED: relation — signed_id_test.rb: findSignedBang raises when expired
+  it("find signed record with a bang within expiration duration", async () => {
+    const { User } = makeModel();
+    const u = await User.create({ name: "Timely" });
+    const token = await u.signedId({ expiresIn: 60 });
+    const found = await User.findSignedBang(token);
+    expect(found.id).toBe(u.id);
   });
 });
 
@@ -465,7 +533,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = new User({ name: "Alice" });
-    await expect(user.signedId()).rejects.toThrow("Cannot generate a signed_id for a new record");
+    await expect(user.signedId()).rejects.toThrow("Cannot get a signed_id for a new record");
   });
 
   it("findSigned recovers the record from its signed ID", async () => {

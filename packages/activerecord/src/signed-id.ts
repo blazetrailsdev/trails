@@ -2,6 +2,7 @@ import type { Base } from "./base.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { underscore } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
+import { UnknownPrimaryKey } from "./errors.js";
 
 /**
  * Signed ID generation and lookup for ActiveRecord models.
@@ -11,7 +12,7 @@ import type { Temporal } from "@blazetrails/activesupport/temporal";
  * Mirrors: ActiveRecord::SignedId
  */
 
-let _signedIdVerifierSecret: string | (() => string) | null = null;
+let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
 const _cachedVerifierClasses = new Set<any>();
 
 /**
@@ -20,7 +21,9 @@ const _cachedVerifierClasses = new Set<any>();
  *
  * Mirrors: ActiveRecord::Base.signed_id_verifier_secret=
  */
-export function setSignedIdVerifierSecret(secret: string | (() => string)): void {
+export function setSignedIdVerifierSecret(
+  secret: string | (() => string | null | undefined) | null,
+): void {
   _signedIdVerifierSecret = secret;
   for (const cls of _cachedVerifierClasses) {
     cls._signedIdVerifier = null;
@@ -40,14 +43,11 @@ export function signedIdVerifier(modelClass: typeof Base): MessageVerifier {
   }
 
   const secret = _signedIdVerifierSecret;
-  if (!secret) {
-    throw new Error(
-      "You must configure a signed ID verifier secret before using signed IDs. " +
-        "Call setSignedIdVerifierSecret('your-secret-key') before generating or verifying signed IDs.",
-    );
+  const resolvedSecret = typeof secret === "function" ? secret() : secret;
+  if (!resolvedSecret) {
+    throw new Error("You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids");
   }
 
-  const resolvedSecret = typeof secret === "function" ? secret() : secret;
   const verifier = new MessageVerifier(resolvedSecret, {
     digest: "sha256",
     url_safe: true,
@@ -66,6 +66,13 @@ export function setSignedIdVerifier(modelClass: typeof Base, verifier: MessageVe
   (modelClass as any)._signedIdVerifier = verifier;
 }
 
+function _hasPrimaryKey(pk: unknown): boolean {
+  if (pk == null) return false;
+  if (Array.isArray(pk))
+    return pk.length > 0 && pk.every((k) => typeof k === "string" && k.length > 0);
+  return typeof pk === "string" && pk.length > 0;
+}
+
 function combinePurposes(modelClass: typeof Base, purpose?: string): string | undefined {
   const combined = combineSignedIdPurposes(modelClass, purpose);
   return combined || undefined;
@@ -82,7 +89,7 @@ export function signedId(
   options?: { purpose?: string; expiresIn?: number; expiresAt?: Temporal.Instant },
 ): string {
   if (!instance.isPersisted()) {
-    throw new Error("Cannot generate a signed_id for a new record");
+    throw new Error("Cannot get a signed_id for a new record");
   }
   const ctor = instance.constructor as typeof Base;
   const verifier = signedIdVerifier(ctor);
@@ -104,12 +111,15 @@ export async function findSigned<T extends typeof Base>(
   token: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T> | null> {
+  const pk = modelClass.primaryKey;
+  if (!_hasPrimaryKey(pk)) {
+    throw new UnknownPrimaryKey(modelClass);
+  }
   const verifier = signedIdVerifier(modelClass);
   const id = verifier.verified(token, {
     purpose: combinePurposes(modelClass, options?.purpose),
   });
   if (id === null) return null;
-  const pk = modelClass.primaryKey;
   if (Array.isArray(pk)) {
     const conditions: Record<string, unknown> = {};
     (pk as string[]).forEach((col, i) => {
