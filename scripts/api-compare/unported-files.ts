@@ -307,9 +307,26 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "marshalling with associations 7 1",
       "marshal between processes",
       "marshalling new record round trip with associations",
+      // Ruby string encoding
+      "respect internal encoding",
+      // with_env_tz — process-level TZ change (ENV["TZ"]); Node.js cannot reload TZ after startup
+      "default in local time",
+      "switching default time zone",
+      "mutating time objects",
     ],
     reason:
-      "GVL / Ruby Thread semantics and Marshal binary serialization — both are Ruby-only; no Node.js equivalent.",
+      "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, " +
+      'and with_env_tz (process-level ENV["TZ"] reload) — all Ruby-only with no Node.js equivalent.',
+  },
+  {
+    testFile: "hstore_test.rb",
+    tests: [
+      // ActionController::Parameters#to_unsafe_h — Ruby-only ProtectedParams API
+      "supports to unsafe h values",
+    ],
+    reason:
+      "ActionController::Parameters#to_unsafe_h is a Ruby-only ProtectedParams API; " +
+      "no equivalent in Node.js request-parameter handling.",
   },
   {
     testFile: "has_and_belongs_to_many_associations_test.rb",
