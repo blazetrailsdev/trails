@@ -81,14 +81,19 @@ describe("GlobalIdentificationTest", () => {
   });
 
   it("dup should clear memoized to_global_id", () => {
-    // Rails: dup'd model with a mutated id yields a different to_global_id.
-    // Trails: toGlobalId is not memoized — each call builds afresh from
-    // the current id, so the dup-then-mutate behavior is the default.
+    // Rails calls model.dup (which clears @global_id memoization) and
+    // mutates the dup's id. The test verifies the resulting GID reflects
+    // the new id, not a stale memoized one. Trails doesn't memoize
+    // toGlobalId, so the same invariant holds without dup: mutating id
+    // on the original instance and re-calling toGlobalId must return a
+    // fresh GID for the new id. Mutating in-place is the stricter check —
+    // if memoization ever creeps in, this test catches it.
     const model = new Person("1");
-    const globalId = toGlobalId.call(model);
-    const dupModel = new Person(String(Number(model.id) + 1));
-    const dupGlobalId = toGlobalId.call(dupModel);
-    expect(globalId.uri).not.toBe(dupGlobalId.uri);
+    const before = toGlobalId.call(model);
+    model.id = "2";
+    const after = toGlobalId.call(model);
+    expect(after.uri).not.toBe(before.uri);
+    expect(after.modelId).toBe("2");
   });
 
   it("toGidParam round-trips through GlobalID.parse", () => {

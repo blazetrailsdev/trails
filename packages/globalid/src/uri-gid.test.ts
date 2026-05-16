@@ -76,6 +76,7 @@ describe("URI::GIDTest", () => {
     // positional (app, modelName, modelId, params) tuple. The resulting
     // URI is not equal to the canonical gid://bcx/Person/5.
     const wrong = buildGid("Person", "5", "bcx");
+    expect(wrong).toBe("gid://Person/5/bcx");
     expect(wrong).not.toBe("gid://bcx/Person/5");
   });
 
@@ -206,8 +207,8 @@ describe("URI::GIDParamsTest", () => {
     // returns the URI string fixed at construction time. Trails: toString()
     // returns the cached uri, so post-construction params writes don't
     // leak into the rendered URI either.
-    const gid = GID.parse("gid://bcx/Person/5?hello=world")!;
-    (gid.params as Record<string, string>)["param"] = "value";
+    const gid = GID.parse("gid://bcx/Person/5?hello=world");
+    gid.params["param"] = "value";
     expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
     expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
   });
