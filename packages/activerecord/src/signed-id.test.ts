@@ -98,7 +98,7 @@ describe("SignedIdTest", () => {
   it("cannot get a signed ID for a new record", async () => {
     const { User } = makeModel();
     const u = new User({ name: "Gina" });
-    await expect(u.signedId()).rejects.toThrow();
+    expect(() => u.signedId()).toThrow();
   });
 
   it("can get a signed ID in an after_create", async () => {
@@ -237,9 +237,7 @@ describe("SignedIdTest", () => {
     const u = await User.create({ name: "NoSecret" });
     setSignedIdVerifierSecret(null);
     try {
-      await expect(Promise.resolve().then(() => u.signedId())).rejects.toThrow(
-        /signed_id_verifier_secret|signed ids/i,
-      );
+      expect(() => u.signedId()).toThrow(/signed_id_verifier_secret|signed ids/i);
     } finally {
       setSignedIdVerifierSecret("blazetrails-test-secret");
     }
@@ -250,9 +248,7 @@ describe("SignedIdTest", () => {
     const u = await User.create({ name: "NilLambda" });
     setSignedIdVerifierSecret(() => null);
     try {
-      await expect(Promise.resolve().then(() => u.signedId())).rejects.toThrow(
-        /signed_id_verifier_secret|signed ids/i,
-      );
+      expect(() => u.signedId()).toThrow(/signed_id_verifier_secret|signed ids/i);
     } finally {
       setSignedIdVerifierSecret("blazetrails-test-secret");
     }
@@ -554,7 +550,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = new User({ name: "Alice" });
-    await expect(user.signedId()).rejects.toThrow("Cannot get a signed_id for a new record");
+    expect(() => user.signedId()).toThrow("Cannot get a signed_id for a new record");
   });
 
   it("findSigned recovers the record from its signed ID", async () => {

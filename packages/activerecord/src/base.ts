@@ -2979,16 +2979,14 @@ export class Base extends Model {
   /**
    * Generate a signed ID for this record using HMAC-SHA256 via MessageVerifier.
    * The purpose parameter scopes the signed ID. expiresIn is in seconds.
-   * Returns a Promise so callers can use the `await expect(...).rejects`
-   * pattern to assert on missing-secret / invalid-config errors.
    *
    * Mirrors: ActiveRecord::SignedId#signed_id
    */
-  async signedId(options?: {
+  signedId(options?: {
     purpose?: string;
     expiresIn?: number;
     expiresAt?: Temporal.Instant;
-  }): Promise<string> {
+  }): string {
     return _signedId(this, options);
   }
 

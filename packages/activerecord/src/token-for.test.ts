@@ -254,7 +254,7 @@ describe("TokenForTest", () => {
       }
     }
     const item = new NoPkItem({ name: "test" });
-    await expect(item.signedId()).rejects.toThrow();
+    expect(() => item.signedId()).toThrow();
   });
 });
 
