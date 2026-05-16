@@ -71,6 +71,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect((i.maximum_term as Duration).iso8601()).toBe("P6Y5M4DT3H2M1S");
       expect((i.minimum_term as Duration).iso8601()).toBe("P1Y2M3DT4H5M6.235S");
       expect((i.default_term as Duration).iso8601()).toBe("P3Y");
+      // Rails: assert_equal %w[ P1M P1Y PT1H ], i.all_terms.map(&:iso8601)
+      expect((i.all_terms as Duration[]).map((d) => d.iso8601())).toEqual(["P1M", "P1Y", "PT1H"]);
       expect(i.legacy_term).toBe("P33Y");
     });
 
