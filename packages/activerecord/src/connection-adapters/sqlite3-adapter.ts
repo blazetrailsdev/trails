@@ -167,7 +167,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.driver?.isOpen() ?? false;
   }
   private _inTransaction = false;
-  private _savepointCounter = 0;
   private _readonly: boolean;
   private _strict: boolean;
   private _preventWrites = false;

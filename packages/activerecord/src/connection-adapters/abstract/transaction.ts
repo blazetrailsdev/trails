@@ -6,7 +6,12 @@ import {
   NotImplementedError,
   TransactionIsolationError,
 } from "../../errors.js";
-import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  NotificationEvent,
+  getAsyncContext,
+  type AsyncContext,
+} from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
@@ -830,6 +835,14 @@ export class TransactionManager {
   private _hasUnmaterializedTransactions = false;
   private _materializingTransactions = false;
   private _lazyTransactionsEnabled = true;
+  /** @internal Async-chain re-entrancy flag for {@link withinNewTransaction}. */
+  private _lockHeld: AsyncContext<true> | null = null;
+  /** @internal Cached AsyncContext adapter (refresh on swap, like other call sites). */
+  private _lockHeldAdapter: ReturnType<typeof getAsyncContext> | null = null;
+  /** @internal Outermost-call mutex; non-null while a foreign chain holds it. */
+  private _lockChain: Promise<void> | null = null;
+  /** @internal In-flight materialization promise for cross-chain waiters. */
+  private _materializingPromise: Promise<void> | null = null;
 
   static readonly NULL_TRANSACTION = Object.freeze(new NullTransaction());
 
@@ -932,20 +945,35 @@ export class TransactionManager {
   }
 
   async materializeTransactions(): Promise<void> {
+    // Re-entrant call from inside an in-progress materializeBang on the same
+    // chain — skip to avoid infinite recursion (queries issued by
+    // materializeBang itself call back into here).
     if (this._materializingTransactions) return;
+    // Foreign-chain caller: wait for the in-flight pass to finish before
+    // proceeding so this caller observes a materialized stack rather than
+    // racing to issue queries against an unmaterialized one.
+    if (this._materializingPromise) {
+      await this._materializingPromise;
+      return;
+    }
+    if (!this._hasUnmaterializedTransactions) return;
 
-    if (this._hasUnmaterializedTransactions) {
-      try {
-        this._materializingTransactions = true;
-        for (const t of this._stack) {
-          if (t instanceof Transaction && !t.isMaterialized()) {
-            await t.materializeBang();
-          }
+    let resolveDone!: () => void;
+    this._materializingPromise = new Promise<void>((r) => {
+      resolveDone = r;
+    });
+    this._materializingTransactions = true;
+    try {
+      for (const t of this._stack) {
+        if (t instanceof Transaction && !t.isMaterialized()) {
+          await t.materializeBang();
         }
-      } finally {
-        this._materializingTransactions = false;
       }
       this._hasUnmaterializedTransactions = false;
+    } finally {
+      this._materializingTransactions = false;
+      this._materializingPromise = null;
+      resolveDone();
     }
   }
 
@@ -1006,7 +1034,51 @@ export class TransactionManager {
     this._connection.clearCacheBang?.();
   }
 
+  /**
+   * Async-chain-aware mutex storage. Mirrors Rails'
+   * `@connection.lock.synchronize` (`abstract/transaction.rb:622`): outermost
+   * `within_new_transaction` calls on the same connection serialize, but a
+   * recursive call from inside the body (e.g. `after_commit` re-entry) skips
+   * re-acquisition to avoid self-deadlock.
+   *
+   * @internal
+   */
+  private _lockStorage(): AsyncContext<true> {
+    const asyncContext = getAsyncContext();
+    if (!this._lockHeld || this._lockHeldAdapter !== asyncContext) {
+      this._lockHeld = asyncContext.create<true>();
+      this._lockHeldAdapter = asyncContext;
+    }
+    return this._lockHeld;
+  }
+
   async withinNewTransaction<T>(
+    options: { isolation?: string | null; joinable?: boolean },
+    fn: (tx: UserTransaction) => Promise<T> | T,
+  ): Promise<T> {
+    const storage = this._lockStorage();
+    if (storage.getStore() === true) {
+      return await this._withinNewTransactionBody(options, fn);
+    }
+    while (this._lockChain) {
+      await this._lockChain;
+    }
+    let release!: () => void;
+    this._lockChain = new Promise<void>((r) => {
+      release = () => {
+        this._lockChain = null;
+        r();
+      };
+    });
+    try {
+      return await storage.run(true, () => this._withinNewTransactionBody(options, fn));
+    } finally {
+      release();
+    }
+  }
+
+  /** @internal */
+  private async _withinNewTransactionBody<T>(
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {

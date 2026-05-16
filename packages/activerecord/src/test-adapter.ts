@@ -77,29 +77,12 @@ const _registeredModelClasses = new Set<any>();
 // Module-level lock to serialize setup() across all SchemaAdapter instances.
 let _setupLock: Promise<void> | null = null;
 
-// Per-inner-adapter mutex for outermost withinNewTransaction calls. Rails uses
-// `connection.lock.synchronize` to serialize concurrent transactions on a
-// shared connection. Concurrent `Promise.all([Model.create, ...])`
-// callers would otherwise corrupt the TM stack on the shared inner adapter.
-// This mutex restores serialization for that case.
-//
-// Reentrancy: AsyncLocalStorage marks "we already hold the lock in THIS async
-// chain." Nested transaction() calls within the same chain (including those
-// fired by after_commit/after_rollback callbacks before
-// inner.withinNewTransaction returns) skip lock acquisition, avoiding deadlock.
-// A concurrent call from a DIFFERENT async chain sees an empty store and
-// correctly blocks on the mutex.
-//
-// Known limitations (both fixed by Phase 8 — push lock into TM itself):
-//   1. `Promise.all([transaction(M, …, requiresNew), transaction(M, …,
-//      requiresNew)])` started from inside a transaction body shares the
-//      parent's storage flag. Both child branches see "in our own chain"
-//      and skip the mutex, then race the TM stack at await points. Exotic
-//      pattern; the common Promise.all(top-level) case IS serialized.
-//   2. Cross-wrapper manual transactions on the same inner adapter aren't
-//      visible to other wrappers in the same chain (_manualTxDepth is
-//      per-instance). Phase 7 deletes SchemaAdapter so this becomes moot.
-const _withinNewTxLocks = new WeakMap<object, Promise<void>>();
+// Async-chain visibility flag for `currentTransaction()` / `inTransaction` /
+// `openTransactions` on the wrapper. Set while a `withinNewTransaction` body
+// is executing on this chain so callers in OUR chain see the inner adapter's
+// transaction state; callers from foreign chains see an empty wrapper. The
+// per-adapter mutex moved to `TransactionManager` in Phase 8 (Rails parity
+// with `@connection.lock.synchronize`).
 let _txLockHeld: AsyncContext<true> | null = null;
 let _txLockHeldAdapter: ReturnType<typeof getAsyncContext> | null = null;
 function _txLockStorage(): AsyncContext<true> {
@@ -113,21 +96,6 @@ function _txLockStorage(): AsyncContext<true> {
     _txLockHeldAdapter = asyncContext;
   }
   return _txLockHeld;
-}
-
-async function _acquireWithinNewTxLock(adapter: object): Promise<() => void> {
-  while (_withinNewTxLocks.has(adapter)) {
-    await _withinNewTxLocks.get(adapter);
-  }
-  let release!: () => void;
-  const lock = new Promise<void>((resolve) => {
-    release = () => {
-      _withinNewTxLocks.delete(adapter);
-      resolve();
-    };
-  });
-  _withinNewTxLocks.set(adapter, lock);
-  return release;
 }
 
 // Set true when createTestAdapter() is called; cleared after data cleanup.
@@ -790,12 +758,9 @@ class SchemaAdapter implements DatabaseAdapter {
       const useSp = isPg() && (this.openTransactions > 0 || this.inTransaction);
       // Force TM materialization (BEGIN on the wire) before SAVEPOINT — TM uses
       // lazy materialization so openTransactions>0 alone doesn't mean BEGIN was sent.
-      // Known limitation: TM.materializeTransactions() returns immediately when
-      // another caller is already materializing, so concurrent statements
-      // inside the same lazy transaction can still race SAVEPOINT-before-BEGIN.
-      // The proper fix lives in TransactionManager (Phase 8 of the plan doc).
-      // The outer mutex in withinNewTransaction prevents the cross-transaction
-      // race that hits MariaDB CI; this case requires deeper TM changes.
+      // Since Phase 8 (#TBD) materializeTransactions() awaits any in-flight
+      // materialization on another chain, so concurrent statements inside the
+      // same lazy transaction no longer race SAVEPOINT-before-BEGIN.
       if (useSp) await this.materializeTransactions();
       const sp = useSp ? `_sr_${attempt}` : "";
       try {
@@ -1015,26 +980,17 @@ class SchemaAdapter implements DatabaseAdapter {
     opts: { isolation?: string | null; joinable?: boolean },
     fn: (tx?: unknown) => Promise<T> | T,
   ): Promise<T> {
+    // setup() runs before TM enters its frame: MySQL DDL implicit-commits
+    // an open tx; PG would try SAVEPOINT before BEGIN was sent.
+    await this.setup();
     const inner = this.inner as any;
-    // Detect "nested in our OWN async chain" via AsyncLocalStorage — not via
-    // shared adapter state. An unrelated concurrent transaction on the same
-    // inner adapter must NOT cause us to bypass the mutex (would race the TM
-    // stack); conversely, callbacks fired from within our own transaction
-    // (after_commit, etc.) must skip the lock to avoid self-deadlock.
+    // Per-connection serialization moved into TransactionManager in Phase 8.
+    // The wrapper still marks "this chain is inside a TM frame on this
+    // adapter" so _txVisible() can expose transaction state to in-chain
+    // callers without leaking it to foreign chains.
     const storage = _txLockStorage();
-    const inOurOwnTx = storage.getStore() === true;
-    if (inOurOwnTx) return inner.withinNewTransaction(opts, fn);
-
-    const release = await _acquireWithinNewTxLock(inner);
-    try {
-      // setup() runs before TM enters its frame (mirrors beginTransaction()'s
-      // existing invariant): MySQL DDL implicit-commits an open tx; PG would
-      // try SAVEPOINT before BEGIN was sent.
-      await this.setup();
-      return await storage.run(true, () => inner.withinNewTransaction(opts, fn));
-    } finally {
-      release();
-    }
+    if (storage.getStore() === true) return inner.withinNewTransaction(opts, fn);
+    return await storage.run(true, () => inner.withinNewTransaction(opts, fn));
   }
 
   currentTransaction() {
@@ -1042,7 +998,7 @@ class SchemaAdapter implements DatabaseAdapter {
     // chain's TM frame as joinable. database-statements.transaction() checks
     // currentTransaction() before falling through to withinNewTransaction;
     // if we exposed a foreign frame here it would "join" and bypass the
-    // outer mutex entirely (failure mode: Promise.all top-level transactions
+    // TM mutex entirely (failure mode: Promise.all top-level transactions
     // observing each other's frame as joinable, breaking serialization).
     // Return null when our own chain has no transaction open.
     if (!this._txVisible()) return null;
