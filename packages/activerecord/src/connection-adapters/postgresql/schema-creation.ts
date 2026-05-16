@@ -24,10 +24,10 @@ import { Utils } from "./utils.js";
 /**
  * Narrowed host interface for the PG-specific schema-creation overrides:
  * the adapter must expose `typeToSql` since the visitor delegates type
- * resolution back to it (Rails parity).
+ * resolution back to it (Rails parity: `delegate :type_to_sql, to: :@conn`).
  * @internal
  */
-interface PgTypeToSqlHost {
+export interface PgSchemaCreationHost extends SchemaQuoter {
   typeToSql(type: string, options?: Record<string, unknown>): string;
 }
 
@@ -57,7 +57,9 @@ export function _pgGeneratedClause(
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
-  constructor(adapter?: SchemaQuoter) {
+  declare protected adapter: PgSchemaCreationHost;
+
+  constructor(adapter?: PgSchemaCreationHost) {
     super("postgres", adapter);
   }
 
@@ -73,10 +75,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
     options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
   ): string {
-    return (this.adapter as unknown as PgTypeToSqlHost).typeToSql(
-      type as string,
-      options as Record<string, unknown>,
-    );
+    return this.adapter.typeToSql(type as string, options as Record<string, unknown>);
   }
 
   /** @internal */
