@@ -3,7 +3,7 @@ import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
 import { Terminal } from "./nodes/node.js";
-import { Route } from "./route.js";
+import { Route, VerbMatchers } from "./route.js";
 
 const SEPARATORS = "/.?";
 
@@ -48,7 +48,7 @@ describe("ActionDispatch::Journey::Route", () => {
     expect((route.requirements["name"] as RegExp).source).toBe("love");
   });
 
-  it("test_ip_address (string constraint)", () => {
+  it("test_ip_address", () => {
     const path = pathFromString("/messages/:id(.:format)");
     const route = new Route({
       name: "name",
@@ -56,7 +56,7 @@ describe("ActionDispatch::Journey::Route", () => {
       constraints: { ip: "192.168.1.1" },
       defaults: { controller: "foo", action: "bar" },
     });
-    expect(route.ip.test("192.168.1.1")).toBe(true);
+    expect(route.ip).toBe("192.168.1.1");
   });
 
   it("test_default_ip", () => {
@@ -66,7 +66,8 @@ describe("ActionDispatch::Journey::Route", () => {
       path,
       defaults: { controller: "foo", action: "bar" },
     });
-    expect(route.ip.test("anything")).toBe(true);
+    expect(route.ip).toBeInstanceOf(RegExp);
+    expect((route.ip as RegExp).source).toBe("(?:)");
   });
 
   it("test_format_with_star", () => {
@@ -106,6 +107,69 @@ describe("ActionDispatch::Journey::Route", () => {
     const path = pathFromString("(/sections/:section)/pages/:id");
     const route = new Route({ name: "name", path, defaults: { action: "show" } });
     expect(route.format({ id: 10, section: null })).toBe("/pages/10");
+  });
+
+  it("VerbMatchers.for resolves canonical and lowercase forms", () => {
+    expect(VerbMatchers.for("GET").verb).toBe("GET");
+    expect(VerbMatchers.for("get").verb).toBe("GET");
+    expect(VerbMatchers.for("all").verb).toBe("");
+  });
+
+  it("VerbMatchers.for returns an Unknown matcher for novel verbs", () => {
+    const m = VerbMatchers.for("propfind");
+    expect(m.verb).toBe("PROPFIND");
+    expect(m.call({ requestMethod: "PROPFIND" })).toBe(true);
+    expect(m.call({ requestMethod: "GET" })).toBe(false);
+  });
+
+  it("matches() honors request_method_match and constraints", () => {
+    const route = new Route({
+      name: "name",
+      path: pathFromString("/posts"),
+      requestMethodMatch: [VerbMatchers.for("GET")],
+      constraints: { subdomain: "api" },
+    });
+    expect(route.matches({ requestMethod: "GET", subdomain: "api" })).toBe(true);
+    expect(route.matches({ requestMethod: "POST", subdomain: "api" })).toBe(false);
+    expect(route.matches({ requestMethod: "GET", subdomain: "www" })).toBe(false);
+  });
+
+  it("matches() supports regex / array / boolean constraint shapes", () => {
+    const route = new Route({
+      name: "name",
+      path: pathFromString("/posts"),
+      constraints: {
+        subdomain: /^api$/,
+        format: ["json", "xml"],
+        signedIn: true,
+      },
+    });
+    expect(
+      route.matches({ requestMethod: "GET", subdomain: "api", format: "json", signedIn: 1 }),
+    ).toBe(true);
+    expect(
+      route.matches({ requestMethod: "GET", subdomain: "www", format: "json", signedIn: 1 }),
+    ).toBe(false);
+    expect(
+      route.matches({ requestMethod: "GET", subdomain: "api", format: "csv", signedIn: 1 }),
+    ).toBe(false);
+    expect(
+      route.matches({ requestMethod: "GET", subdomain: "api", format: "json", signedIn: false }),
+    ).toBe(false);
+  });
+
+  it("verb getter joins all request_method_match verbs with |", () => {
+    const route = new Route({
+      name: "name",
+      path: pathFromString("/posts"),
+      requestMethodMatch: [VerbMatchers.for("GET"), VerbMatchers.for("POST")],
+    });
+    expect(route.verb).toBe("GET|POST");
+  });
+
+  it("isRequiresMatchingVerb is false when only the ALL matcher is present", () => {
+    const route = new Route({ name: "name", path: pathFromString("/posts") });
+    expect(route.isRequiresMatchingVerb()).toBe(false);
   });
 
   it("test_score", () => {

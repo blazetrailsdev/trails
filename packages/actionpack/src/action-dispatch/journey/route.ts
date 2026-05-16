@@ -238,11 +238,14 @@ export class Route {
     return true;
   }
 
-  get ip(): RegExp {
+  /**
+   * Rails: `constraints[:ip] || //`. Returns whatever was supplied in
+   * constraints (typically a String for an exact match or a RegExp);
+   * default is `//` (empty regex — matches anything).
+   */
+  get ip(): string | RegExp {
     const v = this.constraints["ip"];
-    if (v instanceof RegExp) return v;
-    if (typeof v === "string")
-      return new RegExp(`^(?:${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})$`);
+    if (v instanceof RegExp || typeof v === "string") return v;
     return /(?:)/;
   }
 
