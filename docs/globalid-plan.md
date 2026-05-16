@@ -9,17 +9,17 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-9)
+### Parity scoreboard (after GID-11) — **api:compare 100% ✓**
 
 Targets are **pre-skip** — the unportable-surface skip list (see below)
 brings the practical 100% to 56/56 api / 149/149 tests.
 
-| Signal       | Current           | 100% target (pre-skip) | Gap          |
-| ------------ | ----------------- | ---------------------- | ------------ |
-| api:compare  | 57 / 59 (96.6%)   | 59 / 59                | 2 methods    |
-| test:compare | 102 / 158 (64.6%) | 158 / 158              | 56 tests     |
-| files (api)  | 4 / 5             | 5 / 5                  | verifier.ts  |
-| files (test) | 5 / 8             | 8 / 8                  | 3 test files |
+| Signal       | Current              | 100% target (pre-skip) | Gap          |
+| ------------ | -------------------- | ---------------------- | ------------ |
+| api:compare  | **59 / 59 (100%)** ✓ | 59 / 59                | —            |
+| test:compare | 105 / 158 (66.5%)    | 158 / 158              | 53 tests     |
+| files (api)  | **5 / 5** ✓          | 5 / 5                  | —            |
+| files (test) | 6 / 8                | 8 / 8                  | 2 test files |
 
 Per-file api:compare:
 
@@ -29,7 +29,7 @@ Per-file api:compare:
 | `uri/gid.rb`          | 21    | 21    | 100% |
 | `signed_global_id.rb` | 16    | 16    | 100% |
 | `locator.rb`          | 16    | 16    | 100% |
-| `verifier.rb`         | 0     | 2     | 0%   |
+| `verifier.rb`         | 2     | 2     | 100% |
 
 Per-file test:compare:
 
@@ -38,9 +38,9 @@ Per-file test:compare:
 | `uri_gid_test.rb`               | 27    | 30    | 90% |
 | `signed_global_id_test.rb`      | 20    | 24    | 83% |
 | `global_identification_test.rb` | 5     | 6     | 83% |
+| `verifier_test.rb`              | 3     | 4     | 75% |
 | `global_locator_test.rb`        | 37    | 59    | 63% |
 | `global_id_test.rb`             | 13    | 26    | 50% |
-| `verifier_test.rb`              | 0     | 4     | 0%  |
 | `pattern_matching_test.rb`      | 0     | 2     | 0%  |
 | `railtie_test.rb`               | 0     | 7     | 0%  |
 
@@ -213,22 +213,27 @@ ActiveJob use to issue SGIDs without an AR instance. Add the same:
 - Cross-package consumers (ActionCable/ActiveJob ports) can now issue
   SGIDs by calling `SignedGlobalID.setVerifier(...)` once at boot.
 
-### GID-11 — `Verifier` wrapper (~30 LOC)
+### GID-11 — `Verifier` wrapper — **done**
 
-New file `packages/globalid/src/verifier.ts`. Rails has
-`GlobalID::Verifier` wrapping `ActiveSupport::MessageVerifier` with
-sha256 digest. We use `MessageVerifier` directly today; wrap it:
+New file `packages/globalid/src/verifier.ts` exporting `Verifier`. Mirrors
+`GlobalID::Verifier`: SHA-256 digest, URL-safe base64. Implemented as a
+wrapper around our existing `MessageVerifier` (which already supports
+`url_safe: true`) rather than a subclass — TS private fields make
+subclassing MessageVerifier's `encode`/`decode` hooks impractical.
 
-```ts
-export class Verifier {
-  constructor(secret: string) { /* sha256 + url_safe MessageVerifier */ }
-  /** @internal */ encode(data: unknown): string { ... }
-  /** @internal */ decode(token: string): unknown { ... }
-}
-```
+Public surface: `constructor(secret)`, `generate(data, options?)`,
+`verified(message, options?)`. Private hooks for api:compare parity:
+`encode(buf | string)` → urlsafe base64, `decode(str)` → Buffer
+(tolerates both urlsafe and standard forms).
 
-Two private methods (`encode`, `decode`) close out `verifier.rb`. New
-test file `verifier.test.ts` (4 tests) closes the test:compare file.
+`verifier_test.rb` mirror: 3/4 tests match (`generates URL-safe
+messages`, `verifies URL-safe messages`, `verifies non-URL-safe
+messages`). The 4th Ruby test asserts an exact Marshal-serialized
+token that can't be reproduced because we use JSON serialization;
+documented as a permanent skip.
+
+**api:compare verifier.rb: 0% → 100% (2/2). Overall api:compare reaches
+100% (59/59).**
 
 ### Unportable surface — accept as gap, add to skip list
 

@@ -334,6 +334,21 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Tests Marshal/YAML binary encoding of AR records. " +
       "Ruby binary serialization formats have no Node.js equivalent.",
   },
+  // --- globalid: Ruby-Marshal exact-token assertion ---
+  {
+    testFile: "verifier_test.rb",
+    className: "VerifierTest",
+    tests: ["generates URL-safe messages"],
+    reason:
+      "Asserts byte-for-byte equality against a known token produced by " +
+      "Ruby's Marshal serializer wrapped in MessageVerifier. Our globalid " +
+      "Verifier uses JSON serialization (the default for our MessageVerifier), " +
+      "so the encoded payload differs structurally — the same input produces " +
+      "a different (but equivalent) token. The behavioral guarantee this " +
+      "test cares about (urlsafe encoding, no +/=/ chars) is covered by " +
+      "packages/globalid/src/verifier.test.ts asserting char-class absence " +
+      "rather than exact bytes.",
+  },
 ];
 
 export function isSourceUnported(file: string): boolean {
