@@ -928,67 +928,74 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaCreateTableOptionsTest", () => {
+    // Mirrors Rails schema_test.rb SchemaCreateTableOptionsTest:
+    // exercises the createTable → DDL → dump round-trip via the
+    // `options:` table-option string.
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS trains`);
+      await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
+      await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
+    });
+
     it("list partition options is dumped", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE list_partitioned (id integer, city varchar(50)) PARTITION BY LIST (city)`,
-        );
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "list_partitioned");
-        expect(lines.join("\n")).toContain(`options: "PARTITION BY LIST (city)"`);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS list_partitioned`);
-      }
+      await adapter.getDatabaseVersion();
+      if (!adapter.supportsNativePartitioning()) return;
+      const options = "PARTITION BY LIST (kind)";
+      await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
+        t.string("name");
+        t.string("kind");
+      });
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
+
     it("range partition options is dumped", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE range_partitioned (id integer, amount integer) PARTITION BY RANGE (amount)`,
-        );
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "range_partitioned");
-        expect(lines.join("\n")).toContain(`options: "PARTITION BY RANGE (amount)"`);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS range_partitioned`);
-      }
+      await adapter.getDatabaseVersion();
+      if (!adapter.supportsNativePartitioning()) return;
+      const options = "PARTITION BY RANGE (created_at)";
+      await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
+        t.string("name");
+        t.datetime("created_at", { null: false });
+      });
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
+
     it("inherited table options is dumped", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE transportation_modes (name varchar(50), kind varchar(50))`,
-        );
-        await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes)`);
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
-        expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes)"`);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS trains`);
-        await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
-      }
+      await adapter.schemaStatements().createTable("transportation_modes", (t) => {
+        t.string("name");
+        t.string("kind");
+      });
+      const options = "INHERITS (transportation_modes)";
+      await adapter.schemaStatements().createTable("trains", { options });
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
+
     it("multiple inherited table options is dumped", async () => {
-      try {
-        await adapter.exec(`CREATE TABLE vehicles (name varchar(50))`);
-        await adapter.exec(`CREATE TABLE transportation_modes (kind varchar(50))`);
-        await adapter.exec(`CREATE TABLE trains () INHERITS (transportation_modes, vehicles)`);
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
-        expect(lines.join("\n")).toContain(`options: "INHERITS (transportation_modes, vehicles)"`);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS trains`);
-        await adapter.exec(`DROP TABLE IF EXISTS transportation_modes`);
-        await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
-      }
+      await adapter.schemaStatements().createTable("vehicles", (t) => {
+        t.string("name");
+      });
+      await adapter.schemaStatements().createTable("transportation_modes", (t) => {
+        t.string("kind");
+      });
+      const options = "INHERITS (transportation_modes, vehicles)";
+      await adapter.schemaStatements().createTable("trains", { options });
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
+
     it("no partition options are dumped", async () => {
-      try {
-        await adapter.exec(`CREATE TABLE regular_table (id integer, name varchar(50))`);
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "regular_table");
-        expect(lines.join("\n")).not.toContain("PARTITION BY");
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS regular_table`);
-      }
+      await adapter.schemaStatements().createTable("trains", (t) => {
+        t.string("name");
+      });
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
+      expect(lines.join("\n")).not.toContain("options:");
     });
     it("table comment is dumped and round-trips via createTable", async () => {
       try {

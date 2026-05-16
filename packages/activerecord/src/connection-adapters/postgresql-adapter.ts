@@ -4323,7 +4323,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (inherited.length > 0) {
       options.options = `INHERITS (${inherited.join(", ")})`;
     }
-    if (!options.options) {
+    if (!options.options && this.supportsNativePartitioning()) {
       const partDef = await this.tablePartitionDefinition(tableName);
       if (partDef) options.options = `PARTITION BY ${partDef}`;
     }
