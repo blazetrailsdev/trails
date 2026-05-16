@@ -6,7 +6,12 @@ import {
   NotImplementedError,
   TransactionIsolationError,
 } from "../../errors.js";
-import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  NotificationEvent,
+  getAsyncContext,
+  type AsyncContext,
+} from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
@@ -828,8 +833,21 @@ export class TransactionManager {
   private _stack: (Transaction | NullTransaction)[] = [];
   private _connection: TransactionConnection;
   private _hasUnmaterializedTransactions = false;
-  private _materializingTransactions = false;
   private _lazyTransactionsEnabled = true;
+  /** @internal AsyncContext carrying the per-acquisition lock-owner token. */
+  private _lockOwner: AsyncContext<symbol> | null = null;
+  /** @internal Cached AsyncContext adapter (refresh on swap, like other call sites). */
+  private _lockOwnerAdapter: ReturnType<typeof getAsyncContext> | null = null;
+  /** @internal Token identifying the chain that currently holds the lock. */
+  private _currentLockOwner: symbol | null = null;
+  /** @internal Outermost-call mutex; non-null while a foreign chain holds it. */
+  private _lockChain: Promise<void> | null = null;
+  /** @internal AsyncContext carrying the per-materialization owner token. */
+  private _materializingOwner: AsyncContext<symbol> | null = null;
+  /** @internal Cached AsyncContext adapter for the materialize owner. */
+  private _materializingOwnerAdapter: ReturnType<typeof getAsyncContext> | null = null;
+  /** @internal Token identifying the chain currently materializing. */
+  private _currentMaterializingOwner: symbol | null = null;
 
   static readonly NULL_TRANSACTION = Object.freeze(new NullTransaction());
 
@@ -850,6 +868,20 @@ export class TransactionManager {
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
+    return await this.synchronize(() => this._beginTransactionInner(options));
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#begin_transaction
+   * inner body (the part inside `@connection.lock.synchronize`,
+   * `abstract/transaction.rb:507`).
+   * @internal
+   */
+  private async _beginTransactionInner(options: {
+    isolation?: string | null;
+    joinable?: boolean;
+    _lazy?: boolean;
+  }): Promise<Transaction> {
     const { isolation = null, joinable = true, _lazy = true } = options;
     const current = this.currentTransaction;
     const runCommitCallbacks = current instanceof Transaction ? !current.joinable : true;
@@ -931,25 +963,63 @@ export class TransactionManager {
     });
   }
 
-  async materializeTransactions(): Promise<void> {
-    if (this._materializingTransactions) return;
-
-    if (this._hasUnmaterializedTransactions) {
-      try {
-        this._materializingTransactions = true;
-        for (const t of this._stack) {
-          if (t instanceof Transaction && !t.isMaterialized()) {
-            await t.materializeBang();
-          }
-        }
-      } finally {
-        this._materializingTransactions = false;
-      }
-      this._hasUnmaterializedTransactions = false;
+  /** @internal */
+  private _materializingStorage(): AsyncContext<symbol> {
+    const asyncContext = getAsyncContext();
+    if (!this._materializingOwner || this._materializingOwnerAdapter !== asyncContext) {
+      this._materializingOwner = asyncContext.create<symbol>();
+      this._materializingOwnerAdapter = asyncContext;
     }
+    return this._materializingOwner;
   }
 
+  async materializeTransactions(): Promise<void> {
+    // Re-entrant call from inside an in-progress materializeBang on the same
+    // chain — skip to avoid infinite recursion (queries issued by
+    // materializeBang itself call back into here).
+    const storage = this._materializingStorage();
+    if (this._currentMaterializingOwner && storage.getStore() === this._currentMaterializingOwner) {
+      return;
+    }
+    // Mirrors Rails (`abstract/transaction.rb:577-591`): the pass runs under
+    // the per-connection lock. Foreign chains block here; once they enter,
+    // an earlier holder will have flipped `_hasUnmaterializedTransactions`
+    // off and they no-op. `beginTransaction` is wrapped in the same lock
+    // (mirroring Rails line 507) so `_hasUnmaterializedTransactions` cannot
+    // flip back to true mid-pass — making the unconditional clear at the
+    // end of the loop safe by exclusion.
+    await this.synchronize(async () => {
+      if (!this._hasUnmaterializedTransactions) return;
+      const owner = Symbol("tm.materialize");
+      this._currentMaterializingOwner = owner;
+      try {
+        await storage.run(owner, async () => {
+          for (const t of this._stack) {
+            if (t instanceof Transaction && !t.isMaterialized()) {
+              await t.materializeBang();
+            }
+          }
+        });
+        this._hasUnmaterializedTransactions = false;
+      } finally {
+        this._currentMaterializingOwner = null;
+      }
+    });
+  }
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#commit_transaction
+   * (`abstract/transaction.rb:593`). Wrapped in `synchronize` so direct
+   * callers (manual TM use outside `within_new_transaction`) get the same
+   * exclusion the body-internal callers already have. Reentrant for the
+   * common case where this is called from inside `_withinNewTransactionBody`.
+   */
   async commitTransaction(): Promise<void> {
+    await this.synchronize(() => this._commitTransactionInner());
+  }
+
+  /** @internal */
+  private async _commitTransactionInner(): Promise<void> {
     const transaction = this._stack[this._stack.length - 1];
     if (!(transaction instanceof Transaction)) return;
 
@@ -967,7 +1037,17 @@ export class TransactionManager {
     await transaction.commitRecords();
   }
 
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::TransactionManager#rollback_transaction
+   * (`abstract/transaction.rb:610`). Wrapped in `synchronize` for the same
+   * reason as {@link commitTransaction}.
+   */
   async rollbackTransaction(transaction?: Transaction): Promise<void> {
+    await this.synchronize(() => this._rollbackTransactionInner(transaction));
+  }
+
+  /** @internal */
+  private async _rollbackTransactionInner(transaction?: Transaction): Promise<void> {
     const txn = transaction || this._stack[this._stack.length - 1];
 
     if (!(txn instanceof Transaction)) return;
@@ -1006,7 +1086,71 @@ export class TransactionManager {
     this._connection.clearCacheBang?.();
   }
 
+  /**
+   * Async-chain-aware mutex storage. Mirrors Rails'
+   * `@connection.lock.synchronize` (`abstract/transaction.rb:622`): outermost
+   * `within_new_transaction` calls on the same connection serialize, but a
+   * recursive call from inside the body (e.g. `after_commit` re-entry) skips
+   * re-acquisition to avoid self-deadlock.
+   *
+   * Token-based ownership: each acquisition mints a fresh symbol stored both
+   * in the AsyncContext and in `_currentLockOwner`. Reentry requires both to
+   * match — so a detached task that inherits the AsyncContext but outlives
+   * the holder's release (token cleared) correctly re-acquires the lock.
+   *
+   * @internal
+   */
+  private _lockStorage(): AsyncContext<symbol> {
+    const asyncContext = getAsyncContext();
+    if (!this._lockOwner || this._lockOwnerAdapter !== asyncContext) {
+      this._lockOwner = asyncContext.create<symbol>();
+      this._lockOwnerAdapter = asyncContext;
+    }
+    return this._lockOwner;
+  }
+
+  /**
+   * Run `fn` under the per-connection lock that serializes
+   * {@link withinNewTransaction}. Mirrors Rails'
+   * `@connection.lock.synchronize do … end` so callers can extend the lock
+   * scope across pre-/post-transaction work (e.g. DDL setup) without
+   * starting a transaction. Same reentrance rules as
+   * {@link withinNewTransaction}.
+   */
+  async synchronize<T>(fn: () => Promise<T> | T): Promise<T> {
+    const storage = this._lockStorage();
+    if (this._currentLockOwner && storage.getStore() === this._currentLockOwner) {
+      return await fn();
+    }
+    while (this._lockChain) {
+      await this._lockChain;
+    }
+    const owner = Symbol("tm.lock");
+    let release!: () => void;
+    this._lockChain = new Promise<void>((r) => {
+      release = () => {
+        this._lockChain = null;
+        this._currentLockOwner = null;
+        r();
+      };
+    });
+    this._currentLockOwner = owner;
+    try {
+      return await storage.run(owner, () => fn());
+    } finally {
+      release();
+    }
+  }
+
   async withinNewTransaction<T>(
+    options: { isolation?: string | null; joinable?: boolean },
+    fn: (tx: UserTransaction) => Promise<T> | T,
+  ): Promise<T> {
+    return await this.synchronize(() => this._withinNewTransactionBody(options, fn));
+  }
+
+  /** @internal */
+  private async _withinNewTransactionBody<T>(
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
