@@ -17,4 +17,5 @@ export * as Visitors from "./visitors.js";
 
 export { toDot, type DotHost, type DotTransition } from "./nfa/dot.js";
 
-export { MatchData, Simulator, type GtgState, type TransitionTable } from "./gtg/simulator.js";
+export * as GTG from "./gtg/index.js";
+export * as Path from "./path/index.js";
