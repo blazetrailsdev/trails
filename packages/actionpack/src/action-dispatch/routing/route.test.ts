@@ -61,7 +61,43 @@ describe("Route", () => {
     });
   });
 
+  describe("score() — AST-based scoring", () => {
+    it("static segments outscore dynamic captures", () => {
+      const r1 = new Route("GET", "/posts/:id", "posts", "show");
+      const r2 = new Route("GET", "/posts/featured", "posts", "featured");
+      expect(r2.score()).toBeGreaterThan(r1.score());
+    });
+
+    it("scores top-level glob captures as 0 (nested by definition)", () => {
+      const r1 = new Route("GET", "/files/static", "files", "show");
+      const r2 = new Route("GET", "/files/*path", "files", "show");
+      // Static route should outscore the glob route.
+      expect(r1.score()).toBeGreaterThan(r2.score());
+    });
+
+    it("scores symbols inside optional groups as 0", () => {
+      const r1 = new Route("GET", "/posts/:id", "posts", "show"); // top-level :id
+      const r2 = new Route("GET", "/posts(/:id)", "posts", "show"); // optional :id
+      expect(r1.score()).toBeGreaterThan(r2.score());
+    });
+
+    it("knowledge boost applies only to top-level dynamics", () => {
+      const r = new Route("GET", "/posts/:id", "posts", "show");
+      expect(r.score({ id: true })).toBeGreaterThan(r.score());
+    });
+  });
+
   describe("pathFor() — edge cases", () => {
+    it("throws missing-required for top-level *splat captures", () => {
+      const route = new Route("GET", "/files/*path", "files", "show");
+      expect(() => route.pathFor({})).toThrow(/Missing required parameter :path/);
+    });
+
+    it("preserves literal '/' in *splat values (no slash-collapse corruption)", () => {
+      const route = new Route("GET", "/files/*path", "files", "show");
+      expect(route.pathFor({ path: "a/b/c" })).toBe("/files/a/b/c");
+    });
+
     it("throws missing-required when a name is required at the top level even if it also appears optionally", () => {
       // `/:id(.:id)` has `:id` both required (top-level) and inside an
       // optional group. Pattern.requiredNames would drop it; the

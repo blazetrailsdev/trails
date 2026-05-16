@@ -246,13 +246,17 @@ export class Route {
     for (const [k, v] of Object.entries(params)) {
       if (v != null) hash[k] = String(v);
     }
-    // Collapse runs of `/` and strip a trailing `/` (unless that's the
-    // whole string). When all-optional groups partially supply params,
-    // adjacent slashes from omitted groups can leave double slashes
-    // (e.g. `(/:a)(/:b)` with `{ b: "x" }` → `//x`).
     let out = this._pathFormatter.evaluate(hash);
-    out = out.replace(/\/{2,}/g, "/");
-    if (out.length > 1 && out.endsWith("/")) out = out.slice(0, -1);
+    // Collapse runs of `/` left over from omitted optional groups (e.g.
+    // `(/:a)(/:b)` with `{ b: "x" }` → `//x`) and strip a single trailing
+    // slash. Skip when the path can emit literal `/` inside a captured
+    // value — top-level `*splat` or `:controller` parameters preserve
+    // slashes via Format.requiredPath / escapePath, so post-processing
+    // would corrupt those values.
+    if (!hasUnescapedSlashCaptures(this.path)) {
+      out = out.replace(/\/{2,}/g, "/");
+      if (out.length > 1 && out.endsWith("/")) out = out.slice(0, -1);
+    }
     return out;
   }
 
@@ -296,7 +300,22 @@ export class Route {
   }
 }
 
+/**
+ * True when the route can emit literal `/` inside a captured value —
+ * i.e. it has a `*splat` glob or a `:controller` parameter, both of
+ * which use Format.requiredPath / `escapePath` (which preserves `/`).
+ * Slash-collapse post-processing is unsafe for these routes because it
+ * would munge user-supplied glob values containing `/`.
+ */
+function hasUnescapedSlashCaptures(path: string): boolean {
+  return /\*[a-zA-Z_]/.test(path) || /:controller\b/.test(path);
+}
+
 function topLevelSymbolNames(tree: unknown): readonly string[] {
+  // Names of `:symbol` and `*splat` captures that appear strictly outside
+  // any optional `Group`. Stars are treated as required when top-level —
+  // omitting `*path` from a route like `/files/*path` should still throw
+  // missing-parameter rather than silently produce `/files/`.
   const out: string[] = [];
   const seen = new Set<string>();
   const walk = (node: unknown, nested: boolean): void => {
@@ -309,8 +328,14 @@ function topLevelSymbolNames(tree: unknown): readonly string[] {
       left?: unknown;
       right?: unknown;
     };
-    if (n.isGroup?.() || n.isStar?.()) {
+    if (n.isGroup?.()) {
       walk(n.left, true);
+      return;
+    }
+    if (n.isStar?.()) {
+      // The star wraps a Symbol child; that child is the splat name and is
+      // required iff the star itself is top-level.
+      walk(n.left, nested);
       return;
     }
     if (n.isCat?.()) {
