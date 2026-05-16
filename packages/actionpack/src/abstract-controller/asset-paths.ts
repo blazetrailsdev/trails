@@ -33,15 +33,17 @@ export interface AssetPathsHost {
 }
 
 /**
- * Install the AssetPaths config slots on `cls` as static properties
- * with `undefined` defaults. Idempotent — re-applying does not clobber
- * a value, and the prototype-chain check (`slot in host` rather than
- * `Object.hasOwn`) preserves inherited values so subclasses don't
- * shadow a parent's configuration with `undefined`.
+ * Marks a host class as conforming to the `AssetPathsHost` slot
+ * contract. **Does not install anything at runtime** — eager writes of
+ * `undefined` would create own properties on subclasses that
+ * permanently shadow later assignments on a parent class. JS static
+ * inheritance already gives Rails-style propagation: reading an unset
+ * slot from a subclass walks to the parent transparently.
+ *
+ * Kept as a named no-op so call sites mirror Rails'
+ * `include AbstractController::AssetPaths` shape and serve as a
+ * grep-able marker that the host opts into this slot contract.
  */
-export function applyAssetPaths(cls: object): void {
-  const host = cls as Record<AssetPathSlot, unknown>;
-  for (const slot of SLOTS) {
-    if (!(slot in host)) host[slot] = undefined;
-  }
+export function applyAssetPaths(_cls: object): void {
+  // Intentionally empty — see docstring.
 }

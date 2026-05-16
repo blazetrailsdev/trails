@@ -2,15 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyAssetPaths, ASSET_PATH_SLOTS } from "./asset-paths.js";
 
 describe("AbstractController::AssetPaths", () => {
-  it("installs all six Rails-named slots on the host class", () => {
-    class Host {}
-    applyAssetPaths(Host);
-    for (const slot of ASSET_PATH_SLOTS) {
-      expect(Object.hasOwn(Host as object, slot)).toBe(true);
-    }
-  });
-
-  it("defaults each slot to undefined", () => {
+  it("reads slots as undefined when nothing is set anywhere", () => {
     class Host {}
     applyAssetPaths(Host);
     for (const slot of ASSET_PATH_SLOTS) {
@@ -18,7 +10,7 @@ describe("AbstractController::AssetPaths", () => {
     }
   });
 
-  it("does not clobber slots that already carry a value", () => {
+  it("does not clobber slots that already carry a value on the host class", () => {
     class Host {
       static assetHost = "https://cdn.example.com";
     }
@@ -26,7 +18,17 @@ describe("AbstractController::AssetPaths", () => {
     expect(Host.assetHost).toBe("https://cdn.example.com");
   });
 
-  it("does not shadow inherited values when applied to a subclass", () => {
+  it("does not shadow inherited values when applied to a subclass before the parent sets the slot", () => {
+    class Base {}
+    class Sub extends Base {}
+    applyAssetPaths(Sub);
+    // Now the parent sets the slot AFTER applyAssetPaths(Sub).
+    (Base as unknown as { assetHost?: string }).assetHost = "https://cdn.example.com";
+    expect((Sub as unknown as { assetHost?: string }).assetHost).toBe("https://cdn.example.com");
+    expect(Object.hasOwn(Sub, "assetHost")).toBe(false);
+  });
+
+  it("does not shadow inherited values when the parent already had the slot set", () => {
     class Base {
       static assetHost = "https://cdn.example.com";
     }

@@ -18,13 +18,12 @@ export interface LoggerHost {
 }
 
 /**
- * Install the `logger` config slot on `cls` with an `undefined` default.
- * Uses a prototype-chain presence check (`"logger" in host`) so applying
- * to a subclass doesn't shadow a logger already set on a base class.
+ * Marks a host class as conforming to the `LoggerHost` slot contract.
+ * No-op at runtime — see `applyAssetPaths` for the rationale. JS static
+ * inheritance gives Rails-style propagation of `logger` for free.
  */
-export function applyLogger(cls: object): void {
-  const host = cls as Record<string, unknown>;
-  if (!("logger" in host)) host.logger = undefined;
+export function applyLogger(_cls: object): void {
+  // Intentionally empty — see asset-paths.ts docstring.
 }
 
 /**
