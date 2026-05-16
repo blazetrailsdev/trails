@@ -63,18 +63,18 @@ These have agents currently working.
 
 For reference. Body removed (see git log + the PR).
 
-| Batch | Title | PR |
-|------|-------|----|
-| 1 | PG createTable signature harmonization | #1709 |
-| 4 | PG index option parse + emit (Schema Slot C) | #1710 |
-| 5 | PG interval round-trip (interval[] + binary parser) | #1727 |
-| 6 | PG-only type registration + citext aftermath | #1718 |
-| 7 | PG infinity + time-zone wiring | #1711 |
-| 8 | MySQL warnings + quoting + init fidelity | #1723 |
-| 9 | Autosave + has-one Rails-divergence | #1712 |
-| 11 | Query-cache Phases 2–3 wiring | #1713 |
-| 12 | Insert-all conflict-target + IndexDefinition | #1720 |
-| 14 | Fixtures schema-gap closures | #1715 |
+| Batch | Title                                               | PR    |
+| ----- | --------------------------------------------------- | ----- |
+| 1     | PG createTable signature harmonization              | #1709 |
+| 4     | PG index option parse + emit (Schema Slot C)        | #1710 |
+| 5     | PG interval round-trip (interval[] + binary parser) | #1727 |
+| 6     | PG-only type registration + citext aftermath        | #1718 |
+| 7     | PG infinity + time-zone wiring                      | #1711 |
+| 8     | MySQL warnings + quoting + init fidelity            | #1723 |
+| 9     | Autosave + has-one Rails-divergence                 | #1712 |
+| 11    | Query-cache Phases 2–3 wiring                       | #1713 |
+| 12    | Insert-all conflict-target + IndexDefinition        | #1720 |
+| 14    | Fixtures schema-gap closures                        | #1715 |
 
 Other recent closures folded back into queued-batches list:
 
