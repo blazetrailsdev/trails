@@ -104,6 +104,7 @@ describe("CallbacksTest", () => {
     await defineSchema(adapter, {
       people: { name: "string" },
       animals: { name: "string", type: "string" },
+      dogs: { name: "string" },
       topics: { title: "string" },
       cb_posts: { title: "string" },
     });
