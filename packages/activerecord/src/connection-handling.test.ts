@@ -506,6 +506,11 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
   });
 
   describe("AbstractAdapter#isPreventingWrites stack matching", () => {
+    afterEach(() => {
+      connectedToStack().length = 0;
+      Base.connectionHandler.clearAllConnectionsBang();
+    });
+
     it("Base.connectedTo preventing writes applies globally to unrelated pools", () => {
       class UnrelatedAbstract extends Base {
         static {

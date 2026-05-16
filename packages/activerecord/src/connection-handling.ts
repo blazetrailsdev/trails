@@ -877,32 +877,24 @@ export function resolveConfigForConnection(
  * surface AdapterNotSpecified with the available-configs hint instead of
  * silently passing through.
  *
- * The normalized result is cached per (class, rawConfigs) so multi-shard
- * `connectsTo` calls don't pay an N× `DatabaseConfigurations.fromEnv` build
- * when delegating each role through `resolveConfigForConnection`.
+ * Not cached: `DatabaseConfigurations.fromEnv(...)` also folds in
+ * `DATABASE_URL`/`TRAILS_ENV` and updates `DatabaseConfigurations.current`,
+ * so a (class, rawConfigs) cache key would miss later env-state changes
+ * and leave `HashConfig.isPrimary()` consulting a stale registry.
+ * Rebuilding per resolve mirrors Rails' `Base.configurations.resolve(...)`
+ * and keeps the multi-shard `connectsTo` loop honest against later
+ * configuration or env shifts — `fromEnv` is a thin per-call build.
  *
  * @internal
  */
-const _normalizedConfigsCache = new WeakMap<
-  object,
-  { raw: unknown; configs: DatabaseConfigurations }
->();
 function normalizeConfigurations(klass: typeof Base): DatabaseConfigurations {
   const rawConfigs = (klass as any).configurations;
-  const cached = _normalizedConfigsCache.get(klass);
-  if (cached && cached.raw === rawConfigs) return cached.configs;
-
-  let configs: DatabaseConfigurations;
-  if (rawConfigs instanceof DatabaseConfigurations) {
-    configs = rawConfigs;
-  } else if (rawConfigs && typeof rawConfigs === "object") {
-    configs = DatabaseConfigurations.fromEnv(
+  if (rawConfigs instanceof DatabaseConfigurations) return rawConfigs;
+  if (rawConfigs && typeof rawConfigs === "object") {
+    return DatabaseConfigurations.fromEnv(
       (rawConfigs as { toH?: () => RawConfigurations }).toH?.() ??
         (rawConfigs as RawConfigurations),
     );
-  } else {
-    configs = DatabaseConfigurations.fromEnv({});
   }
-  _normalizedConfigsCache.set(klass, { raw: rawConfigs, configs });
-  return configs;
+  return DatabaseConfigurations.fromEnv({});
 }
