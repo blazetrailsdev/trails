@@ -7845,11 +7845,46 @@ describe("PreloaderTest", () => {
     expect(preloaded.name).toBe("Available");
   });
 
-  it.skip("preload with available records sti", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs STI */
+  it("preload with available records sti", async () => {
+    const adapter = freshAdapter();
+    class StiBook extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class StiEssay extends Base {
+      static {
+        this.tableName = "sti_essays";
+        this.attribute("body", "string");
+        this.attribute("type", "string");
+        this.attribute("sti_book_id", "integer");
+        this.inheritanceColumn = "type";
+        this.adapter = adapter;
+      }
+    }
+    class StiEssaySpecial extends StiEssay {}
+    Associations.hasOne.call(StiBook, "essay", {
+      className: "StiEssay",
+      foreignKey: "sti_book_id",
+    });
+    registerModel("StiBook", StiBook);
+    registerModel("StiEssay", StiEssay);
+    registerModel("StiEssaySpecial", StiEssaySpecial);
+
+    const book = await StiBook.create({ title: "B" });
+    const essaySpecial = await StiEssaySpecial.create({ body: "s", sti_book_id: book.id });
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [book],
+      associations: "essay",
+      availableRecords: [[essaySpecial]],
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    expect(queryCalls).toHaveLength(0);
+    const preloaded = (book as any)._preloadedAssociations.get("essay");
+    expect(preloaded).toBe(essaySpecial);
   });
 
   it("preload with only some records available", async () => {
@@ -7922,17 +7957,120 @@ describe("PreloaderTest", () => {
     expect(author2.name).toBe("Loaded");
   });
 
-  it.skip("preload with available records with through association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs through preload with available records */
+  it("preload with available records with through association", async () => {
+    const adapter = freshAdapter();
+    class TAAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TACategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TAEssay extends Base {
+      static {
+        this.attribute("ta_author_id", "integer");
+        this.attribute("ta_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(TAAuthor, "essays", {
+      className: "TAEssay",
+      foreignKey: "ta_author_id",
+    });
+    Associations.belongsTo.call(TAEssay, "category", {
+      className: "TACategory",
+      foreignKey: "ta_category_id",
+    });
+    Associations.hasMany.call(TAAuthor, "essayCategories", {
+      through: "essays",
+      source: "category",
+      className: "TACategory",
+    });
+    registerModel("TAAuthor", TAAuthor);
+    registerModel("TACategory", TACategory);
+    registerModel("TAEssay", TAEssay);
+
+    const author = await TAAuthor.create({ name: "David" });
+    const cat = await TACategory.create({ name: "General" });
+    await TAEssay.create({ ta_author_id: author.id, ta_category_id: cat.id });
+    const categories = await TACategory.all().toArray();
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [author],
+      associations: "essayCategories",
+      availableRecords: categories,
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    // One query for the middle (essay) records; categories come from availableRecords
+    expect(queryCalls).toHaveLength(1);
+    const preloaded = (author as any)._preloadedAssociations.get("essayCategories") ?? [];
+    expect(preloaded.map((c: any) => c.id)).toContain(cat.id);
   });
-  it.skip("preload with only some records available with through associations", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs through preload */
+
+  it("preload with only some records available with through associations", async () => {
+    const adapter = freshAdapter();
+    class TBAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TBCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TBEssay extends Base {
+      static {
+        this.attribute("tb_author_id", "integer");
+        this.attribute("tb_category_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(TBAuthor, "essays", {
+      className: "TBEssay",
+      foreignKey: "tb_author_id",
+    });
+    Associations.belongsTo.call(TBEssay, "category", {
+      className: "TBCategory",
+      foreignKey: "tb_category_id",
+    });
+    Associations.hasMany.call(TBAuthor, "essayCategories", {
+      through: "essays",
+      source: "category",
+      className: "TBCategory",
+    });
+    registerModel("TBAuthor", TBAuthor);
+    registerModel("TBCategory", TBCategory);
+    registerModel("TBEssay", TBEssay);
+
+    const mary = await TBAuthor.create({ name: "Mary" });
+    const dave = await TBAuthor.create({ name: "Dave" });
+    const tech = await TBCategory.create({ name: "Tech" });
+    const general = await TBCategory.create({ name: "General" });
+    await TBEssay.create({ tb_author_id: mary.id, tb_category_id: tech.id });
+    await TBEssay.create({ tb_author_id: dave.id, tb_category_id: general.id });
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [mary, dave],
+      associations: "essayCategories",
+      availableRecords: [tech],
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    // One query for essays, one for the missing category (general)
+    expect(queryCalls).toHaveLength(2);
+    const maryCats = (mary as any)._preloadedAssociations.get("essayCategories") ?? [];
+    const daveCats = (dave as any)._preloadedAssociations.get("essayCategories") ?? [];
+    expect(maryCats.map((c: any) => c.id)).toContain(tech.id);
+    expect(daveCats.map((c: any) => c.id)).toContain(general.id);
   });
 
   it("preload with available records with multiple classes", async () => {
@@ -7980,23 +8118,117 @@ describe("PreloaderTest", () => {
     expect((posts[0] as any)._preloadedAssociations.get("pmAuthor").name).toBe("Auth");
   });
 
-  it.skip("preload with available records queries when scoped", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs scoped preloading */
+  it("preload with available records queries when scoped", async () => {
+    const adapter = freshAdapter();
+    class QSAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class QSPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("qs_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(QSPost, "author", {
+      className: "QSAuthor",
+      foreignKey: "qs_author_id",
+    });
+    registerModel("QSAuthor", QSAuthor);
+    registerModel("QSPost", QSPost);
+
+    const david = await QSAuthor.create({ name: "David" });
+    const post = await QSPost.create({ title: "P", qs_author_id: david.id });
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [post],
+      associations: "author",
+      scope: QSAuthor.where({ name: "David" }) as any,
+      availableRecords: [david],
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    // Scope present → availableRecords ignored, runs the query
+    expect(queryCalls).toHaveLength(1);
   });
-  it.skip("preload with available records queries when collection", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs collection preloading */
+
+  it("preload with available records queries when collection", async () => {
+    const adapter = freshAdapter();
+    class QCPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class QCComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("qc_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(QCPost, "comments", {
+      className: "QCComment",
+      foreignKey: "qc_post_id",
+    });
+    registerModel("QCPost", QCPost);
+    registerModel("QCComment", QCComment);
+
+    const post = await QCPost.create({ title: "P" });
+    const c1 = await QCComment.create({ body: "c1", qc_post_id: post.id });
+    const comments = [c1];
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [post],
+      associations: "comments",
+      availableRecords: comments,
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    // Collection association → availableRecords skipped, runs the query
+    expect(queryCalls).toHaveLength(1);
   });
-  it.skip("preload with available records queries when incomplete", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs incomplete record detection */
+
+  it("preload with available records queries when incomplete", async () => {
+    const adapter = freshAdapter();
+    class QIAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class QIPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("qi_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(QIPost, "author", {
+      className: "QIAuthor",
+      foreignKey: "qi_author_id",
+    });
+    registerModel("QIAuthor", QIAuthor);
+    registerModel("QIPost", QIPost);
+
+    const david = await QIAuthor.create({ name: "David" });
+    const bob = await QIAuthor.create({ name: "Bob" });
+    const post = await QIPost.create({ title: "P", qi_author_id: david.id });
+
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsForKeys");
+    await new Preloader({
+      records: [post],
+      associations: "author",
+      availableRecords: [bob],
+    }).call();
+    const queryCalls = spy.mock.calls.filter((c) => (c[0] as unknown[]).length > 0);
+    // Bob doesn't match david's key → still 1 query
+    expect(queryCalls).toHaveLength(1);
+    const preloaded = (post as any)._preloadedAssociations.get("author");
+    expect(preloaded?.id).toBe(david.id);
   });
 
   it("preload with unpersisted records no ops", async () => {

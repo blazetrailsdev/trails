@@ -7,7 +7,7 @@ export interface PreloaderOptions {
   records: Base[];
   associations: any;
   scope?: any;
-  availableRecords?: Base[];
+  availableRecords?: (Base | Base[])[];
   associateByDefault?: boolean;
 }
 
@@ -29,7 +29,7 @@ export class Preloader {
   readonly associateByDefault: boolean;
 
   private _tree: Branch;
-  private _availableRecords: Base[];
+  private _availableRecords: (Base | Base[])[];
 
   constructor(options: PreloaderOptions) {
     this.records = options.records;
