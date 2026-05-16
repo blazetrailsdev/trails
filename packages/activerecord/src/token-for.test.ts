@@ -223,7 +223,7 @@ describe("TokenForTest", () => {
     });
     const item = await CustomPkItem.create({ uuid: "abc-123", name: "test" });
     expect(item.uuid).toBe("abc-123");
-    const token = await item.signedId();
+    const token = item.signedId();
     const found = await CustomPkItem.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("test");
@@ -239,7 +239,7 @@ describe("TokenForTest", () => {
       }
     }
     const item = await CpkItem.create({ shop_id: 1, id: 42, name: "cpk-test" });
-    const token = await item.signedId();
+    const token = item.signedId();
     const found = await CpkItem.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("cpk-test");

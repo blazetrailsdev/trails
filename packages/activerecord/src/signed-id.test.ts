@@ -44,7 +44,7 @@ describe("SignedIdTest", () => {
   it("find signed record within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId({ expiresIn: 60 });
+    const token = u.signedId({ expiresIn: 60 });
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("Alice");
@@ -53,7 +53,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Bob" });
-    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
+    const token = u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
@@ -61,7 +61,7 @@ describe("SignedIdTest", () => {
   it("fail to find record from that has since been destroyed", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Carol" });
-    const token = await u.signedId();
+    const token = u.signedId();
     await u.destroy();
     const result = await User.findSigned(token);
     expect(result).toBeNull();
@@ -70,7 +70,7 @@ describe("SignedIdTest", () => {
   it("fail to find signed record with purpose", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Dan" });
-    const token = await u.signedId({ purpose: "login" });
+    const token = u.signedId({ purpose: "login" });
     const result = await User.findSigned(token, { purpose: "reset" });
     expect(result).toBeNull();
   });
@@ -83,7 +83,7 @@ describe("SignedIdTest", () => {
   it("find signed record with bang with purpose", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Eve" });
-    const token = await u.signedId({ purpose: "confirm" });
+    const token = u.signedId({ purpose: "confirm" });
     const found = await User.findSignedBang(token, { purpose: "confirm" });
     expect(found.name).toBe("Eve");
   });
@@ -91,7 +91,7 @@ describe("SignedIdTest", () => {
   it("find signed record with bang with purpose raises", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Frank" });
-    const token = await u.signedId({ purpose: "confirm" });
+    const token = u.signedId({ purpose: "confirm" });
     await expect(User.findSignedBang(token, { purpose: "reset" })).rejects.toThrow();
   });
 
@@ -105,7 +105,7 @@ describe("SignedIdTest", () => {
     const { User } = makeModel();
     let capturedToken: string | null = null;
     User.afterCreate(async (record: any) => {
-      capturedToken = await record.signedId();
+      capturedToken = record.signedId();
     });
     await User.create({ name: "Henry" });
     expect(capturedToken).not.toBeNull();
@@ -123,7 +123,7 @@ describe("SignedIdTest", () => {
       }
     }
     const t = await Toy.create({ toy_id: "abc-123", name: "Block" });
-    const token = await t.signedId();
+    const token = t.signedId();
     const found = await Toy.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("Block");
@@ -142,7 +142,7 @@ describe("SignedIdTest", () => {
       static {}
     }
     const d = await Dog.create({ name: "Rex" });
-    const token = await d.signedId();
+    const token = d.signedId();
     const found = await Dog.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("Rex");
@@ -171,7 +171,7 @@ describe("SignedIdTest", () => {
       }
     }
     const t = await Toy.create({ toy_id: "k-9", name: "Robot" });
-    const token = await t.signedId();
+    const token = t.signedId();
     const found = await Toy.findSignedBang(token);
     expect(found.name).toBe("Robot");
   });
@@ -189,7 +189,7 @@ describe("SignedIdTest", () => {
       static {}
     }
     const c = await Car.create({ name: "Sedan" });
-    const token = await c.signedId();
+    const token = c.signedId();
     const found = await Car.findSignedBang(token);
     expect(found.name).toBe("Sedan");
   });
@@ -197,7 +197,7 @@ describe("SignedIdTest", () => {
   it("find signed record within expiration time", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Timed" });
-    const token = await u.signedId({ expiresIn: 30_000 });
+    const token = u.signedId({ expiresIn: 30_000 });
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.name).toBe("Timed");
@@ -206,14 +206,14 @@ describe("SignedIdTest", () => {
   it("fail to find signed record within expiration time", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Expired" });
-    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
+    const token = u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     const result = await User.findSigned(token);
     expect(result).toBeNull();
   });
   it("finding signed record that has been destroyed raises on the bang", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Ivan" });
-    const token = await u.signedId();
+    const token = u.signedId();
     await u.destroy();
     await expect(User.findSignedBang(token)).rejects.toThrow(RecordNotFound);
   });
@@ -226,7 +226,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await UserShort.create({ name: "Jake" });
-    const token = await u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
+    const token = u.signedId({ expiresAt: Temporal.Now.instant().subtract({ seconds: 1 }) });
     await expect(UserShort.findSignedBang(token)).rejects.toThrow(
       /Expired message|InvalidSignature/,
     );
@@ -257,7 +257,7 @@ describe("SignedIdTest", () => {
   it("always output url_safe", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Safe" });
-    const token = await u.signedId();
+    const token = u.signedId();
     // Base64 tokens should not contain characters unsafe for URLs
     // Standard base64 uses +, /, = which are URL-safe enough for query params
     expect(typeof token).toBe("string");
@@ -273,7 +273,7 @@ describe("SignedIdTest", () => {
     setSignedIdVerifier(User as any, customVerifier);
     expect(signedIdVerifier(User as any)).toBe(customVerifier);
     const u = await User.create({ name: "Custom" });
-    const token = await u.signedId();
+    const token = u.signedId();
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(u.id);
@@ -287,7 +287,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId();
+    const token = u.signedId();
     const found = await User.findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(u.id);
@@ -301,7 +301,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId();
+    const token = u.signedId();
     const found = await User.where({ name: "Alice" }).findSigned(token);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(u.id);
@@ -317,7 +317,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId();
+    const token = u.signedId();
     const found = await User.findSignedBang(token);
     expect(found.id).toBe(u.id);
   });
@@ -330,7 +330,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId();
+    const token = u.signedId();
     const found = await User.where({ name: "Alice" }).findSignedBang(token);
     expect(found.id).toBe(u.id);
     await expect(User.where({ name: "Bob" }).findSignedBang(token)).rejects.toThrow();
@@ -344,7 +344,7 @@ describe("SignedIdTest", () => {
       }
     }
     const u = await User.create({ name: "Alice" });
-    const token = await u.signedId({ purpose: "confirm" });
+    const token = u.signedId({ purpose: "confirm" });
     const found = await User.findSigned(token, { purpose: "confirm" });
     expect(found).not.toBeNull();
     expect(found!.id).toBe(u.id);
@@ -355,7 +355,7 @@ describe("SignedIdTest", () => {
   it("find signed record with a bang within expiration duration", async () => {
     const { User } = makeModel();
     const u = await User.create({ name: "Timely" });
-    const token = await u.signedId({ expiresIn: 60 });
+    const token = u.signedId({ expiresIn: 60 });
     const found = await User.findSignedBang(token);
     expect(found.id).toBe(u.id);
   });
@@ -537,7 +537,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = await User.create({ name: "Alice" });
-    const sid = await user.signedId();
+    const sid = user.signedId();
     expect(typeof sid).toBe("string");
     expect(sid.length).toBeGreaterThan(0);
   });
@@ -563,7 +563,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = await User.create({ name: "Bob" });
-    const sid = await user.signedId();
+    const sid = user.signedId();
     const found = await User.findSigned(sid);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(user.id);
@@ -592,7 +592,7 @@ describe("signedId / findSigned / findSignedBang", () => {
       }
     }
     const user = await User.create({ name: "Carol" });
-    const sid = await user.signedId({ purpose: "password_reset" });
+    const sid = user.signedId({ purpose: "password_reset" });
     // Wrong purpose returns null
     const wrongPurpose = await User.findSigned(sid, { purpose: "login" });
     expect(wrongPurpose).toBeNull();
