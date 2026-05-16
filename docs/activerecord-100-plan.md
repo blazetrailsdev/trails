@@ -104,70 +104,15 @@ Other recent closures folded back into queued-batches list:
 
 ---
 
-## Post-merge findings (2026-05-16 triage cycle)
+## Post-merge inline notes (2026-05-16 triage cycle)
 
-Followups extracted from `~/.btwhooks/.../<PR>/post-pr/*.md` for the 2026-05-16 merge wave. Items needing dedicated batches are listed below as new queued batches (B109+). Other followups are recorded inline against the relevant cluster/file.
+Actionable items from the merge wave that don't fit a standalone batch. Sized followups have been promoted to batches B109–B118; this section captures the residue.
 
-### From #1742 (Batch 79 — Transactions Slot D)
-
-- **~30 LOC** — `restore previously new record after double save` (transactions.test.ts:~1167) still skipped. Needs Rails-trace research: in Rails, between save#1 and save#2 inside the same outer user-tx, is `@_previously_new_record` actually mutated, or only at commit time? If commit-only, the per-call snapshot is fine. Otherwise: replace closure snapshot with `_restoreTransactionRecordState` reading `_startTransactionState`, level-guarded. **Files:** `transactions.ts#withTransactionReturningStatus`. Belongs in [Batch 111 below](#batch-111).
-- **~10 LOC** — `primaryKey = "movieid"` auto-declare DX gap. `setPrimaryKeyAttr` in `attribute-methods/primary-key.ts` is a one-liner; lazy auto-declare (only if no later `attribute()` or schema-load fires) would let `makeSQLiteMovie` drop redundant `this.attribute("movieid", "integer")`. Risk: many models call `primaryKey = ...` in a static block + rely on later schema reflection; eager declare clobbers schema-driven type.
-
-### From #1741 (Insert-all triage)
-
-- **~10 LOC** — extend `insert-all.ts#verifyAttributes` to reject keys not in `model.attributeNames`, throwing `UnknownAttributeError`. Unblocks `insert-all.test.ts:738` "insert all raises on unknown attribute" + likely 2 "clear error message when a column does not exist" tests.
-- **~6 LOC** — add `insertAllBang`/`upsertAllBang` class-level wrappers in `querying.ts` mirroring `insertAll`/`upsertAll` delegations. Then retarget the unknown-attribute test to `Book.insertAllBang(...)` to match Rails call shape.
-- **~250 LOC triage slot** — Batch 109 below: sharpen remaining ~60 single-line `BLOCKED:` annotations in `insert-all.test.ts` into the three-line BLOCKED/ROOT-CAUSE/SCOPE format. Clusters: timestamps (~15 tests, shared root cause: no implicit `created_at`/`updated_at` handling in `insert-all.ts#mapKeyWithValue`), RETURNING (~4, pg-only), readonly (~3, no `_readonlyAttributes` filter), schema/index (~7).
-
-### From #1740 (Batch 82 — Unknown-triage Slot A)
-
-- **~30 LOC** — Port 3 hstore `store_accessor` tests (hstore_test.rb:118/136/157): `test_with_store_accessors`, `test_duplication_with_store_accessors`, `test_changes_with_store_accessors`. `storeAccessor` is implemented; tests just need bodies. Verify per-accessor dirty aliases (`<accessor>_changed?`, `_was`, `_change`) are wired on the storeAccessor-defined module first (+~10 LOC `store.ts` if not).
-- **~20 LOC** — Per-attribute `<attr>_before_type_cast` alias method generation. Generic `readAttributeBeforeTypeCast(name)` is implemented (`attribute-methods/before-type-cast.ts:21`), but Rails generates per-attribute aliases via `define_method`. Add to `attribute-methods.ts` generation pipeline. Unblocks hstore "cast value on write" + all `<attr>_before_type_cast` tests across types.
-- **Mechanical sweep** — `normalize-skips.ts` previously had `/PERMANENT:/` regex that missed `PERMANENT-SKIP:` (the canonical marker). Fixed in #1740. Audit `grep "PERMANENT:" scripts/` for other tooling with the same bug.
-- **~1 LOC cleanup** — `scripts/api-compare/unported-files.ts:480` has a pre-existing `className` type error (not introduced by #1740).
-
-### From #1737 (Phase 5 root cluster C)
-
-Phase 5 root cluster C remainder, each ships as its own PR using the async `freshAdapter` + `defineSchema` pattern:
-
-- **~250 LOC** — `enum.test.ts` (~77 freshAdapter sites, 2018 LOC). Largest remaining root offender. May need split.
-- **~250 LOC** — `attribute-methods.test.ts` (~79 sites, 1872 LOC). Likely splits along inner describes.
-- **~150 LOC** — `attributes.test.ts` (~58 sites, 835 LOC). Single-PR sized.
-- **~80 LOC** — `attribute-methods/` subtree: `query.test.ts`, `read.test.ts`, `write.test.ts`, `time-zone-conversion.test.ts`. Bundle as one PR.
-
-Pattern note: `as const` on a TEST_SCHEMA with wrapped `{ columns, primaryKey }` breaks structural assignment to `Schema` (readonly tuples). Cast `: Schema` and drop `as const`. Flat column-only schemas can keep `as const`.
-
-### From #1736 (Batch 47 — MySQL table-options)
-
-- **~80–150 LOC (Batch 110 below)** — Route `TableDefinition#toSql()` through `schemaCreation.accept(...)` (Arel-style visitor). Today only `addColumn`/`addIndex`/`changeColumn` go through the visitor on MySQL; `createTable` still uses the abstract toSql() switch which never inspects `options.autoIncrement`. This unblocks re-introducing the `AbstractMysqlAdapter.createTableDefinition` override (the 6th item in Batch 47 that was reverted because dropping AUTO_INCREMENT broke MariaDB CI).
-- **~5 LOC** — Re-add `AbstractMysqlAdapter.createTableDefinition` override (`return new MysqlTableDefinition(name, rest)` with adapter/adapterName stripped) once the toSql work above lands. Plumbing already there from commit `13ed839c4` in #1736.
-- **Watchpoint** — `MigrationContext.createTable` now has three PK code paths in `_columnMeta` build (`compositePk` array, `primaryKey: false`, `primaryKey: "name"` string). Future batches touching this method should verify `id: false` with `primaryKey: ["a","b"]` interactions through `force: :cascade` recreation.
-
-### From #1735 (Batch 44 — Connection-pool B+C)
-
-- **~30 LOC** — Align `withRoleAndShard`/`connectingTo`/`connectedToMany` to Rails' `[self]` semantics: push `[self]`, resolve `connection_class_for_self` at read time via `klasses.include?(...)`. Then update `core.ts#matchesStack` + `AbstractAdapter#isPreventingWrites` to walk at read time too. Closes the primary-abstract-without-`connectsTo` leak documented inline at `abstract-adapter.ts:735`.
-- **~10 LOC** — `core.ts#matchesStack:336` uses `k.name === "Base"` string match. Switch to the `_isActiveRecordBase` own-property marker for consistency once the bigger followup above lands.
-- **~5 LOC** — Add a `connectionSpecificationName` reader test pinning the new "primary class → 'Base'" branch (`connection-handling.ts:~373`). Exercised indirectly today via primary-class test.
-
-### From #1734 (Phase 5 root cluster B)
-
-Phase 5 root remainder, each its own PR (continues #1734's pattern):
-
-- **~150 LOC** — `calculations.test.ts` (~101 freshAdapter sites, 7596 LOC). Schema map large (Account, Company, Firm + many test-local variants). Probably one PR.
-- **~200 LOC** — `persistence.test.ts` (~141 sites, 4789 LOC). Schema surface bigger (Topic, Reply, Post, Author, Category). May need split if test-bodies need async upgrades beyond call sites.
-
-Notes: `it(name, () => {})` callbacks that previously called sync `freshAdapter()` must flip to `async () => {`. Adapter calls outside `freshAdapter()` (e.g. inline `createTestAdapter()` in `beforeEach`) need their own conversion — grep for them after the sed.
-
-### From #1733 (Batch 41 — Migration B/C/E)
-
-- **~10 LOC** — `Migration.properTableName` (`migration.ts:1334`) skips the `name.respond_to?(:table_name)` branch from Rails (`migration.rb:1119-1125`). If a caller passes a model class, the TS port stringifies the class into prefix/name/suffix template instead of returning `klass.tableName`. Not exercised today.
-- **~80–120 LOC** — Flesh out `Migration.copy` (`migration.ts:1350`) to honor engine `scope` on `MigrationProxy` (Rails emits `${version}_${name.underscore}.${scope}.rb` + supports `on_skip`/`on_copy` callbacks). Today the TS stub just `copyFileSync`s. The `MigrationProxy.scope` field this batch added is present-but-unused on the copy path.
-
-### From #1732 (Batch 27 — HMT post-#1714 composite)
-
-- **~60 LOC** — Polymorphic-through with composite owner PK. Documented by the `it.skip` added in #1732. Needs: (a) require explicit single-column `primaryKey:` option on polymorphic-through, (b) validation in `Reflection` or `_throughOwnerPolymorphic` rejecting composite `primaryKey:` with `ConfigurationError`, (c) flip the skip to a real assertion.
-- **~20 LOC** — Audit whether `_throughOwnerCols`' `options.queryConstraints` FK branch (`collection-proxy.ts:~1042`) is reachable. `Reflection`'s constructor rejects `queryConstraints:` on user-defined associations and rewrites `foreignKey:[]` → reflection-level. If branch is dead, delete; if reachable via some not-yet-exercised builder, add a fixture.
-- **~30 LOC** — Sweep `has-one-through-association.ts` for analogous composite-PK/composite-FK throws that still raise plain `Error` (the corresponding CollectionProxy paths in HMT now use `ConfigurationError`).
+- **Mechanical sweep (from #1740)** — `normalize-skips.ts` `/PERMANENT:/` regex previously missed `PERMANENT-SKIP:`. Fixed in #1740. Audit `grep "PERMANENT:" scripts/` for other tooling with the same bug.
+- **~1 LOC cleanup (from #1740)** — `scripts/api-compare/unported-files.ts:480` has a pre-existing `className` type error (not introduced by #1740).
+- **Watchpoint (from #1736)** — `MigrationContext.createTable` now has three PK code paths in `_columnMeta` (`compositePk` array, `primaryKey: false`, `primaryKey: "name"` string). Future batches touching this method should verify `id: false` with `primaryKey: ["a","b"]` interactions through `force: :cascade` recreation.
+- **Pattern note (from #1737)** — `as const` on a TEST_SCHEMA with wrapped `{ columns, primaryKey }` breaks structural assignment to `Schema` (readonly tuples). Cast `: Schema` and drop `as const`. Flat column-only schemas can keep `as const`.
+- **Pattern note (from #1734)** — When migrating to async `freshAdapter`, callbacks previously calling sync `freshAdapter()` must flip to `async () => {`. Inline `createTestAdapter()` outside `freshAdapter()` (e.g. in `beforeEach`) needs its own conversion — grep for them after the sed.
 
 ---
 
