@@ -72,6 +72,7 @@ import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 const getTemporalTypeParser = makeGetTypeParser(pg.types);
 const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
 const OID_INTERVAL = 1186;
+const OID_INTERVAL_ARRAY = 1187;
 import {
   READ_QUERY,
   executeBatch as pgExecuteBatch,
@@ -333,8 +334,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           getTypeParser: (oid: number, format?: string) => {
             // PG interval (OID 1186): return the raw ISO 8601 string so the
             // AR Interval type can Duration.parse() it (Rails sets
-            // intervalstyle = iso_8601 per connection).
-            if (oid === OID_INTERVAL && format !== "binary") return (v: unknown) => v;
+            // intervalstyle = iso_8601 per connection). For binary format
+            // pg-types ships no interval decoder, so explicitly delegate to
+            // the built-in (text-only assumption: configureConnection sets
+            // intervalstyle, so we never receive binary intervals in
+            // practice — this branch is documented passthrough).
+            if (oid === OID_INTERVAL) {
+              return format === "binary"
+                ? pg.types.getTypeParser(OID_INTERVAL, "binary")
+                : (v: unknown) => v;
+            }
+            // PG interval[] (OID 1187): pg-types hard-codes parseInterval as
+            // the element parser, bypassing our OID 1186 override. Return the
+            // raw array literal so AR Array.deserialize parses the elements
+            // through Interval.castValue (Duration.parse on ISO 8601).
+            if (oid === OID_INTERVAL_ARRAY && format !== "binary") return (v: unknown) => v;
             if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
               return (v: unknown) => v;
             return oid === 1082 && !PostgreSQLAdapter.decodeDates
@@ -410,8 +424,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           // When decodeDates is false, skip the date parser (OID 1082) so
           // pg returns the raw string — mirrors Rails' decode_dates flag.
           // PG interval (OID 1186): return raw ISO 8601 string for AR
-          // Interval (intervalstyle = iso_8601 is set on connect).
-          if (oid === OID_INTERVAL && format !== "binary") {
+          // Interval (intervalstyle = iso_8601 is set on connect). Binary
+          // format is delegated to the pg-types built-in — see the
+          // matching branch in the connectionString constructor for the
+          // text-only-in-practice rationale.
+          if (oid === OID_INTERVAL) {
+            const fallback =
+              format === "binary"
+                ? pg.types.getTypeParser(OID_INTERVAL, "binary")
+                : (v: unknown) => v;
+            return userGetTypeParser?.(oid, format) ?? fallback;
+          }
+          // PG interval[] (OID 1187): pg-types hard-codes parseInterval as
+          // the element parser, so we must override the array OID too. Raw
+          // array literal is handed to AR Array.deserialize, which routes
+          // each element through Interval.castValue.
+          if (oid === OID_INTERVAL_ARRAY && format !== "binary") {
             const fallback = (v: unknown) => v;
             return userGetTypeParser?.(oid, format) ?? fallback;
           }
