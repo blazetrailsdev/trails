@@ -98,13 +98,28 @@ describe("Route", () => {
       expect(route.pathFor({ path: "a/b/c" })).toBe("/files/a/b/c");
     });
 
-    it("collapses slashes when splat-bearing optional is omitted", () => {
-      // The route *declares* a splat inside an optional but the user
-      // doesn't supply it. The supplied-value check should detect that
-      // no value contains `/`, so the collapse runs and removes the
-      // leading `//` from the omitted optional.
+    it("collapses slashes when slash-bearing-capture optional is omitted", () => {
+      // The route declares a `:controller` (which preserves `/` in its
+      // value via Format.requiredPath) but the user doesn't supply it.
+      // The supplied-value check should detect that no used value
+      // contains `/`, so the collapse runs and removes the leading `//`
+      // from the omitted optional.
       const route = new Route("GET", "(/:controller)(/:action)", "x", "y");
       expect(route.pathFor({ action: "show" })).toBe("/show");
+    });
+
+    it("ignores unused params when deciding whether to collapse slashes", () => {
+      // `extra` isn't declared in the route, so a `/` in its value must
+      // not block the collapse of the structural double-slash.
+      const route = new Route("GET", "(/:a)(/:b)", "x", "y");
+      expect(route.pathFor({ b: "x", extra: "/" } as Record<string, string>)).toBe("/x");
+    });
+
+    it("treats empty-string required params as missing", () => {
+      // Format.evaluate would emit `""` and leave structural slashes
+      // around it, producing malformed URLs like `//x`. Throw instead.
+      const route = new Route("GET", "/:a/:b", "x", "y");
+      expect(() => route.pathFor({ a: "", b: "x" })).toThrow(/Missing required parameter :a/);
     });
 
     it("does not lose route params named __proto__ / constructor", () => {

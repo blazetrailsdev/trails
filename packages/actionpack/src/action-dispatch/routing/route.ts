@@ -243,7 +243,12 @@ export class Route {
       this._requiredParamNames = topLevelSymbolNames(tree);
     }
     for (const name of this._requiredParamNames!) {
-      if (!Object.hasOwn(params, name) || params[name] == null) {
+      // Empty string is treated as missing — Format.evaluate would still
+      // emit a literal `""` and leave structural slashes around it,
+      // producing malformed URLs like `//x`. Rails URL helpers raise on
+      // empty required params for the same reason.
+      const v = params[name];
+      if (!Object.hasOwn(params, name) || v == null || v === "") {
         throw new Error(
           `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
         );
@@ -264,7 +269,7 @@ export class Route {
     // Format.requiredPath / escapePath, preserving `/`) and collapsing
     // would munge them. When the slash-bearing capture is omitted (e.g.
     // it's inside an unsatisfied optional group), collapsing is safe.
-    if (!suppliedAnySlash(params)) {
+    if (!suppliedAnySlash(params, this.paramNames)) {
       out = out.replace(/\/{2,}/g, "/");
       if (out.length > 1 && out.endsWith("/")) out = out.slice(0, -1);
     }
@@ -312,14 +317,19 @@ export class Route {
 }
 
 /**
- * True if any supplied param value contains a literal `/`. Glob and
- * `:controller` captures preserve slashes (via `escapePath`), so when
- * such a value is actually supplied, post-process slash-collapse would
- * corrupt it. When no supplied value contains `/`, collapse is safe
- * even if the route declares a splat/controller that was omitted.
+ * True if any supplied param value that the route actually uses
+ * contains a literal `/`. Glob and `:controller` captures preserve
+ * slashes (via `escapePath`), so when such a value is actually
+ * supplied, post-process slash-collapse would corrupt it. Unused
+ * params are ignored — they never reach the formatter output.
  */
-function suppliedAnySlash(params: Record<string, string | number>): boolean {
-  for (const v of Object.values(params)) {
+function suppliedAnySlash(
+  params: Record<string, string | number>,
+  declaredNames: readonly string[],
+): boolean {
+  const declared = new Set(declaredNames);
+  for (const [k, v] of Object.entries(params)) {
+    if (!declared.has(k)) continue;
     if (typeof v === "string" && v.includes("/")) return true;
   }
   return false;
