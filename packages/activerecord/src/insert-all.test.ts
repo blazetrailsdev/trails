@@ -112,16 +112,6 @@ describe("InsertAllTest", () => {
     expect(found.author).toBe("New Author");
   });
 
-  it.skip("insert all raises on unknown attribute", async () => {
-    // BLOCKED: relation — insert_all.rb: unknown-attr rejection
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
-    const adapter = freshAdapter();
-    const Book = makeBook(adapter);
-    const count = await Book.insertAll([{ title: "Valid", nonexistent_col: "oops" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
   it("insert all with enum values", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
@@ -210,23 +200,11 @@ describe("InsertAllTest", () => {
     }
   });
 
-  it.skip("insert all raises on unknown attribute", async () => {
-    // BLOCKED: relation — insert_all.rb: unknown-attr rejection
-    // ROOT-CAUSE: insert-all.test.ts test model/fixture setup incomplete for some edge cases
-    // SCOPE: ~20 LOC in insert-all.test.ts test setup; affects ~64 tests
-    const adapter = freshAdapter();
-    const Book = makeBook(adapter);
-    const count = await Book.insertAll([{ title: "Valid", nonexistent_col: "oops" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
   it.skip("insert all raises on duplicate records", () => {
     // BLOCKED: relation — insert_all.rb: raises on duplicate (unique constraint)
-    /* needs unique constraint enforcement in memory adapter */
   });
   it.skip("insert all with returning", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
-    /* needs RETURNING clause support */
   });
   itIfConflictTarget("insert all skip duplicates", async () => {
     const adapter = freshAdapter();
@@ -268,7 +246,6 @@ describe("InsertAllTest", () => {
 
   it.skip("upsert all does not update readonly attributes", () => {
     // BLOCKED: relation — insert_all.rb: readonly attrs not updated
-    /* needs readonly attribute checking in upsert */
   });
 
   it.skip("upsert all updates changed columns only", () => {
@@ -288,7 +265,6 @@ describe("InsertAllTest", () => {
 
   it.skip("insert_all has a clear error message when a column does not exist", () => {
     // BLOCKED: relation — insert_all.rb: clear error on missing column
-    /* needs column validation */
   });
 
   it("insert_all can insert records with timestamps", async () => {
@@ -311,7 +287,6 @@ describe("InsertAllTest", () => {
 
   it.skip("insert_all with on_duplicate updates record timestamps", () => {
     // BLOCKED: relation — insert_all.rb: timestamp touch on on_duplicate
-    /* needs ON CONFLICT DO UPDATE with timestamp columns */
   });
   it("insert_all with raw sql on_duplicate", async () => {
     const Book = makeBookWithAdapter();
@@ -328,11 +303,9 @@ describe("InsertAllTest", () => {
   });
   it.skip("upsert all has a clear error message when a column does not exist", () => {
     // BLOCKED: relation — insert_all.rb: clear error on missing column in upsert
-    /* needs column validation */
   });
   it.skip("upsert all with unique_by column not an index raises error", () => {
     // BLOCKED: schema — insert_all.rb: uniqueBy column must be an index
-    /* needs index introspection */
   });
 
   it.skip("upsert all supports update_only option", () => {
@@ -342,11 +315,9 @@ describe("InsertAllTest", () => {
 
   it.skip("upsert all supports returning option", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
-    /* needs RETURNING clause support */
   });
   it.skip("insert_all! raises on duplicate", () => {
     // BLOCKED: relation — insert_all.rb: insert_all! raises on duplicate
-    /* needs unique constraint enforcement */
   });
   it("insert_all with empty array", async () => {
     const adapter = freshAdapter();
@@ -418,7 +389,6 @@ describe("InsertAllTest", () => {
 
   it.skip("insert_all respects attribute aliases", () => {
     // BLOCKED: relation — insert_all.rb: aliasAttribute support
-    /* needs aliasAttribute support */
   });
   it("insert_all does not modify given array", async () => {
     const adapter = freshAdapter();
@@ -464,19 +434,15 @@ describe("InsertAllTest", () => {
   });
   it.skip("insert_all can insert rows with all defaults", () => {
     // BLOCKED: relation — insert_all.rb: insert row with all-default columns
-    /* needs default value insertion without explicit columns */
   });
   it.skip("insert_all generates correct sql", () => {
     // BLOCKED: relation — insert_all.rb: SQL generation for insertAll
-    /* needs SQL inspection / adapter-specific SQL generation */
   });
   it.skip("upsert_all generates correct sql", () => {
     // BLOCKED: relation — insert_all.rb: SQL generation for upsertAll
-    /* needs SQL inspection / adapter-specific SQL generation */
   });
   it.skip("insert_all with returning and on_duplicate", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING + ON CONFLICT clause
-    /* needs RETURNING + ON CONFLICT */
   });
   it("insert_all with on_duplicate raw sql", async () => {
     const Book = makeBookWithAdapter();
@@ -492,19 +458,15 @@ describe("InsertAllTest", () => {
   });
   it.skip("insert_all does not include readonly attributes", () => {
     // BLOCKED: relation — insert_all.rb: readonly attrs excluded from insertAll
-    /* needs readonly attribute filtering in insertAll */
   });
   it.skip("upsert_all does not include readonly attributes", () => {
     // BLOCKED: relation — insert_all.rb: readonly attrs excluded from upsertAll
-    /* needs readonly attribute filtering in upsertAll */
   });
   it.skip("insert_all! raises for duplicate records", () => {
     // BLOCKED: relation — insert_all.rb: insert_all! raises for duplicate records
-    /* needs unique constraint enforcement */
   });
   it.skip("insert! raises for invalid records", () => {
     // BLOCKED: validation — insert_all.rb: insert! validates records
-    /* needs validation in insert! */
   });
 
   it("upsert_all noop when empty", async () => {
@@ -773,10 +735,15 @@ describe("InsertAllTest", () => {
     expect(found.title).toBe("Updated");
   });
 
-  it("insert all raises on unknown attribute", async () => {
+  it.skip("insert all raises on unknown attribute", async () => {
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#verifyAttributes checks row-key uniformity across rows but not membership in model.attributeNames; Rails raises ActiveRecord::UnknownAttributeError (insert_all_test.rb#test_insert_all_raises_on_unknown_attribute).
+    // SCOPE: ~10 LOC — extend verifyAttributes to assert keys ⊆ model.attributeNames; affects ~3 tests
+    const { UnknownAttributeError } = await import("./errors.js");
     const Book = makeBookWithAdapter();
-    const count = await Book.insertAll([{ title: "Valid" }]);
-    expect(count).toBeGreaterThanOrEqual(1);
+    await expect(
+      Book.all().insertAllBang([{ title: "Valid", unknown_attribute: "x" }]),
+    ).rejects.toThrow(UnknownAttributeError);
   });
 
   it("skip duplicates strategy does not secretly upsert", async () => {
