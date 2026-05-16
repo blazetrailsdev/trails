@@ -2,7 +2,7 @@
 
 **Snapshot 2026-05-11:** api:compare is closed at 100% (4969/4969 methods). Remaining work is test:compare un-skips — getting Rails-mirrored test bodies to run and pass.
 
-**This doc is the strategy + vocabulary reference.** Active work — in-flight PRs, post-merge followups, story count — lives in [`activerecord-100-plan.md`](activerecord-100-plan.md). Per-cluster slot detail (slot descriptions, LOC sizing, audit attribution, overlap notes) lives in [`activerecord-100-clusters.md`](activerecord-100-clusters.md). Read this doc when you're starting fresh and need to understand _how_ we work; read the plan when you want to see _what's open today_; read the clusters when you're picking _which slot to spawn_.
+**This doc is the strategy + vocabulary reference.** Active work — open batches, per-cluster followups, story count, guardrails — lives in [`activerecord-100-plan.md`](activerecord-100-plan.md). Read this doc when you're starting fresh and need to understand _how_ we work; read the plan when you want to see _what's open today_.
 
 **PR sizing target: ~250 LOC** (range 220–280 within the 300-LOC hard ceiling from CLAUDE.md). No small PRs (review-cycle overhead per PR is fixed; 50-LOC PRs aren't worth it). No huge PRs (anything ≥300 needs to split). Bundle small adjacent gaps into ~250-LOC slots; split anything that overflows along a natural seam.
 
@@ -205,8 +205,7 @@ Permanently not-portable tests are excluded via `UNPORTED_FILES` in `scripts/api
 
 ## See also
 
-- [`activerecord-100-plan.md`](activerecord-100-plan.md) — live work tracker: in-flight PRs, post-merge fidelity followups, story count, guardrails.
-- [`activerecord-100-clusters.md`](activerecord-100-clusters.md) — per-cluster slot detail: slot descriptions, LOC sizing, audit attribution, overlap notes.
+- [`activerecord-100-plan.md`](activerecord-100-plan.md) — live work tracker: open batches, per-cluster followups, story count, guardrails.
 - [`docs/explicit-test-schema-plan.md`](explicit-test-schema-plan.md) — `defineSchema` + `AR_NO_AUTO_SCHEMA` migration plan for test infrastructure.
 - [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts) — canonical not-portable list with reasons.
 - `$HOME/github/blazetrailsdev/test-compare-prompt-template.md` — agent prompt template for un-skip work.

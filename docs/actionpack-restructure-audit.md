@@ -282,6 +282,14 @@ renames these to hyphenated Rails-literal forms
 (`abstract-controller/`, `action-dispatch/`, etc.) and adds the
 missing `action-pack/` sibling.
 
+### Wave 2 — action_dispatch mechanical moves (P1) — closed (#1603)
+
+**Wave 2b followup (~100 LOC):** Move `actiondispatch/dispatch/*.test.ts` to correct subdirectories (`http/`, `middleware/`, `routing/`); delete empty `dispatch/`, `session/`, `dispatch/request/` directories (only re-export stubs remain); update test import paths.
+
+**Dedup followup (~50 LOC, separate PR):** Consolidate `request-forgery-protection.ts` and `http-authentication.ts` — both have full impls under `actiondispatch/` but Rails places them under `action_controller/metal/`. Move impl to metal, remove the actiondispatch copies.
+
+(Original scope kept below for reference.)
+
 ### Wave 2 — action_dispatch mechanical moves (P1) (1 PR, ~500 LOC)
 
 All dispatch-root files relocated to their Rails-mirrored homes in
@@ -312,6 +320,18 @@ one PR. Pure path moves; method bodies untouched.
   (Rails has these only under `action_controller/metal/`).
 - Delete the empty `actiondispatch/dispatch/` directory.
 
+### Wave 3 — AbstractController split — closed (#1615); Wave 3.5 hyphenated rename closed (#1621)
+
+**Followups:**
+
+- ~50 LOC — `abstract-controller/callbacks.ts` is types-only (Rails `callbacks.rb` is a full `Callbacks` concern with `ClassMethods`/`ActionFilter`). api:compare 0/6 today. Extract callback registration class methods from `base.ts`.
+- ~5 LOC — `extract-ruby-api.rb` extractor splits `ActionPack` module methods by source file. `actionpackversion` shows 1/2 because `version()` (in `version.rb`) is attributed to `gem-version.ts`. Per-file method attribution needed.
+- ~30 LOC — `sed` sweep on `docs/actionpack-restructure-audit.md` to update older-wave prose still using concat names (`actiondispatch/` etc.) → hyphenated form.
+- Sweep — other `extends Error` classes in actionpack; verify whether any should chain through `AbstractControllerError` (only `DoubleRenderError` wired so far).
+- `action-dispatch/index.ts` keeps its own `VERSION` const (mirrors Rails `action_dispatch.rb`); decide whether to consolidate under `action-pack/`.
+
+(Original Wave 3 scope kept below for reference.)
+
 ### Wave 3 — AbstractController split (P2) (1 PR, ~450 LOC)
 
 Single PR creates `abstractcontroller/` top-level dir and extracts the
@@ -326,6 +346,19 @@ sub-files:
 - Update `packages/actionpack/src/index.ts` to export both.
 - Ship the tooling edits called out in the Tooling impact section
   below (config.ts, compare.ts, test-compare entries).
+
+### Wave 4 — testing relocation — closed (#1625)
+
+**Followups (~550 LOC across 4 PRs):**
+
+- ~80 LOC — `TestRequest` setters + class methods (12 Rails methods missing: `DEFAULT_ENV`, `create(env)`, `default_env`, setters for `request_method=`/`host=`/`port=`/`request_uri=`/`path=`/`action=`/`if_modified_since=`/`if_none_match=`/`remote_addr=`/`user_agent=`/`accept=`). Mechanical port.
+- ~120 LOC — Implement `TestResponse` (`parsed_body` / `from_response` / `response_parser`) in new `action-dispatch/testing/test-response.ts`. Needs `RequestEncoder` parser registry first (or simple MIME→parser map).
+- ~150 LOC — Implement `TestProcess` module in new `action-dispatch/testing/test-process.ts` (`file_fixture_upload` / `assigns` / `session` / `flash` / `cookies` / `redirect_to_url`). `assigns` should raise NoMethodError per Rails (gem extracted) — preserve fidelity.
+- ~200 LOC — Split assertions out of `TestCase`/`IntegrationTest`: extract `assertResponse`/`assertRedirectedTo`/`assertHeader`/`assertContentType` into `action-dispatch/testing/assertions/response.ts`; create `action-dispatch/testing/assertions/routing.ts` (`assertRouting`/`assertRecognizes`/`assertGenerates`). Behavior-touching refactor; keep public surface stable via TestCase mixin.
+
+Pre-existing notes: `TestSession` is a Map wrapper (Rails extends `Rack::Session::Abstract::PersistedSecure::SecureSessionHash`; surface is camel-equivalent). `LiveTestResponse` extends `Response` (Rails extends `Live::Response`); acceptable until SSE testing exercised.
+
+(Original Wave 4 scope kept below for reference.)
 
 ### Wave 4 — testing relocation (P1+P2) (1 PR, ~450 LOC)
 
@@ -349,7 +382,14 @@ Verified mapping already present in
 so api:compare has nothing to verify. Closed as no-op; bundled with
 Wave 6 to avoid a doc-only PR.
 
-### Wave 6 closed — action-dispatch top-level infra files
+### Wave 6 closed — action-dispatch top-level infra files (#1629)
+
+**Followups:**
+
+- ~30 LOC — Align `action-controller/log-subscriber.ts` with the new pattern: extend `@blazetrails/activesupport` LogSubscriber, call `attachTo("action_controller")`, register `subscribeLogLevel` per method. Mirror Rails `action_controller/log_subscriber.rb`.
+- ~5 LOC — Surface `HTTP_STATUS_CODES` barrel re-export at actionpack root (consumers currently reach into rack).
+- ~1 line — Audit-doc note that `ActionDispatch.Constants.VARY` is exported as a namespace by design (matches Rails `module Constants`); Copilot flagged twice as a divergence — it isn't.
+- Pre-existing: `action-controller/deprecator.ts` naming consistency with the `Railtie → Trailtie` precedent (kept as `Deprecator` deliberately; document or rename).
 
 Created as real implementations from Rails source (no stubs, per
 project policy):
@@ -551,18 +591,32 @@ ship in parallel once L+S+V are in):
 LOC ceiling waived per Wave 7's mechanical-port nature. TS LOC ≈
 Ruby × 1.3. Test LOC ports inline alongside the source PR.
 
-| PR  | Cluster | Files                                                              | Src LOC | Test LOC | Total | Deps |
-| --- | ------- | ------------------------------------------------------------------ | ------- | -------- | ----- | ---- |
-| 1   | L       | `router/utils.rb`, `nfa/dot.rb`, `gtg/simulator.rb` + index barrel | ~240    | ~80      | ~320  | —    |
-| 2   | S₁      | `scanner.rb`                                                       | ~100    | ~100     | ~200  | 1    |
-| 3   | S₂      | `nodes/node.rb` + `parser.rb`                                      | ~400    | ~260     | ~660  | 2    |
-| 4   | V       | `visitors.rb`                                                      | ~350    | —        | ~350  | 3, 1 |
-| 5   | P       | `path/pattern.rb`                                                  | ~270    | ~280     | ~550  | 3, 4 |
-| 6   | G       | `gtg/transition_table.rb` + `gtg/builder.rb`                       | ~480    | ~220     | ~700  | 3    |
-| 7   | R₁      | `route.rb` + `routes.rb`                                           | ~350    | ~190     | ~540  | 5, 6 |
-| 8   | R₂      | `formatter.rb`                                                     | ~300    | ~150     | ~450  | 4, 7 |
-| 9   | R₃      | `router.rb`                                                        | ~200    | ~500     | ~700  | 7, 8 |
-| 10  | wire-up | `actiondispatch/routing/route-set.ts` swap                         | ~200    | included | ~200  | 9    |
+| PR                    | Cluster | Files                                                              | Src LOC | Test LOC | Total | Deps |
+| --------------------- | ------- | ------------------------------------------------------------------ | ------- | -------- | ----- | ---- |
+| ~~1~~ closed (#1634)  | L       | `router/utils.rb`, `nfa/dot.rb`, `gtg/simulator.rb` + index barrel | ~240    | ~80      | ~320  | —    |
+| ~~2~~ closed (#1639)  | S₁      | `scanner.rb`                                                       | ~100    | ~100     | ~200  | 1    |
+| ~~3~~ closed (#1643)  | S₂      | `nodes/node.rb` + `parser.rb`                                      | ~400    | ~260     | ~660  | 2    |
+| ~~4~~ closed (#1648)  | V       | `visitors.rb`                                                      | ~350    | —        | ~350  | 3, 1 |
+| ~~5~~ closed (#1654)  | P       | `path/pattern.rb`                                                  | ~270    | ~280     | ~550  | 3, 4 |
+| ~~6~~ closed (#1664)  | G       | `gtg/transition_table.rb` + `gtg/builder.rb`                       | ~480    | ~220     | ~700  | 3    |
+| ~~7~~ closed (#1668)  | R₁      | `route.rb` + `routes.rb`                                           | ~350    | ~190     | ~540  | 5, 6 |
+| ~~8~~ closed (#1673)  | R₂      | `formatter.rb`                                                     | ~300    | ~150     | ~450  | 4, 7 |
+| ~~9~~ closed (#1680)  | R₃      | `router.rb`                                                        | ~200    | ~500     | ~700  | 7, 8 |
+| ~~10~~ closed (#1685) | wire-up | `actiondispatch/routing/route-set.ts` swap (Journey seam)          | ~200    | included | ~200  | 9    |
+
+**🎯 Wave 7 complete.** PRs 1–10 merged. `RouteSet.recognize` uses Journey by default (#1696); legacy `matchSegments` engine deleted (#1721); native short-circuit return (#1706); RegExp requirements pushed into AST (#1702); `Route#match` delegates to Journey via lazy per-instance `buildJourneyRouter` + `journeyRecognize`.
+
+**Wave 7 followups:**
+
+- ~80 LOC — Journey GTG symbol char-class widening based on requirement regex (`transition_table.ts` Builder consult `Pattern.requirements`). Unblocks SKIPPED named-character-classes test (`routing.test.ts:1268`) for `filename: /(.+)/` matching dotted paths.
+- ~80 LOC — Real dispatcher registry; replace throwing-stub `app` in bridge so `Router.serve` becomes real dispatch.
+- ~30 LOC — Swap `RouterRequest`/`RoutableApp`/`FormatterHost` interim interfaces for real `ActionDispatch::Request` types.
+
+**Wave 7 PR 1 followups (~25 LOC):**
+
+- ~10 LOC — Drop dead `ESCAPED` regex in `journey/router/utils.ts`. Audit four `UNSAFE_*` regexes for the `/u` flag (non-BMP characters split into surrogate pairs and percent-encode to U+FFFD bytes; Rails works on UTF-8 bytes).
+- ~15 LOC — `unescapeUri` non-BMP support (`codePointAt` + variable step).
+- Pre-existing: `normalizePath` `%Aa` not normalized (faithful Rails port — `/(%[a-f0-9]{2})/` no `/i`). `toGraphviz` doesn't escape label content (`@internal` debug-only, same as Rails). `escapeSegment`/`unescapeUri` callers in trails (activerecord URL generation, actionview link helpers) may have depended on old buggy `+` handling — grep when next touching routing.
 
 **Total: 10 PRs, ~4670 TS LOC.** PRs 4 and 6 can ship in parallel once
 PR 3 lands; PR 5 follows PR 4 (Path/Pattern subclasses

@@ -1,6 +1,6 @@
 /**
  * HMT Slot E — Nested-through advanced. Closes the HMT cluster
- * (docs/activerecord-100-clusters.md). Regression contracts for
+ * (docs/activerecord-100-plan.md). Regression contracts for
  * distinct, same-table-twice, polymorphic source + sourceType,
  * source-reflection reset between independent preloads, and the
  * autosave-skip guarantee. Mirrors selected scenarios from
