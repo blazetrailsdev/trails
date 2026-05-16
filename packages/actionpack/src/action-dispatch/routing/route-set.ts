@@ -80,14 +80,12 @@ export class RouteSet {
   }
 
   /**
-   * Recognize a request: find the first matching route.
+   * Recognize a request: find the first matching route. Delegates to the
+   * Journey-backed router; the legacy `Route#match` engine remains in place
+   * for direct test callers but is no longer used by RouteSet.
    */
   recognize(method: string, path: string): MatchedRoute | null {
-    for (const route of this.routes) {
-      const m = route.match(method, path);
-      if (m) return m;
-    }
-    return null;
+    return recognizeViaJourney(this.journeyRouter, method, path);
   }
 
   /**
