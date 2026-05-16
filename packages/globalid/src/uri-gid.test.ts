@@ -70,6 +70,30 @@ describe("URI::GIDTest", () => {
     const c = parseGid("gid://bcxxx/Persona/1");
     expect(a.app).not.toBe(c.app);
   });
+
+  it("build with wrong ordered array creates a wrong ordered gid", () => {
+    // Rails: URI::GID.build(['Person', '5', 'bcx', nil]) misorders the
+    // positional (app, modelName, modelId, params) tuple. The resulting
+    // URI is not equal to the canonical gid://bcx/Person/5.
+    const wrong = buildGid("Person", "5", "bcx");
+    expect(wrong).toBe("gid://Person/5/bcx");
+    expect(wrong).not.toBe("gid://bcx/Person/5");
+  });
+
+  it("new returns invalid gid when not checking", () => {
+    // Rails: URI::GID.new(*URI.split('gid:///')) bypasses URI::GID.parse
+    // validation. The Trails analog is constructing GID directly with
+    // synthetic components — the parse path is skipped so no error is
+    // raised even though the URI string is non-canonical.
+    const synthetic = new GID("gid:///", {
+      app: "",
+      modelName: "",
+      modelId: "",
+      params: {},
+    });
+    expect(synthetic).toBeTruthy();
+    expect(synthetic.uri).toBe("gid:///");
+  });
 });
 
 describe("URI::GIDModelIDEncodingTest", () => {
@@ -176,6 +200,17 @@ describe("URI::GIDParamsTest", () => {
   it("as String", () => {
     const uri = buildGid("bcx", "Person", "5", { hello: "world" });
     expect(uri).toBe("gid://bcx/Person/5?hello=world");
+  });
+
+  it("immutable params", () => {
+    // Rails: mutating @gid.params doesn't affect @gid.to_s, because to_s
+    // returns the URI string fixed at construction time. Trails: toString()
+    // returns the cached uri, so post-construction params writes don't
+    // leak into the rendered URI either.
+    const gid = GID.parse("gid://bcx/Person/5?hello=world");
+    gid.params["param"] = "value";
+    expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
+    expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
   });
 });
 
