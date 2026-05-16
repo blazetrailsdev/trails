@@ -1458,8 +1458,36 @@ describe("ReflectionTest", () => {
     expect(ref).not.toBeNull();
     expect(ref!.name).toBe("books");
   });
-  it.skip("reflect on missing source assocation raise exception", () => {
-    // BLOCKED: Hotel/Chef fixture models + check_validity! not yet ported — Slot C.
+  it("reflect on missing source assocation raise exception", () => {
+    // Mirrors Rails test/cases/reflection_test.rb: Hotel has_many :lost_items,
+    // through: :departments; Department has no :lost_items assoc.
+    class MsHotel extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class MsDepartment extends Base {
+      static {
+        this.attribute("hotel_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("MsHotel", MsHotel);
+    registerModel("MsDepartment", MsDepartment);
+    Associations.hasMany.call(MsHotel, "departments", {
+      className: "MsDepartment",
+      foreignKey: "hotel_id",
+    });
+    Associations.hasMany.call(MsHotel, "lostItems", {
+      through: "departments",
+      className: "MsLostItem",
+    });
+
+    const ref = reflectOnAssociation(MsHotel, "lostItems") as ThroughReflection;
+    expect(ref).not.toBeNull();
+    expect(ref.sourceReflection).toBeNull();
+    expect(() => (ref as any).checkValidityBang()).toThrow(/Could not find the source association/);
   });
   it.skip("name error from incidental code is not converted to name error for association", () => {
     // UNPORTED: relies on Ruby const_missing mechanism — no JS equivalent.

@@ -928,7 +928,7 @@ export function buildHasOne(
     buildAttrs[`${underscore(options.as)}_type`] = ctor.name;
   }
 
-  let targetModel = resolveModel(className);
+  let targetModel = resolveAssocClass(record, _assocName, className);
   const inheritanceCol = getInheritanceColumn(targetModel);
   if (inheritanceCol && buildAttrs[inheritanceCol]) {
     const typeName = buildAttrs[inheritanceCol] as string;
@@ -951,7 +951,7 @@ export function buildBelongsTo(
 ): Base {
   const className = options.className ?? camelize(_assocName);
 
-  let targetModel = resolveModel(className);
+  let targetModel = resolveAssocClass(_record, _assocName, className);
   const inheritanceCol = getInheritanceColumn(targetModel);
   if (inheritanceCol && attrs[inheritanceCol]) {
     const typeName = attrs[inheritanceCol] as string;
@@ -1379,7 +1379,7 @@ export async function loadHasOneThrough(
   const targetFk = `${underscore(sourceName)}_id`;
   const fkValue = throughRecord._readAttribute(targetFk);
   if (fkValue === null || fkValue === undefined) return null;
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(throughRecord, sourceName, className);
   return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
 }
 
@@ -1515,7 +1515,7 @@ export async function loadHabtm(
 
   const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(singularize(assocName));
-  const targetModel = resolveModel(className);
+  const targetModel = resolveAssocClass(record, assocName, className);
   const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
   const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
@@ -1576,7 +1576,9 @@ export async function processDependentAssociations(record: Base): Promise<void> 
         }
       } else if (dep === "delete") {
         // Bulk delete avoids N+1 on join tables (HABTM middle hasMany)
-        const childModel = resolveModel(
+        const childModel = resolveAssocClass(
+          record,
+          assoc.name,
           (assoc.options.className as string) ?? camelize(singularize(assoc.name)),
         );
         const fk = (assoc.options.foreignKey as string) ?? `${underscore(ctor.name)}_id`;
@@ -1996,7 +1998,7 @@ export async function updateCounterCaches(
     } else {
       className = assoc.options.className ?? camelize(assoc.name);
     }
-    const targetModel = resolveModel(className);
+    const targetModel = resolveAssocClass(record, assoc.name, className);
 
     // Counter column name
     const counterCol =
@@ -2239,7 +2241,7 @@ export async function touchBelongsToParents(record: Base): Promise<void> {
     } else {
       className = assoc.options.className ?? camelize(assoc.name);
     }
-    const targetModel = resolveModel(className);
+    const targetModel = resolveAssocClass(record, assoc.name, className);
 
     const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
