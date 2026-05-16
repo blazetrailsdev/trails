@@ -1364,19 +1364,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // shape as _pushThrough / _buildThroughScope); composite owners go
     // through the column-paired helper.
     const throughAs = throughAssoc.options.as;
-    const ownerConditions = throughAs
-      ? (() => {
-          const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAs);
-          return { [poly.idCol]: poly.idValue, [poly.typeCol]: poly.typeValue };
-        })()
+    const poly = throughAs ? this._throughOwnerPolymorphic(throughAssoc, ctor, throughAs) : null;
+    const ownerConditions: Record<string, unknown> = poly
+      ? { [poly.idCol]: poly.idValue, [poly.typeCol]: poly.typeValue }
       : this._throughOwnerAttrs(throughAssoc, ctor);
     // Guard against unsaved owners / missing composite components — otherwise
     // findBy({fk: null}) would translate to IS NULL and could destroy an
     // orphan join row. Mirrors the short-circuits in _buildThroughScope and
     // _deleteThroughAllSql.
-    const polyIdValue = throughAs ? (ownerConditions as any)[`${underscore(throughAs)}_id`] : null;
-    if (throughAs ? polyIdValue == null : Object.values(ownerConditions).some((v) => v == null)) {
+    if (poly ? poly.idValue == null : Object.values(ownerConditions).some((v) => v == null)) {
       return;
+    }
+    // Apply the polymorphic-source discriminator the same way _deleteThroughAllSql
+    // and _buildThroughScope do, so we don't destroy a join row belonging to a
+    // different source type that happens to share the id.
+    if (this._assocDef.options.sourceType) {
+      const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+      ownerConditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
     }
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
