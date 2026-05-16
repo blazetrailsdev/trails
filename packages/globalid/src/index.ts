@@ -4,6 +4,7 @@ export { _resetApp } from "./config.js";
 export { GlobalID } from "./global-id.js";
 export type { GlobalIDModel, GlobalIDOptions } from "./global-id.js";
 export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";
+export { Verifier } from "./verifier.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";
