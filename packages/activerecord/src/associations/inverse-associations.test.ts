@@ -217,17 +217,64 @@ describe("InverseBelongsToTests", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
     /* needs deep recursive inverse */
   });
-  it.skip("unscope does not set inverse when incorrect", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs unscope support */
+  it("unscope does not set inverse when incorrect", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Human, "interests");
+    Associations.belongsTo.call(Interest, "human");
+    registerModel(Human);
+    registerModel(Interest);
+
+    const human = await Human.create({ name: "Gordon" });
+    const interest = await Interest.create({ topic: "Trainspotting", human_id: human.id });
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const list = (await (createdHuman as any).interests
+      .or((human as any).interests)
+      .toArray()) as Base[];
+    const found = list.find((i) => (i as any).id === (interest as any).id);
+    expect(found).toBeDefined();
+    // Without inversable? guard, the AssociationRelation would alias
+    // `createdHuman` onto the found interest. Verify the cache wasn't
+    // poisoned by the wrong owner.
+    expect((found as any)._cachedAssociations?.get("human")).not.toBe(createdHuman);
   });
-  it.skip("or does not set inverse when incorrect", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs or-query inverse checking */
+  it("or does not set inverse when incorrect", async () => {
+    class Human extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Interest extends Base {
+      static {
+        this.attribute("topic", "string");
+        this.attribute("human_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(Human, "interests");
+    Associations.belongsTo.call(Interest, "human");
+    registerModel(Human);
+    registerModel(Interest);
+
+    const human = await Human.create({ name: "Gordon" });
+    const interest = await Interest.create({ topic: "Trainspotting", human_id: human.id });
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const list = (await (createdHuman as any).interests.unscope("where").toArray()) as Base[];
+    const found = list.find((i) => (i as any).id === (interest as any).id);
+    expect(found).toBeDefined();
+    expect((found as any)._cachedAssociations?.get("human")).not.toBe(createdHuman);
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
     const { Man, Face } = makeModels();

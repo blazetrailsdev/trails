@@ -228,6 +228,42 @@ function validateInverseOf(targetModel: typeof Base, assocName: string, inverseO
   throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections, targetModel.name);
 }
 
+/**
+ * Resolve the inverse association name for a load — combines an explicit
+ * `inverseOf` option with reflection-based automatic detection so both
+ * paths wire the parent reference back onto the child.
+ *
+ * Mirrors: ActiveRecord::Reflection::AssociationReflection#inverse_name
+ *
+ * @internal
+ */
+function _resolveInverseName(
+  ownerCtor: typeof Base,
+  assocName: string,
+  options: AssociationOptions,
+): string | null {
+  if (options.inverseOf === false) return null;
+  // Explicit inverseOf wins everywhere, including polymorphic belongs_to
+  // (where automatic detection can't pick a target).
+  if (typeof options.inverseOf === "string") return options.inverseOf;
+  if (options.polymorphic) return null;
+  const refl = ownerCtor._reflectOnAssociation?.(assocName);
+  return refl?.inverseName?.() ?? null;
+}
+
+/**
+ * Cache `owner` on `child` under `inverseName`. Centralizes the lazy
+ * `_cachedAssociations` init so every load/set path writes the same shape.
+ *
+ * Mirrors: ActiveRecord::Associations::Association#inversed_from
+ *
+ * @internal
+ */
+function _wireInverseAssociation(owner: Base, child: Base, inverseName: string): void {
+  child._cachedAssociations = child._cachedAssociations ?? new Map();
+  child._cachedAssociations.set(inverseName, owner);
+}
+
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -646,9 +682,13 @@ export async function loadBelongsTo(
         resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
-    if (options.inverseOf && cached) {
-      cached._cachedAssociations = cached._cachedAssociations ?? new Map();
-      cached._cachedAssociations.set(options.inverseOf, record);
+    if (cached) {
+      const inverseName = _resolveInverseName(
+        record.constructor as typeof Base,
+        assocName,
+        options,
+      );
+      if (inverseName) _wireInverseAssociation(record, cached, inverseName);
     }
     return cached;
   }
@@ -660,9 +700,13 @@ export async function loadBelongsTo(
         resolveAssocClass(record, assocName, options.className ?? camelize(assocName));
       validateInverseOf(targetModel, assocName, options.inverseOf);
     }
-    if (options.inverseOf && preloaded) {
-      preloaded._cachedAssociations = preloaded._cachedAssociations ?? new Map();
-      preloaded._cachedAssociations.set(options.inverseOf, record);
+    if (preloaded) {
+      const inverseName = _resolveInverseName(
+        record.constructor as typeof Base,
+        assocName,
+        options,
+      );
+      if (inverseName) _wireInverseAssociation(record, preloaded, inverseName);
     }
     return preloaded;
   }
@@ -755,10 +799,12 @@ export async function loadBelongsTo(
     }
   }
 
-  // Set inverse_of: store reference back to the owner
-  if (result && options.inverseOf) {
-    result._cachedAssociations = result._cachedAssociations ?? new Map();
-    result._cachedAssociations.set(options.inverseOf, record);
+  // Set inverse_of: store reference back to the owner. Resolve via the
+  // reflection so automatic_inverse_of also wires the parent — mirrors
+  // ActiveRecord::Associations::Association#set_inverse_instance.
+  if (result) {
+    const inverseName = _resolveInverseName(ctor, assocName, options);
+    if (inverseName) _wireInverseAssociation(record, result, inverseName);
   }
 
   syncToAssociationInstance(record, assocName, result);
@@ -895,10 +941,11 @@ export async function loadHasOne(
     }
   }
 
-  // Set inverse_of: store reference back to the owner
-  if (result && options.inverseOf) {
-    result._cachedAssociations = result._cachedAssociations ?? new Map();
-    result._cachedAssociations.set(options.inverseOf, record);
+  // Set inverse_of: store reference back to the owner. Resolve via the
+  // reflection so automatic_inverse_of also wires the parent.
+  if (result) {
+    const inverseName = _resolveInverseName(ctor, assocName, options);
+    if (inverseName) _wireInverseAssociation(record, result, inverseName);
   }
 
   syncToAssociationInstance(record, assocName, result);
@@ -1103,11 +1150,13 @@ export async function loadHasMany(
   }
   const results: Base[] = await rel.toArray();
 
-  // Set inverse_of on each loaded child
-  if (options.inverseOf) {
+  // Set inverse_of on each loaded child. Resolve via the reflection so
+  // automatic_inverse_of also wires each child's parent reference.
+  // Mirrors HasManyAssociation#set_inverse_instance.
+  const inverseName = _resolveInverseName(ctor, assocName, options);
+  if (inverseName) {
     for (const child of results) {
-      child._cachedAssociations = child._cachedAssociations ?? new Map();
-      child._cachedAssociations.set(options.inverseOf, record);
+      _wireInverseAssociation(record, child, inverseName);
     }
   }
 
