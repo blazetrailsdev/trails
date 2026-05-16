@@ -132,15 +132,24 @@ function parseModelId(raw: string, modelName: string): string | string[] {
  * @internal Normalize a raw modelId input (scalar or array) into the
  * same shape parseGid produces: stringify with `?? ""` (parity with
  * buildGid), filter empty segments, cap at COMPOSITE_MODEL_ID_MAX_SIZE,
- * collapse to a single string when arity = 1. Shared by GlobalID.create
- * and GID.build so their skip-parse paths agree with the round-trip
- * through parseGid(buildGid(...)).
+ * collapse to a single string when arity = 1. Throws MissingModelIdError
+ * when all segments normalize to empty — matches parseGid's check,
+ * since buildGid joins sparse arrays into a `/`-only segment string
+ * which is truthy and slips past its own guard.
+ *
+ * Shared by GlobalID.create and GID.build so their skip-parse paths
+ * agree with the round-trip through parseGid(buildGid(...)).
  */
-export function normalizeModelId(raw: unknown): string | string[] {
+export function normalizeModelId(raw: unknown, modelName: string): string | string[] {
   const parts = (Array.isArray(raw) ? raw : [raw])
     .map((p) => String(p ?? ""))
     .filter((p) => p.length > 0)
     .slice(0, COMPOSITE_MODEL_ID_MAX_SIZE);
+  if (parts.length === 0) {
+    throw new MissingModelIdError(
+      `Unable to create a Global ID for ${modelName} without a model id.`,
+    );
+  }
   return parts.length === 1 ? parts[0] : parts;
 }
 
@@ -252,7 +261,7 @@ export class GID {
     return new GID(uri, {
       app: args.app,
       modelName: args.modelName,
-      modelId: normalizeModelId(args.modelId),
+      modelId: normalizeModelId(args.modelId, args.modelName),
       params: args.params ?? {},
     });
   }

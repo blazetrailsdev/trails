@@ -58,7 +58,7 @@ export class GlobalID {
     const components: GidComponents = {
       app,
       modelName,
-      modelId: normalizeModelId(model.id),
+      modelId: normalizeModelId(model.id, modelName),
       params: params ?? {},
     };
     return new GlobalID(uri, components);
