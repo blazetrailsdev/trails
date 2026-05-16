@@ -190,6 +190,70 @@ describe("MigrationTest", () => {
     expect(indexes[0].name).toBe("index_posts_on_slug");
   });
 
+  it("addIndex emits PG using/include/nulls_not_distinct/where in Rails clause order", async () => {
+    const executed: string[] = [];
+    const adapter = {
+      adapterName: "postgres" as const,
+      quoteIdentifier: (s: string) => `"${s}"`,
+      quoteTableName: (s: string) => `"${s}"`,
+      executeMutation: async (sql: string) => {
+        executed.push(sql);
+      },
+    } as unknown as DatabaseAdapter;
+    const ctx = new MigrationContext(adapter);
+    await ctx.addIndex("posts", ["data"], {
+      unique: true,
+      using: "gin",
+      include: ["author_id"],
+      nullsNotDistinct: true,
+      where: "active",
+      name: "idx_posts_data",
+    });
+    expect(executed).toHaveLength(1);
+    expect(executed[0]).toBe(
+      `CREATE UNIQUE INDEX "idx_posts_data" ON "posts" USING gin ("data") INCLUDE ("author_id") NULLS NOT DISTINCT WHERE active`,
+    );
+  });
+
+  it("createTable inline index propagates using/include/nullsNotDistinct/where through addIndex", async () => {
+    const executed: string[] = [];
+    const adapter = {
+      adapterName: "postgres" as const,
+      quoteIdentifier: (s: string) => `"${s}"`,
+      quoteTableName: (s: string) => `"${s}"`,
+      executeMutation: async (sql: string) => {
+        executed.push(sql);
+      },
+      supportsIndexesInCreate: () => false,
+      schemaCache: { clearDataSourceCacheBang: () => {} },
+    } as unknown as DatabaseAdapter;
+    const ctx = new MigrationContext(adapter);
+    await ctx.createTable("posts", {}, (t) => {
+      t.string("data");
+      t.index(["data"], {
+        unique: true,
+        using: "gin",
+        include: ["author_id"],
+        nullsNotDistinct: true,
+        where: "active",
+        name: "idx_posts_data",
+      });
+    });
+    const indexSql = executed.find((s) => s.startsWith("CREATE UNIQUE INDEX"));
+    expect(indexSql).toBe(
+      `CREATE UNIQUE INDEX "idx_posts_data" ON "posts" USING gin ("data") INCLUDE ("author_id") NULLS NOT DISTINCT WHERE active`,
+    );
+    const tracked = ctx.indexes("posts");
+    expect(tracked[0]).toMatchObject({
+      using: "gin",
+      include: ["author_id"],
+      nullsNotDistinct: true,
+      where: "active",
+      unique: true,
+      name: "idx_posts_data",
+    });
+  });
+
   it("rename table", async () => {
     const { ctx } = freshContext();
     await ctx.createTable("old_name", {}, (t) => {

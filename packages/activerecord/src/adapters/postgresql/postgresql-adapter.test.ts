@@ -104,6 +104,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(idx).toBeDefined();
     });
 
+    it("indexes() returns where and nullsNotDistinct from definition", async () => {
+      await adapter.exec(`CREATE TABLE "ex_idx_opts" ("id" SERIAL PRIMARY KEY, "n" INTEGER)`);
+      await adapter.exec(`CREATE INDEX "ex_idx_opts_where" ON "ex_idx_opts" ("n") WHERE n > 0`);
+      const pgVersion = await adapter.getDatabaseVersion();
+      const supportsNnd = pgVersion >= 150000;
+      if (supportsNnd) {
+        await adapter.exec(
+          `CREATE UNIQUE INDEX "ex_idx_opts_nnd" ON "ex_idx_opts" ("n") NULLS NOT DISTINCT`,
+        );
+      }
+      const indexes = await adapter.indexes("ex_idx_opts");
+      const whereIdx = indexes.find((i) => i.name === "ex_idx_opts_where") as
+        | { where?: string }
+        | undefined;
+      expect(whereIdx?.where).toMatch(/n > 0/);
+      if (supportsNnd) {
+        const nndIdx = indexes.find((i) => i.name === "ex_idx_opts_nnd") as
+          | { nullsNotDistinct?: boolean }
+          | undefined;
+        expect(nndIdx?.nullsNotDistinct).toBe(true);
+      }
+    });
+
     it("index with opclass", async () => {
       await adapter.exec(`CREATE TABLE "ex_opclass" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await adapter.addIndex("ex_opclass", ["name"], {

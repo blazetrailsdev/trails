@@ -1503,6 +1503,7 @@ export class MigrationContext {
       name?: string;
       where?: string;
       orders?: Record<string, string>;
+      using?: string;
       nullsNotDistinct?: boolean;
       include?: string[];
     }[]
@@ -1655,26 +1656,21 @@ export class MigrationContext {
       return;
     }
     for (const idx of td.indexes) {
-      const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
-      const ordersMap: Record<string, string> =
+      const rawOrders =
         typeof idx.orders === "string"
           ? Object.fromEntries(idx.columns.map((c) => [c, idx.orders as string]))
-          : (idx.orders ?? {});
-      const unique = idx.unique ? "UNIQUE " : "";
-      const using = idx.using && idx.using !== "btree" ? ` USING ${idx.using}` : "";
-      const colsList = idx.columns
-        .map((c) => {
-          const isExpr = /\W/.test(c);
-          const quoted = isExpr ? c : this.adapter.quoteIdentifier(c);
-          const order = ordersMap[c];
-          return `${quoted}${order ? ` ${order.toUpperCase()}` : ""}`;
-        })
-        .join(", ");
-      let sql = `CREATE ${unique}INDEX ${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(name)}${using} (${colsList})`;
-      if (idx.where) sql += ` WHERE ${idx.where}`;
-      await this.adapter.executeMutation(sql);
-      if (!this._indexes.has(name)) this._indexes.set(name, []);
-      this._indexes.get(name)!.push({ ...idx, name: indexName, orders: ordersMap });
+          : idx.orders;
+      const ordersMap = rawOrders && Object.keys(rawOrders).length > 0 ? rawOrders : undefined;
+      await this.addIndex(name, idx.columns, {
+        unique: idx.unique,
+        name: idx.name,
+        where: idx.where,
+        order: ordersMap,
+        using: idx.using,
+        nullsNotDistinct: idx.nullsNotDistinct,
+        include: idx.include,
+        ifNotExists: idx.ifNotExists,
+      });
     }
   }
 
@@ -1880,6 +1876,7 @@ export class MigrationContext {
       nullsNotDistinct?: boolean;
       ifNotExists?: boolean;
       include?: string[];
+      using?: string;
     },
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
@@ -1899,10 +1896,16 @@ export class MigrationContext {
         return col;
       })
       .join(", ");
-    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(table)} (${colsStr})`;
-    if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
+    const usingStr =
+      an === "postgres" && options?.using && options.using !== "btree"
+        ? ` USING ${options.using}`
+        : "";
+    let sql = `CREATE ${uniqueStr}INDEX ${ifNotExistsStr}${this.adapter.quoteIdentifier(indexName)} ON ${this.adapter.quoteTableName(table)}${usingStr} (${colsStr})`;
+    // Clause order mirrors Rails' visit_CreateIndexDefinition
+    // (abstract/schema_creation.rb): INCLUDE → NULLS NOT DISTINCT → WHERE.
     if (an === "postgres" && options?.include && options.include.length > 0)
       sql += ` INCLUDE (${options.include.map((c) => this.adapter.quoteIdentifier(c)).join(", ")})`;
+    if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
     if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
     await this.adapter.executeMutation(sql);
     if (!this._indexes.has(table)) this._indexes.set(table, []);
@@ -1912,6 +1915,7 @@ export class MigrationContext {
       name: indexName,
       where: options?.where,
       orders: options?.order,
+      using: usingStr ? options?.using : undefined,
       nullsNotDistinct: options?.nullsNotDistinct,
       include: options?.include,
     });
@@ -2028,11 +2032,17 @@ export class MigrationContext {
     name?: string;
     where?: string;
     orders?: Record<string, string>;
+    using?: string;
     nullsNotDistinct?: boolean;
+    include?: string[];
   }> {
     const idxs = this._indexes.get(tableName);
     if (!idxs) return [];
-    return idxs.map((i) => ({ ...i, columns: [...i.columns] }));
+    return idxs.map((i) => ({
+      ...i,
+      columns: [...i.columns],
+      include: i.include ? [...i.include] : undefined,
+    }));
   }
 }
 
