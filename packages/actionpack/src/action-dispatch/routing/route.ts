@@ -278,15 +278,10 @@ function collectParamNamesFromJourneyAst(path: string): string[] {
   try {
     const tree = new Parser().parse(path);
     const ast = new Ast(tree, true);
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const name of ast.names) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        out.push(name);
-      }
-    }
-    return out;
+    // Preserve duplicates so this stays in lockstep with Pattern.names —
+    // e.g. `/:id/:id` keeps two captures. Constraint splitters that need
+    // uniqueness build their own Set.
+    return ast.names.slice();
   } catch {
     // Parser failure shouldn't crash the route table; fall back to no captures.
     return [];

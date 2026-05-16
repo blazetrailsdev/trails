@@ -69,6 +69,11 @@ describe("Route", () => {
       expect(bareStar.pathParamNames).toEqual([]);
     });
 
+    it("preserves duplicate capture names (in lockstep with Pattern.names)", () => {
+      const route = new Route("GET", "/:id/:id", "x", "y");
+      expect(route.pathParamNames).toEqual(["id", "id"]);
+    });
+
     it("returns a defensive copy that cannot mutate route internals", () => {
       const route = new Route("GET", "/posts/:id", "posts", "show");
       const names = route.pathParamNames as string[];
