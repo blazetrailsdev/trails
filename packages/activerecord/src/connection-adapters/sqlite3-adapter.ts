@@ -1396,8 +1396,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       // agree on names like `aux.sqlite_sequence`.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
       if (bare === "sqlite_sequence" || bare === "sqlite_schema") return false;
+      // sqlite_master stores virtual tables as type='table' with sql LIKE
+      // 'CREATE VIRTUAL%', and FTS/shadow tables with sql IS NULL. The
+      // pragma_table_list path filters those out as 'virtual'/'shadow', so
+      // mirror that here to keep the two branches in agreement.
       const rows = (await this.execute(
-        `SELECT 1 AS one FROM ${sqliteMaster} WHERE type IN ('table','view') AND name=${sqliteQuoteStringLiteral(bare)}`,
+        `SELECT 1 AS one FROM ${sqliteMaster}
+         WHERE type IN ('table','view')
+           AND name=${sqliteQuoteStringLiteral(bare)}
+           AND sql IS NOT NULL
+           AND sql NOT LIKE 'CREATE VIRTUAL%'`,
         [],
         "SCHEMA",
       )) as Array<{ one: number }>;
