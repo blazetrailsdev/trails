@@ -6,10 +6,13 @@
  *
  *   - `has_many :through` whose source reflection is a polymorphic
  *     belongs_to, disambiguated by `source_type:` ("polymorphic
- *     has_many through"). Both the direct (loadHasManyThrough) path
- *     and the `includes()` preloader must filter through-records by
- *     the polymorphic discriminator (`*_type`) and only materialize
- *     the matching target class.
+ *     has_many through"). The fixture layers this on top of a
+ *     nested through (Hotel → Departments → Chefs), so `loadHasMany`
+ *     routes through `loadHasManyThrough`'s walker rather than the
+ *     final-step JOIN/AssociationScope path. Both that walker and
+ *     the `includes()` preloader must filter through-records by the
+ *     polymorphic discriminator (`*_type`) and only materialize the
+ *     matching target class.
  *   - The same chain with an STI subclass as the polymorphic target —
  *     the source-type filter is applied at the through step *and*
  *     STI promotion happens at the leaf so subclass rows materialize
@@ -217,10 +220,11 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const drinks = h._preloadedAssociations?.get("drinkDesigners") as any[];
     expect(cakes.map((d: any) => d.id).sort()).toEqual([cake1.id, cake2.id].sort());
     expect(drinks.map((d: any) => d.id).sort()).toEqual([drink.id].sort());
-    // Class assertions matter: the drink row's id (1) collides with
-    // cake1's id, so a preloader that materialized cake rows for
-    // `drinkDesigners` would still satisfy the id expectation. Pin
-    // the constructor on both sides.
+    // Class assertions matter: drink.id collides with strayCake.id
+    // (per-table sequences plus the seed's drink-row fillers), so a
+    // preloader that swapped tables for `drinkDesigners` could
+    // still satisfy the id expectation. Pin the constructor on
+    // both sides.
     expect(cakes.every((d: any) => d instanceof PsCakeDesigner)).toBe(true);
     expect(drinks.every((d: any) => d instanceof PsDrinkDesigner)).toBe(true);
   });
@@ -278,7 +282,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     // reflection state would cause the second owner's preloaded set
     // to contain (or omit) the first owner's targets.
     const { hotel: h1, cake1, cake2 } = await seed();
-    const { hotel: h2 } = await seed();
+    const { hotel: h2, cake1: h2cake1, cake2: h2cake2 } = await seed();
 
     const first = (await PsHotel.all()
       .includes("cakeDesigners")
@@ -292,7 +296,9 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     // Second preload — independent relation, same reflection. If
     // source-reflection scope/owner state isn't reset after the
     // first preload completes, h2's preloaded set will contain h1's
-    // cakes (or miss h2's entirely).
+    // cakes (or miss h2's). Assert h2's exact expected pair so the
+    // contract catches both leak directions: stray h1 row and
+    // wrong-id substitution (e.g. h2's stray cake).
     const second = (await PsHotel.all()
       .includes("cakeDesigners")
       .where({ id: h2.id })
@@ -300,7 +306,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     const secondIds = (second[0]._preloadedAssociations?.get("cakeDesigners") as any[])
       .map((d) => d.id)
       .sort();
-    expect(secondIds.length).toBe(2);
+    expect(secondIds).toEqual([h2cake1.id, h2cake2.id].sort());
     expect(secondIds.every((id) => !firstIds.includes(id))).toBe(true);
   });
 });
