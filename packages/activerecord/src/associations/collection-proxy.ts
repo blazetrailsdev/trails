@@ -1027,8 +1027,28 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ctor: typeof Base,
   ): { fkCols: string[]; pkCols: string[] } {
     const ownerFk = throughAssoc.options.foreignKey ?? `${underscore(ctor.name)}_id`;
-    const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+    // Mirror Reflection#activeRecordPrimaryKey (reflection.ts:780-796): an
+    // explicit primaryKey wins, otherwise queryConstraints wins, otherwise
+    // a composite PK that includes "id" collapses to "id" when no query
+    // constraints are involved. Rails uses this same resolution inside
+    // `construct_join_attributes` (through_association.rb).
     const fkCols = Array.isArray(ownerFk) ? ownerFk : [ownerFk as string];
+    let ownerPk: string | string[];
+    if (throughAssoc.options.primaryKey !== undefined) {
+      ownerPk = throughAssoc.options.primaryKey;
+    } else if (throughAssoc.options.queryConstraints) {
+      ownerPk = throughAssoc.options.queryConstraints;
+    } else if (
+      // Rails' id-collapse: a scalar FK against a composite PK that includes
+      // "id" pairs with the scalar "id" column (reflection.ts:791-793).
+      fkCols.length === 1 &&
+      Array.isArray(ctor.primaryKey) &&
+      ctor.primaryKey.includes("id")
+    ) {
+      ownerPk = "id";
+    } else {
+      ownerPk = ctor.primaryKey as string | string[];
+    }
     const pkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk as string];
     if (fkCols.length !== pkCols.length) {
       throw new Error(
@@ -1827,8 +1847,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       throughModelAssocs.find((a) => a.name === pluralize(sourceName));
 
     const throughAs = throughAssoc.options.as;
-    const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const ownerPkCols = Array.isArray(ownerPk) ? ownerPk : [ownerPk as string];
+    // For polymorphic through we can't run the FK/PK pair check (the FK
+    // shape is the polymorphic _id/_type pair, not the owner key). For the
+    // canonical through path, defer to the helper so resolution matches
+    // Reflection#activeRecordPrimaryKey.
+    const ownerPkCols = throughAs
+      ? (() => {
+          const pk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
+          return Array.isArray(pk) ? pk : [pk as string];
+        })()
+      : this._throughOwnerCols(throughAssoc, ctor).pkCols;
     const ownerPkValues = ownerPkCols.map((c) => this._record._readAttribute(c));
     if (ownerPkValues.some((v) => v == null)) return (targetModel as any).all().none();
 
