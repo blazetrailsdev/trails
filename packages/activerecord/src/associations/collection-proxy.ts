@@ -1049,7 +1049,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!constraints) {
         ownerFk = derivedFk;
       } else if (constraints.includes(derivedFk)) {
-        ownerFk = constraints;
+        // Mirrors Reflection#deriveFkQueryConstraints (reflection.ts:573):
+        // when the derived FK is itself one of the constraint columns, the
+        // FK is just that scalar — the remaining constraints come from
+        // scope chains, not the join FK.
+        ownerFk = derivedFk;
       } else {
         // Mirror Reflection#deriveFkQueryConstraints validation
         // (reflection.ts:555-571): only 2-column constraints are derivable,
@@ -1366,6 +1370,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           return { [poly.idCol]: poly.idValue, [poly.typeCol]: poly.typeValue };
         })()
       : this._throughOwnerAttrs(throughAssoc, ctor);
+    // Guard against unsaved owners / missing composite components — otherwise
+    // findBy({fk: null}) would translate to IS NULL and could destroy an
+    // orphan join row. Mirrors the short-circuits in _buildThroughScope and
+    // _deleteThroughAllSql.
+    const polyIdValue = throughAs ? (ownerConditions as any)[`${underscore(throughAs)}_id`] : null;
+    if (throughAs ? polyIdValue == null : Object.values(ownerConditions).some((v) => v == null)) {
+      return;
+    }
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
 
