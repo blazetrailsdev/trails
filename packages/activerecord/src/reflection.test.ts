@@ -1346,6 +1346,66 @@ describe("ReflectionTest", () => {
       }),
     ).toThrow(ArgumentError);
   });
+  it("plain function for source type does not raise (only ES classes are rejected)", () => {
+    // Same Rails semantics as the className case, exercised through
+    // ThroughReflection so the helper's lift to AbstractReflection is
+    // covered for both call sites.
+    class NsTagB extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NsPostB extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("NsTagB", NsTagB);
+    registerModel("NsPostB", NsPostB);
+    const fn = function namedFactory() {
+      return "NsPostB";
+    };
+    expect(() =>
+      Associations.hasMany.call(NsTagB, "taggedPostsB", {
+        through: "taggings",
+        source: "taggable",
+        // @ts-expect-error sourceType typed as string; here we exercise the runtime guard
+        sourceType: fn,
+      }),
+    ).not.toThrow();
+  });
+  it("plain function for class name does not raise (only ES classes are rejected)", () => {
+    // Rails check is `options[option_name].class == Class` — only literal
+    // Class instances are rejected; a Proc or other callable passes through
+    // (it is not invoked as a factory, just not flagged here). We mirror
+    // that by matching `/^class[\s{]/` on Function.prototype.toString so
+    // plain functions are accepted at construction. Downstream resolution
+    // still expects a string and will fail later if the user passes a
+    // non-string — same as Rails.
+    class HostA extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class TargetA extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("HostA", HostA);
+    registerModel("TargetA", TargetA);
+    const fn = function namedFactory() {
+      return "TargetA";
+    };
+    expect(() =>
+      // @ts-expect-error className typed as string; here we exercise the runtime guard
+      Associations.hasMany.call(HostA, "targetAs", { className: fn }),
+    ).not.toThrow();
+  });
   it("join table with common prefix", () => {
     class CatalogCategory extends Base {
       static {

@@ -140,7 +140,7 @@ export class AbstractReflection {
     const foreignKeys = this._arrayWrap((this as any).joinForeignKey);
 
     if (primaryKeys.length !== foreignKeys.length) {
-      throw new Error(
+      throw new ArgumentError(
         `joinScope: joinPrimaryKey and joinForeignKey must have the same number of columns ` +
           `(got ${primaryKeys.length} primary key column(s) and ${foreignKeys.length} foreign key column(s))`,
       );
@@ -282,6 +282,21 @@ export class AbstractReflection {
     if (Array.isArray(value)) return value;
     if (typeof value === "string") return [value];
     return [];
+  }
+
+  /**
+   * @internal
+   * Raises if the given option was passed a class instead of a string.
+   * Mirrors: AbstractReflection#ensure_option_not_given_as_class!
+   */
+  protected ensureOptionNotGivenAsClassBang(optionName: string): void {
+    const opts = (this as any).options as Record<string, unknown> | undefined;
+    const val = opts?.[optionName];
+    if (typeof val === "function" && /^class[\s{]/.test(Function.prototype.toString.call(val))) {
+      throw new ArgumentError(
+        `A class was passed to \`:${optionName}\` but we are expecting a string.`,
+      );
+    }
   }
 }
 
@@ -499,11 +514,9 @@ export class AssociationReflection extends MacroReflection {
       delete opts.foreignKey;
     }
 
-    if (opts.className && typeof opts.className === "function") {
-      throw new ArgumentError("A class was passed to `:className` but we are expecting a string.");
-    }
-
     super(name, scope, opts, activeRecord);
+
+    this.ensureOptionNotGivenAsClassBang("className");
   }
 
   get macro(): MacroType {
@@ -993,19 +1006,6 @@ export class AssociationReflection extends MacroReflection {
 
   /**
    * @internal
-   * Raises if the given option was passed a class instead of a string.
-   */
-  protected ensureOptionNotGivenAsClassBang(optionName: string): void {
-    const val = this.options[optionName];
-    if (typeof val === "function" && /^class[\s{]/.test(Function.prototype.toString.call(val))) {
-      throw new ArgumentError(
-        `A class was passed to \`:${optionName}\` but we are expecting a string.`,
-      );
-    }
-  }
-
-  /**
-   * @internal
    * Derives the join table name for hasAndBelongsToMany associations.
    */
   protected deriveJoinTable(): string {
@@ -1165,10 +1165,7 @@ export class ThroughReflection extends AbstractReflection {
   constructor(delegate: AssociationReflection) {
     super();
     this._delegate = delegate;
-    const sourceTypeVal = delegate.options.sourceType;
-    if (typeof sourceTypeVal === "function") {
-      throw new ArgumentError("A class was passed to `:sourceType` but we are expecting a string.");
-    }
+    this.ensureOptionNotGivenAsClassBang("sourceType");
   }
 
   get name(): string {

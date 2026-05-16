@@ -256,7 +256,9 @@ describe("UnknownPrimaryKeyTest", () => {
       static _tableName = "dummies";
     }
     const err = new UnknownPrimaryKey(Dummy, "No PK configured.");
-    expect(err.message).toContain("\n No PK configured.");
+    expect(err.message).toBe(
+      "Unknown primary key for table dummies in model Dummy.\nNo PK configured.",
+    );
     expect(err.model).toBe(Dummy);
   });
 });

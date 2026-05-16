@@ -713,12 +713,11 @@ export class UnknownPrimaryKey extends ActiveRecordError {
 
   constructor(model?: typeof import("./base.js").Base | null, description?: string) {
     let msg: string;
-    if (model == null) {
-      msg = "Unknown primary key.";
-    } else if (description) {
-      msg = `Unknown primary key for table ${model.tableName} in model ${model.name}.\n ${description}`;
-    } else {
+    if (model) {
       msg = `Unknown primary key for table ${model.tableName} in model ${model.name}.`;
+      if (description) msg += `\n${description}`;
+    } else {
+      msg = "Unknown primary key.";
     }
     super(msg);
     this.name = "UnknownPrimaryKey";
