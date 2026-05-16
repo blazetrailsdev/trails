@@ -24,6 +24,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("DJAS routing widening — nested-through", () => {
@@ -60,8 +61,14 @@ describe("DJAS routing widening — nested-through", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      nt_authors: { name: "string" },
+      nt_posts: { nt_author_id: "integer", title: "string" },
+      nt_comments: { nt_post_id: "integer", body: "string" },
+      nt_ratings: { nt_comment_id: "integer", value: "integer" },
+    });
     NtAuthor.adapter = adapter;
     NtPost.adapter = adapter;
     NtComment.adapter = adapter;

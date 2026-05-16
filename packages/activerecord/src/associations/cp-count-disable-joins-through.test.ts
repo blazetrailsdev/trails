@@ -23,6 +23,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("CollectionProxy#count — disable_joins through", () => {
@@ -49,8 +50,14 @@ describe("CollectionProxy#count — disable_joins through", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      cd_authors: { name: "string" },
+      cd_posts: { cd_author_id: "integer", title: "string" },
+      cd_comments: { cd_post_id: "integer", body: "string" },
+      cd_ratings: { cd_comment_id: "integer", value: "integer" },
+    });
     CdAuthor.adapter = adapter;
     CdPost.adapter = adapter;
     CdComment.adapter = adapter;
