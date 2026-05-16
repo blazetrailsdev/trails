@@ -39,14 +39,14 @@ const delegatedTypeRegistry = new WeakMap<
  *   });
  *
  * This adds:
- *   - entry.entryableClass      → the class of the delegated type
- *   - entry.entryableName       → lowercase type name (e.g. "message")
- *   - entry.isMessage()         → type predicate
- *   - entry.isComment()         → type predicate
- *   - Entry.messages()          → scope (returns Relation)
- *   - Entry.comments()          → scope (returns Relation)
- *   - entry.message             → accessor (returns the associated record)
- *   - entry.buildMessage(attrs) → builder method
+ *   - entry.entryableClass         → the class of the delegated type
+ *   - entry.entryableName          → StringInquirer (e.g. inquiry("message"))
+ *   - entry.isMessage()            → type predicate
+ *   - entry.isComment()            → type predicate
+ *   - Entry.messages()             → scope (returns Relation)
+ *   - Entry.comments()             → scope (returns Relation)
+ *   - entry.message                → accessor (associated record via belongs_to)
+ *   - entry.buildEntryable(attrs)  → role-level builder for the current type
  */
 export function delegatedType(
   modelClass: typeof Base,
@@ -105,7 +105,9 @@ export function delegatedType(
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;
       if (!typeName) return null;
-      const singular = underscore(typeName.replace(/.*::/, ""));
+      // Rails: model_name.singular == name.underscore.tr("/", "_").
+      // "Access::NoticeMessage" → "access/notice_message" → "access_notice_message".
+      const singular = underscore(typeName).replace(/\//g, "_");
       return inquiry(singular);
     },
     configurable: true,
@@ -141,9 +143,9 @@ export function delegatedType(
     const singularSnake = singularize(scopeSnake);
     const scopeName = camelize(scopeSnake, false);
     const singularName = camelize(singularSnake, false);
-    // Predicate name preserves the original CamelCase tail: is${demodulized}().
-    // e.g. "Access::NoticeMessage" → isNoticeMessage()
-    const predicateSuffix = typeName.replace(/.*::/, "");
+    // Predicate camelizes the singular scope name so it tracks Rails' query
+    // method (which is "#{singular}?"). "Access::NoticeMessage" → isAccessNoticeMessage().
+    const predicateSuffix = camelize(singularSnake, true);
 
     // Type predicate: isMessage(), isAccessNoticeMessage()
     Object.defineProperty(modelClass.prototype, `is${predicateSuffix}`, {

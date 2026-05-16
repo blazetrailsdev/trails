@@ -246,7 +246,7 @@ describe("DelegatedTypeTest", () => {
     delegatedType(Entry3, "entryable", { types: ["Access::NoticeMessage"] });
     expect(typeof (Entry3 as any).accessNoticeMessages).toBe("function");
     const e = new Entry3({ entryable_type: "Access::NoticeMessage", entryable_id: 7 });
-    expect((e as any).isNoticeMessage()).toBe(true);
+    expect((e as any).isAccessNoticeMessage()).toBe(true);
     expect((e as any).accessNoticeMessageId).toBe(7);
   });
 
