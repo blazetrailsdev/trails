@@ -348,6 +348,7 @@ export class LoaderQuery {
         this.associationKeyName.every((k, i) => k === (other.associationKeyName as string[])[i]));
     return (
       keysMatch &&
+      this._scopeAdapterId() === other._scopeAdapterId() &&
       this._scopeTableName() === other._scopeTableName() &&
       this._valuesForQueries() === other._valuesForQueries()
     );
@@ -357,12 +358,38 @@ export class LoaderQuery {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
-    return `${keyName}::${this._scopeTableName()}::${this._valuesForQueries()}`;
+    return `${keyName}::${this._scopeAdapterId()}::${this._scopeTableName()}::${this._valuesForQueries()}`;
   }
 
   private _scopeTableName(): string {
     return this.scope?._modelClass?.tableName ?? this.scope?.tableName ?? "";
   }
+
+  // Mirrors Rails' `scope.model.connection_specification_name` in
+  // Preloader::Association::LoaderQuery#hash/#eql?. Does not check out a DB
+  // connection — `connectionSpecificationName` is a plain string getter and
+  // the cached `_adapter` field is read without invoking the `.adapter`
+  // getter (which would call `pool.checkout()`). When the spec name resolves
+  // to a shared ancestor (e.g. "Base" for direct-adapter test setups) we
+  // append a stable per-process adapter id (lazily assigned in a WeakMap)
+  // so two models with the same spec but different adapter instances don't
+  // coalesce. The WeakMap allocation is intentional and not a DB side effect.
+  private _scopeAdapterId(): string {
+    const klass = this.scope?._modelClass;
+    if (klass == null) return "";
+    const spec = klass.connectionSpecificationName ?? "";
+    const adapter = klass._adapter;
+    if (adapter == null) return spec;
+    let id = LoaderQuery._adapterIds.get(adapter);
+    if (id == null) {
+      id = ++LoaderQuery._idCounter;
+      LoaderQuery._adapterIds.set(adapter, id);
+    }
+    return `${spec}:${id}`;
+  }
+
+  private static _adapterIds = new WeakMap<object, number>();
+  private static _idCounter = 0;
 
   private _valuesForQueries(): string {
     if (typeof this.scope?.valuesForQueries === "function") {

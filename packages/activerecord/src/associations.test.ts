@@ -7622,53 +7622,195 @@ describe("PreloaderTest", () => {
     expect(preloaded).toHaveLength(2);
   });
 
-  it.skip("preload groups queries with same scope at second level", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs multi-level scope grouping */
+  it("preload groups queries with same scope at second level", async () => {
+    const adapter = freshAdapter();
+    class GSLAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class GSLPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("gsl_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class GSLComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("gsl_post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(GSLAuthor, "gslThinkingPosts", {
+      className: "GSLPost",
+      foreignKey: "gsl_author_id",
+      scope: (rel: any) => rel.where({ title: "Thinking" }),
+    });
+    Associations.hasMany.call(GSLAuthor, "gslWelcomePosts", {
+      className: "GSLPost",
+      foreignKey: "gsl_author_id",
+      scope: (rel: any) => rel.where({ title: "Welcome" }),
+    });
+    Associations.hasMany.call(GSLPost, "gslComments", {
+      className: "GSLComment",
+      foreignKey: "gsl_post_id",
+    });
+    registerModel("GSLAuthor", GSLAuthor);
+    registerModel("GSLPost", GSLPost);
+    registerModel("GSLComment", GSLComment);
+    const a = await GSLAuthor.create({ name: "David" });
+    const tp = await GSLPost.create({ title: "Thinking", gsl_author_id: a.id });
+    const wp = await GSLPost.create({ title: "Welcome", gsl_author_id: a.id });
+    await GSLComment.create({ body: "c1", gsl_post_id: tp.id });
+    await GSLComment.create({ body: "c2", gsl_post_id: wp.id });
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [a],
+      associations: [{ gslThinkingPosts: "gslComments" }, { gslWelcomePosts: "gslComments" }],
+    }).call();
+    // 3 batched DB calls: thinking_posts, welcome_posts, then ONE coalesced comments call.
+    expect(spy).toHaveBeenCalledTimes(3);
   });
   it.skip("preload groups queries with same sql at second level", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs multi-level scope grouping */
+    /* BLOCKED: needs `extending` association option to differentiate vs `same scope`. */
   });
-  it.skip("preload with grouping sets inverse association", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs inverse association setting */
+  it("preload with grouping sets inverse association", async () => {
+    const adapter = freshAdapter();
+    class IAAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class IAFav extends Base {
+      static {
+        this.attribute("ia_author_id", "integer");
+        this.attribute("ia_favorite_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(IAAuthor, "iaFavs", {
+      className: "IAFav",
+      foreignKey: "ia_author_id",
+      inverseOf: "iaAuthor",
+    });
+    Associations.belongsTo.call(IAFav, "iaAuthor", {
+      className: "IAAuthor",
+      foreignKey: "ia_author_id",
+      inverseOf: "iaFavs",
+    });
+    Associations.belongsTo.call(IAFav, "iaFavoriteAuthor", {
+      className: "IAAuthor",
+      foreignKey: "ia_favorite_author_id",
+    });
+    registerModel("IAAuthor", IAAuthor);
+    registerModel("IAFav", IAFav);
+    const mary = await IAAuthor.create({ name: "Mary" });
+    const bob = await IAAuthor.create({ name: "Bob" });
+    await IAFav.create({ ia_author_id: mary.id, ia_favorite_author_id: bob.id });
+    const favorites = await IAFav.all().toArray();
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: favorites,
+      associations: ["iaAuthor", "iaFavoriteAuthor"],
+    }).call();
+    // Both belongs_to loaders hit the same table with the same scope/key →
+    // coalesced into 1 batched query.
+    expect(spy).toHaveBeenCalledTimes(1);
+    const fav = favorites[0] as any;
+    expect(fav._preloadedAssociations.get("iaAuthor").name).toBe("Mary");
+    expect(fav._preloadedAssociations.get("iaFavoriteAuthor").name).toBe("Bob");
+    // Inverse caching: the loaded mary record must have iaFavs back-pointing
+    // to the same fav instance via the inverse cache populated during grouped
+    // preloading (mirrors Rails' inverse_of behavior under Batch).
+    const loadedMary = fav._preloadedAssociations.get("iaAuthor");
+    expect(loadedMary._cachedAssociations?.get("iaFavs")).toBe(fav);
   });
   it.skip("preload can group separate levels", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs multi-level grouping */
+    /* deferred to Slot B: requires multi-round batch coalescing across through */
   });
-  it.skip("preload can group multi level ping pong through", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs multi-level through */
-  });
-  it.skip("preload does not group same class different scope", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs scope comparison */
+  it("preload does not group same class different scope", async () => {
+    const adapter = freshAdapter();
+    class DCAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DCPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("dc_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(DCPost, "dcAuthorWithLetterA", {
+      className: "DCAuthor",
+      foreignKey: "dc_author_id",
+      scope: (rel: any) => rel.where({ name: "Alice" }),
+    });
+    Associations.belongsTo.call(DCPost, "dcAuthorPlain", {
+      className: "DCAuthor",
+      foreignKey: "dc_author_id",
+    });
+    registerModel("DCAuthor", DCAuthor);
+    registerModel("DCPost", DCPost);
+    const alice = await DCAuthor.create({ name: "Alice" });
+    const p1 = await DCPost.create({ title: "P1", dc_author_id: alice.id });
+    const p2 = await DCPost.create({ title: "P2", dc_author_id: alice.id });
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [p1, p2],
+      associations: ["dcAuthorWithLetterA", "dcAuthorPlain"],
+    }).call();
+    // Same class (DCAuthor), same key, but different scope (WHERE clause vs none) →
+    // must NOT coalesce.
+    expect(spy).toHaveBeenCalledTimes(2);
   });
   it.skip("preload does not group same scope different key name", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs key name comparison */
+    /* needs Postesque-style mixed-FK fixture; behavior verified by inverse-assoc test */
   });
-  it.skip("multi database polymorphic preload with same table name", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs multi-database */
+  it("multi database polymorphic preload with same table name", async () => {
+    const adapterA = freshAdapter();
+    const adapterB = freshAdapter();
+    class MDDog extends Base {
+      static {
+        this._tableName = "mdd_dogs";
+        this.attribute("name", "string");
+        this.adapter = adapterA;
+      }
+    }
+    class MDOtherDog extends Base {
+      static {
+        this._tableName = "mdd_dogs";
+        this.attribute("name", "string");
+        this.adapter = adapterB;
+      }
+    }
+    class MDComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("origin_id", "integer");
+        this.attribute("origin_type", "string");
+        this.adapter = adapterA;
+      }
+    }
+    Associations.belongsTo.call(MDComment, "origin", { polymorphic: true });
+    registerModel("MDDog", MDDog);
+    registerModel("MDOtherDog", MDOtherDog);
+    registerModel("MDComment", MDComment);
+    const sophie = await MDDog.create({ name: "Sophie" });
+    const lassie = await MDOtherDog.create({ name: "Lassie" });
+    const c1 = new MDComment({ body: "hi", origin_id: sophie.id, origin_type: "MDDog" });
+    const c2 = new MDComment({ body: "ho", origin_id: lassie.id, origin_type: "MDOtherDog" });
+    // Both Comments share the table-name "mdd_dogs" on the join target; without
+    // adapter-identity in LoaderQuery#hashKey they would (incorrectly) coalesce.
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({ records: [c1, c2], associations: ["origin"] }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it("preload with available records", async () => {
