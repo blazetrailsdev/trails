@@ -188,7 +188,9 @@ describe("TestRouter", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor("post", { id: "hello world" })).toBe("/posts/hello world");
+    // URL-unsafe characters in path params are percent-escaped (mirrors
+    // Rails Journey Utils.escape_segment).
+    expect(routes.pathFor("post", { id: "hello world" })).toBe("/posts/hello%20world");
   });
 
   it("generate with name", () => {

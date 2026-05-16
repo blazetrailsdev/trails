@@ -4,9 +4,13 @@
 
 import { Parser } from "../journey/parser.js";
 import { Ast } from "../journey/ast.js";
+import { Pattern } from "../journey/path/pattern.js";
+import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
+
+const PATHFOR_SEPARATORS = "/.?";
 
 export interface RouteConstraints {
   [key: string]: string | RegExp;
@@ -62,10 +66,15 @@ export class Route {
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
   readonly anchor: boolean;
 
-  private readonly segments: PathSegment[];
   private readonly paramNames: string[];
   /** @internal lazy single-route Journey router for match() */
   private _journeyRouter: JourneyRouter | null = null;
+  /** @internal lazy Journey Format tree for pathFor() */
+  private _pathFormatter: Format | null = null;
+  /** @internal required (non-optional) path captures, computed from Pattern */
+  private _requiredParamNames: readonly string[] | null = null;
+  /** @internal anchored requirement regexes for path captures, by capture name */
+  private _pathRequirements: Record<string, RegExp> | null = null;
   /** @internal true once we've discovered the path can't be parsed */
   private _journeyRouterUnbuildable = false;
 
@@ -87,7 +96,6 @@ export class Route {
     this.redirectTarget = options.redirect;
     this.anchor = options.anchor !== false;
 
-    this.segments = parseSegments(this.path);
     // Derive capture names from the Journey parser/AST — the same source
     // the Journey bridge uses. Keeps the path-vs-request constraint split
     // in lockstep with what `Pattern.names` will report, so escaped sigils
@@ -117,10 +125,12 @@ export class Route {
    * them against undefined request properties.
    */
   get requestConstraints(): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
+    // Null-prototype map so a constraint keyed `__proto__` becomes an own
+    // property rather than hitting the inherited setter.
+    const out: Record<string, unknown> = Object.create(null);
     const paths = new Set<string>(this.paramNames);
-    for (const [k, v] of Object.entries(this.constraints)) {
-      if (!paths.has(k)) out[k] = v;
+    for (const k of Object.keys(this.constraints)) {
+      if (!paths.has(k)) out[k] = this.constraints[k];
     }
     return out;
   }
@@ -130,25 +140,75 @@ export class Route {
    * `*name` segment). These become Journey pattern requirements.
    */
   get pathConstraints(): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
+    const out: Record<string, unknown> = Object.create(null);
     const paths = new Set<string>(this.paramNames);
-    for (const [k, v] of Object.entries(this.constraints)) {
-      if (paths.has(k)) out[k] = v;
+    for (const k of Object.keys(this.constraints)) {
+      if (paths.has(k)) out[k] = this.constraints[k];
     }
     return out;
   }
 
   /**
    * Compute a specificity score for this route. Higher = more specific.
+   * Static literals score 3, top-level dynamic captures score 1 (or 2 if
+   * the caller signals knowledge of that name). Captures nested inside
+   * an optional group or glob score 0.
    */
   score(knowledge: Record<string, boolean> = {}): number {
-    let s = 0;
-    for (const seg of this.segments) {
-      if (seg.type === "static") s += 3;
-      else if (seg.type === "dynamic") s += knowledge[seg.name] ? 2 : 1;
-      else if (seg.type === "glob") s += 0;
-      else if (seg.type === "optional") s += 0;
+    let tree;
+    try {
+      tree = new Parser().parse(this.path);
+    } catch {
+      return 0;
     }
+    let s = 0;
+    const walk = (node: unknown, nested: boolean): void => {
+      const n = node as {
+        isLiteral?: () => boolean;
+        isSymbol?: () => boolean;
+        isGroup?: () => boolean;
+        isStar?: () => boolean;
+        isCat?: () => boolean;
+        type?: string;
+        toSym?: () => string;
+        children?: () => unknown[];
+        left?: unknown;
+        right?: unknown;
+      };
+      if (n.isGroup?.() || n.isStar?.()) {
+        walk(n.left, true);
+        return;
+      }
+      if (n.isCat?.()) {
+        walk(n.left, nested);
+        walk(n.right, nested);
+        return;
+      }
+      if (n.type === "OR") {
+        // Or-children are alternatives — only one can match a real
+        // request, so score the most specific branch rather than the
+        // sum of all branches.
+        let max = 0;
+        for (const c of n.children?.() ?? []) {
+          const before = s;
+          walk(c, nested);
+          const branch = s - before;
+          if (branch > max) max = branch;
+          s = before;
+        }
+        s += max;
+        return;
+      }
+      if (n.isLiteral?.()) {
+        if (!nested) s += 3;
+        return;
+      }
+      if (n.isSymbol?.()) {
+        if (!nested) s += knowledge[n.toSym!()] ? 2 : 1;
+        return;
+      }
+    };
+    walk(tree, false);
     return s;
   }
 
@@ -180,49 +240,90 @@ export class Route {
   }
 
   /**
-   * Generate a path from this route by substituting params.
+   * Generate a path from this route by substituting params. Throws if a
+   * required (non-optional) capture is missing, matching Rails'
+   * UrlGenerationError behavior.
    */
   pathFor(params: Record<string, string | number> = {}): string {
-    const parts: string[] = [];
-    for (const seg of this.segments) {
-      if (seg.type === "static") {
-        parts.push(seg.value);
-      } else if (seg.type === "dynamic") {
-        const val = params[seg.name];
-        if (val === undefined) {
-          throw new Error(
-            `Missing required parameter :${seg.name} for route "${this.name ?? this.path}"`,
-          );
-        }
-        parts.push(String(val));
-      } else if (seg.type === "glob") {
-        const val = params[seg.name];
-        if (val !== undefined) {
-          parts.push(String(val));
-        }
-      } else if (seg.type === "optional") {
-        // Include optional group only if all dynamic params are provided
-        const optParts: string[] = [];
-        let allPresent = true;
-        for (const child of seg.children) {
-          if (child.type === "static") {
-            optParts.push(child.value);
-          } else if (child.type === "dynamic") {
-            const val = params[child.name];
-            if (val === undefined || val === null) {
-              allPresent = false;
-              break;
-            }
-            optParts.push(String(val));
-          }
-        }
-        if (allPresent && optParts.length > 0) {
-          parts.push(...optParts);
-        }
+    if (this._pathFormatter === null) {
+      const tree = new Parser().parse(this.path);
+      const ast = new Ast(tree, true);
+      // Pass path-capture constraints into the Pattern so requirement
+      // checks (e.g. `id: /\d+/`) are honored at generation time. Use
+      // `pathConstraints` (not the raw `constraints`) so request-level
+      // constraints like `subdomain` don't accidentally validate
+      // unrelated params. Null-prototype map so a route capture named
+      // `__proto__` becomes an own requirement entry.
+      const reqs: Record<string, RegExp> = Object.create(null);
+      for (const [k, v] of Object.entries(this.pathConstraints)) {
+        if (v instanceof RegExp) reqs[k] = v;
+        else if (typeof v === "string") reqs[k] = new RegExp(v);
+      }
+      const pattern = new Pattern(ast, reqs, PATHFOR_SEPARATORS, this.anchor);
+      this._pathFormatter = pattern.buildFormatter();
+      // `Pattern.requiredNames` filters by optional-name *set*, so a name
+      // that appears both required and optional (e.g. `/:id(.:id)`) gets
+      // dropped. Walk the AST and collect symbol names strictly outside
+      // Group nodes (top-level Stars count as required too) — that's the
+      // true "must be supplied" set.
+      this._requiredParamNames = topLevelSymbolNames(tree);
+      // Build the anchored requirements ourselves from `reqs` (which is
+      // already null-prototype). Going through Pattern's
+      // `requirementsForMissingKeysCheck` getter would route a
+      // `__proto__` capture to the plain-object inherited setter,
+      // dropping the requirement before we can copy it.
+      const safeReqs: Record<string, RegExp> = Object.create(null);
+      for (const name of Object.keys(reqs)) {
+        const re = reqs[name]!;
+        safeReqs[name] = new RegExp(`^(?:${re.source})$`, re.flags);
+      }
+      this._pathRequirements = safeReqs;
+    }
+    for (const name of this._requiredParamNames!) {
+      // Match Journey Formatter's Ruby-truthiness rule: only nil/undefined
+      // are missing. Empty string is treated as supplied and emitted by
+      // Format.evaluate (e.g. `/posts/:id` with `{ id: "" }` → `/posts/`).
+      if (!Object.hasOwn(params, name) || params[name] == null) {
+        throw new Error(
+          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
+        );
       }
     }
-    const result = "/" + parts.join("/");
-    return result === "/" ? "/" : result;
+    // Validate supplied path-capture values against the route's
+    // requirement regexes (Rails Journey Formatter `missing_keys` check).
+    for (const [name, re] of Object.entries(this._pathRequirements!)) {
+      // `Object.hasOwn` avoids inheriting prototype-chain values for
+      // optional captures named like `constructor`/`toString`.
+      if (!Object.hasOwn(params, name)) continue;
+      const v = params[name];
+      if (v != null && !re.test(String(v))) {
+        throw new Error(
+          `Missing required parameter :${name} for route "${this.name ?? this.path}"`,
+        );
+      }
+    }
+    // Null-prototype object so an own `__proto__` route param becomes a
+    // real own property rather than hitting the inherited setter (which
+    // would silently update the prototype instead of storing the value).
+    const hash: Record<string, unknown> = Object.create(null);
+    for (const [k, v] of Object.entries(params)) {
+      if (v != null) hash[k] = String(v);
+    }
+    let out = this._pathFormatter.evaluate(hash);
+    // Collapse runs of `/` left over from omitted optional groups
+    // (e.g. `(/:a)(/:b)` with `{ b: "x" }` → `//x` → `/x`). Skip when
+    // a path-preserving capture (`*splat` / `:controller`) is supplied
+    // with a value containing `/` — those use Format.requiredPath /
+    // escapePath, which keeps `/` literal, so collapsing would munge
+    // the user value.
+    if (!emittedSlashInPathPreservingCapture(params, this.path, out)) {
+      // Collapse `/{2,}` runs left over from omitted optional groups
+      // (e.g. `(/:a)(/:b)` with `{ b: "x" }` → `//x` → `/x`). Trailing
+      // slashes are kept — they can be structural (e.g. `/posts/` is
+      // the correct output for `/posts/:id` with `{ id: "" }`).
+      out = out.replace(/\/{2,}/g, "/");
+    }
+    return out;
   }
 
   /**
@@ -265,26 +366,100 @@ export class Route {
   }
 }
 
-// --- Path segment types ---
+/**
+ * True if a *path-preserving* capture's slash-bearing value was actually
+ * emitted by the formatter. Checking emitted-vs-supplied matters when
+ * the capture sits in an optional group that gets omitted because some
+ * other required param in the same group is missing — the value
+ * shouldn't suppress the structural-slash collapse if it never made it
+ * to the output.
+ *
+ * Only `*splat` and `:controller` parameters preserve slashes (via
+ * `Format.requiredPath` + `escapePath`); ordinary `:name` segments
+ * percent-encode `/` to `%2F`, so their values can't introduce literal
+ * `/` runs into the output and don't need to suppress collapse.
+ */
+function emittedSlashInPathPreservingCapture(
+  params: Record<string, string | number>,
+  path: string,
+  out: string,
+): boolean {
+  // Names of path-preserving captures declared by this route. Splat
+  // (`*name`) is always path-preserving; the `:controller` symbol gets
+  // special-cased by Journey's FormatBuilder.
+  // `\*name` is NOT escaped by Journey's scanner — only `\:`, `\(`, `\)`
+  // are literalized. So splat names are matched without a backslash
+  // exclusion, and the name accepts any `\w` after `*` (matching the
+  // scanner's STAR rule, including digit-leading names like `*123`).
+  const splatNames = new Set<string>();
+  for (const m of path.matchAll(/\*(\w+)/g)) {
+    splatNames.add(m[1]!);
+  }
+  const declaresController = /(?<!\\):controller\b/.test(path);
+  for (const [k, v] of Object.entries(params)) {
+    if (typeof v !== "string" || !v.includes("/")) continue;
+    const isPathPreserving = splatNames.has(k) || (declaresController && k === "controller");
+    if (!isPathPreserving) continue;
+    // `escapePath` keeps `/` literal but escapes other unsafe chars,
+    // so the value can land in `out` either verbatim or partially
+    // escaped. Cheap proof-of-presence: the slash-containing prefix up
+    // to the first non-path-safe character should appear unchanged.
+    const slashPrefix = v.split(/[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/, 1)[0]!;
+    if (slashPrefix.includes("/") && out.includes(slashPrefix)) return true;
+  }
+  return false;
+}
 
-interface StaticSegment {
-  type: "static";
-  value: string;
+function topLevelSymbolNames(tree: unknown): readonly string[] {
+  // Names of `:symbol` and `*splat` captures that appear strictly outside
+  // any optional `Group`. Top-level `Star` nodes ARE counted as required
+  // (recurse into them without flipping `nested`) so omitting `*path`
+  // from `/files/*path` still throws missing-parameter rather than
+  // silently producing `/files/`.
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const walk = (node: unknown, nested: boolean): void => {
+    const n = node as {
+      isSymbol?: () => boolean;
+      isGroup?: () => boolean;
+      isStar?: () => boolean;
+      isCat?: () => boolean;
+      type?: string;
+      toSym?: () => string;
+      children?: () => unknown[];
+      left?: unknown;
+      right?: unknown;
+    };
+    if (n.isGroup?.()) {
+      walk(n.left, true);
+      return;
+    }
+    if (n.isStar?.()) {
+      // The star wraps a Symbol child; that child is the splat name and is
+      // required iff the star itself is top-level.
+      walk(n.left, nested);
+      return;
+    }
+    if (n.isCat?.()) {
+      walk(n.left, nested);
+      walk(n.right, nested);
+      return;
+    }
+    if (n.type === "OR") {
+      for (const c of n.children?.() ?? []) walk(c, nested);
+      return;
+    }
+    if (!nested && n.isSymbol?.()) {
+      const name = n.toSym!();
+      if (!seen.has(name)) {
+        seen.add(name);
+        out.push(name);
+      }
+    }
+  };
+  walk(tree, false);
+  return out;
 }
-interface DynamicSegment {
-  type: "dynamic";
-  name: string;
-}
-interface GlobSegment {
-  type: "glob";
-  name: string;
-}
-interface OptionalGroup {
-  type: "optional";
-  children: (StaticSegment | DynamicSegment)[];
-}
-
-type PathSegment = StaticSegment | DynamicSegment | GlobSegment | OptionalGroup;
 
 function collectParamNamesFromJourneyAst(path: string): string[] {
   try {
@@ -298,77 +473,6 @@ function collectParamNamesFromJourneyAst(path: string): string[] {
     // Parser failure shouldn't crash the route table; fall back to no captures.
     return [];
   }
-}
-
-function parseSegments(path: string): PathSegment[] {
-  const segments: PathSegment[] = [];
-  const raw = path.replace(/^\/+/, "");
-  if (!raw) return segments;
-
-  // Handle optional groups: (/:locale) or (.:format)
-  let i = 0;
-  const parts: string[] = [];
-  let current = "";
-
-  // First split by / but handle parenthesized groups
-  while (i < raw.length) {
-    if (raw[i] === "(") {
-      // Find matching close paren
-      if (current) {
-        parts.push(current);
-        current = "";
-      }
-      let depth = 1;
-      let group = "(";
-      i++;
-      while (i < raw.length && depth > 0) {
-        if (raw[i] === "(") depth++;
-        if (raw[i] === ")") depth--;
-        group += raw[i];
-        i++;
-      }
-      parts.push(group);
-    } else if (raw[i] === "/") {
-      if (current) {
-        parts.push(current);
-        current = "";
-      }
-      i++;
-    } else {
-      current += raw[i];
-      i++;
-    }
-  }
-  if (current) parts.push(current);
-
-  for (const part of parts) {
-    if (part.startsWith("(") && part.endsWith(")")) {
-      // Optional group
-      const inner = part.slice(1, -1).replace(/^\/+/, "").replace(/^\./, "");
-      const children: (StaticSegment | DynamicSegment)[] = [];
-      for (const sub of inner.split("/").filter(Boolean)) {
-        if (sub.startsWith(":")) {
-          children.push({ type: "dynamic", name: sub.slice(1) });
-        } else if (sub.startsWith("*")) {
-          // glob in optional — treat as dynamic
-          children.push({ type: "dynamic", name: sub.slice(1) });
-        } else {
-          children.push({ type: "static", value: sub });
-        }
-      }
-      if (children.length > 0) {
-        segments.push({ type: "optional", children });
-      }
-    } else if (part.startsWith("*")) {
-      segments.push({ type: "glob", name: part.slice(1) });
-    } else if (part.startsWith(":")) {
-      segments.push({ type: "dynamic", name: part.slice(1) });
-    } else {
-      segments.push({ type: "static", value: part });
-    }
-  }
-
-  return segments;
 }
 
 function normalizePath(p: string): string {
