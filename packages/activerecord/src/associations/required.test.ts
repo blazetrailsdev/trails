@@ -20,6 +20,8 @@ beforeEach(async () => {
     r_books: { title: "string", author_id: "integer" },
     r_writers: { name: "string" },
     r_novels: { title: "string", writer_id: "integer" },
+    rg_parents: { name: "string" },
+    rg_children: { title: "string", rg_parent_id: "integer" },
     // RAUser/RAProfile etc. tableize as ra_*, rh_*, rm_* (consecutive-caps
     // collapse per Rails' String#underscore; see packages/activesupport
     // inflector). The same key columns map through.
@@ -253,5 +255,50 @@ describe("belongs_to required option", () => {
     const novel = new RNovel({ title: "LotR", writer_id: writer.id });
     const saved = await novel.save();
     expect(saved).toBe(true);
+  });
+
+  // Regression: readAttributeForValidation routes through `record.association(name)`
+  // for association names; without the `assoc.target != null` guard, an unloaded
+  // association with target === null would surface null to validators that then
+  // crash or misreport. Combining `belongs_to required: true` (FK presence on
+  // child) with `has_many validate: true` (parent triggers child validation on
+  // save) is the path PR #1461 broadened, and this test pins the guard.
+  it("validates has_many children when parent saves without crashing on unloaded target", async () => {
+    const adapter = freshAdapter();
+
+    class RGChild extends Base {
+      static _tableName = "rg_children";
+    }
+    RGChild.attribute("id", "integer");
+    RGChild.attribute("title", "string");
+    RGChild.attribute("rg_parent_id", "integer");
+    RGChild.adapter = adapter;
+
+    class RGParent extends Base {
+      static _tableName = "rg_parents";
+    }
+    RGParent.attribute("id", "integer");
+    RGParent.attribute("name", "string");
+    RGParent.adapter = adapter;
+
+    registerModel("RGParent", RGParent);
+    registerModel("RGChild", RGChild);
+    Associations.belongsTo.call(RGChild, "rgParent", {
+      required: true,
+      foreignKey: "rg_parent_id",
+      className: "RGParent",
+    });
+    Associations.hasMany.call(RGParent, "rgChildren", {
+      validate: true,
+      foreignKey: "rg_parent_id",
+      className: "RGChild",
+    });
+
+    // No children built or loaded — has_many target is empty. Save must not
+    // throw and must succeed (no children to invalidate the parent).
+    const parent = new RGParent({ name: "p1" });
+    const saved = await parent.save();
+    expect(saved).toBe(true);
+    expect(parent.id).toBeTruthy();
   });
 });
