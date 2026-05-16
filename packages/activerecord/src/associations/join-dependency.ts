@@ -160,7 +160,11 @@ export class JoinDependency {
     let targetModel: typeof Base | undefined;
     let targetTable: string;
     let joinOn: string;
-    const assocType: "hasMany" | "hasOne" | "belongsTo" = assocDef.type;
+    // HABTM is structurally has_many :through under the hood, so collapse
+    // its assoc type to "hasMany" for downstream JoinNode consumers (limit
+    // suppression, singular-vs-collection assignment, etc.).
+    const assocType: "hasMany" | "hasOne" | "belongsTo" =
+      assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
 
     if (assocDef.type === "belongsTo") {
       if (assocDef.options.polymorphic) return null;
@@ -174,7 +178,14 @@ export class JoinDependency {
       if (Array.isArray(targetPk)) return null;
       // effectiveName resolved below after targetTable is known
       joinOn = `PLACEHOLDER."${targetPk}" = "${sourceAlias}"."${foreignKey}"`;
-    } else if (assocDef.type === "hasMany" || assocDef.type === "hasOne") {
+    } else if (
+      assocDef.type === "hasMany" ||
+      assocDef.type === "hasOne" ||
+      assocDef.type === "hasAndBelongsToMany"
+    ) {
+      // HABTM always has options.through set by the builder (it auto-generates
+      // a join model and routes through it). Mirrors how Rails' HABTM is
+      // structurally a has_many :through against an anonymous join model.
       if (assocDef.options.through) {
         return this._addThroughAssociation(
           assocDef,
@@ -670,7 +681,7 @@ export class JoinDependency {
         : assocDef.name;
       recursiveNode.immediateAssocName = assocDef.name;
       recursiveNode.parentPath = parentAssocName ?? null;
-      recursiveNode.assocType = assocDef.type;
+      recursiveNode.assocType = assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type;
 
       return recursiveNode;
     }
@@ -741,7 +752,7 @@ export class JoinDependency {
       assocName: fullAssocName,
       immediateAssocName: assocDef.name,
       parentPath: parentAssocName ?? null,
-      assocType: assocDef.type,
+      assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
       joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" "${targetAlias}" ON ${targetJoinOn}`,
     };
 
