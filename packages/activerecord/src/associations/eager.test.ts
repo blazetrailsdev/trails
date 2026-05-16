@@ -1679,10 +1679,14 @@ describe("EagerAssociationTest", () => {
     await new CollectionProxy(p1, "ejHabtmCategories", assoc).push(tech, gen);
     await new CollectionProxy(p2, "ejHabtmCategories", assoc).push(gen);
 
-    const posts = await EjHabtmPost.all()
-      .eagerLoad("ejHabtmCategories")
-      .order("id", "asc")
-      .toArray();
+    const rel = EjHabtmPost.all().eagerLoad("ejHabtmCategories").order("id", "asc");
+    // Prove the JOIN path is taken (not the addAssociation==null fallback to preload):
+    // the eager-load SQL must reference both the join table and the target table.
+    const sql = rel.toSql();
+    expect(sql).toMatch(/LEFT OUTER JOIN.*ej_habtm_categories_ej_habtm_posts/);
+    expect(sql).toMatch(/LEFT OUTER JOIN.*ej_habtm_categories[^_]/);
+
+    const posts = await rel.toArray();
     expect(posts).toHaveLength(2);
     const cats0 = (posts[0] as any)._preloadedAssociations.get("ejHabtmCategories");
     const cats1 = (posts[1] as any)._preloadedAssociations.get("ejHabtmCategories");
