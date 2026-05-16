@@ -334,6 +334,65 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Tests Marshal/YAML binary encoding of AR records. " +
       "Ruby binary serialization formats have no Node.js equivalent.",
   },
+  // --- globalid: Ruby pattern matching (`case ... in`) ---
+  {
+    testFile: "pattern_matching_test.rb",
+    reason:
+      "Tests Ruby's `case ... in` pattern matching against URI::GID via " +
+      "`deconstruct_keys`. TypeScript has no equivalent destructuring " +
+      "protocol; callers read `.app` / `.modelName` / `.modelId` / `.params` " +
+      "directly off the GID instance.",
+  },
+  // --- globalid: Rails::Railtie wiring ---
+  {
+    testFile: "railtie_test.rb",
+    reason:
+      "Exercises Rails::Railtie boot wiring for GlobalID — `app_id`, " +
+      "`expires_in`, verifier secret derivation from Rails.application. " +
+      "Trails has no Railtie analogue; wiring happens via the package-local " +
+      "`wire.ts` side-effect import and explicit `setApp` / verifier setters.",
+  },
+  // --- globalid: module-based `only:` filters (Ruby modules have no TS analogue) ---
+  {
+    testFile: "global_locator_test.rb",
+    className: "GlobalLocatorTest",
+    tests: [
+      "by GID with only: restriction by module",
+      "by GID with only: restriction by module no match",
+      "by GID with only: restriction by multiple types w/module",
+      "by SGID with only: restriction by module",
+      "by SGID with only: restriction by module no match",
+      "by SGID with only: restriction by multiple types w/module",
+    ],
+    reason:
+      "Ruby `only:` accepts a Module to filter records whose class includes " +
+      "that module. TypeScript has no module-include relationship for " +
+      "classes; `instanceof` only works against constructors. The " +
+      "class-based `only:` cases are covered by the matching non-module " +
+      "tests in the same file.",
+  },
+  // --- globalid: legacy self-validated SGID metadata + cross-class equality ---
+  {
+    testFile: "signed_global_id_test.rb",
+    className: "SignedGlobalIDPurposeTest",
+    tests: ["parse is backwards compatible with the self validated metadata"],
+    reason:
+      "Backwards-compat path for SGIDs issued by globalid <1.3.0 before " +
+      "verifier-validated metadata existed. Trails has no pre-1.3.0 SGIDs " +
+      "in circulation; `verifyWithLegacySelfValidatedMetadata` exists as a " +
+      "nominal stub for api:compare parity.",
+  },
+  {
+    testFile: "signed_global_id_test.rb",
+    className: "SignedGlobalIDTest",
+    tests: ["value equality with an unsigned id"],
+    reason:
+      "Asserts a SignedGlobalID equals an unsigned GlobalID with the same " +
+      "URI. Cross-class equality across @blazetrails/globalid subpath " +
+      "imports hits the TS private-field nominal-typing trap; the " +
+      "`SignedGlobalID#equals` contract is symmetric only within its own " +
+      "class. Same-class equality is covered by `value equality`.",
+  },
   // --- globalid: Ruby-Marshal exact-token assertion ---
   {
     testFile: "verifier_test.rb",

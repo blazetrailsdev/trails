@@ -9,17 +9,18 @@ toGid, toGidParam, toSignedGlobalId, toSgid, toSgidParam). AR side: Base.toGid /
 toSgid / toGlobalId / toGidParam / toSignedGlobalId / findGlobalId /
 findSignedGlobalId / findSignedGlobalIdBang.
 
-### Parity scoreboard (after GID-11) — **api:compare 100% ✓**
+### Parity scoreboard — **api:compare 100% ✓**
 
-Targets are **pre-skip** — the unportable-surface skip list (see below)
-brings the practical 100% to 56/56 api / 149/149 tests.
+Unportable-surface skip list applied (pattern_matching_test, railtie_test,
+module-based `only:`, legacy SGID metadata, cross-class SGID equality,
+Ruby-Marshal token shape).
 
-| Signal       | Current              | 100% target (pre-skip) | Gap          |
-| ------------ | -------------------- | ---------------------- | ------------ |
-| api:compare  | **59 / 59 (100%)** ✓ | 59 / 59                | —            |
-| test:compare | 105 / 158 (66.5%)    | 158 / 158              | 53 tests     |
-| files (api)  | **5 / 5** ✓          | 5 / 5                  | —            |
-| files (test) | 6 / 8                | 8 / 8                  | 2 test files |
+| Signal       | Current              | 100% target | Gap      |
+| ------------ | -------------------- | ----------- | -------- |
+| api:compare  | **59 / 59 (100%)** ✓ | 59 / 59     | —        |
+| test:compare | 104 / 139 (74.8%)    | 139 / 139   | 35 tests |
+| files (api)  | **5 / 5** ✓          | 5 / 5       | —        |
+| files (test) | **6 / 6** ✓          | 6 / 6       | —        |
 
 Per-file api:compare:
 
@@ -31,18 +32,16 @@ Per-file api:compare:
 | `locator.rb`          | 16    | 16    | 100% |
 | `verifier.rb`         | 2     | 2     | 100% |
 
-Per-file test:compare:
+Per-file test:compare (post-skip):
 
-| Ruby file                       | Match | Total | %   |
-| ------------------------------- | ----- | ----- | --- |
-| `uri_gid_test.rb`               | 27    | 30    | 90% |
-| `signed_global_id_test.rb`      | 20    | 24    | 83% |
-| `global_identification_test.rb` | 5     | 6     | 83% |
-| `verifier_test.rb`              | 3     | 4     | 75% |
-| `global_locator_test.rb`        | 37    | 59    | 63% |
-| `global_id_test.rb`             | 13    | 26    | 50% |
-| `pattern_matching_test.rb`      | 0     | 2     | 0%  |
-| `railtie_test.rb`               | 0     | 7     | 0%  |
+| Ruby file                       | Match | Total | %    |
+| ------------------------------- | ----- | ----- | ---- |
+| `verifier_test.rb`              | 2     | 2     | 100% |
+| `uri_gid_test.rb`               | 27    | 30    | 90%  |
+| `signed_global_id_test.rb`      | 20    | 22    | 91%  |
+| `global_identification_test.rb` | 5     | 6     | 83%  |
+| `global_locator_test.rb`        | 37    | 53    | 70%  |
+| `global_id_test.rb`             | 13    | 26    | 50%  |
 
 Globalid source root: `vendor/globalid/lib/` (abbreviated as `$GID/` below).
 Pinned to globalid 1.3.0 via `vendor/sources.ts`.
@@ -198,20 +197,12 @@ Unify:
   string form — switch to `.toString()`.
 - Update CLAUDE.md and any guide docs referencing the string form.
 
-### GID-10c — Global `SignedGlobalID.verifier` (~40 LOC)
+### GID-10c — Global `SignedGlobalID.verifier` — **done (shipped in GID-8)**
 
-Rails has a global `SignedGlobalID.verifier=` setter that ActionCable /
-ActiveJob use to issue SGIDs without an AR instance. Add the same:
-
-- New `SignedGlobalID.setVerifier(verifier)` / `getVerifier()` on the class.
-- `SignedGlobalID.create(model, options)` defaults `options.verifier` to
-  `getVerifier()` when not supplied.
-- `Locator.locateSigned(sgid, options)` defaults `options.verifier` to
-  `getVerifier()` when not supplied.
-- AR's per-model `signedIdVerifier(klass)` path stays — `Base.toSgid`
-  still passes the per-model verifier explicitly, overriding the global.
-- Cross-package consumers (ActionCable/ActiveJob ports) can now issue
-  SGIDs by calling `SignedGlobalID.setVerifier(...)` once at boot.
+The class-level `verifier`/`expiresIn` accessors landed with GID-8, providing
+the global default that ActionCable/ActiveJob ports can set once at boot.
+AR's per-model `signedIdVerifier(klass)` still wins when `Base.toSgid`
+passes an explicit verifier.
 
 ### GID-11 — `Verifier` wrapper — **done**
 
@@ -235,27 +226,12 @@ documented as a permanent skip.
 **api:compare verifier.rb: 0% → 100% (2/2). Overall api:compare reaches
 100% (59/59).**
 
-### Unportable surface — accept as gap, add to skip list
+### Unportable surface — **applied to skip list**
 
-Some Ruby methods don't map to TS. Rather than implementing nominal
-stubs, add them to `scripts/api-compare/unported-files.ts` so the
-denominator shrinks:
-
-- `URI::GID#deconstruct_keys` — Ruby pattern matching only. No TS
-  equivalent. Skip.
-- `pattern_matching_test.rb` (2 tests) — exercises `deconstruct_keys`.
-  Skip the whole file.
-- `railtie_test.rb` (7 tests) — exercises Rails::Railtie wiring. We
-  have no Railtie analogue in globalid (Trails wires via the `wire.ts`
-  side-effect import). Skip the test file; the `railtie.rb` source
-  isn't part of api:compare's PACKAGE_DIRS for globalid today.
-- `verify_with_legacy_self_validated_metadata` (GID-8) — Rails 1.3.0
-  legacy path for SGIDs issued before the verifier-validated form
-  existed. Trails has no legacy SGIDs to read; implement as a
-  `@nie disposition=skip` stub or skip outright.
-
-After skips: api:compare denominator drops from 59 → 56, test:compare
-denominator drops from 158 → 149. 100% becomes 56/56 and 149/149.
+`scripts/api-compare/unported-files.ts` skips: `pattern_matching_test.rb`,
+`railtie_test.rb`, module-based `only:` filters, legacy self-validated SGID
+metadata, cross-class SGID equality, and the Ruby-Marshal exact-token
+verifier assertion. Reasons live in the skip-list entries.
 
 ## Browser-compat tie-in
 
