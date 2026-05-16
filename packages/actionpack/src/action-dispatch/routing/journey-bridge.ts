@@ -32,6 +32,15 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
     const ast = new Ast(tree, true);
     const requirements = regexpRequirements(r.constraints);
     const pattern = new Pattern(ast, requirements, SEPARATORS, r.anchor);
+    // Path-name constraints belong in the pattern, not on the JourneyRoute,
+    // or Route#matches will recheck them against request properties (where
+    // the captured value isn't yet) and reject every request. Rails splits
+    // these the same way.
+    const pathNames = new Set(pattern.names);
+    const requestConstraints: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(r.constraints)) {
+      if (!pathNames.has(k)) requestConstraints[k] = v;
+    }
     const verb = (r.verb || "").toUpperCase();
     const requestMethodMatch = !verb || verb === "ALL" ? undefined : [VerbMatchers.for(verb)];
     const name = r.name ?? `__r${i}`;
@@ -50,6 +59,7 @@ export function buildJourneyRouter(routes: readonly LocalRoute[]): JourneyRouter
             },
           },
           path: pattern,
+          constraints: requestConstraints,
           defaults: { ...r.defaults, controller: r.controller, action: r.action },
           requestMethodMatch,
           precedence: index,
