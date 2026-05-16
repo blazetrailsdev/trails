@@ -171,8 +171,49 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
         : null);
 
     if (inverseName) {
+      // Mirrors Association#inversable?: only wire when the child's FK
+      // actually points at the owner. Chained queries that widen the
+      // scope (`.or(other.collection)`, `.unscope(:where)`) can return
+      // rows that belong to a *different* owner; wiring those would
+      // alias the wrong parent onto the child. Compare FK→PK via the
+      // reflection so composite-PK reflections work.
+      const fkCols = resolvedRefl
+        ? Array.isArray(resolvedRefl.foreignKey)
+          ? resolvedRefl.foreignKey
+          : [resolvedRefl.foreignKey]
+        : null;
+      const pkCols = resolvedRefl
+        ? Array.isArray(resolvedRefl.activeRecordPrimaryKey)
+          ? resolvedRefl.activeRecordPrimaryKey
+          : [resolvedRefl.activeRecordPrimaryKey]
+        : null;
+      const ownerRec = owner as unknown as {
+        isPersisted?: () => boolean;
+        _readAttribute: (n: string) => unknown;
+      };
+      const ownerPersisted = ownerRec.isPersisted?.() ?? true;
       for (const r of records) {
-        const cache = ((r as any)._cachedAssociations ??= new Map());
+        const childRec = r as unknown as {
+          isPersisted?: () => boolean;
+          _readAttribute: (n: string) => unknown;
+          _cachedAssociations?: Map<string, unknown>;
+        };
+        const childPersisted = childRec.isPersisted?.() ?? true;
+        let inversable = !ownerPersisted || !childPersisted;
+        if (!inversable && fkCols && pkCols && fkCols.length === pkCols.length) {
+          inversable = true;
+          for (let i = 0; i < fkCols.length; i++) {
+            if (childRec._readAttribute(fkCols[i]) !== ownerRec._readAttribute(pkCols[i])) {
+              inversable = false;
+              break;
+            }
+          }
+        } else if (!inversable && (!fkCols || !pkCols)) {
+          // No reflection metadata → preserve prior behavior and wire.
+          inversable = true;
+        }
+        if (!inversable) continue;
+        const cache = (childRec._cachedAssociations ??= new Map());
         cache.set(inverseName, owner);
       }
     }
