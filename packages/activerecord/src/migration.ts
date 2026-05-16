@@ -1915,7 +1915,7 @@ export class MigrationContext {
       name: indexName,
       where: options?.where,
       orders: options?.order,
-      using: options?.using,
+      using: usingStr ? options?.using : undefined,
       nullsNotDistinct: options?.nullsNotDistinct,
       include: options?.include,
     });
