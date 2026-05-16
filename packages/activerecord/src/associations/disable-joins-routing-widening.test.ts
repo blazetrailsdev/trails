@@ -23,6 +23,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
@@ -55,8 +56,14 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      rw_authors: { name: "string" },
+      rw_comments: { rw_author_id: "integer", origin_id: "integer", origin_type: "string" },
+      rw_members: { name: "string" },
+      rw_other_origins: { label: "string" },
+    });
     RwAuthor.adapter = adapter;
     RwComment.adapter = adapter;
     RwMember.adapter = adapter;

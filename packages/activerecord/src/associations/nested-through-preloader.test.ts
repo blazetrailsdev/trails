@@ -26,6 +26,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, registerSubclass, enableSti } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("HMT Slot D — nested-through preloader / STI / joins+includes", () => {
@@ -65,8 +66,14 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
   enableSti(NtdRating);
   registerSubclass(NtdHighRating);
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      ntd_authors: { name: "string" },
+      ntd_posts: { ntd_author_id: "integer", title: "string" },
+      ntd_comments: { ntd_post_id: "integer", body: "string" },
+      ntd_ratings: { ntd_comment_id: "integer", value: "integer", type: "string" },
+    });
     NtdAuthor.adapter = adapter;
     NtdPost.adapter = adapter;
     NtdComment.adapter = adapter;
