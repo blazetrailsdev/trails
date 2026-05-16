@@ -239,7 +239,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
       if (options["default"] == null) {
         sql += `, ALTER COLUMN ${quotedName} DROP DEFAULT`;
       } else {
-        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"])}`;
+        // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
+        // quote_default_expression so array/typeMap-aware serialization
+        // is preserved on ALTER COLUMN SET DEFAULT.
+        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"], column)}`;
       }
     }
 
@@ -253,8 +256,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
     const col = this.adapter.quoteIdentifier(o.column.name);
+    // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
+    // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
-      o.default == null ? "DROP DEFAULT" : `SET${this.adapter.quoteDefaultExpression(o.default)}`;
+      o.default == null
+        ? "DROP DEFAULT"
+        : `SET${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 

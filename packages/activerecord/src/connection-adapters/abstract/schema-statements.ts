@@ -1101,7 +1101,7 @@ export class SchemaStatements {
     if (
       this.adapter.supportsDatetimeWithPrecision?.() &&
       type === "datetime" &&
-      colOpts.precision === undefined
+      !("precision" in colOpts)
     ) {
       colOpts.precision = 6;
     }

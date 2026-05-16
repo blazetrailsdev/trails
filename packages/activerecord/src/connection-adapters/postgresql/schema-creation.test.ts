@@ -9,7 +9,24 @@ import {
   AlterTable,
 } from "../abstract/schema-definitions.js";
 
-const s = () => new SchemaCreation() as any;
+// Stub host satisfies `PgSchemaCreationHost`: the inherited Quoting
+// fallback covers quote*, plus a minimal `typeToSql` since PG's override
+// delegates to the adapter (Rails parity: SchemaCreation delegates
+// type_to_sql to @conn).
+const s = () =>
+  new SchemaCreation({
+    quoteIdentifier: (n: string) => `"${n}"`,
+    quoteTableName: (n: string) => `"${n}"`,
+    quoteDefaultExpression: (v: unknown) => ` DEFAULT ${typeof v === "string" ? `'${v}'` : v}`,
+    typeToSql: (type: string, options: Record<string, unknown> = {}) => {
+      if (type === "decimal") {
+        const p = options.precision;
+        const sc = options.scale;
+        return p != null && sc != null ? `decimal(${p},${sc})` : "decimal";
+      }
+      return type;
+    },
+  }) as any;
 
 describe("PostgreSQL SchemaCreation", () => {
   it("visitForeignKeyDefinition: NOT VALID + DEFERRABLE", () => {
