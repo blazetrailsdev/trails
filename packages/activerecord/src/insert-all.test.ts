@@ -1084,7 +1084,9 @@ describe("InsertAll async uniqueIndexes regression", () => {
         spy.mockRestore();
       }
       expect(upsertSql).toBeDefined();
-      expect(upsertSql).toMatch(/ON CONFLICT \("key"\) WHERE "active"/);
+      // PG normalizes the partial-index predicate when it round-trips
+      // through pg_get_indexdef ("active" → active), so accept either form.
+      expect(upsertSql).toMatch(/ON CONFLICT \("key"\) WHERE "?active"?/);
     },
   );
 });
