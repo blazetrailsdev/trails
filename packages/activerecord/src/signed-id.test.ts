@@ -297,9 +297,20 @@ describe("SignedIdTest", () => {
     expect(found!.id).toBe(u.id);
   });
 
-  it.skip("find signed record on relation", () => {
-    // BLOCKED: feature — Relation.findSigned scoping wrapper (Rails SignedId::RelationMethods).
-    // Needs Relation.findSigned / findSignedBang that call scoping { model.findSigned(...) }.
+  it("find signed record on relation", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const token = await u.signedId();
+    const found = await User.where({ name: "Alice" }).findSigned(token);
+    expect(found).not.toBeNull();
+    expect(found!.id).toBe(u.id);
+    const miss = await User.where({ name: "Bob" }).findSigned(token);
+    expect(miss).toBeNull();
   });
 
   it("find signed record with a bang", async () => {
@@ -315,8 +326,18 @@ describe("SignedIdTest", () => {
     expect(found.id).toBe(u.id);
   });
 
-  it.skip("find signed record with a bang on relation", () => {
-    // BLOCKED: feature — Relation.findSignedBang scoping wrapper (Rails SignedId::RelationMethods).
+  it("find signed record with a bang on relation", async () => {
+    class User extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    const u = await User.create({ name: "Alice" });
+    const token = await u.signedId();
+    const found = await User.where({ name: "Alice" }).findSignedBang(token);
+    expect(found.id).toBe(u.id);
+    await expect(User.where({ name: "Bob" }).findSignedBang(token)).rejects.toThrow();
   });
 
   it("find signed record with purpose", async () => {

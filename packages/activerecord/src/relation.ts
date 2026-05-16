@@ -4287,6 +4287,24 @@ export class Relation<T extends Base> {
     }
   }
 
+  /**
+   * Mirrors: ActiveRecord::SignedId::RelationMethods#find_signed
+   */
+  async findSigned(token: string, options?: { purpose?: string }): Promise<T | null> {
+    return this.scoping(() =>
+      (this._modelClass as any).findSigned(token, options),
+    ) as Promise<T | null>;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::SignedId::RelationMethods#find_signed!
+   */
+  async findSignedBang(token: string, options?: { purpose?: string }): Promise<T> {
+    return this.scoping(() =>
+      (this._modelClass as any).findSignedBang(token, options),
+    ) as Promise<T>;
+  }
+
   // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
   private _cacheKeys: Map<string, Promise<string>> | undefined;
   private _cacheVersions: Map<string, Promise<string | null>> | undefined;
