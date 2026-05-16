@@ -77,7 +77,7 @@ describeIfMysql("Mysql2Adapter", () => {
       const columns = await adapter.columns("charset_collations");
       const col = columns.find((c) => c.name === "description");
       expect(col?.type).toBe("binary");
-      expect(col?.collation).toBeUndefined();
+      expect(col?.collation).toBeNull();
     });
 
     it("change column doesn't preserve collation for string to non-string types", async () => {
@@ -89,7 +89,7 @@ describeIfMysql("Mysql2Adapter", () => {
       const columns = await adapter.columns("charset_collations");
       const col = columns.find((c) => c.name === "description");
       expect(col?.type).toBe("integer");
-      expect(col?.collation).toBeUndefined();
+      expect(col?.collation).toBeNull();
     });
 
     it("change column preserves collation for string to text", async () => {
