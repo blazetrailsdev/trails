@@ -1759,6 +1759,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
     const sqlModeClause = sqlMode ? `@@SESSION.sql_mode = ${sqlMode}` : "";
 
+    // mysql2 uses `charset`; Rails database.yml uses `encoding`. Support both, preferring charset.
+    // `variables: { encoding:, collation: }` from database.yml is also accepted and removed from
+    // the SET-variable list (before varClauses is computed) so it doesn't also get emitted as
+    // `@@SESSION.encoding = …` alongside the SET NAMES prepend.
+    const varEncoding = vars["encoding"];
+    if (varEncoding !== undefined) delete vars["encoding"];
+    const varCollation = vars["collation"];
+    if (varCollation !== undefined) delete vars["collation"];
+
     const varClauses = Object.entries(vars)
       .filter(([, v]) => v !== null && v !== undefined)
       .map(([k, v]) => {
@@ -1773,13 +1782,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Mirrors Rails: `if @config[:encoding]` → `SET NAMES encoding [COLLATE collation], ...`
     // mysql2's `charset` pool option corresponds to Rails' database.yml `encoding:`.
     const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
-    // mysql2 uses `charset`; Rails database.yml uses `encoding`. Support both, preferring charset.
-    // `variables: { encoding:, collation: }` from database.yml is also accepted and removed
-    // from the SET-variable list so it doesn't get emitted as `@@SESSION.encoding = …`.
-    const varEncoding = vars["encoding"];
-    if (varEncoding !== undefined) delete vars["encoding"];
-    const varCollation = vars["collation"];
-    if (varCollation !== undefined) delete vars["collation"];
     const charset =
       (this._poolConfig.charset as string | undefined) ??
       (this._poolConfig as { encoding?: string }).encoding ??
