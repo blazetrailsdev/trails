@@ -99,18 +99,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing
     });
 
-    it.skip("where clause with infinite range on a datetime column", () => {
-      // BLOCKED: relation.where range support with Float::INFINITY endpoints
-      // does not yet emit "-infinity"/"infinity" wire strings via Arel range
-      // serialization. Sentinels are unified at the type layer; the gap is in
-      // QueryAttribute.serialize for endless/beginless ranges with Infinity bounds.
-      // SCOPE: ~40 LOC in arel/relation range visitor
+    it("where clause with infinite range on a datetime column", async () => {
+      const M = await modelClass();
+      const created = await (M as any).create({ datetime: new Date().toISOString() });
+      const found = await (M as any)
+        .where({ datetime: { begin: -Infinity, end: Infinity } })
+        .take();
+      expect(found.id).toBe(created.id);
     });
 
-    it.skip("where clause with infinite range on a date column", () => {
-      // BLOCKED: see "where clause with infinite range on a datetime column" —
-      // same Arel range-bound serialization gap; date column path identical.
-      // SCOPE: covered by the datetime fix above
+    it("where clause with infinite range on a date column", async () => {
+      const M = await modelClass();
+      const created = await (M as any).create({ date: "2020-01-01" });
+      const found = await (M as any).where({ date: { begin: -Infinity, end: Infinity } }).take();
+      expect(found.id).toBe(created.id);
     });
   });
 });

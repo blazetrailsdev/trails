@@ -22,24 +22,35 @@ export class RangeHandler {
   }
 
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    // Cast bounds through the attribute's type (e.g. integer casts "1-meowmeow" → 1)
+    // Cast bounds through the attribute's type (e.g. integer casts "1-meowmeow" → 1).
+    // Mirrors Rails RangeHandler#call: bounds that are nil or `is_a?(Float)`
+    // skip the bind path so the Arel layer can recognize ±Infinity as
+    // open-ended via Predications#infinity? / open_ended?.
+    const skipCast = (v: unknown): boolean =>
+      v === null || v === undefined || (typeof v === "number" && !Number.isFinite(v));
     const cast = this._castBound
       ? (v: unknown) => this._castBound!(attribute, v)
       : (v: unknown) => v;
-    const beginVal =
-      value.begin !== null && value.begin !== undefined ? cast(value.begin) : value.begin;
-    const endVal = value.end !== null && value.end !== undefined ? cast(value.end) : value.end;
+    const beginVal = skipCast(value.begin) ? value.begin : cast(value.begin);
+    const endVal = skipCast(value.end) ? value.end : cast(value.end);
 
-    if (beginVal === null || beginVal === undefined) {
-      if (endVal === null || endVal === undefined) {
+    if (beginVal === null || beginVal === undefined || beginVal === -Infinity) {
+      if (endVal === null || endVal === undefined || endVal === Infinity) {
+        if (beginVal === -Infinity || endVal === Infinity) {
+          return attribute.notIn([]);
+        }
         return attribute.isNotNull();
       }
+      if (endVal === -Infinity) return attribute.in([]);
       return value.excludeEnd ? attribute.lt(endVal) : attribute.lteq(endVal);
     }
 
-    if (endVal === null || endVal === undefined) {
+    if (beginVal === Infinity) return attribute.in([]);
+
+    if (endVal === null || endVal === undefined || endVal === Infinity) {
       return attribute.gteq(beginVal);
     }
+    if (endVal === -Infinity) return attribute.in([]);
 
     if (value.excludeEnd) {
       return new Nodes.And([attribute.gteq(beginVal), attribute.lt(endVal)]);
@@ -49,20 +60,29 @@ export class RangeHandler {
   }
 
   callNegated(attribute: Nodes.Attribute, value: Range): Nodes.Node {
+    const skipCast = (v: unknown): boolean =>
+      v === null || v === undefined || (typeof v === "number" && !Number.isFinite(v));
     const cast = this._castBound
       ? (v: unknown) => this._castBound!(attribute, v)
       : (v: unknown) => v;
-    const beginVal =
-      value.begin !== null && value.begin !== undefined ? cast(value.begin) : value.begin;
-    const endVal = value.end !== null && value.end !== undefined ? cast(value.end) : value.end;
+    const beginVal = skipCast(value.begin) ? value.begin : cast(value.begin);
+    const endVal = skipCast(value.end) ? value.end : cast(value.end);
 
-    if (beginVal === null || beginVal === undefined) {
-      if (endVal === null || endVal === undefined) return attribute.isNull();
+    if (beginVal === null || beginVal === undefined || beginVal === -Infinity) {
+      if (endVal === null || endVal === undefined || endVal === Infinity) {
+        if (beginVal === -Infinity || endVal === Infinity) {
+          return attribute.in([]);
+        }
+        return attribute.isNull();
+      }
+      if (endVal === -Infinity) return attribute.notIn([]);
       return value.excludeEnd ? attribute.gteq(endVal) : attribute.gt(endVal);
     }
-    if (endVal === null || endVal === undefined) {
+    if (beginVal === Infinity) return attribute.notIn([]);
+    if (endVal === null || endVal === undefined || endVal === Infinity) {
       return attribute.lt(beginVal);
     }
+    if (endVal === -Infinity) return attribute.notIn([]);
     if (value.excludeEnd) {
       return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
     }

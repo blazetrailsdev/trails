@@ -170,6 +170,11 @@ export function columnNameWithOrderMatcher(): RegExp {
 export function quote(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
+  // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`
+  // produces the bareword `Infinity`, which MySQL parses as an identifier and
+  // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
+  // strings; MySQL coerces or rejects at the column-type boundary.
+  if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (value instanceof Temporal.Instant) return `'${formatInstantForSql(value)}'`;
   if (value instanceof Temporal.PlainDateTime) return `'${formatPlainDateTimeForSql(value)}'`;
