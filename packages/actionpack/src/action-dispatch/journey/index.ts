@@ -35,3 +35,4 @@ export {
   UrlGenerationError,
   type FormatterHost,
 } from "./formatter.js";
+export { Router, type RouterRequest, type RackishResponse, type RoutableApp } from "./router.js";
