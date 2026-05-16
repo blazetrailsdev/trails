@@ -1,0 +1,47 @@
+name: Setup pnpm
+description: Picks hosted vs self-hosted pnpm + cache strategy.
+
+# Hosted runners: install pnpm via action-setup + use GitHub's Actions Cache
+# service for the pnpm store (current behavior).
+#
+# Self-hosted runners: use the preinstalled pnpm from the runner image, pin
+# store-dir to the persistent mounted volume, and skip cache: pnpm so no
+# tarballs traverse the WAN. See docs/self-hosted-runner-restart-plan.md
+# for the bandwidth incident context.
+#
+# Branch selection uses runner.environment != 'github-hosted' so an
+# empty/missing value fails open to the self-hosted branch — surfaces as a
+# loud "no cache" CI run rather than silently fetching from GitHub's cache.
+#
+# Third-party actions are pinned by SHA, not tag, so a retag can't change
+# CI without a PR. Renovate/dependabot bumps the SHAs.
+
+runs:
+  using: composite
+  steps:
+    - if: runner.environment == 'github-hosted'
+      uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: 10.27.0
+    - if: runner.environment == 'github-hosted'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 22
+        cache: pnpm
+
+    - if: runner.environment != 'github-hosted'
+      shell: bash
+      run: |
+        EXPECTED=10.27.0
+        ACTUAL=$(pnpm --version)
+        if [ "$ACTUAL" != "$EXPECTED" ]; then
+          echo "::error::self-hosted runner has pnpm $ACTUAL; expected $EXPECTED"
+          exit 1
+        fi
+        # pnpm config writes to ~/.npmrc, which is OUTSIDE the mounted
+        # volume — re-run every job. Cheap no-op when already set.
+        pnpm config set store-dir /home/runner/.local/share/pnpm/store
+    - if: runner.environment != 'github-hosted'
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 22
