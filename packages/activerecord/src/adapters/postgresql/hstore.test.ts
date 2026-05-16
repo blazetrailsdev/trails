@@ -8,6 +8,7 @@ import {
   parseHstore,
   serializeHstore,
 } from "../../connection-adapters/postgresql/oid/hstore.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -575,12 +576,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await assertArrayCycle([{ NULL: null }]);
     });
 
-    it.skip("schema dump with shorthand", async () => {
-      // BLOCKED: schema — SchemaDumper does not emit t.hstore(...) for hstore columns
-      // ROOT-CAUSE: schema-dumper.ts maps column types to t.type() calls but does not have a
-      //   shorthand mapping for hstore; it would emit a generic t.column() instead of t.hstore().
-      //   Rails expects: `t.hstore "tags", default: {}`.
-      // SCOPE: ~10 LOC in schema-dumper.ts; add hstore→"hstore" type-name mapping.
+    it("schema dump with shorthand", async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "hstores");
+      expect(output).toMatch(/t\.hstore\("tags",\s*\{?\s*default:\s*\{\}/);
     });
   });
 });

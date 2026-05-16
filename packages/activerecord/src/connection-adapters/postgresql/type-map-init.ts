@@ -47,6 +47,16 @@ import { Xml } from "./oid/xml.js";
 // as a module side-effect — AR-side type.ts already does the same for
 // the built-in AR types (date/datetime/time/text/json).
 typeRegistry.register("interval", () => new Interval());
+typeRegistry.register("hstore", () => new Hstore());
+typeRegistry.register("jsonb", () => new Jsonb());
+typeRegistry.register("money", () => new Money());
+typeRegistry.register("inet", () => new Inet());
+typeRegistry.register("cidr", () => new Cidr());
+typeRegistry.register("bit", () => new Bit());
+typeRegistry.register("bit_varying", () => new BitVarying());
+typeRegistry.register("xml", () => new Xml());
+typeRegistry.register("point", () => new Point());
+typeRegistry.register("uuid", () => new Uuid());
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.

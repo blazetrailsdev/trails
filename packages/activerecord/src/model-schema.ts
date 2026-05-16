@@ -485,6 +485,15 @@ export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
 
 /**
  * Rails: columns_hash.fetch(name) { NullColumn.new(name) }
+ *
+ * Returns the **schema column** (DB-reflected metadata: sqlType,
+ * default, null, etc.), not the **attribute** definition (the
+ * user-facing Type produced by `typeForAttribute`). Schema columns
+ * exist only for actual DB columns; user-declared `attribute :virtual,
+ * :string` defs have no column. Callers needing the AM Type — for
+ * casting, dirty tracking, comparison — should use `typeForAttribute`
+ * instead. Returns a NullColumn-shaped object for unknown names so
+ * `column.null`, `column.type`, etc. remain safely accessible.
  */
 export function columnForAttribute(this: SchemaHost, name: string): any {
   loadSchema.call(this);
