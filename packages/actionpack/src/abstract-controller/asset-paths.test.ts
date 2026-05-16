@@ -26,6 +26,16 @@ describe("AbstractController::AssetPaths", () => {
     expect(Host.assetHost).toBe("https://cdn.example.com");
   });
 
+  it("does not shadow inherited values when applied to a subclass", () => {
+    class Base {
+      static assetHost = "https://cdn.example.com";
+    }
+    class Sub extends Base {}
+    applyAssetPaths(Sub);
+    expect(Sub.assetHost).toBe("https://cdn.example.com");
+    expect(Object.hasOwn(Sub, "assetHost")).toBe(false);
+  });
+
   it("exposes the canonical slot list (matches Rails config_accessor args)", () => {
     expect(ASSET_PATH_SLOTS).toEqual([
       "assetHost",

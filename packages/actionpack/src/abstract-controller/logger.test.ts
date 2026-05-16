@@ -17,6 +17,17 @@ describe("AbstractController::Logger", () => {
     applyLogger(Host);
     expect(Host.logger).toBe(noop);
   });
+
+  it("does not shadow a logger inherited from a base class", () => {
+    const noop: LoggerLike = { info() {} };
+    class Base {
+      static logger: LoggerLike = noop;
+    }
+    class Sub extends Base {}
+    applyLogger(Sub);
+    expect(Sub.logger).toBe(noop);
+    expect(Object.hasOwn(Sub, "logger")).toBe(false);
+  });
 });
 
 describe("benchmark()", () => {

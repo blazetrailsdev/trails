@@ -35,11 +35,13 @@ export interface AssetPathsHost {
 /**
  * Install the AssetPaths config slots on `cls` as static properties
  * with `undefined` defaults. Idempotent — re-applying does not clobber
- * an already-set value.
+ * a value, and the prototype-chain check (`slot in host` rather than
+ * `Object.hasOwn`) preserves inherited values so subclasses don't
+ * shadow a parent's configuration with `undefined`.
  */
 export function applyAssetPaths(cls: object): void {
   const host = cls as Record<AssetPathSlot, unknown>;
   for (const slot of SLOTS) {
-    if (!Object.hasOwn(host, slot)) host[slot] = undefined;
+    if (!(slot in host)) host[slot] = undefined;
   }
 }

@@ -17,10 +17,14 @@ export interface LoggerHost {
   logger?: LoggerLike;
 }
 
-/** Install the `logger` config slot on `cls` with an `undefined` default. */
+/**
+ * Install the `logger` config slot on `cls` with an `undefined` default.
+ * Uses a prototype-chain presence check (`"logger" in host`) so applying
+ * to a subclass doesn't shadow a logger already set on a base class.
+ */
 export function applyLogger(cls: object): void {
   const host = cls as Record<string, unknown>;
-  if (!Object.hasOwn(host, "logger")) host.logger = undefined;
+  if (!("logger" in host)) host.logger = undefined;
 }
 
 /**
