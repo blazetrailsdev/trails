@@ -17,3 +17,10 @@ export {
   type LocalizeOptions,
 } from "./translation.js";
 export { deprecator } from "./deprecator.js";
+export {
+  applyAssetPaths,
+  ASSET_PATH_SLOTS,
+  type AssetPathSlot,
+  type AssetPathsHost,
+} from "./asset-paths.js";
+export { applyLogger, benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
