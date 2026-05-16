@@ -228,6 +228,12 @@ export class SchemaCache {
       return this._columns.get(tableName);
     }
 
+    // Null-pool guard: callers (e.g. `columnForAttribute` before a pool is
+    // attached) may pass `pool: null` to consult only the warm cache. Don't
+    // attempt to acquire a connection in that case — return undefined and
+    // let the caller fall back to the schema-less NullColumn shape.
+    if (pool == null) return undefined;
+
     return withConnection(pool, async (connection) => {
       if (typeof connection.columns === "function") {
         const cols = await connection.columns(tableName);
