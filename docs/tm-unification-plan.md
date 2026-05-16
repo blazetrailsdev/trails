@@ -117,16 +117,21 @@ the TM stack — the TM stack is the truth.
 - **HABTM/HMT insert-record parity (deferred)** — `insertHabtmRecord` still bypasses Rails' two-step (target save + through save via `save_through_record`). We persist the join row only. Larger semantic change, out of plan-doc scope.
 - **Phase 8 cross-file PG flakes** — observed during local verification: HABTM/HMT/nested-through files green in isolation, mixed runs surface 5–18 cross-file races. Tracked under Phase 8 (TM-internal mutex, `connection-adapters/abstract/transaction.ts:1009`).
 
-## Phase 5 — Universal `defineSchema` adoption — partial (#1633, #1686, #1693, #1697)
+## Phase 5 — Universal `defineSchema` adoption — partial (#1633, #1686, #1690, #1693, #1697, #1734, #1737, #1738)
 
-**Remaining (post-#1697):**
+**Latest wave merged (2026-05-16):**
 
-- `packages/activerecord/src/calculations.test.ts` — 7596 LOC, 101 `freshAdapter()` sites, no `defineSchema` yet. Likely 2–3 sub-PRs by describe-block cluster.
-- `packages/activerecord/src/enum.test.ts` — 2018 LOC, 75 `freshAdapter()` sites. One PR via async-freshAdapter pattern (proven on `core.test.ts` in #1697).
+- Root cluster B finder + validations — #1734.
+- Root cluster C enum cluster — #1737.
+- `relation/where.test.ts` — #1738.
+
+**Remaining (sized via `pnpm tsx scripts/audit-define-schema.ts`):**
+
+- `calculations.test.ts` (~150 LOC, ~101 sites) + `persistence.test.ts` (~200 LOC, ~141 sites) — see Batch 113 in `activerecord-100-plan.md`.
+- `attribute-methods.test.ts` + `attributes.test.ts` + `attribute-methods/` subtree — see Batch 114.
+- `enum.test.ts` (~250 LOC, ~77 sites) — see Batch 115. (Note: `enum.test.ts` was named as a target for #1737 but the actual sub-PR shipped the surrounding cluster instead; verify with audit script.)
 - `associations/association-scope.test.ts` — 1118 LOC standalone.
 - `associations/inverse-associations.test.ts` — 1717 LOC, may need 2 PRs.
-- `relation/where.test.ts` — 2062 LOC, 45 `_tableName` overrides.
-- root cluster B remainder (finder/persistence/primary-keys/validations) — may have landed in a parallel sub-PR.
 
 **Pattern note from #1697:** `core.test.ts` async-freshAdapter pattern (shared `TEST_SCHEMA` constant, helper async, sed-replace, flip sync `it()` to async) reusable for `enum.test.ts`. `calculations.test.ts` has too many distinct tables for one shared schema — per-describe `beforeEach` `defineSchema` (the pattern from `callbacks.test.ts`).
 
