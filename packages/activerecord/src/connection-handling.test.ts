@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import {
   connectedToStack,
   currentRole,
@@ -502,5 +503,91 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
     );
 
     expect(loadCalled).toBe(true);
+  });
+
+  describe("AbstractAdapter#isPreventingWrites stack matching", () => {
+    it("Base.connectedTo preventing writes applies globally to unrelated pools", () => {
+      class UnrelatedAbstract extends Base {
+        static {
+          this.abstractClass = true;
+          this.connectionClass = true;
+        }
+      }
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "UnrelatedAbstract", { adapter: "sqlite3", database: ":memory:" }),
+        {
+          owner: "UnrelatedAbstract",
+          role: "writing",
+          adapterFactory: () => new SQLite3Adapter(),
+        },
+      );
+      const conn = UnrelatedAbstract.leaseConnection();
+      expect(conn.isPreventingWrites()).toBe(false);
+      Base.connectedTo({ role: "writing", preventWrites: true }, () => {
+        expect(conn.isPreventingWrites()).toBe(true);
+      });
+      expect(conn.isPreventingWrites()).toBe(false);
+    });
+
+    it("abstract-class connectedTo does not leak to unrelated pools", () => {
+      class AnimalsRecord extends Base {
+        static {
+          this.abstractClass = true;
+          this.connectionClass = true;
+        }
+      }
+      class MealsRecord extends Base {
+        static {
+          this.abstractClass = true;
+          this.connectionClass = true;
+        }
+      }
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
+        { owner: "AnimalsRecord", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      );
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
+        { owner: "MealsRecord", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      );
+      const animals = AnimalsRecord.leaseConnection();
+      const meals = MealsRecord.leaseConnection();
+      AnimalsRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+        expect(animals.isPreventingWrites()).toBe(true);
+        expect(meals.isPreventingWrites()).toBe(false);
+      });
+    });
+
+    it("primary class connectedTo targets the Base-normalized pool only", () => {
+      class ApplicationRecord extends Base {
+        static {
+          this.abstractClass = true;
+          this.connectionClass = true;
+        }
+        static override primaryClassQ(): boolean {
+          return true;
+        }
+      }
+      class OtherAbstract extends Base {
+        static {
+          this.abstractClass = true;
+          this.connectionClass = true;
+        }
+      }
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
+        { owner: ApplicationRecord, role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      );
+      Base.connectionHandler.establishConnection(
+        new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
+        { owner: "OtherAbstract", role: "writing", adapterFactory: () => new SQLite3Adapter() },
+      );
+      const appConn = ApplicationRecord.leaseConnection();
+      const otherConn = OtherAbstract.leaseConnection();
+      ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+        expect(appConn.isPreventingWrites()).toBe(true);
+        expect(otherConn.isPreventingWrites()).toBe(false);
+      });
+    });
   });
 });

@@ -88,16 +88,9 @@ export function connectsTo(
   (this as any)._defaultShard = Object.keys(shardEntries)[0];
   (this as any).connectionClass = true;
 
-  // Normalize configurations once for the multi-shard/role loop instead of
-  // rebuilding DatabaseConfigurations.fromEnv inside resolveConfigForConnection
-  // on every iteration. The `connection_specification_name` side effect only
-  // depends on `this`, so plant it once upfront.
-  if (!this.name) throw new Error("Anonymous class is not allowed.");
-  (this as any)._connectionSpecificationName = isPrimaryClass.call(this) ? "Base" : this.name;
-  const configs = normalizeConfigurations(this);
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
-      const dbConfig = configs.resolve(dbKey);
+      const dbConfig = resolveConfigForConnection.call(this, dbKey);
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,
@@ -381,6 +374,13 @@ export function connectionSpecificationName(this: typeof Base): string {
     return (this as any)._connectionSpecificationName;
   }
   if (this.name === "Base") {
+    return "Base";
+  }
+  // Primary classes (Base/ApplicationRecord) store their pool under "Base"
+  // per PoolConfig#connectionDescriptor's normalization; reflect that here
+  // so leaseConnection() lookups hit the right pool when connectsTo hasn't
+  // run yet to plant _connectionSpecificationName.
+  if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "Base";
   }
   if ((this as any).connectionClassQ?.()) {
@@ -877,16 +877,32 @@ export function resolveConfigForConnection(
  * surface AdapterNotSpecified with the available-configs hint instead of
  * silently passing through.
  *
+ * The normalized result is cached per (class, rawConfigs) so multi-shard
+ * `connectsTo` calls don't pay an N× `DatabaseConfigurations.fromEnv` build
+ * when delegating each role through `resolveConfigForConnection`.
+ *
  * @internal
  */
+const _normalizedConfigsCache = new WeakMap<
+  object,
+  { raw: unknown; configs: DatabaseConfigurations }
+>();
 function normalizeConfigurations(klass: typeof Base): DatabaseConfigurations {
   const rawConfigs = (klass as any).configurations;
-  if (rawConfigs instanceof DatabaseConfigurations) return rawConfigs;
-  if (rawConfigs && typeof rawConfigs === "object") {
-    return DatabaseConfigurations.fromEnv(
+  const cached = _normalizedConfigsCache.get(klass);
+  if (cached && cached.raw === rawConfigs) return cached.configs;
+
+  let configs: DatabaseConfigurations;
+  if (rawConfigs instanceof DatabaseConfigurations) {
+    configs = rawConfigs;
+  } else if (rawConfigs && typeof rawConfigs === "object") {
+    configs = DatabaseConfigurations.fromEnv(
       (rawConfigs as { toH?: () => RawConfigurations }).toH?.() ??
         (rawConfigs as RawConfigurations),
     );
+  } else {
+    configs = DatabaseConfigurations.fromEnv({});
   }
-  return DatabaseConfigurations.fromEnv({});
+  _normalizedConfigsCache.set(klass, { raw: rawConfigs, configs });
+  return configs;
 }
