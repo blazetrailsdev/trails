@@ -25,7 +25,6 @@ import {
   ConnectionNotEstablished,
   DatabaseConnectionError,
   TransactionIsolationError,
-  NotImplementedError,
 } from "../errors.js";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
@@ -2309,20 +2308,4 @@ function translateException(
     return new ConnectionNotEstablished(message, { cause: exception });
   }
   return new StatementInvalid(message, { sql, binds, cause: exception });
-}
-
-/** @internal */
-function arelVisitor(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/sqlite3_adapter.rb:798
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#arel_visitor is not implemented",
-  );
-}
-
-/** @internal */
-function reconnect(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/sqlite3_adapter.rb
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::SQLite3Adapter#reconnect is not implemented",
-  );
 }

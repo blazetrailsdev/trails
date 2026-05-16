@@ -2065,7 +2065,7 @@ export class SchemaStatements {
 
   /** @internal */
   dataSourceSql(_name?: string, _options?: { type?: string }): string {
-    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
     throw new NotImplementedError(
       "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",
     );
@@ -2073,7 +2073,7 @@ export class SchemaStatements {
 
   /** @internal */
   quotedScope(_name?: string, _options?: { type?: string }): Record<string, string> {
-    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1894
     throw new NotImplementedError(
       "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",
     );

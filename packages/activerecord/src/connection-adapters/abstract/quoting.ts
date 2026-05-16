@@ -8,7 +8,6 @@
  *   `instanceof Date` alongside Temporal types and handles each separately.
  */
 
-import { NotImplementedError } from "../../errors.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getDefaultTimezone } from "../../type/internal/timezone.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -497,14 +496,6 @@ function typeCastedBinds(
     }
     return this.typeCast(value);
   });
-}
-
-/** @internal */
-function lookupCastType(sqlType: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:234
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Quoting#lookup_cast_type is not implemented",
-  );
 }
 
 /**
