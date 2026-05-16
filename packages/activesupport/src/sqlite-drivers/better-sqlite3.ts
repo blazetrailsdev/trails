@@ -134,12 +134,9 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  // `strict` is a no-op here: better-sqlite3's npm build compiles with
-  // SQLITE_DQS=0 (double-quoted-string literals already rejected), and the
-  // upstream binding does not expose sqlite3_db_config to toggle the DML/DDL
-  // flags at runtime. Surface the field on Options if a future release adds
-  // it; today we pass it through unchanged so user-set driverOptions still
-  // win, but emit nothing of our own.
+  // `config.strict` is intentionally unread: better-sqlite3 compiles with
+  // SQLITE_DQS=0 and exposes no sqlite3_db_config binding, so the strict
+  // flag has nothing to attach to here.
   return new Database(config.database, opts);
 }
 
