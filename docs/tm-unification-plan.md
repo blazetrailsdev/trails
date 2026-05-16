@@ -277,10 +277,7 @@ Every public stack-mutating TM method (`beginTransaction`, `commitTransaction`, 
 
 ## Phase 9 — Collapse `SchemaAdapter` to a SQL-compat shim or delete
 
-**Goal.** After Phase 7+8, `SchemaAdapter` is just `fixSqliteCompat`
-
-- quote/explain delegation pass-throughs. Move SQL compat into the
-  SQLite adapter itself (where it belongs) and delete the wrapper.
+**Goal.** After Phase 7+8, `SchemaAdapter` is just `fixSqliteCompat` plus quote/explain delegation pass-throughs. Move SQL compat into the SQLite adapter itself (where it belongs) and delete the wrapper.
 
 **Files touched.**
 
