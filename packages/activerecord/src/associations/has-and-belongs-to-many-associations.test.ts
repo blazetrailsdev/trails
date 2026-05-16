@@ -1120,20 +1120,72 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(dev.id).toBeNull();
   });
 
-  it.skip("association with validate false does not run associated validation callbacks on create", () => {
-    // BLOCKED: associations — autosave-on-habtm
-    // ROOT-CAUSE: HABTM declaration does not wire autosave validation callbacks
-    //   by default, so `validate: false` has no observable effect on parent.valid?.
-    //   Rails wires define_autosave_validation_callbacks for every has_many (and
-    //   HABTM proxies through has_many in Rails); our HABTM builder skips it
-    //   unless `autosave: true` is also passed.
-    // SCOPE: associations.ts hasAndBelongsToMany — wire defineAutosaveValidationCallbacks
+  it("association with validate false does not run associated validation callbacks on create", async () => {
+    const a2 = createTestAdapter();
+    class RichPerson extends Base {
+      static {
+        this.attribute("first_name", "string");
+      }
+    }
+    class Treasure extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    RichPerson.adapter = a2;
+    Treasure.adapter = a2;
+    registerModel(RichPerson);
+    registerModel(Treasure);
+    let rpValidations = 0;
+    RichPerson.beforeValidation((r: any) => {
+      rpValidations += 1;
+      r.first_name = "autoset";
+    });
+    Associations.hasAndBelongsToMany.call(Treasure, "rich_people", {
+      className: "RichPerson",
+      joinTable: "treasures_rich_people",
+      validate: false,
+    });
+    const treasure = new Treasure({ name: "Gold" });
+    const rich = new RichPerson();
+    (treasure as any).rich_people = [rich];
+    treasure.isValid();
+    expect(rich.first_name).toBeNull();
+    expect(rpValidations).toBe(0);
   });
 
-  it.skip("association with validate false does not run associated validation callbacks on update", () => {
-    // BLOCKED: associations — autosave-on-habtm
-    // ROOT-CAUSE: same as the "on create" case above.
-    // SCOPE: associations.ts hasAndBelongsToMany — wire defineAutosaveValidationCallbacks
+  it("association with validate false does not run associated validation callbacks on update", async () => {
+    const a2 = createTestAdapter();
+    class RichPerson2 extends Base {
+      static {
+        this.attribute("first_name", "string");
+      }
+    }
+    class Treasure2 extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    RichPerson2.adapter = a2;
+    Treasure2.adapter = a2;
+    registerModel(RichPerson2);
+    registerModel(Treasure2);
+    Associations.hasAndBelongsToMany.call(Treasure2, "rich_people", {
+      className: "RichPerson2",
+      joinTable: "treasures_rich_people2",
+      validate: false,
+    });
+    const rich = await RichPerson2.create({ first_name: "Original" });
+    let invoked = 0;
+    RichPerson2.beforeValidation((r: any) => {
+      invoked += 1;
+      r.first_name = "mutated";
+    });
+    const treasure = new Treasure2({ name: "Gold" });
+    (treasure as any).rich_people = [rich];
+    treasure.isValid();
+    expect(rich.first_name).toBe("Original");
+    expect(invoked).toBe(0);
   });
 
   it("custom join table", async () => {

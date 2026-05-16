@@ -343,10 +343,13 @@ export class Associations {
       createHabtmJoinModel,
       modelRegistry,
     });
-    if (options.autosave) {
-      const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
-      if (habtmReflection) addAutosaveAssociationCallbacks(this, habtmReflection);
-    }
+    // Rails registers the autosave-association callbacks for every HABTM
+    // (the underlying has_many :through is built via the standard
+    // `has_many` builder, which always calls `define_callbacks`). Wire it
+    // here so `validate: false` is observable (`treasure.valid?` must not
+    // run child validations) regardless of an explicit `autosave:` option.
+    const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
+    if (habtmReflection) addAutosaveAssociationCallbacks(this, habtmReflection);
   }
 }
 

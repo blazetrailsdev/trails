@@ -198,12 +198,61 @@ export class HasAndBelongsToMany {
       return record.association(middleName).handleDependency();
     });
 
+    // Tightened option set forwarded to the public HABTM reflection.
+    // Rails' `hm_options` allowlist for the generated `has_many :through`
+    // is the canonical set: before/after_add/remove, autosave, validate,
+    // join_table, class_name, extend, strict_loading (associations.rb:1899).
+    // We additionally retain `foreignKey`/`primaryKey` because our public
+    // HABTM reflection plays the dual role Rails splits between
+    // `habtm_reflection` (which keeps the full options) and the generated
+    // through-`has_many` — join-key resolution (`_resolveHabtmJoin`,
+    // `loadHabtm`) reads these directly off the public reflection.
+    // Spreading `...options` previously leaked `readonly`/`dependent`
+    // into through-hasMany semantics — Rails drops those. `inverseOf` IS
+    // retained because Rails' `habtm_reflection` is constructed with the
+    // full options hash (associations.rb:1871) and consumers in this
+    // codebase consult `reflection.options.inverseOf` for inverse caching.
+    const HABTM_FORWARDED_KEYS = [
+      "beforeAdd",
+      "afterAdd",
+      "beforeRemove",
+      "afterRemove",
+      "autosave",
+      "validate",
+      "className",
+      "extend",
+      "strictLoading",
+      "foreignKey",
+      "primaryKey",
+      "inverseOf",
+      "indexErrors",
+      "associationForeignKey",
+    ] as const;
+    // Note: `joinTable` is intentionally NOT forwarded — `joinTableName`
+    // (set above) already resolves `options.joinTable ?? default`, so the
+    // value is captured. Re-forwarding would also overwrite it with
+    // `undefined` when callers pass `joinTable: undefined` explicitly.
+    // `associationForeignKey` is retained on the reflection options to
+    // mirror Rails' `habtm_reflection` (which keeps the full options
+    // hash); note however that `_build`, `_resolveHabtmJoin`, and
+    // `loadHabtm` currently hard-code the target FK as
+    // `${singular(name)}_id` — full plumbing into the generated join
+    // model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
-      ...options,
       joinTable: joinTableName,
       through: middleName,
       source: (options.source as string) ?? singularize(name),
     };
+    for (const k of HABTM_FORWARDED_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(options, k)) {
+        habtmOptions[k] = options[k];
+      }
+    }
+    // `scope:` is captured as a positional reflection arg below, but keep
+    // it on the options bag too for callers that bypass reflection.
+    if (typeof options.scope === "function") {
+      habtmOptions.scope = options.scope;
+    }
     model._associations.push({
       type: "hasAndBelongsToMany",
       name,
@@ -228,6 +277,11 @@ export class HasAndBelongsToMany {
       model,
     );
     Reflection.addReflection(model, name, habtmReflection as any);
+    // Mirrors Rails' `middle_reflection.parent_reflection = habtm_reflection`
+    // — the through middle is owned by the public HABTM reflection. Some
+    // reflection-walking code paths (e.g. nested-through resolution and
+    // inverse lookup) inspect this link.
+    (middleReflection as any).parentReflection = habtmReflection;
     CollectionAssociationBuilder.defineAccessors(model, habtmReflection);
   }
 }
