@@ -225,15 +225,19 @@ export class HasAndBelongsToMany {
       "foreignKey",
       "primaryKey",
       "inverseOf",
+      "indexErrors",
+      "associationForeignKey",
     ] as const;
     // Note: `joinTable` is intentionally NOT forwarded — `joinTableName`
     // (set above) already resolves `options.joinTable ?? default`, so the
     // value is captured. Re-forwarding would also overwrite it with
     // `undefined` when callers pass `joinTable: undefined` explicitly.
-    // `associationForeignKey` is also omitted: the HABTM machinery
-    // hard-codes the target FK as `${singular(name)}_id` in `_build` and
-    // in `_resolveHabtmJoin`/`loadHabtm`, so advertising it here would
-    // mislead — full wiring is a follow-up.
+    // `associationForeignKey` is retained on the reflection options to
+    // mirror Rails' `habtm_reflection` (which keeps the full options
+    // hash); note however that `_build`, `_resolveHabtmJoin`, and
+    // `loadHabtm` currently hard-code the target FK as
+    // `${singular(name)}_id` — full plumbing into the generated join
+    // model and join SQL is a follow-up.
     const habtmOptions: Record<string, unknown> = {
       joinTable: joinTableName,
       through: middleName,
