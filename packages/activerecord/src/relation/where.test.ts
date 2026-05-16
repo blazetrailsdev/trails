@@ -7,11 +7,118 @@ import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const woaCols = {
+  authors: { name: "string" } as const,
+  essays: { writer_id: "string" } as const,
+};
+const woaSuffixes = ["", "cr_", "sp_", "ab_", "ai_"];
+const woaTables: Schema = {};
+for (const s of woaSuffixes) {
+  woaTables[`woa_${s}authors`] = { ...woaCols.authors };
+  woaTables[`woa_${s}essays`] = { ...woaCols.essays };
+}
+
+const SCHEMA: Schema = {
+  posts: {
+    title: "string",
+    body: "string",
+    status: "integer",
+    views: "integer",
+    likes: "integer",
+    age: "integer",
+    data: "string",
+    published: "boolean",
+    author: "string",
+    author_id: "integer",
+  },
+  authors: { name: "string", age: "integer", author_id: "integer" },
+  users: {
+    name: "string",
+    email: "string",
+    age: "integer",
+    role: "string",
+    active: "boolean",
+    status: "string",
+  },
+  people: { name: "string", age: "integer", status: "string", role: "string" },
+  products: { name: "string", price: "integer" },
+  topics: { title: "string", body: "string" },
+  enum_posts: { title: "string", status: "integer" },
+  ...woaTables,
+  woar_authors: { name: "string" },
+  woar_posts: { author_id: "integer" },
+  wm_authors: { name: "string" },
+  wm_posts: { title: "string", author_id: "integer" },
+  wm_editors: {},
+  wm_authors2: {},
+  wm_posts2: { author_id: "integer", editor_id: "integer" },
+  wa_authors: {},
+  wa_posts: { title: "string", author_id: "integer" },
+  wahm_authors: { name: "string" },
+  wahm_posts: { title: "string", wahm_author_id: "integer" },
+  wa_authors2: {},
+  wa_editors2: {},
+  wa_posts2: { author_id: "integer", editor_id: "integer" },
+  wna_posts: { title: "string", author_id: "integer" },
+  wnahm_authors: { name: "string" },
+  wnahm_posts: { title: "string", wnahm_author_id: "integer" },
+  wnamm_authors: { name: "string" },
+  wnamm_posts: { wnamm_author_id: "integer" },
+  wnamm_comments: { wnamm_author_id: "integer" },
+  bts_authors: {},
+  bts_posts: { author_id: "integer" },
+  btn_authors: {},
+  btn_posts: { author_id: "integer" },
+  btav_authors: {},
+  btav_posts: { author_id: "integer" },
+  btnr_authors: {},
+  btnr_posts: { author_id: "integer" },
+  cpk_books: {
+    columns: {
+      author_id: "integer",
+      number: "integer",
+      title: "string",
+    },
+    primaryKey: ["author_id", "number"],
+  },
+  cpk_orders: {
+    columns: {
+      shop_id: "integer",
+      number: "integer",
+      status: "string",
+    },
+    primaryKey: ["shop_id", "number"],
+  },
+  cpk_posts: {
+    columns: { shop_id: "integer", number: "integer" },
+    primaryKey: ["shop_id", "number"],
+  },
+  cpk_items: {
+    columns: {
+      shop_id: "integer",
+      number: "integer",
+      status: "string",
+    },
+    primaryKey: ["shop_id", "number"],
+  },
+  cpk_entries: {
+    columns: {
+      shop_id: "integer",
+      number: "integer",
+      title: "string",
+    },
+    primaryKey: ["shop_id", "number"],
+  },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -20,8 +127,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("where with string generates sql", () => {
@@ -117,8 +224,8 @@ describe("WhereTest", () => {
 describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("where copies bind params", () => {
@@ -1256,7 +1363,7 @@ describe("where with Range", () => {
   });
 
   it("filters records with BETWEEN", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1276,7 +1383,7 @@ describe("where with Range", () => {
   });
 
   it("BETWEEN is inclusive on both ends", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1296,7 +1403,7 @@ describe("where with Range", () => {
 
 describe("Range edge cases", () => {
   it("count with Range condition", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1313,7 +1420,7 @@ describe("Range edge cases", () => {
   });
 
   it("Range combined with IN array in same where", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1336,8 +1443,8 @@ describe("Range edge cases", () => {
 
 describe("where with raw SQL", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("supports raw SQL string with bind params", async () => {
@@ -1379,8 +1486,8 @@ describe("where with raw SQL", () => {
 
 describe("where with subquery", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("supports Relation as value for IN subquery", async () => {
@@ -1414,7 +1521,7 @@ describe("where with subquery", () => {
 
 describe("rewhere clears NOT clauses", () => {
   it("replaces whereNot clauses for the same key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1436,7 +1543,7 @@ describe("rewhere clears NOT clauses", () => {
 
 describe("where with named binds", () => {
   it("replaces :name placeholders with values", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1457,7 +1564,7 @@ describe("where with named binds", () => {
   });
 
   it("handles string named binds with quoting", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1476,7 +1583,7 @@ describe("where with named binds", () => {
 
 describe("whereAny", () => {
   it("matches records where ANY condition is true (OR)", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1495,7 +1602,7 @@ describe("whereAny", () => {
   });
 
   it("filters correctly with strict conditions", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1518,7 +1625,7 @@ describe("whereAny", () => {
 
 describe("whereAll", () => {
   it("matches records where ALL conditions are true (AND)", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1552,7 +1659,7 @@ describe("Relation Where (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = freshAdapter();
+    adapter = await freshAdapter();
     User.adapter = adapter;
     await User.create({ name: "Alice", email: "alice@test.com", age: 25, active: true });
     await User.create({ name: "Bob", email: "bob@test.com", age: 30, active: false });
@@ -1650,7 +1757,7 @@ describe("where with Range (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = freshAdapter();
+    adapter = await freshAdapter();
     Person.adapter = adapter;
     await Person.create({ name: "Child", age: 10 });
     await Person.create({ name: "Teen", age: 16 });
@@ -1697,8 +1804,8 @@ describe("Range / BETWEEN (Rails-guided)", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Product.adapter = adapter;
   });
 
@@ -1738,8 +1845,8 @@ describe("Range / BETWEEN (Rails-guided)", () => {
 describe("Raw SQL Where (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test "where with SQL string and bind values"
@@ -1828,8 +1935,8 @@ describe("Raw SQL Where (Rails-guided)", () => {
 
 describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeAuthor() {
@@ -1987,8 +2094,8 @@ describe("WhereTest", () => {
 // ==========================================================================
 describe("WhereTest Arel nodes", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("where accepts an Arel node", async () => {
@@ -2045,8 +2152,8 @@ describe("WhereTest Arel nodes", () => {
 // WhereTest — targets relation/where_test.rb (continued)
 // ==========================================================================
 describe("WhereTest", () => {
-  it("aliased attribute", () => {
-    const adapter = createTestAdapter();
+  it("aliased attribute", async () => {
+    const adapter = await freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
