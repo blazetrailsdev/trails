@@ -2311,6 +2311,7 @@ describe("SchemaAdapter TM delegation", () => {
   // TM does not track them and never tries to release them again.
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
     const testAdapter = createTestAdapter();
+    await defineSchema(testAdapter, { items: { name: "string" } });
     const inner = (testAdapter as any).innerAdapter;
     const spy = vi.spyOn(inner, "withinNewTransaction");
     class Item extends Base {
@@ -2330,6 +2331,7 @@ describe("SchemaAdapter TM delegation", () => {
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
     const testAdapter = createTestAdapter();
+    await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
         this.attribute("name", "string");
@@ -2369,6 +2371,7 @@ describe("SchemaAdapter TM delegation", () => {
     // shared TM stack and corrupt instrumenter state (the failure that
     // hit MariaDB CI).
     const testAdapter = createTestAdapter();
+    await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
         this.attribute("name", "string");
@@ -2426,6 +2429,7 @@ describe("SchemaAdapter TM delegation", () => {
     // set the AsyncLocalStorage flag. _manualTxDepth tracks them per
     // wrapper so the chain-aware delegations expose inner state.
     const testAdapter = createTestAdapter();
+    await defineSchema(testAdapter, { items: { name: "string" } });
     class Item extends Base {
       static {
         this.attribute("name", "string");
