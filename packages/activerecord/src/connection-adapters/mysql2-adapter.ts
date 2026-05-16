@@ -1620,6 +1620,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * @internal
    */
   protected async _warningCount(conn: mysql.PoolConnection): Promise<number> {
+    // Optimization: when the mysql2 npm driver exposes the protocol's
+    // last `serverStatus` packet, the bottom 16 bits of the per-connection
+    // `warningCount` are populated for the most recent statement (mirrors
+    // Rails reading `@raw_connection.warning_count` directly instead of
+    // round-tripping `SHOW COUNT(*) WARNINGS`). Fall back to the SHOW
+    // query when the field is absent or non-numeric.
+    const raw = (conn as unknown as { warningCount?: unknown; _warningCount?: unknown })
+      .warningCount;
+    if (typeof raw === "number") return raw;
     const [rows] = await conn.query("SHOW COUNT(*) WARNINGS");
     const row = (rows as Record<string, unknown>[])[0];
     if (!row) return 0;
@@ -1661,7 +1670,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       const level = row.Level ?? null;
       const code = row.Code == null ? null : String(row.Code);
       const message = row.Message ?? "";
-      const warning = new SQLWarning(message, code, level, sql);
+      const warning = new SQLWarning(message, code, level, sql, this.pool);
       if (this.isWarningIgnored({ level: level ?? undefined, code: code ?? undefined, message }))
         continue;
       if (action === "raise") throw warning;
@@ -1727,6 +1736,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
     const sqlModeClause = sqlMode ? `@@SESSION.sql_mode = ${sqlMode}` : "";
 
+    // mysql2 uses `charset`; Rails database.yml uses `encoding`. Support both, preferring charset.
+    // `variables: { encoding:, collation: }` from database.yml is also accepted and removed from
+    // the SET-variable list (before varClauses is computed) so it doesn't also get emitted as
+    // `@@SESSION.encoding = …` alongside the SET NAMES prepend.
+    const varEncoding = vars["encoding"];
+    if (varEncoding !== undefined) delete vars["encoding"];
+    const varCollation = vars["collation"];
+    if (varCollation !== undefined) delete vars["collation"];
+
     const varClauses = Object.entries(vars)
       .filter(([, v]) => v !== null && v !== undefined)
       .map(([k, v]) => {
@@ -1741,11 +1759,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Mirrors Rails: `if @config[:encoding]` → `SET NAMES encoding [COLLATE collation], ...`
     // mysql2's `charset` pool option corresponds to Rails' database.yml `encoding:`.
     const SAFE_CHARSET_RE = /^[A-Za-z0-9_]+$/;
-    // mysql2 uses `charset`; Rails database.yml uses `encoding`. Support both, preferring charset.
     const charset =
       (this._poolConfig.charset as string | undefined) ??
-      (this._poolConfig as { encoding?: string }).encoding;
-    const charsetCollation = (this._poolConfig as { collation?: string }).collation;
+      (this._poolConfig as { encoding?: string }).encoding ??
+      (typeof varEncoding === "string" ? varEncoding : undefined);
+    const charsetCollation =
+      (this._poolConfig as { collation?: string }).collation ??
+      (typeof varCollation === "string" ? varCollation : undefined);
     if (charset && !SAFE_CHARSET_RE.test(charset)) {
       throw new Error(`Invalid MySQL charset: ${JSON.stringify(charset)}`);
     }

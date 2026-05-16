@@ -598,7 +598,10 @@ export abstract class Migration {
     await this.schema.createTable(tname, optionsOrFn, fn);
   }
 
-  async dropTable(name: string, options?: { ifExists?: boolean }): Promise<void> {
+  async dropTable(
+    name: string,
+    options?: { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+  ): Promise<void> {
     if (this._recording) {
       this._recorder.record("dropTable", [name]);
       return;
@@ -1674,10 +1677,20 @@ export class MigrationContext {
     }
   }
 
-  async dropTable(name: string, options?: { force?: "cascade" }): Promise<void> {
+  async dropTable(
+    name: string,
+    options?: { ifExists?: boolean; force?: "cascade"; temporary?: boolean },
+  ): Promise<void> {
+    // Mirrors Rails MySQL drop_table: emit `DROP TEMPORARY TABLE` when `temporary: true`.
+    // `IF EXISTS` is included by default (matches the abstract drop_table contract); pass
+    // `ifExists: false` to omit it. `force: "cascade"` adds `CASCADE` on Postgres.
+    const temporary =
+      options?.temporary === true && this._adapterName === "mysql" ? " TEMPORARY" : "";
+    const ifExists = options?.ifExists === false ? "" : " IF EXISTS";
     const cascade =
       options?.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
-    await this.adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"${cascade}`);
+    const quoted = this.adapter.quoteTableName(name);
+    await this.adapter.executeMutation(`DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`);
     this._tables.delete(name);
     this._columns.delete(name);
     this._columnMeta.delete(name);

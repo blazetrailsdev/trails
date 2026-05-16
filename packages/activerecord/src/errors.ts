@@ -672,8 +672,19 @@ export class SQLWarning extends AdapterError {
   readonly level: string | null;
   sql?: string;
 
-  constructor(message?: string, code?: string | null, level?: string | null, sql?: string) {
-    super(message ?? "SQL Warning");
+  /**
+   * `connectionPool` is inherited via {@link AdapterError}'s accessor; we
+   * accept it as a constructor argument mirroring Rails'
+   * `SQLWarning.new(message, code, level, sql, pool)`.
+   */
+  constructor(
+    message?: string,
+    code?: string | null,
+    level?: string | null,
+    sql?: string,
+    connectionPool?: unknown,
+  ) {
+    super(message ?? "SQL Warning", { connectionPool });
     this.name = "SQLWarning";
     this.code = code ?? null;
     this.level = level ?? null;

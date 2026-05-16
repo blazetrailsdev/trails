@@ -67,9 +67,11 @@ export function quoteIdentifier(name: string): string {
 }
 
 // eslint-disable-next-line no-control-regex
-const MYSQL_ESCAPE_RE = /[\\\x00\n\r\x1a]/g;
+const MYSQL_ESCAPE_RE = /[\\'"\x00\n\r\x1a]/g;
 const MYSQL_ESCAPE_MAP: Record<string, string> = {
   "\\": "\\\\",
+  "'": "\\'",
+  '"': '\\"',
   "\0": "\\0",
   "\n": "\\n",
   "\r": "\\r",
@@ -77,16 +79,15 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
 };
 
 /**
- * Quote a string value for use in SQL. Single quotes are escaped using
- * SQL-standard quote doubling (''), which is safe regardless of
- * NO_BACKSLASH_ESCAPES. Backslash and control characters (NUL, newline,
- * carriage return, Ctrl-Z) are escaped with backslashes for safe
- * transport across protocols.
+ * Quote a string value for use in SQL. Single/double quotes, backslash,
+ * and control characters (NUL, newline, carriage return, Ctrl-Z) are
+ * escaped with backslashes. Mirrors Rails MySQL `quote_string`, which
+ * delegates to `mysql2`/`trilogy`'s connection-level escape — both of
+ * which use backslash-escapes (not SQL-standard `''` doubling). The npm
+ * `mysql2` driver's `escape()` matches this same shape.
  */
 export function quoteString(value: string): string {
-  const withDoubledQuotes = value.replace(/'/g, "''");
-  const escaped = withDoubledQuotes.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
-  return `'${escaped}'`;
+  return `'${value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch)}'`;
 }
 
 export function quotedBinary(value: Buffer | Uint8Array | string): string {
