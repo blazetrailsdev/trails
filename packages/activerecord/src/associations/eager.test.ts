@@ -1690,6 +1690,54 @@ describe("EagerAssociationTest", () => {
     expect(cats1).toHaveLength(1);
     expect(cats1[0].name).toBe("General");
   });
+  it("eager association loading with habtm and limit", async () => {
+    class EjlHabtmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    class EjlHabtmCategory extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasAndBelongsToMany.call(EjlHabtmPost, "ejlHabtmCategories", {
+      className: "EjlHabtmCategory",
+      joinTable: "ejl_habtm_categories_ejl_habtm_posts",
+    });
+    registerModel(EjlHabtmPost);
+    registerModel(EjlHabtmCategory);
+
+    const p1 = await EjlHabtmPost.create({ title: "P1" });
+    const p2 = await EjlHabtmPost.create({ title: "P2" });
+    const p3 = await EjlHabtmPost.create({ title: "P3" });
+    const tech = await EjlHabtmCategory.create({ name: "Technology" });
+    const gen = await EjlHabtmCategory.create({ name: "General" });
+
+    const { CollectionProxy } = await import("./collection-proxy.js");
+    const assoc = (EjlHabtmPost as any)._associations.find(
+      (a: any) => a.name === "ejlHabtmCategories",
+    )!;
+    await new CollectionProxy(p1, "ejlHabtmCategories", assoc).push(tech, gen);
+    await new CollectionProxy(p2, "ejlHabtmCategories", assoc).push(gen);
+    void p3;
+
+    // HABTM nodes coerce to assocType:"hasMany" so isLimitable=false, which
+    // routes through the subquery-limited path. Verify owner-side limit still
+    // produces the right owner count and that preloaded targets are intact.
+    const posts = await EjlHabtmPost.all()
+      .eagerLoad("ejlHabtmCategories")
+      .order("id", "asc")
+      .limit(2)
+      .toArray();
+    expect(posts).toHaveLength(2);
+    const cats0 = (posts[0] as any)._preloadedAssociations.get("ejlHabtmCategories");
+    const cats1 = (posts[1] as any)._preloadedAssociations.get("ejlHabtmCategories");
+    expect(cats0).toHaveLength(2);
+    expect(cats1).toHaveLength(1);
+  });
   it("eager association loading with habtm via preload", async () => {
     class PrHabtmPost extends Base {
       static {
