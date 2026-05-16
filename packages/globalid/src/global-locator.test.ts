@@ -3,7 +3,14 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { Locator, setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
+import {
+  Locator,
+  BlockLocator,
+  setModelFinder,
+  _resetModelFinder,
+  _resetLocators,
+  type LocatorModel,
+} from "./locator.js";
 
 const TEST_APP = "bcx";
 const UUID = "7ef9b614-353c-43a1-a203-ab2307851990";
@@ -381,6 +388,46 @@ describe("GlobalLocatorTest", () => {
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/")).toBeNull();
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value")).toBeNull();
   });
+
+  // ─── Locator.use(app, locator) — per-app dispatch ──────────────────────
+
+  it("use locator with block", async () => {
+    Locator.use("foo", (gid) => `block-located:${gid.modelName}:${gid.modelId}`);
+    try {
+      const found = await Locator.locate("gid://foo/Person/1");
+      expect(found).toBe("block-located:Person:1");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("use locator with class", async () => {
+    class CustomLocator extends BlockLocator {
+      constructor() {
+        super((gid) => `class-located:${gid.modelId}`);
+      }
+    }
+    Locator.use("bar", new CustomLocator());
+    try {
+      expect(await Locator.locate("gid://bar/Person/9")).toBe("class-located:9");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("app locator is case insensitive", async () => {
+    Locator.use("MyApp", (gid) => `case-test:${gid.modelId}`);
+    try {
+      expect(await Locator.locate("gid://myapp/Person/3")).toBe("case-test:3");
+      expect(await Locator.locate("gid://MYAPP/Person/4")).toBe("case-test:4");
+    } finally {
+      _resetLocators();
+    }
+  });
+
+  it("locator name cannot have underscore", () => {
+    expect(() => Locator.use("invalid_app", () => null)).toThrow(/invalid app name/i);
+  });
 });
 
 // ─── Non-Rails coverage (regressions / edge cases not in Rails suite) ──────
@@ -438,5 +485,113 @@ describe("Locator without model finder", () => {
 
   it("returns null when no finder is registered", async () => {
     expect(await Locator.locate("gid://bcx/Person/1")).toBeNull();
+  });
+});
+
+describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
+  beforeEach(() => {
+    setApp(TEST_APP);
+    setModelFinder((name) => REGISTRY[name]);
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+    _resetLocators();
+  });
+
+  it("falls back to the default locator when no app-specific locator is registered", async () => {
+    Locator.use("other-app", () => "should-not-be-called");
+    const found = (await Locator.locate("gid://bcx/Person/5")) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("5");
+  });
+
+  it("defaultLocator getter/setter (Rails: Locator.default_locator=)", () => {
+    const original = Locator.defaultLocator;
+    const custom = new BlockLocator(() => "custom-default");
+    // LocatorLike-widened defaultLocator accepts a BlockLocator directly —
+    // no cast needed.
+    Locator.defaultLocator = custom;
+    expect(Locator.defaultLocator).toBe(custom);
+    Locator.defaultLocator = original;
+  });
+
+  it("locatorFor returns the registered locator for the app", () => {
+    const custom = new BlockLocator(() => null);
+    Locator.use("zed", custom);
+    const gid = GlobalID.parse("gid://zed/Person/1");
+    expect(Locator.locatorFor(gid!)).toBe(custom);
+  });
+
+  it("parseAllowed filters by class allowlist", () => {
+    const gids = ["gid://bcx/Person/1", "gid://bcx/PersonChild/2", "gid://bcx/Unknown/3"];
+    const allowed = Locator.parseAllowed(gids, PersonChild as unknown as LocatorModel);
+    expect(allowed).toHaveLength(1);
+    expect(allowed[0].modelName).toBe("PersonChild");
+  });
+
+  it("normalizeApp lowercases the app name", () => {
+    expect(Locator.normalizeApp("MyApp")).toBe("myapp");
+    expect(Locator.normalizeApp("FOO")).toBe("foo");
+  });
+
+  it("locateMany returns [] when parseAllowed filters out every input", async () => {
+    // All GIDs are invalid / unknown class / filtered by only: → empty allowed
+    // set → return [] without dispatching to any locator (no first-locator
+    // crash, no extraneous work).
+    const found = await Locator.locateMany(["not-a-gid", "gid://bcx/Unknown/1"], {});
+    expect(found).toEqual([]);
+  });
+
+  it("locate returns null for arity-mismatched GIDs even with a BlockLocator registered", async () => {
+    // Without the facade-level arity check, the registered BlockLocator
+    // would run on bad-arity GIDs (inconsistent with BaseLocator's
+    // modelIdIsValid filter, which returns null for them).
+    Locator.use("ba", () => {
+      throw new Error("should not be called — bad-arity GID must be filtered at the facade");
+    });
+    // Person has scalar primaryKey; composite-form id is bad arity.
+    expect(await Locator.locate("gid://ba/Person/1/2")).toBeNull();
+  });
+
+  it("locateMany drops arity-mismatched GIDs before the first-app dispatch selection", async () => {
+    // Bad-arity GID anchored at allowed[0] with a different app would
+    // otherwise cause locateMany to filter to its app and lose the valid
+    // same-app GIDs that follow. parseAllowed's arity filter removes the
+    // bad entry first, so allowed[0] is a real candidate.
+    Locator.use("doomed-app", () => {
+      throw new Error("should not be called — bad-arity GID must be filtered first");
+    });
+    const found = await Locator.locateMany(
+      [
+        "gid://doomed-app/Person/1/2", // scalar-PK Person with composite-form id → bad arity
+        "gid://bcx/Person/3",
+        "gid://bcx/Person/4",
+      ],
+      {},
+    );
+    expect(found).toHaveLength(2);
+    expect((found[0] as Person).id).toBe("3");
+    expect((found[1] as Person).id).toBe("4");
+  });
+
+  it("locateMany filters out mismatched-app GIDs (single-app dispatch invariant)", async () => {
+    // Register an 'other-app' BlockLocator that would crash if asked to
+    // resolve a 'bcx' GID. locateMany should keep only the first-GID-app
+    // entries; the foreign GID is silently dropped.
+    Locator.use("other-app", () => {
+      throw new Error("should not be called — foreign-app GID must be filtered");
+    });
+    const found = await Locator.locateMany(
+      [
+        "gid://bcx/Person/1",
+        "gid://other-app/Person/99", // would route to the throwing locator
+        "gid://bcx/Person/2",
+      ],
+      {},
+    );
+    expect(found).toHaveLength(2);
+    expect((found[0] as Person).id).toBe("1");
+    expect((found[1] as Person).id).toBe("2");
   });
 });
