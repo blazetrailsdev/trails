@@ -2,24 +2,25 @@
  * Tests for ActiveRecord::AttributeAssignment
  * Mirrors: activerecord/test/cases/attribute_assignment_test.rb
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 import { typeCastAttributeValue, findParameterPosition } from "./attribute-assignment.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA = {
+  topics: { title: "string", author: "string" },
+  people: { born_on: "date" },
+  events: { title: "string", starts_at: "datetime", starts_on: "date" },
+} as const;
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
-
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
 
 // ==========================================================================
 // AttributeAssignmentTest — targets attribute_assignment_test.rb
@@ -27,8 +28,8 @@ afterAll(() => {
 describe("AttributeAssignmentTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("bulk assign attributes", () => {

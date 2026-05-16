@@ -6,17 +6,62 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA: Schema = {
+  topics: { title: "string" },
+  items: { name: "string" },
+  counters: { count: "integer" },
+  widgets: { name: "string", label: "string" },
+  auto_items: { name: "string" },
+  big_items: { name: "string" },
+  nil_default_pks: { name: "string" },
+  big_nil_default_pks: { name: "string" },
+  custom_pk_topics: {
+    columns: { custom_id: "integer", title: "string" },
+    primaryKey: ["custom_id"],
+  },
+  orders: {
+    columns: {
+      shop_id: "integer",
+      order_id: "integer",
+      id: "integer",
+      name: "string",
+      status: "string",
+      total: "integer",
+    },
+    primaryKey: false,
+  },
+  records: {
+    columns: { status: "string", record_id: "integer" },
+    primaryKey: ["record_id"],
+  },
+  entries: {
+    columns: { entry_id: "integer", blog_id: "integer" },
+    primaryKey: ["entry_id"],
+  },
+  products: {
+    columns: { product_id: "integer", name: "string" },
+    primaryKey: ["product_id"],
+  },
+  things: {
+    columns: { thing_id: "integer", group_id: "integer" },
+    primaryKey: ["thing_id"],
+  },
+};
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("PrimaryKeysTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeTopic() {
@@ -294,7 +339,7 @@ describe("PrimaryKeysTest", () => {
 
 describe("PrimaryKeyIntegerTest", () => {
   it("primary key column type with serial/integer", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -305,7 +350,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(typeof w.id).toBe("number");
   });
   it("primary key with serial/integer are automatically numbered", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -317,7 +362,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(w2.id as number).toBeGreaterThan(w1.id as number);
   });
   it("schema dump primary key with serial/integer", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -329,7 +374,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(typeof w.id).toBe("number");
   });
   it("primary key column type with options", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -340,7 +385,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(w.id).not.toBeNull();
   });
   it("bigint primary key with unsigned", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -354,7 +399,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
 describe("PrimaryKeyAnyTypeTest", () => {
   it("any type primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -366,7 +411,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(w.id).not.toBeNull();
   });
   it("schema dump primary key includes type and options", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("label", "string");
@@ -377,7 +422,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(w.id).toBeDefined();
   });
   it("schema typed primary key column", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -392,7 +437,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
 
 describe("PrimaryKeyWithAutoIncrementTest", () => {
   it("primary key with integer", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class AutoItem extends Base {
       static {
         this.attribute("name", "string");
@@ -405,7 +450,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
     expect(b.id as number).toBe((a.id as number) + 1);
   });
   it("primary key with bigint", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class BigItem extends Base {
       static {
         this.attribute("name", "string");
@@ -419,9 +464,9 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 });
 
 describe("PrimaryKeyIntegerNilDefaultTest", () => {
-  it("schema dump primary key integer with default nil", () => {
+  it("schema dump primary key integer with default nil", async () => {
     // In Rails, this tests schema.rb dump format. We verify integer PK with null default works.
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NilDefaultPk extends Base {
       static {
         this.attribute("id", "integer", { default: null });
@@ -431,8 +476,8 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
     }
     expect(NilDefaultPk.primaryKey).toBe("id");
   });
-  it("schema dump primary key bigint with default nil", () => {
-    const adapter = freshAdapter();
+  it("schema dump primary key bigint with default nil", async () => {
+    const adapter = await freshAdapter();
     class BigNilDefaultPk extends Base {
       static {
         this.attribute("id", "big_integer", { default: null });
@@ -462,8 +507,8 @@ describe("Base features (Rails-guided) - primary keys", () => {
 
 describe("CompositePrimaryKeyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("composite primary key", () => {
