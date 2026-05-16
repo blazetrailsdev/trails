@@ -428,6 +428,134 @@ describe("GlobalLocatorTest", () => {
   it("locator name cannot have underscore", () => {
     expect(() => Locator.use("invalid_app", () => null)).toThrow(/invalid app name/i);
   });
+
+  it("by valid purpose returns right model", async () => {
+    const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
+    const found = (await Locator.locateSigned(loginSgid.toString(), {
+      verifier,
+      for: "login",
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("login-1");
+  });
+
+  it("by valid purpose with SGID returns right model", async () => {
+    const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
+    const found = (await Locator.locateSigned(loginSgid, { verifier, for: "login" })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("login-1");
+  });
+
+  it("by invalid purpose returns nil", async () => {
+    const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
+    expect(
+      await Locator.locateSigned(loginSgid.toString(), { verifier, for: "like_button" }),
+    ).toBeNull();
+  });
+
+  it("by invalid purpose with SGID returns nil", async () => {
+    const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
+    expect(await Locator.locateSigned(loginSgid, { verifier, for: "like_button" })).toBeNull();
+  });
+
+  it("by many with one record missing leading to a raise", async () => {
+    // Rails: `Person.find` raises RecordNotFound when one id misses. Our
+    // fixture's `Person.find` throws when it sees the sentinel "missing"
+    // id, so locating many GIDs where one resolves to "missing" must
+    // surface the error.
+    const gids = [GlobalID.create(new Person("1")), GlobalID.create(new Person("missing"))];
+    await expect(Locator.locateMany(gids)).rejects.toThrow();
+  });
+
+  it("by many with one record missing not leading to a raise when ignoring missing", async () => {
+    // With ignoreMissing the locator routes through `where(id: ids).toArray()`,
+    // which the fixture filters down to non-"missing" entries — no throw.
+    const gids = [GlobalID.create(new Person("1")), GlobalID.create(new Person("missing"))];
+    const found = (await Locator.locateMany(gids, { ignoreMissing: true })) as Person[];
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe("1");
+  });
+
+  it("by GID without a primary key method", async () => {
+    // Rails fixture PersonWithoutPrimaryKey has no `primary_key` method; the
+    // locator falls back to the default ('id'). Trails analog: a model class
+    // with `find` and `where` but no `primaryKey` static.
+    class PersonNoPk {
+      id: string;
+      constructor(id: string) {
+        this.id = id;
+      }
+      static async find(id: unknown): Promise<PersonNoPk | PersonNoPk[]> {
+        if (Array.isArray(id)) return id.map((i) => new PersonNoPk(String(i)));
+        return new PersonNoPk(String(id));
+      }
+      static where(conds: Record<string, unknown>): { toArray(): Promise<PersonNoPk[]> } {
+        const ids = conds["id"] as unknown[];
+        return {
+          async toArray() {
+            return ids.map((i) => new PersonNoPk(String(i)));
+          },
+        };
+      }
+    }
+    setModelFinder((name) =>
+      name === "PersonNoPk" ? (PersonNoPk as unknown as LocatorModel) : REGISTRY[name],
+    );
+
+    const gid = GlobalID.create(
+      new PersonNoPk("id") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    const found = (await Locator.locate(gid)) as PersonNoPk;
+    expect(found).toBeInstanceOf(PersonNoPk);
+    expect(found.id).toBe("id");
+
+    const gid2 = GlobalID.create(
+      new PersonNoPk("id2") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    const many = (await Locator.locateMany([gid, gid2])) as PersonNoPk[];
+    expect(many).toHaveLength(2);
+
+    const manyIgnore = (await Locator.locateMany([gid, gid2], {
+      ignoreMissing: true,
+    })) as PersonNoPk[];
+    expect(manyIgnore).toHaveLength(2);
+  });
+
+  it("can set default_locator", async () => {
+    // Rails: Locator.default_locator = MyLocator.new — swap the locator
+    // used when no per-app locator is registered.
+    const sentinel = { located: true };
+    const previous = Locator.defaultLocator;
+    Locator.defaultLocator = {
+      locate: async () => sentinel,
+      locateMany: async () => [sentinel],
+    };
+    try {
+      const found = await Locator.locate("gid://no-such-app/Person/1");
+      expect(found).toBe(sentinel);
+    } finally {
+      Locator.defaultLocator = previous;
+    }
+  });
+
+  it("use locator with class and single argument", async () => {
+    // Rails: a registered class with locate(gid) (no options arg) still
+    // dispatches. The locator's locate / locateMany are duck-typed via
+    // LocatorLike; method arity isn't checked.
+    const deprecated = {
+      locate: async () => "deprecated",
+      locateMany: async (gids: GlobalID[]) => gids.map((g) => g.modelId),
+    };
+    Locator.use("deprecated", deprecated);
+    try {
+      expect(await Locator.locate("gid://deprecated/Person/1")).toBe("deprecated");
+      expect(
+        await Locator.locateMany(["gid://deprecated/Person/1", "gid://deprecated/Person/2"]),
+      ).toEqual(["1", "2"]);
+    } finally {
+      _resetLocators();
+    }
+  });
 });
 
 // ─── ScopedRecordLocatingTest ──────────────────────────────────────────────

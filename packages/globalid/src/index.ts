@@ -7,7 +7,7 @@ export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";
 export { Verifier } from "./verifier.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
-export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";
+export type { SignedGlobalIDOptions, ParseOptions, FromUriOptions } from "./signed-global-id.js";
 export {
   parseGid,
   buildGid,

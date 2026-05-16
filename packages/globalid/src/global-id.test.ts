@@ -1,11 +1,49 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
+import { setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
 const fakeModel = (id: unknown, name = "Person") => ({
   id,
   constructor: { name },
 });
+
+// ─── Fixture models for find / model_class tests ───────────────────────────
+
+class Person {
+  static primaryKey = "id";
+  id: string;
+  constructor(id: string) {
+    this.id = id;
+  }
+  static async find(id: unknown): Promise<Person> {
+    return new this(String(id));
+  }
+}
+class PersonUuid extends Person {}
+class PersonChild extends Person {}
+class PersonModel extends Person {}
+class CompositePrimaryKeyModel {
+  static primaryKey: string[] = ["tenant", "key"];
+  id: string[];
+  constructor(id: string[]) {
+    this.id = id;
+  }
+  static async find(id: unknown): Promise<CompositePrimaryKeyModel> {
+    return new CompositePrimaryKeyModel((id as unknown[]).map(String));
+  }
+}
+
+const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
+  Person: Person as unknown as LocatorModel,
+  PersonUuid: PersonUuid as unknown as LocatorModel,
+  // Rails 'Person::Child' — TS class can't have :: in its name, so the
+  // registered name uses the namespaced spelling that GlobalID.modelName
+  // round-trips, mapped to a flat PersonChild class.
+  "Person::Child": PersonChild as unknown as LocatorModel,
+  PersonModel: PersonModel as unknown as LocatorModel,
+  CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
+};
 
 describe("GlobalIDTest", () => {
   it("value equality", () => {
@@ -22,8 +60,14 @@ describe("GlobalIDTest", () => {
 });
 
 describe("GlobalIDParamEncodedTest", () => {
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => {
+    setApp("bcx");
+    setModelFinder((name) => FIXTURE_REGISTRY[name]);
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+  });
 
   it("parsing", () => {
     const gid = GlobalID.create(fakeModel("id"));
@@ -31,13 +75,32 @@ describe("GlobalIDParamEncodedTest", () => {
     expect(parsed).not.toBeNull();
     expect(parsed!.equals(gid)).toBe(true);
   });
+
+  it("finding", async () => {
+    // Rails: GlobalID.find(@gid.to_param) — class-level convenience that
+    // parses and locates in one step. Trails has Locator.locate(gid) for
+    // the same flow.
+    const gid = GlobalID.create(
+      new Person("id") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    const parsed = GlobalID.parse(gid.toParam())!;
+    const found = (await parsed.find()) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(parsed.modelId);
+  });
 });
 
 describe("GlobalIDCreationTest", () => {
   const uuid = "7ef9b614-353c-43a1-a203-ab2307851990";
 
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => {
+    setApp("bcx");
+    setModelFinder((name) => FIXTURE_REGISTRY[name]);
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+  });
 
   it("as string", () => {
     expect(GlobalID.create(fakeModel(5)).toString()).toBe("gid://bcx/Person/5");
@@ -116,6 +179,91 @@ describe("GlobalIDCreationTest", () => {
     const gid3 = GlobalID.create(fakeModel(10));
     expect(gid1.equals(gid2)).toBe(true);
     expect(gid1.equals(gid3)).toBe(false);
+  });
+
+  it("model class", () => {
+    expect(
+      GlobalID.create(new Person("5") as unknown as { id: unknown; constructor: { name: string } })
+        .modelClass,
+    ).toBe(Person);
+    expect(
+      GlobalID.create(
+        new PersonUuid(uuid) as unknown as { id: unknown; constructor: { name: string } },
+      ).modelClass,
+    ).toBe(PersonUuid);
+    expect(GlobalID.create(fakeModel(1, "PersonModel")).modelClass).toBe(PersonModel);
+    expect(GlobalID.create(fakeModel(["t", "i"], "CompositePrimaryKeyModel")).modelClass).toBe(
+      CompositePrimaryKeyModel,
+    );
+  });
+
+  it("find", async () => {
+    const personGid = GlobalID.create(
+      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    const found = (await personGid.find()) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("5");
+  });
+
+  it("find with class", async () => {
+    const personGid = GlobalID.create(
+      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    const found = (await personGid.find({ only: Person as unknown as LocatorModel })) as Person;
+    expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("5");
+  });
+
+  it("find with class no match", async () => {
+    const personGid = GlobalID.create(
+      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    class Unrelated {}
+    expect(await personGid.find({ only: Unrelated as unknown as LocatorModel })).toBeNull();
+  });
+
+  it("find with subclass", async () => {
+    // Rails: a PersonChild GID with only: Person succeeds because
+    // PersonChild < Person. findAllowed uses `instanceof prototype`.
+    // Use the namespaced 'Person::Child' GID directly — that's how
+    // GlobalID.create(new PersonChild(...)) renders the modelName when
+    // the class is registered under the Rails namespaced spelling.
+    const namespacedGid = GlobalID.parse(`gid://bcx/Person::Child/4`)!;
+    const found = (await namespacedGid.find({
+      only: Person as unknown as LocatorModel,
+    })) as PersonChild;
+    expect(found).toBeInstanceOf(PersonChild);
+  });
+
+  it("find with subclass no match", async () => {
+    const namespacedGid = GlobalID.parse(`gid://bcx/Person::Child/4`)!;
+    class Unrelated {}
+    expect(await namespacedGid.find({ only: Unrelated as unknown as LocatorModel })).toBeNull();
+  });
+
+  it("find with multiple class", async () => {
+    const personGid = GlobalID.create(
+      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    class Other {}
+    const found = (await personGid.find({
+      only: [Other as unknown as LocatorModel, Person as unknown as LocatorModel],
+    })) as Person;
+    expect(found).toBeInstanceOf(Person);
+  });
+
+  it("find with multiple class no match", async () => {
+    const personGid = GlobalID.create(
+      new Person("5") as unknown as { id: unknown; constructor: { name: string } },
+    );
+    class A {}
+    class B {}
+    expect(
+      await personGid.find({
+        only: [A as unknown as LocatorModel, B as unknown as LocatorModel],
+      }),
+    ).toBeNull();
   });
 });
 

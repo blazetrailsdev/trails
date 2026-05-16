@@ -7,6 +7,7 @@ import {
   _resetSignedGlobalIDClassConfig,
 } from "./signed-global-id.js";
 import { setApp, _resetApp } from "./config.js";
+import { setModelFinder, _resetModelFinder, type LocatorModel } from "./locator.js";
 
 function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
@@ -15,9 +16,24 @@ function makeVerifier(secret = "test-secret"): MessageVerifier {
 const person = (id: unknown = 5) => ({ id, constructor: { name: "Person" } });
 const TEST_APP = "bcx";
 
+// Minimal Person class used by `model class` test below.
+class Person {
+  static primaryKey = "id";
+  constructor(public id: string) {}
+  static async find(id: unknown): Promise<Person> {
+    return new Person(String(id));
+  }
+}
+
 describe("SignedGlobalIDTest", () => {
-  beforeEach(() => setApp(TEST_APP));
-  afterEach(() => _resetApp());
+  beforeEach(() => {
+    setApp(TEST_APP);
+    setModelFinder((name) => (name === "Person" ? (Person as unknown as LocatorModel) : undefined));
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+  });
 
   it("as string", () => {
     const verifier = makeVerifier();
@@ -46,6 +62,12 @@ describe("SignedGlobalIDTest", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier });
     expect(sgid.toParam()).toBe(sgid.toString());
+  });
+
+  it("model class", () => {
+    const verifier = makeVerifier();
+    const sgid = SignedGlobalID.create(person(5), { verifier });
+    expect(sgid.modelClass).toBe(Person);
   });
 
   it("inspect", () => {
@@ -77,6 +99,20 @@ describe("SignedGlobalIDPurposeTest", () => {
     const defaultSgid = SignedGlobalID.create(person(5), { verifier, for: "default" });
     expect(sgid.purpose).toBe("default");
     expect(sgid.equals(defaultSgid)).toBe(true);
+  });
+
+  it("new accepts a :for", () => {
+    // Rails: SignedGlobalID.new(Person.new(5).to_gid.uri, for: 'login') —
+    // the URI-first initializer form. In Trails this is the static
+    // `fromUri(uri, options)` factory since constructors are kwargs-style
+    // through static methods, not direct `new`.
+    const verifier = makeVerifier();
+    const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
+    const expected = SignedGlobalID.fromUri(`gid://${TEST_APP}/Person/5`, {
+      verifier,
+      for: "login",
+    });
+    expect(loginSgid.equals(expected)).toBe(true);
   });
 
   it("create accepts a :for", () => {

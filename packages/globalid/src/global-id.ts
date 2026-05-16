@@ -6,6 +6,19 @@ import {
   validateApp,
   type GidComponents,
 } from "./uri/gid.js";
+import { Locator, lookupClass, type LocateOptions, type LocatorModel } from "./locator.js";
+import { SignedGlobalID } from "./signed-global-id.js";
+
+/**
+ * @internal Mirrors Ruby's `model <= GlobalID` — matches the identity
+ * itself OR any subclass. Safe for non-constructor `LocatorModel`
+ * values (returns false instead of throwing on missing `.prototype`).
+ */
+export function isOrExtends(klass: LocatorModel, base: { prototype: object }): boolean {
+  if ((klass as unknown) === base) return true;
+  const proto = (klass as unknown as { prototype?: unknown }).prototype;
+  return typeof proto === "object" && proto !== null && proto instanceof (base as never);
+}
 
 export interface GlobalIDModel {
   id: unknown;
@@ -107,5 +120,40 @@ export class GlobalID {
   /** Mirrors: GlobalID.app= validation */
   static validateApp(app: string | null | undefined): string {
     return validateApp(app);
+  }
+
+  /**
+   * Resolve the model class via the registered ModelFinder.
+   *
+   * Mirrors: GlobalID#model_class — `model_name.constantize`. Raises if the
+   * resolved class is GlobalID / SignedGlobalID (Rails has the same guard
+   * against recursive `model_class` lookup).
+   */
+  get modelClass(): LocatorModel {
+    const klass = lookupClass(this.modelName);
+    if (!klass) {
+      throw new Error(
+        `Cannot resolve model class for ${this.modelName}. Register the class via setModelFinder.`,
+      );
+    }
+    // Rails: `if model <= GlobalID then raise ArgumentError` — rejects
+    // GlobalID itself and any subclass. In Ruby SGID < GID so the
+    // single `<=` check covers both. In TS they're peers, and we also
+    // need to catch subclasses via prototype-chain checks. Guard the
+    // prototype access since the finder is structurally typed and a
+    // non-constructor value technically satisfies LocatorModel.
+    if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
+      throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
+    }
+    return klass;
+  }
+
+  /**
+   * Find the record this GID references.
+   *
+   * Mirrors: GlobalID#find — delegates to `Locator.locate(self, options)`.
+   */
+  find(options?: LocateOptions): Promise<unknown | null> {
+    return Locator.locate(this, options);
   }
 }

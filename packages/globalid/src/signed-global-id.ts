@@ -2,7 +2,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { getApp } from "./config.js";
 import { buildGid, parseGid, type GidComponents } from "./uri/gid.js";
-import type { GlobalIDModel } from "./global-id.js";
+import { GlobalID, isOrExtends, type GlobalIDModel } from "./global-id.js";
+import { lookupClass, type LocatorModel } from "./locator.js";
 
 export type { GlobalIDModel };
 
@@ -35,6 +36,19 @@ export interface SignedGlobalIDOptions {
   verifier?: MessageVerifier;
   /** Custom GID query params (any extra keys become URI params). */
   [key: string]: unknown;
+}
+
+/**
+ * Options accepted by {@link SignedGlobalID.fromUri}. A narrower slice of
+ * {@link SignedGlobalIDOptions} — only the knobs that affect verification
+ * and the SGID instance fields, since fromUri operates on a pre-built URI
+ * and can't embed `app` or arbitrary extra URI params.
+ */
+export interface FromUriOptions {
+  for?: string;
+  expiresIn?: number | null;
+  expiresAt?: Temporal.Instant | null;
+  verifier?: MessageVerifier;
 }
 
 export interface ParseOptions {
@@ -113,6 +127,28 @@ export class SignedGlobalID {
     const purpose = SignedGlobalID.pickPurpose(options);
     const expiresAt = pickExpiration(options);
 
+    return new SignedGlobalID(uri, purpose, expiresAt, verifier);
+  }
+
+  /**
+   * Build a SignedGlobalID from a raw GID URI plus options.
+   *
+   * Mirrors: SignedGlobalID.new(uri, options) — the Rails initializer that
+   * `SignedGlobalIDPurposeTest > 'new accepts a :for'` exercises. Use
+   * {@link create} for the model-first entry point; use this when you
+   * already have a URI string and want the SGID wrapper. Only
+   * verifier/purpose/expiration are read — `app` and extra URI params
+   * can't be threaded into an already-built URI string.
+   */
+  static fromUri(uri: string, options: FromUriOptions = {}): SignedGlobalID {
+    // Rails' SignedGlobalID#initialize delegates to URI::GID.parse, which
+    // raises on malformed URIs. Match that invariant here so callers get
+    // an early error rather than deferred failures from modelId/modelName
+    // getters reading garbage components.
+    parseGid(uri);
+    const verifier = SignedGlobalID.pickVerifier(options);
+    const purpose = SignedGlobalID.pickPurpose(options);
+    const expiresAt = pickExpiration(options);
     return new SignedGlobalID(uri, purpose, expiresAt, verifier);
   }
 
@@ -252,19 +288,40 @@ export class SignedGlobalID {
     return this.toString();
   }
 
-  /** Mirrors: GlobalID#model_id (inherited by SignedGlobalID). */
+  /** Mirrors: GlobalID#model_id  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get modelId(): string | string[] {
     return this._parts().modelId;
   }
 
-  /** Mirrors: GlobalID#model_name (inherited by SignedGlobalID). */
+  /** Mirrors: GlobalID#model_name  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get modelName(): string {
     return this._parts().modelName;
   }
 
-  /** Mirrors: GlobalID#params (inherited by SignedGlobalID). */
+  /** Mirrors: GlobalID#params  — re-exposed on SignedGlobalID (peer class in TS, not a subclass). */
   get params(): Record<string, string> {
     return this._parts().params;
+  }
+
+  /**
+   * Resolve the model class via the registered ModelFinder.
+   *
+   * Mirrors: GlobalID#model_class  — re-exposed on SignedGlobalID (peer class in TS, not a subclass).
+   * In Ruby SGID inherits the `model <= GlobalID` guard from GID; in TS
+   * the peer class repeats it so a misconfigured ModelFinder can't slip
+   * either identity through.
+   */
+  get modelClass(): LocatorModel {
+    const klass = lookupClass(this.modelName);
+    if (!klass) {
+      throw new Error(
+        `Cannot resolve model class for ${this.modelName}. Register the class via setModelFinder.`,
+      );
+    }
+    if (isOrExtends(klass, GlobalID) || isOrExtends(klass, SignedGlobalID)) {
+      throw new Error("GlobalID and SignedGlobalID cannot be used as model_class.");
+    }
+    return klass;
   }
 
   /**
