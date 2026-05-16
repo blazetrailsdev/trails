@@ -367,26 +367,21 @@ export class LoaderQuery {
 
   // Rails uses connection identity (Model.connection_specification_name) so that
   // multi-database models sharing a table name don't get coalesced. We use the
-  // adapter identity, which is the AR-trails analogue.
+  // adapter instance as the AR-trails analogue, keyed via a WeakMap so the
+  // adapter object itself is never mutated.
   private _scopeAdapterId(): string {
     const klass = this.scope?._modelClass;
     const adapter = klass?._adapter ?? klass?.adapter;
     if (adapter == null) return "";
-    return (
-      (adapter as any)._poolKey ??
-      (adapter as any).connectionName ??
-      `id:${this._objectId(adapter)}`
-    );
+    let id = LoaderQuery._adapterIds.get(adapter);
+    if (id == null) {
+      id = ++LoaderQuery._idCounter;
+      LoaderQuery._adapterIds.set(adapter, id);
+    }
+    return `id:${id}`;
   }
 
-  private _objectId(obj: object): number {
-    let id = (obj as any).__loaderQueryId;
-    if (id != null) return id;
-    id = ++LoaderQuery._idCounter;
-    Object.defineProperty(obj, "__loaderQueryId", { value: id, enumerable: false });
-    return id;
-  }
-
+  private static _adapterIds = new WeakMap<object, number>();
   private static _idCounter = 0;
 
   private _valuesForQueries(): string {
