@@ -47,13 +47,21 @@ export class GlobalID {
       if (v != null) filteredParams[k] = String(v);
     }
     const modelName = model.constructor.name;
-    const uri = buildGid(
+    const params = Object.keys(filteredParams).length ? filteredParams : null;
+    const uri = buildGid(app, modelName, model.id, params);
+    // Skip re-parsing — buildGid encoded the components we already have.
+    // Mirror GID.build's normalization: composite PKs stay as a string[],
+    // primitives stringify.
+    const modelId: string | string[] = Array.isArray(model.id)
+      ? model.id.map((p) => String(p))
+      : String(model.id ?? "");
+    const components: GidComponents = {
       app,
       modelName,
-      model.id,
-      Object.keys(filteredParams).length ? filteredParams : null,
-    );
-    return new GlobalID(uri, parseGid(uri));
+      modelId,
+      params: params ?? {},
+    };
+    return new GlobalID(uri, components);
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */
