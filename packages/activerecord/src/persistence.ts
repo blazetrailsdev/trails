@@ -806,7 +806,13 @@ interface UpdateColumnsRecord {
     arelTable: InstanceType<typeof ArelTable>;
     _attributeDefinitions: Map<
       string,
-      { type: { cast(v: unknown): unknown; serialize?(v: unknown): unknown } }
+      {
+        type: {
+          cast(v: unknown): unknown;
+          serialize?(v: unknown): unknown;
+          type?(): string;
+        };
+      }
     >;
     _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
     adapter: {
@@ -891,13 +897,23 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     // numbers, null, booleans) are already DB-ready and must not be passed
     // through serialize() — doing so would corrupt types whose serialize()
     // has side effects (e.g. re-encrypting an already-encrypted value).
+    // Only pre-serialize for temporal types and their PG ±infinity sentinels.
+    // isDateInfinity matches `Number.POSITIVE_INFINITY`, so without the
+    // type-name gate a Float column carrying Infinity would route through
+    // serialize() — corrupting the value via the date-infinity wire string.
+    const typeName = def?.type.type?.();
+    const isTemporalType =
+      typeName === "date" ||
+      typeName === "datetime" ||
+      typeName === "time" ||
+      typeName === "timestamp" ||
+      typeName === "timestamptz";
     const dbValue =
       cast instanceof Temporal.Instant ||
       cast instanceof Temporal.PlainDate ||
       cast instanceof Temporal.PlainTime ||
       cast instanceof Temporal.ZonedDateTime ||
-      isDateInfinity(cast) ||
-      isDateNegativeInfinity(cast)
+      (isTemporalType && (isDateInfinity(cast) || isDateNegativeInfinity(cast)))
         ? (def?.type.serialize?.(cast) ?? cast)
         : cast;
     setPairs.push([table.get(key), dbValue]);

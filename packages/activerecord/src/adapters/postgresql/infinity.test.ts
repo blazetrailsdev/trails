@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { Range } from "../../index.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -54,6 +55,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(Number.isNaN(record.float)).toBe(true);
     });
 
+    it("updateColumns with infinity on a float column", async () => {
+      const M = await modelClass();
+      const record = await (M as any).create({});
+      await (record as any).updateColumns({ float: Number.POSITIVE_INFINITY });
+      await (record as any).reload();
+      expect((record as any).float).toBe(Number.POSITIVE_INFINITY);
+    });
+
     it("update_all with infinity on a float column", async () => {
       const M = await modelClass();
       const record = await (M as any).create({});
@@ -99,18 +108,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       // SCOPE: ~80 LOC — InTimeZone helper + TimeZoneConverter integration test plumbing
     });
 
-    it.skip("where clause with infinite range on a datetime column", () => {
-      // BLOCKED: relation.where range support with Float::INFINITY endpoints
-      // does not yet emit "-infinity"/"infinity" wire strings via Arel range
-      // serialization. Sentinels are unified at the type layer; the gap is in
-      // QueryAttribute.serialize for endless/beginless ranges with Infinity bounds.
-      // SCOPE: ~40 LOC in arel/relation range visitor
+    it("where clause with infinite range on a datetime column", async () => {
+      const M = await modelClass();
+      const created = await (M as any).create({ datetime: "2020-01-01 00:00:00" });
+      const found = await (M as any).where({ datetime: new Range(-Infinity, Infinity) }).take();
+      expect(found.id).toBe(created.id);
     });
 
-    it.skip("where clause with infinite range on a date column", () => {
-      // BLOCKED: see "where clause with infinite range on a datetime column" —
-      // same Arel range-bound serialization gap; date column path identical.
-      // SCOPE: covered by the datetime fix above
+    it("where clause with infinite range on a date column", async () => {
+      const M = await modelClass();
+      const created = await (M as any).create({ date: "2020-01-01" });
+      const found = await (M as any).where({ date: new Range(-Infinity, Infinity) }).take();
+      expect(found.id).toBe(created.id);
     });
   });
 });
