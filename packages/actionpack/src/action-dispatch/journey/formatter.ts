@@ -1,4 +1,7 @@
+import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
+
+export { UrlGenerationError };
 
 /**
  * Host shape the Formatter needs from the higher-level RouteSet.
@@ -23,22 +26,6 @@ export class RouteWithParams {
   /** Rails `path(_)` — argument unused, kept for parity with MissingRoute. */
   path(_methodName?: string): string {
     return this._route.format(this._parameterizedParts);
-  }
-}
-
-/**
- * Thrown when `generate` cannot find a matching route. Mirrors Rails'
- * `ActionController::UrlGenerationError`.
- */
-export class UrlGenerationError extends Error {
-  constructor(
-    message: string,
-    readonly routes: FormatterHost,
-    readonly routeName: string | null,
-    readonly methodName: string,
-  ) {
-    super(message);
-    this.name = "UrlGenerationError";
   }
 }
 
@@ -208,11 +195,12 @@ export class Formatter {
 
     const routes = this._nonRecursive(this._buildOrGetCache(), options);
 
-    const suppliedKeys: Record<string, boolean> = {};
+    // Rails: `h[k.to_s] = true if v` — Ruby truthiness only excludes nil/false,
+    // so `0` and `""` are considered supplied.
+    const suppliedSet = new Set<string>();
     for (const [k, v] of Object.entries(options)) {
-      if (v) suppliedKeys[String(k)] = true;
+      if (v != null && v !== false) suppliedSet.add(String(k));
     }
-    const suppliedSet = new Set(Object.keys(suppliedKeys));
 
     const buckets = new Map<number, [number, Route][]>();
     for (const entry of routes) {
@@ -235,9 +223,8 @@ export class Formatter {
   private _nonRecursive(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
     const routes: [number, Route][] = [];
     const queue: CacheNode[] = [cache];
-
-    while (queue.length > 0) {
-      const c = queue.shift()!;
+    for (let i = 0; i < queue.length; i++) {
+      const c = queue[i]!;
       if (c.routes) routes.push(...c.routes);
       for (const [k, v] of Object.entries(options)) {
         const key = pairKey(k, v);
@@ -255,7 +242,9 @@ export class Formatter {
     for (const key of route.requiredParts) {
       const test = tests[key];
       if (test == null) {
-        if (!parts[key]) {
+        // Ruby `unless parts[key]` — only nil/false count as missing.
+        const v = parts[key];
+        if (v == null || v === false) {
           (missing ??= []).push(key);
         }
       } else {

@@ -137,6 +137,16 @@ describe("ActionDispatch::Journey::Formatter", () => {
     expect(f.generate(null, { controller: "x" }, {})).toBeInstanceOf(RouteWithParams);
   });
 
+  it("treats falsey-but-present values (0, empty string) as supplied (Ruby semantics)", () => {
+    const r = makeRoute("show", "/posts/:id");
+    const f = new Formatter(buildHost({ show: r }));
+    const zero = f.generate("show", { id: 0 }, {}) as RouteWithParams;
+    expect(zero.path()).toBe("/posts/0");
+    // Empty string is truthy in Ruby (`unless ""` is false), so it's "supplied".
+    const empty = f.generate("show", { id: "" }, {}) as RouteWithParams;
+    expect(empty.path()).toBe("/posts/");
+  });
+
   it("pathParams option merges underneath top-level options", () => {
     const r = makeRoute("show", "/posts/:id");
     const f = new Formatter(buildHost({ show: r }));
