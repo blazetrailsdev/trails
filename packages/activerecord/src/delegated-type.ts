@@ -99,8 +99,13 @@ export function delegatedType(
   });
 
   // Add instance method: delegatedName (e.g. entryableName).
-  // Rails: public_send("#{role}_class").model_name.singular.inquiry — returns
-  // an ActiveSupport::StringInquirer so callers can do entryable_name.message?
+  // Rails: public_send("#{role}_class").model_name.singular.inquiry —
+  // returns an ActiveSupport::StringInquirer so callers can do
+  // entryable_name.message?. We derive the same string value directly from
+  // foreign_type (underscore + tr("/","_"), matching ModelName#singular)
+  // rather than routing through `${role}Class`, which currently returns
+  // the foreign_type string instead of the constantized class (Rails
+  // divergence pre-existing from #1583).
   Object.defineProperty(modelClass.prototype, `${role}Name`, {
     get(this: Base) {
       const typeName = this.readAttribute(foreignType) as string | null;
