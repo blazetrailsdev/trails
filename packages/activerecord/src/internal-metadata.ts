@@ -17,6 +17,14 @@ import {
   star,
 } from "@blazetrails/arel";
 
+/**
+ * Stand-in for InternalMetadata when metadata storage is disabled
+ * (`use_metadata_table: false`). All methods short-circuit and the
+ * physical `ar_internal_metadata` table is never touched.
+ *
+ * Mirrors: ActiveRecord::InternalMetadata::NullInternalMetadata
+ * @internal
+ */
 export class NullInternalMetadata {
   async createTable(): Promise<void> {}
   async dropTable(): Promise<void> {}
@@ -25,6 +33,7 @@ export class NullInternalMetadata {
     return null;
   }
 
+  /** @internal */
   async tableExists(): Promise<boolean> {
     return false;
   }
@@ -168,6 +177,14 @@ export class InternalMetadata {
     return Number(rows[0]?.cnt ?? 0);
   }
 
+  /**
+   * Whether `ar_internal_metadata` exists on the wrapped adapter. Reads the
+   * table directly (SELECT 1) rather than consulting the schema cache, so
+   * the result is fresh after recent DDL.
+   *
+   * Mirrors: ActiveRecord::InternalMetadata#table_exists?
+   * @internal
+   */
   async tableExists(): Promise<boolean> {
     // When disabled, report the table as absent so callers don't
     // accidentally trust it. The physical table may still exist on disk

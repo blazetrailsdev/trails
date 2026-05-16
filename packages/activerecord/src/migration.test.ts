@@ -346,6 +346,27 @@ describe("MigrationTest", () => {
     expect(ctx.tableExists("pre_new_suf")).toBe(true);
   });
 
+  it("MigrationContext inherits tableNamePrefix and tableNameSuffix from Base config", () => {
+    const savedPrefix = Base.tableNamePrefix;
+    const savedSuffix = Base.tableNameSuffix;
+    Base.tableNamePrefix = "ctxpre_";
+    Base.tableNameSuffix = "_ctxsuf";
+    try {
+      const { ctx } = freshContext();
+      expect(ctx.tableNamePrefix).toBe("ctxpre_");
+      expect(ctx.tableNameSuffix).toBe("_ctxsuf");
+      // Explicit override on the context still wins over the global config.
+      ctx.tableNamePrefix = "override_";
+      expect(ctx.tableNamePrefix).toBe("override_");
+      // Other context still tracks the configured value.
+      const { ctx: ctx2 } = freshContext();
+      expect(ctx2.tableNamePrefix).toBe("ctxpre_");
+    } finally {
+      Base.tableNamePrefix = savedPrefix;
+      Base.tableNameSuffix = savedSuffix;
+    }
+  });
+
   it("decimal scale without precision should raise", () => {
     const td = new TableDefinition("products");
     expect(() => {

@@ -1511,8 +1511,31 @@ export class MigrationContext {
       include?: string[];
     }[]
   >();
-  tableNamePrefix = "";
-  tableNameSuffix = "";
+  private _tableNamePrefix: string | null = null;
+  private _tableNameSuffix: string | null = null;
+
+  /**
+   * Effective table-name prefix. Defaults to `Migration.tableNameOptions().tableNamePrefix`
+   * (i.e. the configured `ActiveRecord::Base.table_name_prefix` value) when no explicit
+   * value has been assigned to this context. Mirrors Rails, where `MigrationContext`
+   * does not carry its own prefix and reads from the active record config at use time.
+   */
+  get tableNamePrefix(): string {
+    return this._tableNamePrefix ?? Migration.tableNameOptions().tableNamePrefix;
+  }
+  set tableNamePrefix(value: string) {
+    this._tableNamePrefix = value;
+  }
+
+  /**
+   * Effective table-name suffix. Symmetric with {@link tableNamePrefix}.
+   */
+  get tableNameSuffix(): string {
+    return this._tableNameSuffix ?? Migration.tableNameOptions().tableNameSuffix;
+  }
+  set tableNameSuffix(value: string) {
+    this._tableNameSuffix = value;
+  }
 
   constructor(private adapter: DatabaseAdapter) {}
 
