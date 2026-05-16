@@ -194,6 +194,7 @@ export {
   extractKeys,
   toParam,
   toQuery,
+  isPlainObject,
   compact,
   compactBlankObj,
 } from "./hash-utils.js";

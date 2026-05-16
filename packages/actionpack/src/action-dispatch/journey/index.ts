@@ -28,3 +28,10 @@ export {
   type RouteOptions,
 } from "./route.js";
 export { Routes, type Mapping } from "./routes.js";
+export {
+  Formatter,
+  RouteWithParams,
+  MissingRoute,
+  UrlGenerationError,
+  type FormatterHost,
+} from "./formatter.js";
