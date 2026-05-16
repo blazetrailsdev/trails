@@ -891,10 +891,14 @@ function normalizeConfigurations(klass: typeof Base): DatabaseConfigurations {
   const rawConfigs = (klass as any).configurations;
   if (rawConfigs instanceof DatabaseConfigurations) return rawConfigs;
   if (rawConfigs && typeof rawConfigs === "object") {
-    return DatabaseConfigurations.fromEnv(
-      (rawConfigs as { toH?: () => RawConfigurations }).toH?.() ??
-        (rawConfigs as RawConfigurations),
-    );
+    // Guard the `toH` call: raw config maps can carry arbitrary top-level
+    // keys, so a non-function `toH` entry is real config data — not a
+    // hash-like accessor to unwrap. Mirrors the same guard used elsewhere
+    // (see lines around 623 and `test-databases.ts`).
+    const toH = (rawConfigs as { toH?: unknown }).toH;
+    const raw =
+      typeof toH === "function" ? (toH.call(rawConfigs) as RawConfigurations) : rawConfigs;
+    return DatabaseConfigurations.fromEnv(raw as RawConfigurations);
   }
   return DatabaseConfigurations.fromEnv({});
 }

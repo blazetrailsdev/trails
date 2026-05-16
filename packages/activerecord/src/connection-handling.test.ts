@@ -605,7 +605,22 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
 });
 
 describe("resolveConfigForConnection / connectsTo with unset configurations", () => {
-  afterEach(() => {
+  let prevCurrentConfigs: unknown;
+  let prevBaseConfigs: unknown;
+
+  beforeEach(async () => {
+    const { DatabaseConfigurations } = await import("./database-configurations.js");
+    prevCurrentConfigs = (DatabaseConfigurations as any).current;
+    prevBaseConfigs = (Base as any).configurations;
+  });
+
+  afterEach(async () => {
+    const { DatabaseConfigurations } = await import("./database-configurations.js");
+    // fromEnv({}) mutates DatabaseConfigurations.current (the primary-config
+    // registry HashConfig#isPrimary consults), so save and restore it here
+    // — clearing connections alone leaves a stale primary registry behind.
+    (DatabaseConfigurations as any).current = prevCurrentConfigs;
+    (Base as any).configurations = prevBaseConfigs;
     Base.connectionHandler.clearAllConnectionsBang();
     delete (Base as any)._connectionSpecificationName;
   });
