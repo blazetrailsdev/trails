@@ -330,7 +330,18 @@ export class InsertAll {
     // AbstractAdapter#supports_insert_conflict_target? returning false, so a
     // wrapper adapter that forgets to delegate doesn't silently fall through
     // and emit a bogus conflict target.
-    const conn = this.connection as { supportsInsertConflictTarget?: () => boolean };
+    const conn = this.connection as {
+      supportsInsertConflictTarget?: () => boolean;
+      getDatabaseVersion?: () => Promise<unknown>;
+    };
+    // PG's supports_insert_conflict_target reads databaseVersion via a sync
+    // getter that throws until getDatabaseVersion() has populated the cache.
+    // Cold upsertAll(..., { uniqueBy }) would trip that before uniqueIndexes
+    // ran, so prime the version here when the adapter advertises the async
+    // initializer (mirroring how AbstractAdapter#prepareCoercedClass uses it).
+    if (typeof conn.getDatabaseVersion === "function") {
+      await conn.getDatabaseVersion();
+    }
     const supports =
       typeof conn.supportsInsertConflictTarget === "function"
         ? conn.supportsInsertConflictTarget()
