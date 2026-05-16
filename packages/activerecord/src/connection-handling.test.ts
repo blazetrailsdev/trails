@@ -643,5 +643,39 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
       /`missing_env` database is not configured/,
     );
+    // Pin the available-configurations hint — regressions in the hint
+    // wording shouldn't slip through.
+    expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
+      /Available database configurations are:/,
+    );
+  });
+
+  it("connectsTo plants _connectionSpecificationName (primary class normalizes to 'Base')", async () => {
+    const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
+    class AppRecord extends Base {}
+    class SecondaryAbstract extends Base {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    try {
+      __resetPrimaryAbstractClass();
+      primaryAbstractClass(AppRecord);
+      (AppRecord as any).configurations = {
+        development: { primary: { adapter: "sqlite3", database: ":memory:" } },
+      };
+      (SecondaryAbstract as any).configurations = (AppRecord as any).configurations;
+
+      // Exercises the public connectsTo path so the
+      // resolveConfigForConnection side effect (planting
+      // _connectionSpecificationName) is covered end-to-end.
+      AppRecord.connectsTo({ database: { writing: "primary" } });
+      expect((AppRecord as any)._connectionSpecificationName).toBe("Base");
+
+      SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
+      expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");
+    } finally {
+      __resetPrimaryAbstractClass();
+    }
   });
 });
