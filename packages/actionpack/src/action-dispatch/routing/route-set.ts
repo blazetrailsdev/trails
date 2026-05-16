@@ -13,6 +13,12 @@ import { bodyFromString } from "@blazetrails/rack";
 import { Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
+import {
+  buildJourneyRouter,
+  journeyRecognize as recognizeViaJourney,
+  type JourneyMatch,
+} from "./journey-bridge.js";
+import type { Router as JourneyRouter } from "../journey/router.js";
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -28,6 +34,8 @@ export class RouteSet {
   private namedRoutes: Map<string, Route> = new Map();
   private dispatcher: Dispatcher | undefined;
   private defaultUrlOptions: { host?: string } = {};
+  /** @internal */
+  private _journeyRouter: JourneyRouter | null = null;
 
   /**
    * Draw routes using the Mapper DSL. Can be called multiple times;
@@ -43,6 +51,24 @@ export class RouteSet {
         this.namedRoutes.set(route.name, route);
       }
     }
+    this._journeyRouter = null;
+  }
+
+  /**
+   * Lazily-built `Journey::Router` mirroring the current route table.
+   * Wave 7 wire-up seam — exercises Journey end-to-end while keeping
+   * the legacy matcher as the default for `recognize()`.
+   */
+  get journeyRouter(): JourneyRouter {
+    if (!this._journeyRouter) {
+      this._journeyRouter = buildJourneyRouter(this.routes);
+    }
+    return this._journeyRouter;
+  }
+
+  /** Route lookup via the Journey-backed router. */
+  journeyRecognize(method: string, path: string): JourneyMatch | null {
+    return recognizeViaJourney(this.journeyRouter, method, path);
   }
 
   /**
@@ -108,6 +134,7 @@ export class RouteSet {
   clear(): void {
     this.routes = [];
     this.namedRoutes.clear();
+    this._journeyRouter = null;
   }
 
   /**
