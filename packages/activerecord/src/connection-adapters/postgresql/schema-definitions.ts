@@ -10,6 +10,7 @@
 
 import { NotImplementedError } from "../../errors.js";
 import {
+  AddColumnDefinition,
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
   Table as AbstractTable,
@@ -598,6 +599,20 @@ export class AlterTable extends AbstractAlterTable {
   constructor(td: TableDefinition) {
     super(td.tableName);
     this._td = td;
+  }
+
+  /**
+   * Rails' `AlterTable#add_column` routes through `@td.new_column_definition`,
+   * which on PG strips `type: :virtual` to its underlying `options[:type]`.
+   * The abstract trails impl bypasses the TableDefinition; override here so
+   * `t.virtual(...)` inside `change_table` resolves correctly.
+   */
+  override addColumn(
+    name: string,
+    type: Parameters<TableDefinition["newColumnDefinition"]>[1],
+    options: Parameters<TableDefinition["newColumnDefinition"]>[2] = {},
+  ): void {
+    this.adds.push(new AddColumnDefinition(this._td.newColumnDefinition(name, type, options)));
   }
 
   validateConstraint(name: string): void {

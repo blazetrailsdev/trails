@@ -526,6 +526,15 @@ export interface DatabaseAdapter {
   supportsIndexesInCreate?(): boolean;
 
   /**
+   * Whether the adapter supports `datetime` columns with sub-second precision.
+   * True for PostgreSQL, modern MySQL/MariaDB, and SQLite >= 3. Used by
+   * `buildAddColumnDefinition` to default `precision: 6` when none is given.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_datetime_with_precision?
+   */
+  supportsDatetimeWithPrecision?(): boolean;
+
+  /**
    * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.
    * True for PostgreSQL and SQLite >= 3.24. MySQL's ON DUPLICATE KEY UPDATE
    * has no conflict-target syntax, so this stays false there (matching Rails).

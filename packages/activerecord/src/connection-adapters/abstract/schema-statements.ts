@@ -1098,18 +1098,24 @@ export class SchemaStatements {
     const { ifNotExists: _, ...colOpts } = options;
     // Mirrors abstract/schema_statements.rb#build_add_column_definition:
     // default datetime precision to 6 when the adapter supports it.
-    const supportsDtPrecision = (
-      this.adapter as unknown as { supportsDatetimeWithPrecision?: () => boolean }
-    ).supportsDatetimeWithPrecision;
     if (
-      typeof supportsDtPrecision === "function" &&
-      supportsDtPrecision.call(this.adapter) &&
+      this.adapter.supportsDatetimeWithPrecision?.() &&
       type === "datetime" &&
       colOpts.precision === undefined
     ) {
       colOpts.precision = 6;
     }
-    const at = new AlterTable(tableName);
+    // Mirrors Rails' AlterTable(td) construction so PG can normalize
+    // `type: :virtual` → `options[:type]` via `td.new_column_definition`.
+    const createAlterTable = (
+      this.adapter as unknown as {
+        createAlterTable?: (name: string) => AlterTable;
+      }
+    ).createAlterTable;
+    const at =
+      typeof createAlterTable === "function"
+        ? createAlterTable.call(this.adapter, tableName)
+        : new AlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
   }

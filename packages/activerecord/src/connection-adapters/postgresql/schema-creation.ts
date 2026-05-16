@@ -51,6 +51,24 @@ export class SchemaCreation extends AbstractSchemaCreation {
     super("postgres", adapter);
   }
 
+  /**
+   * Rails' `SchemaCreation` delegates `type_to_sql` to `@conn` (the adapter).
+   * Trails' abstract `SchemaCreation` carries its own simplified
+   * implementation, so PG must override to route back to the adapter's
+   * `typeToSql` — otherwise `pgDatetimeConfig.datetimeType` and
+   * `nativeDatabaseTypesOverrides` are bypassed.
+   * @internal
+   */
+  override typeToSql(type: Parameters<AbstractSchemaCreation["typeToSql"]>[0], options = {}) {
+    const adapter = this.adapter as unknown as {
+      typeToSql?: (t: string, o?: Record<string, unknown>) => string;
+    };
+    if (typeof adapter.typeToSql === "function") {
+      return adapter.typeToSql(type as string, options as Record<string, unknown>);
+    }
+    return super.typeToSql(type, options);
+  }
+
   /** @internal */
   protected override visitAlterTable(o: any): string {
     // Pull out FK adds so super doesn't process them — we re-add them below
