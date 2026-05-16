@@ -18,6 +18,7 @@ import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 
 // 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
 // base64, so we pad a known repeating byte to 32 bytes and encode. Shared
@@ -33,8 +34,9 @@ const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
  * block's beforeAll/afterAll; setupBooks() only builds fresh classes
  * and an adapter per test.
  */
-function setupBooks() {
+async function setupBooks() {
   const adapter = createTestAdapter();
+  await defineSchema(adapter, { books: { name: "string" } });
 
   class UnencryptedBook extends Base {
     static {
@@ -92,7 +94,7 @@ function setupBooks() {
 }
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
-  let books: ReturnType<typeof setupBooks>;
+  let books: Awaited<ReturnType<typeof setupBooks>>;
 
   // Snapshot global state up front and restore it after the whole
   // block. Configurable.config and Relation/Base/EncryptedAttributeType
@@ -147,7 +149,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   });
 
   beforeEach(async () => {
-    books = setupBooks();
+    books = await setupBooks();
     // Warm the books table so the first create in each test doesn't race
     // with the test-adapter's regex-recovery schema path on MariaDB,
     // which can otherwise leave the create's INSERT torn from the

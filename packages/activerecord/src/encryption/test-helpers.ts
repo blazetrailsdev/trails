@@ -7,6 +7,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -130,10 +131,60 @@ export function configureEncryption(
   }
 }
 
+export const AUTHOR_NAME_LIMIT = 100;
+
 // ─── Test adapter factory ─────────────────────────────────────────────────────
 
-export function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+/**
+ * Tables used by the makeEncrypted* factories below. Defined once so every
+ * encryption test gets the same shared schema after a single
+ * `installEncryptionSchema(adapter)` call — no per-file duplication.
+ *
+ * Table names are the AR inflection of each fixture class
+ * (e.g. EncryptedBook → encrypted_books). Columns mirror the
+ * `this.attribute(...)` calls in each factory; `id` is added by
+ * defineSchema's default primary key.
+ */
+const ENCRYPTION_SCHEMA: Schema = {
+  // Columns that hold encrypted ciphertext are declared with limit 1024
+  // (Rails uses `t.string :name, limit: 1024` on the shared encrypted_books
+  // fixture). Default VARCHAR(255) truncates the JSON-wrapped, base64'd
+  // ciphertext on MySQL/MariaDB.
+  encrypted_posts: {
+    title: { type: "string", limit: 1024 },
+    body: { type: "string", limit: 1024 },
+  },
+  encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
+  encrypted_book_with_downcase_names: { name: { type: "string", limit: 1024 } },
+  encrypted_book_ignore_cases: {
+    name: { type: "string", limit: 1024 },
+    original_name: { type: "string", limit: 1024 },
+  },
+  // EncryptedAuthor enforces AUTHOR_NAME_LIMIT at the AR attribute layer
+  // (plaintext); the column itself needs room for ciphertext.
+  encrypted_authors: { name: { type: "string", limit: 1024 } },
+  encrypted_book_with_custom_compressors: { name: { type: "string", limit: 1024 } },
+  book_that_will_fail_to_encrypt_names: { name: { type: "string", limit: 1024 } },
+  encrypted_traffic_light_with_store_states: { state: "text" },
+  // Encrypted binary payloads (ciphertext + IV + auth tag, JSON-wrapped and
+  // base64-encoded) exceed VARCHAR(255) — defineSchema maps `binary` →
+  // VARCHAR on MySQL, which truncates. Rails' fixture schema uses a single
+  // shared `encrypted_books` table with `t.binary :logo` (= BLOB on MySQL);
+  // we approximate with `text` to give MariaDB enough room.
+  encrypted_book_with_binaries: { logo: "text" },
+  encrypted_book_with_serialized_first_binaries: { logo: "text" },
+  encrypted_book_with_serialized_second_binaries: { logo: "text" },
+  encrypted_book_with_binary_message_pack_serializeds: { logo: "text" },
+};
+
+export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
+  await defineSchema(adapter, ENCRYPTION_SCHEMA);
+}
+
+export async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await installEncryptionSchema(adapter);
+  return adapter;
 }
 
 // ─── Model factories ──────────────────────────────────────────────────────────
@@ -146,10 +197,17 @@ export function freshAdapter(): DatabaseAdapter {
  */
 let _freshModelCounter = 0;
 
-export function makeFreshModel(adapter: DatabaseAdapter, attributes: Record<string, string>): any {
-  // Each call gets a unique table name via the counter. The class itself is
-  // anonymous (no unique class name), which is fine for test isolation.
+export async function makeFreshModel(
+  adapter: DatabaseAdapter,
+  attributes: Record<string, string>,
+): Promise<any> {
   const tableName = `fresh_model_${++_freshModelCounter}`;
+  const columns: Schema[string] = {};
+  for (const [name, type] of Object.entries(attributes)) {
+    if (name === "id") continue; // defineSchema adds id implicitly
+    (columns as Record<string, string>)[name] = type;
+  }
+  await defineSchema(adapter, { [tableName]: columns } as Schema);
   const klass = class extends Base {
     static {
       this._tableName = tableName;
@@ -216,8 +274,6 @@ export function makeEncryptedBookIgnoreCase(adapter: DatabaseAdapter) {
     }
   } as any;
 }
-
-export const AUTHOR_NAME_LIMIT = 100;
 
 export function makeEncryptedAuthor(adapter: DatabaseAdapter) {
   return class EncryptedAuthor extends Base {
