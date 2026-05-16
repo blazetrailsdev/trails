@@ -159,12 +159,21 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     const records = await super.toArray();
     const owner = this._association.owner;
     const reflection = this._association.reflection;
-    const inverseOf = reflection.options.inverseOf;
+    // Resolve the inverse association name via the registered Reflection,
+    // so automatic inverse_of (no explicit option) wires the parent onto
+    // each loaded child — mirrors `set_inverse_instance_from_queries`.
+    const ownerCtor = owner.constructor as typeof import("./base.js").Base;
+    const resolvedRefl = ownerCtor._reflectOnAssociation?.(reflection.name);
+    const inverseName: string | null =
+      resolvedRefl?.inverseName?.() ??
+      (reflection.options.inverseOf && !reflection.options.polymorphic
+        ? (reflection.options.inverseOf as string)
+        : null);
 
-    if (inverseOf && !reflection.options.polymorphic) {
+    if (inverseName) {
       for (const r of records) {
         const cache = ((r as any)._cachedAssociations ??= new Map());
-        cache.set(inverseOf, owner);
+        cache.set(inverseName, owner);
       }
     }
 
