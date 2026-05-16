@@ -430,6 +430,78 @@ describe("GlobalLocatorTest", () => {
   });
 });
 
+// ─── ScopedRecordLocatingTest ──────────────────────────────────────────────
+//
+// Mirrors vendor/globalid/test/cases/global_locator_test.rb#ScopedRecordLocatingTest.
+// Rails fixture `Person::Scoped` has `find` gated by an `unscoped { ... }`
+// block — only callable inside the block. Exercises `UnscopedLocator`'s
+// `klass.unscoped(block)` wrap.
+
+class PersonScoped extends Person {
+  static _findAllowed = false;
+  static async unscoped<R>(block: () => R | Promise<R>): Promise<R> {
+    PersonScoped._findAllowed = true;
+    try {
+      return await block();
+    } finally {
+      PersonScoped._findAllowed = false;
+    }
+  }
+  // When the gating flag is off, Rails' `Person::Scoped.find` returns nil
+  // (via `super if @find_allowed`). The signature widens to `| null` only
+  // at the call site (cast) since the base `Person.find` type is fixed.
+  static override async find(id: unknown): Promise<PersonScoped | PersonScoped[]> {
+    if (!PersonScoped._findAllowed) {
+      return (Array.isArray(id) ? [] : null) as unknown as PersonScoped;
+    }
+    return super.find(id) as Promise<PersonScoped | PersonScoped[]>;
+  }
+}
+
+describe("ScopedRecordLocatingTest", () => {
+  let gid: GlobalID;
+
+  beforeEach(() => {
+    setApp(TEST_APP);
+    setModelFinder((name) =>
+      name === "PersonScoped"
+        ? (PersonScoped as unknown as LocatorModel)
+        : name === "Person"
+          ? (Person as unknown as LocatorModel)
+          : undefined,
+    );
+    gid = GlobalID.create(new PersonScoped("1"));
+  });
+  afterEach(() => {
+    _resetApp();
+    _resetModelFinder();
+    PersonScoped._findAllowed = false;
+  });
+
+  it("by GID with scoped record", async () => {
+    const found = (await Locator.locate(gid)) as PersonScoped;
+    expect(found).toBeInstanceOf(PersonScoped);
+    expect(found.id).toBe(gid.modelId);
+  });
+
+  it("by many with scoped records", async () => {
+    const gids = [GlobalID.create(new PersonScoped("1")), GlobalID.create(new PersonScoped("2"))];
+    const found = (await Locator.locateMany(gids)) as PersonScoped[];
+    expect(found).toHaveLength(2);
+    expect(found.every((r) => r instanceof PersonScoped)).toBe(true);
+    expect(found.map((r) => r.id)).toEqual(["1", "2"]);
+  });
+
+  it("by many with scoped and unscoped records", async () => {
+    const gids = [GlobalID.create(new PersonScoped("1")), GlobalID.create(new Person("2"))];
+    const found = (await Locator.locateMany(gids)) as Person[];
+    expect(found).toHaveLength(2);
+    expect(found[0]).toBeInstanceOf(PersonScoped);
+    expect(found[1]).toBeInstanceOf(Person);
+    expect(found.map((r) => r.id)).toEqual(["1", "2"]);
+  });
+});
+
 // ─── Non-Rails coverage (regressions / edge cases not in Rails suite) ──────
 
 describe("Locator (non-Rails coverage)", () => {
