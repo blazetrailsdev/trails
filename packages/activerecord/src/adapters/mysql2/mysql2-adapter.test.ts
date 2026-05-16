@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/mysql2/mysql2_adapter_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysql,
   Mysql2Adapter,
@@ -377,12 +377,20 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", () => {
-      // Mirrors Mysql2Adapter#translate_exception's ConnectionError branch.
-      const driverErr = Object.assign(new Error("MySQL client is not connected"), {
+      // Mirrors Mysql2Adapter#translate_exception's ConnectionError branch
+      // AND AbstractMysqlAdapter#translate_exception's `when nil` branch
+      // (the latter is reached for a plain Error without any driver code,
+      // covering callers that don't go through the Mysql2Adapter override).
+      const codedErr = Object.assign(new Error("MySQL client is not connected"), {
         code: "PROTOCOL_CONNECTION_LOST",
       });
-      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
-      expect(translated).toBeInstanceOf(ConnectionNotEstablished);
+      expect(adapter.translateException(codedErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+        ConnectionNotEstablished,
+      );
+      const plainErr = new Error("MySQL client is not connected");
+      expect(adapter.translateException(plainErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+        ConnectionNotEstablished,
+      );
     });
 
     it("translates node-mysql2 connection codes to ConnectionFailed", () => {
@@ -412,6 +420,14 @@ describeIfMysql("Mysql2Adapter", () => {
       await withTimezoneConfig({ default: "local" }, async () => {
         await adapter.execute("SELECT 1");
         expect(adapter.databaseTimezone).toBe("local");
+        // execQuery and executeMutation are also on the perform-query path
+        // and must re-sync — guard against accidental removal.
+        adapter.databaseTimezone = "utc";
+        await adapter.execQuery("SELECT 1");
+        expect(adapter.databaseTimezone).toBe("local");
+        adapter.databaseTimezone = "utc";
+        await adapter.executeMutation("DO 1");
+        expect(adapter.databaseTimezone).toBe("local");
       });
       await adapter.execute("SELECT 1");
       expect(adapter.databaseTimezone).toBe("utc");
@@ -430,6 +446,7 @@ describeIfMysql("Mysql2Adapter", () => {
         );
         await adapter.executeMutation(`SET SESSION sql_mode=''`);
         await adapter.executeMutation(`INSERT INTO warn_posts (title) VALUES ('Title')`);
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         await withDbWarningsAction("log", async () => {
           // `id > (0+'foo')` triggers a "Truncated incorrect DOUBLE value" warning;
           // under db_warnings_action=:log that warning is logged, not raised, and
@@ -439,6 +456,7 @@ describeIfMysql("Mysql2Adapter", () => {
           );
           expect(affected).toBe(1);
         });
+        warnSpy.mockRestore();
       } finally {
         await adapter.rollback().catch(() => {});
         await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`).catch(() => {});
@@ -455,12 +473,14 @@ describeIfMysql("Mysql2Adapter", () => {
         );
         await adapter.executeMutation(`SET SESSION sql_mode=''`);
         await adapter.executeMutation(`INSERT INTO warn_posts_d (title) VALUES ('Title')`);
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
         await withDbWarningsAction("log", async () => {
           const affected = await adapter.executeMutation(
             `DELETE FROM warn_posts_d WHERE id > (0+'foo') LIMIT 1`,
           );
           expect(affected).toBe(1);
         });
+        warnSpy.mockRestore();
       } finally {
         await adapter.rollback().catch(() => {});
         await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`).catch(() => {});
