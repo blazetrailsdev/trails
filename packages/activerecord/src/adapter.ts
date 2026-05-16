@@ -273,6 +273,19 @@ export interface DatabaseAdapter {
   readonly schemaCache?: SchemaCache;
 
   /**
+   * Pool-bound schema cache reflection. Returns a one-arg `indexes(tableName)`
+   * form so call sites don't need to know about the connection pool. On
+   * pool-backed adapters this delegates to the pool's BoundSchemaReflection;
+   * on standalone adapters it wraps the adapter as a fake pool.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#schema_cache
+   * (Rails' raw schema_cache already exposes a one-arg `indexes(tableName)`;
+   * our TS port splits the cache from the bound handle, so this getter is
+   * the Rails-shaped surface for call sites that just want to look things up.)
+   */
+  readonly schemaCacheBound?: import("./connection-adapters/schema-cache.js").BoundSchemaReflection;
+
+  /**
    * Returns the SchemaStatements wrapper that pairs with this adapter.
    * Adapter subclasses override this to return a dialect-specific subclass
    * (e.g. PostgreSQLSchemaStatements). Used by Migration.schema and
@@ -511,6 +524,15 @@ export interface DatabaseAdapter {
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_indexes_in_create?
    */
   supportsIndexesInCreate?(): boolean;
+
+  /**
+   * Whether the adapter supports a conflict target in INSERT...ON CONFLICT.
+   * True for PostgreSQL and SQLite >= 3.24. MySQL's ON DUPLICATE KEY UPDATE
+   * has no conflict-target syntax, so this stays false there (matching Rails).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#supports_insert_conflict_target?
+   */
+  supportsInsertConflictTarget?(): boolean;
 
   /**
    * Set or clear the comment on a table after it has been created.

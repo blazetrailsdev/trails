@@ -2,10 +2,17 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { adapterType, createTestAdapter } from "./test-adapter.js";
+
+// Rails' insert_all_test.rb skips uniqueBy-dependent tests via
+// `skip unless supports_insert_conflict_target?`. MySQL's ON DUPLICATE KEY
+// UPDATE has no conflict-target syntax, so InsertAll raises when uniqueBy
+// is given — mirror Rails by skipping those tests on MySQL here.
+const supportsConflictTarget = adapterType !== "mysql";
+const itIfConflictTarget = supportsConflictTarget ? it : it.skip;
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
@@ -186,9 +193,21 @@ describe("InsertAllTest", () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Existing", author: "Author" });
-    await Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" });
-    const found = await Book.find(b.id);
-    expect(found.title).toBe("Updated");
+    // Read from adapterType, not adapter.supportsInsertConflictTarget(): PG's
+    // implementation reads databaseVersion synchronously, which throws before
+    // the first connection has populated the version cache.
+    if (supportsConflictTarget) {
+      await Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" });
+      const found = await Book.find(b.id);
+      expect(found.title).toBe("Updated");
+    } else {
+      // Rails parity: insert_all.rb#find_unique_index_for raises ArgumentError
+      // when :unique_by is given to an adapter without conflict-target support
+      // (MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax).
+      await expect(
+        Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" }),
+      ).rejects.toThrow(/does not support :uniqueBy/);
+    }
   });
 
   it.skip("insert all raises on unknown attribute", async () => {
@@ -209,7 +228,7 @@ describe("InsertAllTest", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
     /* needs RETURNING clause support */
   });
-  it("insert all skip duplicates", async () => {
+  itIfConflictTarget("insert all skip duplicates", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Existing", author: "Auth" });
@@ -235,7 +254,7 @@ describe("InsertAllTest", () => {
     const reloaded = await Book.find(b.id);
     expect(reloaded.title).toBe("Updated");
   });
-  it("upsert all with unique by", async () => {
+  itIfConflictTarget("upsert all with unique by", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Original", author: "Auth" });
@@ -521,26 +540,29 @@ describe("InsertAllTest", () => {
   it.skip("insert all and upsert all finds index with inverted unique by columns", () => {
     // BLOCKED: schema — insert_all.rb: inverted uniqueBy column order match
   });
-  it("insert all and upsert all works with composite primary keys when unique by is provided", async () => {
-    const adapter = freshAdapter();
-    class CpkOrder extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-        this.adapter = adapter;
+  itIfConflictTarget(
+    "insert all and upsert all works with composite primary keys when unique by is provided",
+    async () => {
+      const adapter = freshAdapter();
+      class CpkOrder extends Base {
+        static {
+          this.attribute("shop_id", "integer");
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.primaryKey = ["shop_id", "id"];
+          this.adapter = adapter;
+        }
       }
-    }
-    await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
-    await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "second" }], {
-      uniqueBy: ["shop_id", "id"],
-    });
-    const count = await CpkOrder.count();
-    expect(count).toBe(1);
-    const record = (await CpkOrder.find([1, 1])) as CpkOrder;
-    expect(record.name).toBe("second");
-  });
+      await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "first" }]);
+      await CpkOrder.upsertAll([{ shop_id: 1, id: 1, name: "second" }], {
+        uniqueBy: ["shop_id", "id"],
+      });
+      const count = await CpkOrder.count();
+      expect(count).toBe(1);
+      const record = (await CpkOrder.find([1, 1])) as CpkOrder;
+      expect(record.name).toBe("second");
+    },
+  );
   it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {
     const adapter = freshAdapter();
     class CpkOrder extends Base {
@@ -994,28 +1016,77 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 // Regression: upsertAll on returning DBs (cache miss path)
 // ==========================================================================
 describe("InsertAll async uniqueIndexes regression", () => {
-  it("upsertAll with uniqueBy succeeds when schema cache is cold (returning DB scenario)", async () => {
-    const adapter = createTestAdapter();
-    await defineSchema(adapter, { pkgs: { name: "string", sha: "string" } });
-    const ss = new SchemaStatements(adapter);
-    await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
+  itIfConflictTarget(
+    "upsertAll with uniqueBy succeeds when schema cache is cold (returning DB scenario)",
+    async () => {
+      const adapter = createTestAdapter();
+      await defineSchema(adapter, { pkgs: { name: "string", sha: "string" } });
+      const ss = new SchemaStatements(adapter);
+      await ss.addIndex("pkgs", ["sha", "name"], { unique: true, name: "idx_pkgs_sha_name" });
 
-    class Pkg extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("sha", "string");
-        this.adapter = adapter;
-        this._tableName = "pkgs";
+      class Pkg extends Base {
+        static {
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.attribute("sha", "string");
+          this.adapter = adapter;
+          this._tableName = "pkgs";
+        }
       }
-    }
 
-    // Clear the cache to simulate a returning DB where migrateDb skipped createTable.
-    adapter.schemaCache?.clear();
+      // Clear the cache to simulate a returning DB where migrateDb skipped createTable.
+      adapter.schemaCache?.clear();
 
-    // Should succeed — async _uniqueIndexes() fetches from the live DB.
-    await expect(
-      Pkg.upsertAll([{ name: "foo", sha: "abc123" }], { uniqueBy: ["sha", "name"] }),
-    ).resolves.toBeGreaterThanOrEqual(0);
-  });
+      // Should succeed — async _uniqueIndexes() fetches from the live DB.
+      await expect(
+        Pkg.upsertAll([{ name: "foo", sha: "abc123" }], { uniqueBy: ["sha", "name"] }),
+      ).resolves.toBeGreaterThanOrEqual(0);
+    },
+  );
+
+  itIfConflictTarget(
+    "upsertAll with partial unique index emits WHERE in conflict target",
+    async () => {
+      const adapter = createTestAdapter();
+      await defineSchema(adapter, {
+        flags: { key: "string", active: "boolean" },
+      });
+      const ss = new SchemaStatements(adapter);
+      // WHERE "active" works on both SQLite (1=true) and PG (boolean column).
+      // Avoid '"active" = 1' which PG rejects (boolean ≠ integer).
+      await ss.addIndex("flags", ["key"], {
+        unique: true,
+        name: "idx_flags_key_active",
+        where: '"active"',
+      });
+
+      class Flag extends Base {
+        static {
+          this.attribute("id", "integer");
+          this.attribute("key", "string");
+          this.attribute("active", "boolean");
+          this.adapter = adapter;
+          this._tableName = "flags";
+        }
+      }
+
+      // vi.spyOn passes through to the original by default and records calls;
+      // mockRestore in finally guarantees the patched method is restored even
+      // if the upsert throws, so the adapter never leaks a spied method.
+      const spy = vi.spyOn(adapter, "executeMutation");
+      let upsertSql: string | undefined;
+      try {
+        await Flag.upsertAll([{ key: "feature_x", active: true }], { uniqueBy: "key" });
+        upsertSql = spy.mock.calls
+          .map((c) => c[0] as string)
+          .find((s) => s.includes("ON CONFLICT"));
+      } finally {
+        spy.mockRestore();
+      }
+      expect(upsertSql).toBeDefined();
+      // PG normalizes the partial-index predicate when it round-trips
+      // through pg_get_indexdef ("active" → active), so accept either form.
+      expect(upsertSql).toMatch(/ON CONFLICT \("key"\) WHERE "?active"?/);
+    },
+  );
 });
