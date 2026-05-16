@@ -1,5 +1,11 @@
 import { getApp } from "./config.js";
-import { buildGid, parseGid, validateApp, type GidComponents } from "./uri/gid.js";
+import {
+  buildGid,
+  normalizeModelId,
+  parseGid,
+  validateApp,
+  type GidComponents,
+} from "./uri/gid.js";
 
 export interface GlobalIDModel {
   id: unknown;
@@ -47,13 +53,15 @@ export class GlobalID {
       if (v != null) filteredParams[k] = String(v);
     }
     const modelName = model.constructor.name;
-    const uri = buildGid(
+    const params = Object.keys(filteredParams).length ? filteredParams : null;
+    const uri = buildGid(app, modelName, model.id, params);
+    const components: GidComponents = {
       app,
       modelName,
-      model.id,
-      Object.keys(filteredParams).length ? filteredParams : null,
-    );
-    return new GlobalID(uri, parseGid(uri));
+      modelId: normalizeModelId(model.id, modelName),
+      params: params ?? {},
+    };
+    return new GlobalID(uri, components);
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */

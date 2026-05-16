@@ -128,6 +128,35 @@ function parseModelId(raw: string, modelName: string): string | string[] {
   return parts.length === 1 ? parts[0] : parts;
 }
 
+/**
+ * @internal Normalize a raw modelId input (scalar or array) into the
+ * same shape parseGid produces: stringify with `?? ""` (parity with
+ * buildGid), filter empty segments, cap at COMPOSITE_MODEL_ID_MAX_SIZE,
+ * collapse to a single string when arity = 1. Throws MissingModelIdError
+ * when all segments normalize to empty — matches parseGid's check,
+ * since buildGid joins sparse arrays into a `/`-only segment string
+ * which is truthy and slips past its own guard.
+ *
+ * Shared by GlobalID.create and GID.build so their skip-parse paths
+ * agree with the round-trip through parseGid(buildGid(...)).
+ */
+export function normalizeModelId(raw: unknown, modelName: string): string | string[] {
+  // Mirror parseModelId ordering: cap raw segments at
+  // COMPOSITE_MODEL_ID_MAX_SIZE first, then filter empties. Reversing
+  // the order would let a 21st non-empty segment slip past the cap
+  // when preceded by empty/null entries.
+  const parts = (Array.isArray(raw) ? raw : [raw])
+    .slice(0, COMPOSITE_MODEL_ID_MAX_SIZE)
+    .map((p) => String(p ?? ""))
+    .filter((p) => p.length > 0);
+  if (parts.length === 0) {
+    throw new MissingModelIdError(
+      `Unable to create a Global ID for ${modelName} without a model id.`,
+    );
+  }
+  return parts.length === 1 ? parts[0] : parts;
+}
+
 function parseQueryParams(qs: string | undefined): Record<string, string> {
   if (!qs) return {};
   const result: Record<string, string> = {};
@@ -233,17 +262,10 @@ export class GID {
     params?: Record<string, string> | null;
   }): GID {
     const uri = buildGid(args.app, args.modelName, args.modelId, args.params);
-    // Construct components directly from inputs — buildGid already validated
-    // them, so skipping the round-trip through parseGid saves a regex match
-    // + URL decode pass. modelId is normalized to the same shape parseGid
-    // produces: arrays for composite, string for scalar.
-    const modelId = Array.isArray(args.modelId)
-      ? args.modelId.map((p) => String(p))
-      : String(args.modelId ?? "");
     return new GID(uri, {
       app: args.app,
       modelName: args.modelName,
-      modelId,
+      modelId: normalizeModelId(args.modelId, args.modelName),
       params: args.params ?? {},
     });
   }

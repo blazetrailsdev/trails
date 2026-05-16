@@ -22,6 +22,7 @@ import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { Base } from "./base.js";
 import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import { include } from "@blazetrails/activesupport";
@@ -564,6 +565,7 @@ export async function resetTestAdapterState(): Promise<void> {
     _pendingModels.clear();
     _pendingCpk.clear();
     _registeredModelClasses.clear();
+    Base._modelsByName.clear();
     _needsCleanup = false;
   } finally {
     _cleanupPromise = null;

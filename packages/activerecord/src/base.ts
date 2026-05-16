@@ -117,42 +117,13 @@ import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
 } from "@blazetrails/activemodel";
-// Lazy-loaded to avoid pulling node:crypto into browser bundles
-let _sgidModule: typeof import("@blazetrails/globalid/signed-global-id") | null = null;
-let _sgidModulePromise: Promise<typeof import("@blazetrails/globalid/signed-global-id")> | null =
-  null;
-const loadSgid = async () => {
-  if (_sgidModule) return _sgidModule;
-  if (!_sgidModulePromise) {
-    _sgidModulePromise = import("@blazetrails/globalid/signed-global-id")
-      .then((mod) => {
-        _sgidModule = mod;
-        return mod;
-      })
-      .catch((error) => {
-        _sgidModulePromise = null;
-        throw error;
-      });
-  }
-  return _sgidModulePromise;
-};
-let _signedIdModule: typeof import("./signed-id.js") | null = null;
-let _signedIdModulePromise: Promise<typeof import("./signed-id.js")> | null = null;
-const loadSignedId = async () => {
-  if (_signedIdModule) return _signedIdModule;
-  if (!_signedIdModulePromise) {
-    _signedIdModulePromise = import("./signed-id.js")
-      .then((mod) => {
-        _signedIdModule = mod;
-        return mod;
-      })
-      .catch((error) => {
-        _signedIdModulePromise = null;
-        throw error;
-      });
-  }
-  return _signedIdModulePromise;
-};
+import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
+import {
+  signedId as _signedId,
+  signedIdVerifier as _signedIdVerifier,
+  findSigned as _findSigned,
+  findSignedBang as _findSignedBang,
+} from "./signed-id.js";
 import { registerMigrationArConfig } from "./migration.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
@@ -2869,10 +2840,9 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#to_sgid
    */
-  async toSgid(options?: ToSgidOptions): Promise<SignedGlobalIDType> {
-    const [SgidMod, SignedIdModule] = await Promise.all([loadSgid(), loadSignedId()]);
-    const verifier = SignedIdModule.signedIdVerifier(this.constructor as typeof Base);
-    return SgidMod.SignedGlobalID.create(this as GlobalIDModel, { ...options, verifier });
+  toSgid(options?: ToSgidOptions): SignedGlobalIDType {
+    const verifier = _signedIdVerifier(this.constructor as typeof Base);
+    return _SignedGlobalIDCtor.create(this as GlobalIDModel, { ...options, verifier });
   }
 
   /**
@@ -2880,8 +2850,8 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base#to_sgid_param
    */
-  async toSgidParam(options?: Parameters<Base["toSgid"]>[0]): Promise<string> {
-    return (await this.toSgid(options)).toParam();
+  toSgidParam(options?: Parameters<Base["toSgid"]>[0]): string {
+    return this.toSgid(options).toParam();
   }
 
   /** Mirrors: Identification#to_global_id — returns a GlobalID instance. */
@@ -2897,7 +2867,7 @@ export class Base extends Model {
   }
 
   /** Mirrors: Identification#to_signed_global_id — alias of toSgid. */
-  async toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): Promise<SignedGlobalIDType> {
+  toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): SignedGlobalIDType {
     return this.toSgid(options);
   }
 
@@ -2921,8 +2891,7 @@ export class Base extends Model {
     input: string | _SignedGlobalIDType,
     options?: Omit<import("@blazetrails/globalid").LocateSignedOptions, "verifier">,
   ): Promise<unknown | null> {
-    const SignedIdModule = await loadSignedId();
-    const verifier = SignedIdModule.signedIdVerifier(this);
+    const verifier = _signedIdVerifier(this);
     return _Locator.locateSigned(input, { ...options, verifier });
   }
 
@@ -3020,8 +2989,8 @@ export class Base extends Model {
   /**
    * Generate a signed ID for this record using HMAC-SHA256 via MessageVerifier.
    * The purpose parameter scopes the signed ID. expiresIn is in seconds.
-   * Returns a Promise because the signed-id module is lazy-loaded to keep
-   * node:crypto out of browser bundles.
+   * Returns a Promise so callers can use the `await expect(...).rejects`
+   * pattern to assert on missing-secret / invalid-config errors.
    *
    * Mirrors: ActiveRecord::SignedId#signed_id
    */
@@ -3030,8 +2999,7 @@ export class Base extends Model {
     expiresIn?: number;
     expiresAt?: Temporal.Instant;
   }): Promise<string> {
-    const SignedIdModule = await loadSignedId();
-    return SignedIdModule.signedId(this, options);
+    return _signedId(this, options);
   }
 
   /**
@@ -3044,8 +3012,7 @@ export class Base extends Model {
     signedId: string,
     options?: { purpose?: string },
   ): Promise<InstanceType<T> | null> {
-    const SignedIdModule = await loadSignedId();
-    return SignedIdModule.findSigned(this, signedId, options);
+    return _findSigned(this, signedId, options);
   }
 
   /**
@@ -3059,8 +3026,7 @@ export class Base extends Model {
     signedId: string,
     options?: { purpose?: string },
   ): Promise<InstanceType<T>> {
-    const SignedIdModule = await loadSignedId();
-    return SignedIdModule.findSignedBang(this, signedId, options);
+    return _findSignedBang(this, signedId, options);
   }
 
   /**
