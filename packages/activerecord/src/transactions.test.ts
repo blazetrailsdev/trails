@@ -8,6 +8,7 @@ import {
   transaction,
   savepoint,
   Rollback,
+  ReadOnlyRecord,
   afterAllTransactionsCommit,
   Associations,
   registerModel,
@@ -756,12 +757,25 @@ describe("TransactionTest", () => {
     });
     expect(history).toEqual(["rolled_back"]);
   });
-  it.skip("after_commit callback doesnt fire for readonly", () => {
-    // NOT IN RAILS — our addition; no matching Rails test found.
-    // BLOCKED: transactions — unverified behavior
-    // ROOT-CAUSE: undefined behavior for readonly records and commit callbacks;
-    //   Rails does not have a test for this. Needs investigation before implementing.
-    // SCOPE: ~10 LOC test body + implementation verification.
+  it("after_commit callback doesnt fire for readonly", async () => {
+    const log: string[] = [];
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+        this.afterCommit(() => {
+          log.push("committed");
+        });
+      }
+    }
+    const t = await Topic.create({ title: "frozen" });
+    log.length = 0;
+    t.readonlyBang();
+    t.title = "changed";
+    await expect(t.save()).rejects.toThrow(ReadOnlyRecord);
+    expect(log).toEqual([]);
+    await expect(t.destroy()).rejects.toThrow(ReadOnlyRecord);
+    expect(log).toEqual([]);
   });
   it("transaction within transaction", async () => {
     class TxPost extends Base {

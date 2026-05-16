@@ -337,15 +337,6 @@ describe("CallbacksTest", () => {
     expect(log).toContain("initialized");
   });
 
-  it.skip("after_commit_on_create_in_transaction", () => {
-    // BLOCKED: transactions — transaction_callbacks_test.rb: after_commit fires on create inside transaction
-    /* needs transaction + afterCommit on create */
-  });
-  it.skip("after_commit callback doesnt fire for readonly", () => {
-    // BLOCKED: transactions — transaction_callbacks_test.rb: after_commit skipped for readonly records
-    /* needs readonly check in commit callbacks */
-  });
-
   it("new valid?", async () => {
     class CbPost extends Base {
       static {
