@@ -2316,21 +2316,11 @@ describe("MigrationTest", () => {
       expect(rows.length).toBe(1);
     });
 
-    it.skip("changing columns", () => {
-      // BLOCKED: adapter — changeColumn requires ALTER COLUMN TYPE not supported by SQLite
-    });
-
-    it.skip("changing column null with default", () => {
-      // BLOCKED: adapter — changeColumnNull requires ALTER COLUMN ... SET NOT NULL not supported by SQLite
-    });
-
-    it.skip("default functions on columns", () => {
-      // BLOCKED: adapter — gen_random_uuid() / UUID() requires PostgreSQL or MySQL
-    });
-
-    it.skip("updating auto increment", () => {
-      // BLOCKED: adapter — auto_increment is MySQL-only (Mysql2Adapter / TrilogyAdapter)
-    });
+    // "changing columns", "changing column null with default", and "default
+    // functions on columns" live in adapters/postgresql/change-schema.test.ts
+    // (describeIfPg) — they require PostgreSQL.
+    // "updating auto increment" lives in adapters/abstract-mysql-adapter/bulk-alter.test.ts
+    // (describeIfMysql) — it requires MySQL/Trilogy.
 
     it("changing index", async () => {
       // Create table with a non-unique index, then swap to a unique index

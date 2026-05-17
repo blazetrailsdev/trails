@@ -14,10 +14,12 @@ describeIfPg("Migration", () => {
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await adapter.exec("DROP TABLE IF EXISTS strings");
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
     await adapter.exec(`CREATE TABLE strings (id serial primary key, somedate character varying)`);
   });
   afterEach(async () => {
     await adapter.exec("DROP TABLE IF EXISTS strings");
+    await adapter.exec("DROP TABLE IF EXISTS delete_me");
     await adapter.close();
   });
 
@@ -148,6 +150,53 @@ describeIfPg("Migration", () => {
         const col = cols.find((c) => c.name === "somedate");
         expect(col!.type).toBe("datetime");
       });
+    });
+
+    // Bulk-alter tests moved from migration.test.ts BulkAlterTableMigrationsTest.
+    // PG-only because they exercise ALTER COLUMN TYPE / DEFAULT functions
+    // that aren't supported by SQLite.
+    it("changing columns", async () => {
+      await adapter.exec(
+        `CREATE TABLE delete_me (id serial primary key, name varchar, birthdate date)`,
+      );
+      const ss = adapter.schemaStatements();
+      await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime", { comment: "This is a comment" });
+      });
+      const cols = await adapter.columns("delete_me");
+      const name = cols.find((c) => c.name === "name")!;
+      const birthdate = cols.find((c) => c.name === "birthdate")!;
+      expect(String(name.default)).toBe("NONAME");
+      expect(birthdate.type).toBe("datetime");
+    });
+
+    it("changing column null with default", async () => {
+      await adapter.exec(
+        `CREATE TABLE delete_me (id serial primary key, name varchar, age integer, birthdate date)`,
+      );
+      const ss = adapter.schemaStatements();
+      await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime");
+        t.changeNull("age", false, 0);
+      });
+      const cols = await adapter.columns("delete_me");
+      expect(String(cols.find((c) => c.name === "name")!.default)).toBe("NONAME");
+      expect(cols.find((c) => c.name === "birthdate")!.type).toBe("datetime");
+      expect(cols.find((c) => c.name === "age")!.null).toBe(false);
+    });
+
+    it("default functions on columns", async () => {
+      await adapter.exec(`CREATE TABLE delete_me (id serial primary key)`);
+      const ss = adapter.schemaStatements();
+      await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.string("name", { default: () => "gen_random_uuid()" });
+      });
+      const cols = await adapter.columns("delete_me");
+      const name = cols.find((c) => c.name === "name")!;
+      expect(name.default).toBeNull();
+      expect((name as any).defaultFunction).toBe("gen_random_uuid()");
     });
 
     it("change type with array", async () => {

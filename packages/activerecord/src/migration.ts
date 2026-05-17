@@ -556,8 +556,21 @@ export abstract class Migration {
         await this.addUniqueConstraint(rucTable, rucColumn, rucOpts);
         break;
       }
-      default:
-        throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
+      default: {
+        // Delegate unknown commands to CommandRecorder's invert dispatch so
+        // Rails-shape ops like removeColumns/addColumns/changeTable round-
+        // trip. Mirrors Rails: revert { } -> recorder.replay(self) where
+        // replayed cmds are the inverted ones.
+        const { cmd: iCmd, args: iArgs } = this._recorder.inverseOf(cmd, args);
+        const method = (this as unknown as Record<string, (...a: unknown[]) => Promise<void>>)[
+          iCmd
+        ];
+        if (typeof method !== "function") {
+          throw new IrreversibleMigration(`Cannot reverse operation: ${cmd}`);
+        }
+        await method.apply(this, iArgs);
+        break;
+      }
     }
   }
 
@@ -1018,6 +1031,16 @@ export abstract class Migration {
   ): Promise<void> {
     const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
     const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+    if (this._recording) {
+      // Rails: change_table delegates to the CommandRecorder so individual
+      // ops inside the block can be inverted (or batched, in the bulk path).
+      await this._recorder.changeTable(
+        tableName,
+        options as Record<string, unknown>,
+        callback as Parameters<CommandRecorder["changeTable"]>[2],
+      );
+      return;
+    }
     if (options.bulk) {
       // Bulk path mirrors Rails: delegate to SchemaStatements#changeTable which
       // records ops via a Proxy and coalesces into a single ALTER. Apply
@@ -1045,18 +1068,53 @@ export abstract class Migration {
     return this.schema.indexName(this._pt(tableName), options);
   }
 
-  async removeColumns(tableName: string, ...columns: string[]): Promise<void> {
+  async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
+  async removeColumns(
+    tableName: string,
+    ...args: [...string[], { type?: ColumnType; ifExists?: boolean }]
+  ): Promise<void>;
+  async removeColumns(
+    tableName: string,
+    ...columnsOrOptions: Array<string | ({ type?: ColumnType } & Record<string, unknown>)>
+  ): Promise<void> {
+    if (this._recording) {
+      // Record as a single removeColumns op so invertRemoveColumns can flip
+      // it back to addColumns (Rails: CommandRecorder#invert_remove_columns).
+      this._recorder.record("removeColumns", [tableName, ...columnsOrOptions]);
+      return;
+    }
+    const last = columnsOrOptions[columnsOrOptions.length - 1];
+    const hasOpts = typeof last === "object" && last !== null;
+    const opts = (hasOpts ? (columnsOrOptions.pop() as Record<string, unknown>) : {}) as {
+      type?: ColumnType;
+      ifExists?: boolean;
+    };
+    const columns = columnsOrOptions as string[];
     for (const col of columns) {
-      await this.removeColumn(tableName, col);
+      await this.removeColumn(tableName, col, opts.type, { ifExists: opts.ifExists });
     }
   }
 
   async addColumns(
     tableName: string,
-    ...columns: Array<{ name: string; type: ColumnType; options?: ColumnOptions }>
+    ...args: [...string[], { type: ColumnType } & ColumnOptions]
+  ): Promise<void>;
+  async addColumns(
+    tableName: string,
+    ...columnsAndOptions: Array<string | ({ type: ColumnType } & ColumnOptions)>
   ): Promise<void> {
+    if (this._recording) {
+      this._recorder.record("addColumns", [tableName, ...columnsAndOptions]);
+      return;
+    }
+    const last = columnsAndOptions[columnsAndOptions.length - 1];
+    if (typeof last !== "object" || last === null || !("type" in last)) {
+      throw new TypeError("addColumns requires a trailing options hash with a :type entry");
+    }
+    const { type, ...rest } = columnsAndOptions.pop() as { type: ColumnType } & ColumnOptions;
+    const columns = columnsAndOptions as string[];
     for (const col of columns) {
-      await this.addColumn(tableName, col.name, col.type, col.options ?? {});
+      await this.addColumn(tableName, col, type, rest);
     }
   }
 
