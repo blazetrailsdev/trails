@@ -555,18 +555,28 @@ export function applyScopeForCreate(
   const scope = assoc.scopeForCreate();
   if (!scope || Object.keys(scope).length === 0) return;
 
-  const reflection = assoc.reflection as unknown as {
-    foreignKey?: string | string[];
-    type?: string | null;
+  // `assoc.reflection` is the lightweight AssociationDefinition (its `type`
+  // is the macro name — "belongsTo" / etc. — not the polymorphic foreign
+  // type column). Resolve the rich Reflection via `_reflectOnAssociation`
+  // to read Rails-equivalent `foreignKey` / `type` accessors. Fall back to
+  // `options.foreignKey` when the rich reflection isn't installed (e.g.
+  // before macro registration finishes).
+  const ctor = assoc.owner.constructor as typeof Base & {
+    _reflectOnAssociation?: (n: string) => unknown;
   };
-  const fk = reflection.foreignKey;
+  const rich = ctor._reflectOnAssociation?.(assoc.reflection.name) as
+    | { foreignKey?: string | string[]; type?: string | null }
+    | undefined;
+  const fk =
+    rich?.foreignKey ?? (assoc.reflection.options as { foreignKey?: string | string[] }).foreignKey;
+  const foreignType = rich?.type ?? null;
   const skipAssign = new Set<string>();
   if (Array.isArray(fk)) {
     for (const k of fk) if (k) skipAssign.add(String(k));
   } else if (fk) {
     skipAssign.add(String(fk));
   }
-  if (reflection.type) skipAssign.add(String(reflection.type));
+  if (foreignType) skipAssign.add(String(foreignType));
 
   const assigned = new Set<string>(((record as any).changedAttributeNamesToSave ?? []) as string[]);
   if (exceptFromScopeAttributes) {

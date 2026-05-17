@@ -667,11 +667,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     let targetModel = this.model as typeof Base;
 
-    // STI: if a type attribute is provided, resolve to the correct subclass
+    // STI: resolve subclass from the caller-supplied inheritance column,
+    // falling back to a value from scope_for_create (e.g.
+    // `has_many :posts, -> { where(type: "SpecialPost") }`). Rails resolves
+    // the subclass after scope-merge, so peek at scope here before
+    // instantiation; the full scope_for_create filter still runs below.
+    const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol && buildAttrs[inheritanceCol]) {
-      const typeName = buildAttrs[inheritanceCol] as string;
-      targetModel = findStiClass(targetModel, typeName);
+    if (inheritanceCol) {
+      const typeName = (buildAttrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as
+        | string
+        | undefined;
+      if (typeName) targetModel = findStiClass(targetModel, typeName);
     }
 
     const record = new targetModel(buildAttrs);
@@ -682,15 +689,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
     let targetModel = this.model as typeof Base;
 
+    const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol && attrs[inheritanceCol]) {
-      const typeName = attrs[inheritanceCol] as string;
-      targetModel = findStiClass(targetModel, typeName);
+    if (inheritanceCol) {
+      const typeName = (attrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as string | undefined;
+      if (typeName) targetModel = findStiClass(targetModel, typeName);
     }
 
     const record = new targetModel(attrs);
     this._applyScopeForCreate(record, attrs);
     return record;
+  }
+
+  private _scopeForCreateRaw(): Record<string, unknown> {
+    const fn = (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
+      .scopeForCreate;
+    return typeof fn === "function" ? fn.call(this) : {};
   }
 
   // Mirrors Rails' Association#initialize_attributes (association.rb:217):
@@ -701,17 +715,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     exceptFromScope: Record<string, unknown>,
     foreignKey?: string,
   ): void {
-    const sfc =
-      typeof (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
-        .scopeForCreate === "function"
-        ? (this as unknown as { scopeForCreate: () => Record<string, unknown> }).scopeForCreate()
-        : {};
+    const sfc = this._scopeForCreateRaw();
     if (!sfc || Object.keys(sfc).length === 0) return;
 
+    // Rails' skip_assign is [foreign_key, foreign_type] — the polymorphic
+    // type column on belongs_to (Reflection#type returns foreign_type, NOT
+    // the STI inheritance column). For HABTM / has_many we already know
+    // the owner-side FK; the polymorphic "as" foreign-type column is
+    // derived from the macro options when present.
     const skipAssign = new Set<string>();
     if (foreignKey) skipAssign.add(foreignKey);
-    const inheritanceCol = getInheritanceColumn(record.constructor as typeof Base);
-    if (inheritanceCol) skipAssign.add(inheritanceCol);
+    const asName = this._assocDef.options.as;
+    if (asName) skipAssign.add(`${underscore(asName)}_type`);
 
     const assigned = new Set<string>(
       ((record as any).changedAttributeNamesToSave ?? []) as string[],
