@@ -274,8 +274,12 @@ export class BelongsToAssociation extends SingularAssociation {
       const pk = (record.constructor as any).primaryKey;
       if (pk) return Array.isArray(pk) ? pk : [pk];
     }
-    const pk = (this.klass as any).primaryKey;
+    const pk = (this.klass as any)?.primaryKey;
     if (pk) return Array.isArray(pk) ? pk : [pk];
+    // Polymorphic belongs_to: no resolved klass when target is absent —
+    // fall back to the loaded target's class when one is cached.
+    const targetPk = (this.target as any)?.constructor?.primaryKey;
+    if (targetPk) return Array.isArray(targetPk) ? targetPk : [targetPk];
     return ["id"];
   }
 
