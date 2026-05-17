@@ -8,11 +8,25 @@ import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA = {
+  posts: {
+    title: "string",
+    updated_at: "datetime",
+  },
+  users: {
+    name: "string",
+    updated_at: "datetime",
+  },
+} as const;
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -21,8 +35,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("CacheKeyTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("cache_key format is not too precise", async () => {
@@ -126,7 +140,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version is only there when versioning is on", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -142,7 +156,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version is the same when it comes from the DB or from the user", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -164,7 +178,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version does NOT call updated_at when value is from the database", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -182,7 +196,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version does call updated_at when it is assigned via a Time object", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -200,7 +214,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version does call updated_at when it is assigned via a string", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -215,8 +229,8 @@ describe("CacheKeyTest", () => {
     expect(version).toBe("20250101000000000000");
   });
 
-  it("cache_version does call updated_at when it is assigned via a hash", () => {
-    const adapter = freshAdapter();
+  it("cache_version does call updated_at when it is assigned via a hash", async () => {
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -231,8 +245,8 @@ describe("CacheKeyTest", () => {
     expect(typeof version).toBe("string");
   });
 
-  it("updated_at on class but not on instance raises an error", () => {
-    const adapter = freshAdapter();
+  it("updated_at on class but not on instance raises an error", async () => {
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -244,19 +258,20 @@ describe("CacheKeyTest", () => {
     expect(version).toBeNull();
   });
 
-  it("cache key format for new records", () => {
+  it("cache key format for new records", async () => {
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
+    Post.adapter = adp;
     const p = new Post({ title: "new" });
     expect(p.cacheKey()).toBe("posts/new");
   });
 
   it("cache key for timestamp", async () => {
-    const a = freshAdapter();
+    const a = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -271,19 +286,20 @@ describe("CacheKeyTest", () => {
     expect(key).toBe(`posts/${p.id}-20230615120000000000`);
   });
 
-  it("cache version for new records", () => {
+  it("cache version for new records", async () => {
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdapter();
       }
     }
+    Post.adapter = adp;
     const p = new Post({ title: "new" });
     expect(p.cacheVersion()).toBeNull();
   });
 
   it("cache_key has no version when versioning is on", async () => {
-    const a = freshAdapter();
+    const a = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -299,7 +315,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version does not truncate zeros when timestamp ends in zeros", async () => {
-    const a = freshAdapter();
+    const a = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -315,7 +331,7 @@ describe("CacheKeyTest", () => {
   });
 
   it("cache_version calls updated_at when the value is generated at create time", async () => {
-    const a = freshAdapter();
+    const a = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -335,8 +351,8 @@ describe("CacheKeyTest", () => {
 });
 
 describe("cacheKey / cacheKeyWithVersion", () => {
-  it("returns model/new for new records", () => {
-    const adapter = freshAdapter();
+  it("returns model/new for new records", async () => {
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -349,7 +365,7 @@ describe("cacheKey / cacheKeyWithVersion", () => {
   });
 
   it("returns model/id for persisted records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -362,7 +378,7 @@ describe("cacheKey / cacheKeyWithVersion", () => {
   });
 
   it("cacheKeyWithVersion includes updated_at", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -377,7 +393,7 @@ describe("cacheKey / cacheKeyWithVersion", () => {
   });
 
   it("cacheVersion returns timestamp string", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
