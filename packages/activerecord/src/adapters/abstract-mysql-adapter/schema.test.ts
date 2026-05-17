@@ -146,54 +146,62 @@ describeIfMysql("Mysql2Adapter", () => {
       });
     });
   });
+});
 
-  describe("MySQLAnsiQuotesTest", () => {
-    // Build a fresh adapter with sql_mode='ANSI_QUOTES' applied in the pool init SQL
-    // so it persists across every checked-out connection — Rails uses
-    // `execute("SET SESSION sql_mode='ANSI_QUOTES'")` on its single leased connection;
-    // we apply the variable per-connection via the pool init hook (newClient).
-    let ansi: Mysql2Adapter;
-    beforeEach(async () => {
-      ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });
-    });
-    afterEach(async () => {
-      // Rails' teardown calls `@connection.reconnect!` to clear ANSI_QUOTES on
-      // the shared leased connection. We use a dedicated adapter per test, so
-      // close() fully drains the pool and no extra reconnect is needed.
-      await ansi.close();
-    });
+// Top-level suite mirrors Rails: MysqlAnsiQuotesTest is a separate test class
+// (not nested inside SchemaTest's module). Keeping it outside the "Mysql2Adapter"
+// describe also avoids spinning up the SchemaTest adapter pool for ANSI tests.
+describeIfMysql("MySQLAnsiQuotesTest", () => {
+  // Build a fresh adapter with sql_mode='ANSI_QUOTES' applied in the pool init SQL
+  // so it persists across every checked-out connection — Rails uses
+  // `execute("SET SESSION sql_mode='ANSI_QUOTES'")` on its single leased connection;
+  // we apply the variable per-connection via the pool init hook (newClient).
+  let ansi: Mysql2Adapter | undefined;
+  beforeEach(() => {
+    ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });
+  });
+  afterEach(async () => {
+    // Rails' teardown calls `@connection.reconnect!` to clear ANSI_QUOTES on
+    // the shared leased connection. We use a dedicated adapter per test, so
+    // close() fully drains the pool and no extra reconnect is needed.
+    // Optional-chain so a beforeEach construction failure doesn't mask itself
+    // with a secondary TypeError here.
+    await ansi?.close();
+    ansi = undefined;
+  });
 
-    it("primary key method with ansi quotes", async () => {
-      await defineSchema(ansi, { topics: { title: "string" } });
-      try {
-        expect(await ansi.primaryKey("topics")).toBe("id");
-      } finally {
-        await ansi.dropTable("topics", { ifExists: true });
-      }
-    });
+  it("primary key method with ansi quotes", async () => {
+    const a = ansi!;
+    await defineSchema(a, { topics: { title: "string" } });
+    try {
+      expect(await a.primaryKey("topics")).toBe("id");
+    } finally {
+      await a.dropTable("topics", { ifExists: true });
+    }
+  });
 
-    it("foreign keys method with ansi quotes", async () => {
-      // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
-      // bigint student_id referencing students(id). Bigint width matches the
-      // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
-      await defineSchema(ansi, {
-        students: { name: "string" },
-        lessons_students: {
-          columns: { student_id: "big_integer" },
-          primaryKey: false,
-        },
-      });
-      try {
-        await ansi.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
-        const fks = await ansi.foreignKeys("lessons_students");
-        expect(fks).toHaveLength(1);
-        expect(fks[0].fromTable).toBe("lessons_students");
-        expect(fks[0].toTable).toBe("students");
-        expect(fks[0].onDelete).toBe("cascade");
-      } finally {
-        await ansi.dropTable("lessons_students", { ifExists: true });
-        await ansi.dropTable("students", { ifExists: true });
-      }
+  it("foreign keys method with ansi quotes", async () => {
+    const a = ansi!;
+    // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
+    // bigint student_id referencing students(id). Bigint width matches the
+    // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
+    await defineSchema(a, {
+      students: { name: "string" },
+      lessons_students: {
+        columns: { student_id: "big_integer" },
+        primaryKey: false,
+      },
     });
+    try {
+      await a.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
+      const fks = await a.foreignKeys("lessons_students");
+      expect(fks).toHaveLength(1);
+      expect(fks[0].fromTable).toBe("lessons_students");
+      expect(fks[0].toTable).toBe("students");
+      expect(fks[0].onDelete).toBe("cascade");
+    } finally {
+      await a.dropTable("lessons_students", { ifExists: true });
+      await a.dropTable("students", { ifExists: true });
+    }
   });
 });
