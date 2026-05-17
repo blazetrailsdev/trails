@@ -14,10 +14,16 @@ import {
 import type {
   ColumnOptions,
   ColumnType,
+  IdHashOptions,
+  PrimaryKeyType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
 import { quoteIdentifier, quoteTableName } from "./quoting.js";
 import { quoteDefaultExpression } from "../abstract/quoting.js";
+import {
+  SchemaCreation as MysqlSchemaCreation,
+  type VisitorHostAdapter,
+} from "./schema-creation.js";
 
 /**
  * MySQL-specific column type methods mixed into TableDefinition.
@@ -38,27 +44,38 @@ export interface ColumnMethods {
   unsignedDecimal(name: string, options?: ColumnOptions): unknown;
 }
 
-/**
- * @todo `SchemaStatements#createTable` instantiates `AbstractTableDefinition` directly (not this
- *   subclass) via `new TableDefinition(...)`. The MySQL-specific overrides here
- *   (`newColumnDefinition`, `integerLikePrimaryKeyType`, `validColumnDefinitionOptions`) are
- *   exercised by `changeColumn` (see `abstract-mysql-adapter.ts`) but NOT by `createTable`.
- *   Fix: override `createTableDefinition()` in an MySQL-specific SchemaStatements to return
- *   this subclass, mirroring Rails' `MySQL::SchemaStatements#create_table_definition`.
- */
 export class TableDefinition extends AbstractTableDefinition {
+  /** @internal Full adapter when constructed by `createTableDefinition`; consulted by
+   * `toSql()` to build a host-aware MySQL visitor (support flags + MariaDB). */
+  private readonly _mysqlAdapter?: VisitorHostAdapter;
+  /** @internal Lazily-allocated visitor; the host adapter ref is fixed for our lifetime so
+   * one instance is reused across `toSql()` calls. Note: when no host adapter is supplied
+   * (direct `new MysqlTableDefinition(...)` paths in tests), the visitor's `_mariadb` field
+   * defaults to `false` and cannot be flipped through this TD — set it on the visitor
+   * directly if a test needs MariaDB-flavored output. */
+  private _visitor?: MysqlSchemaCreation;
+
   constructor(
     tableName: string,
     options: {
-      id?: boolean | "uuid";
+      id?: boolean | PrimaryKeyType | IdHashOptions;
       charset?: string | null;
       collation?: string | null;
+      primaryKey?: string | string[] | false;
+      temporary?: boolean;
+      ifNotExists?: boolean;
+      as?: string;
+      options?: string;
+      comment?: string;
+      adapter?: VisitorHostAdapter;
+      adapterName?: "sqlite" | "postgres" | "mysql";
     } = {},
   ) {
+    const { adapter, adapterName: _ignoredAdapterName, ...rest } = options;
     super(tableName, {
-      ...options,
-      charset: options.charset ?? undefined,
-      collation: options.collation ?? undefined,
+      ...rest,
+      charset: rest.charset ?? undefined,
+      collation: rest.collation ?? undefined,
       adapterName: "mysql",
       adapter: {
         quoteIdentifier: quoteIdentifier,
@@ -66,6 +83,22 @@ export class TableDefinition extends AbstractTableDefinition {
         quoteDefaultExpression: quoteDefaultExpression,
       },
     });
+    this._mysqlAdapter = adapter;
+  }
+
+  /**
+   * Routes `CREATE TABLE` SQL generation through the MySQL `SchemaCreation`
+   * visitor (Arel-style accept). Doing so makes `options.autoIncrement` and
+   * other column options consistent between `createTable`, `addColumn`, and
+   * `changeColumn` — they all go through {@link SchemaCreation#addColumnOptions}.
+   */
+  override toSql(): string {
+    // Build the visitor directly from the stored host adapter — its support flags and
+    // `isMariadb()` are the only state the visitor consults, and going through
+    // `schemaStatements().schemaCreation` would allocate a fresh `SchemaStatements` per call
+    // on adapters whose `schemaStatements()` isn't memoized (current behavior on Mysql2Adapter).
+    // Memoize the visitor since the host adapter ref is fixed for our lifetime.
+    return (this._visitor ??= new MysqlSchemaCreation(this._mysqlAdapter)).accept(this);
   }
 
   blob(name: string, options: ColumnOptions & { limit?: number } = {}): this {

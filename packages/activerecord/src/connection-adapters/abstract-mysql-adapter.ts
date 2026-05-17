@@ -165,6 +165,25 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     throw new Error(`${this.constructor.name} must implement columns()`);
   }
 
+  /**
+   * Override `SchemaStatements#createTableDefinition` to instantiate the
+   * MySQL-specific {@link MysqlTableDefinition} subclass, so its overrides
+   * (`newColumnDefinition` primary-key rewrite, `integerLikePrimaryKeyType`
+   * → `autoIncrement: true`, `aliasedTypes` identity, MySQL-only options)
+   * apply to `createTable` as well as `changeColumn`.
+   *
+   * Mirrors: `ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#create_table_definition`
+   * @internal
+   */
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
+    // Strip caller-supplied adapter/adapterName (abstract SchemaStatements#createTable forwards
+    // a bare SchemaQuoter shape) and substitute `this` — the full MySQL adapter — so the
+    // TableDefinition's `toSql()` can build a host-aware visitor. Matches the PG sibling
+    // (postgresql-adapter.ts) so the dispatch is symmetric across dialects.
+    const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
+    return new MysqlTableDefinition(name, { ...rest, adapter: this });
+  }
+
   protected _mariadb = false;
   protected _databaseVersion: Version | null = null;
   // Rails' `statement_limit` database.yml key — max prepared

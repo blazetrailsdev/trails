@@ -9,6 +9,7 @@ import {
   ColumnDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
+import { TableDefinition as MyTd } from "./schema-definitions.js";
 
 describe("MySQL::SchemaCreation", () => {
   const sc = new SchemaCreation();
@@ -136,5 +137,98 @@ describe("MySQL::SchemaCreation", () => {
     const col = new ColumnDefinition("updated_at", "datetime", {});
     const result = sc.addColumnOptions("`updated_at` datetime", col.options);
     expect(result).not.toContain("ON UPDATE");
+  });
+});
+
+describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
+  it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", () => {
+    const td = new MyTd("users", {});
+    td.string("name");
+    expect(td.toSql()).toBe(
+      "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
+    );
+  });
+
+  it("honors id: false (no primary key column)", () => {
+    const td = new MyTd("logs", { id: false });
+    td.string("body");
+    expect(td.toSql()).toBe("CREATE TABLE `logs` (`body` varchar(255))");
+  });
+
+  it("appends DEFAULT CHARSET and COLLATE from table options", () => {
+    const td = new MyTd("posts", { charset: "utf8mb4", collation: "utf8mb4_unicode_ci" });
+    td.string("title");
+    const sql = td.toSql();
+    expect(sql).toContain("DEFAULT CHARSET=utf8mb4");
+    expect(sql).toContain("COLLATE=utf8mb4_unicode_ci");
+  });
+
+  it("emits IF NOT EXISTS and TEMPORARY modifiers", () => {
+    const td = new MyTd("tmp", { id: false, temporary: true, ifNotExists: true });
+    td.integer("n");
+    expect(td.toSql()).toBe("CREATE TEMPORARY TABLE IF NOT EXISTS `tmp` (`n` int)");
+  });
+
+  it("emits composite PRIMARY KEY clause", () => {
+    const td = new MyTd("memberships", { primaryKey: ["user_id", "group_id"] });
+    td.bigint("user_id", { null: false });
+    td.bigint("group_id", { null: false });
+    const sql = td.toSql();
+    expect(sql).toContain("PRIMARY KEY (`user_id`, `group_id`)");
+  });
+
+  it("inlines indexes when supportsIndexesInCreate (MySQL)", () => {
+    const td = new MyTd("users", {});
+    td.string("email");
+    td.index(["email"], { unique: true, name: "idx_users_email" });
+    const sql = td.toSql();
+    expect(sql).toContain("UNIQUE INDEX `idx_users_email` (`email`)");
+  });
+
+  it("inlines FOREIGN KEY constraints", () => {
+    const td = new MyTd("posts", {});
+    td.bigint("author_id");
+    td.foreignKey("authors", { column: "author_id" });
+    const sql = td.toSql();
+    expect(sql).toContain("CONSTRAINT ");
+    expect(sql).toContain("FOREIGN KEY (`author_id`) REFERENCES `authors` (`id`)");
+  });
+
+  it("inlines CHECK constraints", () => {
+    const td = new MyTd("products", {});
+    td.integer("price");
+    td.checkConstraint("price > 0", { name: "price_positive" });
+    const sql = td.toSql();
+    expect(sql).toContain("CONSTRAINT `price_positive` CHECK (price > 0)");
+  });
+
+  it("appends MySQL COMMENT on table option", () => {
+    const td = new MyTd("notes", { comment: "user-supplied" });
+    td.string("body");
+    expect(td.toSql()).toContain("COMMENT 'user-supplied'");
+  });
+
+  it("emits AS clause after table options for CTAS", () => {
+    const td = new MyTd("snapshot", { id: false, as: "SELECT 1" });
+    expect(td.toSql()).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
+  });
+
+  it("skips FK emission when host adapter has foreignKeys disabled", () => {
+    const host = {
+      supportsForeignKeys: () => true,
+      config: { foreignKeys: false },
+    };
+    const td = new MyTd("posts", { adapter: host });
+    td.bigint("author_id");
+    td.foreignKey("authors", { column: "author_id" });
+    expect(td.toSql()).not.toContain("FOREIGN KEY");
+  });
+
+  it("skips CHECK emission when host adapter reports !supportsCheckConstraints", () => {
+    const host = { supportsCheckConstraints: () => false };
+    const td = new MyTd("products", { adapter: host });
+    td.integer("price");
+    td.checkConstraint("price > 0", { name: "p_pos" });
+    expect(td.toSql()).not.toContain("CHECK");
   });
 });

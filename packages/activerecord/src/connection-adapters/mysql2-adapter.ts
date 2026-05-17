@@ -43,7 +43,7 @@ import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.j
 class MysqlSchemaStatements extends SchemaStatements {
   private _mysqlSchemaCreation?: MysqlSchemaCreation;
   override get schemaCreation(): MysqlSchemaCreation {
-    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation());
+    return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this.adapter));
   }
 
   /**

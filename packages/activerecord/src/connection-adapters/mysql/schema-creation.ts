@@ -49,16 +49,43 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
+/** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches. */
+export interface VisitorHostAdapter {
+  supportsCheckConstraints?(): boolean;
+  supportsForeignKeys?(): boolean;
+  supportsIndexesInCreate?(): boolean;
+  isMariadb?(): boolean;
+  /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
+  config?: { foreignKeys?: boolean };
+}
+
+/** @internal Shared identifier guard for MySQL bare-identifier emission (charset/collation). */
+export function assertSafeMysqlIdentifier(value: string, kind: string): void {
+  if (!/^[A-Za-z0-9_]+$/.test(value)) {
+    throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
+  }
+}
+
 export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal Whether this is a MariaDB connection. */
   protected _mariadb = false;
+  /** @internal Optional adapter ref so `supports*` helpers mirror Rails' `@conn`-delegated flags. */
+  protected _hostAdapter?: VisitorHostAdapter;
 
-  constructor() {
+  constructor(host?: VisitorHostAdapter) {
     super("mysql", {
       quoteIdentifier: quoteIdentifier,
       quoteTableName: quoteTableName,
       quoteDefaultExpression: quoteDefaultExpression,
     });
+    this._hostAdapter = host;
+  }
+
+  /** @internal Live MariaDB lookup — consults the host adapter every call so a late
+   * `getFullVersion()` flip (lazy detection on first probe) is honored. Falls back to the
+   * `_mariadb` field so existing tests that set it directly continue to work. */
+  protected isMariadb(): boolean {
+    return this._hostAdapter?.isMariadb?.() ?? this._mariadb;
   }
 
   /** @internal */
@@ -171,7 +198,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitDropCheckConstraint(name: string): string {
-    return `DROP ${this._mariadb ? "CONSTRAINT" : "CHECK"} ${name}`;
+    return `DROP ${this.isMariadb() ? "CONSTRAINT" : "CHECK"} ${name}`;
   }
 
   /** @internal */
@@ -180,6 +207,61 @@ export class SchemaCreation extends AbstractSchemaCreation {
       super.visitAddColumnDefinition(o),
       this.columnOptions(o.column) as MysqlColumnOptions,
     );
+  }
+
+  /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
+  protected supportsIndexesInCreate(): boolean {
+    return this._hostAdapter?.supportsIndexesInCreate?.() ?? true;
+  }
+
+  /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
+   * foreign_keys_enabled?`). The enabled half reads `adapter.config.foreignKeys`, matching
+   * `SchemaStatements#isForeignKeysEnabled`. */
+  protected useForeignKeys(): boolean {
+    const supports = this._hostAdapter?.supportsForeignKeys?.() ?? true;
+    const enabled = this._hostAdapter?.config?.foreignKeys !== false;
+    return supports && enabled;
+  }
+
+  /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
+  protected supportsCheckConstraints(): boolean {
+    return this._hostAdapter?.supportsCheckConstraints?.() ?? true;
+  }
+
+  /**
+   * MySQL CREATE TABLE generator. Mirrors Rails'
+   * `abstract/schema_creation.rb#visit_TableDefinition`, routing every
+   * column through {@link SchemaCreation#visitColumnDefinition} so
+   * `addColumnOptions` (this subclass) handles `AUTO_INCREMENT`,
+   * `ON UPDATE`, charset/collation, etc. consistently with addColumn.
+   *
+   * @internal
+   */
+  protected override visitTableDefinition(o: TableDefinition): string {
+    let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
+    if (o.ifNotExists) sql += " IF NOT EXISTS";
+    sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
+
+    const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
+    if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
+      const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteIdentifier(k)).join(", ");
+      statements.push(`PRIMARY KEY (${cols})`);
+    }
+    if (this.supportsIndexesInCreate()) {
+      for (const idx of o.indexes) statements.push(this.visitIndexDefinition(idx, false));
+    }
+    if (this.useForeignKeys()) {
+      for (const fk of o.foreignKeys) statements.push(this.visitForeignKeyDefinition(fk));
+    }
+    if (this.supportsCheckConstraints()) {
+      for (const chk of o.checkConstraints)
+        statements.push(this.visitCheckConstraintDefinition(chk));
+    }
+
+    if (statements.length > 0) sql += ` (${statements.join(", ")})`;
+    sql = this.addTableOptionsBang(sql, o);
+    if (o.as) sql += ` AS ${o.as}`;
+    return sql;
   }
 
   /** @internal */
@@ -250,8 +332,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override addTableOptionsBang(sql: string, o: TableDefinition): string {
     const mo = o as MysqlTableDef;
-    if (mo.charset) sql += ` DEFAULT CHARSET=${mo.charset}`;
-    if (mo.collation) sql += ` COLLATE=${mo.collation}`;
+    if (mo.charset) {
+      assertSafeMysqlIdentifier(mo.charset, "charset");
+      sql += ` DEFAULT CHARSET=${mo.charset}`;
+    }
+    if (mo.collation) {
+      assertSafeMysqlIdentifier(mo.collation, "collation");
+      sql += ` COLLATE=${mo.collation}`;
+    }
     return this.addSqlCommentBang(super.addTableOptionsBang(sql, o), o.comment);
   }
 
@@ -264,11 +352,17 @@ export class SchemaCreation extends AbstractSchemaCreation {
         sql += " NULL";
       }
     }
-    if (mo.charset) sql += ` CHARACTER SET ${mo.charset}`;
-    if (mo.collation) sql += ` COLLATE ${mo.collation}`;
+    if (mo.charset) {
+      assertSafeMysqlIdentifier(mo.charset, "charset");
+      sql += ` CHARACTER SET ${mo.charset}`;
+    }
+    if (mo.collation) {
+      assertSafeMysqlIdentifier(mo.collation, "collation");
+      sql += ` COLLATE ${mo.collation}`;
+    }
     if (mo.as) {
       sql += ` AS (${mo.as})`;
-      if (mo.stored) sql += this._mariadb ? " PERSISTENT" : " STORED";
+      if (mo.stored) sql += this.isMariadb() ? " PERSISTENT" : " STORED";
     }
     // Call super without primaryKey so ON UPDATE can be inserted before PRIMARY KEY,
     // matching the original abstract ordering: DEFAULT → NOT NULL → AUTO_INCREMENT → ON UPDATE → PRIMARY KEY.
