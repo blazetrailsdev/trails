@@ -14,6 +14,8 @@ import {
 import type {
   ColumnOptions,
   ColumnType,
+  IdHashOptions,
+  PrimaryKeyType,
   SchemaStatementsLike,
 } from "../abstract/schema-definitions.js";
 import { quoteIdentifier, quoteTableName } from "./quoting.js";
@@ -41,7 +43,7 @@ export interface ColumnMethods {
 
 export class TableDefinition extends AbstractTableDefinition {
   /** @internal Full adapter when constructed by `createTableDefinition`; used so `toSql()`
-   * reuses the adapter's `MysqlSchemaCreation` instance rather than allocating a new one. */
+   * can obtain a host-aware `MysqlSchemaCreation` (carrying adapter support flags). */
   private readonly _mysqlAdapter?: {
     schemaStatements?: () => { schemaCreation: MysqlSchemaCreation };
   };
@@ -49,7 +51,7 @@ export class TableDefinition extends AbstractTableDefinition {
   constructor(
     tableName: string,
     options: {
-      id?: boolean | "uuid";
+      id?: boolean | PrimaryKeyType | IdHashOptions;
       charset?: string | null;
       collation?: string | null;
       primaryKey?: string | string[] | false;
@@ -86,9 +88,10 @@ export class TableDefinition extends AbstractTableDefinition {
    * `changeColumn` — they all go through {@link SchemaCreation#addColumnOptions}.
    */
   override toSql(): string {
-    // Prefer the adapter's pre-wired visitor (carries host-adapter support flags). Guard with
-    // instanceof in case a non-MySQL SchemaStatements ever surfaces here — falling back to the
-    // abstract visitor would silently drop MySQL-specific addColumnOptions / charset handling.
+    // Ask the adapter for a host-aware visitor (carries support flags + MariaDB flag) when
+    // available. Guard with instanceof in case a non-MySQL SchemaStatements ever surfaces here
+    // — falling back to the abstract visitor would silently drop MySQL-specific
+    // addColumnOptions / charset handling.
     const fromAdapter = this._mysqlAdapter?.schemaStatements?.().schemaCreation;
     const visitor =
       fromAdapter instanceof MysqlSchemaCreation ? fromAdapter : new MysqlSchemaCreation();

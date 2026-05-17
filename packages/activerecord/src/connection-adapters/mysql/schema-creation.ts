@@ -49,11 +49,19 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
-/** @internal Adapter surface consulted by the visitor's support flags. */
+/** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches. */
 interface VisitorHostAdapter {
   supportsCheckConstraints?(): boolean;
   supportsForeignKeys?(): boolean;
   supportsIndexesInCreate?(): boolean;
+  isMariadb?(): boolean;
+}
+
+/** @internal Shared identifier guard for MySQL bare-identifier emission (charset/collation). */
+export function assertSafeMysqlIdentifier(value: string, kind: string): void {
+  if (!/^[A-Za-z0-9_]+$/.test(value)) {
+    throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
+  }
 }
 
 export class SchemaCreation extends AbstractSchemaCreation {
@@ -69,6 +77,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       quoteDefaultExpression: quoteDefaultExpression,
     });
     this._hostAdapter = host;
+    if (host?.isMariadb?.()) this._mariadb = true;
   }
 
   /** @internal */
@@ -219,7 +228,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override visitTableDefinition(o: TableDefinition): string {
     let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
     if (o.ifNotExists) sql += " IF NOT EXISTS";
-    sql += ` ${this.adapter.quoteTableName(o.tableName)} `;
+    sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
     const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
@@ -237,7 +246,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         statements.push(this.visitCheckConstraintDefinition(chk));
     }
 
-    if (statements.length > 0) sql += `(${statements.join(", ")})`;
+    if (statements.length > 0) sql += ` (${statements.join(", ")})`;
     sql = this.addTableOptionsBang(sql, o);
     if (o.as) sql += ` AS ${o.as}`;
     return sql;
@@ -311,20 +320,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override addTableOptionsBang(sql: string, o: TableDefinition): string {
     const mo = o as MysqlTableDef;
-    // Mirror the pre-existing TableDefinition.toSql() guard (abstract/schema-definitions.ts):
-    // MySQL emits charset/collation as bare identifiers, so reject anything that isn't a
-    // safe identifier to prevent DDL injection via untrusted Migration input.
-    const safeIdentRe = /^[A-Za-z0-9_]+$/;
     if (mo.charset) {
-      if (!safeIdentRe.test(mo.charset)) {
-        throw new ArgumentError(`Invalid MySQL charset: ${JSON.stringify(mo.charset)}`);
-      }
+      assertSafeMysqlIdentifier(mo.charset, "charset");
       sql += ` DEFAULT CHARSET=${mo.charset}`;
     }
     if (mo.collation) {
-      if (!safeIdentRe.test(mo.collation)) {
-        throw new ArgumentError(`Invalid MySQL collation: ${JSON.stringify(mo.collation)}`);
-      }
+      assertSafeMysqlIdentifier(mo.collation, "collation");
       sql += ` COLLATE=${mo.collation}`;
     }
     return this.addSqlCommentBang(super.addTableOptionsBang(sql, o), o.comment);
