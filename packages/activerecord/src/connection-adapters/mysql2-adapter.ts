@@ -1031,22 +1031,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Returns the name of the currently-connected database via `SELECT DATABASE()`.
-   * Mirrors Rails' AbstractMysqlAdapter#current_database. The abstract base returns
-   * `""`; this override hits the server so callers see the live session value.
-   */
-  override async currentDatabase(): Promise<string> {
-    const rows = (await this.schemaQuery("SELECT database() AS db")) as Array<{
-      db?: string | null;
-      DB?: string | null;
-    }>;
-    if (rows.length === 0) return "";
-    const row = rows[0];
-    const val = row.db ?? row.DB ?? (Object.values(row)[0] as string | null | undefined);
-    return val == null ? "" : String(val);
-  }
-
-  /**
    * Return the primary key: scalar string for single-column PKs,
    * array for composite PKs, null for no-PK tables. Uses the same
    * `information_schema.statistics` + `seq_in_index` shape Rails

@@ -173,9 +173,15 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("foreign keys method with ansi quotes", async () => {
+      // Mirrors Rails test/schema/schema.rb: lessons_students is id:false with a
+      // bigint student_id referencing students(id). Bigint width matches the
+      // default Rails PK so addForeignKey doesn't trip MySQL's type-match rule.
       await defineSchema(ansi, {
         students: { name: "string" },
-        lessons_students: { student_id: "integer" },
+        lessons_students: {
+          columns: { student_id: "big_integer" },
+          primaryKey: false,
+        },
       });
       try {
         await ansi.addForeignKey("lessons_students", "students", { onDelete: "cascade" });
