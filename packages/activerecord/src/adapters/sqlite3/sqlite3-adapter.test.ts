@@ -645,7 +645,7 @@ describe("SQLite3AdapterTest", () => {
     }
   });
 
-  it("forwards strictStringsByDefault to the driver via openSync(config)", () => {
+  it("forwards strictStringsByDefault to the driver via openSync(config)", async () => {
     // Mirrors Rails: strict_strings_by_default = true reaches the adapter
     // through `strict: true` on the per-connection config, not via a runtime
     // override after open. The driver hook receives that resolved value.
@@ -691,7 +691,7 @@ describe("SQLite3AdapterTest", () => {
         expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(true);
         expect(conn.strictStrings).toBe(true);
       } finally {
-        void conn.close();
+        await conn.close();
       }
     } finally {
       SQLite3Adapter.strictStringsByDefault = false;
@@ -706,7 +706,7 @@ describe("SQLite3AdapterTest", () => {
       expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(false);
       expect(explicit.strictStrings).toBe(false);
     } finally {
-      void explicit.close();
+      await explicit.close();
     }
   });
 
