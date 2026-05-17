@@ -1194,9 +1194,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const idCol = polyFk;
     // The polymorphic schema (`<as>_id`/`<as>_type`) only carries a scalar
-    // owner identifier. Composite owner primary keys are unrepresentable —
-    // require an explicit single-column `primaryKey:` on the association so
-    // the choice of identifier is deliberate rather than silently collapsed.
+    // owner identifier. Rails' `Reflection#active_record_primary_key`
+    // (reflection.rb:587-604) freely returns a composite-PK array here, and
+    // `check_validity!` (reflection.rb:621) explicitly *skips* the
+    // composite-PK arity check for polymorphic associations — `join_id_for`
+    // (reflection.rb:642-644) then writes an array of values into the
+    // single `<as>_id` column, producing a silently-broken IN-shaped WHERE.
+    // Trails surfaces the misconfiguration as `ConfigurationError` instead:
+    // reject a composite `primaryKey:` outright, and require an explicit
+    // single-column `primaryKey:` when the owner has a composite PK so the
+    // chosen scalar identifier is deliberate, not silently collapsed.
     const ownerPkOption = throughAssoc.options.primaryKey;
     if (Array.isArray(ownerPkOption)) {
       throw new ConfigurationError(
