@@ -4,7 +4,6 @@ import { resolveModel, buildHasManyRelation } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
-import { _assignAttributes } from "@blazetrails/activemodel";
 
 /**
  * Base class for all association proxies. An Association wraps a single
@@ -595,7 +594,10 @@ export function applyScopeForCreate(
   }
 
   const attributes = filterScopeForCreate(scope, assigned, skipAssign);
-  if (attributes) _assignAttributes(record as any, attributes);
+  // Route through AR's `_assignAttributes` (mixed onto Base) so
+  // multiparameter / nested-attribute handling applies — matches
+  // Rails' `record.send(:_assign_attributes, ...)` dispatch.
+  if (attributes) (record as any)._assignAttributes(attributes);
 }
 
 /**

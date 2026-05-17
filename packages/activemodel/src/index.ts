@@ -19,12 +19,7 @@ export {
   AttrNames,
 } from "./attribute-methods.js";
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
-export {
-  assignAttributes,
-  _assignAttributes,
-  attributeWriterMissing,
-  ArgumentError,
-} from "./attribute-assignment.js";
+export { assignAttributes, attributeWriterMissing, ArgumentError } from "./attribute-assignment.js";
 export type { AttributeAssignment } from "./attribute-assignment.js";
 export {
   AttributeMutationTracker,
