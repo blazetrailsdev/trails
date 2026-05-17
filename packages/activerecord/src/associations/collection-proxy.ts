@@ -1270,6 +1270,33 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
   }
 
+  /**
+   * Walk the through-chain looking for `record` via the source reflection.
+   * Mirrors the through branch of
+   * `CollectionAssociation#include_in_memory?` —
+   * `assoc.reader.any? { |source| source.send(source_reflection.name)... }`.
+   */
+  private async _includeInMemoryThrough(record: T): Promise<boolean> {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughName = this._assocDef.options.through!;
+    const throughAssoc = associations.find((a: any) => a.name === throughName);
+    if (!throughAssoc) return false;
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
+    if (!sources) return false;
+    for (const joinRecord of sources) {
+      const source = await (joinRecord as any)[sourceName];
+      if (source == null) continue;
+      if (Array.isArray(source)) {
+        if (source.includes(record)) return true;
+      } else if (source === record) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private _raiseOnTypeMismatch(records: T[]): void {
     const opts = this._assocDef.options;
     // Polymorphic associations have no fixed klass — Rails no-ops type checking there.
@@ -1516,7 +1543,28 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
   async isInclude(record: T): Promise<boolean> {
+    // Rails `include?` short-circuits on type mismatch — a record whose
+    // class is unrelated to the reflection's `klass` can never be in the
+    // target. Without this guard, a bogus record would issue a needless
+    // `exists?` query and might silently match a row with the same PK on
+    // the wrong table.
+    // Mirrors `ActiveRecord::Associations::CollectionAssociation#include?`
+    // (`return false unless record.is_a?(reflection.klass)`).
+    if (!this._assocDef.options.polymorphic) {
+      const className =
+        (this._assocDef.options.className as string | undefined) ??
+        camelize(singularize(this._assocName));
+      const klass = resolveAssocClass(this._record, this._assocName, className);
+      if (!(record instanceof klass)) return false;
+    }
     if (record.isNewRecord()) {
+      // Mirrors `CollectionAssociation#include_in_memory?`: for through
+      // associations, walk the through target looking for `record` via the
+      // source reflection; OR fall back to the local target. For
+      // non-through associations, just check the local target.
+      if (this._assocDef.options.through) {
+        if (await this._includeInMemoryThrough(record)) return true;
+      }
       return this._target.includes(record);
     }
 
@@ -2314,6 +2362,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async appendBang(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
+    this._raiseOnTypeMismatch(records);
     if (this._assocDef.options.through) {
       await this._pushThrough(records, false, true);
       return;
