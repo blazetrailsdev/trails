@@ -1,21 +1,21 @@
 import { describe, it, expect } from "vitest";
 import {
-  _routes,
-  _routesStatic,
+  _routesInstanceDefault,
+  _routesClassDefault,
   filterActionMethodsForRoutes,
   type RouteSetLike,
 } from "./url-for.js";
 
 describe("AbstractController::UrlFor", () => {
-  describe("instance _routes() stub", () => {
+  describe("_routesInstanceDefault()", () => {
     it("raises with the Rails-shaped hint until the host overrides it", () => {
-      expect(() => _routes.call({})).toThrow(/include routing helpers explicitly/);
+      expect(() => _routesInstanceDefault.call({})).toThrow(/include routing helpers explicitly/);
     });
   });
 
-  describe("static _routesStatic()", () => {
+  describe("_routesClassDefault()", () => {
     it("returns null by default", () => {
-      expect(_routesStatic()).toBeNull();
+      expect(_routesClassDefault()).toBeNull();
     });
   });
 

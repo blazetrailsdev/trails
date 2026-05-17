@@ -1,17 +1,18 @@
 /**
- * `AbstractController::UrlFor` — includes `urlFor` into the host class
- * (an abstract controller or mailer). The host must provide a route
- * set by implementing the `_routes` static method. Otherwise calling
- * `urlFor` raises.
+ * `AbstractController::UrlFor` — Rails-shaped contract that the route
+ * set + action-method filtering rely on. Rails additionally `include
+ * ActionDispatch::Routing::UrlFor` here to provide the actual
+ * `urlFor(...)` instance method; that mixin is **not yet ported**.
  *
- * Note that this module is completely decoupled from HTTP — the only
- * requirement is a valid `_routes` implementation.
+ * This module currently provides:
+ *  - the instance-side `_routes` stub that throws until the host wires
+ *    in a real route set
+ *  - the class-side `_routes` default that returns `null`
+ *  - `filterActionMethodsForRoutes`, used by hosts to strip named-route
+ *    helper names out of their `actionMethods` list (mirrors Rails'
+ *    `ClassMethods#action_methods` override)
  *
  * Ported from `vendor/rails/actionpack/lib/abstract_controller/url_for.rb`.
- * The deeper `ActionDispatch::Routing::UrlFor` mixin (which provides
- * the actual `urlFor` instance method) is **not yet ported**; until
- * then this module just declares the contract and the helper-name
- * filtering behavior used by `actionMethods`.
  */
 
 export interface NamedRoutesLike {
@@ -38,22 +39,20 @@ const NO_ROUTES_MESSAGE =
   "For instance, `include Rails.application.routes.urlHelpers`.";
 
 /**
- * Instance-side `_routes` stub — raises until the host overrides it.
- * Rails matches this behavior: trying to generate URLs before the
- * routes are wired up should fail loudly with a hint.
+ * Default instance-side `_routes` — raises until the host overrides
+ * it. Mirrors Rails: trying to generate URLs before the routes are
+ * wired up should fail loudly with a hint.
  */
-export function _routes(this: object): never {
+export function _routesInstanceDefault(this: object): never {
   throw new Error(NO_ROUTES_MESSAGE);
 }
 
 /**
- * Default static `_routes`: returns `null`. Hosts that get their
- * routes wired up later override this on the class (or via
- * `setRoutes`).
+ * Default class-side `_routes` — returns `null`. Conforms to
+ * `UrlForClassMethods#_routes`. Hosts override this on the class once
+ * a route set is wired up.
  */
-export function _routesStatic(): RouteSetLike | null {
-  return null;
-}
+export const _routesClassDefault: UrlForClassMethods["_routes"] = () => null;
 
 /**
  * Filter `actionMethods` by removing any names that collide with

@@ -40,8 +40,8 @@ export {
   type RenderingHost,
 } from "./rendering.js";
 export {
-  _routes,
-  _routesStatic,
+  _routesInstanceDefault,
+  _routesClassDefault,
   filterActionMethodsForRoutes,
   type NamedRoutesLike,
   type RouteSetLike,
