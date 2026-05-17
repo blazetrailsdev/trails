@@ -1206,14 +1206,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : this._throughOwnerAttrs(throughAssoc, ctor);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
-    // Rails: when the association is declared with `validate: false`, the
-    // implicit `save` during `push`/`<<` is invoked with `validate: false`,
-    // suppressing both the target record's and the join record's
-    // validations (matches `Association#insert_record` /
-    // `HasManyAssociation#insert_record` in
-    // `activerecord/lib/active_record/associations/has_many_association.rb`).
-    const skipValidate = this._assocDef.options.validate === false;
-    const saveOpts = skipValidate ? { validate: false } : undefined;
 
     for (const record of records) {
       if (
@@ -1224,14 +1216,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Save the target record if it's new
       if (record.isNewRecord()) {
         if (bang) {
-          if (skipValidate) {
-            const saved = await record.save(saveOpts);
-            if (!saved) continue;
-          } else {
-            await record.saveBang();
-          }
+          await record.saveBang(); // raises RecordInvalid if invalid
         } else {
-          const saved = await record.save(saveOpts);
+          const saved = await record.save();
           if (!saved) continue;
         }
       }
@@ -1255,14 +1242,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (bang) {
         // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
         joinRecord = new throughModel(joinAttrs);
-        if (skipValidate) {
-          await joinRecord.save(saveOpts);
-        } else {
-          await joinRecord.saveBang();
-        }
-      } else if (skipValidate) {
-        joinRecord = new throughModel(joinAttrs);
-        await joinRecord.save(saveOpts);
+        await joinRecord.saveBang();
       } else {
         joinRecord = await throughModel.create(joinAttrs);
       }
@@ -1291,41 +1271,27 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Walk the through-chain looking for `record` in already-loaded sources.
-   * Returns the boolean answer when the through-target is loaded; returns
-   * `null` to signal "not determinable in memory, caller should fall back
-   * to the database path". Mirrors Rails'
-   * `HasManyThroughAssociation#include_in_memory?`.
+   * Walk the through-chain looking for `record` via the source reflection.
+   * Mirrors the through branch of
+   * `CollectionAssociation#include_in_memory?` —
+   * `assoc.reader.any? { |source| source.send(source_reflection.name)... }`.
    */
-  private async _includeInMemoryThrough(record: T): Promise<boolean | null> {
+  private async _includeInMemoryThrough(record: T): Promise<boolean> {
     const ctor = this._record.constructor as typeof Base;
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughName = this._assocDef.options.through!;
     const throughAssoc = associations.find((a: any) => a.name === throughName);
-    if (!throughAssoc) return null;
-    // Only consult the cache when the through proxy was already populated;
-    // otherwise we'd issue extra queries to answer `include?`.
-    const throughProxy = (this._record as any)._collectionProxies?.get(throughName) as
-      | CollectionProxy<Base>
-      | undefined;
-    if (!throughProxy || !(throughProxy as any)._targetLoaded) return null;
+    if (!throughAssoc) return false;
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-    const targetPk = (record.constructor as typeof Base).primaryKey;
-    if (Array.isArray(targetPk)) return null;
-    const targetId = record._readAttribute(targetPk);
-    if (targetId == null) return null;
-    for (const joinRecord of (throughProxy as any)._target as Base[]) {
-      const source = (joinRecord as any)[sourceName];
+    const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
+    if (!sources) return false;
+    for (const joinRecord of sources) {
+      const source = await (joinRecord as any)[sourceName];
       if (source == null) continue;
-      const candidates: Base[] = Array.isArray(source)
-        ? source
-        : source instanceof Promise
-          ? []
-          : [source as Base];
-      for (const cand of candidates) {
-        const pk = (cand.constructor as typeof Base).primaryKey;
-        if (Array.isArray(pk)) continue;
-        if (cand._readAttribute(pk) === targetId) return true;
+      if (Array.isArray(source)) {
+        if (source.includes(record)) return true;
+      } else if (source === record) {
+        return true;
       }
     }
     return false;
@@ -1592,16 +1558,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (!(record instanceof klass)) return false;
     }
     if (record.isNewRecord()) {
+      // Mirrors `CollectionAssociation#include_in_memory?`: for through
+      // associations, walk the through target looking for `record` via the
+      // source reflection; OR fall back to the local target. For
+      // non-through associations, just check the local target.
+      if (this._assocDef.options.through) {
+        if (await this._includeInMemoryThrough(record)) return true;
+      }
       return this._target.includes(record);
-    }
-
-    // Through associations: when the through-target is already loaded in
-    // memory, walk the chain rather than re-querying. Matches Rails'
-    // `HasManyThroughAssociation#include_in_memory?` (recursively walks
-    // `through_reflection.target` looking for `source_reflection`).
-    if (this._assocDef.options.through) {
-      const inMemory = await this._includeInMemoryThrough(record);
-      if (inMemory !== null) return inMemory;
     }
 
     if (this._targetLoaded) {

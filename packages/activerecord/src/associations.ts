@@ -93,12 +93,6 @@ export interface AssociationOptions {
   autosave?: boolean;
   scope?: (rel: any, owner?: any) => any;
   validate?: boolean;
-  /** When true, records loaded through this association are marked
-   * readonly, causing `save`/`destroy` on them to raise `ReadOnlyRecord`.
-   *
-   * Mirrors Rails' `has_many :foo, readonly: true` — applied at load time
-   * via `Relation#readonly!`. */
-  readonly?: boolean;
   required?: boolean;
   optional?: boolean;
   beforeAdd?:
@@ -1604,10 +1598,6 @@ export async function loadHabtm(
   // composition (where/order/select/group/having/unscope).
   let rel: any = _scopeForAssociation(targetModel).where(inNode);
   if (options.scope) rel = options.scope(rel);
-  // Rails `has_and_belongs_to_many :foo, readonly: true` propagates the
-  // readonly flag onto every loaded record. Apply after the user scope so
-  // an explicit `readonlyBang(false)` in the scope can opt out.
-  if (options.readonly) rel = rel.readonlyBang();
 
   return rel.toArray();
 }
