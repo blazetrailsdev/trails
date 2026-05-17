@@ -3974,8 +3974,8 @@ export class Relation<T extends Base> {
   /**
    * Insert multiple records, raising on failure.
    *
-   * Mirrors: ActiveRecord::Base.insert_all! — accepts the same `returning` /
-   * `recordTimestamps` keyword options as `insertAll` (Rails relation.rb:790).
+   * Mirrors: ActiveRecord::Base.insert_all! (Rails relation.rb:790 —
+   * `def insert_all!(attributes, returning: nil, record_timestamps: nil)`).
    */
   async insertAllBang(
     records: Record<string, unknown>[],

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
+import { UnknownAttributeError } from "./errors.js";
 import { adapterType, createTestAdapter } from "./test-adapter.js";
 
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
@@ -270,7 +271,6 @@ describe("InsertAllTest", () => {
   });
 
   it("insert_all has a clear error message when a column does not exist", async () => {
-    const { UnknownAttributeError } = await import("./errors.js");
     const Book = makeBookWithAdapter();
     await expect(Book.insertAll([{ title: "Valid", no_such_column: 1 }])).rejects.toThrow(
       UnknownAttributeError,
@@ -314,7 +314,6 @@ describe("InsertAllTest", () => {
     expect((all[0] as any).author).toBe("Updated");
   });
   it("upsert all has a clear error message when a column does not exist", async () => {
-    const { UnknownAttributeError } = await import("./errors.js");
     const Book = makeBookWithAdapter();
     await expect(Book.upsertAll([{ title: "Valid", no_such_column: 1 }])).rejects.toThrow(
       UnknownAttributeError,
@@ -806,7 +805,6 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all raises on unknown attribute", async () => {
-    const { UnknownAttributeError } = await import("./errors.js");
     const Book = makeBookWithAdapter();
     await expect(
       Book.all().insertAllBang([{ title: "Valid", unknown_attribute: "x" }]),
