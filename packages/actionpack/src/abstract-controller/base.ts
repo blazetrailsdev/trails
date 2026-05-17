@@ -26,8 +26,17 @@ export class AbstractController {
   /** The action currently being processed. */
   actionName: string = "";
 
+  /** Internal storage for response body. Subclasses may override the
+   * `responseBody` accessor (e.g. Metal writes through to the response). */
+  protected _responseBody: string | Buffer | null = null;
+
   /** Response body. */
-  responseBody: string | Buffer | null = null;
+  get responseBody(): string | Buffer | null {
+    return this._responseBody;
+  }
+  set responseBody(value: string | Buffer | null) {
+    this._responseBody = value;
+  }
 
   /** Whether a response has been committed (render/redirect called). */
   private _performed: boolean = false;
@@ -198,12 +207,12 @@ export class AbstractController {
     const executeAction = async (): Promise<void> => {
       // Run before callbacks
       for (const entry of befores) {
-        if (this._performed) return;
+        if (this.performed) return;
         const result = await (entry.callback as ActionCallback)(this);
         if (result === false) return; // Halt chain
       }
 
-      if (this._performed) return;
+      if (this.performed) return;
 
       // Execute the action (only if it's a recognized action method)
       if (Constructor.hasAction(action)) {
@@ -237,9 +246,15 @@ export class AbstractController {
     await chain();
   }
 
-  /** Whether a render or redirect has been performed. */
+  /**
+   * Whether a render or redirect has been performed. Mirrors Rails'
+   * `AbstractController::Base#performed?` which is defined as
+   * `response_body` — i.e. truthy iff the response body has been
+   * assigned. The `_performed` flag is also honored so internal helpers
+   * (e.g. `head`) can mark performed without assigning a body.
+   */
   get performed(): boolean {
-    return this._performed;
+    return this._performed || this._responseBody !== null;
   }
 
   /** Mark the response as performed. */
