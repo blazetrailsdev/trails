@@ -26,11 +26,19 @@ export abstract class Collector {
   }
 }
 
+// Keys we must never intercept, or the Collector instance becomes
+// thenable and gets assimilated by Promise.resolve / `await`.
+const PROMISE_KEYS = new Set<string | symbol>(["then", "catch", "finally"]);
+
 const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
   get(target, prop, receiver) {
-    const existing = Reflect.get(target, prop, receiver);
-    if (existing !== undefined) return existing;
-    if (typeof prop !== "string") return existing;
+    // Shadowing: any real own/inherited property — including ones that
+    // intentionally hold `undefined` — must win. Use Reflect.has rather
+    // than the undefined check so a subclass `myProp = undefined` isn't
+    // mistakenly routed through MIME dispatch.
+    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+    if (PROMISE_KEYS.has(prop)) return undefined;
+    if (typeof prop !== "string") return undefined;
     const mime = MimeType.lookup(prop);
     if (mime) {
       return (...args: unknown[]): unknown => target.custom(mime, ...args);

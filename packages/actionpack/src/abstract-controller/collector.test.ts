@@ -29,7 +29,9 @@ describe("AbstractController::Collector", () => {
       latefmt?: (...args: unknown[]) => unknown;
     };
     expect(MimeType.lookup("latefmt")).toBeUndefined();
-    MimeType.register("application/latefmt", "latefmt", [], ["latefmt"]);
+    // No extension mapping — unregister() doesn't clean extensionMap, so
+    // leaving one behind leaks global MIME state across the test suite.
+    MimeType.register("application/latefmt", "latefmt");
     try {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");
     } finally {
@@ -58,6 +60,27 @@ describe("AbstractController::Collector", () => {
       thisIsNotAMime: () => unknown;
     };
     expect(() => c.thisIsNotAMime()).toThrow(/register it as a MIME type/);
+  });
+
+  it("is not assimilated by Promise.resolve (no synthesized `then`)", async () => {
+    const c = new TestCollector();
+    const resolved = await Promise.resolve(c);
+    // If `then` were intercepted, Promise.resolve(c) would attempt to
+    // call it as a thenable and resolve to whatever value it produced.
+    expect(resolved).toBe(c);
+  });
+
+  it("shadows real properties even when they hold undefined", () => {
+    class WithUndef extends Collector {
+      myFlag: string | undefined = undefined;
+      custom(_mime: MimeType): unknown {
+        return null;
+      }
+    }
+    const c = new WithUndef();
+    // `myFlag` reads should return undefined, NOT a synthesized
+    // unknown-format thrower function.
+    expect(c.myFlag).toBeUndefined();
   });
 
   it("has() responds true for both real props and registered MIME symbols", () => {
