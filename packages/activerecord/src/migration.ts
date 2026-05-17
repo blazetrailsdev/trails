@@ -1629,7 +1629,7 @@ export class MigrationContext {
       if (a === "postgres" && rawType.toUpperCase() === "USER-DEFINED" && x.udt_name) {
         rawType = String(x.udt_name);
       }
-      const normalized = MigrationContext._normalizeIntrospectedType(rawType);
+      const normalized = MigrationContext._normalizeIntrospectedType(rawType, a);
       // Prefer PG's authoritative size columns when present — they sit in
       // information_schema rather than baked into the type string.
       if (a === "postgres") {
@@ -1638,10 +1638,10 @@ export class MigrationContext {
         const numScale = x.numeric_scale;
         const dtPrec = x.datetime_precision;
         if (typeof charLen === "number") normalized.limit = charLen;
-        if (
-          typeof numPrec === "number" &&
-          (normalized.type === "decimal" || normalized.type === "float")
-        ) {
+        // numeric_precision is meaningless for floats per PG type-map-init
+        // (float4 carries a fixed limit, float8 carries nothing) — only fill
+        // it for decimal.
+        if (typeof numPrec === "number" && normalized.type === "decimal") {
           normalized.precision = numPrec;
           if (typeof numScale === "number") normalized.scale = numScale;
         }
@@ -1661,7 +1661,10 @@ export class MigrationContext {
    * registrations (mysql-type-lookup, postgresql/oid). Assumes MySQL
    * `emulate_booleans: true` (Rails default) so `tinyint(1)` → boolean.
    */
-  private static _normalizeIntrospectedType(raw: string): {
+  static _normalizeIntrospectedType(
+    raw: string,
+    adapter: "sqlite" | "postgres" | "mysql" = "sqlite",
+  ): {
     type: string;
     limit?: number;
     precision?: number;
@@ -1707,12 +1710,22 @@ export class MigrationContext {
       return { type: "integer", limit: intByteLimit[head] ?? 4 };
     if (/^(bigint|int8|bigserial)$/.test(head)) return { type: "bigint" };
     if (/^(float|float4)$/.test(head)) return { type: "float", limit: 24 };
-    if (/^(double|double precision|float8|real)$/.test(head)) return { type: "float", limit: 53 };
+    // PG `real` is single-precision (float4 → limit 24); MySQL `real` is
+    // an alias for double (float8 → limit 53).
+    if (/^real$/.test(head))
+      return adapter === "postgres" ? { type: "float", limit: 24 } : { type: "float", limit: 53 };
+    if (/^(double|double precision|float8)$/.test(head)) return { type: "float", limit: 53 };
     if (/^(numeric|decimal|number)$/.test(head)) return { type: "decimal", ...decSizes };
     if (/^(bool|boolean)$/.test(head)) return { type: "boolean" };
-    if (/^bit$/.test(head)) return { type: "binary", ...limit }; // MySQL BIT is binary per mysql-type-lookup
+    // PG registers `bit`/`varbit` as standalone Bit/BitVarying types
+    // (postgresql/type-map-init.ts); MySQL `bit` is a binary blob per
+    // mysql-type-lookup. PG `bit varying` arrives via information_schema.
+    if (/^bit$/.test(head))
+      return adapter === "postgres" ? { type: "bit", ...limit } : { type: "binary", ...limit };
+    if (/^(varbit|bit varying)$/.test(head)) return { type: "bitVarying", ...limit };
     if (/^date$/.test(head)) return { type: "date" };
-    if (/^time$/.test(head)) return { type: "time", ...precOnly };
+    if (/^(time|time without time zone)$/.test(head)) return { type: "time", ...precOnly };
+    if (/^(timetz|time with time zone)$/.test(head)) return { type: "time", ...precOnly };
     if (
       /^(datetime|timestamp|timestamptz|timestamp with time zone|timestamp without time zone)$/.test(
         head,

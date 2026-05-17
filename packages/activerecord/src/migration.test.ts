@@ -1978,6 +1978,62 @@ describe("MigrationTest", () => {
     }
   });
 
+  it("_normalizeIntrospectedType maps catalog rows to Rails-canonical types", () => {
+    const N = (
+      MigrationContext as unknown as {
+        _normalizeIntrospectedType: (
+          raw: string,
+          a?: "sqlite" | "postgres" | "mysql",
+        ) => { type: string; limit?: number; precision?: number; scale?: number };
+      }
+    )._normalizeIntrospectedType;
+
+    // MySQL boolean emulation + integer byte limits + enum/set/year/bit
+    expect(N("tinyint(1)", "mysql")).toEqual({ type: "boolean" });
+    expect(N("tinyint", "mysql")).toEqual({ type: "integer", limit: 1 });
+    expect(N("smallint", "mysql")).toEqual({ type: "integer", limit: 2 });
+    expect(N("mediumint", "mysql")).toEqual({ type: "integer", limit: 3 });
+    expect(N("int(11)", "mysql")).toEqual({ type: "integer", limit: 4 });
+    expect(N("year", "mysql")).toEqual({ type: "integer", limit: 4 });
+    expect(N("enum('a','b')", "mysql")).toEqual({ type: "string" });
+    expect(N("set('a','b')", "mysql")).toEqual({ type: "string" });
+    expect(N("bit(8)", "mysql")).toEqual({ type: "binary", limit: 8 });
+
+    // Strings vs text vs citext
+    expect(N("varchar(255)", "mysql")).toEqual({ type: "string", limit: 255 });
+    expect(N("text", "mysql")).toEqual({ type: "text" });
+    expect(N("longtext", "mysql")).toEqual({ type: "text" });
+    expect(N("citext", "postgres")).toEqual({ type: "citext" });
+
+    // Decimal: one-arg → precision, two-arg → precision+scale
+    expect(N("decimal(10)", "mysql")).toEqual({ type: "decimal", precision: 10 });
+    expect(N("numeric(10,2)", "postgres")).toEqual({ type: "decimal", precision: 10, scale: 2 });
+
+    // Float byte limits: PG vs MySQL `real` divergence
+    expect(N("float", "mysql")).toEqual({ type: "float", limit: 24 });
+    expect(N("double", "mysql")).toEqual({ type: "float", limit: 53 });
+    expect(N("real", "postgres")).toEqual({ type: "float", limit: 24 });
+    expect(N("real", "mysql")).toEqual({ type: "float", limit: 53 });
+    expect(N("double precision", "postgres")).toEqual({ type: "float", limit: 53 });
+
+    // Date/time precision propagation
+    expect(N("datetime(6)", "mysql")).toEqual({ type: "datetime", precision: 6 });
+    expect(N("time(3)", "mysql")).toEqual({ type: "time", precision: 3 });
+    expect(N("time with time zone", "postgres")).toEqual({ type: "time" });
+    expect(N("timestamp with time zone", "postgres")).toEqual({ type: "datetime" });
+
+    // PG bit / bit varying are their own types (NOT binary like MySQL)
+    expect(N("bit", "postgres")).toEqual({ type: "bit" });
+    expect(N("bit varying", "postgres")).toEqual({ type: "bitVarying" });
+    expect(N("varbit", "postgres")).toEqual({ type: "bitVarying" });
+
+    // Binary / uuid / json
+    expect(N("bytea", "postgres")).toEqual({ type: "binary" });
+    expect(N("blob", "mysql")).toEqual({ type: "binary" });
+    expect(N("uuid", "postgres")).toEqual({ type: "uuid" });
+    expect(N("jsonb", "postgres")).toEqual({ type: "jsonb" });
+  });
+
   it.skipIf(adapterType === "mysql")("create table with query", async () => {
     const adapter = freshAdapter();
     const ctx = new MigrationContext(adapter);
