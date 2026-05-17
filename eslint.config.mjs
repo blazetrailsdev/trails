@@ -204,7 +204,14 @@ export default defineConfig(
   // carry a `// @nie disposition=…` comment. Tracks the elimination
   // initiative (docs/activerecord-100-clusters.md).
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: [
+      "packages/activerecord/src/**/*.ts",
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/activemodel/src/**/*.ts",
+      "packages/activesupport/src/**/*.ts",
+      "packages/arel/src/**/*.ts",
+    ],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/nie-requires-annotation": "error",
