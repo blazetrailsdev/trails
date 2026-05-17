@@ -467,6 +467,7 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesDistinctOn(_node: Nodes.DistinctOn): SQLString {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:194 cluster=arel-visitor-strategy
     throw new NotImplementedError(
       "DISTINCT ON is not supported by the base ToSql visitor. Use the PostgreSQL visitor instead.",
     );
@@ -848,12 +849,14 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
   }
 
   protected visitArelNodesRegexp(_node: Nodes.Regexp): SQLString {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:520 cluster=arel-visitor-strategy
     throw new NotImplementedError(
       "Regexp (~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
     );
   }
 
   protected visitArelNodesNotRegexp(_node: Nodes.NotRegexp): SQLString {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/arel/visitors/to_sql.rb:524 cluster=arel-visitor-strategy
     throw new NotImplementedError(
       "NotRegexp (!~ operator) is not supported by the base ToSql visitor. Use a database-specific visitor (e.g. PostgreSQL) instead.",
     );

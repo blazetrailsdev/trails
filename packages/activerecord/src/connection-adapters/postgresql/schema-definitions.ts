@@ -630,7 +630,7 @@ export class AlterTable extends AbstractAlterTable {
 
 /** @internal */
 function validColumnDefinitionOptions(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb cluster=pg-long-tail
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:285 cluster=pg-long-tail
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#valid_column_definition_options is not implemented",
   );
@@ -638,7 +638,7 @@ function validColumnDefinitionOptions(): never {
 
 /** @internal */
 function aliasedTypes(name: any, fallback: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb cluster=pg-long-tail
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:289 cluster=pg-long-tail
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#aliased_types is not implemented",
   );
@@ -646,7 +646,7 @@ function aliasedTypes(name: any, fallback: any): never {
 
 /** @internal */
 function integerLikePrimaryKeyType(type: any, options: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb cluster=pg-long-tail
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/postgresql/schema_definitions.rb:293 cluster=pg-long-tail
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::PostgreSQL::TableDefinition#integer_like_primary_key_type is not implemented",
   );

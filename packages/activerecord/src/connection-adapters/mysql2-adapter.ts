@@ -1840,7 +1840,7 @@ function isMysql2ConnectionError(e: unknown): boolean {
 
 /** @internal */
 function reconnect(): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb:150 cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#reconnect is not implemented",
   );
@@ -1848,7 +1848,7 @@ function reconnect(): never {
 
 /** @internal */
 function initializeTypeMap(m: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb cluster=mysql-mysql2-adapter
+  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb:40 cluster=mysql-mysql2-adapter
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",
   );
