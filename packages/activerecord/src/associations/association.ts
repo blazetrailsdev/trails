@@ -462,8 +462,42 @@ export class Association {
     );
   }
 
+  /**
+   * Mirrors Rails' `Association#target_scope` (association.rb).
+   *
+   * For non-through associations, returns `klass.all()`. Through
+   * associations walk `reflection.chain.drop(1)` and merge each
+   * intermediate reflection's `klass.scopeForAssociation()` — this is
+   * what propagates `default_scope` declared on join models into the
+   * target query.
+   *
+   * Rails calls `.except(:select, :create_with, :includes, :preload,
+   * :eager_load, :joins, :left_outer_joins)` before merging; our
+   * `Relation#except` is a set-operation (SQL EXCEPT) and does not yet
+   * support clause-removal. As a result we merge the full intermediate
+   * scope; this is correct for `default_scope { where(...) }` (the
+   * common case) but may pull through unwanted clauses for more exotic
+   * default scopes. Tracking as a follow-up.
+   *
+   * @internal
+   */
   private targetScope(): any {
-    return (this.klass as any)?.all?.() ?? null;
+    const klass = this.klass as any;
+    if (!klass?.all) return null;
+    let scope = klass.all();
+    const refl = (this.owner.constructor as any)._reflectOnAssociation?.(this.reflection.name) as
+      | { chain?: Array<{ klass?: typeof Base }> }
+      | undefined;
+    const chain = refl?.chain;
+    if (!chain || chain.length <= 1) return scope;
+    for (let i = 1; i < chain.length; i++) {
+      const interKlass = chain[i]?.klass as any;
+      const interScope = interKlass?.scopeForAssociation?.();
+      if (interScope && typeof scope.merge === "function") {
+        scope = scope.merge(interScope);
+      }
+    }
+    return scope;
   }
 
   /** @internal */
