@@ -77,3 +77,5 @@ export {
   type DigestAuthParams,
 } from "./http-authentication.js";
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
+export { AssumeSSL } from "./middleware/assume-ssl.js";
+export { Callbacks } from "./middleware/callbacks.js";
