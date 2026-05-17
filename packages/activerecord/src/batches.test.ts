@@ -596,6 +596,7 @@ describe("EachTest", () => {
       }
     }
     await Post.create({ title: "a" });
+    const prev = activeRecordConfig.errorOnIgnoredOrder;
     activeRecordConfig.errorOnIgnoredOrder = true;
     let threw = false;
     try {
@@ -608,7 +609,7 @@ describe("EachTest", () => {
     } catch {
       threw = true;
     } finally {
-      activeRecordConfig.errorOnIgnoredOrder = false;
+      activeRecordConfig.errorOnIgnoredOrder = prev;
     }
     expect(threw).toBe(false);
   });
@@ -621,6 +622,7 @@ describe("EachTest", () => {
         this.adapter = adp;
       }
     }
+    const prevErrCfg = activeRecordConfig.errorOnIgnoredOrder;
     activeRecordConfig.errorOnIgnoredOrder = true;
     try {
       await expect(async () => {
@@ -629,7 +631,7 @@ describe("EachTest", () => {
         }
       }).rejects.toThrow();
     } finally {
-      activeRecordConfig.errorOnIgnoredOrder = false;
+      activeRecordConfig.errorOnIgnoredOrder = prevErrCfg;
     }
   });
 
@@ -859,7 +861,7 @@ describe("EachTest", () => {
     expect(records[records.length - 1].readAttribute("id")).toBe(secondToLast.readAttribute("id"));
   });
 
-  it("in batches with useRanges yields batches that cover all rows", async () => {
+  it("in batches with useRanges emits range predicate and covers all rows", async () => {
     const adp = freshAdapter();
     class Post extends Base {
       static {
@@ -869,10 +871,19 @@ describe("EachTest", () => {
     }
     for (let i = 0; i < 7; i++) await Post.create({ title: `t-${i}` });
     let total = 0;
+    const sqls: string[] = [];
     for await (const rel of Post.all().inBatches({ batchSize: 3, useRanges: true })) {
+      sqls.push(rel.toSql());
       total += (await rel.toArray()).length;
     }
     expect(total).toBe(7);
+    // useRanges yields a range predicate (>= AND <=), never an IN clause.
+    expect(sqls.length).toBeGreaterThan(0);
+    for (const sql of sqls) {
+      expect(sql).toMatch(/>=/);
+      expect(sql).toMatch(/<=/);
+      expect(sql).not.toMatch(/\bIN\s*\(/i);
+    }
   });
 });
 

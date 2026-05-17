@@ -2668,13 +2668,7 @@ export class Base extends Model {
         um.where(table.get(lockCol).eq(Number(rawVersion) || 0));
       }
     }
-    const updateDefaultConstraint = _Persistence.buildDefaultConstraint.call(ctor as any);
-    if (updateDefaultConstraint != null) um.where(updateDefaultConstraint as any);
-    const updateGlobalScope = ScopeRegistry.globalCurrentScope(ctor);
-    if (updateGlobalScope) {
-      const ast = updateGlobalScope._whereClause?.ast;
-      if (ast != null) um.where(ast as any);
-    }
+    _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
 
     const umVisitor = ctor.adapter.arelVisitor;
     this._pendingOperation = ctor.adapter
@@ -2715,13 +2709,7 @@ export class Base extends Model {
             dm.where(table.get(lockCol).eq(Number(currentVersion) || 0));
           }
         }
-        const destroyDefaultConstraint = _Persistence.buildDefaultConstraint.call(ctor as any);
-        if (destroyDefaultConstraint != null) dm.where(destroyDefaultConstraint as any);
-        const destroyGlobalScope = ScopeRegistry.globalCurrentScope(ctor);
-        if (destroyGlobalScope) {
-          const ast = destroyGlobalScope._whereClause?.ast;
-          if (ast != null) dm.where(ast as any);
-        }
+        _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
         const affected = await ctor.adapter.execDelete(dm.toSql(), `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected === 0) {
