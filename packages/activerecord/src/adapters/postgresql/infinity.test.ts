@@ -1,14 +1,32 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/infinity_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// The `postgresql_infinities` table exists only to exercise PG ±Infinity
+// timestamp/date sentinel semantics — created via raw DDL below;
+// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await defineSchema(adapter, {});
+  return adapter;
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await freshAdapter();
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_infinities`);
     await adapter.exec(`
       CREATE TABLE postgresql_infinities (
