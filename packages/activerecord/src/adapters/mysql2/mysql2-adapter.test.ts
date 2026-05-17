@@ -460,6 +460,22 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.databaseTimezone).toBe("utc");
     });
 
+    it("configure connection seeds database timezone from default", async () => {
+      // Mirrors Rails' `Mysql2Adapter#configure_connection` which assigns
+      // `@raw_connection.query_options[:database_timezone] = default_timezone`
+      // up front. Asserts the seed lands immediately — the per-query re-sync
+      // is covered by the test above.
+      adapter.databaseTimezone = "utc";
+      await withTimezoneConfig({ default: "local" }, () => {
+        adapter.configureConnection();
+        expect(adapter.databaseTimezone).toBe("local");
+      });
+      await withTimezoneConfig({ default: "utc" }, () => {
+        adapter.configureConnection();
+        expect(adapter.databaseTimezone).toBe("utc");
+      });
+    });
+
     it("warnings do not change returned value of exec update", async () => {
       // Mirrors: test_warnings_do_not_change_returned_value_of_exec_update.
       // Pin a single pool connection via beginTransaction so SET SESSION

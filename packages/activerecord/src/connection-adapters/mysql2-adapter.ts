@@ -250,7 +250,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // connected" message is promoted to ConnectionNotEstablished;
       // everything else in this family is ConnectionFailed.
       const msg = (e as Error).message;
-      if (AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg)) {
+      if (AbstractMysqlAdapter.isClientNotConnected(e)) {
         return new ConnectionNotEstablished(msg, { cause: e });
       }
       return new ConnectionFailed(msg, { sql, binds, cause: e });
@@ -1515,6 +1515,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // database_timezone on the single raw connection. In our pool model
     // we have no single raw connection to configure here; mysql2's typeCast
     // handles temporal fields and results are returned as objects (not arrays).
+    // The database_timezone equivalent ({@link databaseTimezone}) is seeded
+    // from the global default here and re-synced per-query in perform_query,
+    // mirroring Rails' `query_options[:database_timezone] = default_timezone`.
+    this._syncDatabaseTimezone();
     super.configureConnection();
   }
 
