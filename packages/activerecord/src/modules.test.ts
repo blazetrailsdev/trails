@@ -106,44 +106,4 @@ describe("ModulesTest", () => {
     }
     expect(Account.tableName).toBe("accounts_archive_v2");
   });
-
-  it("compute type can infer class name of sibling inside module", () => {
-    class Vehicle extends Base {
-      static {
-        this.attribute("type", "string");
-        this.inheritanceColumn = "type";
-        this.adapter = adapter;
-      }
-    }
-    class Car extends Vehicle {}
-    expect(Car.name).toBe("Car");
-  });
-
-  it("nested models should not raise exception when using delete all dependency on association", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p1 = await Post.create({ title: "a" });
-    const p2 = await Post.create({ title: "b" });
-    await p1.destroy();
-    await p2.destroy();
-    expect(await Post.count()).toBe(0);
-  });
-
-  it("nested models should not raise exception when using nullify dependency on association", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_id", "integer");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Post.create({ title: "a", author_id: 1 });
-    p.author_id = null;
-    await p.save();
-    expect(p.author_id).toBeNull();
-  });
 });

@@ -504,20 +504,6 @@ describe("SQLite3AdapterTest", () => {
     expect(id).toBe(3);
   });
 
-  it("supports extensions", () => {
-    expect(adapter.supportsExtensions()).toBe(false);
-  });
-
-  it("respond to enable extension", () => {
-    // better-sqlite3 doesn't support loadExtension by default
-    // but we verify the adapter exists and is functional
-    expect(adapter.isOpen).toBe(true);
-  });
-
-  it("respond to disable extension", () => {
-    expect(adapter.isOpen).toBe(true);
-  });
-
   it("statement closed", async () => {
     const a = new SQLite3Adapter(":memory:");
     expect(a.isOpen).toBe(true);

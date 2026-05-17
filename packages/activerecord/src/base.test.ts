@@ -618,30 +618,6 @@ describe("BasicsTest", () => {
     await p.destroy();
     expect(p.isDestroyed()).toBe(true);
   });
-  it("generated association methods module name", () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    // In TS, the class itself serves as the association methods container
-    expect(typeof Post).toBe("function");
-  });
-
-  it("generated relation methods module name", () => {
-    const adp = freshAdapter();
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adp;
-      }
-    }
-    // Verify the model has relation-building methods
-    expect(typeof Post.where).toBe("function");
-    expect(typeof Post.order).toBe("function");
-  });
 
   it("arel attribute normalization", () => {
     const adp = freshAdapter();

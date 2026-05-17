@@ -214,6 +214,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Cross-connection read_uncommitted visibility requires SQLITE_OPEN_SHAREDCACHE. " +
       "better-sqlite3 does not expose this flag, so two connections cannot share a cache.",
   },
+  {
+    testFile: "adapters/sqlite3/sqlite3_adapter_test.rb",
+    tests: ["supports extensions", "respond to enable extension", "respond to disable extension"],
+    reason:
+      "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the " +
+      "sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION " +
+      "entry points, so supports_extensions? / enable_extension / disable_extension cannot " +
+      "be implemented against the driver Trails uses.",
+  },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
   {
     testFile: "reflection_test.rb",
@@ -235,6 +244,9 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "associations spanning cross modules",
       "find account and include company",
       "eager loading in modules",
+      "compute type can infer class name of sibling inside module",
+      "nested models should not raise exception when using delete all dependency on association",
+      "nested models should not raise exception when using nullify dependency on association",
     ],
     reason:
       "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
@@ -313,10 +325,17 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "default in local time",
       "switching default time zone",
       "mutating time objects",
+      // Ruby Module#inspect — assert generated mixin Module's #inspect returns
+      // "Post::GeneratedAssociationMethods" / "Post::GeneratedRelationMethods".
+      // TS has no Module objects with namespaced #inspect; generated method bags
+      // are plain prototype-extension objects with no inspectable class name.
+      "generated association methods module name",
+      "generated relation methods module name",
     ],
     reason:
       "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, " +
-      'and with_env_tz (process-level ENV["TZ"] reload) — all Ruby-only with no Node.js equivalent.',
+      'with_env_tz (process-level ENV["TZ"] reload), and Ruby Module#inspect for ' +
+      "namespaced generated-method modules — all Ruby-only with no Node.js equivalent.",
   },
   {
     testFile: "hstore_test.rb",
