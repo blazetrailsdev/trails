@@ -42,8 +42,10 @@ const FILE_OVERRIDES: Record<string, string> = {
  * Keyed by `pkg:rubyDirPrefix` — matched if the ruby file path starts with the prefix.
  */
 const DIR_PREFIX_OVERRIDES: Record<string, string> = {
-  // Rails: action_controller/railties/... → our trailties convention
+  // Rails: action_controller/railties/... → our trailties convention.
+  // Same convention for abstract_controller/railties/...
   "actioncontroller:railties/": "trailties/",
+  "abstractcontroller:railties/": "trailties/",
 };
 
 /**

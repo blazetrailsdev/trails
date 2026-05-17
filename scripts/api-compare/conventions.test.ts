@@ -117,6 +117,12 @@ describe("rubyFileToTs", () => {
     );
   });
 
+  it("maps abstract_controller/railties/... to trailties/... via DIR_PREFIX_OVERRIDES", () => {
+    expect(rubyFileToTs("railties/routes_helpers.rb", "abstractcontroller")).toBe(
+      "trailties/routes-helpers.ts",
+    );
+  });
+
   it("FILE_OVERRIDES takes precedence over DIR_PREFIX_OVERRIDES", () => {
     // activerecord:railtie.rb → trailtie.ts is a FILE_OVERRIDES entry; it must
     // win even if a hypothetical DIR_PREFIX_OVERRIDES entry would also match.

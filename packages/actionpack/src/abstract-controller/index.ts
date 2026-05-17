@@ -95,3 +95,9 @@ export {
   type HelpersHost,
   type ResolutionOptions,
 } from "./helpers.js";
+export {
+  withRoutesHelpers,
+  type RoutesHelpersClassMethods,
+  type RoutesHelpersControllerClass,
+  type UrlHelpersRouteSet,
+} from "./trailties/routes-helpers.js";
