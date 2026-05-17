@@ -902,6 +902,58 @@ describe("ReflectionTest", () => {
     expect(ref.joinPrimaryKey).toBe("post_id");
     expect(ref.joinForeignKey).toBe("id");
   });
+  it("through reflection ignores foreignKey option on join keys (delegates to source)", () => {
+    // Rails parity: ThroughReflection#join_primary_key / #join_foreign_key
+    // delegate to source_reflection exclusively. `:foreign_key` on the
+    // has_many :through macro lives on the delegate_reflection and must not
+    // leak into the join keys.
+    class Author extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class Comment extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    registerModel("Comment", Comment);
+    Associations.hasMany.call(Author, "posts", {});
+    Associations.hasMany.call(Post, "comments", {});
+    Associations.hasMany.call(Author, "comments", {
+      through: "posts",
+      foreignKey: "bogus_id",
+    });
+    const ref = reflectOnAssociation(Author, "comments") as ThroughReflection;
+    // Source is `comments` on Post; source's joinPrimaryKey is "post_id"
+    // (its foreign_key). The bogus `foreignKey: "bogus_id"` on the through
+    // macro must NOT appear here.
+    expect(ref.joinPrimaryKey).toBe("post_id");
+    expect(ref.joinForeignKey).toBe("id");
+
+    // When sourceReflection cannot be resolved, Rails raises
+    // HasManyThroughSourceAssociationNotFoundError (reflection.rb:1469).
+    // Before this fix, joinPrimaryKey/joinForeignKey silently fell back
+    // to delegate_reflection and could leak the bogus foreignKey.
+    Associations.hasMany.call(Author, "missing", {
+      through: "posts",
+      source: "doesNotExist",
+      foreignKey: "bogus_id",
+    });
+    const bad = reflectOnAssociation(Author, "missing") as ThroughReflection;
+    expect(() => bad.joinPrimaryKey).toThrow(/source association/i);
+    expect(() => bad.joinForeignKey).toThrow(/source association/i);
+  });
   it("join scope builds arel predicate for has many", () => {
     const { Author } = makeModels();
     const ref = reflectOnAssociation(Author, "books") as AssociationReflection;

@@ -1289,7 +1289,9 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get joinPrimaryKey(): string | string[] {
-    return this.sourceReflection?.joinPrimaryKey ?? this._delegate.joinPrimaryKey;
+    const src = this.sourceReflection;
+    if (!src) this.checkValidityBang();
+    return src!.joinPrimaryKey;
   }
 
   /**
@@ -1302,16 +1304,21 @@ export class ThroughReflection extends AbstractReflection {
   joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
     const src = this.sourceReflection as unknown as {
       joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
-      joinPrimaryKey?: string | string[];
+      joinPrimaryKey: string | string[];
     } | null;
+    if (!src) {
+      this.checkValidityBang();
+    }
     if (src && typeof src.joinPrimaryKeyFor === "function") {
       return src.joinPrimaryKeyFor(klass);
     }
-    return src?.joinPrimaryKey ?? this._delegate.joinPrimaryKey;
+    return src!.joinPrimaryKey;
   }
 
   get joinForeignKey(): string | string[] {
-    return this.sourceReflection?.joinForeignKey ?? this._delegate.joinForeignKey;
+    const src = this.sourceReflection;
+    if (!src) this.checkValidityBang();
+    return src!.joinForeignKey;
   }
 
   scopeFor(relation: any, owner?: any): any {
