@@ -4,6 +4,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type {
+  SqliteDriver,
+  SqliteOpenConfig,
+  SyncSqliteConnection,
+  SyncSqliteStatement,
+} from "@blazetrails/activesupport/sqlite-adapter";
 import { assertLogged } from "./test-helper.js";
 
 let adapter: SQLite3Adapter;
@@ -636,6 +642,72 @@ describe("SQLite3AdapterTest", () => {
       }
     } finally {
       SQLite3Adapter.strictStringsByDefault = false;
+    }
+  });
+
+  it("forwards strictStringsByDefault to the driver via openSync(config)", async () => {
+    // Mirrors Rails: strict_strings_by_default = true reaches the adapter
+    // through `strict: true` on the per-connection config, not via a runtime
+    // override after open. The driver hook receives that resolved value.
+    const capture: { config: SqliteOpenConfig | null } = { config: null };
+    const fakeStmt: SyncSqliteStatement = {
+      run: () => ({ changes: 0, lastInsertRowid: 0 }),
+      get: () => ({ v: "3.37.0" }),
+      all: () => [],
+      iterate: () => [].values(),
+      columns: () => [],
+      setReadBigInts: () => {},
+      reader: true,
+    };
+    const fakeConn: SyncSqliteConnection = {
+      prepare: () => fakeStmt,
+      exec: () => {},
+      pragma: () => [],
+      close: () => {},
+      isOpen: () => true,
+      raw: null,
+    };
+    const fakeDriver: SqliteDriver = {
+      name: "fake-strict-capture",
+      capabilities: {
+        inProcessSync: true,
+        streaming: false,
+        loadExtension: false,
+        concurrentStatements: true,
+        foreignKeysOnByDefault: false,
+        immediateTransactions: false,
+      },
+      open: () => Promise.reject(new Error("sync only")),
+      openSync: (config: SqliteOpenConfig) => {
+        capture.config = config;
+        return fakeConn;
+      },
+    };
+
+    const originalDefault = SQLite3Adapter.strictStringsByDefault;
+    SQLite3Adapter.strictStringsByDefault = true;
+    try {
+      const conn = new SQLite3Adapter(":memory:", { driver: fakeDriver });
+      try {
+        expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(true);
+        expect(conn.strictStrings).toBe(true);
+      } finally {
+        await conn.close();
+      }
+    } finally {
+      SQLite3Adapter.strictStringsByDefault = originalDefault;
+    }
+
+    capture.config = null;
+    const explicit = new SQLite3Adapter(":memory:", {
+      driver: fakeDriver,
+      strict: false,
+    });
+    try {
+      expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(false);
+      expect(explicit.strictStrings).toBe(false);
+    } finally {
+      await explicit.close();
     }
   });
 

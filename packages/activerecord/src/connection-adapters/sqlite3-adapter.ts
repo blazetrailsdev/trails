@@ -847,7 +847,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override checkVersion(): void {
     if (this.databaseVersion.lt("3.8.0")) {
       throw new Error(
-        `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.0.`,
+        `Your version of SQLite (${this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
     }
   }
@@ -921,21 +921,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
   async virtualTableExists(tableName: string): Promise<boolean> {
-    try {
-      const rows = await this.execute(
-        `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'virtual' AND name = ?`,
-        [tableName],
-        "SCHEMA",
-      );
-      return rows.length > 0;
-    } catch {
-      const rows = await this.execute(
-        `SELECT name FROM sqlite_master WHERE type='table' AND sql LIKE '%VIRTUAL%' AND name = ?`,
-        [tableName],
-        "SCHEMA",
-      );
-      return rows.length > 0;
-    }
+    const rows = await this.execute(
+      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'virtual' AND name = ?`,
+      [tableName],
+      "SCHEMA",
+    );
+    return rows.length > 0;
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
