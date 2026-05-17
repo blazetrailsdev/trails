@@ -118,7 +118,7 @@ export function connectsTo(
           return new AdapterClass(adapterArg);
         },
       });
-      (pool as unknown as { adapterReady: Promise<unknown> }).adapterReady = adapterReady;
+      pool.adapterReady = adapterReady;
       connections.push(pool);
     }
   }

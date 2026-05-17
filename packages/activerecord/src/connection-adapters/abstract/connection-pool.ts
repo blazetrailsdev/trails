@@ -224,6 +224,14 @@ export class ConnectionPool implements ReapablePool {
 
   automaticReconnect = true;
   checkoutTimeout: number;
+  /**
+   * Resolves once the adapter class for this pool has been loaded by the
+   * async ConnectionAdapters resolver. Set by sync entry points like
+   * `connectsTo` so callers can await preload before issuing real queries;
+   * defaults to a resolved promise for pools whose adapterFactory is
+   * supplied directly.
+   */
+  adapterReady: Promise<unknown> = Promise.resolve();
 
   private _connections: DatabaseAdapter[] | null = [];
   private _available: ConnectionLeasingQueue | null;
