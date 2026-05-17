@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
 import {
   Associations,
@@ -14,6 +14,8 @@ import {
 } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -23,8 +25,21 @@ function freshAdapter(): DatabaseAdapter {
 
 describe("InverseBelongsToTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      faces: { description: "string", man_id: "integer", human_id: "integer" },
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      humen: { name: "string" },
+      interests: { topic: "string", human_id: "integer", man_id: "integer" },
+      nodes: { name: "string", node_id: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModels() {
@@ -378,8 +393,31 @@ describe("InverseBelongsToTests", () => {
 
 describe("InverseHasManyTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      interests: { topic: "string", man_id: "integer", human_id: "integer" },
+      humen: { name: "string" },
+      nodes: { name: "string", node_id: "integer" },
+      cpk_men: {
+        columns: {
+          region_id: "integer",
+          id: "integer",
+          name: "string",
+        },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_interests: {
+        cpk_man_region_id: "integer",
+        cpk_man_id: "integer",
+        topic: "string",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModels() {
@@ -571,7 +609,6 @@ describe("InverseHasManyTests", () => {
   });
 
   it("inverse should be set on composite primary key child", async () => {
-    const adapter = freshAdapter();
     class CpkMan extends Base {
       static {
         this._tableName = "cpk_men";
@@ -716,8 +753,17 @@ describe("InverseHasManyTests", () => {
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      interests: { topic: "string", man_id: "integer" },
+      hobbies: { name: "string", man_id: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
