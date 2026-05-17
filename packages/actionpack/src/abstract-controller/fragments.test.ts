@@ -41,16 +41,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("class config", () => {
-  it("applyFragments seeds a key list, preserving an existing one", () => {
-    class A {}
-    applyFragments(A as unknown as new (...a: never[]) => unknown);
-    expect((A as unknown as FragmentsClassMethods).fragmentCacheKeys).toEqual([]);
-
-    class B {
+  it("applyFragments is a no-op so subclasses inherit the parent key list", () => {
+    class Parent {
       static fragmentCacheKeys = [() => "v1"];
     }
-    applyFragments(B as unknown as new (...a: never[]) => unknown);
-    expect(B.fragmentCacheKeys).toHaveLength(1);
+    class Child extends Parent {}
+    applyFragments(Child as unknown as new (...a: never[]) => unknown);
+    // Child must NOT have its own fragmentCacheKeys property — the
+    // parent's list inherits via the prototype chain.
+    expect(Object.prototype.hasOwnProperty.call(Child, "fragmentCacheKeys")).toBe(false);
+    expect(Child.fragmentCacheKeys).toHaveLength(1);
   });
 
   it("fragmentCacheKey appends constants-as-thunks and blocks in order", () => {

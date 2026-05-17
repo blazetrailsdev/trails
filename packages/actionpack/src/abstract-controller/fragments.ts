@@ -32,12 +32,17 @@ export interface FragmentsHost {
   instrumentPayload?(key: unknown): Record<string, unknown>;
 }
 
+/**
+ * Marks a host class as conforming to the fragments slot contract.
+ * No-op at runtime — mirrors `applyAssetPaths` / `applyCaching`. Seeding
+ * an own `fragmentCacheKeys = []` here would shadow an inherited list
+ * on subclasses; instead `fragmentCacheKey` and reads treat `undefined`
+ * as an empty list, preserving Rails' `class_attribute` copy-on-write.
+ */
 export function applyFragments<T extends new (...args: never[]) => unknown>(
-  cls: T & Partial<FragmentsClassMethods>,
+  _cls: T & Partial<FragmentsClassMethods>,
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(cls, "fragmentCacheKeys")) {
-    cls.fragmentCacheKeys = [];
-  }
+  // Intentionally empty.
 }
 
 export function fragmentCacheKey(
@@ -57,7 +62,9 @@ export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unk
   const heads = (this.constructor.fragmentCacheKeys ?? []).map((k) => k.call(this));
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
-  const version = env?.RAILS_CACHE_ID ?? env?.RAILS_APP_VERSION ?? null;
+  // Rails uses `||` here (`ENV["RAILS_CACHE_ID"] || ENV["RAILS_APP_VERSION"]`),
+  // so empty strings fall through — not `??`.
+  const version = env?.RAILS_CACHE_ID || env?.RAILS_APP_VERSION || null;
 
   let tail: unknown;
   if (isPlainObject(key) && typeof this.urlFor === "function") {
