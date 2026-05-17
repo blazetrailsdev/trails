@@ -170,9 +170,15 @@ export async function resetCounters(
     const count = await countHasMany(record, assoc.name, assoc.options);
     // Mirrors Rails: `updates[counter_name] = count if count != count_was` — skip
     // the UPDATE entirely when the stored counter already matches the recount.
+    // Ruby's `!=` is type-coercing across Integer/Bignum; in TS we have to match
+    // explicitly when the stored attribute is bigint (e.g. big_integer columns).
     const countWas =
       (record as any).readAttribute?.(counterColumn) ?? (record as any)[counterColumn];
-    if (count !== countWas) updates[counterColumn] = count;
+    const sameCount =
+      typeof countWas === "bigint" ? countWas === BigInt(count) : count === countWas;
+    if (!sameCount) {
+      updates[counterColumn] = typeof countWas === "bigint" ? BigInt(count) : count;
+    }
   }
 
   if (options.touch) {
