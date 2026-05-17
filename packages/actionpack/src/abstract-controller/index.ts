@@ -64,3 +64,16 @@ export {
   type CachingSlot,
   type ViewCacheDependency,
 } from "./caching.js";
+export {
+  applyFragments,
+  combinedFragmentCacheKey,
+  expireFragment,
+  fragmentCacheKey,
+  fragmentExist,
+  instrumentFragmentCache,
+  readFragment,
+  writeFragment,
+  type FragmentCacheKeyBlock,
+  type FragmentsClassMethods,
+  type FragmentsHost,
+} from "./fragments.js";
