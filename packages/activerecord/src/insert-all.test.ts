@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
+import { UnknownAttributeError } from "./errors.js";
 import { adapterType, createTestAdapter } from "./test-adapter.js";
 
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
@@ -201,10 +202,14 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all raises on duplicate records", () => {
-    // BLOCKED: relation — insert_all.rb: raises on duplicate (unique constraint)
+    // BLOCKED: relation
+    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
+    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
   it.skip("insert all with returning", () => {
-    // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
+    // BLOCKED: adapter-pg
+    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
+    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
   });
   itIfConflictTarget("insert all skip duplicates", async () => {
     const adapter = freshAdapter();
@@ -245,7 +250,9 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("upsert all does not update readonly attributes", () => {
-    // BLOCKED: relation — insert_all.rb: readonly attrs not updated
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
+    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
   });
 
   it.skip("upsert all updates changed columns only", () => {
@@ -263,8 +270,11 @@ describe("InsertAllTest", () => {
     expect(all.some((b: any) => b.title === "EnumBook")).toBe(true);
   });
 
-  it.skip("insert_all has a clear error message when a column does not exist", () => {
-    // BLOCKED: relation — insert_all.rb: clear error on missing column
+  it("insert_all has a clear error message when a column does not exist", async () => {
+    const Book = makeBookWithAdapter();
+    await expect(Book.insertAll([{ title: "Valid", no_such_column: 1 }])).rejects.toThrow(
+      UnknownAttributeError,
+    );
   });
 
   it("insert_all can insert records with timestamps", async () => {
@@ -286,7 +296,9 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert_all with on_duplicate updates record timestamps", () => {
-    // BLOCKED: relation — insert_all.rb: timestamp touch on on_duplicate
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it("insert_all with raw sql on_duplicate", async () => {
     const Book = makeBookWithAdapter();
@@ -301,11 +313,16 @@ describe("InsertAllTest", () => {
     expect(all).toHaveLength(1);
     expect((all[0] as any).author).toBe("Updated");
   });
-  it.skip("upsert all has a clear error message when a column does not exist", () => {
-    // BLOCKED: relation — insert_all.rb: clear error on missing column in upsert
+  it("upsert all has a clear error message when a column does not exist", async () => {
+    const Book = makeBookWithAdapter();
+    await expect(Book.upsertAll([{ title: "Valid", no_such_column: 1 }])).rejects.toThrow(
+      UnknownAttributeError,
+    );
   });
   it.skip("upsert all with unique_by column not an index raises error", () => {
-    // BLOCKED: schema — insert_all.rb: uniqueBy column must be an index
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
 
   it.skip("upsert all supports update_only option", () => {
@@ -317,7 +334,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: adapter-pg — insert_all.rb: RETURNING clause support
   });
   it.skip("insert_all! raises on duplicate", () => {
-    // BLOCKED: relation — insert_all.rb: insert_all! raises on duplicate
+    // BLOCKED: relation
+    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
+    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
   it("insert_all with empty array", async () => {
     const adapter = freshAdapter();
@@ -332,7 +351,9 @@ describe("InsertAllTest", () => {
     expect(count).toBe(0);
   });
   it.skip("insert all with partial unique index", () => {
-    // BLOCKED: schema — insert_all.rb: partial unique index support
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it("insert_all works without callbacks or validations", async () => {
     const adapter = freshAdapter();
@@ -442,7 +463,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: SQL generation for upsertAll
   });
   it.skip("insert_all with returning and on_duplicate", () => {
-    // BLOCKED: adapter-pg — insert_all.rb: RETURNING + ON CONFLICT clause
+    // BLOCKED: adapter-pg
+    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
+    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
   });
   it("insert_all with on_duplicate raw sql", async () => {
     const Book = makeBookWithAdapter();
@@ -457,13 +480,19 @@ describe("InsertAllTest", () => {
     expect((book as any).author).toBe("B");
   });
   it.skip("insert_all does not include readonly attributes", () => {
-    // BLOCKED: relation — insert_all.rb: readonly attrs excluded from insertAll
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
+    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
   });
   it.skip("upsert_all does not include readonly attributes", () => {
-    // BLOCKED: relation — insert_all.rb: readonly attrs excluded from upsertAll
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
+    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
   });
   it.skip("insert_all! raises for duplicate records", () => {
-    // BLOCKED: relation — insert_all.rb: insert_all! raises for duplicate records
+    // BLOCKED: relation
+    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
+    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
   it.skip("insert! raises for invalid records", () => {
     // BLOCKED: validation — insert_all.rb: insert! validates records
@@ -479,7 +508,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: type — insert_all.rb: type-cast + serialize consistency
   });
   it.skip("insert all returns requested sql fields", () => {
-    // BLOCKED: adapter-pg — insert_all.rb: RETURNING requested sql fields
+    // BLOCKED: adapter-pg
+    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
+    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
   });
   it.skip("insert all with skip duplicates and autonumber id not given", () => {
     // BLOCKED: relation — insert_all.rb: skip duplicates, autonumber id absent
@@ -488,19 +519,29 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: skip duplicates, autonumber id given
   });
   it.skip("insert all will raise if duplicates are skipped only for a certain conflict target", () => {
-    // BLOCKED: relation — insert_all.rb: conflict-target-specific duplicate skip
+    // BLOCKED: relation
+    // ROOT-CAUSE: insertAll uses onDuplicate="raise" semantics only via DB-native constraint violation; current path swallows the adapter error and returns affected-row count rather than re-raising as RecordNotUnique. insertAllBang delegates to insertAll so inherits the gap.
+    // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
   it.skip("insert all and upsert all with index finding options", () => {
-    // BLOCKED: schema — insert_all.rb: index lookup for uniqueBy
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it.skip("insert all and upsert all with expression index", () => {
-    // BLOCKED: schema — insert_all.rb: expression index support
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it.skip("insert all and upsert all raises when index is missing", () => {
-    // BLOCKED: schema — insert_all.rb: raises when matching index missing
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it.skip("insert all and upsert all finds index with inverted unique by columns", () => {
-    // BLOCKED: schema — insert_all.rb: inverted uniqueBy column order match
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   itIfConflictTarget(
     "insert all and upsert all works with composite primary keys when unique by is provided",
@@ -563,46 +604,74 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: PK columns not overwritten by upsert
   });
   it.skip("upsert all does not perform an upsert if a partial index doesnt apply", () => {
-    // BLOCKED: schema — insert_all.rb: partial index condition gate
+    // BLOCKED: schema
+    // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
+    // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it.skip("upsert all respects updated at precision when touched implicitly", () => {
-    // BLOCKED: relation — insert_all.rb: updated_at precision respected
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all uses given updated at over implicit updated at", () => {
-    // BLOCKED: relation — insert_all.rb: explicit updated_at wins over implicit
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all uses given updated on over implicit updated on", () => {
-    // BLOCKED: relation — insert_all.rb: explicit updated_on wins over implicit
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all implicitly sets timestamps on create when model record timestamps is true", () => {
-    // BLOCKED: relation — insert_all.rb: implicit timestamps on create (true)
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is true but overridden", () => {
-    // BLOCKED: relation — insert_all.rb: no implicit timestamps on create when overridden
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all does not implicitly set timestamps on create when model record timestamps is false", () => {
-    // BLOCKED: relation — insert_all.rb: no implicit timestamps on create (false)
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all implicitly sets timestamps on create when model record timestamps is false but overridden", () => {
-    // BLOCKED: relation — insert_all.rb: implicit timestamps on create when false overridden
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all respects created at precision when touched implicitly", () => {
-    // BLOCKED: relation — insert_all.rb: created_at precision respected
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all implicitly sets timestamps on update when model record timestamps is true", () => {
-    // BLOCKED: relation — insert_all.rb: implicit timestamps on update (true)
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden", () => {
-    // BLOCKED: relation — insert_all.rb: no implicit timestamps on update when overridden
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all does not implicitly set timestamps on update when model record timestamps is false", () => {
-    // BLOCKED: relation — insert_all.rb: no implicit timestamps on update (false)
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all implicitly sets timestamps on update when model record timestamps is false but overridden", () => {
-    // BLOCKED: relation — insert_all.rb: implicit timestamps on update when false overridden
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all implicitly sets timestamps even when columns are aliased", () => {
-    // BLOCKED: relation — insert_all.rb: implicit timestamps with aliased columns
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
   });
   it.skip("upsert all works with partitioned indexes", () => {
     // BLOCKED: adapter-pg — insert_all.rb: partitioned index support
@@ -735,11 +804,7 @@ describe("InsertAllTest", () => {
     expect(found.title).toBe("Updated");
   });
 
-  it.skip("insert all raises on unknown attribute", async () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts#verifyAttributes checks row-key uniformity across rows but not membership in model.attributeNames; Rails raises ActiveRecord::UnknownAttributeError (insert_all_test.rb#test_insert_all_raises_on_unknown_attribute).
-    // SCOPE: ~10 LOC — extend verifyAttributes to assert keys ⊆ model.attributeNames; affects ~3 tests
-    const { UnknownAttributeError } = await import("./errors.js");
+  it("insert all raises on unknown attribute", async () => {
     const Book = makeBookWithAdapter();
     await expect(
       Book.all().insertAllBang([{ title: "Valid", unknown_attribute: "x" }]),
@@ -762,17 +827,23 @@ describe("InsertAllTest", () => {
   });
 
   it.skip("insert all returns primary key if returning is supported", async () => {
-    // BLOCKED: adapter-pg — insert_all.rb: RETURNING primary key
+    // BLOCKED: adapter-pg
+    // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
+    // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
     // RETURNING clause support depends on the adapter
   });
 
   it.skip("upsert all does not touch updated at when values do not change", async () => {
-    // BLOCKED: relation — insert_all.rb: no updated_at touch when values unchanged
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
     // requires timestamps tracking
   });
 
   it.skip("upsert all touches updated at and updated on when values change", async () => {
-    // BLOCKED: relation — insert_all.rb: updated_at + updated_on touch on change
+    // BLOCKED: relation
+    // ROOT-CAUSE: insert-all.ts#mapKeyWithValue seeds created_at/updated_at via timestampsForCreate() on insert only; upsert/on-duplicate paths in Builder.toSql do not refresh updated_at, do not honor recordTimestamps overrides, and ignore precision config.
+    // SCOPE: ~80–120 LOC across insert-all.ts (split mapKeyWithValue insert vs update + touch_timestamp_attribute? gate) and schemaCreation timestamp formatting; affects ~15 timestamp tests
     // requires timestamps tracking
   });
 

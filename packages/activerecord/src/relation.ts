@@ -60,7 +60,7 @@ import {
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
 import { wrapWithScopeProxy } from "./relation/delegation.js";
-import { InsertAll } from "./insert-all.js";
+import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -3964,17 +3964,27 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Base.insert!
    */
-  async insertBang(attrs: Record<string, unknown>): Promise<number> {
-    return this.insertAll([attrs]);
+  async insertBang(
+    attrs: Record<string, unknown>,
+    options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
+  ): Promise<number> {
+    return this.insertAllBang([attrs], options);
   }
 
   /**
    * Insert multiple records, raising on failure.
    *
-   * Mirrors: ActiveRecord::Base.insert_all!
+   * Mirrors: ActiveRecord::Base.insert_all! (Rails relation.rb:790 —
+   * `def insert_all!(attributes, returning: nil, record_timestamps: nil)`).
    */
-  async insertAllBang(records: Record<string, unknown>[]): Promise<number> {
-    return this.insertAll(records);
+  async insertAllBang(
+    records: Record<string, unknown>[],
+    options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
+  ): Promise<number> {
+    return InsertAll.execute(this, records, {
+      returning: options?.returning,
+      recordTimestamps: options?.recordTimestamps,
+    });
   }
 
   /**

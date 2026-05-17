@@ -2,6 +2,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
 import { stiName } from "./inheritance.js";
@@ -13,6 +14,10 @@ type AdapterDialect = AdapterName;
 
 const TIMESTAMP_COLUMNS = ["created_at", "updated_at"] as const;
 const UPDATE_TIMESTAMP_COLUMNS = ["updated_at"] as const;
+// Mirrors timestamp.ts CREATED_ATTRS/UPDATED_ATTRS: both _at and _on are magic
+// timestamp columns, so verifyAttributes must allow either pair even when only
+// the other is in the model's declared attribute set.
+const TIMESTAMP_ATTR_ALLOWLIST = ["created_at", "created_on", "updated_at", "updated_on"] as const;
 
 // Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#column_name_with_order_matcher
 // Intentionally more restrictive than Rails: quoted identifiers ("col", `col`) and COLLATE
@@ -213,11 +218,27 @@ export class InsertAll {
 
   /** @internal */
   private verifyAttributes(): void {
-    if (this.inserts.length <= 1) return;
-    for (const row of this.inserts.slice(1)) {
-      const rowKeys = new Set([...Object.keys(row), ...Object.keys(this._scopeAttributes)]);
-      if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
-        throw new Error("All objects being inserted must have the same keys");
+    if (this.inserts.length > 1) {
+      for (const row of this.inserts.slice(1)) {
+        const rowKeys = new Set([...Object.keys(row), ...Object.keys(this._scopeAttributes)]);
+        if (rowKeys.size !== this.keys.size || ![...this.keys].every((k) => rowKeys.has(k))) {
+          throw new Error("All objects being inserted must have the same keys");
+        }
+      }
+    }
+    // Rails raises UnknownAttributeError in extract_types_from_columns_on against
+    // schema_cache.columns_hash; we mirror the same intent against the model's
+    // declared attribute set so the error surfaces before any SQL is built.
+    const known = new Set(this.model.attributeNames());
+    if (known.size === 0) return;
+    for (const pk of this.primaryKeys()) known.add(pk);
+    for (const col of TIMESTAMP_ATTR_ALLOWLIST) known.add(col);
+    for (const key of this.keys) {
+      if (!known.has(key)) {
+        // UnknownAttributeError only reads record?.constructor?.name; skip the
+        // full constructor (attribute init, defaults, callbacks) on the error
+        // path by handing it a bare object with the right constructor link.
+        throw new UnknownAttributeError({ constructor: this.model }, key);
       }
     }
   }

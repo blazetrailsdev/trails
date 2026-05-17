@@ -2148,7 +2148,10 @@ export class Base extends Model {
   declare static leftOuterJoins: typeof Querying.leftOuterJoins;
   declare static none: typeof Querying.none;
   declare static insert: typeof Querying.insert;
+  declare static insertBang: typeof Querying.insertBang;
   declare static insertAll: typeof Querying.insertAll;
+  declare static insertAllBang: typeof Querying.insertAllBang;
+  declare static upsert: typeof Querying.upsert;
   declare static upsertAll: typeof Querying.upsertAll;
   declare static updateAll: typeof Querying.updateAll;
   declare static deleteAll: typeof Querying.deleteAll;
