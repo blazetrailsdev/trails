@@ -13,12 +13,13 @@ function isTemporalDatetime(v: unknown): boolean {
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -543,77 +544,84 @@ describe("PersistenceTest", () => {
 // PersistenceTest (continued) — more persistence_test.rb coverage
 // ==========================================================================
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { label: "string" },
+      posts: { title: "string", body: "string" },
+      cm_items: { title: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("fills auto populated columns on creation", async () => {
-    const adapter = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("label", "string");
-        this.adapter = adapter;
       }
     }
+    Item.adapter = adapter;
     const record = await Item.create({ label: "x" });
     expect(record.id).not.toBeNull();
     expect(record.isPersisted()).toBe(true);
   });
 
   it("build", () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const post = Post.new({ title: "built" });
     expect((post as any).title).toBe("built");
     expect((post as any).isNewRecord()).toBe(true);
   });
 
   it("build many", () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const posts = [{ title: "a" }, { title: "b" }].map((attrs) => Post.new(attrs));
     expect(posts.length).toBe(2);
     expect(posts.every((p) => (p as any).isNewRecord())).toBe(true);
   });
 
   it("save null string attributes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const post = (await Post.create({ title: null })) as any;
     expect(post.id).toBeDefined();
   });
 
   it("save nil string attributes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const post = (await Post.create({ title: undefined })) as any;
     expect(post.id).toBeDefined();
   });
 
   it("create many", async () => {
-    const adp = freshAdapter();
     class CmItem extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    CmItem.adapter = adapter;
     const items = await Promise.all([
       CmItem.create({ title: "a" }),
       CmItem.create({ title: "b" }),
@@ -624,13 +632,12 @@ describe("PersistenceTest", () => {
   });
 
   it("delete many", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p1 = (await Post.create({ title: "a" })) as any;
     const p2 = (await Post.create({ title: "b" })) as any;
     await Post.delete(p1.id);
@@ -640,13 +647,12 @@ describe("PersistenceTest", () => {
   });
 
   it("update many with duplicated ids", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p = (await Post.create({ title: "original" })) as any;
     await Post.update(p.id, { title: "updated" });
     const found = (await Post.find(p.id)) as any;
@@ -654,37 +660,34 @@ describe("PersistenceTest", () => {
   });
 
   it("update many with invalid id", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     await expect(Post.find(99999)).rejects.toThrow();
   });
 
   it("update many with active record base object", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p = (await Post.create({ title: "original" })) as any;
     await p.update({ title: "updated" });
     expect(p.title).toBe("updated");
   });
 
   it("update many with array of active record base objects", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p1 = (await Post.create({ title: "a" })) as any;
     const p2 = (await Post.create({ title: "b" })) as any;
     await p1.update({ title: "a2" });
@@ -694,26 +697,24 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes includes errors", () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p = Post.new({}) as any;
     expect(p.errors).toBeDefined();
   });
 
   it("create columns not equal attributes", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
       }
     }
+    Post.adapter = adapter;
     const p = (await Post.create({ title: "t" })) as any;
     expect(p.id).toBeDefined();
   });
@@ -723,18 +724,31 @@ describe("PersistenceTest", () => {
 // PersistenceTest2 — additional coverage for persistence_test.rb
 // ==========================================================================
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
   let Post: typeof Base;
-  beforeEach(() => {
-    const adp = createTestAdapter();
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", body: "string" },
+      cb_posts: { title: "string" },
+      special_posts: { title: "string", body: "string" },
+      count_posts: { count: { type: "integer", default: 0 } },
+      count_posts2: { count: { type: "integer", default: 5 } },
+      ts_posts: { title: "string", created_at: "datetime" },
+      timed_posts: { title: "string", updated_at: "datetime" },
+    });
     class PostClass extends Base {
       static {
         this.tableName = "posts";
-        this.adapter = adp;
         this.attribute("title", "string");
         this.attribute("body", "string");
       }
     }
+    PostClass.adapter = adapter;
     Post = PostClass;
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("delete", async () => {
@@ -790,20 +804,20 @@ describe("PersistenceTest", () => {
         this.primaryKey = "uuid";
         this.attribute("uuid", "string");
         this.attribute("name", "string");
-        this.adapter = createTestAdapter();
       }
     }
+    Item.adapter = adapter;
     expect(Item.primaryKey).toBe("uuid");
   });
 
   it("update column should not modify updated at", async () => {
     class TimedPost extends Base {
       static {
-        this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.attribute("updated_at", "datetime");
       }
     }
+    TimedPost.adapter = adapter;
     const p = await TimedPost.create({ title: "timed" });
     await p.updateColumn("title", "changed");
     expect(p.title).toBe("changed");
@@ -844,7 +858,6 @@ describe("PersistenceTest", () => {
     class CBPost extends Base {
       static {
         this.tableName = "cb_posts";
-        this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.beforeValidation((record: any) => {
           const val = record.title;
@@ -852,6 +865,7 @@ describe("PersistenceTest", () => {
         });
       }
     }
+    CBPost.adapter = adapter;
     const p = await CBPost.create({});
     expect(p.title).toBe("default");
   });
@@ -874,9 +888,9 @@ describe("PersistenceTest", () => {
     class SpecialPost extends Post {
       static {
         this.tableName = "special_posts";
-        this.adapter = createTestAdapter();
       }
     }
+    SpecialPost.adapter = adapter;
     const sp = await SpecialPost.create({ title: "special" });
     expect(sp.isPersisted()).toBe(true);
   });
@@ -896,10 +910,10 @@ describe("PersistenceTest", () => {
     class CountPost extends Base {
       static {
         this.tableName = "count_posts";
-        this.adapter = createTestAdapter();
         this.attribute("count", "integer", { default: 0 });
       }
     }
+    CountPost.adapter = adapter;
     const p = await CountPost.create({});
     p.increment("count");
     expect(p.count).toBe(1);
@@ -909,10 +923,10 @@ describe("PersistenceTest", () => {
     class CountPost2 extends Base {
       static {
         this.tableName = "count_posts2";
-        this.adapter = createTestAdapter();
         this.attribute("count", "integer", { default: 5 });
       }
     }
+    CountPost2.adapter = adapter;
     const p = await CountPost2.create({});
     p.decrement("count");
     expect(p.count).toBe(4);
@@ -928,11 +942,11 @@ describe("PersistenceTest", () => {
     class TSPost extends Base {
       static {
         this.tableName = "ts_posts";
-        this.adapter = createTestAdapter();
         this.attribute("title", "string");
         this.attribute("created_at", "datetime");
       }
     }
+    TSPost.adapter = adapter;
     const p = await TSPost.create({ title: "ts" });
     expect(p.isPersisted()).toBe(true);
   });
