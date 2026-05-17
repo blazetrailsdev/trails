@@ -134,6 +134,9 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
+  // `config.strict` is intentionally unread: better-sqlite3 compiles with
+  // SQLITE_DQS=0 and exposes no sqlite3_db_config binding, so the strict
+  // flag has nothing to attach to here.
   return new Database(config.database, opts);
 }
 

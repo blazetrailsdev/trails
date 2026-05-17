@@ -103,6 +103,17 @@ export interface SqliteOpenConfig {
   noMutex?: boolean;
   /** busy_timeout ms for SQLITE_BUSY contention. Default 5000. */
   timeout?: number;
+  /**
+   * Opt into SQLite's connection-level strict-strings mode when the driver
+   * supports it. Maps to `sqlite3_db_config(SQLITE_DBCONFIG_DQS_DDL=0,
+   * SQLITE_DBCONFIG_DQS_DML=0)`, which rejects double-quoted string literals.
+   * Drivers that can't honor this MUST silently ignore it (e.g. better-sqlite3
+   * compiles with `SQLITE_DQS=0` so DQS is already off, and the upstream
+   * binding doesn't expose `sqlite3_db_config`). Per-table `STRICT` semantics
+   * are a `CREATE TABLE` clause and belong to schema-creation, not here.
+   * Default: false.
+   */
+  strict?: boolean;
   /** Driver-specific options pass-through. AR core never inspects this. */
   driverOptions?: Record<string, unknown>;
 }

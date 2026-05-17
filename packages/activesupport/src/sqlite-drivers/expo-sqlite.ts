@@ -189,8 +189,9 @@ export const expoSqliteDriver: SqliteDriver = {
         "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
       );
     }
-    // readOnly, timeout, noMutex are not exposed by expo-sqlite's openDatabaseAsync;
-    // pass driverOptions through for any driver-specific overrides.
+    // readOnly, timeout, noMutex, strict are not exposed by expo-sqlite's
+    // openDatabaseAsync; pass driverOptions through for any driver-specific
+    // overrides.
     const db = await expoSqlite.openDatabaseAsync(config.database, {
       ...(config.driverOptions as Parameters<ExpoSqliteModule["openDatabaseAsync"]>[1] | undefined),
     });

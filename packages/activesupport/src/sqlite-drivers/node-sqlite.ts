@@ -159,6 +159,11 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
     enableForeignKeyConstraints: false, // match better-sqlite3 default
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
+  // node:sqlite's `enableDoubleQuotedStringLiterals` defaults to false (DQS
+  // off = strict), but SqliteOpenConfig.strict documents a default of false.
+  // Mirror that contract for direct driver users by mapping `strict ?? false`
+  // onto the option, not just when the caller passes it explicitly.
+  opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
   return new nodeSqlite.DatabaseSync(config.database, opts);
 }
 

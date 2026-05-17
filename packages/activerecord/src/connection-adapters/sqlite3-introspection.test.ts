@@ -88,6 +88,18 @@ describe("SQLite3Adapter schema introspection", () => {
     expect(indexes).toEqual([{ name: "widgets_on_name", columns: ["name"], unique: false }]);
   });
 
+  it("dataSourceExists matches both tables and views, hides sqlite_* internals", async () => {
+    await adapter.executeMutation(
+      "CREATE TABLE widgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)",
+    );
+    await adapter.executeMutation("CREATE VIEW widget_names AS SELECT name FROM widgets");
+    expect(await adapter.dataSourceExists("widgets")).toBe(true);
+    expect(await adapter.dataSourceExists("widget_names")).toBe(true);
+    expect(await adapter.dataSourceExists("missing")).toBe(false);
+    expect(await adapter.dataSourceExists("sqlite_sequence")).toBe(false);
+    expect(await adapter.dataSourceExists("sqlite_schema")).toBe(false);
+  });
+
   it("tableExists/dataSourceExists resolve schema-qualified names correctly", async () => {
     // Companion to the PRAGMA test: sqlite_master lookups must route to
     // `<schema>.sqlite_master` for ATTACHed DBs. Matching on

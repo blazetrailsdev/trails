@@ -3,25 +3,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { Notifications, squish } from "@blazetrails/activesupport";
-import type { NotificationEvent } from "@blazetrails/activesupport";
-
-async function assertLogged(
-  expected: Array<[string, string, unknown[]]>,
-  fn: () => unknown | Promise<unknown>,
-): Promise<void> {
-  const logged: Array<[string, string, unknown[]]> = [];
-  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-    const p = event.payload as Record<string, unknown>;
-    logged.push([squish(String(p.sql ?? "")), String(p.name ?? ""), (p.binds as unknown[]) ?? []]);
-  });
-  try {
-    await fn();
-  } finally {
-    Notifications.unsubscribe(sub);
-  }
-  expect(logged).toEqual(expected);
-}
+import { Notifications } from "@blazetrails/activesupport";
+import { assertLogged } from "./test-helper.js";
 
 let adapter: SQLite3Adapter;
 
