@@ -236,8 +236,8 @@ export class Metal extends AbstractController {
 
   /**
    * Public Rails-style setter that writes through to the underlying
-   * response and marks the controller as performed. Mirrors
-   * `ActionController::Metal#response_body=`.
+   * response. Mirrors `ActionController::Metal#response_body=`. After
+   * assignment, `isPerformed()` returns true.
    */
   set responseBody(body: string | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
@@ -254,7 +254,6 @@ export class Metal extends AbstractController {
     this._body = str;
     this._responseBody = str;
     if (this.response) this.response.body = str;
-    this.markPerformed();
   }
 
   override get responseBody(): string {
@@ -263,10 +262,13 @@ export class Metal extends AbstractController {
 
   /**
    * Tests if render or redirect has already happened. Mirrors
-   * `ActionController::Metal#performed?`.
+   * `ActionController::Metal#performed?` which returns
+   * `response_body || response.committed?`.
    */
   isPerformed(): boolean {
-    return Boolean(this._body) || (this.response?.committed ?? false);
+    return (
+      this._responseBody !== null || Boolean(this._body) || (this.response?.committed ?? false)
+    );
   }
 
   /** Convert controller to a Rack-compatible response. */
