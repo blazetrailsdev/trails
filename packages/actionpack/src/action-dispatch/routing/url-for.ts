@@ -158,13 +158,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /** @internal Rails: `Array#extract_options!` — pops a trailing options hash. */
 function extractOptions(arr: unknown[]): Record<string, unknown> {
   const last = arr[arr.length - 1];
-  if (
-    last != null &&
-    typeof last === "object" &&
-    !Array.isArray(last) &&
-    last.constructor === Object
-  ) {
-    return arr.pop() as Record<string, unknown>;
+  if (isPlainObject(last)) {
+    arr.pop();
+    return last;
   }
   return {};
 }
