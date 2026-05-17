@@ -238,16 +238,22 @@ export class Request {
 
   // --- IP addresses ---
 
-  get remoteIp(): string {
-    // Check for ActionDispatch::RemoteIp result first
-    if (this.env["action_dispatch.remote_ip"]) {
-      return String(this.env["action_dispatch.remote_ip"]);
+  get remoteIp(): string | null {
+    const v = this.env["action_dispatch.remote_ip"];
+    if (v != null) {
+      if (typeof v === "object" && typeof (v as { calculate?: unknown }).calculate === "function") {
+        return (v as { calculate(): string | null }).calculate();
+      }
+      return typeof v === "string" ? v : String(v);
     }
-    // Fall back to REMOTE_ADDR
     return (this.env["REMOTE_ADDR"] as string) || "127.0.0.1";
   }
 
-  get ip(): string {
+  set remoteIp(value: string | null) {
+    this.env["action_dispatch.remote_ip"] = value;
+  }
+
+  get ip(): string | null {
     return this.remoteIp;
   }
 
