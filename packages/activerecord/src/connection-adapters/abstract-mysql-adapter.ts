@@ -915,8 +915,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * restore the variable to its default. Identifier is validated against
    * MySQL variable-name characters before interpolation.
    *
-   * Cheaper alternative to the `variables:` pool-init pattern when callers
-   * just need to flip a session flag mid-test (e.g. `sql_mode`).
+   * trails-only helper — Rails inlines this in `configure_connection`
+   * via the `variables:` pool-init shape. Exposed here as a cheaper
+   * alternative when callers just need to flip a session flag mid-test
+   * (e.g. `sql_mode`) without rebuilding the pool.
+   *
+   * @internal
    */
   async setSessionVariable(name: string, value: unknown): Promise<void> {
     if (!/^\w+$/.test(name)) {
