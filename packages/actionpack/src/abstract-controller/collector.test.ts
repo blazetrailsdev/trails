@@ -1,7 +1,88 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector } from "./collector.js";
 
+// ==========================================================================
+// abstract/collector_test.rb
+// ==========================================================================
+
+// Rails' `MyCollector` records each per-MIME invocation as
+// `[mime, args, kwargs, block]`. JS has no kwargs/block distinction;
+// we record `[mime, args]` and treat the last arg as the "block" when
+// it's a function (mirroring Rails' &block sugar).
+class MyCollector extends Collector {
+  responses: [MimeType, unknown[], (() => unknown) | null][] = [];
+  custom(mime: MimeType, ...args: unknown[]): unknown {
+    const last = args[args.length - 1];
+    const block = typeof last === "function" ? (last as () => unknown) : null;
+    const positional = block ? args.slice(0, -1) : args;
+    this.responses.push([mime, positional, block]);
+    return undefined;
+  }
+}
+
+describe("TestCollector", () => {
+  it("responds to default mime types", () => {
+    const collector = new MyCollector();
+    expect("html" in collector).toBe(true);
+    expect("text" in collector).toBe(true);
+  });
+
+  it("does not respond to unknown mime types", () => {
+    const collector = new MyCollector();
+    expect("unknown" in collector).toBe(false);
+  });
+
+  it("register mime types on method missing", () => {
+    // Rails: `remove_method :js`; first call → method_missing →
+    // define_method. JS has no method_missing; trails' Proxy dispatches
+    // dynamically every call. The behavioral parity is "MIME types
+    // become reachable as soon as they're registered" — exercise that
+    // by unregistering and re-registering js.
+    MimeType.unregister("js");
+    try {
+      const collector = new MyCollector();
+      expect("js" in collector).toBe(false);
+      MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
+      const c = collector as MyCollector & { js: (...a: unknown[]) => unknown };
+      c.js();
+      expect("js" in c).toBe(true);
+    } finally {
+      if (!MimeType.lookup("js")) {
+        MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
+      }
+    }
+  });
+
+  it("does not register unknown mime types", () => {
+    const collector = new MyCollector() as MyCollector & { unknown: () => void };
+    expect(() => collector.unknown()).toThrow(/register it as a MIME type/);
+  });
+
+  it("generated methods call custom with arguments received", () => {
+    const collector = new MyCollector() as MyCollector & {
+      html: (...a: unknown[]) => unknown;
+      text: (...a: unknown[]) => unknown;
+      js: (...a: unknown[]) => unknown;
+    };
+    collector.html();
+    collector.text("foo", { bar: "baz" });
+    const block = (): string => "baz";
+    collector.js("bar", block);
+
+    expect(collector.responses[0]).toEqual([MimeType.HTML, [], null]);
+    expect(collector.responses[1]).toEqual([MimeType.TEXT, ["foo", { bar: "baz" }], null]);
+    expect(collector.responses[2].slice(0, 2)).toEqual([MimeType.JS, ["bar"]]);
+    expect((collector.responses[2][2] as () => string)()).toBe("baz");
+  });
+});
+
+// ==========================================================================
+// trails-only Proxy-shape coverage — no Rails counterpart. Kept here
+// because every assertion targets a Proxy edge case that doesn't exist
+// in Rails (then/catch/inspect collisions, JSON.stringify, late MIME
+// registration via the Proxy, undefined-shadowing).
+// ==========================================================================
 class TestCollector extends Collector {
   readonly calls: [string, unknown[]][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
@@ -10,7 +91,7 @@ class TestCollector extends Collector {
   }
 }
 
-describe("AbstractController::Collector", () => {
+describe("AbstractController::Collector — trails-only Proxy edges", () => {
   it("dispatches per-MIME methods through custom()", () => {
     const c = new TestCollector() as TestCollector & {
       html: (...args: unknown[]) => unknown;
@@ -29,8 +110,6 @@ describe("AbstractController::Collector", () => {
       latefmt?: (...args: unknown[]) => unknown;
     };
     expect(MimeType.lookup("latefmt")).toBeUndefined();
-    // Only the registry lookup matters for Collector dispatch; skip the
-    // extension mapping to keep this test focused.
     MimeType.register("application/latefmt", "latefmt");
     try {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");
@@ -55,13 +134,6 @@ describe("AbstractController::Collector", () => {
     expect(c.counter).toBe(2);
   });
 
-  it("throws a useful error for unknown MIME symbols", () => {
-    const c = new TestCollector() as TestCollector & {
-      thisIsNotAMime: () => unknown;
-    };
-    expect(() => c.thisIsNotAMime()).toThrow(/register it as a MIME type/);
-  });
-
   it("binds `this` inside custom() to the Proxy receiver, not the raw target", () => {
     class ThisChecker extends Collector {
       seenThis: unknown;
@@ -71,11 +143,9 @@ describe("AbstractController::Collector", () => {
       }
     }
     const c = new ThisChecker() as ThisChecker & { html: () => unknown };
-    // Direct call → `this` is the proxy
     c.custom(MimeType.HTML);
     const viaDirect = c.seenThis;
     c.seenThis = undefined;
-    // Per-MIME dispatch → `this` must be the same proxy
     c.html();
     expect(c.seenThis).toBe(viaDirect);
   });
@@ -83,8 +153,6 @@ describe("AbstractController::Collector", () => {
   it("is not assimilated by Promise.resolve (no synthesized `then`)", async () => {
     const c = new TestCollector();
     const resolved = await Promise.resolve(c);
-    // If `then` were intercepted, Promise.resolve(c) would attempt to
-    // call it as a thenable and resolve to whatever value it produced.
     expect(resolved).toBe(c);
   });
 
@@ -95,17 +163,12 @@ describe("AbstractController::Collector", () => {
 
   it("util.inspect / logging does not trip the unknown-format thrower", () => {
     const c = new TestCollector();
-    // Node's util.inspect calls obj.inspect() when present. The Proxy
-    // must NOT synthesize a throwing function here.
     expect((c as unknown as { inspect?: unknown }).inspect).toBeUndefined();
     expect("inspect" in c).toBe(false);
   });
 
   it("`has` returns false for reserved keys even when a MIME type collides", () => {
     const c = new TestCollector();
-    // Register a MIME called `then` to simulate a collision. The
-    // unknown-format thrower would otherwise become reachable via
-    // `await collector`, and the `in` check would report true.
     MimeType.register("application/then", "then");
     try {
       expect("then" in c).toBe(false);
@@ -123,8 +186,6 @@ describe("AbstractController::Collector", () => {
       }
     }
     const c = new WithUndef();
-    // `myFlag` reads should return undefined, NOT a synthesized
-    // unknown-format thrower function.
     expect(c.myFlag).toBeUndefined();
   });
 
