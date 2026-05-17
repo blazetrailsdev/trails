@@ -181,13 +181,16 @@ export function quoteDefaultExpression(
   if (column != null && "array" in column) {
     const sqlType = column.sqlType ?? column.type ?? null;
     const castType = sqlType ? typeMap?.lookup(sqlType) : null;
-    serialized = castType?.serialize ? castType.serialize(value) : value;
-    // Array types are keyed by OID, not by SQL type name — type map lookup
-    // misses. Encode via a passthrough OidArray so quote() gets an ArrayData.
-    // Guard on column.array === true so non-array columns with a falsy array
-    // flag don't silently emit an array literal for unexpected Array values.
-    if (column.array === true && globalThis.Array.isArray(serialized)) {
-      serialized = new ArrayData(new OidArray(new ValueType()), serialized as unknown[]);
+    if (column.array === true && globalThis.Array.isArray(value)) {
+      // Rails routes the JS array through OID::Array.serialize so each
+      // element is cast by the element subtype before quoting. Type-map
+      // lookup keyed by sqlType returns the SUBTYPE (e.g. IntegerType for
+      // an `integer[]` column); wrap it in OidArray so .serialize() walks
+      // the elements and emits a `{…}` Data wrapper for quote().
+      const subtype = (castType ?? new ValueType()) as ConstructorParameters<typeof OidArray>[0];
+      serialized = new OidArray(subtype).serialize(value);
+    } else if (castType?.serialize) {
+      serialized = castType.serialize(value);
     }
   }
   return ` DEFAULT ${quote(serialized)}`;
