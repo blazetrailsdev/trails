@@ -15,15 +15,30 @@ export type PrimitiveColumnSpec =
   | "binary"
   | "json";
 
+/**
+ * PostgreSQL-only column types. Using one of these against a non-PG adapter
+ * throws — there is no useful fallback (e.g. SQLite has no HSTORE), and
+ * silently swapping in a different type would let test schemas drift away
+ * from the production DDL they're meant to mirror.
+ */
+export type PgPrimitiveColumnSpec = "citext" | "hstore" | "uuid" | "interval" | "oid";
+
+export type AnyPrimitiveColumnSpec = PrimitiveColumnSpec | PgPrimitiveColumnSpec;
+
 export type ColumnSpec =
-  | PrimitiveColumnSpec
+  | AnyPrimitiveColumnSpec
   | {
-      type: PrimitiveColumnSpec;
+      type: AnyPrimitiveColumnSpec;
       limit?: number;
       references?: string;
       null?: boolean;
       default?: unknown;
       primary?: boolean;
+      /**
+       * PostgreSQL array column (`INTEGER[]`, `TEXT[]`, etc.). PG-only;
+       * setting `array: true` against a non-PG adapter throws.
+       */
+      array?: boolean;
     };
 
 export interface WrappedTableSchema {
@@ -134,7 +149,7 @@ function resolveReferences(schema: Schema): string[] {
 }
 
 /** @internal */
-const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
+const COLUMN_TYPE_MAP_PG: Record<AnyPrimitiveColumnSpec, string> = {
   string: "string",
   text: "text",
   integer: "integer",
@@ -147,14 +162,33 @@ const COLUMN_TYPE_MAP_PG: Record<PrimitiveColumnSpec, string> = {
   time: "time",
   binary: "binary",
   json: "json",
+  // PG-only types — passed straight through to PostgreSQLAdapter#typeToSql,
+  // which routes them via NATIVE_DATABASE_TYPES.
+  citext: "citext",
+  hstore: "hstore",
+  uuid: "uuid",
+  interval: "interval",
+  oid: "oid",
 };
+
+/** @internal */
+const PG_ONLY_TYPES = new Set<string>(["citext", "hstore", "uuid", "interval", "oid"]);
 
 // MySQL/MariaDB accepts native DATETIME columns with "YYYY-MM-DD HH:MM:SS" format
 // (no T/Z suffix). AR DateTime.serialize now emits this format, so datetime can
 // use the native column type. date/time/binary/json still use "string" (VARCHAR).
+// PG-only types are deliberately absent: defineSchema throws when one is used
+// against MySQL or SQLite.
 /** @internal */
 const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
-  ...COLUMN_TYPE_MAP_PG,
+  string: "string",
+  text: "text",
+  integer: "integer",
+  big_integer: "bigint",
+  float: "float",
+  decimal: "decimal",
+  boolean: "boolean",
+  datetime: "datetime",
   date: "string",
   time: "string",
   binary: "string",
@@ -164,12 +198,8 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
 // SQLite stores temporal and binary types as TEXT.
 /** @internal */
 const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
-  ...COLUMN_TYPE_MAP_PG,
+  ...COLUMN_TYPE_MAP_MYSQL,
   datetime: "string",
-  date: "string",
-  time: "string",
-  binary: "string",
-  json: "string",
 };
 
 export async function defineSchema(
@@ -205,13 +235,25 @@ export async function defineSchema(
     const compositePkCols = Array.isArray(pk) ? new Set(pk) : null;
     await ss.createTable(table, createOpts, (t) => {
       for (const [colName, spec] of Object.entries(columns)) {
-        const primitive: PrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
-        const arType = typeMap[primitive];
+        const primitive: AnyPrimitiveColumnSpec = typeof spec === "string" ? spec : spec.type;
+        const isArray = typeof spec === "object" && spec.array === true;
+        if (PG_ONLY_TYPES.has(primitive) && adapter.adapterName !== "postgres") {
+          throw new Error(
+            `defineSchema: column "${table}.${colName}" uses PostgreSQL-only type "${primitive}", but adapter is "${adapter.adapterName}". PG-only types: citext, hstore, uuid, interval, oid.`,
+          );
+        }
+        if (isArray && adapter.adapterName !== "postgres") {
+          throw new Error(
+            `defineSchema: column "${table}.${colName}" uses array:true, which is PostgreSQL-only, but adapter is "${adapter.adapterName}".`,
+          );
+        }
+        const arType = (typeMap as Record<string, string | undefined>)[primitive] ?? primitive;
         const options: Record<string, unknown> = {};
         if (typeof spec === "object") {
           if (spec.limit !== undefined) options["limit"] = spec.limit;
           if (spec.null !== undefined) options["null"] = spec.null;
           if (spec.default !== undefined) options["default"] = spec.default;
+          if (spec.array !== undefined) options["array"] = spec.array;
           if (spec.primary && pk === undefined) {
             options["primaryKey"] = true;
           }
