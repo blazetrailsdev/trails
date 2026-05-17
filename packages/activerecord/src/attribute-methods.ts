@@ -260,16 +260,38 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // Generate getter/setter for each attribute definition that doesn't
   // already have one on the prototype (mirrors Rails' define_attribute_methods)
   for (const name of this._attributeDefinitions.keys()) {
-    if (Object.prototype.hasOwnProperty.call(this.prototype, name)) continue;
-    Object.defineProperty(this.prototype, name, {
-      get(this: AttributeAccessorHost) {
-        return this.readAttribute(name);
-      },
-      set(this: AttributeAccessorHost, value: unknown) {
-        this.writeAttribute(name, value);
-      },
-      configurable: true,
-    });
+    if (!Object.prototype.hasOwnProperty.call(this.prototype, name)) {
+      Object.defineProperty(this.prototype, name, {
+        get(this: AttributeAccessorHost) {
+          return this.readAttribute(name);
+        },
+        set(this: AttributeAccessorHost, value: unknown) {
+          this.writeAttribute(name, value);
+        },
+        configurable: true,
+      });
+    }
+    // Per-attribute *BeforeTypeCast / *ForDatabase aliases. Rails generates
+    // these via `attribute_method_suffix "_before_type_cast", "_for_database"`
+    // in AttributeMethods::BeforeTypeCast.
+    const btcName = `${name}BeforeTypeCast`;
+    if (!Object.prototype.hasOwnProperty.call(this.prototype, btcName)) {
+      Object.defineProperty(this.prototype, btcName, {
+        get(this: { readAttributeBeforeTypeCast(n: string): unknown }) {
+          return this.readAttributeBeforeTypeCast(name);
+        },
+        configurable: true,
+      });
+    }
+    const fdName = `${name}ForDatabase`;
+    if (!Object.prototype.hasOwnProperty.call(this.prototype, fdName)) {
+      Object.defineProperty(this.prototype, fdName, {
+        get(this: { readAttributeForDatabase(n: string): unknown }) {
+          return this.readAttributeForDatabase(name);
+        },
+        configurable: true,
+      });
+    }
   }
   this._attributeMethodsGenerated = true;
   return true;

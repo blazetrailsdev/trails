@@ -362,7 +362,79 @@ export function storeAccessor(
       },
       configurable: true,
     });
+    defineStoreAccessorDirtyMethods(storeModuleProto, accessorName, attribute, accessor);
   }
+}
+
+interface StoreDirtyHost {
+  attributeChanged(name: string): boolean;
+  savedChangeToAttribute(name: string): boolean;
+  changes: Record<string, [unknown, unknown]>;
+  savedChanges: Record<string, [unknown, unknown]>;
+}
+
+function dig(obj: unknown, key: string): unknown {
+  if (obj == null) return undefined;
+  if (obj instanceof HashWithIndifferentAccess) {
+    return (obj.toHash() as Record<string, unknown>)[key];
+  }
+  if (typeof obj === "object") return (obj as Record<string, unknown>)[key];
+  return undefined;
+}
+
+/**
+ * Mirrors Rails' per-accessor dirty methods generated in
+ * ActiveRecord::Store::ClassMethods#_define_accessors_module:
+ *
+ *   <accessor>Changed, <accessor>Change, <accessor>Was,
+ *   savedChangeTo<Accessor>, savedChangeTo<Accessor>?,
+ *   <accessor>BeforeLastSave
+ */
+function defineStoreAccessorDirtyMethods(
+  proto: object,
+  accessorName: string,
+  storeAttribute: string,
+  key: string,
+): void {
+  const cap = accessorName.charAt(0).toUpperCase() + accessorName.slice(1);
+  const define = (name: string, fn: (this: StoreDirtyHost) => unknown): void => {
+    if (Object.prototype.hasOwnProperty.call(proto, name)) return;
+    Object.defineProperty(proto, name, { value: fn, writable: true, configurable: true });
+  };
+
+  define(`${accessorName}Changed`, function (this) {
+    if (!this.attributeChanged(storeAttribute)) return false;
+    const [prev, next] = this.changes[storeAttribute] ?? [undefined, undefined];
+    return dig(prev, key) !== dig(next, key);
+  });
+  define(`${accessorName}Change`, function (this) {
+    if (!this.attributeChanged(storeAttribute)) return undefined;
+    const [prev, next] = this.changes[storeAttribute] ?? [undefined, undefined];
+    return [dig(prev, key) ?? null, dig(next, key) ?? null];
+  });
+  define(`${accessorName}Was`, function (this) {
+    if (!this.attributeChanged(storeAttribute)) return undefined;
+    const [prev] = this.changes[storeAttribute] ?? [undefined];
+    return dig(prev, key) ?? null;
+  });
+  // Matches Model's `savedChangeToAttribute(name)` predicate shape; the value
+  // form is exposed as `savedChangeTo<X>Values()` (parallel to
+  // `savedChangeToAttributeValues` on Model).
+  define(`savedChangeTo${cap}`, function (this) {
+    if (!this.savedChangeToAttribute?.(storeAttribute)) return false;
+    const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+    return dig(prev, key) !== dig(next, key);
+  });
+  define(`savedChangeTo${cap}Values`, function (this) {
+    if (!this.savedChangeToAttribute?.(storeAttribute)) return undefined;
+    const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+    return [dig(prev, key) ?? null, dig(next, key) ?? null];
+  });
+  define(`${accessorName}BeforeLastSave`, function (this) {
+    if (!this.savedChangeToAttribute?.(storeAttribute)) return undefined;
+    const [prev] = this.savedChanges?.[storeAttribute] ?? [undefined];
+    return dig(prev, key) ?? null;
+  });
 }
 
 /**

@@ -65,6 +65,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.close();
   });
 
+  async function freshStoreAccessorModel(a: PostgreSQLAdapter): Promise<any> {
+    const { Base } = await import("../../index.js");
+    class HstoreWithAccessors extends Base {
+      static tableName = "hstores";
+      static {
+        this.adapter = a;
+        this.storeAccessor("settings", { accessors: ["language", "timezone"] });
+      }
+    }
+    await HstoreWithAccessors.loadSchema();
+    return HstoreWithAccessors;
+  }
+
   async function assertArrayCycle(array: Array<Record<string, string | null>>): Promise<void> {
     const x = await HstoreModel.createBang({ payload: array });
     await (x as any).reload();
@@ -371,47 +384,78 @@ describeIfPg("PostgreSQLAdapter", () => {
       //   type that can be added via t.hstore(...).
       // SCOPE: ~10 LOC in schema-statements.ts; pairs with hstore migration support.
     });
-    it.skip("cast value on write", () => {
-      // BLOCKED: type
-      // ROOT-CAUSE: attribute-methods/before-type-cast.ts provides readAttributeBeforeTypeCast(name),
-      //   but the per-attribute alias `<attr>_before_type_cast` (e.g. `x.tags_before_type_cast`)
-      //   is not generated; Rails defines it via define_method in AttributeMethods::BeforeTypeCast.
-      // SCOPE: ~20 LOC in attribute-methods.ts attribute-method generation; affects all
-      //   `<attr>_before_type_cast` tests across types.
+    it("cast value on write", async () => {
+      const x = HstoreModel.new({ tags: { bool: true, number: 5 } });
+      expect((x as any).tagsBeforeTypeCast).toEqual({ bool: true, number: 5 });
+      expect((x as any).tags).toEqual({ bool: "true", number: "5" });
+      await (x as any).save();
+      await (x as any).reload();
+      expect((x as any).tags).toEqual({ bool: "true", number: "5" });
     });
-    it.skip("with store accessors", () => {
-      // BLOCKED: store
-      // ROOT-CAUSE: Test body is an empty stub. Base.storeAccessor (base.ts:1535) and the
-      //   underlying storeAccessor() (store.ts:329) ARE implemented — accessors get defined
-      //   via Object.defineProperty on a per-class prototype module. The blocker is that
-      //   HstoreModel is not configured with `store("settings", { accessors: [...] })`, so
-      //   the Rails-mirrored assertions (x.language / x.timezone) cannot be exercised.
-      // SCOPE: ~10 LOC port — declare a separate model class with store() wiring + paste
-      //   Rails body. Same applies to "duplication with store accessors" and
-      //   "changes with store accessors".
+    it("with store accessors", async () => {
+      const HstoreWithAccessors = await freshStoreAccessorModel(adapter);
+      const x = HstoreWithAccessors.new({ language: "fr", timezone: "GMT" });
+      expect((x as any).language).toBe("fr");
+      expect((x as any).timezone).toBe("GMT");
+
+      await (x as any).saveBang();
+      const y = await HstoreWithAccessors.first();
+      expect((y as any).language).toBe("fr");
+      expect((y as any).timezone).toBe("GMT");
+
+      (y as any).language = "de";
+      await (y as any).saveBang();
+
+      const z = await HstoreWithAccessors.first();
+      expect((z as any).language).toBe("de");
+      expect((z as any).timezone).toBe("GMT");
     });
-    it.skip("duplication with store accessors", () => {
-      // BLOCKED: store
-      // ROOT-CAUSE: Same as "with store accessors" — empty stub; needs a model with
-      //   `store("settings", { accessors: ["language", "timezone"] })` plus the dup
-      //   assertions from Rails test_duplication_with_store_accessors.
-      // SCOPE: ~10 LOC port.
+    it("duplication with store accessors", async () => {
+      const HstoreWithAccessors = await freshStoreAccessorModel(adapter);
+      const x = HstoreWithAccessors.new({ language: "fr", timezone: "GMT" });
+      expect((x as any).language).toBe("fr");
+      expect((x as any).timezone).toBe("GMT");
+
+      const y = (x as any).dup();
+      expect((y as any).language).toBe("fr");
+      expect((y as any).timezone).toBe("GMT");
     });
     it.skip("yaml round trip with store accessors", () => {
       // BLOCKED: serialization — Ruby YAML/Marshal round-trip, no Node.js equivalent
       // ROOT-CAUSE: Node.js has no YAML.dump/Marshal.dump for ActiveRecord instances.
       // SCOPE: Permanent skip-list candidate; no faithful port is possible.
     });
-    it.skip("changes with store accessors", () => {
-      // BLOCKED: store
-      // ROOT-CAUSE: Empty stub. storeAccessor is implemented (store.ts:329) and
-      //   changedInPlace already works for hstore (see "hstore mutate" passing).
-      //   The blocker is porting Rails' per-accessor dirty-tracking expectations
-      //   (language_changed?, language_was, language_change) which require generated
-      //   `<accessor>_changed?` / `<accessor>_was` / `<accessor>_change` aliases on
-      //   the store accessor module — confirm those are wired before un-skipping.
-      // SCOPE: ~15 LOC port + verify per-accessor dirty alias methods exist on the
-      //   storeAccessor-defined module.
+    it("changes with store accessors", async () => {
+      const HstoreWithAccessors = await freshStoreAccessorModel(adapter);
+      const x = HstoreWithAccessors.new({ language: "de" });
+      expect((x as any).languageChanged()).toBe(true);
+      expect((x as any).languageWas()).toBeNull();
+      expect((x as any).languageChange()).toEqual([null, "de"]);
+      await (x as any).saveBang();
+
+      expect((x as any).languageChanged()).toBe(false);
+      await (x as any).reload();
+
+      (x as any).settings = null;
+      expect((x as any).languageChanged()).toBe(true);
+      expect((x as any).languageWas()).toBe("de");
+      expect((x as any).languageChange()).toEqual(["de", null]);
+    });
+    it("saved changes with store accessors", async () => {
+      const HstoreWithAccessors = await freshStoreAccessorModel(adapter);
+      const x = HstoreWithAccessors.new({ language: "fr" });
+      await (x as any).saveBang();
+
+      // After save: previousChanges has [nil, {language: "fr"}] for settings.
+      expect((x as any).savedChangeToLanguage()).toBe(true);
+      expect((x as any).savedChangeToLanguageValues()).toEqual([null, "fr"]);
+      expect((x as any).languageBeforeLastSave()).toBeNull();
+
+      (x as any).language = "de";
+      await (x as any).saveBang();
+      expect((x as any).savedChangeToLanguage()).toBe(true);
+      expect((x as any).savedChangeToLanguageValues()).toEqual(["fr", "de"]);
+      expect((x as any).languageBeforeLastSave()).toBe("fr");
     });
     it("changes in place", async () => {
       const hstore = await HstoreModel.createBang({ settings: { one: "two" } });
