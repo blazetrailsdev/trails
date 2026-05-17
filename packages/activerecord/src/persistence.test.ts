@@ -35,7 +35,7 @@ describe("PersistenceTest", () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       topics: { title: "string", body: "string", replies_count: "integer" },
-      minimals: { _: "string" },
+      minimals: {},
     });
   });
 
@@ -2797,7 +2797,11 @@ describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
     adapter = freshAdapter();
-    await defineSchema(adapter, { posts: { title: "string", views: "integer" } });
+    await defineSchema(adapter, {
+      posts: { title: "string", body: "string", views: "integer", published: "boolean" },
+      animals: { name: "string" },
+      dogs: { name: "string" },
+    });
   });
 
   it("save valid record returns true", async () => {
