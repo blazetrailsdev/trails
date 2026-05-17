@@ -264,11 +264,13 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
   const childCtor = child.constructor as typeof Base;
   const inverseRefl = childCtor._reflectOnAssociation?.(inverseName);
   // When the inverse is a has_many collection AND the child's class opts into
-  // has_many_inversing, the inverse instance must be pushed onto the parent's
-  // cached collection (deduped by identity) — mirrors Rails
-  // `replace_on_target(..., inversing: true)` seeding @replaced_or_added_targets.
-  // Without this gate Rails (and trails) leave the parent collection alone, so
-  // that loading a child's belongs_to does not eagerly mutate parent state.
+  // has_many_inversing, push the owner onto the parent's cached collection
+  // (deduped by identity). Rails models this as `replace_on_target(...,
+  // inversing: true)` writing into `CollectionAssociation#@target` and
+  // `@replaced_or_added_targets`; trails' equivalent target for inverse-of
+  // wiring is `_cachedAssociations`, so the dedup lives here. The
+  // CollectionProxy `<<` / `build` paths read this cache, so the invariant
+  // carries through; full proxy-side dedup is a deferred follow-up.
   if (
     inverseRefl?.macro === "hasMany" &&
     (childCtor as typeof Base & { hasManyInversing: boolean }).hasManyInversing
