@@ -1426,17 +1426,40 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(parent).not.toBeNull();
   });
 
-  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs inverse validation on polymorphic */
+  it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
+    const { Man, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Man has no association named "nonexistent" — set must raise.
+    expect(() =>
+      setBelongsTo(t, "taggable", m, {
+        polymorphic: true,
+        inverseOf: "nonexistent",
+        foreignKey: "taggable_id",
+      }),
+    ).toThrow(InverseOfAssociationNotFoundError);
   });
-  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs inverse validation on polymorphic */
+  it("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", async () => {
+    const { Man, Face, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m.id });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Man has :tags as the inverse; Face does not. Setting a Man passes,
+    // but setting a Face under the same inverseOf must raise.
+    expect(() =>
+      setBelongsTo(t, "taggable", m, {
+        polymorphic: true,
+        inverseOf: "tags",
+        foreignKey: "taggable_id",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      setBelongsTo(t, "taggable", f, {
+        polymorphic: true,
+        inverseOf: "tags",
+        foreignKey: "taggable_id",
+      }),
+    ).toThrow(InverseOfAssociationNotFoundError);
   });
 });
 

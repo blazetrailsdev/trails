@@ -252,7 +252,7 @@ export class BelongsToAssociation extends SingularAssociation {
     return `${underscore(this.reflection.name)}_id`;
   }
 
-  private foreignKeyNames(): string[] {
+  protected foreignKeyNames(): string[] {
     const fk = this.reflection.options.foreignKey;
     if (typeof fk === "string") return [fk];
     if (Array.isArray(fk)) return fk;
@@ -267,7 +267,7 @@ export class BelongsToAssociation extends SingularAssociation {
     return [`${underscore(this.reflection.name)}_id`];
   }
 
-  private associationPrimaryKeys(record: Base | null): string[] {
+  protected associationPrimaryKeys(record: Base | null): string[] {
     const configured = this.reflection.options.primaryKey;
     if (configured) {
       return Array.isArray(configured) ? configured : [configured];
@@ -278,10 +278,6 @@ export class BelongsToAssociation extends SingularAssociation {
     }
     const pk = (this.klass as any)?.primaryKey;
     if (pk) return Array.isArray(pk) ? pk : [pk];
-    // Polymorphic belongs_to: no resolved klass when target is absent —
-    // fall back to the loaded target's class when one is cached.
-    const targetPk = (this.target as any)?.constructor?.primaryKey;
-    if (targetPk) return Array.isArray(targetPk) ? targetPk : [targetPk];
     return ["id"];
   }
 

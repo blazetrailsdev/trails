@@ -2201,6 +2201,20 @@ export function setBelongsTo(
 
   // Set inverse on target
   if (target && typeof options.inverseOf === "string") {
+    // Rails BelongsToPolymorphicAssociation: `polymorphic_inverse_of`
+    // raises when the inverseOf name does not resolve on the assigned
+    // record's class — caught here at set time, before wiring.
+    if (options.polymorphic) {
+      const inv = (targetCtor as any)?._reflectOnAssociation?.(options.inverseOf);
+      if (!inv) {
+        throw new InverseOfAssociationNotFoundError(
+          assocName,
+          options.inverseOf,
+          [],
+          targetCtor!.name,
+        );
+      }
+    }
     _wireInverseAssociation(record, target, options.inverseOf);
   }
 }

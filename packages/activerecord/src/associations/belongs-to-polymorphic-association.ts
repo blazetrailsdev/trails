@@ -80,6 +80,40 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     super.replace(record);
   }
 
+  /**
+   * Polymorphic belongs_to has no static target class, so when neither an
+   * explicit `primaryKey` option nor an owning record is given we fall
+   * back to the loaded target's class (the generic
+   * `BelongsToAssociation` path can't do this — it has no polymorphic
+   * type column to consult).
+   */
+  protected override associationPrimaryKeys(record: Base | null): string[] {
+    const configured = this.reflection.options.primaryKey;
+    if (configured) return Array.isArray(configured) ? configured : [configured];
+    if (record) {
+      const pk = (record.constructor as any).primaryKey;
+      if (pk) return Array.isArray(pk) ? pk : [pk];
+    }
+    const targetPk = (this.target as any)?.constructor?.primaryKey;
+    if (targetPk) return Array.isArray(targetPk) ? targetPk : [targetPk];
+    return ["id"];
+  }
+
+  /**
+   * Mirrors Rails `BelongsToPolymorphicAssociation#inverse_reflection_for`
+   * (associations/belongs_to_polymorphic_association.rb:35-37) — looks up
+   * the inverse on the assigned record's class via `polymorphic_inverse_of`,
+   * which raises `InverseOfAssociationNotFoundError` when the configured
+   * inverse name does not exist on that class.
+   */
+  protected override inverseReflectionFor(record: Base): unknown {
+    const refl: any = this.reflection;
+    if (typeof refl.polymorphicInverseOf === "function") {
+      return refl.polymorphicInverseOf(record.constructor as typeof Base);
+    }
+    return null;
+  }
+
   protected override async doAsyncFindTarget(): Promise<Base | null> {
     return loadBelongsTo(this.owner, this.reflection.name, this.reflection.options);
   }

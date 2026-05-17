@@ -14,7 +14,6 @@ import {
 } from "./associations/errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import type { AssociationDefinition } from "./associations.js";
-import { modelRegistry } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
@@ -1021,13 +1020,9 @@ export function isInversePolymorphicAssociationChanged(reflection: any, record: 
   // caller's `||` chain falls through to FK-changed / will-save legs.
   if (className == null) return false;
   const recordClass = record.constructor as {
-    polymorphicClassFor?: (n: string) => unknown;
+    polymorphicClassFor: (n: string) => unknown;
   };
-  const resolved =
-    typeof recordClass.polymorphicClassFor === "function"
-      ? recordClass.polymorphicClassFor(String(className))
-      : (modelRegistry.get(String(className)) ?? reflection.activeRecord);
-  return reflection.activeRecord !== resolved;
+  return reflection.activeRecord !== recordClass.polymorphicClassFor(String(className));
 }
 
 /** @internal */
