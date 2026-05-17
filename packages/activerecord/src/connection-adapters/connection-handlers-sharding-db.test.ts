@@ -1,22 +1,26 @@
 import { describe, it, expect, afterEach } from "vitest";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { currentRole, connectedToStack } from "../core.js";
 
-function withBaseConfigs(
+async function withBaseConfigs(
   raw: Record<string, unknown>,
-  fn: () => void,
+  fn: () => void | Promise<void>,
   opts: { defaultEnv?: string } = {},
-): void {
+): Promise<void> {
   const prevConfigs = (Base as any).configurations;
   const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
   const prevCurrent = (DatabaseConfigurations as any).current;
   if (opts.defaultEnv) DatabaseConfigurations.defaultEnv = opts.defaultEnv;
   (Base as any).configurations = raw;
   try {
-    fn();
+    await fn();
   } finally {
     (Base as any).configurations = prevConfigs;
     DatabaseConfigurations.defaultEnv = prevDefaultEnv;
@@ -33,11 +37,40 @@ describe("ConnectionHandlersShardingDbTest", () => {
     (Base as any).connectionClass = undefined;
   });
 
-  it.skip("establishing a connection in connected to block uses current role and shard", () => {
-    // BLOCKED: connection-pool — needs file-backed DB; establish_connection inside connected_to
+  it("establishing a connection in connected to block uses current role and shard", async () => {
+    const tmpfile = path.join(os.tmpdir(), `trails-connectsto-${randomUUID()}.sqlite3`);
+    try {
+      await withBaseConfigs(
+        {
+          default_env: { primary: { adapter: "sqlite3", database: tmpfile } },
+        },
+        async () => {
+          const pools = Base.connectsTo({
+            shards: { default: { writing: "primary" } },
+          });
+          await Promise.all(pools.map((p) => p.adapterReady));
+
+          await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+            await Base.establishConnection({ adapter: "sqlite3", database: tmpfile });
+            const conn = Base.leaseConnection();
+            await conn.executeMutation(
+              `CREATE TABLE IF NOT EXISTS "people" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)`,
+            );
+            const rows = await conn.execute(`SELECT * FROM "people" LIMIT 1`);
+            expect(Array.isArray(rows)).toBe(true);
+
+            const pm = (Base.connectionHandler as any).getPoolManager("Base");
+            expect([...pm.shardNames].sort()).toEqual(["default", "shard_one"]);
+          });
+        },
+        { defaultEnv: "default_env" },
+      );
+    } finally {
+      if (fs.existsSync(tmpfile)) fs.unlinkSync(tmpfile);
+    }
   });
-  it("establish connection using 3 levels config", () => {
-    withBaseConfigs(
+  it("establish connection using 3 levels config", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           primary: { adapter: "sqlite3", database: ":memory:" },
@@ -73,8 +106,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       { defaultEnv: "default_env" },
     );
   });
-  it("establish connection using 3 levels config with shards and replica", () => {
-    withBaseConfigs(
+  it("establish connection using 3 levels config with shards and replica", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           primary: { adapter: "sqlite3", database: ":memory:" },
@@ -180,8 +213,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
     }
   });
 
-  it("retrieves proper connection with nested connected to", () => {
-    withBaseConfigs(
+  it("retrieves proper connection with nested connected to", async () => {
+    await withBaseConfigs(
       {
         default_env: {
           primary: { adapter: "sqlite3", database: ":memory:" },
@@ -240,8 +273,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
     expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
   });
 
-  it("calling connected to on a non existent shard raises", () => {
-    withBaseConfigs(
+  it("calling connected to on a non existent shard raises", async () => {
+    await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
       () => {
         Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
@@ -264,8 +297,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       { defaultEnv: "default_env" },
     );
   });
-  it("calling connected to on a non existent role for shard raises", () => {
-    withBaseConfigs(
+  it("calling connected to on a non existent role for shard raises", async () => {
+    await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
       () => {
         Base.connectsTo({
@@ -293,8 +326,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       { defaultEnv: "default_env" },
     );
   });
-  it("calling connected to on a default role for non existent shard raises", () => {
-    withBaseConfigs(
+  it("calling connected to on a default role for non existent shard raises", async () => {
+    await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: ":memory:" } } },
       () => {
         Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
@@ -523,16 +556,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       (SecondaryBase as any).connectionClass = undefined;
     }
   });
-  it.skip("swapping shards globally in a multi threaded environment", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
-  });
-  it.skip("swapping shards and roles in a multi threaded environment", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
-  });
-  it.skip("swapping granular shards and roles in a multi threaded environment", () => {
-    // BLOCKED: GVL — Ruby thread / GVL semantics, no Node.js equivalent
-    // SCOPE: ~0 LOC fix; permanent skip-list.ts candidate
-  });
+  // The 3 "swapping shards (and roles) in a multi threaded environment" Rails
+  // tests are permanently unported (Ruby GVL / Thread semantics). Tracked in
+  // scripts/api-compare/unported-files.ts.
 });

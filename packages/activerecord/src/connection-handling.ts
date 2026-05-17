@@ -10,7 +10,10 @@ import {
   _setAdapterClassResolver,
   type DatabaseConfig,
 } from "./database-configurations/database-config.js";
-import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
+import {
+  resolve as resolveConnectionAdapter,
+  resolveSync as resolveConnectionAdapterSync,
+} from "./connection-adapters.js";
 import {
   AdapterNotFound,
   AdapterNotSpecified,
@@ -91,16 +94,85 @@ export function connectsTo(
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
+      const adapterName = dbConfig.adapter ?? "";
+      const adapterArg = buildAdapterArg(adapterName, dbConfig.configuration);
+      // Kick off async load so the sync adapter cache is populated by the
+      // time the pool first asks for a connection. The returned promise is
+      // attached to the pool as `adapterReady` so callers running real
+      // queries can await it before leaseConnection(). Capture any
+      // rejection in `loadError` so the sync factory below can surface the
+      // real cause (AdapterNotFound, loader import error, ...) instead of
+      // a generic "not preloaded" message — and swallow the rejection on a
+      // detached `.catch` so callers that never await `adapterReady` don't
+      // trip an unhandled-promise warning.
+      let loadError: unknown = null;
+      const adapterReady: Promise<unknown> = adapterName
+        ? resolveConnectionAdapter(adapterName).catch((err) => {
+            loadError = err;
+            throw err;
+          })
+        : Promise.resolve(null);
+      adapterReady.catch(() => {});
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,
         shard,
+        adapterFactory: () => {
+          if (loadError) throw loadError;
+          const AdapterClass = resolveConnectionAdapterSync(adapterName);
+          if (!AdapterClass) {
+            throw new ConnectionNotEstablished(
+              `Adapter ${adapterName || "(missing)"} for ${this.name} pool not preloaded; ` +
+                `await the pool's \`adapterReady\` promise after \`connectsTo\` returns.`,
+            );
+          }
+          return new AdapterClass(adapterArg);
+        },
       });
+      pool.adapterReady = adapterReady;
       connections.push(pool);
     }
   }
 
   return connections;
+}
+
+/**
+ * Build the adapter-constructor argument used by `connectsTo` and
+ * `establishConnection`. SQLite expects the database string directly; other
+ * adapters take a config hash. Mirrors the inline normalization done by
+ * `establishWithConfig`.
+ *
+ * @internal
+ */
+function buildAdapterArg(adapterName: string, configuration: Record<string, unknown>): unknown {
+  const normalized = normalizeAdapterName(adapterName);
+  const url = configuration.url as string | undefined;
+  const database = configuration.database as string | undefined;
+  if (normalized === "sqlite") {
+    // Mirrors establishWithConfig's `url || config?.database || ":memory:"`
+    // precedence so connectsTo and establishConnection normalize SQLite
+    // configs identically. autoConnect already pre-zeroes `url` when the
+    // configuration hash carries a `database`, so the resolved-database-
+    // wins semantic is preserved on the public entrypoint.
+    return parseSqliteUrl(url || database || ":memory:");
+  }
+  // Mirrors establishWithConfig's `else if (url) adapterArg = url` branch:
+  // URL-only configs (e.g. opaque adapter strings like jdbc:...) are passed
+  // through as the raw URL string. Hash-form configs (no url, or url + an
+  // explicit database) get the normalized hash with username/host defaults.
+  if (url && database === undefined) {
+    return url;
+  }
+  const { adapter: _a, url: _u, username, ...rest } = configuration;
+  const adapterConfig: Record<string, unknown> = { ...rest };
+  if (adapterConfig.user === undefined && username !== undefined) {
+    adapterConfig.user = username;
+  }
+  if (adapterConfig.host === undefined) {
+    adapterConfig.host = "localhost";
+  }
+  return adapterConfig;
 }
 
 export function connectedTo<T>(
@@ -571,7 +643,6 @@ async function establishWithConfig(
   const normalized = normalizeAdapterName(adapterName);
   // Pass the original adapter name to the registry so caller overrides
   // like register("mysql2", ...) aren't shadowed by normalization.
-  // `normalized` is only used below for adapter-arg construction.
   const AdapterClass = await _loadAdapter(adapterName);
 
   let adapterArg: unknown;
@@ -580,15 +651,7 @@ async function establishWithConfig(
   } else if (url) {
     adapterArg = url;
   } else if (config) {
-    const { adapter: _a, url: _u, username, ...rest } = config;
-    const adapterConfig: Record<string, unknown> = { ...rest };
-    if (adapterConfig.user === undefined && username !== undefined) {
-      adapterConfig.user = username;
-    }
-    if (adapterConfig.host === undefined) {
-      adapterConfig.host = "localhost";
-    }
-    adapterArg = adapterConfig;
+    adapterArg = buildAdapterArg(adapterName, config);
   } else {
     adapterArg = url;
   }
@@ -603,8 +666,16 @@ async function establishWithConfig(
     },
   );
 
+  // Honor the active connected_to scope so callers like
+  // `connected_to(role:, shard:) { establish_connection(db_config) }` register
+  // the new pool under the current role/shard instead of writing/default.
+  const role = coreCurrentRole.call(modelClass as any);
+  const shard = coreCurrentShard.call(modelClass as any);
+
   modelClass.connectionHandler.establishConnection(dbConfig, {
     owner: modelClass.connectionClassForSelf(),
+    role,
+    shard,
     adapterFactory: () => new AdapterClass(adapterArg),
   });
 }

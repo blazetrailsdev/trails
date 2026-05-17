@@ -19,6 +19,22 @@ const adapters = new Map<string, AdapterLoader>();
 // Memoize the loader's result so resolve() is effectively a cached lookup
 // (like Rails' adapter registry). Cleared when a name is re-registered.
 const resolved = new Map<string, Promise<AdapterClass>>();
+// Sync mirror of `resolved`, populated when each promise settles. Lets
+// sync entry points (like `connectsTo`) hand the pool a sync
+// `adapterFactory` once async adapter loading has completed at least once.
+const resolvedSyncCache = new Map<string, AdapterClass>();
+
+/**
+ * Synchronous companion to `resolve(name)`. Returns the adapter class if it
+ * has been resolved at least once (via `resolve()`), or null. Used by
+ * `connectsTo` to build a sync `adapterFactory` without changing its
+ * signature.
+ *
+ * @internal
+ */
+export function resolveSync(adapterName: string): AdapterClass | null {
+  return resolvedSyncCache.get(adapterName) ?? null;
+}
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters.register
@@ -32,6 +48,7 @@ const resolved = new Map<string, Promise<AdapterClass>>();
 export function register(name: string, loader: AdapterLoader): void {
   adapters.set(name, loader);
   resolved.delete(name);
+  resolvedSyncCache.delete(name);
 }
 
 /**
@@ -51,10 +68,15 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
         `Available adapters are: ${available}.`,
     );
   }
-  const promise = loader().catch((err) => {
-    resolved.delete(adapterName);
-    throw err;
-  });
+  const promise = loader()
+    .then((klass) => {
+      resolvedSyncCache.set(adapterName, klass);
+      return klass;
+    })
+    .catch((err) => {
+      resolved.delete(adapterName);
+      throw err;
+    });
   resolved.set(adapterName, promise);
   return promise;
 }
