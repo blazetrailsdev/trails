@@ -10,7 +10,10 @@ import {
   _setAdapterClassResolver,
   type DatabaseConfig,
 } from "./database-configurations/database-config.js";
-import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
+import {
+  resolve as resolveConnectionAdapter,
+  resolveSync as resolveConnectionAdapterSync,
+} from "./connection-adapters.js";
 import {
   AdapterNotFound,
   AdapterNotSpecified,
@@ -91,16 +94,64 @@ export function connectsTo(
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
+      const adapterName = dbConfig.adapter ?? "";
+      const adapterArg = buildAdapterArg(adapterName, dbConfig.configuration);
+      // Kick off async load so the sync adapter cache is populated by the
+      // time the pool first asks for a connection. The returned promise is
+      // attached to the pool as `adapterReady` so callers running real
+      // queries can await it before leaseConnection().
+      const adapterReady = adapterName
+        ? resolveConnectionAdapter(adapterName)
+        : Promise.resolve(null);
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,
         shard,
+        adapterFactory: () => {
+          const AdapterClass = resolveConnectionAdapterSync(adapterName);
+          if (!AdapterClass) {
+            throw new ConnectionNotEstablished(
+              `Adapter ${adapterName || "(missing)"} for ${this.name} pool not preloaded; ` +
+                `await the pool's \`adapterReady\` promise after \`connectsTo\` returns.`,
+            );
+          }
+          return new AdapterClass(adapterArg);
+        },
       });
+      (pool as unknown as { adapterReady: Promise<unknown> }).adapterReady = adapterReady;
       connections.push(pool);
     }
   }
 
   return connections;
+}
+
+/**
+ * Build the adapter-constructor argument used by `connectsTo` and
+ * `establishConnection`. SQLite expects the database string directly; other
+ * adapters take a config hash. Mirrors the inline normalization done by
+ * `establishWithConfig`.
+ *
+ * @internal
+ */
+function buildAdapterArg(adapterName: string, configuration: Record<string, unknown>): unknown {
+  const normalized = normalizeAdapterName(adapterName);
+  if (normalized === "sqlite") {
+    const dbOrUrl =
+      (configuration.database as string | undefined) ??
+      (configuration.url as string | undefined) ??
+      ":memory:";
+    return parseSqliteUrl(dbOrUrl);
+  }
+  const { adapter: _a, url: _u, username, ...rest } = configuration;
+  const adapterConfig: Record<string, unknown> = { ...rest };
+  if (adapterConfig.user === undefined && username !== undefined) {
+    adapterConfig.user = username;
+  }
+  if (adapterConfig.host === undefined) {
+    adapterConfig.host = "localhost";
+  }
+  return adapterConfig;
 }
 
 export function connectedTo<T>(
@@ -571,7 +622,6 @@ async function establishWithConfig(
   const normalized = normalizeAdapterName(adapterName);
   // Pass the original adapter name to the registry so caller overrides
   // like register("mysql2", ...) aren't shadowed by normalization.
-  // `normalized` is only used below for adapter-arg construction.
   const AdapterClass = await _loadAdapter(adapterName);
 
   let adapterArg: unknown;
@@ -580,15 +630,7 @@ async function establishWithConfig(
   } else if (url) {
     adapterArg = url;
   } else if (config) {
-    const { adapter: _a, url: _u, username, ...rest } = config;
-    const adapterConfig: Record<string, unknown> = { ...rest };
-    if (adapterConfig.user === undefined && username !== undefined) {
-      adapterConfig.user = username;
-    }
-    if (adapterConfig.host === undefined) {
-      adapterConfig.host = "localhost";
-    }
-    adapterArg = adapterConfig;
+    adapterArg = buildAdapterArg(adapterName, config);
   } else {
     adapterArg = url;
   }
@@ -603,8 +645,16 @@ async function establishWithConfig(
     },
   );
 
+  // Honor the active connected_to scope so callers like
+  // `connected_to(role:, shard:) { establish_connection(db_config) }` register
+  // the new pool under the current role/shard instead of writing/default.
+  const role = coreCurrentRole.call(modelClass as any);
+  const shard = coreCurrentShard.call(modelClass as any);
+
   modelClass.connectionHandler.establishConnection(dbConfig, {
     owner: modelClass.connectionClassForSelf(),
+    role,
+    shard,
     adapterFactory: () => new AdapterClass(adapterArg),
   });
 }
