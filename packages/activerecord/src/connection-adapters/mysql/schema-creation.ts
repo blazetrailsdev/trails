@@ -50,7 +50,7 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
 /** @internal Adapter surface consulted by the visitor's support flags and MariaDB branches. */
-interface VisitorHostAdapter {
+export interface VisitorHostAdapter {
   supportsCheckConstraints?(): boolean;
   supportsForeignKeys?(): boolean;
   supportsIndexesInCreate?(): boolean;
@@ -77,7 +77,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
       quoteDefaultExpression: quoteDefaultExpression,
     });
     this._hostAdapter = host;
-    if (host?.isMariadb?.()) this._mariadb = true;
+  }
+
+  /** @internal Live MariaDB lookup — consults the host adapter every call so a late
+   * `getFullVersion()` flip (lazy detection on first probe) is honored. Falls back to the
+   * `_mariadb` field so existing tests that set it directly continue to work. */
+  protected isMariadb(): boolean {
+    return this._hostAdapter?.isMariadb?.() ?? this._mariadb;
   }
 
   /** @internal */
@@ -190,7 +196,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitDropCheckConstraint(name: string): string {
-    return `DROP ${this._mariadb ? "CONSTRAINT" : "CHECK"} ${name}`;
+    return `DROP ${this.isMariadb() ? "CONSTRAINT" : "CHECK"} ${name}`;
   }
 
   /** @internal */
@@ -344,7 +350,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (mo.collation) sql += ` COLLATE ${mo.collation}`;
     if (mo.as) {
       sql += ` AS (${mo.as})`;
-      if (mo.stored) sql += this._mariadb ? " PERSISTENT" : " STORED";
+      if (mo.stored) sql += this.isMariadb() ? " PERSISTENT" : " STORED";
     }
     // Call super without primaryKey so ON UPDATE can be inserted before PRIMARY KEY,
     // matching the original abstract ordering: DEFAULT → NOT NULL → AUTO_INCREMENT → ON UPDATE → PRIMARY KEY.

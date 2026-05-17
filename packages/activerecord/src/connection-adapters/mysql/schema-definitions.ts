@@ -20,7 +20,10 @@ import type {
 } from "../abstract/schema-definitions.js";
 import { quoteIdentifier, quoteTableName } from "./quoting.js";
 import { quoteDefaultExpression } from "../abstract/quoting.js";
-import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
+import {
+  SchemaCreation as MysqlSchemaCreation,
+  type VisitorHostAdapter,
+} from "./schema-creation.js";
 
 /**
  * MySQL-specific column type methods mixed into TableDefinition.
@@ -42,15 +45,9 @@ export interface ColumnMethods {
 }
 
 export class TableDefinition extends AbstractTableDefinition {
-  /** @internal Full adapter when constructed by `createTableDefinition`; consulted by `toSql()`
-   * for a host-aware visitor (support flags + MariaDB) or to construct one in the fallback path. */
-  private readonly _mysqlAdapter?: {
-    schemaStatements?: () => { schemaCreation: MysqlSchemaCreation };
-    supportsCheckConstraints?(): boolean;
-    supportsForeignKeys?(): boolean;
-    supportsIndexesInCreate?(): boolean;
-    isMariadb?(): boolean;
-  };
+  /** @internal Full adapter when constructed by `createTableDefinition`; consulted by
+   * `toSql()` to build a host-aware MySQL visitor (support flags + MariaDB). */
+  private readonly _mysqlAdapter?: VisitorHostAdapter;
 
   constructor(
     tableName: string,
@@ -92,16 +89,11 @@ export class TableDefinition extends AbstractTableDefinition {
    * `changeColumn` — they all go through {@link SchemaCreation#addColumnOptions}.
    */
   override toSql(): string {
-    // Ask the adapter for a host-aware visitor (carries support flags + MariaDB flag) when
-    // available. Guard with instanceof in case a non-MySQL SchemaStatements ever surfaces here
-    // — falling back to the abstract visitor would silently drop MySQL-specific
-    // addColumnOptions / charset handling.
-    const fromAdapter = this._mysqlAdapter?.schemaStatements?.().schemaCreation;
-    const visitor =
-      fromAdapter instanceof MysqlSchemaCreation
-        ? fromAdapter
-        : new MysqlSchemaCreation(this._mysqlAdapter);
-    return visitor.accept(this);
+    // Build the visitor directly from the stored host adapter — its support flags and
+    // `isMariadb()` are the only state the visitor consults, and going through
+    // `schemaStatements().schemaCreation` would allocate a fresh `SchemaStatements` per call
+    // on adapters whose `schemaStatements()` isn't memoized (current behavior on Mysql2Adapter).
+    return new MysqlSchemaCreation(this._mysqlAdapter).accept(this);
   }
 
   blob(name: string, options: ColumnOptions & { limit?: number } = {}): this {

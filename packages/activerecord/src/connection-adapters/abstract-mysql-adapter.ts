@@ -176,12 +176,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * @internal
    */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
-    // SchemaStatements#createTable forwards `adapter: this.adapter, adapterName: this.adapterName`
-    // (the bare SchemaQuoter shape). MySQL needs the full adapter so `toSql()` can reach
-    // `schemaStatements().schemaCreation` for the host-aware visitor — drop the bare
-    // signal and substitute `this` (the MySQL adapter).
-    const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
-    return new MysqlTableDefinition(name, { ...rest, adapter: this });
+    // Pass `this` (the MySQL adapter) as the `adapter` option so `MysqlTableDefinition#toSql`
+    // can build a host-aware visitor (support flags + MariaDB). `MysqlTableDefinition` is the
+    // authoritative layer for normalizing `adapter` / `adapterName` — it discards anything we
+    // pass for `adapterName` and the bare SchemaQuoter shape supplied by abstract
+    // SchemaStatements#createTable — so we don't strip those here.
+    return new MysqlTableDefinition(name, { ...options, adapter: this });
   }
 
   protected _mariadb = false;
