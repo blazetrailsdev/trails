@@ -333,7 +333,8 @@ export function withIsolatedConnectionState<T>(fn: () => T): T {
 function klassesInclude(klasses: Set<any>, target: any): boolean {
   if (klasses.has(target)) return true;
   for (const k of klasses) {
-    if (typeof k === "function" && k.name === "Base") return true;
+    if (typeof k === "function" && Object.prototype.hasOwnProperty.call(k, "_isActiveRecordBase"))
+      return true;
   }
   return false;
 }
