@@ -25,3 +25,17 @@ export {
 } from "./asset-paths.js";
 export { applyLogger, benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
 export { Collector } from "./collector.js";
+export {
+  DoubleRenderError,
+  DEFAULT_PROTECTED_INSTANCE_VARIABLES,
+  render,
+  renderToString,
+  viewAssigns,
+  _normalizeArgs,
+  _normalizeOptions,
+  _processOptions,
+  _processVariant,
+  normalizeRender,
+  type RenderOptions,
+  type RenderingHost,
+} from "./rendering.js";
