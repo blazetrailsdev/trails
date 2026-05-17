@@ -1445,4 +1445,93 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await proxy.destroy(proj);
     expect(proj.isDestroyed()).toBe(true);
   });
+
+  // ==========================================================================
+  // destroy_associations override mixin chaining
+  // Mirrors Rails associations.rb:1886-1894 — each HABTM declaration layers an
+  // anonymous module override of destroy_associations that chains via super.
+  // ==========================================================================
+
+  it("layers destroyAssociations chain for multiple HABTMs on one class", async () => {
+    const a2 = createTestAdapter();
+    class MultiOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TagA extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TagB extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    MultiOwner.adapter = a2;
+    TagA.adapter = a2;
+    TagB.adapter = a2;
+    registerModel(MultiOwner);
+    registerModel(TagA);
+    registerModel(TagB);
+    Associations.hasAndBelongsToMany.call(MultiOwner, "tag_as", {
+      className: "TagA",
+      joinTable: "multi_owners_tag_as",
+    });
+    Associations.hasAndBelongsToMany.call(MultiOwner, "tag_bs", {
+      className: "TagB",
+      joinTable: "multi_owners_tag_bs",
+    });
+
+    const owner = await MultiOwner.create({ name: "Owner" });
+    const calls: string[] = [];
+    // The HABTM override targets the middle hasMany (one per HABTM
+    // declaration). Stub each middle association's handleDependency to
+    // observe whether the chained `super` calls reach both layers.
+    const origAssoc = (owner as any).association.bind(owner);
+    (owner as any).association = (n: string) => {
+      const a = origAssoc(n);
+      if (n.endsWith("tag_as") || n.endsWith("tag_bs")) {
+        const orig = a.handleDependency.bind(a);
+        a.handleDependency = async () => {
+          calls.push(n);
+          return orig();
+        };
+      }
+      return a;
+    };
+
+    await (owner as any).destroyAssociations();
+    // Both layered overrides should have run — chained super reaches both.
+    expect(calls.length).toBe(2);
+  });
+
+  it("does not double-install the destroy bridge on subclasses", () => {
+    const a2 = createTestAdapter();
+    class ParentOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    ParentOwner.adapter = a2;
+    registerModel(ParentOwner);
+    Associations.hasAndBelongsToMany.call(ParentOwner, "p_tags", {
+      className: "TagA",
+      joinTable: "parent_owners_p_tags",
+    });
+    const parentDestroyCount = (ParentOwner as any)._callbacks?.destroy?.length ?? 0;
+
+    class ChildOwner extends ParentOwner {}
+    registerModel(ChildOwner);
+    Associations.hasAndBelongsToMany.call(ChildOwner, "c_tags", {
+      className: "TagB",
+      joinTable: "child_owners_c_tags",
+    });
+    const childDestroyCount = (ChildOwner as any)._callbacks?.destroy?.length ?? 0;
+
+    // Subclass should not add a second bridge dispatcher — the parent's
+    // bridge is COW'd into the child chain by the callback engine.
+    expect(childDestroyCount).toBeLessThanOrEqual(parentDestroyCount);
+  });
 });
