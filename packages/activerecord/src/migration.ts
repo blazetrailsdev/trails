@@ -1,4 +1,4 @@
-import { getFs, getPath, Logger, getEnv, camelize } from "@blazetrails/activesupport";
+import { getFs, getPath, Logger, getEnv, camelize, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -1382,20 +1382,48 @@ export abstract class Migration {
     return /^\d{3,}$/.test(version);
   }
 
-  static nextMigrationNumber(_number?: number): string {
-    return Temporal.Now.instant()
+  static nextMigrationNumber(number?: number | bigint | string): string {
+    // Rails: max(now.utc.strftime("%Y%m%d%H%M%S"), "%.14d" % number) — so a
+    // numerically-larger sequence wins over a same-second timestamp. Callers
+    // (e.g. Migration.copy) pass `last.version + 1` to guarantee monotonicity
+    // across iterations within the same second. Accepts bigint/string so
+    // versions beyond Number.MAX_SAFE_INTEGER (e.g. future renumbering above
+    // 9.0e15) survive without precision loss.
+    const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
+    if (number == null) return stamp;
+    const raw =
+      typeof number === "bigint"
+        ? number
+        : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
+    const n = raw < 0n ? 0n : raw;
+    // Numeric (BigInt) comparison — string compare goes lexicographic once
+    // either side exceeds 14 digits and would mis-order (e.g. a 15-digit
+    // "100…" would sort below a 14-digit "2026…" string).
+    return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
   }
 
   static properTableName(
-    name: string,
+    name: string | { tableName?: unknown },
     options: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
   ): string {
+    // Mirrors Rails `name.respond_to?(:table_name)`: any non-null reference
+    // exposing a string `tableName` is honored. Model classes (functions)
+    // expose it as a static getter, so `typeof name === "function"` must
+    // count too — guarding only on "object" silently produces a stringified
+    // function name with prefix/suffix applied.
+    if (
+      name != null &&
+      (typeof name === "object" || typeof name === "function") &&
+      typeof (name as { tableName?: unknown }).tableName === "string"
+    ) {
+      return (name as { tableName: string }).tableName;
+    }
     const prefix = options.tableNamePrefix ?? "";
     const suffix = options.tableNameSuffix ?? "";
-    return `${prefix}${name}${suffix}`;
+    return `${prefix}${String(name)}${suffix}`;
   }
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
@@ -1408,12 +1436,16 @@ export abstract class Migration {
   static async copy(
     destination: string,
     sources: Record<string, string>,
-    _options: Record<string, unknown> = {},
-  ): Promise<string[]> {
-    // Rails copies migration files from source directories to destination.
-    // In our TS implementation, migrations are registered programmatically,
-    // not via filesystem discovery. This returns the list of copied files
-    // (empty when there's nothing to copy).
+    options: {
+      onSkip?: (scope: string, migration: MigrationProxy) => void;
+      onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
+    } = {},
+  ): Promise<MigrationProxy[]> {
+    // Mirrors Rails' Migration.copy: discover migrations in each scoped source
+    // directory, dedupe by Rails-name against the destination, renumber so
+    // the copied migration's version is greater than the latest existing one,
+    // emit `${version}_${name.underscore}.${scope}.ts`, and invoke optional
+    // on_skip / on_copy callbacks. See Rails migration.rb:1060-1108.
     const fs = getFs();
     const path = getPath();
 
@@ -1421,18 +1453,68 @@ export abstract class Migration {
       fs.mkdirSync(destination, { recursive: true });
     }
 
-    const copied: string[] = [];
-    for (const [, sourcePath] of Object.entries(sources)) {
+    // Discovery is filename-driven; the adapter is only used by the proxy's
+    // lazy `migration` factory (which we never invoke here), so a stub is safe.
+    const stubAdapter = {} as DatabaseAdapter;
+    const destinationMigrations = Migrator.fromPath(destination, stubAdapter);
+    let last: MigrationProxy | undefined = destinationMigrations[destinationMigrations.length - 1];
+
+    const copied: MigrationProxy[] = [];
+    for (const [scope, sourcePath] of Object.entries(sources)) {
+      // Must round-trip through `Migrator.parseMigrationFilename` (regex
+      // `[a-z0-9_]*`) or the copied file would be invisible to subsequent
+      // discovery via `Migrator.fromPath`.
+      if (!/^[a-z0-9_]+$/.test(scope)) {
+        throw new ArgumentError(
+          `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by Migrator.fromPath.`,
+        );
+      }
       if (!fs.existsSync(sourcePath)) continue;
-      const files = fs
-        .readdirSync(sourcePath)
-        .filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
-      for (const file of files) {
-        const dest = path.join(destination, file);
-        if (!fs.existsSync(dest)) {
-          fs.copyFileSync(path.join(sourcePath, file), dest);
-          copied.push(dest);
+      const sourceMigrations = Migrator.fromPath(sourcePath, stubAdapter);
+
+      for (const source of sourceMigrations) {
+        if (!source.filename) continue;
+        const body = fs.readFileSync(source.filename, "utf8");
+        const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
+
+        const duplicate = destinationMigrations.find((m) => m.name === source.name);
+        if (duplicate) {
+          if (options.onSkip && duplicate.scope !== scope) {
+            options.onSkip(scope, source);
+          }
+          continue;
         }
+
+        const nextNumber = last ? BigInt(last.version) + 1n : 0n;
+        const newVersion = Migration.nextMigrationNumber(nextNumber);
+        const fileBase = underscore(source.name);
+        // Preserve the source file extension — a `.js` source must stay
+        // loadable under a JS-only runtime; switching to `.ts` would break
+        // both `Migrator.fromPath` discovery (regex matches .ts|.js) and
+        // the proxy's dynamic `import()`.
+        const ext = path.extname(source.filename) || ".ts";
+        const newPath = path.join(destination, `${newVersion}_${fileBase}.${scope}${ext}`);
+        const oldPath = source.filename;
+        // Build a fresh migration factory that imports the NEW path — spreading
+        // `source` would carry over a closure pinned to the old engine file.
+        const proxyName = source.name;
+        const copy: MigrationProxy = {
+          name: source.name,
+          version: newVersion,
+          scope,
+          filename: newPath,
+          migration: async () => {
+            const { pathToFileURL } = await import("node:url");
+            const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
+            return (mod.default ?? mod[proxyName]) as MigrationLike;
+          },
+        };
+        last = copy;
+
+        fs.writeFileSync(newPath, `${inserted}${body}`);
+        copied.push(copy);
+        options.onCopy?.(scope, copy, oldPath);
+        destinationMigrations.push(copy);
       }
     }
     return copied;
