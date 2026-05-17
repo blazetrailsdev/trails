@@ -844,8 +844,20 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 
 describe("AutomaticInverseFindingTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      faces: { description: "string", man_id: "integer" },
+      interests: { topic: "string", man_id: "integer" },
+      ratings: { score: "integer", comment_id: "integer" },
+      comments: { body: "string", post_id: "integer" },
+      posts: { title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
