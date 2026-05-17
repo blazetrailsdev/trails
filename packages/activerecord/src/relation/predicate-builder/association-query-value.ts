@@ -48,10 +48,22 @@ export class AssociationQueryValue {
       // a silently malformed hash.
       const ids = this.ids();
       if (this.isRelation(ids)) {
-        throw new Error(
-          "Composite foreign key with Relation value is not yet supported (Slot B). " +
-            "Use explicit FK conditions instead.",
-        );
+        // Pragmatic deviation from Rails: Rails calls `id_list.pluck(primary_key)`
+        // here, synchronously materializing the relation into tuples. Our pluck is
+        // async and queries() is sync, so instead we emit one IN subquery per FK
+        // column (`fk[i] IN (SELECT pk[i] FROM ...)`, ANDed via PredicateBuilder).
+        // This is broader than Rails' tuple-IN — it matches rows where each FK
+        // component is in its column independently rather than as a tuple — but
+        // mirrors the subquery approach used for non-CPK Relations (Batch 71).
+        const pks = this.primaryKey() as string[];
+        const fkCols = fk as string[];
+        const baseRelation = ids as any;
+        return [
+          fkCols.reduce<Record<string, unknown>>((acc, fkCol, i) => {
+            acc[fkCol] = baseRelation.reselect(pks[i]);
+            return acc;
+          }, {}),
+        ];
       }
       // Rails zips each element of id_list with the FK columns (id_list.map { |ids_set| fk.zip(ids_set).to_h }).
       // Each ids_set must be an array with the same arity as joinForeignKey. Non-tuple values

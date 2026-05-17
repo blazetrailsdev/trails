@@ -90,6 +90,38 @@ describe("AssociationQueryValue", () => {
       expect(av.queries()).toEqual([{ blog_id: 5, blog_post_id: 99 }]);
     });
 
+    it("emits per-column subqueries for a Relation value (Batch 71 deviation)", () => {
+      // Rails synchronously plucks tuples from the relation; our sync queries()
+      // can't await pluck, so we emit one reselected subquery per FK column.
+      const reselected: string[] = [];
+      const fakeRelation = {
+        _modelClass: {},
+        toArel() {
+          return null;
+        },
+        selectValues: [],
+        reselect(col: string) {
+          reselected.push(col);
+          return { tag: `reselect(${col})` };
+        },
+        whereValuesHash() {
+          return {};
+        },
+      };
+      const av = new AssociationQueryValue(
+        {
+          joinForeignKey: ["blog_id", "id"],
+          joinPrimaryKey: ["blog_id", "blog_post_id"],
+        },
+        fakeRelation,
+      );
+      const result = av.queries();
+      expect(result).toEqual([
+        { blog_id: { tag: "reselect(blog_id)" }, id: { tag: "reselect(blog_post_id)" } },
+      ]);
+      expect(reselected).toEqual(["blog_id", "blog_post_id"]);
+    });
+
     it("returns null tuple entries when value is null", () => {
       const av = new AssociationQueryValue(
         {
