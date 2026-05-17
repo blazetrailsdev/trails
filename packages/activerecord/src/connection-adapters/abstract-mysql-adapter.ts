@@ -476,8 +476,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this._execMutation(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
+  /**
+   * Mirrors AbstractMysqlAdapter#current_database — `query_value("SELECT database()", "SCHEMA")`.
+   * The Ruby form returns a single scalar; we project the first column off the schemaQuery
+   * row and coerce a null DATABASE() (no current schema) to "".
+   */
   async currentDatabase(): Promise<string> {
-    return "";
+    const rows = (await this.schemaQuery("SELECT database() AS name")) as Array<{
+      name?: string | null;
+      NAME?: string | null;
+    }>;
+    if (rows.length === 0) return "";
+    const val = rows[0].name ?? rows[0].NAME;
+    return val == null ? "" : String(val);
   }
 
   async charset(): Promise<string> {
