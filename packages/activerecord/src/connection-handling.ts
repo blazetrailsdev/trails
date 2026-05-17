@@ -250,7 +250,11 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   const { role, shard } = options;
   const preventWrites = role === READING_ROLE || !!options.preventWrites;
 
-  const klasses = new Set(normalized.map((klass) => klass.connectionClassForSelf()));
+  // Mirrors Rails: push the literal classes (`klasses: classes`) rather than
+  // their resolved connection_class_for_self. The caller's CCFS is resolved
+  // at read time in core.ts#matchesStack, so a `connected_to_many` scope
+  // doesn't leak across abstract subclasses that happen to share a CCFS.
+  const klasses = new Set<any>(normalized);
   const entry = { role, shard, preventWrites, klasses };
   appendToConnectedToStack(entry);
 
@@ -313,7 +317,9 @@ export function connectingTo(
     role,
     shard,
     preventWrites,
-    klasses: new Set([this.connectionClassForSelf()]),
+    // Mirrors Rails: push `[self]` (resolution to connection_class_for_self
+    // happens at read time in core.ts#matchesStack).
+    klasses: new Set([this]),
   });
 }
 
@@ -530,12 +536,16 @@ export function withRoleAndShard<T>(
   fn: () => T,
 ): T {
   const resolvedPreventWrites = role === READING_ROLE || preventWrites;
-  const connectionClass = this.connectionClassForSelf();
+  // Mirrors Rails `with_role_and_shard`: push `[self]` raw, and let
+  // core.ts#matchesStack resolve the caller's connection_class_for_self at
+  // read time. Pushing the pre-resolved CCFS would leak a scope opened on
+  // an abstract subclass without `connectsTo` (so CCFS walks up to Base)
+  // into every pool.
   const entry = {
     role,
     shard,
     preventWrites: resolvedPreventWrites,
-    klasses: new Set([connectionClass]),
+    klasses: new Set<any>([this]),
   };
   appendToConnectedToStack(entry);
 

@@ -156,6 +156,24 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionSpecificationName).toBe("Base");
   });
 
+  it("connection_specification_name returns 'Base' for a primary class even before connectsTo plants it", async () => {
+    const { __resetPrimaryAbstractClass, primaryAbstractClass } = await import("./inheritance.js");
+    class AppRecord extends Base {}
+    try {
+      __resetPrimaryAbstractClass();
+      primaryAbstractClass(AppRecord);
+      // primaryClassQ() is true but _connectionSpecificationName has not been
+      // planted yet (connectsTo not called) — the reader's primary-class
+      // branch should still normalize to "Base".
+      expect(Object.prototype.hasOwnProperty.call(AppRecord, "_connectionSpecificationName")).toBe(
+        false,
+      );
+      expect(AppRecord.connectionSpecificationName).toBe("Base");
+    } finally {
+      __resetPrimaryAbstractClass();
+    }
+  });
+
   it("shard_keys and sharded?", () => {
     expect(Base.shardKeys()).toEqual([]);
     expect(Base.isSharded()).toBe(false);

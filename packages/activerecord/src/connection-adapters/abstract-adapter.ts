@@ -739,14 +739,13 @@ export class AbstractAdapter implements Quoting {
         // affect pools that share its normalized descriptor name (handled
         // below in the name-match branch).
         //
-        // Note: when an abstract subclass without `connectionClass = true`
-        // (e.g. ApplicationRecord set up via `primaryAbstractClass()` only,
-        // never `connectsTo`) calls `connectedTo`, `withRoleAndShard` pushes
-        // `connectionClassForSelf()` which walks up to Base, so klasses will
-        // contain Base and this branch fires globally. That mirrors the
-        // pre-existing convention in `core.ts#matchesStack`. Realistic
-        // primary-class flows call `connectsTo` first (setting
-        // `connectionClass = true`) so the walk stops at the primary class.
+        // `withRoleAndShard`/`connectingTo`/`connectedToMany` push the raw
+        // caller class (`[self]`) onto the stack and let read sites resolve
+        // `connection_class_for_self` — so an `ApplicationRecord` scope set
+        // up without `connectsTo` no longer collapses to Base and leak into
+        // every pool. Realistic primary-class flows call `connectsTo` first
+        // (setting `connectionClass = true`) so reads against Base still
+        // match via the descriptor-name branch below.
         if (Object.prototype.hasOwnProperty.call(k, "_isActiveRecordBase")) {
           includesBase = true;
         }
