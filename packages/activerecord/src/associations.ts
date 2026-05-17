@@ -2096,10 +2096,15 @@ export async function updateCounterCaches(
     const parent = await targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
     if (!parent) continue;
 
+    // Mirrors Rails' BelongsToAssociation#update_counters: forward the
+    // belongs_to(touch:) option so updated_at (and any named timestamps) get
+    // bumped in the same UPDATE that adjusts the counter column.
+    const touch = assoc.options.touch;
+    const opts = touch != null ? { touch } : undefined;
     if (direction === "increment") {
-      await parent.incrementBang(counterCol);
+      await parent.incrementBang(counterCol, 1, opts);
     } else {
-      await parent.decrementBang(counterCol);
+      await parent.decrementBang(counterCol, 1, opts);
     }
   }
 }

@@ -3,7 +3,10 @@ import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { beforeValidation, afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
 import { resolveModel, resolveAssocClass, modelRegistry } from "../../associations.js";
-import { registerCounterCachedAssociation } from "../../counter-cache.js";
+import {
+  flushPendingCounterCacheColumns,
+  registerCounterCachedAssociation,
+} from "../../counter-cache.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 
@@ -71,29 +74,20 @@ export class BelongsTo extends SingularAssociation {
     const targetClassName = reflection.options?.className ?? camelize(name);
     // Rails: `klass = reflection.class_name.safe_constantize` — silently nil
     // when the target class isn't loaded yet, then guarded by
-    // `if klass && klass.respond_to?(:_counter_cache_columns)`. We mirror
-    // by treating registry-miss as the deferral signal (pending-map path);
-    // namespace-aware resolution via reflection.klass is attempted when the
-    // registry has it, allowing modular class names to resolve correctly.
-    const targetClass: typeof import("../../base.js").Base | null = modelRegistry.has(
-      targetClassName,
-    )
-      ? resolveAssocClass(model, name, targetClassName)
-      : null;
-    if (targetClass) {
-      // Mirror Rails' class_attribute `|=` semantics: copy-on-write so subclass
-      // additions don't mutate the parent class's Set in place.
-      const owns = Object.prototype.hasOwnProperty.call(targetClass, "_counterCacheColumns");
-      const inherited: Set<string> | undefined = (targetClass as any)._counterCacheColumns;
-      const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
-      next.add(cacheColumn);
-      (targetClass as any)._counterCacheColumns = next;
-    } else {
-      // Target class not registered yet — store in pending map; registerModel
-      // flushes it when the target is registered, getCounterCacheColumns as fallback.
-      const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<string>();
-      pending.add(cacheColumn);
-      pendingCounterCacheColumns.set(targetClassName, pending);
+    // `if klass && klass.respond_to?(:_counter_cache_columns)`. We mirror by
+    // always staging into the pending map first, then flushing immediately
+    // when the target is already registered. The unconditional pending stage
+    // ensures the registration survives a target class being later re-defined
+    // (test re-runs, hot reload), at which point registerModel re-flushes —
+    // mirroring Rails' behavior where re-loading the target class re-runs
+    // the include chain.
+    const pending = pendingCounterCacheColumns.get(targetClassName) ?? new Set<string>();
+    pending.add(cacheColumn);
+    pendingCounterCacheColumns.set(targetClassName, pending);
+    if (modelRegistry.has(targetClassName)) {
+      // Target already registered — flush right now (eager path).
+      const targetClass = resolveAssocClass(model, name, targetClassName);
+      if (targetClass) flushPendingCounterCacheColumns(targetClass);
     }
 
     // Mirrors Rails: `model.counter_cached_association_names |= [reflection.name]`

@@ -147,7 +147,9 @@ export class BelongsToAssociation extends SingularAssociation {
 
     const scope = klass.where(conditions);
     if (typeof scope.updateCounters === "function") {
-      await scope.updateCounters({ [counterCol]: by });
+      const touch = (this.reflection.options as any).touch;
+      const opts = touch != null ? { touch } : undefined;
+      await scope.updateCounters({ [counterCol]: by }, opts);
     }
   }
 
@@ -337,10 +339,12 @@ export class BelongsToAssociation extends SingularAssociation {
     }
 
     const Klass = this.klass;
+    const touch = (this.reflection.options as any).touch;
+    const opts = touch != null ? { touch } : undefined;
     if (Klass && typeof (Klass as any).where === "function") {
       const scope = (Klass as any).where(conditions);
       if (typeof scope.updateCounters === "function") {
-        await scope.updateCounters({ [counterCol]: by });
+        await scope.updateCounters({ [counterCol]: by }, opts);
       }
     }
 

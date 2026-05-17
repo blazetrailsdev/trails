@@ -644,12 +644,37 @@ describe("CounterCacheTest", () => {
     const reloaded = await Topic.find(t.id);
     expect(reloaded.replies_count).toBe(0);
   });
-  it.skip("counter cache on unloaded association class works", () => {
-    // BLOCKED: associations — pending-registry deferred resolution edge case
-    // ROOT-CAUSE: pendingCounterCacheColumns flush in registerModel resolves _counterCacheColumns,
-    //   but cache-column auto-derivation in counter-cache.ts#counterCacheColumnName runs
-    //   eagerly against the (unloaded) target — needs deferred lookup symmetric to flushPendingCounterCacheColumns
-    // SCOPE: ~15 LOC in associations/belongs-to.ts and counter-cache.ts
+  it("counter cache on unloaded association class works", async () => {
+    // Declare Reply (with belongs_to + counterCache) BEFORE Topic exists in the
+    // registry — exercises pendingCounterCacheColumns deferred-resolution.
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    // Clear any leftover Topic from prior tests so the unloaded path is
+    // actually exercised (registerModel leaks across test cases).
+    const { modelRegistry } = await import("./associations.js");
+    modelRegistry.delete("Topic");
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    registerModel(Reply);
+
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Topic);
+
+    expect(Topic.isCounterCacheColumn("replies_count")).toBe(true);
+    const t = await Topic.create({ title: "x" });
+    await Reply.create({ content: "r", topic_id: t.id });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
   });
   it("update counter caches on update", async () => {
     class Topic extends Base {
@@ -704,16 +729,64 @@ describe("CounterCacheTest", () => {
     await r.destroy();
     expect((await Topic.find(t.id)).replies_count).toBe(0);
   });
-  it.skip("counter cache on association with touch true also updates the timestamps", () => {
-    // BLOCKED: associations — touch: option not wired into counter cache callbacks
-    // ROOT-CAUSE: belongs_to(touch:) does not propagate to updateCounters; updateCounters
-    //   needs an opts.touch path that bumps updated_at/columns alongside the counter delta
-    // SCOPE: ~30 LOC in counter-cache.ts + belongs-to-association.ts increment/decrement callbacks
+  it("counter cache on association with touch true also updates the timestamps", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true, touch: true });
+    registerModel(Topic);
+    registerModel(Reply);
+    const originalTime = new Date("2020-01-01T00:00:00.000Z");
+    const t = await Topic.create({ title: "test", updated_at: originalTime });
+    await Reply.create({ content: "r", topic_id: t.id });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    const updatedTime =
+      reloaded.updated_at instanceof Date
+        ? reloaded.updated_at.getTime()
+        : Number(new Date(String(reloaded.updated_at)));
+    expect(updatedTime).toBeGreaterThan(originalTime.getTime());
   });
-  it.skip("counter cache on association with touch option updates timestamps", () => {
-    // BLOCKED: associations — touch: option (named column) not wired into counter cache
-    // ROOT-CAUSE: same as above — touch: :written_on / touch: %i(…) variants unsupported
-    // SCOPE: ~30 LOC in counter-cache.ts (shared with touch: true case)
+  it("counter cache on association with touch option updates timestamps", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.attribute("written_on", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", {
+      counterCache: true,
+      touch: "written_on",
+    });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "test" });
+    await Reply.create({ content: "r", topic_id: t.id });
+    const reloaded = await Topic.find(t.id);
+    expect(reloaded.replies_count).toBe(1);
+    expect(reloaded.written_on).not.toBeNull();
   });
   it("counter cache with belongs to association with class name", async () => {
     class Author extends Base {
@@ -1495,11 +1568,43 @@ describe("CounterCacheTest", () => {
     }
     expect(updateCount).toBe(0);
   });
-  it.skip("reset counter performs query for correct counter with touch: true", () => {
-    // BLOCKED: associations — touch: option wiring (resetCounters branch)
-    // ROOT-CAUSE: Rails forces the UPDATE under touch: true even when counts match;
-    //   we lack touch: plumbing entirely (see "touch: true also updates the timestamps")
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters — pair with touch: wiring
+  it("reset counter performs query for correct counter with touch: true", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.attribute("updated_at", "datetime");
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "first" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    // First reset brings the counter into agreement.
+    await Topic.resetCounters(t.id, "replies");
+    let updateCount = 0;
+    const sub = Notifications.subscribe("sql.active_record", (evt: any) => {
+      const sql = evt.payload?.sql?.trim().toUpperCase() ?? "";
+      if (sql.startsWith("UPDATE")) updateCount++;
+    });
+    try {
+      // touch: true forces the UPDATE even when the count matches, because the
+      // timestamp columns are part of the SET clause.
+      await Topic.resetCounters(t.id, "replies", { touch: true });
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(updateCount).toBe(1);
   });
   it.skip("reset counters for cpk model", () => {
     // BLOCKED: associations — composite primary key in resetCounters
