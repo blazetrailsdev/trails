@@ -1503,11 +1503,13 @@ describe("CounterCacheTest", () => {
   });
   it.skip("reset counters for cpk model", () => {
     // BLOCKED: associations — composite primary key in resetCounters
-    // ROOT-CAUSE: resetCounters' UPDATE WHERE is now CPK-aware (uses caller-supplied
-    //   id rather than record.id), but countHasMany still raises
-    //   CompositePrimaryKeyMismatchError when the parent has a CPK and the hasMany
-    //   uses a scalar foreignKey — the Rails Cpk::Order/Cpk::Book setup uses a
-    //   composite FK ([:shop_id, :order_id]) which we do not yet support for hasMany.
+    // ROOT-CAUSE: resetCounters' UPDATE WHERE (record.id, mirroring Rails'
+    //   `unscoped.where(primary_key => [object.id])`) is already CPK-aware
+    //   because trails' id getter returns the composite tuple. The blocker
+    //   is countHasMany, which raises CompositePrimaryKeyMismatchError when
+    //   the parent has a CPK and the hasMany uses a scalar foreignKey —
+    //   Rails' Cpk::Order/Cpk::Book setup uses a composite FK
+    //   ([:shop_id, :order_id]) which we do not yet support for hasMany.
     // SCOPE: ~30 LOC in associations.ts to thread composite FK through
     //   computeHasManyWhere / buildHasManyRelation; punt to follow-up PR.
   });
