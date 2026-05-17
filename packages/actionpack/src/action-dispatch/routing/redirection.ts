@@ -34,6 +34,9 @@ export class Endpoint {
   rackApp(): unknown {
     return this.app();
   }
+  engine(): boolean {
+    return false;
+  }
 }
 
 /** Parsed pieces of a URI, mirroring Ruby's URI::Generic. */
