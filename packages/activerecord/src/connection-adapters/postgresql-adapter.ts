@@ -2545,8 +2545,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         // element typname via normalizeFormatType + FORMAT_TYPE_ALIASES.
         // normalizeFormatType deliberately preserves `[]` for the
         // type-casting path, so the strip happens here at the call site.
+        // Forward the original (`[]`-stripped) sqlType as the third arg
+        // so registerClassWithLimit/Precision factories can recover
+        // limit/precision/scale from `numeric(10,2)` etc.
         const base = sqlType.replace(/\[\]\s*$/, "");
-        return tm.lookup(normalizeFormatType(base)) as {
+        return tm.lookup(normalizeFormatType(base), -1, base) as {
           serialize?(v: unknown): unknown;
         } | null;
       },
