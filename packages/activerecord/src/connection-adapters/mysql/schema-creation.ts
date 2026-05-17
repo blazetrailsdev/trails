@@ -55,6 +55,8 @@ export interface VisitorHostAdapter {
   supportsForeignKeys?(): boolean;
   supportsIndexesInCreate?(): boolean;
   isMariadb?(): boolean;
+  /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
+  config?: { foreignKeys?: boolean };
 }
 
 /** @internal Shared identifier guard for MySQL bare-identifier emission (charset/collation). */
@@ -212,9 +214,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return this._hostAdapter?.supportsIndexesInCreate?.() ?? true;
   }
 
-  /** @internal Mirrors Rails' `use_foreign_keys?` → adapter `supports_foreign_keys?`. */
+  /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
+   * foreign_keys_enabled?`). The enabled half reads `adapter.config.foreignKeys`, matching
+   * `SchemaStatements#isForeignKeysEnabled`. */
   protected useForeignKeys(): boolean {
-    return this._hostAdapter?.supportsForeignKeys?.() ?? true;
+    const supports = this._hostAdapter?.supportsForeignKeys?.() ?? true;
+    const enabled = this._hostAdapter?.config?.foreignKeys !== false;
+    return supports && enabled;
   }
 
   /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */

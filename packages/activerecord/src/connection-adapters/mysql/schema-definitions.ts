@@ -49,7 +49,10 @@ export class TableDefinition extends AbstractTableDefinition {
    * `toSql()` to build a host-aware MySQL visitor (support flags + MariaDB). */
   private readonly _mysqlAdapter?: VisitorHostAdapter;
   /** @internal Lazily-allocated visitor; the host adapter ref is fixed for our lifetime so
-   * one instance is reused across `toSql()` calls. */
+   * one instance is reused across `toSql()` calls. Note: when no host adapter is supplied
+   * (direct `new MysqlTableDefinition(...)` paths in tests), the visitor's `_mariadb` field
+   * defaults to `false` and cannot be flipped through this TD — set it on the visitor
+   * directly if a test needs MariaDB-flavored output. */
   private _visitor?: MysqlSchemaCreation;
 
   constructor(

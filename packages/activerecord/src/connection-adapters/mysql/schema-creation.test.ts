@@ -184,4 +184,51 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     const sql = td.toSql();
     expect(sql).toContain("UNIQUE INDEX `idx_users_email` (`email`)");
   });
+
+  it("inlines FOREIGN KEY constraints", () => {
+    const td = new MyTd("posts", {});
+    td.bigint("author_id");
+    td.foreignKey("authors", { column: "author_id" });
+    const sql = td.toSql();
+    expect(sql).toContain("CONSTRAINT ");
+    expect(sql).toContain("FOREIGN KEY (`author_id`) REFERENCES `authors` (`id`)");
+  });
+
+  it("inlines CHECK constraints", () => {
+    const td = new MyTd("products", {});
+    td.integer("price");
+    td.checkConstraint("price > 0", { name: "price_positive" });
+    const sql = td.toSql();
+    expect(sql).toContain("CONSTRAINT `price_positive` CHECK (price > 0)");
+  });
+
+  it("appends MySQL COMMENT on table option", () => {
+    const td = new MyTd("notes", { comment: "user-supplied" });
+    td.string("body");
+    expect(td.toSql()).toContain("COMMENT 'user-supplied'");
+  });
+
+  it("emits AS clause after table options for CTAS", () => {
+    const td = new MyTd("snapshot", { id: false, as: "SELECT 1" });
+    expect(td.toSql()).toMatch(/CREATE TABLE `snapshot`.* AS SELECT 1$/);
+  });
+
+  it("skips FK emission when host adapter has foreignKeys disabled", () => {
+    const host = {
+      supportsForeignKeys: () => true,
+      config: { foreignKeys: false },
+    };
+    const td = new MyTd("posts", { adapter: host });
+    td.bigint("author_id");
+    td.foreignKey("authors", { column: "author_id" });
+    expect(td.toSql()).not.toContain("FOREIGN KEY");
+  });
+
+  it("skips CHECK emission when host adapter reports !supportsCheckConstraints", () => {
+    const host = { supportsCheckConstraints: () => false };
+    const td = new MyTd("products", { adapter: host });
+    td.integer("price");
+    td.checkConstraint("price > 0", { name: "p_pos" });
+    expect(td.toSql()).not.toContain("CHECK");
+  });
 });
