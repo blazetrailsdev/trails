@@ -1,15 +1,58 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("AssociationScope", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      wr_authors: {},
+      wr_posts: { wr_author_id: "integer", kind: "string" },
+      st_authors: { name: "string" },
+      st_galleries: {
+        st_author_id: "integer",
+        imageable_id: "integer",
+        imageable_type: "string",
+      },
+      st_photos: { title: "string" },
+      st_videos: { title: "string" },
+      np_authors: { name: "string" },
+      np_galleries: {
+        np_author_id: "integer",
+        imageable_uuid: "string",
+        imageable_type: "string",
+      },
+      np_photos: {
+        columns: { uuid: "string", title: "string" },
+        primaryKey: ["uuid"],
+      },
+      ho1_users: { name: "string" },
+      ho1_accounts: { ho1_user_id: "integer" },
+      ho1_prefs: { ho1_account_id: "integer", theme: "string" },
+      hs_authors: { name: "string" },
+      hs_posts: { hs_author_id: "integer" },
+      hs_comments: { hs_post_id: "integer", body: "string" },
+      hot_posts: {},
+      hot_post_hooks: { hot_post_id: "integer", hot_review_id: "integer" },
+      hot_reviews: { body: "string" },
+      mg_authors: { name: "string" },
+      mg_postings: { mg_author_id: "integer", mg_tag_id: "integer" },
+      mg_tags: { label: "string" },
+      int_authors: { name: "string" },
+      int_memberships: { int_author_id: "integer", int_tag_id: "integer" },
+      int_tags: { label: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModels() {
