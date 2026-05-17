@@ -8,17 +8,10 @@ import {
 } from "./url-for.js";
 
 describe("AbstractController::UrlFor", () => {
-  describe("_routesInstanceDefault()", () => {
-    it("raises with the Rails-shaped hint until the host overrides it", () => {
-      expect(() => _routesInstanceDefault.call({})).toThrow(/include routing helpers explicitly/);
-      expect(() => _routesInstanceDefault.call({})).toThrow(/#url_for/);
-      expect(() => _routesInstanceDefault.call({})).toThrow(/url_helpers/);
-    });
-  });
-
-  describe("_routesClassDefault()", () => {
-    it("returns null by default", () => {
-      expect(_routesClassDefault()).toBeNull();
+  describe("_routes property defaults", () => {
+    it("both instance and class defaults are null (consistent with property contract)", () => {
+      expect(_routesInstanceDefault).toBeNull();
+      expect(_routesClassDefault).toBeNull();
     });
   });
 

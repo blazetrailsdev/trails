@@ -31,48 +31,49 @@ export interface RouteSetLike {
 }
 
 /**
- * Static-side contract for `_routes`. Hosts that include UrlFor must
- * supply this on the class (mirrors Rails' `module ClassMethods; def
- * _routes; …; end; end`). Returning `null` is valid and means "no
- * routes wired up yet" — `actionMethods` then returns the unfiltered
- * action set.
+ * Static-side contract for `_routes`. Hosts that include UrlFor expose
+ * this on the class. **It's a property, not a method** — trails reads
+ * `controller._routes` directly (see `action-controller/renderer.ts`'s
+ * `envForRequest`), unlike Rails which uses a `def _routes` method.
+ * `null` means "no routes wired up yet"; `filterActionMethodsForRoutes`
+ * then returns the unfiltered action set.
  */
 export interface UrlForClassMethods {
-  _routes(): RouteSetLike | null;
+  _routes: RouteSetLike | null;
 }
 
-const NO_ROUTES_MESSAGE =
+/**
+ * Hint shown when a host tries to use `#url_for` before any route set
+ * is wired up. Use this at the eventual `urlFor()` call site (the
+ * ActionDispatch::Routing::UrlFor mixin, not yet ported).
+ */
+export const NO_ROUTES_MESSAGE =
   "In order to use #url_for, you must include routing helpers explicitly. " +
   "For instance, `include Rails.application.routes.url_helpers`.";
 
 /**
- * Default instance-side `_routes` — raises until the host overrides
- * it. Mirrors Rails: trying to generate URLs before the routes are
- * wired up should fail loudly with a hint.
- */
-export function _routesInstanceDefault(this: object): never {
-  throw new Error(NO_ROUTES_MESSAGE);
-}
-
-/**
- * Default class-side `_routes` — returns `null`. Conforms to
- * `UrlForClassMethods#_routes`. Hosts override this on the class once
+ * Class-side default for `_routes` — `null`. Conforms to
+ * `UrlForClassMethods._routes`. Hosts override this on the class once
  * a route set is wired up.
+ *
+ * Note: trails treats `_routes` as a property (not a method), so the
+ * default is the literal value `null` rather than a function returning
+ * `null`. The renderer reads `controller._routes` and dereferences
+ * `.defaultEnv` directly.
  */
-export const _routesClassDefault: UrlForClassMethods["_routes"] = () => null;
+export const _routesClassDefault: RouteSetLike | null = null;
+
+/** Per-instance default; same property-based contract. */
+export const _routesInstanceDefault: RouteSetLike | null = null;
 
 /**
  * Convenience bag of Rails-shaped defaults. Use this to wire both
  * sides of the contract at once without renaming:
  *
  * ```ts
- * Host.prototype._routes = UrlForDefaults._routes;        // instance
- * (Host as { _routes: () => RouteSetLike | null })._routes = UrlForDefaults._routesStatic;
+ * Host.prototype._routes = UrlForDefaults._routes;
+ * (Host as { _routes: RouteSetLike | null })._routes = UrlForDefaults._routesStatic;
  * ```
- *
- * The two flat exports (`_routesInstanceDefault` /
- * `_routesClassDefault`) remain the canonical names — they're
- * unambiguous when both sides are in scope.
  */
 export const UrlForDefaults = {
   _routes: _routesInstanceDefault,
