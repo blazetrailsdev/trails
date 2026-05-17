@@ -2518,16 +2518,48 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * correctly.
    */
   override quoteDefaultExpression(value: unknown, column?: unknown): string {
-    const col = column as { sqlType?: string | null; type?: string; array?: boolean } | undefined;
+    const col = column as
+      | {
+          sqlType?: string | null;
+          type?: string;
+          array?: boolean;
+          options?: { array?: boolean };
+        }
+      | undefined;
+    // ColumnDefinition stores `array` under `options`; live PG Column
+    // instances expose it as a top-level boolean. Accept both shapes so
+    // DDL paths (addColumn/changeColumn → ColumnDefinition) and dump/SET
+    // DEFAULT paths (live Column) both fire the array branch.
+    const isArray = col?.array === true || col?.options?.array === true;
+    const rawSqlType = col?.sqlType ?? col?.type ?? null;
+    // Rails' lookup_cast_type_from_column normalizes formatted SQL types
+    // (`integer` → `int4`, `numeric(10,2)` → `numeric`) before consulting
+    // the OID-keyed type map. Mirror that here so the TypeMapLike passed
+    // to pgQuoteDefaultExpression resolves element subtypes instead of
+    // falling back to ValueType.
+    const tm = this.typeMap;
+    const lookup = {
+      lookup(sqlType: string): { serialize?(v: unknown): unknown } | null {
+        // Strip a trailing `[]` so an array column's sqlType (e.g.
+        // `integer[]` from ColumnDefinition.typeToSql) resolves to the
+        // element typname via normalizeFormatType + FORMAT_TYPE_ALIASES.
+        // normalizeFormatType deliberately preserves `[]` for the
+        // type-casting path, so the strip happens here at the call site.
+        const base = sqlType.replace(/\[\]\s*$/, "");
+        return tm.lookup(normalizeFormatType(base)) as {
+          serialize?(v: unknown): unknown;
+        } | null;
+      },
+    };
     return pgQuoteDefaultExpression(
       value,
       col != null
         ? {
-            array: col.array === true,
-            sqlType: col.sqlType ?? col.type ?? null,
+            array: isArray,
+            sqlType: rawSqlType,
           }
         : null,
-      this.typeMap,
+      lookup,
     );
   }
 
