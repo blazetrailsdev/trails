@@ -87,6 +87,24 @@ export class Request {
   }
 
   get rawHost(): string {
+    return this.rawHostWithPort;
+  }
+
+  /** Returns 'https://' if this is an SSL request and 'http://' otherwise. */
+  get protocol(): string {
+    return this.ssl ? "https://" : "http://";
+  }
+
+  /**
+   * Returns the host and port for this request, such as "example.com:8080".
+   * Mirrors Rails' `raw_host_with_port`: honors X-Forwarded-Host (last entry).
+   */
+  get rawHostWithPort(): string {
+    const forwarded = (this.env["HTTP_X_FORWARDED_HOST"] as string | undefined)?.trim();
+    if (forwarded) {
+      const parts = forwarded.split(/,\s?/);
+      return parts[parts.length - 1];
+    }
     return (
       (this.env["HTTP_HOST"] as string) || `${this.env["SERVER_NAME"]}:${this.env["SERVER_PORT"]}`
     );
