@@ -69,12 +69,8 @@ export function _helpersInstance(this: HelpersHost): HelperMethodsModule {
  * `clearHelpers` can re-establish them after a wipe.
  */
 export function helperMethod(cls: HelpersClassMethods, ...names: Array<string | string[]>): void {
-  // Rails: `methods.flatten!` — accept nested arrays as well as varargs.
-  const flat: string[] = [];
-  for (const n of names) {
-    if (Array.isArray(n)) flat.push(...n);
-    else flat.push(n);
-  }
+  // Rails: `methods.flatten!` — flattens recursively (default depth nil).
+  const flat = (names as readonly unknown[]).flat(Infinity) as string[];
   if (flat.length === 0) return;
   cls._helperMethods = [...(cls._helperMethods ?? []), ...flat];
   const mod = _helpersForModification(cls);
@@ -134,10 +130,15 @@ export function _helpersForModification(cls: HelpersClassMethods): HelperMethods
   if (Object.prototype.hasOwnProperty.call(cls, "_helpers") && cls._helpers) {
     return cls._helpers;
   }
-  const cloned = Object.create(null) as HelperMethodsModule;
-  if (cls._helpers) Object.assign(cloned, cls._helpers);
-  cls._helpers = cloned;
-  return cloned;
+  // Rails builds the new module with the parent's helpers module as an
+  // ancestor (`mod.include(helpers) if helpers`), so methods added to
+  // the parent *after* the subclass clones remain visible. Match that
+  // by setting the parent's module as the new module's prototype rather
+  // than `Object.assign`-snapshotting at clone time.
+  const inherited = cls._helpers ?? null;
+  const child = Object.create(inherited) as HelperMethodsModule;
+  cls._helpers = child;
+  return child;
 }
 
 /**

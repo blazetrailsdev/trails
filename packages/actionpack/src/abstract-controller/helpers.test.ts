@@ -68,10 +68,24 @@ describe("helperMethod", () => {
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
     helperMethod(child, "fromChild");
 
-    expect(Object.keys(child._helpers!)).toEqual(["fromParent", "fromChild"]);
+    expect(Object.keys(child._helpers!)).toEqual(["fromChild"]);
+    expect(typeof child._helpers!.fromParent).toBe("function");
     expect(Object.keys(parent._helpers!)).toEqual(["fromParent"]);
     expect(parent._helperMethods).toEqual(["fromParent"]);
     expect(child._helperMethods).toEqual(["fromParent", "fromChild"]);
+  });
+
+  it("parent additions made after subclass mutation remain visible (ancestor link)", () => {
+    const parent = makeBase();
+    helperMethod(parent, "early");
+
+    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    helperMethod(child, "childOnly");
+    helperMethod(parent, "late");
+
+    expect(typeof child._helpers!.late).toBe("function");
+    expect(typeof child._helpers!.early).toBe("function");
+    expect(typeof child._helpers!.childOnly).toBe("function");
   });
 });
 
@@ -145,7 +159,7 @@ describe("_helpersInstance", () => {
 });
 
 describe("_helpersForModification", () => {
-  it("returns the own module when present, else clones the inherited one", () => {
+  it("returns the own module when present, else links the inherited one as an ancestor", () => {
     const parent = makeBase();
     helperMethod(parent, "fromParent");
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
@@ -153,8 +167,16 @@ describe("_helpersForModification", () => {
     const mod = _helpersForModification(child);
     expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(true);
     expect(mod).not.toBe(parent._helpers);
-    expect(Object.keys(mod)).toEqual(["fromParent"]);
+    expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
+    expect(Object.keys(mod)).toEqual([]);
+    expect(typeof mod.fromParent).toBe("function");
 
     expect(_helpersForModification(child)).toBe(mod);
+  });
+
+  it("also flattens nested array inputs", () => {
+    const cls = makeBase();
+    helperMethod(cls, ["a", ["b", ["c"]]] as unknown as string);
+    expect(cls._helperMethods).toEqual(["a", "b", "c"]);
   });
 });
