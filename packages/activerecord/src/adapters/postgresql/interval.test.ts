@@ -1,17 +1,36 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/interval_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// The `interval_data_types` table uses the PG-specific `interval` type
+// (including `interval(3)` precision and `interval[]`), which isn't
+// expressible via defineSchema. The table is created via raw DDL below;
+// defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await defineSchema(adapter, {});
+  return adapter;
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let IntervalDataType: any;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await freshAdapter();
     await adapter.exec(`DROP TABLE IF EXISTS interval_data_types`);
     await adapter.exec(`
       CREATE TABLE interval_data_types (

@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/range_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
@@ -9,6 +9,26 @@ import { MultiRange } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// The `postgresql_ranges` table uses the PG-specific range / multirange
+// types (int4range, int8range, numrange, tsrange, tstzrange, daterange,
+// plus user-defined floatrange/stringrange), which aren't expressible via
+// defineSchema. The table is created via raw DDL below; defineSchema(
+// adapter, {}) marks the file as TM-Phase-5 compliant.
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await defineSchema(adapter, {});
+  return adapter;
+}
 
 const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
@@ -20,7 +40,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let PostgresqlRangesTz: any;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await freshAdapter();
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.dropRange("floatrange", { ifExists: true });
     await adapter.dropRange("stringrange", { ifExists: true });
