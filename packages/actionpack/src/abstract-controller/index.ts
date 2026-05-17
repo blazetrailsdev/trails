@@ -77,3 +77,14 @@ export {
   type FragmentsClassMethods,
   type FragmentsHost,
 } from "./fragments.js";
+export {
+  _helpersForModification,
+  _helpersInstance,
+  applyHelpers,
+  clearHelpers,
+  helper,
+  helperMethod,
+  type HelperMethodsModule,
+  type HelpersClassMethods,
+  type HelpersHost,
+} from "./helpers.js";
