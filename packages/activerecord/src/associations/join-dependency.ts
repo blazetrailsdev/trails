@@ -11,6 +11,7 @@
  */
 
 import type { Base } from "../base.js";
+import type { DatabaseAdapter } from "../adapter.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -20,6 +21,8 @@ import { sql as arelSql, Nodes } from "@blazetrails/arel";
 import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
+import { ConnectionNotDefined } from "../errors.js";
+import { quote as abstractQuote } from "../connection-adapters/abstract/quoting.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -123,12 +126,54 @@ export class JoinDependency {
   // When a joined table's real name is unique, we skip the tN alias in SQL
   // (matching Rails' AliasTracker which only aliases on collision).
   private _usedTableNames: Set<string>;
+  // Connection used for adapter-aware string quoting in polymorphic
+  // source_type / STI type predicates. Resolved eagerly in the constructor;
+  // null only when no pool is wired (mirrors `quoterFor` in sanitization.ts).
+  // Eager resolution is safe because all production call sites construct
+  // JoinDependency immediately before walking it; there is no window in
+  // which the pool could become wired between construction and the first
+  // `_quoteString` call.
+  private _adapter: DatabaseAdapter | null;
 
   constructor(baseModel: typeof Base) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
     this._usedTableNames = new Set([this._baseAlias]);
+    this._adapter = JoinDependency._resolveAdapter(baseModel);
     this._buildBaseAliases();
+  }
+
+  /**
+   * Mirrors `quoterFor` (sanitization.ts:237): only the absence of a
+   * configured pool (`ConnectionNotDefined`) falls back to the portable
+   * escape; other failures (pool exhaustion, adapter errors) propagate so
+   * real connection problems don't silently downgrade the emitted SQL.
+   * Structurally rejects adapters missing `quote` for the same reason.
+   * @internal
+   */
+  private static _resolveAdapter(baseModel: typeof Base): DatabaseAdapter | null {
+    if (typeof (baseModel as any).connection !== "function") return null;
+    let conn: DatabaseAdapter | null | undefined;
+    try {
+      conn = (baseModel as any).connection() as DatabaseAdapter | null | undefined;
+    } catch (err) {
+      if (err instanceof ConnectionNotDefined) return null;
+      throw err;
+    }
+    if (!conn || typeof (conn as any).quote !== "function") return null;
+    return conn;
+  }
+
+  /**
+   * Mirrors Rails' `connection.quote(value)` for string literals embedded
+   * into JOIN predicates (polymorphic source_type, STI type IN-lists).
+   * Falls back to the abstract adapter's `quote` only when no pool is
+   * wired (delegates to a single source of truth for the portable escape).
+   * @internal
+   */
+  private _quoteString(value: string): string {
+    if (this._adapter) return (this._adapter as any).quote(value);
+    return abstractQuote(value);
   }
 
   get nodes(): JoinNode[] {
@@ -211,7 +256,7 @@ export class JoinDependency {
 
       if (assocDef.options.as) {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND PLACEHOLDER."${typeCol}" = '${modelClass.name}'`;
+        joinOn += ` AND PLACEHOLDER."${typeCol}" = ${this._quoteString(modelClass.name)}`;
       }
     } else {
       return null;
@@ -445,7 +490,7 @@ export class JoinDependency {
     const inheritanceCol = getInheritanceColumn(model);
     if (inheritanceCol && isStiSubclass(model)) {
       const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
-      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+      const inList = stiNames.map((n: string) => this._quoteString(n)).join(", ");
       joinOn += ` AND "${alias}"."${inheritanceCol}" IN (${inList})`;
     }
     return joinOn;
@@ -708,14 +753,7 @@ export class JoinDependency {
         // polymorphic type column is `foreign_type` (options[:foreign_type]
         // || "#{name}_type"), and the value is the literal :source_type.
         const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        // Escape backslash first, then single-quote — order matters so we
-        // don't double-escape an already-escaped quote. MySQL/MariaDB treat
-        // `\` as a string escape by default (NO_BACKSLASH_ESCAPES off), so
-        // both must be escaped to be portable across adapters.
-        const sourceTypeLit = String(assocDef.options.sourceType)
-          .replaceAll("\\", "\\\\")
-          .replaceAll("'", "''");
-        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${sourceTypeLit}'`;
+        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = ${this._quoteString(String(assocDef.options.sourceType))}`;
       }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
