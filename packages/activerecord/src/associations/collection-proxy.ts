@@ -23,6 +23,7 @@ import {
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
+import { filterScopeForCreate } from "./association.js";
 import {
   StrictLoadingViolationError,
   RecordNotSaved,
@@ -657,7 +658,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : (this._assocDef.options.foreignKey ?? `${underscore(ctor.name)}_id`);
 
     const buildAttrs: Record<string, unknown> = {
-      ...this._scopeForCreateAttrs(attrs),
       ...attrs,
       [foreignKey as string]: this._record._readAttribute(primaryKey as string),
     };
@@ -667,45 +667,83 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     let targetModel = this.model as typeof Base;
 
-    // STI: if a type attribute is provided, resolve to the correct subclass
+    // STI: resolve subclass from the caller-supplied inheritance column,
+    // falling back to a value from scope_for_create (e.g.
+    // `has_many :posts, -> { where(type: "SpecialPost") }`). Rails resolves
+    // the subclass after scope-merge, so peek at scope here before
+    // instantiation; the full scope_for_create filter still runs below.
+    const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol && buildAttrs[inheritanceCol]) {
-      const typeName = buildAttrs[inheritanceCol] as string;
-      targetModel = findStiClass(targetModel, typeName);
+    if (inheritanceCol) {
+      const typeName = (buildAttrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as
+        | string
+        | undefined;
+      if (typeName) targetModel = findStiClass(targetModel, typeName);
     }
 
-    return new targetModel(buildAttrs);
+    const record = new targetModel(buildAttrs);
+    this._applyScopeForCreate(record, attrs, foreignKey as string | string[]);
+    return record;
   }
 
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
     let targetModel = this.model as typeof Base;
 
+    const sfcForSti = this._scopeForCreateRaw();
     const inheritanceCol = getInheritanceColumn(targetModel);
-    if (inheritanceCol && attrs[inheritanceCol]) {
-      const typeName = attrs[inheritanceCol] as string;
-      targetModel = findStiClass(targetModel, typeName);
+    if (inheritanceCol) {
+      const typeName = (attrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as string | undefined;
+      if (typeName) targetModel = findStiClass(targetModel, typeName);
     }
 
-    const merged = { ...this._scopeForCreateAttrs(attrs), ...attrs };
-    return new targetModel(merged);
+    const record = new targetModel(attrs);
+    this._applyScopeForCreate(record, attrs);
+    return record;
   }
 
-  // Mirrors Rails' Association#initialize_attributes: scope_for_create
-  // pre-fills attributes from where-conditions on the association scope,
-  // letting user-supplied attrs win.
-  private _scopeForCreateAttrs(userAttrs: Record<string, unknown>): Record<string, unknown> {
-    const sfc =
-      typeof (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
-        .scopeForCreate === "function"
-        ? (this as unknown as { scopeForCreate: () => Record<string, unknown> }).scopeForCreate()
-        : {};
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(sfc)) {
-      if (!Object.prototype.hasOwnProperty.call(userAttrs, k)) {
-        out[k] = v;
-      }
+  private _scopeForCreateRaw(): Record<string, unknown> {
+    const fn = (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
+      .scopeForCreate;
+    return typeof fn === "function" ? fn.call(this) : {};
+  }
+
+  // Mirrors Rails' Association#initialize_attributes (association.rb:217):
+  // pre-fill scope_for_create attrs. Caller-supplied / already-changed
+  // keys normally win, except for skip_assign = [foreign_key,
+  // foreign_type], where the scope value is allowed through (Rails
+  // relies on this to re-anchor a scoped FK / polymorphic type).
+  // `foreign_type` here is the polymorphic-belongs-to type column
+  // (`${as}_type`), NOT the STI inheritance column.
+  private _applyScopeForCreate(
+    record: Base,
+    exceptFromScope: Record<string, unknown>,
+    foreignKey?: string | string[],
+  ): void {
+    const sfc = this._scopeForCreateRaw();
+    if (!sfc || Object.keys(sfc).length === 0) return;
+
+    // Rails' skip_assign is [foreign_key, foreign_type] — the polymorphic
+    // type column on belongs_to (Reflection#type returns foreign_type, NOT
+    // the STI inheritance column). For composite-key associations the FK
+    // is an array; every column must land in skipAssign so scope values
+    // for any of them can re-anchor (matches Array(reflection.foreign_key)
+    // in Rails' initialize_attributes).
+    const skipAssign = new Set<string>();
+    if (Array.isArray(foreignKey)) {
+      for (const k of foreignKey) if (k) skipAssign.add(k);
+    } else if (foreignKey) {
+      skipAssign.add(foreignKey);
     }
-    return out;
+    const asName = this._assocDef.options.as;
+    if (asName) skipAssign.add(`${underscore(asName)}_type`);
+
+    const assigned = new Set<string>(
+      ((record as any).changedAttributeNamesToSave ?? []) as string[],
+    );
+    for (const k of Object.keys(exceptFromScope)) assigned.add(k);
+
+    const out = filterScopeForCreate(sfc, assigned, skipAssign);
+    if (out) (record as any)._assignAttributes(out);
   }
 
   /**
