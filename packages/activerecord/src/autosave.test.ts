@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   markForDestruction,
@@ -13,8 +14,24 @@ import {
 } from "./autosave-association.js";
 import { Associations } from "./associations.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA = {
+  posts: { title: "string", author_id: "integer" },
+  authors: { name: "string" },
+  books: { title: "string", author_id: "integer" },
+  companies: { name: "string" },
+  accounts: { credit_limit: "integer", company_id: "integer" },
+  strict_accounts: { credit_limit: "integer", company_id: "integer" },
+  employees: { name: "string", company_id: "integer" },
+  ships: { name: "string" },
+  parts: { name: "string", ship_id: "integer" },
+  pirates: { catchphrase: "string" },
+  pirate_ships: { name: "string", pirate_id: "integer" },
+} as const;
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -24,8 +41,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("TestAutosaveAssociationsInGeneral", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("markForDestruction and isMarkedForDestruction", () => {
@@ -152,8 +169,8 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Company.adapter = adapter;
     Account.adapter = adapter;
     registerModel("Company", Company);
@@ -245,8 +262,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Post.adapter = adapter;
     Author.adapter = adapter;
     registerModel("Post", Post);
@@ -318,8 +335,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Company.adapter = adapter;
     Employee.adapter = adapter;
     registerModel("Company", Company);
@@ -401,8 +418,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Ship.adapter = adapter;
     Part.adapter = adapter;
     registerModel("Ship", Ship);
