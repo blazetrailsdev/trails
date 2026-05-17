@@ -1,23 +1,33 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
+  await defineSchema(adapter, {
+    bytea_data_type: { payload: "binary", serialized: "binary" },
+  });
+  return adapter;
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
-    await adapter.exec(`
-      CREATE TABLE bytea_data_type (
-        id serial primary key,
-        payload bytea,
-        serialized bytea
-      )
-    `);
+    adapter = await freshAdapter();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
