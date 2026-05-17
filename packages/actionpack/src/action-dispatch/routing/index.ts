@@ -38,3 +38,15 @@ export {
   type RedirectCallable,
   type OptionRedirectOptions,
 } from "./redirection.js";
+export {
+  urlFor as routingUrlFor,
+  fullUrlFor,
+  urlOptions as routingUrlOptions,
+  routeFor,
+  optimizeRoutesGeneration,
+  _withRoutes,
+  _routesContext,
+  type UrlForHost,
+  type UrlForRoutes,
+  type UrlForOptions,
+} from "./url-for.js";
