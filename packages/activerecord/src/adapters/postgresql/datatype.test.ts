@@ -1,13 +1,33 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/datatype_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// Tables in this file (postgresql_times, postgresql_oids, ex) use PG-specific
+// types (interval, oid, name, char) that aren't expressible via defineSchema.
+// They're created via raw DDL inside each test; defineSchema(adapter, {}) marks
+// the file as TM-Phase-5 compliant (auto-schema path disabled, no model relies
+// on it).
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await defineSchema(adapter, {});
+  return adapter;
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await freshAdapter();
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
