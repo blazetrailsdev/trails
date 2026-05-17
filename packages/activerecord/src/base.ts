@@ -553,6 +553,54 @@ function _applyScopeAttributes(
   }
 }
 
+/**
+ * @internal
+ * Pull constructor-form association assignments (e.g. `new Owner({items:
+ * [...], profile: p})`) out of the regular attribute bag. Returns null
+ * when no key matches a declared association so the hot path allocates
+ * nothing.
+ */
+function _extractAssociationAttrs(
+  ctor: typeof Base | undefined,
+  attrs: Record<string, unknown>,
+): {
+  rest: Record<string, unknown>;
+  assocs: Array<{ type: string; name: string; value: unknown }>;
+} | null {
+  const defs = (ctor as { _associations?: Array<{ name: string; type: string }> } | undefined)
+    ?._associations;
+  if (!defs || defs.length === 0) return null;
+  let assocs: Array<{ type: string; name: string; value: unknown }> | null = null;
+  let rest: Record<string, unknown> | null = null;
+  for (const [k, v] of Object.entries(attrs)) {
+    const def = defs.find((a) => a.name === k);
+    if (def) {
+      (assocs ??= []).push({ type: def.type, name: def.name, value: v });
+    } else {
+      (rest ??= {})[k] = v;
+    }
+  }
+  if (!assocs) return null;
+  return { rest: rest ?? {}, assocs };
+}
+
+/** @internal */
+function _dispatchAssociationAttrs(
+  record: Base,
+  assocs: Array<{ type: string; name: string; value: unknown }>,
+): void {
+  for (const { type, name, value } of assocs) {
+    const proxy = (record as unknown as { association: (n: string) => unknown }).association(
+      name,
+    ) as { replace?: (v: unknown[]) => void; writer?: (v: unknown) => void };
+    if (type === "hasMany" || type === "hasAndBelongsToMany") {
+      proxy.replace?.(Array.isArray(value) ? (value as unknown[]) : value == null ? [] : [value]);
+    } else {
+      proxy.writer?.(value);
+    }
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -2277,6 +2325,11 @@ export class Base extends Model {
 
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
+    // Split out constructor-form association values (e.g. `new Owner({items:
+    // [...]})`) so super() never sees them as plain attributes. Dispatched
+    // after super() so the association proxy exists on `this`.
+    const assocPending = _extractAssociationAttrs(new.target as typeof Base, attrs);
+    if (assocPending) attrs = assocPending.rest;
     if (hasMultiparameterKeys(attrs)) {
       // Mirrors Rails: Base#initialize calls assign_attributes which handles
       // multiparameter keys. We split: regular attrs go through the Model
@@ -2361,6 +2414,9 @@ export class Base extends Model {
         (this as any)._dirty.snapshot((this as any)._attributes);
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
+    }
+    if (assocPending) {
+      _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
     }
   }
 

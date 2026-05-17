@@ -711,6 +711,7 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
     const { multiparams, regular } = extractMultiparameterCallstack(attrs);
     // Assign regular attributes first (with existing error wrapping)
     for (const [key, value] of Object.entries(regular)) {
+      if (assignIfAssociation(this, key, value)) continue;
       try {
         this.writeAttribute(key, value);
       } catch (e) {
@@ -733,6 +734,7 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
   }
 
   for (const [key, value] of Object.entries(attrs)) {
+    if (assignIfAssociation(this, key, value)) continue;
     try {
       this.writeAttribute(key, value);
     } catch (e) {
@@ -749,6 +751,43 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
       );
     }
   }
+}
+
+/**
+ * Constructor-form association writer. When the key matches a declared
+ * association (via `ctor._associations`), dispatch the value to the
+ * association proxy's `replace`/`writer` rather than `writeAttribute`.
+ * Mirrors Rails' `_assign_attribute` routing through `public_send("#{k}=")`
+ * to association writer methods.
+ *
+ * Returns true if the key was an association and was handled.
+ *
+ * @internal
+ */
+function assignIfAssociation(host: AttributeIO, key: string, value: unknown): boolean {
+  const ctor = (host as { constructor?: unknown }).constructor as
+    | { _associations?: Array<{ name: string; type: string }> }
+    | undefined;
+  const assoc = ctor?._associations?.find((a) => a.name === key);
+  if (!assoc) return false;
+  const assocFn = (host as unknown as { association?: (n: string) => unknown }).association;
+  if (typeof assocFn !== "function") return false;
+  const proxy = assocFn.call(host, key) as
+    | { replace?: (v: unknown[]) => void; writer?: (v: unknown) => void }
+    | null
+    | undefined;
+  if (!proxy) return false;
+  if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
+    if (typeof proxy.replace !== "function") return false;
+    proxy.replace(Array.isArray(value) ? (value as unknown[]) : value == null ? [] : [value]);
+    return true;
+  }
+  if (assoc.type === "hasOne" || assoc.type === "belongsTo") {
+    if (typeof proxy.writer !== "function") return false;
+    proxy.writer(value);
+    return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------

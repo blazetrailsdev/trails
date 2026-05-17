@@ -451,6 +451,12 @@ async function autosaveAssociation(record: Base, assoc: AssociationDefinition): 
 
 async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
+  // Rails: save_collection_association resets the scope before iterating so
+  // the per-child save path (which may re-read the scope) doesn't keep a
+  // stale memoized association_scope across the owner save.
+  if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
+    (inst as { resetScope: () => void }).resetScope();
+  }
   const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
 
   for (const child of children) {
