@@ -168,7 +168,17 @@ export async function resetCounters(
     }
 
     const count = await countHasMany(record, assoc.name, assoc.options);
-    updates[counterColumn] = count;
+    // Mirrors Rails: `updates[counter_name] = count if count != count_was` — skip
+    // the UPDATE entirely when the stored counter already matches the recount.
+    // Ruby's `!=` is type-coercing across Integer/Bignum; in TS we have to match
+    // explicitly when the stored attribute is bigint (e.g. big_integer columns).
+    const countWas =
+      (record as any).readAttribute?.(counterColumn) ?? (record as any)[counterColumn];
+    const sameCount =
+      typeof countWas === "bigint" ? countWas === BigInt(count) : count === countWas;
+    if (!sameCount) {
+      updates[counterColumn] = typeof countWas === "bigint" ? BigInt(count) : count;
+    }
   }
 
   if (options.touch) {
@@ -181,6 +191,9 @@ export async function resetCounters(
   }
 
   if (Object.keys(updates).length > 0) {
+    // Mirrors Rails: `unscoped.where(primary_key => [object.id]).update_all(updates)`.
+    // `record.id` returns the CPK tuple via the PrimaryKey#id accessor, and
+    // matches the cast already applied by `find` for scalar PKs.
     await this.unscoped().where(buildPkPredicate(this, record.id)).updateAll(updates);
   }
 }

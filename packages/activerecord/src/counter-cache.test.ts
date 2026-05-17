@@ -2,9 +2,10 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
+import { Notifications } from "@blazetrails/activesupport";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -302,6 +303,10 @@ describe("CounterCacheTest", () => {
 
   beforeEach(() => {
     adapter = freshAdapter();
+  });
+
+  afterEach(() => {
+    Notifications.unsubscribeAll();
   });
 
   // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
@@ -1415,11 +1420,39 @@ describe("CounterCacheTest", () => {
     // ROOT-CAUSE: same gap as "reset counters with modular association" — namespaced target
     // SCOPE: ~10 LOC in counter-cache.ts#resetCounters (shared with modular case)
   });
-  it.skip("reset counter with belongs_to which has class_name", () => {
-    // BLOCKED: associations — class_name option not consulted for counter target
-    // ROOT-CAUSE: resetCounters resolves the counter target via association name; needs to
-    //   honor reflection.options.className (Rails: `reflection.class_name.constantize`)
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters
+  it("reset counter with belongs_to which has class_name", async () => {
+    // Rails: Engine `belongs_to :my_car, class_name: "Car", counter_cache: :engines_count`.
+    // The belongs_to *name* differs from the parent class name; resolution must
+    // walk `options.className` rather than `camelize(name)`.
+    class Car extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("engines_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Engine extends Base {
+      static {
+        this.attribute("car_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Engine, "myCar", {
+      className: "Car",
+      foreignKey: "car_id",
+      counterCache: "engines_count",
+    });
+    Associations.hasMany.call(Car, "engines", { foreignKey: "car_id" });
+    registerModel(Car);
+    registerModel(Engine);
+    const car = await Car.create({ name: "Honda" });
+    await Engine.create({ car_id: car.id });
+    await Car.incrementCounter("engines_count", car.id);
+    const before = await Car.find(car.id);
+    expect(before.engines_count).toBe(2);
+    await Car.resetCounters(car.id, "engines");
+    const after = await Car.find(car.id);
+    expect(after.engines_count).toBe(1);
   });
   it.skip("reset the right counter if two have the same class_name", () => {
     // BLOCKED: associations — multiple belongs_to to same target class
@@ -1427,11 +1460,40 @@ describe("CounterCacheTest", () => {
     //   (e.g. Reply belongs_to :topic, :other_topic) it picks the wrong reflection
     // SCOPE: ~15 LOC — dispatch on reflection name, not class_name
   });
-  it.skip("reset counter skips query for correct counter", () => {
-    // BLOCKED: associations — resetCounters always re-counts via SELECT COUNT(*)
-    // ROOT-CAUSE: Rails skips the UPDATE when the counted value already matches; ours
-    //   always issues the UPDATE. Behavioral parity check uses assert_no_queries.
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters — short-circuit when counts equal
+  it("reset counter skips query for correct counter", async () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("replies_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Reply extends Base {
+      static {
+        this.attribute("content", "string");
+        this.attribute("topic_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Reply, "topic", { counterCache: true });
+    Associations.hasMany.call(Topic, "replies", { foreignKey: "topic_id" });
+    registerModel(Topic);
+    registerModel(Reply);
+    const t = await Topic.create({ title: "first" });
+    await Reply.create({ content: "r1", topic_id: t.id });
+    // First reset brings the counter into agreement.
+    await Topic.resetCounters(t.id, "replies");
+    let updateCount = 0;
+    const sub = Notifications.subscribe("sql.active_record", (evt: any) => {
+      const sql = evt.payload?.sql?.trim().toUpperCase() ?? "";
+      if (sql.startsWith("UPDATE")) updateCount++;
+    });
+    try {
+      await Topic.resetCounters(t.id, "replies");
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+    expect(updateCount).toBe(0);
   });
   it.skip("reset counter performs query for correct counter with touch: true", () => {
     // BLOCKED: associations — touch: option wiring (resetCounters branch)
@@ -1441,9 +1503,15 @@ describe("CounterCacheTest", () => {
   });
   it.skip("reset counters for cpk model", () => {
     // BLOCKED: associations — composite primary key in resetCounters
-    // ROOT-CAUSE: resetCounters builds the WHERE via single-column id; primaryKey
-    //   may be string[] (cpk), needs composite-aware WHERE generation
-    // SCOPE: ~15 LOC in counter-cache.ts#resetCounters
+    // ROOT-CAUSE: resetCounters' UPDATE WHERE (record.id, mirroring Rails'
+    //   `unscoped.where(primary_key => [object.id])`) is already CPK-aware
+    //   because trails' id getter returns the composite tuple. The blocker
+    //   is countHasMany, which raises CompositePrimaryKeyMismatchError when
+    //   the parent has a CPK and the hasMany uses a scalar foreignKey —
+    //   Rails' Cpk::Order/Cpk::Book setup uses a composite FK
+    //   ([:shop_id, :order_id]) which we do not yet support for hasMany.
+    // SCOPE: ~30 LOC in associations.ts to thread composite FK through
+    //   computeHasManyWhere / buildHasManyRelation; punt to follow-up PR.
   });
   it("update counter for decrement", async () => {
     class Topic extends Base {
@@ -1504,11 +1572,48 @@ describe("CounterCacheTest", () => {
     const reloaded = (await CpkOrder.find([1, 1])) as CpkOrder;
     expect(reloaded.items_count).toBe(7);
   });
-  it.skip("reset the right counter if two have the same foreign key", () => {
-    // BLOCKED: associations — multiple belongs_to sharing a foreign_key
-    // ROOT-CAUSE: resetCounters dispatch by name rather than FK; needs to disambiguate
-    //   when two reflections share foreignKey but differ by counter_cache column
-    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters
+  it("reset the right counter if two have the same foreign key", async () => {
+    // Rails: Friendship has both `belongs_to :friend` (no counter_cache) and
+    // `belongs_to :friend_too` (counter_cache: :friends_too_count), sharing
+    // `friend_id`. Resetting `:friends_too` on Person must find the belongs_to
+    // that actually carries `counter_cache:` (the second one), not just any
+    // belongs_to whose className matches the parent.
+    class FriendPerson extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("friends_too_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Friendship extends Base {
+      static {
+        this.attribute("friend_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Friendship, "friend", {
+      className: "FriendPerson",
+      foreignKey: "friend_id",
+    });
+    Associations.belongsTo.call(Friendship, "friendToo", {
+      className: "FriendPerson",
+      foreignKey: "friend_id",
+      counterCache: "friends_too_count",
+    });
+    Associations.hasMany.call(FriendPerson, "friends_too", {
+      className: "Friendship",
+      foreignKey: "friend_id",
+    });
+    registerModel(FriendPerson);
+    registerModel(Friendship);
+    const michael = await FriendPerson.create({ name: "Michael" });
+    await Friendship.create({ friend_id: michael.id });
+    await FriendPerson.incrementCounter("friends_too_count", michael.id);
+    const before = await FriendPerson.find(michael.id);
+    expect(before.friends_too_count).toBe(2);
+    await FriendPerson.resetCounters(michael.id, "friends_too");
+    const after = await FriendPerson.find(michael.id);
+    expect(after.friends_too_count).toBe(1);
   });
   it.skip("reset counter of has_many :through association", () => {
     // BLOCKED: associations — has_many :through target in resetCounters
