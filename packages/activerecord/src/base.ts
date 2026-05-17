@@ -565,17 +565,17 @@ function _extractAssociationAttrs(
   attrs: Record<string, unknown>,
 ): {
   rest: Record<string, unknown>;
-  assocs: Array<{ type: string; name: string; value: unknown }>;
+  assocs: Array<{ name: string; value: unknown }>;
 } | null {
   const defs = (ctor as { _associations?: Array<{ name: string; type: string }> } | undefined)
     ?._associations;
   if (!defs || defs.length === 0) return null;
-  let assocs: Array<{ type: string; name: string; value: unknown }> | null = null;
+  let assocs: Array<{ name: string; value: unknown }> | null = null;
   let rest: Record<string, unknown> | null = null;
   for (const [k, v] of Object.entries(attrs)) {
     const def = defs.find((a) => a.name === k);
     if (def) {
-      (assocs ??= []).push({ type: def.type, name: def.name, value: v });
+      (assocs ??= []).push({ name: def.name, value: v });
     } else {
       (rest ??= {})[k] = v;
     }
@@ -587,7 +587,7 @@ function _extractAssociationAttrs(
 /** @internal */
 function _dispatchAssociationAttrs(
   record: Base,
-  assocs: Array<{ type: string; name: string; value: unknown }>,
+  assocs: Array<{ name: string; value: unknown }>,
 ): void {
   for (const { name, value } of assocs) {
     _AttributeAssignment.assignAssociationIfMatch(
