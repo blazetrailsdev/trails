@@ -16,6 +16,7 @@ import {
   MiddlewareStack as DispatchMiddlewareStack,
   type MiddlewareEntry,
 } from "../action-dispatch/middleware/stack.js";
+import { includeContent } from "./metal/head.js";
 
 const STATUS_CODES: Record<string, number> = {
   ok: 200,
@@ -213,17 +214,48 @@ export class Metal extends AbstractController {
   }
 
   /** Send a head-only response with given status. Mirrors Rails'
-   * `ActionController::Head#head` which sets `self.response_body = ""`
-   * to mark `performed?` true. */
-  head(status: number | string): void {
-    if (typeof status === "string") {
-      const code = STATUS_CODES[status];
-      if (!code) throw new Error(`Unknown status: ${status}`);
+   * `ActionController::Head#head` (`actionpack/lib/action_controller/metal/head.rb`):
+   * sets status, optional `location` / `content_type` / extra headers,
+   * and assigns `response_body = ""` to mark `performed?` true. */
+  head(status: number | string | null, options?: Record<string, unknown>): true {
+    if (status !== null && typeof status === "object") {
+      throw new Error(`${JSON.stringify(status)} is not a valid value for \`status\`.`);
+    }
+    const resolvedStatus = status ?? "ok";
+    let location: unknown;
+    let contentType: unknown;
+    if (options) {
+      location = options.location;
+      contentType = options.content_type;
+      for (const [key, value] of Object.entries(options)) {
+        if (key === "location" || key === "content_type") continue;
+        // Rails capitalizes each `-`/`_`-separated segment: `cache_control`
+        // → `Cache-Control`. `setHeader` lowercases storage; mirror the
+        // wire-format expectation in the assigned name regardless.
+        const headerName = key
+          .split(/[-_]/)
+          .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+          .join("-");
+        this.setHeader(headerName, String(value));
+      }
+    }
+    if (typeof resolvedStatus === "string") {
+      const code = STATUS_CODES[resolvedStatus];
+      if (!code) throw new Error(`Unknown status: ${resolvedStatus}`);
       this._status = code;
     } else {
-      this._status = status;
+      this._status = resolvedStatus;
+    }
+    if (location !== undefined && location !== null) {
+      this.setHeader("location", this.urlFor(String(location)));
+    }
+    if (includeContent(this._status)) {
+      if (!this._contentType) {
+        this._contentType = contentType ? String(contentType) : "text/html";
+      }
     }
     this._responseBody = "";
+    return true;
   }
 
   /** Set the response body directly. */

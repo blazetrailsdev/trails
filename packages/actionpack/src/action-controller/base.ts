@@ -197,12 +197,16 @@ export class Base extends Metal {
 
   /** Render to string without committing the response. */
   renderToString(options: RenderOptions = {}): string {
-    const oldBody = this.body;
+    // Snapshot the underlying body slot (not the stringified getter) so we
+    // can restore the original `null`/non-null state. `body=` now routes
+    // through `_responseBody`, which doubles as the `performed?` signal —
+    // assigning "" would otherwise leave the controller permanently
+    // "performed" after a render-to-string.
+    const oldBody = (this as any)._responseBody;
     const oldPerformed = this.performed;
     this.render(options);
     const result = this.body;
-    this.body = oldBody;
-    // Reset performed state
+    (this as any)._responseBody = oldBody;
     (this as any)._performed = oldPerformed;
     return result;
   }

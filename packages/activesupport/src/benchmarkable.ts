@@ -48,14 +48,14 @@ export function benchmark<T>(
     typeof optionsOrBlock === "function" ? {} : (optionsOrBlock ?? {});
   const level = options.level ?? "info";
 
-  if (!logger || typeof (logger as Record<string, unknown>)[level] !== "function") {
-    return block() as T | Promise<Awaited<T>>;
-  }
+  if (!logger) return block() as T | Promise<Awaited<T>>;
 
   const start = monotonicNow();
   const log = (): void => {
+    const fn = (logger as Record<string, unknown>)[level];
+    if (typeof fn !== "function") return;
     const ms = monotonicNow() - start;
-    (logger as Record<string, (msg: string) => void>)[level](`${message} (${ms.toFixed(1)}ms)`);
+    (fn as (msg: string) => void).call(logger, `${message} (${ms.toFixed(1)}ms)`);
   };
 
   let result: T | Promise<T>;
@@ -71,6 +71,10 @@ export function benchmark<T>(
       result = block();
     }
   } catch (err) {
+    // Rails' Benchmarkable suppresses the trailing log on raise, but the
+    // pre-existing trails actionpack helper logged on throw so callers
+    // could see partial timings of failing operations — kept here to
+    // preserve that contract across both consumers.
     log();
     throw err;
   }
