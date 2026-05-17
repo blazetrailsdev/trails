@@ -319,8 +319,12 @@ export class Request {
       params = parseNestedQuery(input);
     }
 
-    this.env["action_dispatch.request.request_parameters"] = params;
-    return params;
+    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
+      string,
+      unknown
+    >;
+    this.env["action_dispatch.request.request_parameters"] = normalized;
+    return normalized;
   }
 
   get pathParameters(): Record<string, string> {

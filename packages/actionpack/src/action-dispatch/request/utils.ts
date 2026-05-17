@@ -35,18 +35,19 @@ export class RequestUtils {
   }
 
   /**
-   * Returns a normalized copy of `params`. When `performDeepMunge` is true
-   * (the Rails default), arrays have their `null` entries removed
-   * recursively. When false, the structure is passed through untouched.
+   * Returns a normalized version of `params`. When `performDeepMunge` is
+   * true (the Rails default), the structure is recursively cloned with
+   * `null` entries removed from arrays. When false, `params` is returned
+   * as-is — Rails wraps with HashWithIndifferentAccess at this point,
+   * which we don't need in TS.
    *
-   * Mirrors `Request::Utils.normalize_encode_params` minus the
-   * HashWithIndifferentAccess wrapping (which doesn't apply in TS).
+   * Mirrors `Request::Utils.normalize_encode_params`.
    */
   static normalizeEncodeParams(params: ParamValue): ParamValue {
     if (this.performDeepMunge) {
       return noNilNormalize(params);
     }
-    return passthroughNormalize(params);
+    return params;
   }
 
   /**
@@ -65,20 +66,11 @@ function noNilNormalize(params: ParamValue): ParamValue {
     return mapped.filter((el) => el !== null);
   }
   if (params !== null && typeof params === "object") {
-    const out: ParamHash = {};
+    // Null-prototype to (a) match parseNestedQuery's shape and (b) make
+    // `__proto__` in an own key land as data instead of mutating the
+    // prototype chain.
+    const out: ParamHash = Object.create(null);
     for (const [k, v] of Object.entries(params)) out[k] = noNilNormalize(v);
-    return out;
-  }
-  return params;
-}
-
-function passthroughNormalize(params: ParamValue): ParamValue {
-  if (Array.isArray(params)) {
-    return params.map(passthroughNormalize);
-  }
-  if (params !== null && typeof params === "object") {
-    const out: ParamHash = {};
-    for (const [k, v] of Object.entries(params)) out[k] = passthroughNormalize(v);
     return out;
   }
   return params;
