@@ -14,6 +14,7 @@ import {
 } from "./associations/errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import type { AssociationDefinition } from "./associations.js";
+import { modelRegistry } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/activesupport";
@@ -636,6 +637,12 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
         assoc.name,
       );
     }
+    // Polymorphic hasOne via `as:` — write the `<as>_type` column on the
+    // child so the inverse polymorphic belongs_to can resolve back to us.
+    const asName = (reflection?.options?.as ?? assoc.options.as) as string | undefined;
+    if (asName) {
+      childRecord._writeAttribute(`${underscore(asName)}_type`, (ctor as { name: string }).name);
+    }
     // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
     // after FK assignment, before save (autosave_association.rb:497).
     inst?.setInverseInstance?.(childRecord);
@@ -731,6 +738,12 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
         (record.constructor as typeof Base).name,
         assoc.name,
       );
+    }
+    // Polymorphic belongs_to — also write the `<name>_type` column on the
+    // child so reload of the polymorphic reference can resolve correctly.
+    if (assoc.options.polymorphic) {
+      const typeCol = `${underscore(assoc.name)}_type`;
+      record._writeAttribute(typeCol, (assocRecord.constructor as { name: string }).name);
     }
     // Rails save_belongs_to_association:559-568: `association.loaded!` only
     // fires inside the `if association.updated?` branch — after the FK write.
@@ -997,7 +1010,25 @@ export function isInversePolymorphicAssociationChanged(reflection: any, record: 
       ? reflection.inverseOf()
       : (reflection.inverseOf ?? null);
   if (!inverse?.options?.polymorphic) return false;
-  return reflection.activeRecord !== record?.constructor;
+  // Rails inverse_polymorphic_association_changed? — read the polymorphic
+  // type column off the child record and compare the parent class to the
+  // class resolved for that name. Detects swaps where the FK is unchanged
+  // but the polymorphic _type column points at a different active_record.
+  const foreignType: string | undefined =
+    inverse.foreignType ?? (inverse.name ? `${underscore(String(inverse.name))}_type` : undefined);
+  if (!foreignType || typeof record?._readAttribute !== "function") {
+    return reflection.activeRecord !== record?.constructor;
+  }
+  const className = record._readAttribute(foreignType);
+  if (className == null) return reflection.activeRecord !== record?.constructor;
+  const polymorphicClassFor =
+    (record.constructor as { polymorphicClassFor?: (n: string) => unknown })?.polymorphicClassFor ??
+    null;
+  const resolved =
+    typeof polymorphicClassFor === "function"
+      ? polymorphicClassFor.call(record.constructor, className)
+      : (modelRegistry.get(String(className)) ?? record.constructor);
+  return reflection.activeRecord !== resolved;
 }
 
 /** @internal */
