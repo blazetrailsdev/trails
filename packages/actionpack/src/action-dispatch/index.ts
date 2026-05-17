@@ -81,3 +81,10 @@ export {
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
 export { Callbacks } from "./middleware/callbacks.js";
+export {
+  RemoteIp,
+  GetIp,
+  IpSpoofAttackError,
+  TRUSTED_PROXIES,
+  type Proxy,
+} from "./middleware/remote-ip.js";
