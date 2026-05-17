@@ -5,6 +5,8 @@
  * @see https://api.rubyonrails.org/classes/ActionController.html
  */
 
+import type { RouteSetLike } from "../../abstract-controller/url-for.js";
+
 export class ActionControllerError extends Error {
   constructor(message?: string) {
     super(message ?? "");
@@ -56,8 +58,11 @@ export class UrlGenerationError extends ActionControllerError {
 
   get corrections(): string[] {
     if (!this.routeName || !this.routes) return [];
-    const namedRoutes = this.routes as { namedRoutes?: { helperNames?: string[] } };
-    const helpers = namedRoutes.namedRoutes?.helperNames ?? [];
+    // `this.routes` may be a full `RouteSetLike` OR a Journey
+    // `FormatterHost` (which has `namedRoutes.has/get`, not
+    // `namedRoutes.helperNames`). Treat both shapes as optional.
+    const routes = this.routes as Partial<RouteSetLike> | undefined;
+    const helpers = routes?.namedRoutes?.helperNames ?? [];
     const target = this.routeName.toLowerCase();
     return helpers
       .filter((name) => name !== this.methodName && name.toLowerCase().includes(target))

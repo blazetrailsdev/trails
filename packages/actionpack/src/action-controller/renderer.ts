@@ -8,10 +8,7 @@
  */
 
 import { Metal } from "./metal.js";
-
-interface RoutesLike {
-  defaultEnv?: Record<string, unknown>;
-}
+import type { RouteSetLike } from "../abstract-controller/url-for.js";
 
 export class Renderer {
   private _controller: unknown;
@@ -108,8 +105,11 @@ export class Renderer {
    *   default_env so explicit overrides win.
    */
   private envForRequest(): Record<string, unknown> {
-    const routes = (this._controller as { _routes?: RoutesLike | null } | null | undefined)
-      ?._routes;
+    // Narrow to the slice we actually need — `_routes` may be supplied as
+    // a partial `RouteSetLike` (some callers/tests provide only
+    // `defaultEnv` and skip `namedRoutes`).
+    type EnvSlice = Pick<RouteSetLike, "defaultEnv">;
+    const routes = (this._controller as { _routes?: EnvSlice | null } | null | undefined)?._routes;
     if ("HTTP_HOST" in this._env || !routes) {
       return { ...this._env };
     }
