@@ -99,15 +99,26 @@ export function connectsTo(
       // Kick off async load so the sync adapter cache is populated by the
       // time the pool first asks for a connection. The returned promise is
       // attached to the pool as `adapterReady` so callers running real
-      // queries can await it before leaseConnection().
-      const adapterReady = adapterName
-        ? resolveConnectionAdapter(adapterName)
+      // queries can await it before leaseConnection(). Capture any
+      // rejection in `loadError` so the sync factory below can surface the
+      // real cause (AdapterNotFound, loader import error, ...) instead of
+      // a generic "not preloaded" message — and swallow the rejection on a
+      // detached `.catch` so callers that never await `adapterReady` don't
+      // trip an unhandled-promise warning.
+      let loadError: unknown = null;
+      const adapterReady: Promise<unknown> = adapterName
+        ? resolveConnectionAdapter(adapterName).catch((err) => {
+            loadError = err;
+            throw err;
+          })
         : Promise.resolve(null);
+      adapterReady.catch(() => {});
       const pool = this.connectionHandler.establishConnection(dbConfig, {
         owner: this.connectionClassForSelf(),
         role,
         shard,
         adapterFactory: () => {
+          if (loadError) throw loadError;
           const AdapterClass = resolveConnectionAdapterSync(adapterName);
           if (!AdapterClass) {
             throw new ConnectionNotEstablished(
