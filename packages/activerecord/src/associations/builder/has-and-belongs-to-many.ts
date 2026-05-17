@@ -194,9 +194,64 @@ export class HasAndBelongsToMany {
     const middleReflection = Reflection.create("hasMany", middleName, null, middleOptions, model);
     Reflection.addReflection(model, middleName, middleReflection as any);
 
-    beforeDestroy(model, (record: any) => {
-      return record.association(middleName).handleDependency();
-    });
+    // Mirrors Rails associations.rb:1886-1894 — instead of registering a
+    // bare `before_destroy` callback per HABTM, Rails includes an anonymous
+    // module that overrides `destroy_associations` and chains with `super`.
+    // Each HABTM declaration layers its own override; multiple HABTMs on
+    // the same class chain naturally through the captured `prev` reference.
+    // Translation note: `destroyAssociations` isn't yet wired into the
+    // standard destroy flow (see Batch 37), so we still register a
+    // class-level `beforeDestroy` once that invokes it — this preserves
+    // current behavior while installing the Rails-shape override module.
+    // Per-association guard: re-declaring the same HABTM (same `name` on
+    // the same class) would otherwise layer a duplicate wrapper around the
+    // existing chain, causing the join cleanup to run twice. Track the set
+    // of names already wrapped on this class's prototype and short-circuit.
+    const HABTM_WRAPPED_NAMES = Symbol.for("blazetrails.habtm.destroyAssociations.names");
+    const ownWrappedNames: Set<string> = Object.prototype.hasOwnProperty.call(
+      model.prototype,
+      HABTM_WRAPPED_NAMES,
+    )
+      ? (model.prototype as any)[HABTM_WRAPPED_NAMES]
+      : Object.defineProperty(model.prototype, HABTM_WRAPPED_NAMES, {
+          value: new Set<string>(),
+          configurable: true,
+          writable: false,
+        })[HABTM_WRAPPED_NAMES];
+    const prevDestroyAssociations = model.prototype.destroyAssociations;
+    if (ownWrappedNames.has(name)) {
+      // Skip wrapper layering on redeclaration — the existing chain already
+      // handles this association.
+    } else {
+      ownWrappedNames.add(name);
+      model.prototype.destroyAssociations = async function (this: any): Promise<void> {
+        await this.association(middleName).handleDependency();
+        this.association(name).reset?.();
+        // Rails' `association(:name).reset` only clears the Association
+        // instance's loaded state. In this codebase, collection readers are
+        // additionally memoized in `_collectionProxies` (see associations.ts
+        // ~2334), so the user-facing reader would still return the stale
+        // proxy unless we evict it too.
+        this._collectionProxies?.delete(name);
+        if (typeof prevDestroyAssociations === "function") {
+          await prevDestroyAssociations.call(this);
+        }
+      };
+    }
+    const HABTM_DESTROY_INSTALLED = Symbol.for("blazetrails.habtm.destroyAssociations.installed");
+    // Use `in` (inheritance walk) rather than own-property: when a subclass
+    // declares its own HABTM, the parent already installed a bridge that the
+    // callback engine COW'd into the subclass's chain. Installing a second
+    // bridge on the subclass would dispatch `destroyAssociations` twice,
+    // running the full chained override stack twice (duplicate cleanup).
+    if (!(HABTM_DESTROY_INSTALLED in model)) {
+      Object.defineProperty(model, HABTM_DESTROY_INSTALLED, {
+        value: true,
+        configurable: true,
+        writable: false,
+      });
+      beforeDestroy(model, (record: any) => record.destroyAssociations());
+    }
 
     // Tightened option set forwarded to the public HABTM reflection.
     // Rails' `hm_options` allowlist for the generated `has_many :through`

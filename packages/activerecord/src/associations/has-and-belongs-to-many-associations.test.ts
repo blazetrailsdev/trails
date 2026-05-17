@@ -1445,4 +1445,107 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await proxy.destroy(proj);
     expect(proj.isDestroyed()).toBe(true);
   });
+
+  // ==========================================================================
+  // destroy_associations override mixin chaining
+  // Mirrors Rails associations.rb:1886-1894 — each HABTM declaration layers an
+  // anonymous module override of destroy_associations that chains via super.
+  // ==========================================================================
+
+  it("layers destroyAssociations chain for multiple HABTMs on one class", async () => {
+    const a2 = createTestAdapter();
+    class MultiOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TagA extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TagB extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    MultiOwner.adapter = a2;
+    TagA.adapter = a2;
+    TagB.adapter = a2;
+    registerModel(MultiOwner);
+    registerModel(TagA);
+    registerModel(TagB);
+    Associations.hasAndBelongsToMany.call(MultiOwner, "tag_as", {
+      className: "TagA",
+      joinTable: "multi_owners_tag_as",
+    });
+    Associations.hasAndBelongsToMany.call(MultiOwner, "tag_bs", {
+      className: "TagB",
+      joinTable: "multi_owners_tag_bs",
+    });
+
+    const owner = await MultiOwner.create({ name: "Owner" });
+    const calls: string[] = [];
+    // The HABTM override targets the middle hasMany (one per HABTM
+    // declaration). Stub each middle association's handleDependency to
+    // observe whether the chained `super` calls reach both layers.
+    const origAssoc = (owner as any).association.bind(owner);
+    (owner as any).association = (n: string) => {
+      const a = origAssoc(n);
+      const orig = a.handleDependency.bind(a);
+      a.handleDependency = async () => {
+        calls.push(n);
+        return orig();
+      };
+      return a;
+    };
+
+    await (owner as any).destroyAssociations();
+    // Both layered overrides should have run with distinct middle
+    // associations — chained super reaches both, not the same one twice.
+    expect(new Set(calls).size).toBe(2);
+  });
+
+  it("subclass HABTM extends destroyAssociations chain via super", async () => {
+    const a2 = createTestAdapter();
+    class ParentOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    ParentOwner.adapter = a2;
+    registerModel(ParentOwner);
+    Associations.hasAndBelongsToMany.call(ParentOwner, "p_tags", {
+      className: "TagA",
+      joinTable: "parent_owners_p_tags",
+    });
+
+    class ChildOwner extends ParentOwner {}
+    ChildOwner.adapter = a2;
+    registerModel(ChildOwner);
+    Associations.hasAndBelongsToMany.call(ChildOwner, "c_tags", {
+      className: "TagB",
+      joinTable: "child_owners_c_tags",
+    });
+
+    // A ChildOwner instance's destroyAssociations override should chain
+    // through parent's override too, hitting both HABTM middles.
+    const child = await ChildOwner.create({ name: "Child" });
+    const calls: string[] = [];
+    const origAssoc = (child as any).association.bind(child);
+    (child as any).association = (n: string) => {
+      const a = origAssoc(n);
+      const orig = a.handleDependency.bind(a);
+      a.handleDependency = async () => {
+        calls.push(n);
+        return orig();
+      };
+      return a;
+    };
+
+    await (child as any).destroyAssociations();
+    // Two distinct middle hasMany associations should be visited — one
+    // from parent's HABTM override, one from child's, chained via super.
+    expect(new Set(calls).size).toBe(2);
+  });
 });
