@@ -23,8 +23,14 @@ export type QueryPair = [string, string | null];
 
 export class QueryParser {
   /**
-   * When true, semicolons are not treated as separators. Mirrors Rails'
-   * `cattr_accessor :strict_query_string_separator`.
+   * Mirrors Rails' `cattr_accessor :strict_query_string_separator`.
+   *
+   * Under Rack 3 this toggle is a no-op (matching Rails behavior on
+   * Rack 3): Rails' `each_pair` only consults it inside the
+   * `SEMICOLON_COMPAT` elsif branch, which is unreachable when
+   * `Rack::QueryParser::DEFAULT_SEP` doesn't include `;` — i.e. on
+   * Rack 3. Surface is preserved for source-level parity and for
+   * callers that pre-set it on the assumption of forward Rack 4 work.
    */
   static strictQueryStringSeparator: boolean | null = null;
 
