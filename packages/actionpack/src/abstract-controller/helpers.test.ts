@@ -119,6 +119,18 @@ describe("helper", () => {
     expect(child._helpers).toBe(parent._helpers);
   });
 
+  it("re-including a module after a later module overrode its method is a no-op (identity-based)", () => {
+    const cls = makeBase();
+    const A: HelperMethodsModule = { foo: () => "A.foo" };
+    const B: HelperMethodsModule = { foo: () => "B.foo" };
+    helper(cls, A);
+    helper(cls, B);
+    expect(cls._helpers!.foo.call({})).toBe("B.foo");
+    helper(cls, A);
+    // B's override stays in place; A is identity-deduped.
+    expect(cls._helpers!.foo.call({})).toBe("B.foo");
+  });
+
   it("evaluates a trailing block against the helpers module (Rails `helper do ... end`)", () => {
     const cls = makeBase();
     helper(cls, (mod: HelperMethodsModule) => {

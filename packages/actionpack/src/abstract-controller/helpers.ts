@@ -35,6 +35,14 @@ export type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown
 export interface HelpersClassMethods {
   _helpers?: HelperMethodsModule;
   _helperMethods?: string[];
+  /**
+   * Identity set of helper modules already included via `helper(...)`.
+   * Mirrors Rails' `_helpers.include?(mod)` (ancestor-chain identity
+   * check), so a later module that overrides one of an earlier
+   * module's methods can't be undone by a duplicate include of the
+   * earlier module.
+   */
+  _includedHelperModules?: WeakSet<object>;
   name?: string;
 }
 
@@ -103,10 +111,30 @@ export function helper(
     if (typeof arg === "function") {
       arg(_helpersForModification(cls));
     } else if (arg && typeof arg === "object") {
-      if (helpersInclude(cls._helpers, arg)) continue;
+      if (isHelperIncluded(cls, arg)) continue;
+      recordHelperIncluded(cls, arg);
       Object.assign(_helpersForModification(cls), arg);
     }
   }
+}
+
+function isHelperIncluded(cls: HelpersClassMethods, mod: object): boolean {
+  let current: object | null = cls;
+  while (current) {
+    const own = Object.getOwnPropertyDescriptor(current, "_includedHelperModules")?.value as
+      | WeakSet<object>
+      | undefined;
+    if (own?.has(mod)) return true;
+    current = Object.getPrototypeOf(current);
+  }
+  return false;
+}
+
+function recordHelperIncluded(cls: HelpersClassMethods, mod: object): void {
+  if (!Object.prototype.hasOwnProperty.call(cls, "_includedHelperModules")) {
+    cls._includedHelperModules = new WeakSet<object>();
+  }
+  cls._includedHelperModules!.add(mod);
 }
 
 /**
@@ -119,6 +147,7 @@ export function clearHelpers(cls: HelpersClassMethods): void {
   const inherited = [...(cls._helperMethods ?? [])];
   cls._helpers = Object.create(null) as HelperMethodsModule;
   cls._helperMethods = [];
+  cls._includedHelperModules = new WeakSet<object>();
   helperMethod(cls, ...inherited);
 }
 
@@ -140,20 +169,4 @@ export function _helpersForModification(cls: HelpersClassMethods): HelperMethods
   const child = Object.create(inherited) as HelperMethodsModule;
   cls._helpers = child;
   return child;
-}
-
-/**
- * Cheap stand-in for Ruby's `_helpers.include?(mod)`. Two modules are
- * "included" if every method on `mod` is the same function on
- * `helpers`. Suitable for the de-dup guard in `helper(...)`.
- */
-function helpersInclude(
-  helpers: HelperMethodsModule | undefined,
-  mod: HelperMethodsModule,
-): boolean {
-  if (!helpers) return false;
-  for (const k of Object.keys(mod)) {
-    if (helpers[k] !== mod[k]) return false;
-  }
-  return Object.keys(mod).length > 0;
 }
