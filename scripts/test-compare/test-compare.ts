@@ -16,11 +16,8 @@
  * both IsDistinctFrom and IsNotDistinctFrom), matching is count-aware: the Nth
  * Ruby test with a given description consumes the Nth TS test with that description.
  *
- * By default, detailed per-file tables, misplaced tests, and wrong-describe
- * output are only shown for the focus packages (arel, activemodel, activerecord,
- * activesupport, rack, actionview, trailties, globalid, abstractcontroller,
- * actioncontroller, actiondispatch). Using --package overrides this and always
- * shows detail.
+ * Detailed per-file tables, misplaced tests, and wrong-describe output are
+ * shown for every package. Use --package to scope to one.
  *
  * Usage:
  *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
@@ -40,20 +37,6 @@ import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
-
-const DETAIL_PACKAGES = new Set([
-  "arel",
-  "activemodel",
-  "activerecord",
-  "activesupport",
-  "rack",
-  "actionview",
-  "trailties",
-  "globalid",
-  "abstractcontroller",
-  "actioncontroller",
-  "actiondispatch",
-]);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -578,74 +561,72 @@ function main() {
     );
     console.log(`${"=".repeat(90)}\n`);
 
-    if (DETAIL_PACKAGES.has(pkg.package) || filterPkg) {
-      // Show files with misplaced tests first as a moves summary
-      const filesWithMisplaced = pkg.files.filter(
-        (f) => f.misplacedTests && f.misplacedTests.length > 0,
-      );
-      if (filesWithMisplaced.length > 0) {
-        console.log(`  MISPLACED TESTS (need to move):`);
-        console.log(`  ${"-".repeat(86)}`);
+    // Show files with misplaced tests first as a moves summary
+    const filesWithMisplaced = pkg.files.filter(
+      (f) => f.misplacedTests && f.misplacedTests.length > 0,
+    );
+    if (filesWithMisplaced.length > 0) {
+      console.log(`  MISPLACED TESTS (need to move):`);
+      console.log(`  ${"-".repeat(86)}`);
 
-        const moves = new Map<string, { descriptions: string[]; from: string; to: string }>();
-        for (const f of filesWithMisplaced) {
-          for (const mt of f.misplacedTests!) {
-            const key = `${mt.currentTsFile} → ${mt.conventionTsFile}`;
-            if (!moves.has(key))
-              moves.set(key, { descriptions: [], from: mt.currentTsFile, to: mt.conventionTsFile });
-            moves.get(key)!.descriptions.push(mt.description);
-          }
+      const moves = new Map<string, { descriptions: string[]; from: string; to: string }>();
+      for (const f of filesWithMisplaced) {
+        for (const mt of f.misplacedTests!) {
+          const key = `${mt.currentTsFile} → ${mt.conventionTsFile}`;
+          if (!moves.has(key))
+            moves.set(key, { descriptions: [], from: mt.currentTsFile, to: mt.conventionTsFile });
+          moves.get(key)!.descriptions.push(mt.description);
         }
-
-        for (const [, move] of moves) {
-          console.log(`\n  ${move.from}  →  ${move.to}  (${move.descriptions.length} tests)`);
-          for (const desc of move.descriptions) {
-            console.log(`    - ${desc}`);
-          }
-        }
-        console.log("");
       }
 
-      // Show tests in wrong describe block
-      const filesWithWrongDescribe = pkg.files.filter(
-        (f) => f.wrongDescribeTests && f.wrongDescribeTests.length > 0,
-      );
-      if (filesWithWrongDescribe.length > 0) {
-        console.log(`  WRONG DESCRIBE (right file, wrong describe block):`);
-        console.log(`  ${"-".repeat(86)}`);
-
-        for (const f of filesWithWrongDescribe) {
-          console.log(`\n  ${f.conventionTsFile}  (${f.wrongDescribeTests!.length} tests)`);
-          for (const wt of f.wrongDescribeTests!) {
-            console.log(`    - "${wt.description}"`);
-            console.log(`        ruby:  ${wt.rubyPath}`);
-            console.log(`        ts:    ${wt.tsPath}`);
-          }
+      for (const [, move] of moves) {
+        console.log(`\n  ${move.from}  →  ${move.to}  (${move.descriptions.length} tests)`);
+        for (const desc of move.descriptions) {
+          console.log(`    - ${desc}`);
         }
-        console.log("");
       }
+      console.log("");
+    }
 
+    // Show tests in wrong describe block
+    const filesWithWrongDescribe = pkg.files.filter(
+      (f) => f.wrongDescribeTests && f.wrongDescribeTests.length > 0,
+    );
+    if (filesWithWrongDescribe.length > 0) {
+      console.log(`  WRONG DESCRIBE (right file, wrong describe block):`);
+      console.log(`  ${"-".repeat(86)}`);
+
+      for (const f of filesWithWrongDescribe) {
+        console.log(`\n  ${f.conventionTsFile}  (${f.wrongDescribeTests!.length} tests)`);
+        for (const wt of f.wrongDescribeTests!) {
+          console.log(`    - "${wt.description}"`);
+          console.log(`        ruby:  ${wt.rubyPath}`);
+          console.log(`        ts:    ${wt.tsPath}`);
+        }
+      }
+      console.log("");
+    }
+
+    console.log(
+      `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
+    );
+    console.log(
+      `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+    );
+
+    for (const f of pkg.files) {
+      const fileImplemented = f.matched - f.matchedSkipped;
+      const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
+      const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
+      if (showIncomplete && isComplete && f.tsFileExists) continue;
+      const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
       console.log(
-        `  ${"Ruby file".padEnd(45)} ${"Convention TS".padEnd(45)} ${"OK".padStart(4)} ${"Skip".padStart(4)} ${"Desc".padStart(4)} ${"Move".padStart(4)} ${"Miss".padStart(4)} ${"Tot".padStart(4)}`,
-      );
-      console.log(
-        `  ${"-".repeat(45)} ${"-".repeat(45)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)} ${"-".repeat(4)}`,
+        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
-      for (const f of pkg.files) {
-        const fileImplemented = f.matched - f.matchedSkipped;
-        const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
-        const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
-        if (showIncomplete && isComplete && f.tsFileExists) continue;
-        const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
-        console.log(
-          `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
-        );
-
-        if (showMissing && f.missingTests && f.missingTests.length > 0) {
-          for (const m of f.missingTests) {
-            console.log(`      - ${m}`);
-          }
+      if (showMissing && f.missingTests && f.missingTests.length > 0) {
+        for (const m of f.missingTests) {
+          console.log(`      - ${m}`);
         }
       }
     }
