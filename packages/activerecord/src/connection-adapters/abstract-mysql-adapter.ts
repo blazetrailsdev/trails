@@ -1036,6 +1036,17 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static readonly CLIENT_NOT_CONNECTED_RE = /MySQL client is not connected/i;
 
   /**
+   * Predicate form of {@link CLIENT_NOT_CONNECTED_RE}. Single point of truth
+   * shared by the abstract `when nil` branch and the `Mysql2Adapter`
+   * `ConnectionError` branch so they cannot drift.
+   * @internal
+   */
+  static isClientNotConnected(e: unknown): boolean {
+    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+    return AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg);
+  }
+
+  /**
    * Boolean MySQL EXPLAIN flags. MySQL 8.0.18+ supports `EXPLAIN
    * ANALYZE`; older versions and MariaDB support at least `EXTENDED`
    * and `PARTITIONS`. Format is handled separately via the
@@ -1216,7 +1227,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
       // generic Error) get promoted to ConnectionNotEstablished when the
       // message indicates the client lost the server handshake.
-      if (AbstractMysqlAdapter.CLIENT_NOT_CONNECTED_RE.test(msg)) {
+      if (AbstractMysqlAdapter.isClientNotConnected(e)) {
         return new ConnectionNotEstablished(msg, { cause });
       }
     }
