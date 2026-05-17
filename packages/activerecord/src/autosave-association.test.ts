@@ -1147,11 +1147,60 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs more callback infrastructure */
   });
-  it.skip("callbacks on child when parent autosaves polymorphic child with inverse of", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* polymorphic not implemented */
+  it("callbacks on child when parent autosaves polymorphic child with inverse of", async () => {
+    const log: string[] = [];
+    class PolyParent extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class PolyChild extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+        this.beforeValidation(function () {
+          log.push("before_validation");
+        });
+        this.afterValidation(function () {
+          log.push("after_validation");
+        });
+        this.beforeSave(function () {
+          log.push("before_save");
+        });
+        this.afterSave(function () {
+          log.push("after_save");
+        });
+      }
+    }
+    PolyParent.adapter = adapter;
+    PolyChild.adapter = adapter;
+    registerModel("PolyParent", PolyParent);
+    registerModel("PolyChild", PolyChild);
+    Associations.hasOne.call(PolyParent, "polyChild", {
+      as: "employable",
+      autosave: true,
+      className: "PolyChild",
+      inverseOf: "employable",
+    });
+    Associations.belongsTo.call(PolyChild, "employable", {
+      polymorphic: true,
+      inverseOf: "polyChild",
+    });
+    const parent = new PolyParent({ name: "P" });
+    const child = new PolyChild({ name: "C" });
+    // Mirrors Rails HasOneAssociation#set_owner_attributes which writes the
+    // polymorphic _type column at assignment time (before save).
+    child._writeAttribute("employable_type", "PolyParent");
+    cacheAssoc(parent, "polyChild", child);
+    await parent.save();
+    expect(log).toContain("before_validation");
+    expect(log).toContain("after_validation");
+    expect(log).toContain("before_save");
+    expect(log).toContain("after_save");
+    expect(child.isNewRecord()).toBe(false);
+    expect(child._readAttribute("employable_id")).toBe(parent.id);
+    expect(child._readAttribute("employable_type")).toBe("PolyParent");
   });
   it("callbacks on child when child autosaves parent", async () => {
     const log: string[] = [];
@@ -1191,11 +1240,60 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
     /* needs more callback infrastructure */
   });
-  it.skip("callbacks on child when polymorphic child with inverse of autosaves parent", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* polymorphic not implemented */
+  it("callbacks on child when polymorphic child with inverse of autosaves parent", async () => {
+    const log: string[] = [];
+    class PolyAsParent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.beforeValidation(function () {
+          log.push("parent_before_validation");
+        });
+        this.afterValidation(function () {
+          log.push("parent_after_validation");
+        });
+        this.beforeSave(function () {
+          log.push("parent_before_save");
+        });
+        this.afterSave(function () {
+          log.push("parent_after_save");
+        });
+      }
+    }
+    class PolyAsChild extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+      }
+    }
+    PolyAsParent.adapter = adapter;
+    PolyAsChild.adapter = adapter;
+    registerModel("PolyAsParent", PolyAsParent);
+    registerModel("PolyAsChild", PolyAsChild);
+    Associations.hasOne.call(PolyAsParent, "polyAsChild", {
+      as: "employable",
+      className: "PolyAsChild",
+      inverseOf: "employable",
+    });
+    Associations.belongsTo.call(PolyAsChild, "employable", {
+      autosave: true,
+      polymorphic: true,
+      inverseOf: "polyAsChild",
+    });
+    const parent = new PolyAsParent({ name: "P" });
+    const child = new PolyAsChild({ name: "C" });
+    // Mirrors Rails BelongsToPolymorphicAssociation#replace_keys which
+    // writes the polymorphic _type column at assignment time.
+    child._writeAttribute("employable_type", "PolyAsParent");
+    cacheAssoc(child, "employable", parent);
+    await child.save();
+    expect(log).toContain("parent_before_validation");
+    expect(log).toContain("parent_after_validation");
+    expect(log).toContain("parent_before_save");
+    expect(log).toContain("parent_after_save");
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child._readAttribute("employable_id")).toBe(parent.id);
+    expect(child._readAttribute("employable_type")).toBe("PolyAsParent");
   });
 
   it("foreign key attribute is not set unless changed", async () => {
@@ -1472,11 +1570,63 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     expect(ship.isDestroyed()).toBe(false);
   });
 
-  it.skip("recognises inverse polymorphic association changes with same foreign key", () => {
-    // BLOCKED: associations — autosave feature gap
-    // ROOT-CAUSE: associations/autosave-association.ts or preloader.ts missing autosave semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in autosave-association.test.ts
-    /* polymorphic not implemented */
+  it("recognises inverse polymorphic association changes with same foreign key", async () => {
+    class SwapChef extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("employable_id", "integer");
+        this.attribute("employable_type", "string");
+      }
+    }
+    class SwapCakeDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SwapDrinkDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    SwapChef.adapter = adapter;
+    SwapCakeDesigner.adapter = adapter;
+    SwapDrinkDesigner.adapter = adapter;
+    registerModel("SwapChef", SwapChef);
+    registerModel("SwapCakeDesigner", SwapCakeDesigner);
+    registerModel("SwapDrinkDesigner", SwapDrinkDesigner);
+    Associations.hasOne.call(SwapCakeDesigner, "chef", {
+      as: "employable",
+      autosave: true,
+      className: "SwapChef",
+      inverseOf: "employable",
+    });
+    Associations.hasOne.call(SwapDrinkDesigner, "chef", {
+      as: "employable",
+      autosave: true,
+      className: "SwapChef",
+      inverseOf: "employable",
+    });
+    Associations.belongsTo.call(SwapChef, "employable", {
+      polymorphic: true,
+      inverseOf: "chef",
+    });
+
+    const cake = await SwapCakeDesigner.create({ name: "Cake" });
+    const drink = await SwapDrinkDesigner.create({ name: "Drink" });
+    const chef = new SwapChef({ name: "Gordon" });
+    chef._writeAttribute("employable_type", "SwapCakeDesigner");
+    cacheAssoc(cake, "chef", chef);
+    await cake.save();
+    expect(chef._readAttribute("employable_type")).toBe("SwapCakeDesigner");
+    expect(chef._readAttribute("employable_id")).toBe(cake.id);
+
+    // Reassign chef to drink — polymorphic type column flips even when
+    // employable_id may collide. autosave on drink should re-persist the chef.
+    chef._writeAttribute("employable_type", "SwapDrinkDesigner");
+    cacheAssoc(drink, "chef", chef);
+    await drink.save();
+    expect(chef._readAttribute("employable_type")).toBe("SwapDrinkDesigner");
+    expect(chef._readAttribute("employable_id")).toBe(drink.id);
   });
 });
 
