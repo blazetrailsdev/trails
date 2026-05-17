@@ -43,4 +43,4 @@ export async function bodyToString(body: RackBody): Promise<string> {
   return chunks.join("");
 }
 
-export { parseNestedQuery, buildNestedQuery, HTTP_STATUS_CODES } from "./utils.js";
+export { parseNestedQuery, buildNestedQuery, HTTP_STATUS_CODES, statusCode } from "./utils.js";

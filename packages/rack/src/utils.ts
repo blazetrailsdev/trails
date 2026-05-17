@@ -615,9 +615,11 @@ export function statusCode(status: number | string | symbol): number {
   const num = parseInt(s, 10);
   if (!isNaN(num) && String(num) === s) return num;
   // Symbol/string lookup
-  const code = SYMBOL_TO_STATUS_CODE[s];
+  const code = Object.hasOwn(SYMBOL_TO_STATUS_CODE, s) ? SYMBOL_TO_STATUS_CODE[s] : undefined;
   if (code !== undefined) return code;
-  const obsolete = OBSOLETE_SYMBOLS_TO_STATUS_CODES[s];
+  const obsolete = Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, s)
+    ? OBSOLETE_SYMBOLS_TO_STATUS_CODES[s]
+    : undefined;
   if (obsolete !== undefined) {
     let msg = `Status code ${JSON.stringify(s)} is deprecated and will be removed in a future version of Rack.`;
     const mapping = OBSOLETE_SYMBOL_MAPPINGS[s];
