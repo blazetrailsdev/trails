@@ -168,4 +168,44 @@ describe("MimeTypeTest", () => {
     expect(MimeType.HTML.match("text/*")).toBe(true);
     expect(MimeType.HTML.match("application/*")).toBe(false);
   });
+
+  it("all() returns unique registered types in registration order", () => {
+    const all = MimeType.all();
+    expect(new Set(all).size).toBe(all.length);
+    // HTML is registered first (see static initializers), JSON after.
+    const htmlIdx = all.indexOf(MimeType.HTML);
+    const jsonIdx = all.indexOf(MimeType.JSON);
+    expect(htmlIdx).toBeGreaterThanOrEqual(0);
+    expect(jsonIdx).toBeGreaterThan(htmlIdx);
+  });
+
+  it("unregister sweeps extensionMap so lookupByExtension can't resolve a removed type", () => {
+    MimeType.register("application/ext-test", "exttest", [], ["exttest"]);
+    expect(MimeType.lookupByExtension("exttest")?.symbol).toBe("exttest");
+    MimeType.unregister("exttest");
+    expect(MimeType.lookupByExtension("exttest")).toBeUndefined();
+  });
+
+  it("unregister sweeps aliases too — type is no longer reachable via any key", () => {
+    MimeType.register("application/aliased", "aliased");
+    MimeType.registerAlias("aliased", "aliased_alias");
+    expect(MimeType.lookup("aliased_alias")?.symbol).toBe("aliased");
+    MimeType.unregister("aliased");
+    expect(MimeType.lookup("aliased")).toBeUndefined();
+    expect(MimeType.lookup("aliased_alias")).toBeUndefined();
+    expect(MimeType.lookup("application/aliased")).toBeUndefined();
+  });
+
+  it("all() picks up a newly registered type and drops it on unregister", () => {
+    const before = MimeType.all().length;
+    MimeType.register("application/all-test", "alltest");
+    try {
+      const fresh = MimeType.all();
+      expect(fresh.length).toBe(before + 1);
+      expect(fresh.map((t) => t.symbol)).toContain("alltest");
+    } finally {
+      MimeType.unregister("alltest");
+    }
+    expect(MimeType.all().length).toBe(before);
+  });
 });

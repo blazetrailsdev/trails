@@ -75,12 +75,19 @@ export class MimeType {
 
   static unregister(symbol: string): void {
     const type = MimeType.registry.get(symbol);
-    if (type) {
-      MimeType.registry.delete(symbol);
-      MimeType.registry.delete(type.string);
-      for (const syn of type.synonyms) {
-        MimeType.registry.delete(syn);
-      }
+    if (!type) return;
+    // Sweep every registry entry whose value is this type — captures
+    // the symbol, string, synonyms, AND any aliases added later via
+    // registerAlias(). Avoids partial removals where lookup() still
+    // resolves the type through a stale alias key.
+    for (const [key, value] of MimeType.registry) {
+      if (value === type) MimeType.registry.delete(key);
+    }
+    // Same sweep for extensionMap — register() can install extension
+    // mappings, and leaving them behind would let lookupByExtension()
+    // resolve an unregistered type.
+    for (const [ext, value] of MimeType.extensionMap) {
+      if (value === type) MimeType.extensionMap.delete(ext);
     }
   }
 
@@ -90,6 +97,22 @@ export class MimeType {
 
   static lookupByExtension(ext: string): MimeType | undefined {
     return MimeType.extensionMap.get(ext.replace(/^\./, ""));
+  }
+
+  /**
+   * All registered MIME types, deduplicated. Mirrors Rails `Mime::SET`.
+   * Iteration order follows registration order (Map preserves it).
+   */
+  static all(): MimeType[] {
+    const seen = new Set<MimeType>();
+    const out: MimeType[] = [];
+    for (const type of MimeType.registry.values()) {
+      if (!seen.has(type)) {
+        seen.add(type);
+        out.push(type);
+      }
+    }
+    return out;
   }
 
   static onRegister(callback: (type: MimeType) => void): void {
