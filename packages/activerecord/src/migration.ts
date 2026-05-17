@@ -1394,12 +1394,15 @@ export abstract class Migration {
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
     if (number == null) return stamp;
-    const n =
+    const raw =
       typeof number === "bigint"
         ? number
         : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
-    const padded = (n < 0n ? 0n : n).toString().padStart(14, "0");
-    return padded > stamp ? padded : stamp;
+    const n = raw < 0n ? 0n : raw;
+    // Numeric (BigInt) comparison — string compare goes lexicographic once
+    // either side exceeds 14 digits and would mis-order (e.g. a 15-digit
+    // "100…" would sort below a 14-digit "2026…" string).
+    return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
   }
 
   static properTableName(
@@ -1458,6 +1461,14 @@ export abstract class Migration {
 
     const copied: MigrationProxy[] = [];
     for (const [scope, sourcePath] of Object.entries(sources)) {
+      // Must round-trip through `Migrator.parseMigrationFilename` (regex
+      // `[a-z0-9_]*`) or the copied file would be invisible to subsequent
+      // discovery via `Migrator.fromPath`.
+      if (!/^[a-z0-9_]+$/.test(scope)) {
+        throw new ArgumentError(
+          `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by Migrator.fromPath.`,
+        );
+      }
       if (!fs.existsSync(sourcePath)) continue;
       const sourceMigrations = Migrator.fromPath(sourcePath, stubAdapter);
 

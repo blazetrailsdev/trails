@@ -3299,23 +3299,25 @@ describe("MigrationProperTableNameAndCopy", () => {
     // bumps copied versions above it.
     fs.writeFileSync(path.join(dst, "20100101000000_existing_table.ts"), "// dest-existing\n");
 
-    const onCopy = vi.fn();
-    const copied = await Migration.copy(dst, { bukkits: src }, { onCopy });
+    try {
+      const onCopy = vi.fn();
+      const copied = await Migration.copy(dst, { bukkits: src }, { onCopy });
 
-    expect(copied).toHaveLength(2);
-    expect(onCopy).toHaveBeenCalledTimes(2);
-    for (const m of copied) {
-      expect(m.scope).toBe("bukkits");
-      expect(m.filename).toMatch(/\.bukkits\.ts$/);
-      const body = fs.readFileSync(m.filename!, "utf8");
-      expect(body).toContain(`// This migration comes from bukkits (originally`);
+      expect(copied).toHaveLength(2);
+      expect(onCopy).toHaveBeenCalledTimes(2);
+      for (const m of copied) {
+        expect(m.scope).toBe("bukkits");
+        expect(m.filename).toMatch(/\.bukkits\.ts$/);
+        const body = fs.readFileSync(m.filename!, "utf8");
+        expect(body).toContain(`// This migration comes from bukkits (originally`);
+      }
+      // Strict monotonicity across the copy iteration.
+      expect(BigInt(copied[1]!.version) > BigInt(copied[0]!.version)).toBe(true);
+      // Renumbered above the pre-existing destination migration.
+      expect(BigInt(copied[0]!.version) > 20100101000000n).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
-    // Strict monotonicity across the copy iteration.
-    expect(BigInt(copied[1]!.version) > BigInt(copied[0]!.version)).toBe(true);
-    // Renumbered above the pre-existing destination migration.
-    expect(BigInt(copied[0]!.version) > 20100101000000n).toBe(true);
-
-    fs.rmSync(root, { recursive: true, force: true });
   });
 
   it("copy skips duplicates by name and fires onSkip for cross-scope clash", async () => {
@@ -3332,13 +3334,15 @@ describe("MigrationProperTableNameAndCopy", () => {
     // different scope → onSkip must fire.
     fs.writeFileSync(path.join(dst, "20100101000000_create_articles.other.ts"), "// dst\n");
 
-    const onSkip = vi.fn();
-    const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
+    try {
+      const onSkip = vi.fn();
+      const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
 
-    expect(copied).toHaveLength(0);
-    expect(onSkip).toHaveBeenCalledTimes(1);
-    expect(onSkip.mock.calls[0]![0]).toBe("bukkits");
-
-    fs.rmSync(root, { recursive: true, force: true });
+      expect(copied).toHaveLength(0);
+      expect(onSkip).toHaveBeenCalledTimes(1);
+      expect(onSkip.mock.calls[0]![0]).toBe("bukkits");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
