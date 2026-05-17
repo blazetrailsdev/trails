@@ -92,6 +92,22 @@ export class MimeType {
     return MimeType.extensionMap.get(ext.replace(/^\./, ""));
   }
 
+  /**
+   * All registered MIME types, deduplicated. Mirrors Rails `Mime::SET`.
+   * Iteration order follows registration order (Map preserves it).
+   */
+  static all(): MimeType[] {
+    const seen = new Set<MimeType>();
+    const out: MimeType[] = [];
+    for (const type of MimeType.registry.values()) {
+      if (!seen.has(type)) {
+        seen.add(type);
+        out.push(type);
+      }
+    }
+    return out;
+  }
+
   static onRegister(callback: (type: MimeType) => void): void {
     MimeType.callbacks.push(callback);
   }

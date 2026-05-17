@@ -24,3 +24,4 @@ export {
   type AssetPathsHost,
 } from "./asset-paths.js";
 export { applyLogger, benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
+export { Collector } from "./collector.js";
