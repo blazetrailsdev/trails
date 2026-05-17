@@ -116,11 +116,18 @@ export class AssociationQueryValue {
   }
 
   /** @internal */
-  private isPolymorphicClause(relation: unknown): boolean {
+  private isPolymorphicClause(relation: {
+    whereValuesHash?: () => Record<string, unknown>;
+  }): boolean {
     const type = this.primaryType();
     if (!type) return false;
-    const hash = (relation as any).whereValuesHash?.();
-    return !(hash && type in hash);
+    // Rails: polymorphic? && !where_values_hash.key?(primary_type). If the relation
+    // doesn't implement where_values_hash (non-Relation duck), treat as needing the
+    // polymorphic constraint — that's the safer default than skipping the type guard.
+    const hash =
+      typeof relation.whereValuesHash === "function" ? relation.whereValuesHash() : undefined;
+    if (!hash) return true;
+    return !(type in hash);
   }
 
   private isSelectClause(relation: unknown): boolean {

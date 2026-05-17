@@ -541,19 +541,9 @@ export class Relation<T extends Base> {
         const targetModel = modelRegistry.get(className);
         rawPk = targetModel?.primaryKey ?? "id";
       }
-      // Composite PKs are supported at the WHERE level (one IS NULL per column)
-      // but the JOIN ON clause from _resolveAssociationJoin is a raw SQL string;
-      // composite FK or PK options would stringify to "a,b" → invalid SQL.
-      if (Array.isArray(assocDef.options.foreignKey)) {
-        throw new Error(
-          `whereMissing/whereAssociated: composite foreignKey on '${assocName}' is not yet supported.`,
-        );
-      }
-      if (Array.isArray(assocDef.options.primaryKey)) {
-        throw new Error(
-          `whereMissing/whereAssociated: composite primaryKey on '${assocName}' is not yet supported.`,
-        );
-      }
+      // _resolveAssociationJoin now zips composite FK/PK arrays into multiple
+      // Eq predicates AND'd together — emit one IS NOT NULL / IS NULL predicate
+      // per PK column at the call site (whereAssociated/whereMissing).
       const pks = Array.isArray(rawPk) ? rawPk : [rawPk];
       return { joins, table: lastJoin.table, pks };
     }
@@ -1362,17 +1352,17 @@ export class Relation<T extends Base> {
 
     if (assocDef.type === "belongsTo") {
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(name)}_id`;
-      if (Array.isArray(foreignKey)) return null;
       const className = assocDef.options.className ?? _camelize(name);
       const targetModel = modelRegistry.get(className);
       if (!targetModel) return null;
       const targetTable = targetModel.tableName;
       const rawTargetPk = assocDef.options.primaryKey ?? targetModel.primaryKey ?? "id";
-      if (Array.isArray(rawTargetPk)) return null;
-      const targetPk = rawTargetPk;
+      const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+      const pkArr = Array.isArray(rawTargetPk) ? rawTargetPk : [rawTargetPk];
+      if (fkArr.length !== pkArr.length) return null;
       const tgt = new Table(targetTable);
       const src = new Table(sourceTable);
-      const predicates: Nodes.Node[] = [tgt.get(targetPk).eq(src.get(foreignKey))];
+      const predicates: Nodes.Node[] = pkArr.map((pk, i) => tgt.get(pk).eq(src.get(fkArr[i])));
 
       // STI type condition on target
       const inheritanceCol = getInheritanceColumn(targetModel);
@@ -1405,13 +1395,13 @@ export class Relation<T extends Base> {
       if (!targetModel) return null;
       const targetTable = targetModel.tableName;
       const rawPk = assocDef.options.primaryKey ?? sourcePk;
-      if (Array.isArray(rawPk)) return null;
-      const primaryKey = rawPk;
       const foreignKey = assocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`;
-      if (Array.isArray(foreignKey)) return null;
+      const pkArr = Array.isArray(rawPk) ? rawPk : [rawPk];
+      const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+      if (pkArr.length !== fkArr.length) return null;
       const tgt = new Table(targetTable);
       const src = new Table(sourceTable);
-      const predicates: Nodes.Node[] = [tgt.get(foreignKey).eq(src.get(primaryKey))];
+      const predicates: Nodes.Node[] = pkArr.map((pk, i) => tgt.get(fkArr[i]).eq(src.get(pk)));
 
       // Polymorphic type condition
       if (assocDef.options.as) {

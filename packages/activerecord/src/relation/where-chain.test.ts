@@ -259,11 +259,39 @@ describe("WhereChainTest", () => {
     expect(results.some((r: any) => r.id === lonelyAuthor.id)).toBe(false);
   });
 
-  it.skip("associated with composite primary key", () => {
-    // BLOCKED: relation — WhereChain feature gap (not/and/or chaining)
-    // ROOT-CAUSE: relation/where-chain.ts#WhereChain missing or incomplete Rails parity
-    // SCOPE: ~50 LOC in relation/where-chain.ts; affects ~27 tests in where-chain.test.ts
-    /* needs proper composite primary key model setup */
+  it("associated with composite primary key", async () => {
+    const a = freshAdapter();
+    await defineSchema(a, {
+      cpk_shops: { name: "string" },
+      cpk_orders: { shop_id: "integer", order_id: "integer", cpk_shop_id: "integer" },
+    });
+    class CpkShop extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = a;
+      }
+    }
+    class CpkOrder extends Base {
+      static {
+        this.primaryKey = ["shop_id", "order_id"];
+        this.attribute("shop_id", "integer");
+        this.attribute("order_id", "integer");
+        this.attribute("cpk_shop_id", "integer");
+        this.adapter = a;
+      }
+    }
+    registerModel("CpkShop", CpkShop);
+    registerModel("CpkOrder", CpkOrder);
+    Associations.belongsTo.call(CpkOrder, "cpkShop", {
+      className: "CpkShop",
+      foreignKey: "cpk_shop_id",
+    });
+    const shop = await CpkShop.create({ name: "S" });
+    await CpkOrder.create({ shop_id: 1, order_id: 1, cpk_shop_id: shop.id });
+    await CpkOrder.create({ shop_id: 1, order_id: 2 });
+    const results = await CpkOrder.all().whereAssociated("cpkShop").toArray();
+    expect(results).toHaveLength(1);
+    expect((results[0] as any).readAttribute("order_id")).toBe(1);
   });
   it("missing with child association", () => {
     const sql = Post.all().whereMissing("author").toSql();
