@@ -110,3 +110,31 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     expect(nodeSqliteDriver.capabilities.foreignKeysOnByDefault).toBe(false);
   });
 });
+
+describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite strict", () => {
+  // node:sqlite exposes SQLITE_DBCONFIG_DQS_* via the
+  // `enableDoubleQuotedStringLiterals` open option. With strict: true DQS is
+  // disabled, so `SELECT "missing_col"` raises "no such column". With
+  // strict: false (the default) the unknown double-quoted token is parsed
+  // as a string literal and SELECT returns its text verbatim.
+  it("rejects unknown double-quoted identifiers under strict: true", async () => {
+    const conn = await nodeSqliteDriver.open({ database: ":memory:", strict: true });
+    try {
+      const stmt = await conn.prepare(`SELECT "missing_col" AS v`);
+      await expect(Promise.resolve(stmt.get())).rejects.toThrow(/no such column/i);
+    } finally {
+      await conn.close();
+    }
+  });
+
+  it("treats unknown double-quoted identifiers as literals under strict: false", async () => {
+    const conn = await nodeSqliteDriver.open({ database: ":memory:", strict: false });
+    try {
+      const stmt = await conn.prepare(`SELECT "missing_col" AS v`);
+      const row = (await stmt.get()) as Record<string, unknown>;
+      expect(row["v"]).toBe("missing_col");
+    } finally {
+      await conn.close();
+    }
+  });
+});
