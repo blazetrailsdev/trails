@@ -39,3 +39,13 @@ export {
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
+export {
+  _routesInstanceDefault,
+  _routesClassDefault,
+  NO_ROUTES_MESSAGE,
+  UrlForDefaults,
+  filterActionMethodsForRoutes,
+  type NamedRoutesLike,
+  type RouteSetLike,
+  type UrlForClassMethods,
+} from "./url-for.js";
