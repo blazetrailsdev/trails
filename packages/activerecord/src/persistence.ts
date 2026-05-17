@@ -38,6 +38,7 @@ import {
   type ValidationContextArg,
 } from "./validations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
+import { ScopeRegistry } from "./scoping.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
@@ -246,6 +247,12 @@ export async function _updateRecord(
   const defaultConstraint = buildDefaultConstraint.call(this as any);
   if (defaultConstraint != null) um.where(defaultConstraint as any);
 
+  const globalScope = ScopeRegistry.globalCurrentScope(this as any);
+  if (globalScope) {
+    const ast = (globalScope as any)._whereClause?.ast;
+    if (ast != null) um.where(ast);
+  }
+
   const adapter = (this as any).adapter;
   if (typeof adapter.update === "function") {
     return adapter.update(um);
@@ -273,6 +280,12 @@ export async function _deleteRecord(
 
   const defaultConstraint = buildDefaultConstraint.call(this as any);
   if (defaultConstraint != null) dm.where(defaultConstraint as any);
+
+  const globalScope = ScopeRegistry.globalCurrentScope(this as any);
+  if (globalScope) {
+    const ast = (globalScope as any)._whereClause?.ast;
+    if (ast != null) dm.where(ast);
+  }
 
   const adapter = (this as any).adapter;
   if (typeof adapter.delete === "function") {
