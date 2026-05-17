@@ -180,8 +180,12 @@ export class AbstractController {
     return skipped;
   }
 
-  /** Process an action by name. Runs callbacks around the action. */
-  async processAction(action: string): Promise<void> {
+  /**
+   * Process an action by name. Runs callbacks around the action. Extra
+   * `args` are forwarded to the action method (mirrors Rails'
+   * `Controller#process(action, *args)`).
+   */
+  async processAction(action: string, ...args: unknown[]): Promise<void> {
     this.actionName = action;
     this._performed = false;
 
@@ -218,10 +222,10 @@ export class AbstractController {
       if (Constructor.hasAction(action)) {
         const method = (this as any)[action];
         if (typeof method === "function") {
-          await method.call(this);
+          await method.apply(this, args);
         }
       } else if (typeof (this as any).actionMissing === "function") {
-        await (this as any).actionMissing(action);
+        await (this as any).actionMissing(action, ...args);
       } else {
         throw new ActionNotFound(
           `The action '${action}' could not be found for ${this.constructor.name}`,

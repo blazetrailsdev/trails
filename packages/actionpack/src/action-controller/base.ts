@@ -399,9 +399,9 @@ export class Base extends Metal {
    *
    * @internal
    */
-  async processAction(action: string): Promise<void> {
+  async processAction(action: string, ...args: unknown[]): Promise<void> {
     try {
-      await super.processAction(action);
+      await super.processAction(action, ...args);
 
       // Resolve any pending async renders (template/partial)
       if (this._pendingRender && !this.performed) {

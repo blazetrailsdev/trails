@@ -298,11 +298,23 @@ describe("TestHalting", () => {
   });
 });
 
+class CallbacksWithArgs extends AbstractController {
+  text?: string;
+  first() {
+    this.text = "Hello world";
+  }
+  async index(extra: string) {
+    this.responseBody = (this.text ?? "") + extra;
+  }
+}
+CallbacksWithArgs.beforeAction((c) => (c as CallbacksWithArgs).first());
+
 describe("TestCallbacksWithArgs", () => {
-  // BLOCKED: trails' processAction(action: string) does not accept extra
-  // positional args. Rails' Controller#process forwards *args to the
-  // action method. Needs ~30 LOC change to base.ts to thread through.
-  it.skip("callbacks still work when invoking process with multiple arguments", () => {});
+  it("callbacks still work when invoking process with multiple arguments", async () => {
+    const controller = new CallbacksWithArgs();
+    await controller.processAction("index", " Howdy!");
+    expect(controller.responseBody).toBe("Hello world Howdy!");
+  });
 });
 
 describe("TestCallbacksWithMissingConditions", () => {
