@@ -44,6 +44,7 @@ export {
   urlOptions as routingUrlOptions,
   routeFor,
   optimizeRoutesGeneration,
+  initialize as initializeUrlFor,
   _withRoutes,
   _routesContext,
   type UrlForHost,

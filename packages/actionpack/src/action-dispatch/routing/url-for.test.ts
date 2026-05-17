@@ -4,6 +4,7 @@ import {
   _routesContext,
   _withRoutes,
   fullUrlFor,
+  initialize,
   optimizeRoutesGeneration,
   routeFor,
   urlFor,
@@ -75,12 +76,26 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(routes.calls[0]![0]).toEqual({ host: "override.test" });
   });
 
-  it("symbol options throw (HelperMethodBuilder not ported)", () => {
-    expect(() => fullUrlFor.call(makeHost(), Symbol("user"))).toThrow(/symbol/);
+  it("symbol options throw with HelperMethodBuilder reference", () => {
+    expect(() => fullUrlFor.call(makeHost(), Symbol("user"))).toThrow(/HelperMethodBuilder/);
   });
 
-  it("array options with one model delegate to model handler (stub throws)", () => {
-    expect(() => fullUrlFor.call(makeHost(), [{ id: 1 }])).toThrow(/PolymorphicRoutes|model/);
+  it("array options delegate to host.polymorphicUrl when present", () => {
+    const polymorphicUrl = vi.fn(() => "/posts/1");
+    const host = makeHost({ polymorphicUrl });
+    const result = fullUrlFor.call(host, [{ id: 1 }, { only_path: true }]);
+    expect(result).toBe("/posts/1");
+    expect(polymorphicUrl).toHaveBeenCalledWith([{ id: 1 }], { only_path: true });
+  });
+
+  it("array options throw when polymorphicUrl missing", () => {
+    expect(() => fullUrlFor.call(makeHost(), [{ id: 1 }])).toThrow(/PolymorphicRoutes/);
+  });
+
+  it("initialize() sets _routes to null", () => {
+    const host = makeHost();
+    initialize.call(host);
+    expect(host._routes).toBeNull();
   });
 
   it("routeFor calls `${name}Url` on the host", () => {
