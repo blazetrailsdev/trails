@@ -2440,8 +2440,14 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      orders: { status: "string", total: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("group().count() returns hash of counts", async () => {
@@ -2483,8 +2489,14 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { price: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("delegates to the appropriate aggregate method", async () => {
@@ -2509,12 +2521,17 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { comments_count: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("increments a counter column by primary key", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
@@ -2530,7 +2547,6 @@ describe("CalculationsTest", () => {
   });
 
   it("decrements a counter column by primary key", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
@@ -2548,12 +2564,17 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { likes_count: "integer", comments_count: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("updates multiple counters for a record", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
@@ -2591,6 +2612,13 @@ describe("CalculationsTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      orders: { amount: "integer", status: "string", customer_id: "integer" },
+      accounts: { firm_id: "integer", credit_limit: "integer" },
+      items: { name: "string", email: "string" },
+      nullables: { value: "integer" },
+      empties: { amount: "integer" },
+    });
     Order.adapter = adapter;
     Account.adapter = adapter;
     await Order.create({ amount: 10, status: "paid", customer_id: 1 });
@@ -2719,6 +2747,10 @@ describe("CalculationsTest", () => {
       }
     }
     expect(await Empty.all().average("amount")).toBeNull();
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 });
 
