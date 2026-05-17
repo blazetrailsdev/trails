@@ -15,16 +15,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("CidrTest", () => {
-    it.skip("cidr column", async () => {
-      // BLOCKED: adapter-pg — requires live schema with cidr column
-    });
-    it.skip("cidr type cast", async () => {
-      // BLOCKED: adapter-pg — requires live DB round-trip
-    });
-    it.skip("cidr invalid", async () => {
-      // BLOCKED: adapter-pg — requires live DB
-    });
-
     it("type casting IPAddr for database", async () => {
       const type = new Cidr();
       const ip = new IPAddr("255.0.0.0", 8);
