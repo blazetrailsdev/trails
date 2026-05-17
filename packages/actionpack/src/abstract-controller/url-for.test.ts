@@ -10,6 +10,8 @@ describe("AbstractController::UrlFor", () => {
   describe("_routesInstanceDefault()", () => {
     it("raises with the Rails-shaped hint until the host overrides it", () => {
       expect(() => _routesInstanceDefault.call({})).toThrow(/include routing helpers explicitly/);
+      expect(() => _routesInstanceDefault.call({})).toThrow(/#url_for/);
+      expect(() => _routesInstanceDefault.call({})).toThrow(/url_helpers/);
     });
   });
 
@@ -25,8 +27,12 @@ describe("AbstractController::UrlFor", () => {
     });
 
     it("removes any action name that collides with a route helper name", () => {
+      // Trails route-helpers.ts generates `${name}_path` / `${name}_url`
+      // in Rails-shape, so the collision surface is snake_case helper
+      // names plus the bare action names that an app might also expose
+      // as routes (e.g. `show` here).
       const routes: RouteSetLike = {
-        namedRoutes: { helperNames: ["postsUrl", "postPath", "show"] },
+        namedRoutes: { helperNames: ["posts_url", "post_path", "show"] },
       };
       expect(filterActionMethodsForRoutes(["show", "index", "edit"], routes)).toEqual([
         "index",

@@ -35,8 +35,8 @@ export interface UrlForClassMethods {
 }
 
 const NO_ROUTES_MESSAGE =
-  "In order to use #urlFor, you must include routing helpers explicitly. " +
-  "For instance, `include Rails.application.routes.urlHelpers`.";
+  "In order to use #url_for, you must include routing helpers explicitly. " +
+  "For instance, `include Rails.application.routes.url_helpers`.";
 
 /**
  * Default instance-side `_routes` — raises until the host overrides
