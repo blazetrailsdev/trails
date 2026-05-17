@@ -675,6 +675,7 @@ export class Base extends Model {
   static _connectionClass = false;
   static automaticScopeInversing = false;
   static automaticallyInvertPluralAssociations = false;
+  static hasManyInversing = false;
   static paramDelimiter = "_";
   static cacheVersioning = false;
   static cacheTimestampFormat: "usec" | "number" = "usec";

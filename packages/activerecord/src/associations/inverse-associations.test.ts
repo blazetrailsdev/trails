@@ -120,11 +120,13 @@ describe("InverseBelongsToTests", () => {
     Associations.belongsTo.call(Book, "author", { inverseOf: "books" });
     registerModel(Author);
     registerModel(Book);
+    Author.hasManyInversing = true;
     const a = await Author.create({ name: "Alice" });
     const b = await Book.create({ title: "Wonderland", author_id: a.id });
     const parent = await loadBelongsTo(b, "author", { inverseOf: "books" });
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations?.get("books")).toBe(b);
+    const cached = (parent as any)._cachedAssociations?.get("books") as Base[];
+    expect(cached).toEqual([b]);
   });
 
   it("should not try to set inverse instances when the inverse is a has many", async () => {
@@ -215,6 +217,7 @@ describe("InverseBelongsToTests", () => {
       inverseOf: "children",
     });
     registerModel(Node);
+    Node.hasManyInversing = true;
     const parent = await Node.create({ name: "root" });
     const child = await Node.create({ name: "leaf", node_id: parent.id });
     const foundParent = await loadBelongsTo(child, "parent", {
@@ -223,7 +226,8 @@ describe("InverseBelongsToTests", () => {
       inverseOf: "children",
     });
     expect(foundParent).not.toBeNull();
-    expect((foundParent as any)._cachedAssociations?.get("children")).toBe(child);
+    const cached = (foundParent as any)._cachedAssociations?.get("children") as Base[];
+    expect(cached).toEqual([child]);
   });
 
   it.skip("recursive inverse on recursive model has many inversing", () => {
@@ -451,6 +455,19 @@ describe("InverseHasManyTests", () => {
       const cachedMan = (i as any)._cachedAssociations?.get("man");
       expect(cachedMan).toBe(m);
     }
+  });
+
+  it("with has many inversing inverse wire-up pushes onto cached collection and dedupes by identity", async () => {
+    const { Man, Interest } = makeModels();
+    Man.hasManyInversing = true;
+    const created = await Man.create({ name: "Gordon" });
+    await Interest.create({ topic: "stamps", man_id: created.id });
+    const i = (await Interest.first()) as Base;
+    const m = await loadBelongsTo(i, "man", { inverseOf: "interests" });
+    // Re-load: cached-hit path also runs _wireInverseAssociation; must dedup.
+    await loadBelongsTo(i, "man", { inverseOf: "interests" });
+    const cached = (m as any)._cachedAssociations?.get("interests") as Base[];
+    expect(cached).toEqual([i]);
   });
 
   it.skip("parent instance should be shared with every child on find for sti", () => {
@@ -1159,11 +1176,13 @@ describe("AutomaticInverseFindingTests", () => {
     Associations.belongsTo.call(Interest, "man", { inverseOf: "interests" });
     registerModel(Man);
     registerModel(Interest);
+    Man.hasManyInversing = true;
     const m = await Man.create({ name: "Gordon" });
     const i = await Interest.create({ topic: "stamps", man_id: m.id });
     const parent = await loadBelongsTo(i, "man", { inverseOf: "interests" });
     expect(parent).not.toBeNull();
-    expect((parent as any)._cachedAssociations?.get("interests")).toBe(i);
+    const cached = (parent as any)._cachedAssociations?.get("interests") as Base[];
+    expect(cached).toEqual([i]);
   });
 
   it("polymorphic and has many through relationships should not have inverses", () => {
@@ -1285,6 +1304,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 
   it("child instance should be shared with parent on find", async () => {
     const { Man, Tag } = makeModels();
+    Man.hasManyInversing = true;
     const m = await Man.create({ name: "Gordon" });
     await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
     const parent = await loadBelongsTo((await Tag.findBy({ taggable_id: m.id }))!, "taggable", {
@@ -1301,6 +1321,7 @@ describe("InversePolymorphicBelongsToTests", () => {
     // loadBelongsTo (with inverseOf) is stored in the parent's inverse cache —
     // object sharing, not just equal values.
     const { Man, Tag } = makeModels();
+    Man.hasManyInversing = true;
     const m = await Man.create({ name: "Gordon" });
     await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
 
@@ -1319,10 +1340,12 @@ describe("InversePolymorphicBelongsToTests", () => {
     });
     expect(parent).not.toBeNull();
     expect(parent).toBe(preloadedParent);
-    expect((parent as any)._cachedAssociations?.get("tags")).toBe(tags[0]);
+    const cached = (parent as any)._cachedAssociations?.get("tags") as Base[];
+    expect(cached).toEqual([tags[0]]);
   });
   it("child instance should be shared with replaced via accessor parent", async () => {
     const { Man, Tag } = makeModels();
+    Man.hasManyInversing = true;
     const m1 = await Man.create({ name: "Gordon" });
     const t = await Tag.create({ name: "cool", taggable_id: m1.id, taggable_type: "Man" });
     const m2 = await Man.create({ name: "New" });
@@ -1332,7 +1355,8 @@ describe("InversePolymorphicBelongsToTests", () => {
       foreignKey: "taggable_id",
     });
     expect((t as any)._cachedAssociations.get("taggable")).toBe(m2);
-    expect((m2 as any)._cachedAssociations?.get("tags")).toBe(t);
+    const cached = (m2 as any)._cachedAssociations?.get("tags") as Base[];
+    expect(cached).toEqual([t]);
   });
   it.skip("inversed instance should not be reloaded after stale state changed", () => {
     // BLOCKED: associations — inverse-of feature gap
