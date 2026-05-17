@@ -176,6 +176,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * @internal
    */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): MysqlTableDefinition {
+    // SchemaStatements#createTable forwards `adapter: this.adapter, adapterName: this.adapterName`
+    // (the bare SchemaQuoter shape). MySQL needs the full adapter so `toSql()` can reach
+    // `schemaStatements().schemaCreation` for the host-aware visitor — drop the bare
+    // signal and substitute `this` (the MySQL adapter).
     const { adapter: _adapterOpt, adapterName: _adapterNameOpt, ...rest } = options;
     return new MysqlTableDefinition(name, { ...rest, adapter: this });
   }

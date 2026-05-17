@@ -49,16 +49,26 @@ interface MysqlColumnOptions extends Record<string, unknown> {
 
 type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 
+/** @internal Adapter surface consulted by the visitor's support flags. */
+interface VisitorHostAdapter {
+  supportsCheckConstraints?(): boolean;
+  supportsForeignKeys?(): boolean;
+  supportsIndexesInCreate?(): boolean;
+}
+
 export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal Whether this is a MariaDB connection. */
   protected _mariadb = false;
+  /** @internal Optional adapter ref so `supports*` helpers mirror Rails' `@conn`-delegated flags. */
+  protected _hostAdapter?: VisitorHostAdapter;
 
-  constructor() {
+  constructor(host?: VisitorHostAdapter) {
     super("mysql", {
       quoteIdentifier: quoteIdentifier,
       quoteTableName: quoteTableName,
       quoteDefaultExpression: quoteDefaultExpression,
     });
+    this._hostAdapter = host;
   }
 
   /** @internal */
@@ -182,19 +192,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
     );
   }
 
-  /** @internal Mirrors `AbstractMysqlAdapter#supportsIndexesInCreate` (always true on MySQL/MariaDB). */
+  /** @internal Delegates to the adapter when wired (Rails: `@conn.supports_indexes_in_create?`). */
   protected supportsIndexesInCreate(): boolean {
-    return true;
+    return this._hostAdapter?.supportsIndexesInCreate?.() ?? true;
   }
 
-  /** @internal Mirrors Rails' `use_foreign_keys?` — true on MySQL/MariaDB. */
+  /** @internal Mirrors Rails' `use_foreign_keys?` → adapter `supports_foreign_keys?`. */
   protected useForeignKeys(): boolean {
-    return true;
+    return this._hostAdapter?.supportsForeignKeys?.() ?? true;
   }
 
-  /** @internal Mirrors `AbstractMysqlAdapter#supportsCheckConstraints` — true on MySQL 8+/MariaDB 10.2+. */
+  /** @internal Delegates to the adapter; honors MySQL 8.0.16+ / MariaDB 10.2.1+ version gating. */
   protected supportsCheckConstraints(): boolean {
-    return true;
+    return this._hostAdapter?.supportsCheckConstraints?.() ?? true;
   }
 
   /**
@@ -301,8 +311,22 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override addTableOptionsBang(sql: string, o: TableDefinition): string {
     const mo = o as MysqlTableDef;
-    if (mo.charset) sql += ` DEFAULT CHARSET=${mo.charset}`;
-    if (mo.collation) sql += ` COLLATE=${mo.collation}`;
+    // Mirror the pre-existing TableDefinition.toSql() guard (abstract/schema-definitions.ts):
+    // MySQL emits charset/collation as bare identifiers, so reject anything that isn't a
+    // safe identifier to prevent DDL injection via untrusted Migration input.
+    const safeIdentRe = /^[A-Za-z0-9_]+$/;
+    if (mo.charset) {
+      if (!safeIdentRe.test(mo.charset)) {
+        throw new ArgumentError(`Invalid MySQL charset: ${JSON.stringify(mo.charset)}`);
+      }
+      sql += ` DEFAULT CHARSET=${mo.charset}`;
+    }
+    if (mo.collation) {
+      if (!safeIdentRe.test(mo.collation)) {
+        throw new ArgumentError(`Invalid MySQL collation: ${JSON.stringify(mo.collation)}`);
+      }
+      sql += ` COLLATE=${mo.collation}`;
+    }
     return this.addSqlCommentBang(super.addTableOptionsBang(sql, o), o.comment);
   }
 

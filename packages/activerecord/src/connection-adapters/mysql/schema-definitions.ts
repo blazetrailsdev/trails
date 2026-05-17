@@ -86,8 +86,12 @@ export class TableDefinition extends AbstractTableDefinition {
    * `changeColumn` — they all go through {@link SchemaCreation#addColumnOptions}.
    */
   override toSql(): string {
+    // Prefer the adapter's pre-wired visitor (carries host-adapter support flags). Guard with
+    // instanceof in case a non-MySQL SchemaStatements ever surfaces here — falling back to the
+    // abstract visitor would silently drop MySQL-specific addColumnOptions / charset handling.
     const fromAdapter = this._mysqlAdapter?.schemaStatements?.().schemaCreation;
-    const visitor = fromAdapter ?? new MysqlSchemaCreation();
+    const visitor =
+      fromAdapter instanceof MysqlSchemaCreation ? fromAdapter : new MysqlSchemaCreation();
     return visitor.accept(this);
   }
 
