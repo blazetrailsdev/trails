@@ -1033,45 +1033,26 @@ describe("EnumTest", () => {
   it("type.serialize", () => {
     expect(true).toBe(true);
   });
-  it("find via where with strings", () => {
-    class Post extends Base {
-      static {
-        this.tableName = "string_status_posts";
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
+  class StringStatusPost extends Base {
+    static {
+      this.tableName = "string_status_posts";
+      this.attribute("status", "string");
     }
-    expect(Post.where({ status: "active" })).toBeInstanceOf(Relation);
+  }
+  beforeEach(() => {
+    StringStatusPost.adapter = adapter;
+  });
+  it("find via where with strings", () => {
+    expect(StringStatusPost.where({ status: "active" })).toBeInstanceOf(Relation);
   });
   it("find via where with large number", () => {
-    class Post extends Base {
-      static {
-        this.tableName = "string_status_posts";
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.where({ status: "99" })).toBeInstanceOf(Relation);
+    expect(StringStatusPost.where({ status: "99" })).toBeInstanceOf(Relation);
   });
   it("find via where should be type casted", () => {
-    class Post extends Base {
-      static {
-        this.tableName = "string_status_posts";
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
-    }
-    expect(Post.where({ status: "active" })).toBeInstanceOf(Relation);
+    expect(StringStatusPost.where({ status: "active" })).toBeInstanceOf(Relation);
   });
   it("build from scope", async () => {
-    class Post extends Base {
-      static {
-        this.tableName = "string_status_posts";
-        this.attribute("status", "string");
-        this.adapter = adapter;
-      }
-    }
-    const p = await Post.create({ status: "active" });
+    const p = await StringStatusPost.create({ status: "active" });
     expect((p as any).isPersisted()).toBe(true);
   });
   it("enum methods are overwritable", () => {
