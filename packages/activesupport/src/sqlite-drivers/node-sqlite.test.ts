@@ -121,7 +121,10 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite strict", (
     const conn = await nodeSqliteDriver.open({ database: ":memory:", strict: true });
     try {
       const stmt = await conn.prepare(`SELECT "missing_col" AS v`);
-      await expect(Promise.resolve(stmt.get())).rejects.toThrow(/no such column/i);
+      // node:sqlite's stmt.get() is synchronous and throws inline — wrap the
+      // call in a thunk so expect() catches the throw rather than evaluating
+      // it inside the argument expression.
+      expect(() => stmt.get()).toThrow(/no such column/i);
     } finally {
       await conn.close();
     }
