@@ -80,11 +80,18 @@ export {
 export {
   _helpersForModification,
   _helpersInstance,
+  allHelpersFromPath,
   applyHelpers,
   clearHelpers,
+  defaultHelperModule,
   helper,
   helperMethod,
+  helperModulesFromPaths,
+  modulesForHelpers,
+  type HelperMethodNameList,
   type HelperMethodsModule,
+  type HelperResolver,
   type HelpersClassMethods,
   type HelpersHost,
+  type ResolutionOptions,
 } from "./helpers.js";
