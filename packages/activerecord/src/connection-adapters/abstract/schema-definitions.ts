@@ -1036,98 +1036,106 @@ export class TableDefinition {
     const columnDefs = this.columns.map((col) => {
       const parts = [this._adapter.quoteIdentifier(col.name)];
 
-      switch (col.type) {
-        case "primary_key":
-          if (this._adapterName === "postgres") {
-            parts.push("SERIAL PRIMARY KEY");
-          } else if (this._adapterName === "mysql") {
-            parts.push("BIGINT AUTO_INCREMENT PRIMARY KEY");
-          } else {
-            parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
-          }
-          break;
-        case "uuid": {
-          if (this._adapterName === "postgres") {
-            parts.push("UUID");
-          } else if (this._adapterName === "mysql") {
-            parts.push("CHAR(36)");
-          } else {
-            parts.push("VARCHAR(36)");
-          }
-          if (col.options.primaryKey) {
-            if (this._adapterName === "postgres" && col.options.default === undefined) {
-              parts.push("DEFAULT gen_random_uuid()");
+      // Honor pre-populated sqlType from adapter-specific helpers (e.g. PG's
+      // t.cidr/t.inet/t.bit, MySQL's t.mediumblob/t.unsigned_integer). The
+      // schema_creation visitor does the same at visit_ColumnDefinition; this
+      // path is hit when TableDefinition#toSql() runs directly (createTable).
+      if (col.sqlType != null && col.type !== "primary_key") {
+        parts.push(col.sqlType);
+      } else {
+        switch (col.type) {
+          case "primary_key":
+            if (this._adapterName === "postgres") {
+              parts.push("SERIAL PRIMARY KEY");
+            } else if (this._adapterName === "mysql") {
+              parts.push("BIGINT AUTO_INCREMENT PRIMARY KEY");
+            } else {
+              parts.push("INTEGER PRIMARY KEY AUTOINCREMENT");
             }
-            parts.push("PRIMARY KEY");
+            break;
+          case "uuid": {
+            if (this._adapterName === "postgres") {
+              parts.push("UUID");
+            } else if (this._adapterName === "mysql") {
+              parts.push("CHAR(36)");
+            } else {
+              parts.push("VARCHAR(36)");
+            }
+            if (col.options.primaryKey) {
+              if (this._adapterName === "postgres" && col.options.default === undefined) {
+                parts.push("DEFAULT gen_random_uuid()");
+              }
+              parts.push("PRIMARY KEY");
+            }
+            break;
           }
-          break;
-        }
-        case "string":
-          parts.push(`VARCHAR(${col.options.limit ?? 255})`);
-          break;
-        case "text":
-          parts.push("TEXT");
-          break;
-        case "integer":
-          parts.push("INTEGER");
-          break;
-        case "float":
-          parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
-          break;
-        case "decimal":
-          parts.push(`DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`);
-          break;
-        case "boolean":
-          parts.push("BOOLEAN");
-          break;
-        case "date":
-          parts.push("DATE");
-          break;
-        case "time": {
-          const tp = col.options.precision;
-          if (tp != null && !(tp >= 0 && tp <= 6))
-            throw new ArgumentError(
-              `No TIME type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
-            );
-          parts.push(tp != null ? `TIME(${tp})` : "TIME");
-          break;
-        }
-        case "datetime":
-        case "timestamp": {
-          const base = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-          // precision: undefined → Rails default of 6; precision: null → no precision suffix
-          const tp = col.options.precision === undefined ? 6 : col.options.precision;
-          if (tp != null && !(tp >= 0 && tp <= 6))
-            throw new ArgumentError(
-              `No ${base} type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
-            );
-          parts.push(tp != null ? `${base}(${tp})` : base);
-          break;
-        }
-        case "binary":
-          parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
-          break;
-        case "json":
-          parts.push("JSON");
-          break;
-        case "jsonb":
-          parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
-          break;
-        case "bigint":
-          parts.push("BIGINT");
-          break;
-        case "char":
-          parts.push(`CHAR(${col.options.limit ?? 1})`);
-          break;
-        default:
-          if (!col.type || !col.type.trim()) {
-            throw new Error(
-              `Column ${JSON.stringify(col.name)} has an empty or blank type — specify a valid SQL type`,
-            );
+          case "string":
+            parts.push(`VARCHAR(${col.options.limit ?? 255})`);
+            break;
+          case "text":
+            parts.push("TEXT");
+            break;
+          case "integer":
+            parts.push("INTEGER");
+            break;
+          case "float":
+            parts.push(this._adapterName === "postgres" ? "DOUBLE PRECISION" : "REAL");
+            break;
+          case "decimal":
+            parts.push(`DECIMAL(${col.options.precision ?? 10}, ${col.options.scale ?? 0})`);
+            break;
+          case "boolean":
+            parts.push("BOOLEAN");
+            break;
+          case "date":
+            parts.push("DATE");
+            break;
+          case "time": {
+            const tp = col.options.precision;
+            if (tp != null && !(tp >= 0 && tp <= 6))
+              throw new ArgumentError(
+                `No TIME type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
+              );
+            parts.push(tp != null ? `TIME(${tp})` : "TIME");
+            break;
           }
-          // Pass arbitrary type strings through verbatim (case matters for PG enums).
-          parts.push(col.type);
-          break;
+          case "datetime":
+          case "timestamp": {
+            const base = this._adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
+            // precision: undefined → Rails default of 6; precision: null → no precision suffix
+            const tp = col.options.precision === undefined ? 6 : col.options.precision;
+            if (tp != null && !(tp >= 0 && tp <= 6))
+              throw new ArgumentError(
+                `No ${base} type has precision of ${tp}. The allowed range of precision is from 0 to 6`,
+              );
+            parts.push(tp != null ? `${base}(${tp})` : base);
+            break;
+          }
+          case "binary":
+            parts.push(this._adapterName === "postgres" ? "BYTEA" : "BLOB");
+            break;
+          case "json":
+            parts.push("JSON");
+            break;
+          case "jsonb":
+            parts.push(this._adapterName === "postgres" ? "JSONB" : "JSON");
+            break;
+          case "bigint":
+            parts.push("BIGINT");
+            break;
+          case "char":
+            parts.push(`CHAR(${col.options.limit ?? 1})`);
+            break;
+          default:
+            if (!col.type || !col.type.trim()) {
+              throw new Error(
+                `Column ${JSON.stringify(col.name)} has an empty or blank type — specify a valid SQL type`,
+              );
+            }
+            // Pass arbitrary type strings through verbatim (case matters for PG enums).
+            parts.push(col.type);
+            break;
+        }
       }
 
       // For types that don't handle PRIMARY KEY internally, append it if requested

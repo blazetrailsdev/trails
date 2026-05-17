@@ -261,6 +261,35 @@ describe("TableDefinition#toSql", () => {
     expect(sql).toContain("AS SELECT");
   });
 
+  it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers", () => {
+    const td = new TableDefinition("widgets", { id: false });
+    td.cidr("net");
+    td.inet("addr");
+    td.hstore("props");
+    td.macaddr("mac");
+    td.ltree("path");
+    td.tsvector("doc");
+    td.xml("payload");
+    td.bit("flags", { limit: 8 });
+    td.bitVarying("flex", { limit: 16 });
+    td.money("price");
+    td.oid("oid_col");
+    td.tsrange("during");
+    const sql = td.toSql();
+    expect(sql).toContain('"net" CIDR');
+    expect(sql).toContain('"addr" INET');
+    expect(sql).toContain('"props" HSTORE');
+    expect(sql).toContain('"mac" MACADDR');
+    expect(sql).toContain('"path" LTREE');
+    expect(sql).toContain('"doc" TSVECTOR');
+    expect(sql).toContain('"payload" XML');
+    expect(sql).toContain('"flags" BIT(8)');
+    expect(sql).toContain('"flex" BIT VARYING(16)');
+    expect(sql).toContain('"price" MONEY');
+    expect(sql).toContain('"oid_col" OID');
+    expect(sql).toContain('"during" TSRANGE');
+  });
+
   it("handles default values containing doubled single-quotes without mis-parsing", () => {
     const td = new TableDefinition("messages", { id: false });
     td.string("body", { default: "Bob's" });
