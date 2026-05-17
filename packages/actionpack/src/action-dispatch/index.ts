@@ -67,6 +67,7 @@ export {
   type DirectiveName,
 } from "./http/permissions-policy.js";
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
+export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
 export {
   BasicAuth,
