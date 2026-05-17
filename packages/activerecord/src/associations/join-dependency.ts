@@ -11,6 +11,7 @@
  */
 
 import type { Base } from "../base.js";
+import type { DatabaseAdapter } from "../adapter.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -123,12 +124,38 @@ export class JoinDependency {
   // When a joined table's real name is unique, we skip the tN alias in SQL
   // (matching Rails' AliasTracker which only aliases on collision).
   private _usedTableNames: Set<string>;
+  // Lazily resolved connection for adapter-aware string quoting in
+  // polymorphic source_type / STI type predicates. Resolved on first use
+  // because some tests construct JoinDependency before a pool is wired.
+  private _adapter: DatabaseAdapter | null | undefined;
 
-  constructor(baseModel: typeof Base) {
+  constructor(baseModel: typeof Base, adapter?: DatabaseAdapter) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
     this._usedTableNames = new Set([this._baseAlias]);
+    this._adapter = adapter ?? undefined;
     this._buildBaseAliases();
+  }
+
+  /**
+   * Mirrors Rails' `connection.quote(value)` for string literals embedded
+   * into JOIN predicates (polymorphic source_type, STI type IN-lists).
+   * Falls back to a portable escape when no adapter is reachable.
+   * @internal
+   */
+  private _quoteString(value: string): string {
+    if (this._adapter === undefined) {
+      try {
+        this._adapter = (this._baseModel as any).connection?.() ?? null;
+      } catch {
+        this._adapter = null;
+      }
+    }
+    if (this._adapter && typeof (this._adapter as any).quote === "function") {
+      return (this._adapter as any).quote(value);
+    }
+    const escaped = String(value).replaceAll("\\", "\\\\").replaceAll("'", "''");
+    return `'${escaped}'`;
   }
 
   get nodes(): JoinNode[] {
@@ -211,7 +238,7 @@ export class JoinDependency {
 
       if (assocDef.options.as) {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND PLACEHOLDER."${typeCol}" = '${modelClass.name}'`;
+        joinOn += ` AND PLACEHOLDER."${typeCol}" = ${this._quoteString(modelClass.name)}`;
       }
     } else {
       return null;
@@ -445,7 +472,7 @@ export class JoinDependency {
     const inheritanceCol = getInheritanceColumn(model);
     if (inheritanceCol && isStiSubclass(model)) {
       const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
-      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
+      const inList = stiNames.map((n: string) => this._quoteString(n)).join(", ");
       joinOn += ` AND "${alias}"."${inheritanceCol}" IN (${inList})`;
     }
     return joinOn;
@@ -708,14 +735,7 @@ export class JoinDependency {
         // polymorphic type column is `foreign_type` (options[:foreign_type]
         // || "#{name}_type"), and the value is the literal :source_type.
         const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        // Escape backslash first, then single-quote — order matters so we
-        // don't double-escape an already-escaped quote. MySQL/MariaDB treat
-        // `\` as a string escape by default (NO_BACKSLASH_ESCAPES off), so
-        // both must be escaped to be portable across adapters.
-        const sourceTypeLit = String(assocDef.options.sourceType)
-          .replaceAll("\\", "\\\\")
-          .replaceAll("'", "''");
-        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${sourceTypeLit}'`;
+        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = ${this._quoteString(String(assocDef.options.sourceType))}`;
       }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
