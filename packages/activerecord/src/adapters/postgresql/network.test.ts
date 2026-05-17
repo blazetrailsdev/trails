@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Cidr } from "../../connection-adapters/postgresql/oid/cidr.js";
 import { Macaddr } from "../../connection-adapters/postgresql/oid/macaddr.js";
+import { SchemaDumper } from "../../schema-dumper.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -122,6 +123,17 @@ describeIfPg("PostgreSQLAdapter", () => {
           `INSERT INTO "postgresql_network_addresses" ("inet_address") VALUES ('invalid addr')`,
         ),
       ).rejects.toThrow();
+    });
+
+    it("schema dump with shorthand", async () => {
+      // Rails: test_schema_dump_with_shorthand — semantic types in the dump
+      // (`t.inet`, `t.cidr`, `t.macaddr`) instead of `t.string sql_type:`.
+      // Default-value stringification for inet/cidr (IPAddr → "x.x.x.x") is a
+      // separate gap; this test pins shorthand emission only.
+      const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_network_addresses");
+      expect(output).toMatch(/t\.inet\(\s*"inet_address"/);
+      expect(output).toMatch(/t\.cidr\(\s*"cidr_address"/);
+      expect(output).toMatch(/t\.macaddr\("mac_address",\s*\{\s*default:\s*"ff:ff:ff:ff:ff:ff"/);
     });
 
     it("cidr change prefix", async () => {

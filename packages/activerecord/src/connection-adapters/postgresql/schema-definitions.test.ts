@@ -276,18 +276,23 @@ describe("TableDefinition#toSql", () => {
     td.oid("oid_col");
     td.tsrange("during");
     const sql = td.toSql();
-    expect(sql).toContain('"net" CIDR');
-    expect(sql).toContain('"addr" INET');
-    expect(sql).toContain('"props" HSTORE');
-    expect(sql).toContain('"mac" MACADDR');
-    expect(sql).toContain('"path" LTREE');
-    expect(sql).toContain('"doc" TSVECTOR');
-    expect(sql).toContain('"payload" XML');
+    // pgColumn helpers now pass a semantic column type (e.g. "cidr", "inet")
+    // and leave sqlType unset. TableDefinition#toSql's default branch emits
+    // the column type verbatim, which matches Rails' NATIVE_DATABASE_TYPES
+    // lowercase names. bit / bitVarying still set sqlType explicitly because
+    // they carry a (limit) suffix that the native map doesn't express.
+    expect(sql).toContain('"net" cidr');
+    expect(sql).toContain('"addr" inet');
+    expect(sql).toContain('"props" hstore');
+    expect(sql).toContain('"mac" macaddr');
+    expect(sql).toContain('"path" ltree');
+    expect(sql).toContain('"doc" tsvector');
+    expect(sql).toContain('"payload" xml');
     expect(sql).toContain('"flags" BIT(8)');
     expect(sql).toContain('"flex" BIT VARYING(16)');
-    expect(sql).toContain('"price" MONEY');
-    expect(sql).toContain('"oid_col" OID');
-    expect(sql).toContain('"during" TSRANGE');
+    expect(sql).toContain('"price" money');
+    expect(sql).toContain('"oid_col" oid');
+    expect(sql).toContain('"during" tsrange');
   });
 
   it("handles default values containing doubled single-quotes without mis-parsing", () => {

@@ -204,6 +204,7 @@ const DSL_HELPER_METHODS = new Set([
   "ltree",
   "tsvector",
   "inet",
+  "cidr",
   "macaddr",
   "xml",
   "bit",

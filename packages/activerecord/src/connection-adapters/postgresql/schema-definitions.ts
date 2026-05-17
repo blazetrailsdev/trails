@@ -409,116 +409,121 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   uuid(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "uuid" as ColumnType, "UUID", options);
+    return this.pgColumn(name, "uuid" as ColumnType, undefined, options);
   }
 
   jsonb(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "jsonb" as ColumnType, "JSONB", options);
+    return this.pgColumn(name, "jsonb" as ColumnType, undefined, options);
   }
 
   daterange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "DATERANGE", options);
+    return this.pgColumn(name, "daterange" as ColumnType, undefined, options);
   }
 
   int4range(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "INT4RANGE", options);
+    return this.pgColumn(name, "int4range" as ColumnType, undefined, options);
   }
 
   int8range(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "INT8RANGE", options);
+    return this.pgColumn(name, "int8range" as ColumnType, undefined, options);
   }
 
   numrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "NUMRANGE", options);
+    return this.pgColumn(name, "numrange" as ColumnType, undefined, options);
   }
 
   tsrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "TSRANGE", options);
+    return this.pgColumn(name, "tsrange" as ColumnType, undefined, options);
   }
 
   tstzrange(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "TSTZRANGE", options);
+    return this.pgColumn(name, "tstzrange" as ColumnType, undefined, options);
   }
 
   oid(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "integer" as ColumnType, "OID", options);
+    return this.pgColumn(name, "oid" as ColumnType, undefined, options);
   }
 
   cidr(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "CIDR", options);
+    return this.pgColumn(name, "cidr" as ColumnType, undefined, options);
   }
 
   citext(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "text" as ColumnType, "CITEXT", options);
+    return this.pgColumn(name, "citext" as ColumnType, undefined, options);
   }
 
   hstore(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "HSTORE", options);
+    return this.pgColumn(name, "hstore" as ColumnType, undefined, options);
   }
 
   inet(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "INET", options);
+    return this.pgColumn(name, "inet" as ColumnType, undefined, options);
   }
 
   interval(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "INTERVAL", options);
+    return this.pgColumn(name, "interval" as ColumnType, undefined, options);
   }
 
   ltree(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "LTREE", options);
+    return this.pgColumn(name, "ltree" as ColumnType, undefined, options);
   }
 
   macaddr(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "MACADDR", options);
+    return this.pgColumn(name, "macaddr" as ColumnType, undefined, options);
   }
 
   money(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "decimal" as ColumnType, "MONEY", options);
+    return this.pgColumn(name, "money" as ColumnType, undefined, options);
   }
 
   point(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "POINT", options);
+    return this.pgColumn(name, "point" as ColumnType, undefined, options);
   }
 
   line(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "LINE", options);
+    return this.pgColumn(name, "line" as ColumnType, undefined, options);
   }
 
   lseg(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "LSEG", options);
+    return this.pgColumn(name, "lseg" as ColumnType, undefined, options);
   }
 
   box(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "BOX", options);
+    return this.pgColumn(name, "box" as ColumnType, undefined, options);
   }
 
   path(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "PATH", options);
+    return this.pgColumn(name, "path" as ColumnType, undefined, options);
   }
 
   polygon(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "POLYGON", options);
+    return this.pgColumn(name, "polygon" as ColumnType, undefined, options);
   }
 
   circle(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "CIRCLE", options);
+    return this.pgColumn(name, "circle" as ColumnType, undefined, options);
   }
 
   tsvector(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "string" as ColumnType, "TSVECTOR", options);
+    return this.pgColumn(name, "tsvector" as ColumnType, undefined, options);
   }
 
   xml(name: string, options: ColumnOptions = {}): this {
-    return this.pgColumn(name, "text" as ColumnType, "XML", options);
+    return this.pgColumn(name, "xml" as ColumnType, undefined, options);
   }
 
   enumType(name: string, enumName: string, options: ColumnOptions = {}): this {
     return this.pgColumn(name, "string" as ColumnType, enumName, options);
   }
 
-  private pgColumn(name: string, type: ColumnType, sqlType: string, options: ColumnOptions): this {
+  private pgColumn(
+    name: string,
+    type: ColumnType,
+    sqlType: string | undefined,
+    options: ColumnOptions,
+  ): this {
     const col = new ColumnDefinition(name, type, options);
-    col.sqlType = sqlType;
+    if (sqlType !== undefined) col.sqlType = sqlType;
     this.columns.push(col);
     return this;
   }
