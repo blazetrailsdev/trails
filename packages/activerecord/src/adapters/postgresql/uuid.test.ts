@@ -1,13 +1,27 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/uuid_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { isValidUuid, normalizeUuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
 
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// The `uuid_data_type` table needs raw DDL because the `guid` column's
+// DEFAULT is `gen_random_uuid()` (from the `pgcrypto` extension set up
+// in beforeAll). defineSchema can express the `uuid` column type but
+// not the function-call default; defineSchema(adapter, {}) marks the
+// file as TM-Phase-5 compliant.
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
@@ -19,6 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await defineSchema(adapter, {});
     await adapter.exec(`DROP TABLE IF EXISTS uuid_data_type`);
     await adapter.exec(`
       CREATE TABLE uuid_data_type (

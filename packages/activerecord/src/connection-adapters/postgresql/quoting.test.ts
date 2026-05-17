@@ -93,6 +93,37 @@ describe("PostgreSQL quoting", () => {
     expect(quoteDefaultExpression(["a", "b"], column, typeMap)).toBe(" DEFAULT '{a,b}'");
   });
 
+  it("serializes array defaults via an element subtype (per-element coercion)", () => {
+    // Mirrors Rails postgresql/quoting.rb:161-163 where
+    // lookup_cast_type_from_column returns OID::Array(IntegerType) and
+    // serialize walks each element through Integer#serialize. Trails'
+    // TypeMapLike returns the element subtype here; quoteDefaultExpression
+    // must wrap it in OidArray so per-element casting fires.
+    const column = { sqlType: "integer", array: true };
+    const typeMap = {
+      lookup() {
+        return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
+      },
+    };
+    expect(quoteDefaultExpression([1, 2, 3], column, typeMap)).toBe(" DEFAULT '{101,102,103}'");
+  });
+
+  it("passes raw array-literal string defaults through without scalar coercion", () => {
+    // Regression: when the value is a PG array literal string (e.g.
+    // `"{}"`) on an array column, the element-subtype lookup must NOT
+    // run — IntegerType#serialize("{}") would coerce to NaN. Rails
+    // would route through OID::Array#serialize whose string path is a
+    // pass-through; mirror that here.
+    const column = { sqlType: "integer", array: true };
+    const typeMap = {
+      lookup() {
+        return { serialize: (v: unknown) => Number(v) };
+      },
+    };
+    expect(quoteDefaultExpression("{}", column, typeMap)).toBe(" DEFAULT '{}'");
+    expect(quoteDefaultExpression("{1,2,3}", column, typeMap)).toBe(" DEFAULT '{1,2,3}'");
+  });
+
   it("supports nested function calls up to 2 levels deep", () => {
     expect(columnNameMatcher().test("lower(name)")).toBe(true);
     expect(columnNameMatcher().test("lower(trim(name))")).toBe(true);

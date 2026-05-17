@@ -82,3 +82,36 @@ describe("PostgreSQLAdapter#getOidType", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
+  let adapter: PostgreSQLAdapter;
+
+  beforeEach(() => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+  });
+
+  afterEach(async () => {
+    await adapter.close().catch(() => undefined);
+  });
+
+  it("reads `array` from ColumnDefinition.options for DDL paths", () => {
+    // Simulates a ColumnDefinition built by addColumn/changeColumn:
+    // array lives on `.options`, sqlType is the `[]`-suffixed form.
+    const columnDef = { sqlType: "integer[]", options: { array: true } };
+    expect(adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe(" DEFAULT '{1,2,3}'");
+  });
+
+  it("reads `array` from a live Column instance", () => {
+    const column = { sqlType: "integer", array: true };
+    expect(adapter.quoteDefaultExpression([4, 5, 6], column)).toBe(" DEFAULT '{4,5,6}'");
+  });
+
+  it("normalizes `integer[]` sqlType so the integer subtype resolves", () => {
+    // If normalization were missing, `tm.lookup("integer[]")` would
+    // miss and the element subtype would fall back to ValueType,
+    // emitting the floats verbatim ('{1.7,2.3}'). IntegerType#serialize
+    // truncates to integers, so '{1,2}' confirms the subtype lookup hit.
+    const columnDef = { sqlType: "integer[]", options: { array: true } };
+    expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe(" DEFAULT '{1,2}'");
+  });
+});

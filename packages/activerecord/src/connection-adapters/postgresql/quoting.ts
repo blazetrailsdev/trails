@@ -181,13 +181,28 @@ export function quoteDefaultExpression(
   if (column != null && "array" in column) {
     const sqlType = column.sqlType ?? column.type ?? null;
     const castType = sqlType ? typeMap?.lookup(sqlType) : null;
-    serialized = castType?.serialize ? castType.serialize(value) : value;
-    // Array types are keyed by OID, not by SQL type name — type map lookup
-    // misses. Encode via a passthrough OidArray so quote() gets an ArrayData.
-    // Guard on column.array === true so non-array columns with a falsy array
-    // flag don't silently emit an array literal for unexpected Array values.
-    if (column.array === true && globalThis.Array.isArray(serialized)) {
-      serialized = new ArrayData(new OidArray(new ValueType()), serialized as unknown[]);
+    if (column.array === true && globalThis.Array.isArray(value)) {
+      // Rails routes JS arrays through OID::Array.serialize so each
+      // element is cast by the element subtype before quoting. Trails'
+      // TypeMapLike permits two shapes: an already-array-aware type
+      // (serialize returns ArrayData) or the element subtype. Run
+      // serialize first; if ArrayData, use it. Otherwise wrap the
+      // original value in OidArray(subtype) for per-element coercion.
+      const fromTypeMap = castType?.serialize ? castType.serialize(value) : value;
+      if (fromTypeMap instanceof ArrayData) {
+        serialized = fromTypeMap;
+      } else {
+        const subtype = (castType ?? new ValueType()) as ConstructorParameters<typeof OidArray>[0];
+        serialized = new OidArray(subtype).serialize(value);
+      }
+    } else if (column.array === true) {
+      // Non-array values on an array column (e.g. a raw `"{}"` literal)
+      // must pass through to quote() unchanged — the lookup here returns
+      // the element subtype, whose serialize would coerce the string
+      // (Integer#serialize("{}") → NaN) and break the literal default.
+      serialized = value;
+    } else if (castType?.serialize) {
+      serialized = castType.serialize(value);
     }
   }
   return ` DEFAULT ${quote(serialized)}`;

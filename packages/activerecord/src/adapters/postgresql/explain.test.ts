@@ -1,13 +1,26 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/explain_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
 
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// EXPLAIN tests build their own ad-hoc `ex_*` tables; nothing is
+// expressible as a static defineSchema spec. defineSchema(adapter, {})
+// marks the file as TM-Phase-5 compliant.
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await defineSchema(adapter, {});
   });
   afterEach(async () => {
     try {

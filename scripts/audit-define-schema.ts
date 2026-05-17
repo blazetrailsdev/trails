@@ -57,14 +57,15 @@ const files = allTs.filter((f) => {
  * identifier-presence matching.
  */
 function stripCommentsAndStrings(src: string): string {
-  // Strings first — otherwise a `//` inside a URL or other quoted literal
-  // would be mistaken for a line comment and chop off the rest of the line.
+  // Comments first — otherwise an apostrophe inside a `// ...` comment
+  // (e.g. "don't") would open a fake string literal that swallows the
+  // following lines, including any `defineSchema(` call.
   return src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "")
     .replace(/`(?:\\.|[^`\\])*`/g, "``")
     .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "");
+    .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
 const offenders: string[] = [];
