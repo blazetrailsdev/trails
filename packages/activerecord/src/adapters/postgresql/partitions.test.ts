@@ -16,6 +16,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlPartitionsTest", () => {
     it("partitions table exists", async () => {
+      await adapter.getDatabaseVersion();
+      if (!adapter.supportsNativePartitioning()) return;
       await adapter.createTable(
         "partitioned_events",
         {

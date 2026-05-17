@@ -997,26 +997,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchemaDumper(adapter).dumpTable(lines, "trains");
       expect(lines.join("\n")).not.toContain("options:");
     });
+  });
+
+  describe("SchemaTableCommentTest", () => {
+    afterEach(async () => {
+      await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
+    });
+
     it("table comment is dumped and round-trips via createTable", async () => {
-      try {
-        await adapter.exec(
-          `CREATE TABLE commented_table (id serial primary key, name varchar(50))`,
-        );
-        await adapter.exec(`COMMENT ON TABLE commented_table IS 'a test table'`);
-        const lines: string[] = [];
-        await adapter.createSchemaDumper(adapter).dumpTable(lines, "commented_table");
-        const dump = lines.join("\n");
-        expect(dump).toContain(`comment: "a test table"`);
-        await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
-        // Round-trip: createTable with comment: re-applies the comment via changeTableComment
-        const ss = adapter.schemaStatements();
-        await ss.createTable("commented_table", { comment: "a test table" }, (t) => {
-          t.string("name");
-        });
-        expect(await adapter.tableComment("commented_table")).toBe("a test table");
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
-      }
+      await adapter.exec(`CREATE TABLE commented_table (id serial primary key, name varchar(50))`);
+      await adapter.exec(`COMMENT ON TABLE commented_table IS 'a test table'`);
+      const lines: string[] = [];
+      await adapter.createSchemaDumper(adapter).dumpTable(lines, "commented_table");
+      expect(lines.join("\n")).toContain(`comment: "a test table"`);
+      await adapter.exec(`DROP TABLE IF EXISTS commented_table`);
+
+      const ss = adapter.schemaStatements();
+      await ss.createTable("commented_table", { comment: "a test table" }, (t) => {
+        t.string("name");
+      });
+      expect(await adapter.tableComment("commented_table")).toBe("a test table");
     });
   });
 });
