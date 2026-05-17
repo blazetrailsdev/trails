@@ -1164,17 +1164,18 @@ describe("TransactionTest", () => {
     }
   });
 
-  it.skip("restore previously new record after double save", () => {
-    // BLOCKED: transactions — snapshot-overwrite on multiple saves
-    // ROOT-CAUSE: withTransactionReturningStatus registers a fresh tx.afterRollback
-    //   per save. With two saves, both register restore hooks on the same outer
-    //   transaction. Rollback fires hooks in registration order: the second save's
-    //   hook (previouslyNewRecord=false) runs last, overwriting the first save's
-    //   correct restore (previouslyNewRecord=true). Rails avoids this because
-    //   @_start_transaction_state is only captured once (||= idiom) at the outermost
-    //   save, and subsequent saves increment the level counter without taking a new
-    //   snapshot for rollback restoration.
-    // SCOPE: ~10 LOC fix in transactions.ts#withTransactionReturningStatus; deferred.
+  it("restore previously new record after double save", async () => {
+    const { Topic } = makeSQLiteTopic();
+    const topic = await Topic.create({ title: "test" });
+    expect(topic.isPreviouslyNewRecord()).toBe(true);
+
+    await Topic.transaction(async () => {
+      await topic.save();
+      await topic.save();
+      throw new Rollback();
+    });
+
+    expect(topic.isPreviouslyNewRecord()).toBe(true);
   });
 
   it("restore composite id after rollback", async () => {
