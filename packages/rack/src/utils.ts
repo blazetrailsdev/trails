@@ -120,6 +120,9 @@ function normalizeParams(params: any, name: string, v: string | null, depth: num
   // Simple key: "foo"
   if (!name.includes("[")) {
     if (DANGEROUS_KEYS.has(name)) return;
+    // Drop empty keys (e.g. "&=Save" → no `name`). Matches Rack-Ruby's
+    // `return if k.empty?` in lib/rack/query_parser.rb.
+    if (name === "") return;
     params[name] = v;
     return;
   }
