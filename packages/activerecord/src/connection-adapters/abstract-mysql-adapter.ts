@@ -908,6 +908,38 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
+  /**
+   * Set a MySQL session variable to the given value.
+   * Emits `SET SESSION <name> = <quoted value>` against the active connection.
+   * Pass the symbol `"DEFAULT"` (case-insensitive) or the value `null` to
+   * restore the variable to its default. Identifier is validated against
+   * MySQL variable-name characters before interpolation.
+   *
+   * trails-only helper — Rails inlines this in `configure_connection`
+   * via the `variables:` pool-init shape. Exposed here as a cheaper
+   * alternative when callers just need to flip a session flag mid-test
+   * (e.g. `sql_mode`) without rebuilding the pool.
+   *
+   * Caveat: this SETs the variable on whichever pool connection happens
+   * to be checked out, then releases it. Subsequent calls may land on a
+   * different connection where the variable is unchanged. Callers must
+   * pin to a single connection (e.g. `connectionLimit: 1` or an active
+   * transaction) for the variable to be observed across calls. For
+   * pool-wide configuration, use the `variables:` pool-init option.
+   *
+   * @internal
+   */
+  async setSessionVariable(name: string, value: unknown): Promise<void> {
+    if (!/^\w+$/.test(name)) {
+      throw new Error(`setSessionVariable: invalid variable name ${name}`);
+    }
+    const quotedValue =
+      value === null || (typeof value === "string" && value.toUpperCase() === "DEFAULT")
+        ? "DEFAULT"
+        : this.quote(value);
+    await this._execMutation(`SET SESSION ${name} = ${quotedValue}`);
+  }
+
   async primaryKeys(tableName: string): Promise<string[]> {
     void tableName;
     return [];

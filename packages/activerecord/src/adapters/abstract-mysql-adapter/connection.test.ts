@@ -128,6 +128,45 @@ describeIfMysql("Mysql2Adapter", () => {
       const v = await adapter.showVariable("collation_connection");
       expect(v).not.toBeNull();
     });
+    // Direct tests for the trails-only AbstractMysqlAdapter#setSessionVariable
+    // helper. The Rails-named test_mysql_set_session_variable / _to_default
+    // cases below exercise the `variables:` pool-init shape; these cover the
+    // explicit-helper code path (identifier validation, DEFAULT handling,
+    // emitted quoting). Uses connectionLimit: 1 so SET SESSION + SELECT land
+    // on the same pool connection — see the JSDoc caveat.
+    it("setSessionVariable helper sets a session variable", async () => {
+      const a = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+      try {
+        await a.setSessionVariable("default_week_format", 3);
+        const rows = await a.execute("SELECT @@SESSION.default_week_format AS v");
+        expect(Number(rows[0].v)).toBe(3);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("setSessionVariable helper with DEFAULT restores global", async () => {
+      const a = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+      try {
+        const global = await a.execute("SELECT @@GLOBAL.default_week_format AS v");
+        await a.setSessionVariable("default_week_format", 3);
+        await a.setSessionVariable("default_week_format", "DEFAULT");
+        const session = await a.execute("SELECT @@SESSION.default_week_format AS v");
+        expect(session[0].v).toEqual(global[0].v);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("setSessionVariable helper rejects invalid identifiers", async () => {
+      const a = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+      try {
+        await expect(a.setSessionVariable("foo; DROP", 1)).rejects.toThrow(/invalid/);
+      } finally {
+        await a.close();
+      }
+    });
+
     it("mysql default in strict mode", async () => {
       const rows = await adapter.execute("SELECT @@SESSION.sql_mode AS v");
       expect(String(rows[0].v)).toMatch(/STRICT_ALL_TABLES/);

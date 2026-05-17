@@ -9,6 +9,7 @@ import { getFs, getPath } from "@blazetrails/activesupport";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
+import { Column as MysqlColumn } from "./mysql/column.js";
 
 // ---------------------------------------------------------------------------
 // Helper: run callback inside pool.withConnection if available
@@ -56,7 +57,9 @@ function serializeColumn(col: any): ColumnJSON {
 
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
-  return Column.fromJSON(data as ColumnJSON);
+  const json = data as ColumnJSON & { __mysql?: boolean };
+  if (json && json.__mysql) return MysqlColumn.fromJSON(json);
+  return Column.fromJSON(json);
 }
 
 // ---------------------------------------------------------------------------

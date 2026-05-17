@@ -21,6 +21,7 @@ import { Result } from "../result.js";
 import { CreateIndexDefinition, ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import type { AddIndexOptions } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
+import { Column as MysqlColumn } from "./mysql/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import { typeCastedBinds } from "./abstract/database-statements.js";
@@ -1071,7 +1072,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               numeric_scale AS num_scale,
               column_key AS col_key,
               collation_name AS collation,
-              column_comment AS comment
+              column_comment AS comment,
+              extra AS extra
          FROM information_schema.columns
          WHERE table_schema = COALESCE(?, database())
          AND table_name = ?
@@ -1111,11 +1113,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !==
         "NO";
       const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
-      return new Column(name, r.default_value ?? r.DEFAULT_VALUE ?? null, meta, nullable, {
-        collation: (r.collation ?? r.COLLATION ?? null) as string | null,
-        comment: (r.comment ?? r.COMMENT ?? null) as string | null,
-        primaryKey: colKey === "PRI",
-      });
+      const extra = String((r.extra ?? r.EXTRA ?? "") as string).toLowerCase();
+      return new MysqlColumn(
+        name,
+        r.default_value ?? r.DEFAULT_VALUE ?? null,
+        {
+          sqlType: meta.sqlType,
+          type: meta.type ?? undefined,
+          limit: meta.limit,
+          precision: meta.precision,
+          scale: meta.scale,
+        },
+        nullable,
+        {
+          collation: (r.collation ?? r.COLLATION ?? null) as string | null,
+          comment: (r.comment ?? r.COMMENT ?? null) as string | null,
+          primaryKey: colKey === "PRI",
+          autoIncrement: extra === "auto_increment",
+          unsigned: /\bunsigned(?: zerofill)?\b/i.test(sqlType),
+          virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
+        },
+      );
     });
   }
 
