@@ -462,7 +462,16 @@ export class Association {
     );
   }
 
-  private targetScope(): any {
+  /**
+   * Mirrors Rails' `Association#target_scope` (association.rb): returns
+   * `klass.all`. The through-association chain merge that propagates
+   * intermediate `default_scope` is the
+   * `ThroughAssociation#target_scope` override — see
+   * `through-association.ts` / `_throughTargetScope`.
+   *
+   * @internal
+   */
+  protected targetScope(): any {
     return (this.klass as any)?.all?.() ?? null;
   }
 

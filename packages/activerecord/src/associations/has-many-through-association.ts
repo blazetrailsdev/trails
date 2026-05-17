@@ -9,6 +9,7 @@ import { compositeQueryConstraintsList } from "../persistence.js";
 import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass } from "../associations.js";
+import { throughTargetScope } from "./through-association.js";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
   try {
@@ -24,6 +25,14 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
 export class HasManyThroughAssociation extends HasManyAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
+  }
+
+  /**
+   * Mirrors Rails' `ThroughAssociation#target_scope` override.
+   * @internal
+   */
+  protected override targetScope(): unknown {
+    return throughTargetScope(this, super["targetScope"]());
   }
 
   // Rails uses scope.pluck(*reflection.association_primary_key) where `scope`

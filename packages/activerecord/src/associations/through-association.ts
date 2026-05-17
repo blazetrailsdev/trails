@@ -123,6 +123,59 @@ function staleState(assoc: { owner: Base; reflection: any }): unknown[] | null {
   return vals.length > 0 ? vals : null;
 }
 
+/**
+ * Mirrors Rails' `ThroughAssociation#target_scope`
+ * (through_association.rb):
+ *
+ *     def target_scope
+ *       scope = super
+ *       reflection.chain.drop(1).each do |reflection|
+ *         relation = reflection.klass.scope_for_association
+ *         scope.merge!(
+ *           relation.except(:select, :create_with, :includes, :preload,
+ *                           :eager_load, :joins, :left_outer_joins)
+ *         )
+ *       end
+ *       scope
+ *     end
+ *
+ * `superScope` is the base `Association#targetScope` (= `klass.all()`).
+ * This helper folds in each intermediate reflection's
+ * `klass.scopeForAssociation()` to propagate `default_scope` declared on
+ * join models into the target query.
+ *
+ * The clause-removal (`.except(:select, ...)`) is not applied: our
+ * `Relation#except` is a set-operation (SQL EXCEPT). Correct for
+ * `default_scope { where(...) }`; lossy for exotic default scopes
+ * (tracked as a follow-up).
+ *
+ * @internal
+ */
+export function throughTargetScope(
+  assoc: { owner: Base; reflection: { name: string } },
+  superScope: unknown,
+): unknown {
+  let scope = superScope;
+  if (!scope) return scope;
+  const ctor = assoc.owner.constructor as {
+    _reflectOnAssociation?: (n: string) => unknown;
+  };
+  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as
+    | { chain?: Array<{ klass?: { scopeForAssociation?: () => unknown } }> }
+    | null
+    | undefined;
+  const chain = refl?.chain;
+  if (!chain || chain.length <= 1) return scope;
+  for (let i = 1; i < chain.length; i++) {
+    const interKlass = chain[i]?.klass;
+    const interScope = interKlass?.scopeForAssociation?.();
+    if (interScope && typeof (scope as { merge?: unknown }).merge === "function") {
+      scope = (scope as { merge: (r: unknown) => unknown }).merge(interScope);
+    }
+  }
+  return scope;
+}
+
 /** @internal */
 function foreignKeyPresent(assoc: { owner: Base; reflection: any }): boolean {
   const tr = throughReflection(assoc) as any;
