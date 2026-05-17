@@ -41,9 +41,12 @@ describe("AbstractController::UrlFor", () => {
       expect(original).toEqual(["a", "b"]);
     });
 
-    it("accepts a non-array iterable for helperNames (Set, generator)", () => {
+    it("ignores a defaultEnv on the route set when filtering", () => {
+      // defaultEnv is part of RouteSetLike (consumed by the renderer),
+      // but filterActionMethodsForRoutes shouldn't care about it.
       const routes: RouteSetLike = {
-        namedRoutes: { helperNames: new Set(["posts_path", "show"]) },
+        namedRoutes: { helperNames: ["posts_path", "show"] },
+        defaultEnv: { HTTP_HOST: "example.com" },
       };
       expect(filterActionMethodsForRoutes(["show", "index"], routes)).toEqual(["index"]);
     });

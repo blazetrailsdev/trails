@@ -5,9 +5,11 @@
  * `urlFor(...)` instance method; that mixin is **not yet ported**.
  *
  * This module currently provides:
- *  - the instance-side `_routes` stub that throws until the host wires
- *    in a real route set
- *  - the class-side `_routes` default that returns `null`
+ *  - `_routesInstanceDefault` / `_routesClassDefault` — the literal
+ *    `null` defaults trails uses on hosts that haven't wired up
+ *    routes yet (`_routes` is a property in trails, not a method)
+ *  - `NO_ROUTES_MESSAGE` — the Rails-shaped hint to surface at the
+ *    eventual `urlFor()` call site
  *  - `filterActionMethodsForRoutes`, used by hosts to strip named-route
  *    helper names out of their `actionMethods` list (mirrors Rails'
  *    `ClassMethods#action_methods` override)
@@ -18,16 +20,23 @@
 export interface NamedRoutesLike {
   /**
    * Names of generated route helpers (e.g. `posts_path`, `post_url`).
-   * Typed as a generic `Iterable<string>` so the future
-   * `NamedRouteCollection` port can return a Set or any other lazy
-   * source without forcing an array allocation just to satisfy the
-   * contract.
+   * Typed as `readonly string[]` to match how consumers actually use
+   * it — `UrlGenerationError#corrections` (in
+   * `action-controller/metal/exceptions.ts`) calls `.filter().slice()`
+   * on it. If a future `NamedRouteCollection` port wants to expose a
+   * Set internally, it should still return an array here.
    */
-  helperNames: Iterable<string>;
+  helperNames: readonly string[];
 }
 
 export interface RouteSetLike {
   namedRoutes: NamedRoutesLike;
+  /**
+   * Default Rack env merged underneath request-specific env when the
+   * controller generates URLs. Consumed by
+   * `action-controller/renderer.ts#envForRequest`.
+   */
+  defaultEnv?: Record<string, unknown>;
 }
 
 /**
