@@ -317,12 +317,16 @@ describe("MigratorTest", () => {
       await writeFile(join(root, "1_valid_people_have_last_names.ts"), "");
       await writeFile(join(root, "sub", "2_we_need_reminders.ts"), "");
 
+      // Include "10" so the numeric-vs-lexicographic ordering matters
+      // (Rails MigrationContext#migrations sort_by(&:version) is numeric).
+      await writeFile(join(root, "10_late_migration.ts"), "");
+
       const proxies = Migrator.fromPath(root, adapter);
-      expect(proxies).toHaveLength(2);
-      expect(proxies[0]!.version).toBe("1");
+      expect(proxies).toHaveLength(3);
+      expect(proxies.map((p) => p.version)).toEqual(["1", "2", "10"]);
       expect(proxies[0]!.name).toBe("ValidPeopleHaveLastNames");
-      expect(proxies[1]!.version).toBe("2");
       expect(proxies[1]!.name).toBe("WeNeedReminders");
+      expect(proxies[2]!.name).toBe("LateMigration");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

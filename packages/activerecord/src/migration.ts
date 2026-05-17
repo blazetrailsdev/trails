@@ -1690,8 +1690,13 @@ export class MigrationContext {
         : {};
     // datetime(N) / time(N) — N is fractional-seconds precision.
     const precOnly = arg1 !== undefined && arg2 === undefined ? { precision: arg1 } : {};
-    // MySQL fixed byte-limits for small-int variants (mirrors mysql-type-lookup).
-    const intByteLimit: Record<string, number> = {
+    // Per-adapter integer byte limits, mirroring the canonical type maps:
+    //  - postgresql/type-map-init.ts:134-136 (int2=2, int4=4, int8=8)
+    //  - mysql-type-lookup tests (tinyint=1, smallint=2, mediumint=3, int=4)
+    //  - sqlite3-adapter.ts:2188 (sqlite3Int defaults to limit 8)
+    // SQLite collapses everything to its dynamic integer; don't pretend
+    // otherwise. PG/MySQL share byte-sized variants below.
+    const intByteLimit: Record<string, number | undefined> = {
       tinyint: 1,
       smallint: 2,
       int2: 2,
@@ -1705,16 +1710,24 @@ export class MigrationContext {
       return { type: "string", ...limit };
     if (/^(text|tinytext|mediumtext|longtext|clob)$/.test(head)) return { type: "text" };
     if (/^citext$/.test(head)) return { type: "citext" };
-    if (/^(int|integer|int4|int2|smallint|mediumint|tinyint|serial|smallserial|year)$/.test(head))
-      // MySQL `int(N)` is a display width, not a Rails limit — use byte limit.
+    if (/^(int|integer|int4|int2|smallint|mediumint|tinyint|serial|smallserial|year)$/.test(head)) {
+      if (adapter === "sqlite") return { type: "integer", limit: 8 };
       return { type: "integer", limit: intByteLimit[head] ?? 4 };
-    if (/^(bigint|int8|bigserial)$/.test(head)) return { type: "bigint" };
-    if (/^(float|float4)$/.test(head)) return { type: "float", limit: 24 };
-    // PG `real` is single-precision (float4 → limit 24); MySQL `real` is
-    // an alias for double (float8 → limit 53).
+    }
+    if (/^(bigint|int8|bigserial)$/.test(head))
+      return adapter === "sqlite" ? { type: "integer", limit: 8 } : { type: "bigint" };
+    // Float byte-limits: PG float4 has limit 24 and float8 has no limit
+    // (postgresql/type-map-init.ts:138-139). SQLite registers all float-like
+    // declarations as FloatType() with no limit (sqlite3-adapter.ts:2224).
+    // MySQL retains the float/double precision split.
+    if (/^float4$/.test(head)) return { type: "float", limit: 24 };
+    if (/^float8$/.test(head)) return { type: "float" };
+    if (/^float$/.test(head))
+      return adapter === "mysql" ? { type: "float", limit: 24 } : { type: "float" };
     if (/^real$/.test(head))
-      return adapter === "postgres" ? { type: "float", limit: 24 } : { type: "float", limit: 53 };
-    if (/^(double|double precision|float8)$/.test(head)) return { type: "float", limit: 53 };
+      return adapter === "mysql" ? { type: "float", limit: 53 } : { type: "float", limit: 24 };
+    if (/^(double|double precision)$/.test(head))
+      return adapter === "mysql" ? { type: "float", limit: 53 } : { type: "float" };
     if (/^(numeric|decimal|number)$/.test(head)) return { type: "decimal", ...decSizes };
     if (/^(bool|boolean)$/.test(head)) return { type: "boolean" };
     // PG registers `bit`/`varbit` as standalone Bit/BitVarying types
@@ -2713,11 +2726,12 @@ export class Migrator {
       name: "********** NO FILE **********",
     }));
 
-    return [...dbList, ...fileList].sort((a, b) => {
-      const va = BigInt(a.version);
-      const vb = BigInt(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    // Rails sorts by `version.to_i` — non-numeric rows coerce to 0 rather
+    // than raising. Avoid BigInt here so a legacy non-numeric row preserved
+    // by _appliedVersions() doesn't crash status reporting.
+    return [...dbList, ...fileList].sort(
+      (a, b) => (parseInt(a.version, 10) || 0) - (parseInt(b.version, 10) || 0),
+    );
   }
 
   /**

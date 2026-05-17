@@ -2009,12 +2009,23 @@ describe("MigrationTest", () => {
     expect(N("decimal(10)", "mysql")).toEqual({ type: "decimal", precision: 10 });
     expect(N("numeric(10,2)", "postgres")).toEqual({ type: "decimal", precision: 10, scale: 2 });
 
-    // Float byte limits: PG vs MySQL `real` divergence
+    // Float byte limits — mirror per-adapter type maps:
+    //  - MySQL: float→24, double→53, real==double (53)
+    //  - PG (type-map-init.ts:138-139): float4→24, float8→no limit;
+    //    real==float4 → 24, double precision==float8 → no limit
+    //  - SQLite (sqlite3-adapter.ts:2224): all float-like → no limit
     expect(N("float", "mysql")).toEqual({ type: "float", limit: 24 });
     expect(N("double", "mysql")).toEqual({ type: "float", limit: 53 });
-    expect(N("real", "postgres")).toEqual({ type: "float", limit: 24 });
     expect(N("real", "mysql")).toEqual({ type: "float", limit: 53 });
-    expect(N("double precision", "postgres")).toEqual({ type: "float", limit: 53 });
+    expect(N("float4", "postgres")).toEqual({ type: "float", limit: 24 });
+    expect(N("real", "postgres")).toEqual({ type: "float", limit: 24 });
+    expect(N("float8", "postgres")).toEqual({ type: "float" });
+    expect(N("double precision", "postgres")).toEqual({ type: "float" });
+    expect(N("float", "sqlite")).toEqual({ type: "float" });
+
+    // SQLite integer collapses to dynamic 8-byte int (sqlite3-adapter.ts:2188).
+    expect(N("integer", "sqlite")).toEqual({ type: "integer", limit: 8 });
+    expect(N("bigint", "sqlite")).toEqual({ type: "integer", limit: 8 });
 
     // Date/time precision propagation
     expect(N("datetime(6)", "mysql")).toEqual({ type: "datetime", precision: 6 });
@@ -2048,6 +2059,12 @@ describe("MigrationTest", () => {
     const rows = await adapter.execute(`SELECT * FROM "table_from_query_testings"`);
     expect(rows).toHaveLength(1);
     expect(ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
+
+    // _introspectColumns / _normalizeIntrospectedType should populate
+    // _columnMeta with a Rails-canonical type (not the raw catalog string).
+    const cols = ctx.columns("table_from_query_testings");
+    const pid = cols.find((c) => c.name === "person_id");
+    expect(pid?.type).toBe("integer");
 
     await ctx.dropTable("table_from_query_testings");
     await ctx.dropTable("people_src");
