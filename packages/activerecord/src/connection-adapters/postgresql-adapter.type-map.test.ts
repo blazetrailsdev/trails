@@ -108,11 +108,10 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
 
   it("normalizes `integer[]` sqlType so the integer subtype resolves", () => {
     // If normalization were missing, `tm.lookup("integer[]")` would
-    // miss and the element subtype would fall back to ValueType.
+    // miss and the element subtype would fall back to ValueType,
+    // emitting the floats verbatim ('{1.7,2.3}'). IntegerType#serialize
+    // truncates to integers, so '{1,2}' confirms the subtype lookup hit.
     const columnDef = { sqlType: "integer[]", options: { array: true } };
-    // String elements that aren't valid integers should be coerced via
-    // the IntegerType subtype path — confirms the lookup actually
-    // returned IntegerType and not ValueType (which would emit "x,y").
     expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe(" DEFAULT '{1,2}'");
   });
 });

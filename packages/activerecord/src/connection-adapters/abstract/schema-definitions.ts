@@ -1180,7 +1180,10 @@ export class TableDefinition {
       }
 
       if (col.options.default !== undefined) {
-        const clause = this._adapter.quoteDefaultExpression(col.options.default);
+        // Pass the column so PG's quoteDefaultExpression can detect
+        // `options.array` and route through OID::Array#serialize for
+        // array defaults on CREATE TABLE (matches the addColumn path).
+        const clause = this._adapter.quoteDefaultExpression(col.options.default, col);
         if (clause) parts.push(clause.trimStart());
       }
 

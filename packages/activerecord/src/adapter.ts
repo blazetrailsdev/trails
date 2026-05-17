@@ -374,7 +374,7 @@ export interface DatabaseAdapter {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
    */
-  quoteDefaultExpression(value: unknown): string;
+  quoteDefaultExpression(value: unknown, column?: unknown): string;
 
   /**
    * Cast a value to the primitive form drivers expect for binds.
