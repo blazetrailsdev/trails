@@ -7,6 +7,7 @@
 
 import type { RackEnv } from "@blazetrails/rack";
 import { parseNestedQuery } from "@blazetrails/rack";
+import { RequestUtils, type ParamValue } from "../request/utils.js";
 
 export class Request {
   readonly env: RackEnv;
@@ -264,7 +265,10 @@ export class Request {
   get queryParameters(): Record<string, unknown> {
     const qs = this.queryString;
     if (!qs) return {};
-    return parseNestedQuery(qs);
+    return RequestUtils.normalizeEncodeParams(parseNestedQuery(qs) as ParamValue) as Record<
+      string,
+      unknown
+    >;
   }
 
   get requestParameters(): Record<string, unknown> {
@@ -315,8 +319,12 @@ export class Request {
       params = parseNestedQuery(input);
     }
 
-    this.env["action_dispatch.request.request_parameters"] = params;
-    return params;
+    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
+      string,
+      unknown
+    >;
+    this.env["action_dispatch.request.request_parameters"] = normalized;
+    return normalized;
   }
 
   get pathParameters(): Record<string, string> {
