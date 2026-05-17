@@ -413,9 +413,9 @@ describe("CounterCacheTest", () => {
     expect(after.replies_count).toBe(1);
   });
   it.skip("reset counters with modular association", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — modular (namespaced) class name resolution
+    // ROOT-CAUSE: resetCounters does not resolve "Module::Class" via modelRegistry _registryKeys / "::Name" suffix
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters target lookup
   });
   it("update counter caches on destroy", async () => {
     class Topic extends Base {
@@ -640,9 +640,11 @@ describe("CounterCacheTest", () => {
     expect(reloaded.replies_count).toBe(0);
   });
   it.skip("counter cache on unloaded association class works", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — pending-registry deferred resolution edge case
+    // ROOT-CAUSE: pendingCounterCacheColumns flush in registerModel resolves _counterCacheColumns,
+    //   but cache-column auto-derivation in counter-cache.ts#counterCacheColumnName runs
+    //   eagerly against the (unloaded) target — needs deferred lookup symmetric to flushPendingCounterCacheColumns
+    // SCOPE: ~15 LOC in associations/belongs-to.ts and counter-cache.ts
   });
   it("update counter caches on update", async () => {
     class Topic extends Base {
@@ -698,16 +700,15 @@ describe("CounterCacheTest", () => {
     expect((await Topic.find(t.id)).replies_count).toBe(0);
   });
   it.skip("counter cache on association with touch true also updates the timestamps", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
-    /* needs touch option wired into counter cache callbacks */
+    // BLOCKED: associations — touch: option not wired into counter cache callbacks
+    // ROOT-CAUSE: belongs_to(touch:) does not propagate to updateCounters; updateCounters
+    //   needs an opts.touch path that bumps updated_at/columns alongside the counter delta
+    // SCOPE: ~30 LOC in counter-cache.ts + belongs-to-association.ts increment/decrement callbacks
   });
   it.skip("counter cache on association with touch option updates timestamps", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
-    /* needs touch option wired into counter cache callbacks */
+    // BLOCKED: associations — touch: option (named column) not wired into counter cache
+    // ROOT-CAUSE: same as above — touch: :written_on / touch: %i(…) variants unsupported
+    // SCOPE: ~30 LOC in counter-cache.ts (shared with touch: true case)
   });
   it("counter cache with belongs to association with class name", async () => {
     class Author extends Base {
@@ -1131,11 +1132,41 @@ describe("CounterCacheTest", () => {
     expect((await Topic.find(t.id)).replies_count).toBe(2);
   });
 
-  it.skip("counter cache should be correctly counted on has many through association", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
-    /* needs through association counter cache support */
+  it("counter cache should be correctly counted on has many through association", async () => {
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("taggings_count", "integer", { default: 0 });
+        this.adapter = adapter;
+      }
+    }
+    class Tagging extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Tagging, "post", { counterCache: true });
+    Associations.belongsTo.call(Tagging, "tag");
+    Associations.hasMany.call(Post, "taggings", { foreignKey: "post_id" });
+    Associations.hasMany.call(Post, "tags", { through: "taggings" });
+    Associations.hasMany.call(Tag, "taggings", { foreignKey: "tag_id" });
+    registerModel(Tag);
+    registerModel(Post);
+    registerModel(Tagging);
+    const post = await Post.create({ title: "test" });
+    const tag = await Tag.create({ name: "ruby" });
+    await Tagging.create({ post_id: post.id, tag_id: tag.id });
+    await Tagging.create({ post_id: post.id, tag_id: tag.id });
+    const reloaded = await Post.find(post.id);
+    expect(reloaded.taggings_count).toBe(2);
   });
   it("resetting counter cache should be correct", async () => {
     class Topic extends Base {
@@ -1211,9 +1242,11 @@ describe("CounterCacheTest", () => {
     expect(reloaded.replies_count).toBe(1);
   });
   it.skip("counter cache should be correct when concurrent inserts happen", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — concurrent insert ordering
+    // ROOT-CAUSE: updateCounters uses a single UPDATE … SET col = col + n which is correct
+    //   under DB-level row locking, but the Rails test depends on Thread-based parallelism
+    //   that we cannot mirror directly in JS; needs Promise.all-based equivalent
+    // SCOPE: test infra only — port the Rails parallel-inserts pattern to async/await
   });
   it("increment counter by specific amount", async () => {
     class Topic extends Base {
@@ -1378,34 +1411,39 @@ describe("CounterCacheTest", () => {
     expect(after.replies_count).toBe(1);
   });
   it.skip("reset counters with modularized and camelized classnames", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — modular (namespaced) class name resolution in resetCounters
+    // ROOT-CAUSE: same gap as "reset counters with modular association" — namespaced target
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters (shared with modular case)
   });
   it.skip("reset counter with belongs_to which has class_name", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — class_name option not consulted for counter target
+    // ROOT-CAUSE: resetCounters resolves the counter target via association name; needs to
+    //   honor reflection.options.className (Rails: `reflection.class_name.constantize`)
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters
   });
   it.skip("reset the right counter if two have the same class_name", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — multiple belongs_to to same target class
+    // ROOT-CAUSE: resetCounters keys off class name; with two belongs_to to the same class
+    //   (e.g. Reply belongs_to :topic, :other_topic) it picks the wrong reflection
+    // SCOPE: ~15 LOC — dispatch on reflection name, not class_name
   });
   it.skip("reset counter skips query for correct counter", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — resetCounters always re-counts via SELECT COUNT(*)
+    // ROOT-CAUSE: Rails skips the UPDATE when the counted value already matches; ours
+    //   always issues the UPDATE. Behavioral parity check uses assert_no_queries.
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters — short-circuit when counts equal
   });
   it.skip("reset counter performs query for correct counter with touch: true", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — touch: option wiring (resetCounters branch)
+    // ROOT-CAUSE: Rails forces the UPDATE under touch: true even when counts match;
+    //   we lack touch: plumbing entirely (see "touch: true also updates the timestamps")
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters — pair with touch: wiring
   });
   it.skip("reset counters for cpk model", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — composite primary key in resetCounters
+    // ROOT-CAUSE: resetCounters builds the WHERE via single-column id; primaryKey
+    //   may be string[] (cpk), needs composite-aware WHERE generation
+    // SCOPE: ~15 LOC in counter-cache.ts#resetCounters
   });
   it("update counter for decrement", async () => {
     class Topic extends Base {
@@ -1467,14 +1505,16 @@ describe("CounterCacheTest", () => {
     expect(reloaded.items_count).toBe(7);
   });
   it.skip("reset the right counter if two have the same foreign key", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — multiple belongs_to sharing a foreign_key
+    // ROOT-CAUSE: resetCounters dispatch by name rather than FK; needs to disambiguate
+    //   when two reflections share foreignKey but differ by counter_cache column
+    // SCOPE: ~10 LOC in counter-cache.ts#resetCounters
   });
   it.skip("reset counter of has_many :through association", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — has_many :through target in resetCounters
+    // ROOT-CAUSE: resetCounters expects a direct has_many reflection; through reflections
+    //   need to walk to the join model and count via that table
+    // SCOPE: ~30 LOC in counter-cache.ts#resetCounters — through-reflection branch
   });
   it("the passed symbol needs to be an association name or counter name", async () => {
     class Topic extends Base {
@@ -1490,9 +1530,10 @@ describe("CounterCacheTest", () => {
     await expect(Topic.resetCounters(t.id, "nonexistent")).rejects.toThrow(/nonexistent/);
   });
   it.skip("reset counter works with select declared on association", () => {
-    // BLOCKED: associations — counter cache not fully implemented
-    // ROOT-CAUSE: associations/belongs-to.ts#updateCounters or counter_cache option not wired
-    // SCOPE: ~50 LOC fix in associations/belongs-to.ts + relation.ts; affects ~15 tests in counter-cache.test.ts
+    // BLOCKED: associations — select scope on association ignored by resetCounters COUNT(*)
+    // ROOT-CAUSE: resetCounters builds the COUNT bypassing the association scope; Rails
+    //   composes the scope (select, where) before counting
+    // SCOPE: ~15 LOC in counter-cache.ts#resetCounters — apply reflection.scope
   });
   it("update counters doesn't touch timestamps with touch: []", async () => {
     class Topic extends Base {

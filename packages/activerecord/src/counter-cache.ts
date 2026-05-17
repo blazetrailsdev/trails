@@ -219,7 +219,6 @@ export function flushPendingCounterCacheColumns(modelClass: typeof Base): void {
 }
 
 function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
-  const direct: Set<string> = (modelClass as any)._counterCacheColumns ?? new Set<string>();
   // Collect matching pending keys: exact class name, registry aliases, or "::ClassName" suffix.
   const registryKeys: string[] = (modelClass as any)._registryKeys ?? [];
   const suffix = `::${modelClass.name}`;
@@ -228,13 +227,18 @@ function getCounterCacheColumns(modelClass: typeof Base): Set<string> {
     if (key === modelClass.name || registryKeys.includes(key) || key.endsWith(suffix))
       matchingKeys.push(key);
   }
-  if (matchingKeys.length === 0) return direct;
+  // Copy-on-write: avoid mutating an inherited parent-class Set when flushing
+  // pending entries for a subclass. Mirrors Rails' class_attribute `|=`.
+  const owns = Object.prototype.hasOwnProperty.call(modelClass, "_counterCacheColumns");
+  const inherited: Set<string> | undefined = (modelClass as any)._counterCacheColumns;
+  if (matchingKeys.length === 0) return inherited ?? new Set<string>();
+  const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
   for (const key of matchingKeys) {
-    for (const col of pendingCounterCacheColumns.get(key)!) direct.add(col);
+    for (const col of pendingCounterCacheColumns.get(key)!) next.add(col);
     pendingCounterCacheColumns.delete(key);
   }
-  (modelClass as any)._counterCacheColumns = direct;
-  return direct;
+  (modelClass as any)._counterCacheColumns = next;
+  return next;
 }
 
 /**

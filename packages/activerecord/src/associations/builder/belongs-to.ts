@@ -81,9 +81,13 @@ export class BelongsTo extends SingularAssociation {
       ? resolveAssocClass(model, name, targetClassName)
       : null;
     if (targetClass) {
-      const existing: Set<string> = (targetClass as any)._counterCacheColumns ?? new Set();
-      existing.add(cacheColumn);
-      (targetClass as any)._counterCacheColumns = existing;
+      // Mirror Rails' class_attribute `|=` semantics: copy-on-write so subclass
+      // additions don't mutate the parent class's Set in place.
+      const owns = Object.prototype.hasOwnProperty.call(targetClass, "_counterCacheColumns");
+      const inherited: Set<string> | undefined = (targetClass as any)._counterCacheColumns;
+      const next: Set<string> = owns && inherited ? inherited : new Set(inherited ?? []);
+      next.add(cacheColumn);
+      (targetClass as any)._counterCacheColumns = next;
     } else {
       // Target class not registered yet — store in pending map; registerModel
       // flushes it when the target is registered, getCounterCacheColumns as fallback.
