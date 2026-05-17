@@ -18,7 +18,9 @@
  *
  * By default, detailed per-file tables, misplaced tests, and wrong-describe
  * output are only shown for the focus packages (arel, activemodel, activerecord,
- * activesupport, rack, trailties). Using --package overrides this and always shows detail.
+ * activesupport, rack, actionview, trailties, globalid, abstractcontroller,
+ * actioncontroller, actiondispatch). Using --package overrides this and always
+ * shows detail.
  *
  * Usage:
  *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
@@ -48,6 +50,9 @@ const DETAIL_PACKAGES = new Set([
   "actionview",
   "trailties",
   "globalid",
+  "abstractcontroller",
+  "actioncontroller",
+  "actiondispatch",
 ]);
 
 // ---------------------------------------------------------------------------
