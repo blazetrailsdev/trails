@@ -76,9 +76,11 @@ export function assertRedirectedTo(
     return;
   }
 
+  const expectedStr =
+    redirectExpected instanceof RegExp ? redirectExpected.toString() : String(redirectExpected);
   throw new Error(
     message ??
-      `Expected response to be a redirect to <${redirectExpected instanceof RegExp ? redirectExpected.source : redirectExpected}> but was a redirect to <${redirectIs}>`,
+      `Expected response to be a redirect to <${expectedStr}> but was a redirect to <${redirectIs}>`,
   );
 }
 
