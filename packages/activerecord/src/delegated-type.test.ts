@@ -212,7 +212,9 @@ describe("DelegatedTypeTest", () => {
   });
 
   it.skip("touch account", () => {
-    // BLOCKED: uuid + polymorphic-touch — requires UUID PK + touch on a polymorphic delegated_type association; no STI routing gap
+    // BLOCKED: fixture + delegated-type touch chain — needs Recipient/Account fixtures + multi-hop `belongs_to … touch: true` propagation through a polymorphic delegated_type owner; no STI routing gap (audit-STI)
+    // ROOT-CAUSE: missing Recipient/Account test-models for this file, plus an unverified path through `associations/builder/belongs-to.ts#touchParent` when the touched owner is the polymorphic `entryable` of a delegated_type parent (Rails chains Recipient → Message → Entry → Account via `touch: true`)
+    // SCOPE: ~20–30 LOC fixture-models in delegated-type.test.ts; if the chained-touch path also needs work, follow-up in associations/builder/belongs-to.ts; affects this single delegated-type touch test
   });
 
   it("builder method", () => {

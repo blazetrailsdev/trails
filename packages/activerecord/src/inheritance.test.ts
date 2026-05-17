@@ -1434,13 +1434,15 @@ describe("InheritanceTest", () => {
   });
 
   it.skip("scope inherited properly", async () => {
-    // BLOCKED: default-scope — test requires a fixture model with a default_scope on a subclass;
-    // no STI routing gap (STI dispatch works); gap is missing test fixture model
+    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
+    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
+    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
   });
 
   it.skip("inheritance with default scope", async () => {
-    // BLOCKED: default-scope — test requires a fixture model with a default_scope on a subclass;
-    // no STI routing gap (STI dispatch works); gap is missing test fixture model
+    // BLOCKED: fixture — STI subclass with default_scope; no STI routing gap (audit-STI: STI dispatch works)
+    // ROOT-CAUSE: test/models fixtures — Rails' SpecialComment / VerySpecialComment hierarchy with `default_scope` on a subclass is not declared in the trails test-models registry
+    // SCOPE: ~10–20 LOC fixture-models setup in inheritance.test.ts; affects 2 default-scope inheritance tests
   });
 
   it("company descends from active record", async () => {

@@ -546,9 +546,9 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: aliasAttribute in insertAll / upsertAll
   });
   it.skip("insert all and upsert all with sti", () => {
-    // BLOCKED: fixture — test requires the Rails Category / SpecialCategory STI fixture
-    // hierarchy (categories table with `type` discriminator); no STI routing gap (insertAll /
-    // upsertAll set the type column via the existing STI dispatch); gap is missing test fixtures
+    // BLOCKED: fixture — Rails Category / SpecialCategory STI hierarchy is not declared in the trails test-models registry; no STI routing gap (audit-STI: insertAll/upsertAll set the `type` column via existing STI dispatch)
+    // ROOT-CAUSE: test fixtures — `categories` table + `Category` / `SpecialCategory` STI models with the `type` discriminator are missing from this test file's model setup
+    // SCOPE: ~15–25 LOC fixture-models setup in insert-all.test.ts; affects this single STI insert/upsert test
   });
   it.skip("upsert and db warnings", () => {
     // BLOCKED: relation — insert_all.rb: DB warnings emitted on upsert
