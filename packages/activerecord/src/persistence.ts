@@ -38,6 +38,7 @@ import {
   type ValidationContextArg,
 } from "./validations.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
+import { ScopeRegistry } from "./scoping.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>): any;
@@ -243,8 +244,7 @@ export async function _updateRecord(
     um.where(table.get(col).eq(val));
   }
 
-  const defaultConstraint = buildDefaultConstraint.call(this as any);
-  if (defaultConstraint != null) um.where(defaultConstraint as any);
+  applyDefaultAndGlobalConstraints(um as any, this as any);
 
   const adapter = (this as any).adapter;
   if (typeof adapter.update === "function") {
@@ -271,8 +271,7 @@ export async function _deleteRecord(
     dm.where(table.get(col).eq(val));
   }
 
-  const defaultConstraint = buildDefaultConstraint.call(this as any);
-  if (defaultConstraint != null) dm.where(defaultConstraint as any);
+  applyDefaultAndGlobalConstraints(dm as any, this as any);
 
   const adapter = (this as any).adapter;
   if (typeof adapter.delete === "function") {
@@ -1398,6 +1397,25 @@ function instantiateInstanceOf(
 /** @internal */
 function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
   return klass;
+}
+
+/**
+ * Append the default constraint and the global-current-scope WHERE clause
+ * (if any) to an Arel UpdateManager or DeleteManager. Mirrors the constraint
+ * stacking in Rails `persistence.rb` `_update_record` / `_delete_record`.
+ * @internal
+ */
+export function applyDefaultAndGlobalConstraints(
+  manager: { where(node: unknown): unknown },
+  ctor: object,
+): void {
+  const defaultConstraint = buildDefaultConstraint.call(ctor as any);
+  if (defaultConstraint != null) manager.where(defaultConstraint);
+  const globalScope = ScopeRegistry.globalCurrentScope(ctor);
+  if (globalScope) {
+    const ast = (globalScope as any)._whereClause?.ast;
+    if (ast != null) manager.where(ast);
+  }
 }
 
 /** @internal */

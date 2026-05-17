@@ -3217,6 +3217,7 @@ export class Relation<T extends Base> {
     cursor,
     errorOnIgnore,
     load = false,
+    useRanges,
   }: {
     batchSize?: number;
     start?: unknown;
@@ -3225,6 +3226,7 @@ export class Relation<T extends Base> {
     cursor?: string | string[];
     errorOnIgnore?: boolean;
     load?: boolean;
+    useRanges?: boolean | null;
   } = {}): BatchEnumerator<LoadedRelation<Relation<T>>> {
     const self = this;
     const pk = this._modelClass.primaryKey;
@@ -3292,7 +3294,18 @@ export class Relation<T extends Base> {
           const tuples = (batchRows as any[]).map((r) =>
             cursorArr.map((c) => (r as any).readAttribute(c)),
           );
-          if (cursorArr.length === 1) {
+          if (useRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
+            // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
+            // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
+            const col = cursorArr[0];
+            const dir = batchOrders[0][1];
+            const first = tuples[0][0];
+            const last = tuples[tuples.length - 1][0];
+            const attr = self._modelClass.arelTable.get(col) as any;
+            const lo = dir === "desc" ? last : first;
+            const hi = dir === "desc" ? first : last;
+            batchRel._whereClause.predicates.push(attr.gteq(lo).and(attr.lteq(hi)));
+          } else if (cursorArr.length === 1) {
             const ids = tuples.map((t) => t[0]);
             batchRel._whereClause.predicates.push(
               ...self.predicateBuilder.buildFromHash({ [cursorArr[0]]: ids }),
