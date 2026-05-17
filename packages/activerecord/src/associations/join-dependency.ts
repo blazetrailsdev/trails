@@ -687,15 +687,26 @@ export class JoinDependency {
     }
 
     if (sourceAssocDef.type === "belongsTo") {
+      // Polymorphic belongs_to as the source of a has_many :through must
+      // be paired with `source_type:` on the outer association so the target
+      // class is resolvable; without it Rails raises HasManyThroughSourceAssociationPolymorphicError.
+      const isPoly = sourceAssocDef.options.polymorphic === true;
+      if (isPoly && !assocDef.options.sourceType) return null;
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) return null;
-      const className = sourceAssocDef.options.className ?? _camelize(sourceName);
+      const className = isPoly
+        ? assocDef.options.sourceType
+        : (sourceAssocDef.options.className ?? _camelize(sourceName));
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
+      if (isPoly) {
+        const typeCol = `${_toUnderscore(sourceName)}_type`;
+        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${assocDef.options.sourceType}'`;
+      }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
       targetModel = modelRegistry.get(className) as typeof Base | undefined;

@@ -1220,6 +1220,32 @@ describe("NestedThroughAssociationsTest", () => {
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
   });
 
+  it("joins through polymorphic source with source_type emits type constraint", () => {
+    // Mirrors the polymorphism slice of Rails
+    // test_nested_has_many_through_with_a_table_referenced_multiple_times
+    // (activerecord/test/cases/associations/nested_through_associations_test.rb:437):
+    //   tag.tagged_posts uses `source: :taggable, source_type: "Post"`,
+    //   so the join against `posts` must carry an AND on taggings.taggable_type.
+    Associations.hasMany.call(Tag, "taggings", {
+      className: "Tagging",
+      foreignKey: "tag_id",
+    });
+    Associations.hasMany.call(Tag, "taggedPosts", {
+      className: "Post",
+      through: "taggings",
+      source: "taggable",
+      sourceType: "Post",
+    });
+    Associations.belongsTo.call(Tagging, "taggable", {
+      polymorphic: true,
+      foreignKey: "taggable_id",
+    });
+    const sql = (Tag as any).all().joins("taggedPosts").toSql();
+    expect(sql).toMatch(/JOIN "posts"/);
+    expect(sql).toMatch(/"taggable_type"\s*=\s*'Post'/);
+    expect(sql).toMatch(/"posts"."id"\s*=\s*"[^"]+"\."taggable_id"/);
+  });
+
   it("has many through with foreign key option on through reflection", async () => {
     class FkThrAuthor extends Base {
       static {
