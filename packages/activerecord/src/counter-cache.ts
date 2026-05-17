@@ -132,7 +132,7 @@ export async function resetCounters(
     }
   }
 
-  const record = await this.find(id);
+  const record = await this.find(id as any);
   const assocDefs = (this as any)._associations as
     | Array<{ type: string; name: string; options: any }>
     | undefined;
@@ -168,7 +168,11 @@ export async function resetCounters(
     }
 
     const count = await countHasMany(record, assoc.name, assoc.options);
-    updates[counterColumn] = count;
+    // Mirrors Rails: `updates[counter_name] = count if count != count_was` — skip
+    // the UPDATE entirely when the stored counter already matches the recount.
+    const countWas =
+      (record as any).readAttribute?.(counterColumn) ?? (record as any)[counterColumn];
+    if (count !== countWas) updates[counterColumn] = count;
   }
 
   if (options.touch) {
@@ -181,7 +185,9 @@ export async function resetCounters(
   }
 
   if (Object.keys(updates).length > 0) {
-    await this.unscoped().where(buildPkPredicate(this, record.id)).updateAll(updates);
+    // Use the caller-supplied id (not `record.id`) so composite-PK arrays
+    // flow through `buildPkPredicate` untouched.
+    await this.unscoped().where(buildPkPredicate(this, id)).updateAll(updates);
   }
 }
 
