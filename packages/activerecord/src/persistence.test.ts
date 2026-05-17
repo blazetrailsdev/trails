@@ -18,6 +18,7 @@ import { Base, RecordNotFound } from "./index.js";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -30,8 +31,12 @@ function freshAdapter(): DatabaseAdapter {
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string", body: "string", replies_count: "integer" },
+      minimals: {},
+    });
   });
 
   it("create", async () => {
@@ -461,7 +466,14 @@ describe("PersistenceTest", () => {
 // More PersistenceTest
 // ==========================================================================
 describe("PersistenceTest", () => {
-  const adapter = freshAdapter();
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string", updated_at: "datetime" },
+      counters: { count: "integer" },
+    });
+  });
 
   it("raises error when validations failed", async () => {
     class Topic extends Base {
@@ -965,8 +977,12 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      default_records: { name: "string" },
+      posts: { title: "string", views: "integer", updated_at: "string" },
+    });
   });
 
   it("populates non primary key autoincremented column", () => {
@@ -2536,8 +2552,9 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("destroyBy destroys matching records with callbacks", async () => {
@@ -2576,8 +2593,9 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { status: "string" } });
   });
 
   it("updates all records", async () => {
@@ -2599,8 +2617,9 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("finds and updates a record by id", async () => {
@@ -2619,8 +2638,9 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("destroys all records", async () => {
@@ -2775,8 +2795,13 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", body: "string", views: "integer", published: "boolean" },
+      animals: { name: "string" },
+      dogs: { name: "string" },
+    });
   });
 
   it("save valid record returns true", async () => {
