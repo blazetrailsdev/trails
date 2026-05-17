@@ -39,7 +39,7 @@ export class AbstractController {
   }
 
   /** Whether a response has been committed (render/redirect called). */
-  private _performed: boolean = false;
+  protected _performed: boolean = false;
 
   /** Registered callbacks (class-level, inherited). */
   private static _callbacks: CallbackEntry[] = [];

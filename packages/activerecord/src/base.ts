@@ -128,7 +128,14 @@ import * as Translation from "./translation.js";
 import * as Sanitization from "./sanitization.js";
 import * as Serialization from "./serialization.js";
 import * as Querying from "./querying.js";
-import { include, extend, type Included, type ParameterFilter } from "@blazetrails/activesupport";
+import {
+  include,
+  extend,
+  benchmark as benchmarkable,
+  type Included,
+  type ParameterFilter,
+  type BenchmarkLogger,
+} from "@blazetrails/activesupport";
 import {
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
@@ -1285,41 +1292,7 @@ export class Base extends Model {
     options: { level?: "debug" | "info" | "warn" | "error"; silence?: boolean } = {},
     fn: () => T | Promise<T>,
   ): T | Promise<Awaited<T>> {
-    const level = options.level ?? "info";
-    const log = this.logger as { silence?(tempLevel?: number, fn?: () => void): void } | null;
-    const now = (): number => globalThis.performance?.now() ?? Date.now();
-
-    const start = now();
-    let result: T | Promise<T>;
-
-    if (options.silence && log && typeof log.silence === "function") {
-      // ActiveSupport::Logger#silence(tempLevel = ERROR, fn) is synchronous.
-      // We call it with the fn so the level is raised while fn() starts —
-      // this silences synchronous log calls inside fn(). Async continuations
-      // run after the silence window closes, which mirrors Rails' Ruby behavior
-      // where the block is also synchronous.
-      const ERROR_LEVEL = 3; // Logger::ERROR (matches ActiveSupport::Logger::ERROR)
-      log.silence(ERROR_LEVEL, () => {
-        result = fn();
-      });
-    } else {
-      result = fn();
-    }
-
-    const logResult = (val: Awaited<T>): Awaited<T> => {
-      const ms = now() - start;
-      const logger = this.logger;
-      if (logger && typeof (logger as any)[level] === "function") {
-        (logger as any)[level](`${message} (${ms.toFixed(1)}ms)`);
-      }
-      return val;
-    };
-
-    // Return synchronously if fn() was synchronous (matches Rails semantics).
-    if (result! instanceof Promise) {
-      return (result as Promise<Awaited<T>>).then(logResult);
-    }
-    return logResult(result! as Awaited<T>);
+    return benchmarkable(this.logger as BenchmarkLogger | null, message, options, fn);
   }
 
   // -- Timestamp control --

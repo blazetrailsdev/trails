@@ -1,19 +1,16 @@
 /**
  * `AbstractController::Logger` — config slot for a per-controller
  * logger. Rails additionally mixes in `ActiveSupport::Benchmarkable`
- * (`benchmark(message, &block)`); we expose a small standalone
- * `benchmark` helper that the same callers can reuse.
+ * (`benchmark(message, &block)`); the shared helper lives in
+ * `@blazetrails/activesupport` and is re-exported here so the
+ * abstract-controller surface keeps the same callable shape.
  *
  * @internal
  */
 
-export interface LoggerLike {
-  info?(message: string): void;
-  debug?(message: string): void;
-  warn?(message: string): void;
-  error?(message: string): void;
-  fatal?(message: string): void;
-}
+import { benchmark as benchmarkable, type BenchmarkLogger } from "@blazetrails/activesupport";
+
+export type LoggerLike = BenchmarkLogger;
 
 export interface LoggerHost {
   logger?: LoggerLike;
@@ -33,16 +30,9 @@ export function applyLogger<T extends new (...args: never[]) => unknown>(
 }
 
 /**
- * Mirrors `ActiveSupport::Benchmarkable#benchmark` (and the
- * `ActiveRecord::Base.benchmark` shape used elsewhere in trails). Logs
- * the elapsed milliseconds for `block` to `logger.info` and returns
- * whatever the block returns.
- *
- * - Synchronous: logs immediately, then returns the result.
- * - Promise-returning: logs after the promise settles (resolve OR
- *   reject), and rejections propagate to the caller.
- * - Throwing sync block: logs the elapsed time, then rethrows.
- * - No logger attached: block runs unchanged; no timing.
+ * Mirrors `ActiveSupport::Benchmarkable#benchmark`. Thin wrapper around
+ * the shared `benchmark` helper in `@blazetrails/activesupport` —
+ * preserved here so existing actionpack callers don't break.
  */
 export function benchmark<T>(logger: LoggerLike | undefined, message: string, block: () => T): T;
 export function benchmark<T>(
@@ -55,27 +45,5 @@ export function benchmark<T>(
   message: string,
   block: () => T | Promise<T>,
 ): T | Promise<T> {
-  if (typeof logger?.info !== "function") return block();
-  // Monotonic timing where available — `Date.now()` is wall-clock and
-  // can jump under NTP adjustments. The fallback matches the pattern
-  // used by `ActiveRecord::Base.benchmark`.
-  const now = () => globalThis.performance?.now() ?? Date.now();
-  const start = now();
-  const log = (): void => {
-    const ms = (now() - start).toFixed(1);
-    logger.info!(`${message} (${ms}ms)`);
-  };
-  try {
-    const result = block();
-    if (result instanceof Promise) {
-      // `.finally` fires on both resolve and reject, and the rejection
-      // still propagates to callers.
-      return result.finally(log);
-    }
-    log();
-    return result;
-  } catch (err) {
-    log();
-    throw err;
-  }
+  return benchmarkable(logger, message, { logOnError: true }, block) as T | Promise<T>;
 }
