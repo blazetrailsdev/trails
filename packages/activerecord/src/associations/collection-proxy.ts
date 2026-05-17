@@ -682,7 +682,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(buildAttrs);
-    this._applyScopeForCreate(record, attrs, foreignKey as string);
+    this._applyScopeForCreate(record, attrs, foreignKey as string | string[]);
     return record;
   }
 
@@ -717,18 +717,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _applyScopeForCreate(
     record: Base,
     exceptFromScope: Record<string, unknown>,
-    foreignKey?: string,
+    foreignKey?: string | string[],
   ): void {
     const sfc = this._scopeForCreateRaw();
     if (!sfc || Object.keys(sfc).length === 0) return;
 
     // Rails' skip_assign is [foreign_key, foreign_type] — the polymorphic
     // type column on belongs_to (Reflection#type returns foreign_type, NOT
-    // the STI inheritance column). For HABTM / has_many we already know
-    // the owner-side FK; the polymorphic "as" foreign-type column is
-    // derived from the macro options when present.
+    // the STI inheritance column). For composite-key associations the FK
+    // is an array; every column must land in skipAssign so scope values
+    // for any of them can re-anchor (matches Array(reflection.foreign_key)
+    // in Rails' initialize_attributes).
     const skipAssign = new Set<string>();
-    if (foreignKey) skipAssign.add(foreignKey);
+    if (Array.isArray(foreignKey)) {
+      for (const k of foreignKey) if (k) skipAssign.add(k);
+    } else if (foreignKey) {
+      skipAssign.add(foreignKey);
+    }
     const asName = this._assocDef.options.as;
     if (asName) skipAssign.add(`${underscore(asName)}_type`);
 
