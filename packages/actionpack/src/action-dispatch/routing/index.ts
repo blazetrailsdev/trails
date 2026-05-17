@@ -29,3 +29,12 @@ export {
   type ModelClass,
   type ToModel,
 } from "./polymorphic-routes.js";
+export {
+  redirect,
+  Redirect,
+  PathRedirect,
+  OptionRedirect,
+  type RedirectBlock,
+  type RedirectCallable,
+  type OptionRedirectOptions,
+} from "./redirection.js";
