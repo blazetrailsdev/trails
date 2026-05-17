@@ -84,6 +84,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport

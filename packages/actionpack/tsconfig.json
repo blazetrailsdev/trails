@@ -6,5 +6,10 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../actionview" }, { "path": "../activesupport" }, { "path": "../rack" }]
+  "references": [
+    { "path": "../actionview" },
+    { "path": "../activemodel" },
+    { "path": "../activesupport" },
+    { "path": "../rack" }
+  ]
 }

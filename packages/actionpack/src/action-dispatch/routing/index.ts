@@ -9,3 +9,23 @@ export {
   type PathHelper,
   type UrlHelper,
 } from "./route-helpers.js";
+export {
+  polymorphicUrl,
+  polymorphicPath,
+  editPolymorphicUrl,
+  editPolymorphicPath,
+  newPolymorphicUrl,
+  newPolymorphicPath,
+  polymorphicUrlForAction,
+  polymorphicPathForAction,
+  polymorphicMapping,
+  HelperMethodBuilder,
+  type PolymorphicArg,
+  type PolymorphicHost,
+  type PolymorphicMappingEntry,
+  type PolymorphicModel,
+  type PolymorphicOptions,
+  type PolymorphicRoutesAccessor,
+  type ModelClass,
+  type ToModel,
+} from "./polymorphic-routes.js";

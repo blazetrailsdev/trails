@@ -19,6 +19,7 @@ import {
   type JourneyMatch,
 } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
+import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -34,6 +35,12 @@ export class RouteSet {
   private namedRoutes: Map<string, Route> = new Map();
   private dispatcher: Dispatcher | undefined;
   private defaultUrlOptions: { host?: string } = {};
+  /**
+   * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
+   * back to the standard RESTful helper. Populated by `direct(:name) { ... }`
+   * (not yet ported). Mirrors `RouteSet#polymorphic_mappings`.
+   */
+  readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
 
@@ -132,6 +139,7 @@ export class RouteSet {
   clear(): void {
     this.routes = [];
     this.namedRoutes.clear();
+    this.polymorphicMappings.clear();
     this._journeyRouter = null;
   }
 
