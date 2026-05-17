@@ -287,6 +287,51 @@ describe("MigratorTest", () => {
     }
   });
 
+  it("migrations status emits NO FILE entries for applied versions absent from migrations", async () => {
+    const sm = new SchemaMigration(adapter);
+    await sm.createTable();
+    await sm.createVersion("2");
+    await sm.createVersion("10");
+
+    const migrator = new Migrator(adapter, [
+      makeMigration("1", "ValidPeopleHaveLastNames"),
+      makeMigration("2", "WeNeedReminders"),
+      makeMigration("3", "InnocentJointable"),
+    ]);
+    const status = await migrator.migrationsStatus();
+    expect(status).toHaveLength(4);
+    expect(status[0]).toEqual({ status: "down", version: "1", name: "ValidPeopleHaveLastNames" });
+    expect(status[1]).toEqual({ status: "up", version: "2", name: "WeNeedReminders" });
+    expect(status[2]).toEqual({ status: "down", version: "3", name: "InnocentJointable" });
+    expect(status[3]).toEqual({
+      status: "up",
+      version: "10",
+      name: "********** NO FILE **********",
+    });
+  });
+
+  it("MigrationContext.fromPath returns MigrationProxy array from directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-frompath-"));
+    try {
+      await mkdir(join(root, "sub"), { recursive: true });
+      await writeFile(join(root, "1_valid_people_have_last_names.ts"), "");
+      await writeFile(join(root, "sub", "2_we_need_reminders.ts"), "");
+
+      // Include "10" so the numeric-vs-lexicographic ordering matters
+      // (Rails MigrationContext#migrations sort_by(&:version) is numeric).
+      await writeFile(join(root, "10_late_migration.ts"), "");
+
+      const proxies = Migrator.fromPath(root, adapter);
+      expect(proxies).toHaveLength(3);
+      expect(proxies.map((p) => p.version)).toEqual(["1", "2", "10"]);
+      expect(proxies[0]!.name).toBe("ValidPeopleHaveLastNames");
+      expect(proxies[1]!.name).toBe("WeNeedReminders");
+      expect(proxies[2]!.name).toBe("LateMigration");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("migrations status from two directories", async () => {
     const migrator = Migrator.fromPaths(
       adapter,

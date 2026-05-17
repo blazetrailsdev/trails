@@ -129,6 +129,7 @@ describe("MultiDbMigratorTest", () => {
       { status: "down", version: "1", name: "ValidPeopleHaveLastNames" },
       { status: "up", version: "2", name: "WeNeedReminders" },
       { status: "down", version: "3", name: "InnocentJointable" },
+      { status: "up", version: "10", name: "********** NO FILE **********" },
     ]);
 
     await smB.createVersion("4");
@@ -137,6 +138,7 @@ describe("MultiDbMigratorTest", () => {
     expect(statusB).toEqual([
       { status: "down", version: "1", name: "PeopleHaveHobbies" },
       { status: "down", version: "2", name: "PeopleHaveDescriptions" },
+      { status: "up", version: "4", name: "********** NO FILE **********" },
     ]);
   });
 

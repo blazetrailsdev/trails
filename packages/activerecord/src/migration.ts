@@ -1553,6 +1553,7 @@ export class MigrationContext {
         limit?: number | null;
         precision?: number | null;
         scale?: number | null;
+        array?: boolean;
       }
     >
   >();
@@ -1602,7 +1603,16 @@ export class MigrationContext {
   }
 
   /** @internal Query catalog for column names+types — used after CTAS where columns derive from the SELECT. */
-  private async _introspectColumns(name: string): Promise<{ name: string; type: string }[]> {
+  private async _introspectColumns(name: string): Promise<
+    {
+      name: string;
+      type: string;
+      limit?: number;
+      precision?: number;
+      scale?: number;
+      array?: boolean;
+    }[]
+  > {
     const a = this._adapterName;
     const qt = this.adapter.quoteTableName(name);
     let sql: string;
@@ -1611,7 +1621,10 @@ export class MigrationContext {
     } else if (a === "postgres") {
       const [s, t] = name.includes(".") ? name.split(".", 2) : ["public", name];
       const e = (x: string) => x.replace(/'/g, "''");
-      sql = `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '${e(s)}' AND table_name = '${e(t)}' ORDER BY ordinal_position`;
+      // Pull udt_name for user-defined types (citext, hstore, …) which
+      // surface as "USER-DEFINED" via data_type, plus size fields for
+      // limit/precision/scale propagation.
+      sql = `SELECT column_name, data_type, udt_name, character_maximum_length, numeric_precision, numeric_scale, datetime_precision FROM information_schema.columns WHERE table_schema = '${e(s)}' AND table_name = '${e(t)}' ORDER BY ordinal_position`;
     } else {
       sql = `SHOW COLUMNS FROM ${qt}`;
     }
@@ -1619,10 +1632,165 @@ export class MigrationContext {
     return rows.map((r) => {
       const x = r as Record<string, unknown>;
       const colName = (x.name ?? x.column_name ?? x.Field) as string;
-      // SQLite: type field; PG: data_type; MySQL: Type
-      const colType = ((x.type ?? x.data_type ?? x.Type) as string | undefined) ?? "string";
-      return { name: colName, type: colType };
+      // SQLite: type; PG: data_type (with udt_name for USER-DEFINED); MySQL: Type
+      let rawType = ((x.type ?? x.data_type ?? x.Type) as string | undefined) ?? "";
+      let isArray = false;
+      if (a === "postgres") {
+        // PG reports array columns as data_type='ARRAY' + udt_name='_int4'
+        // etc. — strip the leading underscore and surface as the base type
+        // plus array:true (schema-dumper/array.test.ts pattern).
+        if (rawType.toUpperCase() === "ARRAY" && typeof x.udt_name === "string") {
+          rawType = (x.udt_name as string).replace(/^_/, "");
+          isArray = true;
+        } else if (rawType.toUpperCase() === "USER-DEFINED" && x.udt_name) {
+          rawType = String(x.udt_name);
+        }
+      }
+      // Mirror the configured MySQL emulateBooleans setting rather than
+      // hard-coding Rails' default — abstract-mysql-adapter exposes it.
+      const emulateBooleans =
+        a === "mysql"
+          ? ((this.adapter as { emulateBooleans?: boolean }).emulateBooleans ?? true)
+          : true;
+      const normalized = MigrationContext._normalizeIntrospectedType(rawType, a, {
+        emulateBooleans,
+      });
+      // Prefer PG's authoritative size columns when present — they sit in
+      // information_schema rather than baked into the type string.
+      if (a === "postgres") {
+        const charLen = x.character_maximum_length;
+        const numPrec = x.numeric_precision;
+        const numScale = x.numeric_scale;
+        const dtPrec = x.datetime_precision;
+        if (typeof charLen === "number") normalized.limit = charLen;
+        // numeric_precision is meaningless for floats per PG type-map-init
+        // (float4 carries a fixed limit, float8 carries nothing) — only fill
+        // it for decimal.
+        if (typeof numPrec === "number" && normalized.type === "decimal") {
+          normalized.precision = numPrec;
+          if (typeof numScale === "number") normalized.scale = numScale;
+        }
+        if (
+          typeof dtPrec === "number" &&
+          (normalized.type === "datetime" ||
+            normalized.type === "time" ||
+            normalized.type === "timestamptz")
+        )
+          normalized.precision = dtPrec;
+      }
+      return { name: colName, ...normalized, ...(isArray ? { array: true } : {}) };
     });
+  }
+
+  /**
+   * @internal Map raw catalog types (PG/MySQL/SQLite) to Rails-canonical
+   * names plus precision/scale/limit. Mirrors the per-adapter type-lookup
+   * registrations (mysql-type-lookup, postgresql/oid). Callers may pass
+   * `emulateBooleans` (default true) so MySQL `tinyint(1)` follows the
+   * adapter's configured emulation mode; `_introspectColumns` threads in
+   * the live `abstract-mysql-adapter#emulateBooleans` value.
+   */
+  static _normalizeIntrospectedType(
+    raw: string,
+    adapter: "sqlite" | "postgres" | "mysql" = "sqlite",
+    opts: { emulateBooleans?: boolean } = {},
+  ): {
+    type: string;
+    limit?: number;
+    precision?: number;
+    scale?: number;
+  } {
+    const emulateBooleans = opts.emulateBooleans ?? true;
+    const t = raw.toLowerCase().trim();
+    if (!t) return { type: "string" };
+    // MySQL boolean emulation must run before modifier stripping.
+    if (/^tinyint\s*\(\s*1\s*\)/.test(t))
+      return emulateBooleans ? { type: "boolean" } : { type: "integer", limit: 1 };
+    // enum/set carry a literal value list, not a length.
+    if (/^enum\s*\(/.test(t) || /^set\s*\(/.test(t)) return { type: "string" };
+    const parenMatch = t.match(/^([a-z_ ]+?)\s*\((\d+)(?:\s*,\s*(\d+))?\)/);
+    const head = (parenMatch?.[1] ?? t.replace(/\s+unsigned\b.*$/, "")).trim();
+    const arg1 = parenMatch ? Number(parenMatch[2]) : undefined;
+    const arg2 = parenMatch && parenMatch[3] != null ? Number(parenMatch[3]) : undefined;
+    const limit = arg1 !== undefined && arg2 === undefined ? { limit: arg1 } : {};
+    // decimal(N) / decimal(N,M) — one-arg is precision (Rails decimal_columns).
+    const decSizes =
+      arg1 !== undefined
+        ? arg2 !== undefined
+          ? { precision: arg1, scale: arg2 }
+          : { precision: arg1 }
+        : {};
+    // datetime(N) / time(N) — N is fractional-seconds precision.
+    const precOnly = arg1 !== undefined && arg2 === undefined ? { precision: arg1 } : {};
+    // Per-adapter integer byte limits, mirroring the canonical type maps:
+    //  - postgresql/type-map-init.ts:134-136 (int2=2, int4=4, int8=8)
+    //  - mysql-type-lookup tests (tinyint=1, smallint=2, mediumint=3, int=4)
+    //  - sqlite3-adapter.ts:2188 (sqlite3Int defaults to limit 8)
+    // SQLite collapses everything to its dynamic integer; don't pretend
+    // otherwise. PG/MySQL share byte-sized variants below.
+    const intByteLimit: Record<string, number | undefined> = {
+      tinyint: 1,
+      smallint: 2,
+      int2: 2,
+      mediumint: 3,
+      int: 4,
+      integer: 4,
+      int4: 4,
+      year: 4,
+    };
+    if (/^(varchar|character varying|character|char|nvarchar|nchar)$/.test(head))
+      return { type: "string", ...limit };
+    if (/^(text|tinytext|mediumtext|longtext|clob)$/.test(head)) return { type: "text" };
+    if (/^citext$/.test(head)) return { type: "citext" };
+    if (/^(int|integer|int4|int2|smallint|mediumint|tinyint|serial|smallserial|year)$/.test(head)) {
+      if (adapter === "sqlite") return { type: "integer", limit: 8 };
+      // MySQL `year` is registered as a plain IntegerType with no limit
+      // (abstract-mysql-adapter.ts:1422). Other integer aliases keep their
+      // adapter-registered byte limit.
+      if (head === "year") return { type: "integer" };
+      return { type: "integer", limit: intByteLimit[head] ?? 4 };
+    }
+    if (/^(bigint|int8|bigserial)$/.test(head))
+      return adapter === "sqlite" ? { type: "integer", limit: 8 } : { type: "bigint" };
+    // Float byte-limits: PG float4 has limit 24 and float8 has no limit
+    // (postgresql/type-map-init.ts:138-139). SQLite registers all float-like
+    // declarations as FloatType() with no limit (sqlite3-adapter.ts:2224).
+    // MySQL retains the float/double precision split.
+    if (/^float4$/.test(head)) return { type: "float", limit: 24 };
+    if (/^float8$/.test(head)) return { type: "float" };
+    if (/^float$/.test(head))
+      return adapter === "mysql" ? { type: "float", limit: 24 } : { type: "float" };
+    if (/^real$/.test(head))
+      return adapter === "mysql" ? { type: "float", limit: 53 } : { type: "float", limit: 24 };
+    if (/^(double|double precision)$/.test(head))
+      return adapter === "mysql" ? { type: "float", limit: 53 } : { type: "float" };
+    if (/^(numeric|decimal|number)$/.test(head)) return { type: "decimal", ...decSizes };
+    if (/^(bool|boolean)$/.test(head)) return { type: "boolean" };
+    // PG registers `bit`/`varbit` as standalone Bit/BitVarying types
+    // (postgresql/type-map-init.ts); MySQL `bit` is a binary blob per
+    // mysql-type-lookup. PG `bit varying` arrives via information_schema.
+    if (/^bit$/.test(head))
+      return adapter === "postgres" ? { type: "bit", ...limit } : { type: "binary", ...limit };
+    // Store the raw SQL form 'bit varying' so SchemaDumper SQL_TYPE_MAP
+    // (schema-dumper.ts:142-143) resolves it to the bitVarying DSL helper.
+    if (/^(varbit|bit varying)$/.test(head)) return { type: "bit varying", ...limit };
+    if (/^date$/.test(head)) return { type: "date" };
+    if (/^(time|time without time zone)$/.test(head)) return { type: "time", ...precOnly };
+    if (/^(timetz|time with time zone)$/.test(head)) return { type: "time", ...precOnly };
+    // Distinguish PG timestamptz from naive datetime — schema-dumper.ts:117-118
+    // maps `timestamp with time zone` to the `timestamptz` SQL_TYPE_MAP entry
+    // (the emitter then falls back to `t.column(..., "timestamptz")` since
+    // `timestamptz` isn't in DSL_HELPER_METHODS). Separate from the `datetime`
+    // DSL used for naive timestamps.
+    if (/^(timestamptz|timestamp with time zone)$/.test(head))
+      return { type: "timestamptz", ...precOnly };
+    if (/^(datetime|timestamp|timestamp without time zone)$/.test(head))
+      return { type: "datetime", ...precOnly };
+    if (/^uuid$/.test(head)) return { type: "uuid" };
+    if (/^(json|jsonb)$/.test(head)) return { type: head };
+    if (/^(bytea|blob|tinyblob|mediumblob|longblob|binary|varbinary)$/.test(head))
+      return { type: "binary", ...limit };
+    return { type: head };
   }
 
   async createTable(
@@ -1702,6 +1870,7 @@ export class MigrationContext {
         limit?: number | null;
         precision?: number | null;
         scale?: number | null;
+        array?: boolean;
       }
     >();
     const compositePk =
@@ -1728,12 +1897,14 @@ export class MigrationContext {
         limit: col.options.limit,
         precision: col.options.precision,
         scale: col.options.scale,
+        array: (col.options as { array?: boolean }).array,
       });
     }
     if (options?.as != null) {
-      for (const { name: c, type } of await this._introspectColumns(name)) {
+      for (const col of await this._introspectColumns(name)) {
+        const { name: c, ...rest } = col;
         cols.add(c);
-        meta.set(c, { type });
+        meta.set(c, rest);
       }
     }
     this._columns.set(name, cols);
@@ -1889,6 +2060,7 @@ export class MigrationContext {
       limit: _options?.limit,
       precision: _options?.precision,
       scale: _options?.scale,
+      array: (_options as { array?: boolean } | undefined)?.array,
     });
   }
 
@@ -2120,6 +2292,7 @@ export class MigrationContext {
     limit?: number | null;
     precision?: number | null;
     scale?: number | null;
+    array?: boolean;
   }> {
     const meta = this._columnMeta.get(tableName);
     if (meta) {
@@ -2579,13 +2752,44 @@ export class Migrator {
     Array<{ status: "up" | "down"; version: string; name: string }>
   > {
     await this._ensureSchemaTable();
-    const applied = await this._appliedVersions();
+    const applied = new Set(await this._appliedVersions());
 
-    return this._migrations.map((m) => ({
-      status: applied.has(m.version) ? ("up" as const) : ("down" as const),
-      version: m.version,
-      name: m.name,
+    const fileList = this._migrations.map((m) => {
+      const isUp = applied.delete(m.version);
+      return {
+        status: (isUp ? "up" : "down") as "up" | "down",
+        version: m.version,
+        name: m.name,
+      };
+    });
+
+    // Mirrors Rails Migrator#migrations_status: applied versions with no
+    // matching file get a placeholder name. Combined list sorts numerically.
+    const dbList = [...applied].map((version) => ({
+      status: "up" as const,
+      version,
+      name: "********** NO FILE **********",
     }));
+
+    // Rails sorts by `version.to_i` — non-numeric rows coerce to 0 rather
+    // than raising. Use BigInt for precision (versions can exceed
+    // MAX_SAFE_INTEGER) with a 0-fallback for non-numeric legacy rows.
+    // Mirror Ruby String#to_i: take the leading signed integer prefix and
+    // return 0 when none — strings like "123abc" sort as 123 (Rails parity).
+    const toBig = (v: string): bigint => {
+      const m = v.match(/^\s*(-?\d+)/);
+      if (!m) return 0n;
+      try {
+        return BigInt(m[1]!);
+      } catch {
+        return 0n;
+      }
+    };
+    return [...dbList, ...fileList].sort((a, b) => {
+      const va = toBig(a.version);
+      const vb = toBig(b.version);
+      return va < vb ? -1 : va > vb ? 1 : 0;
+    });
   }
 
   /**
@@ -2613,10 +2817,20 @@ export class Migrator {
    * Mirrors: ActiveRecord::MigrationContext#migrations (the discovery half)
    */
   static fromDir(dir: string, adapter: DatabaseAdapter): Migrator {
+    return new Migrator(adapter, Migrator.fromPath(dir, adapter));
+  }
+
+  /**
+   * Scan `dir` for migration files and build `MigrationProxy[]` (without
+   * wrapping them in a Migrator). Mirrors the discovery half of Rails'
+   * `MigrationContext#migrations`.
+   *
+   * Mirrors: ActiveRecord::MigrationContext#migrations (discovery)
+   */
+  static fromPath(dir: string, adapter: DatabaseAdapter): MigrationProxy[] {
     const helper = new Migrator(adapter, []);
-    const files = helper.migrationFiles([dir]);
     const proxies: MigrationProxy[] = [];
-    for (const file of files) {
+    for (const file of helper.migrationFiles([dir])) {
       const parsed = helper.parseMigrationFilename(file);
       if (!parsed) continue;
       const [version, rawName, scope] = parsed;
@@ -2633,7 +2847,13 @@ export class Migrator {
         },
       });
     }
-    return new Migrator(adapter, proxies);
+    // Rails MigrationContext#migrations: `migrations.sort_by(&:version)` —
+    // numeric (not lexicographic) so "10" sorts after "2".
+    return proxies.sort((a, b) => {
+      const va = BigInt(a.version);
+      const vb = BigInt(b.version);
+      return va < vb ? -1 : va > vb ? 1 : 0;
+    });
   }
 
   private _sortMigrations(migrations: MigrationProxy[]): MigrationProxy[] {
