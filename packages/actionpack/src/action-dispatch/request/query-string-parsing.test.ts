@@ -117,10 +117,7 @@ describe("QueryStringParsingTest", () => {
     }
   });
 
-  // Rails strips the empty-key entry (`&=Save`) from parsed params. Our
-  // `parseNestedQuery` in @blazetrails/rack currently retains it as
-  // `"": "Save"`. Tracked as a rack-side gap.
-  it.skip("query string with empty key", () => {
+  it("query string with empty key", () => {
     assertParses(
       { action: "create_customer", full_name: "David Heinemeier Hansson" },
       "action=create_customer&full_name=David%20Heinemeier%20Hansson&=Save",
