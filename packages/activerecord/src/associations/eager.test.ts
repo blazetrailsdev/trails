@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { Associations, loadHasMany, loadHasManyThrough } from "../associations.js";
+import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -4414,11 +4414,13 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("AweAuthor", AweAuthor);
     registerModel("AwePost", AwePost);
-    // Arity-1 scope (no owner) — analog of a Rails extension block; not instance dependent.
+    // Rails: `has_many :posts_with_extension, -> { order(:title) } do ... end`
+    // Extension block + arity-0 scope; not instance dependent.
     Associations.hasMany.call(AweAuthor, "awePostsWithExtension", {
       className: "AwePost",
       foreignKey: "awe_author_id",
-      scope: (_rel: any) => _rel,
+      scope: (rel: any) => rel.order("title"),
+      extend: { extensionMethod() {} },
     });
     const author = await AweAuthor.create({ name: "A" });
     await AwePost.create({ awe_author_id: author.id, title: "p" });
@@ -4427,6 +4429,8 @@ describe("EagerAssociationTest", () => {
     for (const a of authors) {
       expect((a as any)._preloadedAssociations?.has("awePostsWithExtension")).toBe(true);
     }
+    const proxy = association(authors[0], "awePostsWithExtension");
+    expect(typeof (proxy as any).extensionMethod).toBe("function");
   });
   it("including associations with extensions and an instance dependent scope is supported", async () => {
     class AwexAuthor extends Base {
@@ -4444,11 +4448,13 @@ describe("EagerAssociationTest", () => {
     }
     registerModel("AwexAuthor", AwexAuthor);
     registerModel("AwexPost", AwexPost);
+    // Rails: `has_many :posts_with_extension_and_instance, ->(record) { ... } do ... end`
     Associations.hasMany.call(AwexAuthor, "awexPostsWithExtAndInstance", {
       className: "AwexPost",
       foreignKey: "awex_author_id",
       scope: (_rel: any, owner?: any) =>
         owner ? _rel.where({ mention: owner.name.toLowerCase() }) : _rel,
+      extend: { extensionMethod() {} },
     });
     const author = await AwexAuthor.create({ name: "Alice" });
     await AwexPost.create({ awex_author_id: author.id, mention: "alice" });
@@ -4460,6 +4466,8 @@ describe("EagerAssociationTest", () => {
       const loaded = (a as any)._preloadedAssociations.get("awexPostsWithExtAndInstance");
       expect(loaded).toHaveLength(1);
       expect((loaded[0] as any).mention).toBe("alice");
+      const proxy = association(a, "awexPostsWithExtAndInstance");
+      expect(typeof (proxy as any).extensionMethod).toBe("function");
     }
   });
   it("preloading readonly association", async () => {
