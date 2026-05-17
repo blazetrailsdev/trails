@@ -616,7 +616,6 @@ function main() {
 
     for (const f of pkg.files) {
       const fileImplemented = f.matched - f.matchedSkipped;
-      const pct = f.rubyTestCount > 0 ? Math.round((fileImplemented / f.rubyTestCount) * 100) : 0;
       const isComplete = fileImplemented === f.rubyTestCount && f.wrongDescribe === 0;
       if (showIncomplete && isComplete && f.tsFileExists) continue;
       const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
