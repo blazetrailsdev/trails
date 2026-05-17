@@ -46,6 +46,13 @@ describe("helperMethod", () => {
     expect(cls._helpers!.loggedIn.call(proxy)).toBe(true);
   });
 
+  it("flattens nested name arrays (Rails `methods.flatten!`)", () => {
+    const cls = makeBase();
+    helperMethod(cls, "a", ["b", "c"]);
+    expect(cls._helperMethods).toEqual(["a", "b", "c"]);
+    expect(Object.keys(cls._helpers!).sort()).toEqual(["a", "b", "c"]);
+  });
+
   it("throws when controller does not respond to the named method", () => {
     const cls = makeBase();
     helperMethod(cls, "missing");

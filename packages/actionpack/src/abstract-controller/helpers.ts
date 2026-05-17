@@ -68,11 +68,17 @@ export function _helpersInstance(this: HelpersHost): HelperMethodsModule {
  * spread does it for us) and appended to `_helperMethods` so
  * `clearHelpers` can re-establish them after a wipe.
  */
-export function helperMethod(cls: HelpersClassMethods, ...names: string[]): void {
-  if (names.length === 0) return;
-  cls._helperMethods = [...(cls._helperMethods ?? []), ...names];
+export function helperMethod(cls: HelpersClassMethods, ...names: Array<string | string[]>): void {
+  // Rails: `methods.flatten!` — accept nested arrays as well as varargs.
+  const flat: string[] = [];
+  for (const n of names) {
+    if (Array.isArray(n)) flat.push(...n);
+    else flat.push(n);
+  }
+  if (flat.length === 0) return;
+  cls._helperMethods = [...(cls._helperMethods ?? []), ...flat];
   const mod = _helpersForModification(cls);
-  for (const name of names) {
+  for (const name of flat) {
     mod[name] = function (this: { controller: Record<string, unknown> }, ...args: unknown[]) {
       const fn = this.controller[name];
       if (typeof fn !== "function") {
