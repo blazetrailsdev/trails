@@ -32,13 +32,18 @@ function makeHost(store?: MemoryStore): HostClass & FragmentsHost {
   return new HostClass() as unknown as HostClass & FragmentsHost;
 }
 
+const origCache = process.env.RAILS_CACHE_ID;
+const origVer = process.env.RAILS_APP_VERSION;
 beforeEach(() => {
-  vi.stubEnv("RAILS_CACHE_ID", "");
-  vi.stubEnv("RAILS_APP_VERSION", "");
   delete process.env.RAILS_CACHE_ID;
   delete process.env.RAILS_APP_VERSION;
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  if (origCache === undefined) delete process.env.RAILS_CACHE_ID;
+  else process.env.RAILS_CACHE_ID = origCache;
+  if (origVer === undefined) delete process.env.RAILS_APP_VERSION;
+  else process.env.RAILS_APP_VERSION = origVer;
+});
 
 describe("class config", () => {
   it("applyFragments is a no-op so subclasses inherit the parent key list", () => {
@@ -72,6 +77,27 @@ describe("combinedFragmentCacheKey", () => {
 
     process.env.RAILS_CACHE_ID = "deploy-42";
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "deploy-42", "n"]);
+  });
+
+  it("falls through empty-string env vars (|| semantics, not ??)", () => {
+    process.env.RAILS_CACHE_ID = "";
+    process.env.RAILS_APP_VERSION = "1.2.3";
+    expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "1.2.3", "n"]);
+
+    process.env.RAILS_APP_VERSION = "";
+    expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "n"]);
+  });
+
+  it("throws when a hash key is given without a host urlFor", () => {
+    const host = makeHost();
+    (host as { urlFor?: unknown }).urlFor = undefined;
+    expect(() => combinedFragmentCacheKey.call(host, { a: 1 })).toThrow(/requires a host/);
+  });
+
+  it("throws when host urlFor returns a non-string", () => {
+    const host = makeHost();
+    host.urlFor = () => 123 as unknown as string;
+    expect(() => combinedFragmentCacheKey.call(host, { a: 1 })).toThrow(/must return a string/);
   });
 
   it("evaluates prefix blocks in instance scope and flattens one level", () => {

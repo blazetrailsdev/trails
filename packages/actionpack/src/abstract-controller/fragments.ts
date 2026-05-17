@@ -27,7 +27,10 @@ export interface FragmentsClassMethods {
 
 export interface FragmentsHost {
   constructor: FragmentsClassMethods;
-  urlFor?(options: Record<string, unknown>): string;
+  // Widened to `unknown` so hosts with a string-form `urlFor` (e.g.
+  // `ActionController::Metal`) still satisfy the host interface. Rails'
+  // `url_for` likewise accepts strings, hashes, arrays, or nil.
+  urlFor?(options: unknown): string;
   instrumentName?(): string;
   instrumentPayload?(key: unknown): Record<string, unknown>;
 }
@@ -67,8 +70,16 @@ export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unk
   const version = env?.RAILS_CACHE_ID || env?.RAILS_APP_VERSION || null;
 
   let tail: unknown;
-  if (isPlainObject(key) && typeof this.urlFor === "function") {
+  if (isPlainObject(key)) {
+    if (typeof this.urlFor !== "function") {
+      throw new TypeError("combinedFragmentCacheKey: hash key requires a host with `urlFor`");
+    }
     const url = this.urlFor(key);
+    if (typeof url !== "string") {
+      throw new TypeError(
+        `combinedFragmentCacheKey: urlFor must return a string, got ${typeof url}`,
+      );
+    }
     const idx = url.indexOf("://");
     tail = idx >= 0 ? url.slice(idx + 3) : url;
   } else {
