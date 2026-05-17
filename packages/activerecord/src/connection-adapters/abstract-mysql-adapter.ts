@@ -482,9 +482,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * row and coerce a null DATABASE() (no current schema) to "".
    */
   async currentDatabase(): Promise<string> {
-    const rows = await this.schemaQuery("SELECT database()");
+    const rows = (await this.schemaQuery("SELECT database() AS name")) as Array<{
+      name?: string | null;
+      NAME?: string | null;
+    }>;
     if (rows.length === 0) return "";
-    const val = Object.values(rows[0])[0] as string | null | undefined;
+    const val = rows[0].name ?? rows[0].NAME;
     return val == null ? "" : String(val);
   }
 

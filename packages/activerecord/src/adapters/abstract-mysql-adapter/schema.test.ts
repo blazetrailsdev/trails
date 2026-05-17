@@ -157,9 +157,9 @@ describeIfMysql("Mysql2Adapter", () => {
       ansi = new Mysql2Adapter({ uri: MYSQL_TEST_URL, variables: { sql_mode: "ANSI_QUOTES" } });
     });
     afterEach(async () => {
-      // Mirrors Rails' teardown `@connection.reconnect!` — rebuild the pool so any leaked
-      // session state on the test runner's connection cache is cleared.
-      ansi.reconnectBang();
+      // Rails' teardown calls `@connection.reconnect!` to clear ANSI_QUOTES on
+      // the shared leased connection. We use a dedicated adapter per test, so
+      // close() fully drains the pool and no extra reconnect is needed.
       await ansi.close();
     });
 

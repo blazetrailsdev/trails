@@ -150,26 +150,46 @@ function extractFileTests(filePath: string): TestFileInfo {
         ts.isCallExpression(expression) &&
         ts.isPropertyAccessExpression(expression.expression)
       ) {
-        // Handle the callable-modifier form: it.skipIf(expr)("name", fn) / test.runIf(expr)("name", fn).
-        // The outer CallExpression's expression is itself a CallExpression whose expression is a
-        // PropertyAccessExpression like `it.skipIf`. Treat these as a regular test case (modifier
-        // gating happens at runtime; static extraction just needs to recognize the name).
+        // Handle the callable-modifier form: it.skipIf(expr)("name", fn) /
+        // test.runIf(expr)("name", fn) / describe.skipIf(expr)("suite", fn).
+        // The outer CallExpression's expression is itself a CallExpression whose
+        // expression is a PropertyAccessExpression like `it.skipIf`.
+        //
+        // Restricted to gating modifiers (skipIf / runIf) — `each` and friends
+        // generate multiple runtime tests from a template title, so static
+        // extraction of the template name would add noise to test:compare.
         const inner = expression.expression;
         const base = inner.expression;
-        if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
-          const title = getFirstArgString(node);
-          if (title) {
-            const testCase: TestCaseInfo = {
-              path: [...currentAncestors, title].join(" > "),
-              description: title,
-              ancestors: [...currentAncestors],
-              file: relativePath,
-              line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
-              style: base.text as "it" | "test",
-              assertions: [],
-              pending: false,
-            };
-            fileInfo.testCases.push(testCase);
+        const modifier = inner.name.text;
+        const GATING_MODIFIERS = new Set(["skipIf", "runIf"]);
+        if (ts.isIdentifier(base) && GATING_MODIFIERS.has(modifier)) {
+          if (
+            base.text === "describe" ||
+            base.text === "describeIfPg" ||
+            base.text === "describeIfMysql"
+          ) {
+            const title = getFirstArgString(node);
+            if (title) {
+              currentAncestors.push(title);
+              ts.forEachChild(node, visit);
+              currentAncestors.pop();
+              return;
+            }
+          } else if (base.text === "it" || base.text === "test") {
+            const title = getFirstArgString(node);
+            if (title) {
+              const testCase: TestCaseInfo = {
+                path: [...currentAncestors, title].join(" > "),
+                description: title,
+                ancestors: [...currentAncestors],
+                file: relativePath,
+                line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+                style: base.text as "it" | "test",
+                assertions: [],
+                pending: false,
+              };
+              fileInfo.testCases.push(testCase);
+            }
           }
         }
       } else if (ts.isPropertyAccessExpression(expression)) {
