@@ -1193,12 +1193,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       );
     }
     const idCol = polyFk;
-    const ownerPk = throughAssoc.options.primaryKey ?? ctor.primaryKey;
-    const polyPk = Array.isArray(ownerPk)
-      ? ownerPk.includes("id")
-        ? "id"
-        : ownerPk[0]
-      : (ownerPk as string);
+    // The polymorphic schema (`<as>_id`/`<as>_type`) only carries a scalar
+    // owner identifier. Composite owner primary keys are unrepresentable —
+    // require an explicit single-column `primaryKey:` on the association so
+    // the choice of identifier is deliberate rather than silently collapsed.
+    const ownerPkOption = throughAssoc.options.primaryKey;
+    if (Array.isArray(ownerPkOption)) {
+      throw new ConfigurationError(
+        `Polymorphic-through "${this._assocName}" cannot use a composite primary key — ` +
+          `the schema only supports a single \`${underscore(asName)}_id\`/\`${underscore(asName)}_type\` pair. ` +
+          `Set \`primaryKey:\` to a single column on the association.`,
+      );
+    }
+    if (ownerPkOption === undefined && Array.isArray(ctor.primaryKey)) {
+      throw new ConfigurationError(
+        `Polymorphic-through "${this._assocName}" requires an explicit single-column ` +
+          `\`primaryKey:\` option because owner "${ctor.name}" has a composite primary key. ` +
+          `The polymorphic schema only stores a single \`${underscore(asName)}_id\` value.`,
+      );
+    }
+    const polyPk = (ownerPkOption ?? (ctor.primaryKey as string)) as string;
     return {
       idCol,
       idValue: this._record._readAttribute(polyPk),

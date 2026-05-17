@@ -3377,16 +3377,109 @@ describe("AssociationsTest", () => {
     // composite target PK surfaces as a ConfigurationError at construction.
     expect(() => association(doc, "patients")).toThrow(ConfigurationError);
   });
-  it.skip("polymorphic-through with composite owner primary key", async () => {
-    // BLOCKED: associations — polymorphic-through uses a single
-    // `<as>_id`/`<as>_type` schema pair, so the join row can only carry a
-    // *scalar* owner identifier. When the owner has a composite primary key,
-    // `_throughOwnerPolymorphic` collapses to "id" (when present) or the
-    // first PK column, but there is no Rails-side schema convention for
-    // splitting a composite owner across the polymorphic columns. Needs an
-    // explicit `primaryKey:` option (single column) on the polymorphic-through
-    // association, plus validation that rejects a composite `primaryKey:`
-    // here. Tracked under Batch 27 HMT composite follow-ups.
+  it("polymorphic-through with composite owner primary key requires explicit single-column primaryKey", async () => {
+    // The polymorphic join schema (`<as>_id`/`<as>_type`) only carries a
+    // *scalar* owner identifier — composite owner PKs cannot be split across
+    // the two polymorphic columns. `_throughOwnerPolymorphic` now requires an
+    // explicit single-column `primaryKey:` option on the polymorphic-through
+    // when the owner has a composite PK, and rejects an array `primaryKey:`.
+    const adapter = freshAdapter();
+    const makeOwner = (
+      suffix: string,
+    ): {
+      Owner: typeof Base;
+      Tag: typeof Base;
+      Article: typeof Base;
+    } => {
+      const ownerName = `CpkPolyOwner${suffix}`;
+      const tagName = `CpkPolyTag${suffix}`;
+      const articleName = `CpkPolyArticle${suffix}`;
+      const Owner = class extends Base {
+        static {
+          this._tableName = `cpk_poly_owners_${suffix.toLowerCase()}`;
+          this.attribute("region_id", "integer");
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.primaryKey = ["region_id", "id"];
+          this.adapter = adapter;
+        }
+      };
+      Object.defineProperty(Owner, "name", { value: ownerName });
+      const Tag = class extends Base {
+        static {
+          this._tableName = `cpk_poly_tags_${suffix.toLowerCase()}`;
+          this.attribute("id", "integer");
+          this.attribute("taggable_id", "integer");
+          this.attribute("taggable_type", "string");
+          this.attribute("article_id", "integer");
+          this.adapter = adapter;
+        }
+      };
+      Object.defineProperty(Tag, "name", { value: tagName });
+      const Article = class extends Base {
+        static {
+          this._tableName = `cpk_poly_articles_${suffix.toLowerCase()}`;
+          this.attribute("id", "integer");
+          this.attribute("title", "string");
+          this.adapter = adapter;
+        }
+      };
+      Object.defineProperty(Article, "name", { value: articleName });
+      registerModel(ownerName, Owner);
+      registerModel(tagName, Tag);
+      registerModel(articleName, Article);
+      return { Owner, Tag, Article };
+    };
+
+    // No `primaryKey:` on the polymorphic through + composite owner PK ⇒ rejected.
+    {
+      const { Owner, Tag } = makeOwner("A");
+      Associations.hasMany.call(Owner, "tags", { className: Tag.name, as: "taggable" });
+      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleA" });
+      Associations.hasMany.call(Owner, "articles", {
+        through: "tags",
+        className: "CpkPolyArticleA",
+        source: "article",
+      });
+      const owner = await Owner.create({ region_id: 1, id: 5, name: "O" });
+      expect(() => association(owner, "articles")).toThrow(ConfigurationError);
+    }
+
+    // Composite `primaryKey:` on the polymorphic through ⇒ still rejected.
+    {
+      const { Owner, Tag } = makeOwner("B");
+      Associations.hasMany.call(Owner, "tags", {
+        className: Tag.name,
+        as: "taggable",
+        primaryKey: ["region_id", "id"],
+      });
+      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleB" });
+      Associations.hasMany.call(Owner, "articles", {
+        through: "tags",
+        className: "CpkPolyArticleB",
+        source: "article",
+      });
+      const owner = await Owner.create({ region_id: 1, id: 6, name: "O" });
+      expect(() => association(owner, "articles")).toThrow(ConfigurationError);
+    }
+
+    // Explicit single-column `primaryKey:` on the polymorphic through unblocks it.
+    {
+      const { Owner, Tag } = makeOwner("C");
+      Associations.hasMany.call(Owner, "tags", {
+        className: Tag.name,
+        as: "taggable",
+        primaryKey: "id",
+      });
+      Associations.belongsTo.call(Tag, "article", { className: "CpkPolyArticleC" });
+      Associations.hasMany.call(Owner, "articles", {
+        through: "tags",
+        className: "CpkPolyArticleC",
+        source: "article",
+      });
+      const owner = await Owner.create({ region_id: 1, id: 7, name: "O" });
+      expect(() => association(owner, "articles")).not.toThrow();
+    }
   });
   it("belongs to with explicit composite foreign key", async () => {
     const adapter = freshAdapter();
