@@ -570,20 +570,25 @@ function _extractAssociationAttrs(
   const defs = (ctor as { _associations?: Array<{ name: string; type: string }> } | undefined)
     ?._associations;
   if (!defs || defs.length === 0) return null;
+  // Common case: models that declare associations but receive only regular
+  // attrs at construction (`new Post({title})`). First pass detects whether
+  // any key matches an association; only then do we allocate `rest` and
+  // copy entries. Avoids per-construction overhead for the hot path.
   let assocs: Array<{ name: string; value: unknown }> | null = null;
-  let rest: Record<string, unknown> | null = null;
-  for (const [k, v] of Object.entries(attrs)) {
-    const def = defs.find((a) => a.name === k);
-    if (def) {
-      (assocs ??= []).push({ name: def.name, value: v });
-    } else {
-      // Null-prototype to avoid `__proto__`/`constructor` keys mutating
-      // Object.prototype before `rest` is handed to super().
-      (rest ??= Object.create(null) as Record<string, unknown>)[k] = v;
+  for (const k of Object.keys(attrs)) {
+    if (defs.find((a) => a.name === k)) {
+      (assocs ??= []).push({ name: k, value: attrs[k] });
     }
   }
   if (!assocs) return null;
-  return { rest: rest ?? (Object.create(null) as Record<string, unknown>), assocs };
+  // Null-prototype to avoid `__proto__`/`constructor` keys mutating
+  // Object.prototype before `rest` is handed to super().
+  const rest = Object.create(null) as Record<string, unknown>;
+  const assocNames = new Set(assocs.map((a) => a.name));
+  for (const [k, v] of Object.entries(attrs)) {
+    if (!assocNames.has(k)) rest[k] = v;
+  }
+  return { rest, assocs };
 }
 
 /** @internal */

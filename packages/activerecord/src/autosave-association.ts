@@ -747,6 +747,12 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
 
 async function autosaveHabtm(record: Base, assoc: AssociationDefinition): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
+  // Rails save_collection_association resets the scope cache for every
+  // collection macro (hasMany + HABTM). HABTM is backed by
+  // HasManyThroughAssociation, which also memoizes associationScope().
+  if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
+    (inst as { resetScope: () => void }).resetScope();
+  }
   const children: Base[] = Array.isArray(inst?.target) ? (inst.target as Base[]) : [];
 
   for (const child of children) {
