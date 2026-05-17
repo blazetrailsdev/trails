@@ -9,3 +9,4 @@ export {
   type DirectiveName,
 } from "./permissions-policy.js";
 export { Headers } from "./headers.js";
+export { QueryParser, type QueryPair } from "./query-parser.js";
