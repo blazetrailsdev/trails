@@ -704,8 +704,12 @@ export class JoinDependency {
       if (Array.isArray(targetPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
       if (isPoly) {
-        const typeCol = `${_toUnderscore(sourceName)}_type`;
-        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${assocDef.options.sourceType}'`;
+        // Mirrors Rails ThroughReflection / BelongsToReflection: the
+        // polymorphic type column is `foreign_type` (options[:foreign_type]
+        // || "#{name}_type"), and the value is the literal :source_type.
+        const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
+        const sourceTypeLit = String(assocDef.options.sourceType).replaceAll("'", "''");
+        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${sourceTypeLit}'`;
       }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));

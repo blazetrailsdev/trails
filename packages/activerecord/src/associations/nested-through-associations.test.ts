@@ -1226,24 +1226,56 @@ describe("NestedThroughAssociationsTest", () => {
     // (activerecord/test/cases/associations/nested_through_associations_test.rb:437):
     //   tag.tagged_posts uses `source: :taggable, source_type: "Post"`,
     //   so the join against `posts` must carry an AND on taggings.taggable_type.
-    Associations.hasMany.call(Tag, "taggings", {
-      className: "Tagging",
-      foreignKey: "tag_id",
+    class PstTag extends Base {
+      static {
+        this.tableName = "pst_tags";
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PstTagging extends Base {
+      static {
+        this.tableName = "pst_taggings";
+        this.attribute("pst_tag_id", "integer");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class PstPost extends Base {
+      static {
+        this.tableName = "pst_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("PstTag", PstTag);
+    registerModel("PstTagging", PstTagging);
+    registerModel("PstPost", PstPost);
+    Associations.hasMany.call(PstTag, "taggings", {
+      className: "PstTagging",
+      foreignKey: "pst_tag_id",
     });
-    Associations.hasMany.call(Tag, "taggedPosts", {
-      className: "Post",
+    Associations.hasMany.call(PstTag, "taggedPosts", {
+      className: "PstPost",
       through: "taggings",
       source: "taggable",
-      sourceType: "Post",
+      sourceType: "PstPost",
     });
-    Associations.belongsTo.call(Tagging, "taggable", {
+    Associations.belongsTo.call(PstTagging, "taggable", {
       polymorphic: true,
       foreignKey: "taggable_id",
     });
-    const sql = (Tag as any).all().joins("taggedPosts").toSql();
-    expect(sql).toMatch(/JOIN "posts"/);
-    expect(sql).toMatch(/"taggable_type"\s*=\s*'Post'/);
-    expect(sql).toMatch(/"posts"."id"\s*=\s*"[^"]+"\."taggable_id"/);
+    // INNER JOIN path (Relation#_resolveThroughJoin)
+    const innerSql = (PstTag as any).all().joins("taggedPosts").toSql();
+    expect(innerSql).toMatch(/JOIN "pst_posts"/);
+    expect(innerSql).toMatch(/"taggable_type"\s*=\s*'PstPost'/);
+    expect(innerSql).toMatch(/"pst_posts"."id"\s*=\s*"[^"]+"\."taggable_id"/);
+
+    // LEFT OUTER JOIN path (JoinDependency#_addThroughAssociation)
+    const leftSql = (PstTag as any).all().leftJoins("taggedPosts").toSql();
+    expect(leftSql).toMatch(/LEFT OUTER JOIN "pst_posts"/);
+    expect(leftSql).toMatch(/"taggable_type"\s*=\s*'PstPost'/);
   });
 
   it("has many through with foreign key option on through reflection", async () => {

@@ -1529,9 +1529,10 @@ export class Relation<T extends Base> {
       const targetPk = sourceAssocDef?.options?.primaryKey ?? targetModel.primaryKey ?? "id";
       targetPredicates.push(tgtTable.get(targetPk).eq(thrTable.get(targetFk)));
       if (isPolySource) {
-        targetPredicates.push(
-          thrTable.get(`${_toUnderscore(sourceName)}_type`).eq(assocDef.options.sourceType),
-        );
+        // Mirrors Rails BelongsToReflection: type column is `foreign_type`
+        // (options[:foreign_type] || "#{name}_type").
+        const typeCol = sourceAssocDef!.options?.foreignType ?? `${_toUnderscore(sourceName)}_type`;
+        targetPredicates.push(thrTable.get(typeCol).eq(assocDef.options.sourceType));
       }
     } else {
       const sourceAsName = sourceAssocDef?.options?.as;
