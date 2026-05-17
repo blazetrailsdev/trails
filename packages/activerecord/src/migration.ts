@@ -1,4 +1,4 @@
-import { getFs, getPath, Logger, getEnv, camelize } from "@blazetrails/activesupport";
+import { getFs, getPath, Logger, getEnv, camelize, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { FsDirent } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -1382,20 +1382,33 @@ export abstract class Migration {
     return /^\d{3,}$/.test(version);
   }
 
-  static nextMigrationNumber(_number?: number): string {
-    return Temporal.Now.instant()
+  static nextMigrationNumber(number?: number): string {
+    // Rails: max(now.utc.strftime("%Y%m%d%H%M%S"), "%.14d" % number) — so a
+    // numerically-larger sequence wins over a same-second timestamp. Callers
+    // (e.g. Migration.copy) pass `last.version + 1` to guarantee monotonicity
+    // across iterations within the same second.
+    const stamp = Temporal.Now.instant()
       .toString()
       .replace(/[-T:Z.]/g, "")
       .slice(0, 14);
+    if (number == null) return stamp;
+    const padded = Math.max(0, Math.trunc(number)).toString().padStart(14, "0");
+    return padded > stamp ? padded : stamp;
   }
 
   static properTableName(
-    name: string,
+    name: string | { tableName?: string },
     options: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
   ): string {
+    // Mirrors Rails: if the argument quacks like a Model class (responds to
+    // `table_name`), return that directly — the model's own prefix/suffix
+    // are already baked in.
+    if (name !== null && typeof name === "object" && typeof name.tableName === "string") {
+      return name.tableName;
+    }
     const prefix = options.tableNamePrefix ?? "";
     const suffix = options.tableNameSuffix ?? "";
-    return `${prefix}${name}${suffix}`;
+    return `${prefix}${String(name)}${suffix}`;
   }
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
@@ -1408,12 +1421,16 @@ export abstract class Migration {
   static async copy(
     destination: string,
     sources: Record<string, string>,
-    _options: Record<string, unknown> = {},
-  ): Promise<string[]> {
-    // Rails copies migration files from source directories to destination.
-    // In our TS implementation, migrations are registered programmatically,
-    // not via filesystem discovery. This returns the list of copied files
-    // (empty when there's nothing to copy).
+    options: {
+      onSkip?: (scope: string, migration: MigrationProxy) => void;
+      onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
+    } = {},
+  ): Promise<MigrationProxy[]> {
+    // Mirrors Rails' Migration.copy: discover migrations in each scoped source
+    // directory, dedupe by Rails-name against the destination, renumber so
+    // the copied migration's version is greater than the latest existing one,
+    // emit `${version}_${name.underscore}.${scope}.ts`, and invoke optional
+    // on_skip / on_copy callbacks. See Rails migration.rb:1060-1108.
     const fs = getFs();
     const path = getPath();
 
@@ -1421,18 +1438,47 @@ export abstract class Migration {
       fs.mkdirSync(destination, { recursive: true });
     }
 
-    const copied: string[] = [];
-    for (const [, sourcePath] of Object.entries(sources)) {
+    // Discovery is filename-driven; the adapter is only used by the proxy's
+    // lazy `migration` factory (which we never invoke here), so a stub is safe.
+    const stubAdapter = {} as DatabaseAdapter;
+    const destinationMigrations = Migrator.fromPath(destination, stubAdapter);
+    let last: MigrationProxy | undefined = destinationMigrations[destinationMigrations.length - 1];
+
+    const copied: MigrationProxy[] = [];
+    for (const [scope, sourcePath] of Object.entries(sources)) {
       if (!fs.existsSync(sourcePath)) continue;
-      const files = fs
-        .readdirSync(sourcePath)
-        .filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
-      for (const file of files) {
-        const dest = path.join(destination, file);
-        if (!fs.existsSync(dest)) {
-          fs.copyFileSync(path.join(sourcePath, file), dest);
-          copied.push(dest);
+      const sourceMigrations = Migrator.fromPath(sourcePath, stubAdapter);
+
+      for (const source of sourceMigrations) {
+        if (!source.filename) continue;
+        const body = fs.readFileSync(source.filename, "utf8");
+        const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
+
+        const duplicate = destinationMigrations.find((m) => m.name === source.name);
+        if (duplicate) {
+          if (options.onSkip && duplicate.scope !== scope) {
+            options.onSkip(scope, source);
+          }
+          continue;
         }
+
+        const nextNumber = last ? (BigInt(last.version) + 1n).toString() : "0";
+        const newVersion = Migration.nextMigrationNumber(Number(nextNumber));
+        const fileBase = underscore(source.name);
+        const newPath = path.join(destination, `${newVersion}_${fileBase}.${scope}.ts`);
+        const oldPath = source.filename;
+        const copy: MigrationProxy = {
+          ...source,
+          version: newVersion,
+          scope,
+          filename: newPath,
+        };
+        last = copy;
+
+        fs.writeFileSync(newPath, `${inserted}${body}`);
+        copied.push(copy);
+        options.onCopy?.(scope, copy, oldPath);
+        destinationMigrations.push(copy);
       }
     }
     return copied;

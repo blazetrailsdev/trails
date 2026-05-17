@@ -3251,3 +3251,82 @@ describe("Migration.logger integration", () => {
     expect(lines).toHaveLength(0);
   });
 });
+
+// ==========================================================================
+// proper_table_name + Migration.copy (migration_test.rb counterparts)
+// ==========================================================================
+
+describe("MigrationProperTableNameAndCopy", () => {
+  it("proper_table_name_on_migration", () => {
+    // Rails parity: a value with a `tableName` (responds_to :table_name)
+    // is honored; otherwise prefix/suffix wrap the literal name.
+    const reminderClass = { tableName: "reminders" };
+    expect(Migration.properTableName("table")).toBe("table");
+    expect(Migration.properTableName(reminderClass)).toBe("reminders");
+    expect(
+      Migration.properTableName("table", { tableNamePrefix: "p_", tableNameSuffix: "_s" }),
+    ).toBe("p_table_s");
+    // Model wins over options — the model already baked in its own affixes.
+    expect(
+      Migration.properTableName(reminderClass, { tableNamePrefix: "x_", tableNameSuffix: "_y" }),
+    ).toBe("reminders");
+  });
+
+  it("copy renumbers, scopes filenames, prepends provenance comment", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-copy-"));
+    const src = path.join(root, "src");
+    const dst = path.join(root, "dst");
+    fs.mkdirSync(src, { recursive: true });
+    fs.mkdirSync(dst, { recursive: true });
+    fs.writeFileSync(path.join(src, "1_create_articles.ts"), "// source-1\n");
+    fs.writeFileSync(path.join(src, "2_create_comments.ts"), "// source-2\n");
+    // Existing destination migration with a higher version so renumbering
+    // bumps copied versions above it.
+    fs.writeFileSync(path.join(dst, "20100101000000_existing_table.ts"), "// dest-existing\n");
+
+    const onCopy = vi.fn();
+    const copied = await Migration.copy(dst, { bukkits: src }, { onCopy });
+
+    expect(copied).toHaveLength(2);
+    expect(onCopy).toHaveBeenCalledTimes(2);
+    for (const m of copied) {
+      expect(m.scope).toBe("bukkits");
+      expect(m.filename).toMatch(/\.bukkits\.ts$/);
+      const body = fs.readFileSync(m.filename!, "utf8");
+      expect(body).toContain(`// This migration comes from bukkits (originally`);
+    }
+    // Strict monotonicity across the copy iteration.
+    expect(BigInt(copied[1]!.version) > BigInt(copied[0]!.version)).toBe(true);
+    // Renumbered above the pre-existing destination migration.
+    expect(BigInt(copied[0]!.version) > 20100101000000n).toBe(true);
+
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("copy skips duplicates by name and fires onSkip for cross-scope clash", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-copy-"));
+    const src = path.join(root, "src");
+    const dst = path.join(root, "dst");
+    fs.mkdirSync(src, { recursive: true });
+    fs.mkdirSync(dst, { recursive: true });
+    fs.writeFileSync(path.join(src, "1_create_articles.ts"), "// src\n");
+    // Same Rails-name (CreateArticles) already in destination under a
+    // different scope → onSkip must fire.
+    fs.writeFileSync(path.join(dst, "20100101000000_create_articles.other.ts"), "// dst\n");
+
+    const onSkip = vi.fn();
+    const copied = await Migration.copy(dst, { bukkits: src }, { onSkip });
+
+    expect(copied).toHaveLength(0);
+    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onSkip.mock.calls[0]![0]).toBe("bukkits");
+
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
