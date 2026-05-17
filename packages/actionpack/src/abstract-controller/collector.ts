@@ -31,7 +31,15 @@ export abstract class Collector {
 // `toJSON` would be called by JSON.stringify; synthesizing a thrower
 // there breaks serialization. `Symbol.toPrimitive` and `toString` are
 // kept inert too so coercion never hits the unknown-format thrower.
-const RESERVED_KEYS = new Set<string | symbol>(["then", "catch", "finally", "toJSON"]);
+const RESERVED_KEYS = new Set<string | symbol>([
+  "then",
+  "catch",
+  "finally",
+  "toJSON",
+  // Node's util.inspect / console.log call `obj.inspect()` when it
+  // exists. Synthesizing a thrower there breaks routine logging.
+  "inspect",
+]);
 
 const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
   get(target, prop, receiver) {

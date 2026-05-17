@@ -93,6 +93,14 @@ describe("AbstractController::Collector", () => {
     expect(() => JSON.stringify(c)).not.toThrow();
   });
 
+  it("util.inspect / logging does not trip the unknown-format thrower", () => {
+    const c = new TestCollector();
+    // Node's util.inspect calls obj.inspect() when present. The Proxy
+    // must NOT synthesize a throwing function here.
+    expect((c as unknown as { inspect?: unknown }).inspect).toBeUndefined();
+    expect("inspect" in c).toBe(false);
+  });
+
   it("`has` returns false for reserved keys even when a MIME type collides", () => {
     const c = new TestCollector();
     // Register a MIME called `then` to simulate a collision. The

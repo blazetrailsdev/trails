@@ -179,6 +179,16 @@ describe("MimeTypeTest", () => {
     expect(jsonIdx).toBeGreaterThan(htmlIdx);
   });
 
+  it("unregister sweeps aliases too — type is no longer reachable via any key", () => {
+    MimeType.register("application/aliased", "aliased");
+    MimeType.registerAlias("aliased", "aliased_alias");
+    expect(MimeType.lookup("aliased_alias")?.symbol).toBe("aliased");
+    MimeType.unregister("aliased");
+    expect(MimeType.lookup("aliased")).toBeUndefined();
+    expect(MimeType.lookup("aliased_alias")).toBeUndefined();
+    expect(MimeType.lookup("application/aliased")).toBeUndefined();
+  });
+
   it("all() picks up a newly registered type and drops it on unregister", () => {
     const before = MimeType.all().length;
     MimeType.register("application/all-test", "alltest");
