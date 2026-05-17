@@ -28,6 +28,7 @@ import {
   extractMultiparameterCallstack,
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
+import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { clearAutosaveState } from "./autosave-association.js";
 import { getStiBase, getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
@@ -711,6 +712,14 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
     // Assign regular attributes first (with existing error wrapping)
     for (const [key, value] of Object.entries(regular)) {
       try {
+        if (
+          assignAssociationIfMatch(
+            this as { constructor?: unknown; association?: (name: string) => unknown },
+            key,
+            value,
+          )
+        )
+          continue;
         this.writeAttribute(key, value);
       } catch (e) {
         let repr: string;
@@ -733,6 +742,14 @@ export function assignAttributes(this: AttributeIO, attrs: Record<string, unknow
 
   for (const [key, value] of Object.entries(attrs)) {
     try {
+      if (
+        assignAssociationIfMatch(
+          this as { constructor?: unknown; association?: (name: string) => unknown },
+          key,
+          value,
+        )
+      )
+        continue;
       this.writeAttribute(key, value);
     } catch (e) {
       let repr: string;

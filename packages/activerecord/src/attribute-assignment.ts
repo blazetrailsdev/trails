@@ -18,6 +18,7 @@ import {
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
   constructor: unknown;
+  association?: (name: string) => unknown;
 }
 
 /**
@@ -34,6 +35,14 @@ export function _assignAttributes(
   for (const [k, v] of Object.entries(attributes)) {
     if (k.includes("(")) {
       (multiParameterAttributes ??= Object.create(null))[k] = v;
+    } else if (
+      assignAssociationIfMatch(
+        this as { constructor?: unknown; association?: (name: string) => unknown },
+        k,
+        v,
+      )
+    ) {
+      // Routed to association proxy writer (constructor-form collection / singular).
     } else if (v !== null && typeof v === "object" && !Array.isArray(v)) {
       (nestedParameterAttributes ??= Object.create(null))[k] = v;
     } else {
@@ -129,6 +138,52 @@ export function typeCastAttributeValue(multiparameterName: string, value: string
 export function findParameterPosition(multiparameterName: string): number {
   const match = multiparameterName.match(/\((\d+)/);
   return match ? parseInt(match[1], 10) : 0;
+}
+
+/**
+ * @internal
+ * Shared dispatch for constructor-form / assignAttributes association
+ * writers. When `key` matches a declared association on `host.constructor`,
+ * route `value` to the proxy's `replace`/`writer` rather than
+ * `writeAttribute`. Mirrors Rails' `_assign_attribute` routing through
+ * `public_send("#{k}=")` into association writer methods.
+ *
+ * Single source of truth used by `persistence.ts#assignAttributes`,
+ * `attribute-assignment.ts#_assignAttributes`, and the constructor
+ * dispatch in `base.ts`.
+ */
+export function assignAssociationIfMatch(
+  host: { constructor?: unknown; association?: (name: string) => unknown },
+  key: string,
+  value: unknown,
+): boolean {
+  const ctor = host.constructor as
+    | { _associations?: Array<{ name: string; type: string }> }
+    | undefined;
+  const assoc = ctor?._associations?.find((a) => a.name === key);
+  if (!assoc) return false;
+  if (typeof host.association !== "function") return false;
+  const proxy = host.association(key) as
+    | { replace?: (v: unknown[]) => void; writer?: (v: unknown) => void }
+    | null
+    | undefined;
+  if (!proxy) return false;
+  if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
+    if (typeof proxy.replace !== "function") return false;
+    // Rails fidelity: pass the value through unchanged. The normal writer
+    // path (`record.items = value` → CollectionAssociation#writer →
+    // #replace) does not Array.wrap — Rails' replace calls `.each` on the
+    // argument and raises on nil / scalars. Coercing here would silently
+    // accept inputs the regular writer rejects.
+    proxy.replace(value as unknown[]);
+    return true;
+  }
+  if (assoc.type === "hasOne" || assoc.type === "belongsTo") {
+    if (typeof proxy.writer !== "function") return false;
+    proxy.writer(value);
+    return true;
+  }
+  return false;
 }
 
 export const InstanceMethods = {
