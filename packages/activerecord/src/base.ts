@@ -553,6 +553,58 @@ function _applyScopeAttributes(
   }
 }
 
+/**
+ * @internal
+ * Pull constructor-form association assignments (e.g. `new Owner({items:
+ * [...], profile: p})`) out of the regular attribute bag. Returns null
+ * when no key matches a declared association so the hot path allocates
+ * nothing.
+ */
+function _extractAssociationAttrs(
+  ctor: typeof Base | undefined,
+  attrs: Record<string, unknown>,
+): {
+  rest: Record<string, unknown>;
+  assocs: Array<{ name: string; value: unknown }>;
+} | null {
+  const defs = (ctor as { _associations?: Array<{ name: string; type: string }> } | undefined)
+    ?._associations;
+  if (!defs || defs.length === 0) return null;
+  // Common case: models that declare associations but receive only regular
+  // attrs at construction (`new Post({title})`). First pass detects whether
+  // any key matches an association; only then do we allocate `rest` and
+  // copy entries. Avoids per-construction overhead for the hot path.
+  let assocs: Array<{ name: string; value: unknown }> | null = null;
+  for (const k of Object.keys(attrs)) {
+    if (defs.find((a) => a.name === k)) {
+      (assocs ??= []).push({ name: k, value: attrs[k] });
+    }
+  }
+  if (!assocs) return null;
+  // Null-prototype to avoid `__proto__`/`constructor` keys mutating
+  // Object.prototype before `rest` is handed to super().
+  const rest = Object.create(null) as Record<string, unknown>;
+  const assocNames = new Set(assocs.map((a) => a.name));
+  for (const [k, v] of Object.entries(attrs)) {
+    if (!assocNames.has(k)) rest[k] = v;
+  }
+  return { rest, assocs };
+}
+
+/** @internal */
+function _dispatchAssociationAttrs(
+  record: Base,
+  assocs: Array<{ name: string; value: unknown }>,
+): void {
+  for (const { name, value } of assocs) {
+    _AttributeAssignment.assignAssociationIfMatch(
+      record as unknown as { constructor?: unknown; association?: (name: string) => unknown },
+      name,
+      value,
+    );
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   // --- Translation mixin (wired via extend() after class) ---
@@ -2277,6 +2329,11 @@ export class Base extends Model {
 
   constructor(attrs: Record<string, unknown> = {}) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
+    // Split out constructor-form association values (e.g. `new Owner({items:
+    // [...]})`) so super() never sees them as plain attributes. Dispatched
+    // after super() so the association proxy exists on `this`.
+    let assocPending = _extractAssociationAttrs(new.target as typeof Base, attrs);
+    if (assocPending) attrs = assocPending.rest;
     if (hasMultiparameterKeys(attrs)) {
       // Mirrors Rails: Base#initialize calls assign_attributes which handles
       // multiparameter keys. We split: regular attrs go through the Model
@@ -2323,6 +2380,14 @@ export class Base extends Model {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
+        if (assocPending) {
+          _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+          // belongsTo writers may write the owner FK; re-snapshot so
+          // constructor-form association assignment lands in the clean
+          // baseline, matching regular constructor attrs.
+          (this as any)._dirty.snapshot((this as any)._attributes);
+          assocPending = null;
+        }
         cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
@@ -2359,8 +2424,25 @@ export class Base extends Model {
         inheritanceInitializeInternalsCallback.call(this as any);
         // Re-snapshot so internals writes are part of the initial clean state.
         (this as any)._dirty.snapshot((this as any)._attributes);
+        if (assocPending) {
+          _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+          // belongsTo writers may write the owner FK; re-snapshot so
+          // constructor-form association assignment lands in the clean
+          // baseline, matching regular constructor attrs.
+          (this as any)._dirty.snapshot((this as any)._attributes);
+          assocPending = null;
+        }
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
+    }
+    // Suppressed-callback fallback: parent caller fires after_initialize, so
+    // we still dispatch first to keep Rails' "assign → after_initialize" order.
+    if (assocPending) {
+      _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+      // Match the dispatch sites above: re-snapshot so any belongsTo FK
+      // writes from the association writers don't leave construction in a
+      // dirty state.
+      (this as any)._dirty.snapshot((this as any)._attributes);
     }
   }
 
