@@ -272,14 +272,25 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
     if (!childCtor.hasManyInversing) return;
     child._cachedAssociations = child._cachedAssociations ?? new Map();
     // Mirror Rails `replace_on_target(..., inversing: true)`: append + identity
-    // dedup. Promote a stray scalar value (legacy pre-flag write) into a 1-element
-    // array so we never silently drop a previously-cached record.
+    // dedup. Rails has a single `@target` per CollectionAssociation; trails
+    // splits state across `_cachedAssociations` and `_collectionProxies`, so
+    // seed `collection` from the proxy's loaded target when one exists to keep
+    // them in sync (otherwise a later `_cachedAssociations` read could return
+    // a partial array). Promote stray scalars from legacy pre-flag writes.
+    const proxy = child._collectionProxies?.get(inverseName) as
+      | { loaded?: boolean; target?: Base[] }
+      | undefined;
     const existing = child._cachedAssociations.get(inverseName);
-    const collection: Base[] = Array.isArray(existing)
-      ? (existing as Base[])
-      : existing != null
-        ? [existing as Base]
-        : [];
+    let collection: Base[];
+    if (proxy?.loaded && Array.isArray(proxy.target)) {
+      collection = proxy.target;
+    } else if (Array.isArray(existing)) {
+      collection = existing as Base[];
+    } else if (existing != null) {
+      collection = [existing as Base];
+    } else {
+      collection = [];
+    }
     if (!collection.includes(owner)) collection.push(owner);
     child._cachedAssociations.set(inverseName, collection);
     return;
