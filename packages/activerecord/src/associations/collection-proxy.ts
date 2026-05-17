@@ -1206,6 +1206,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : this._throughOwnerAttrs(throughAssoc, ctor);
     const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
     const sourceFk = `${underscore(sourceName)}_id`;
+    // Rails: when the association is declared with `validate: false`, the
+    // implicit `save` during `push`/`<<` is invoked with `validate: false`,
+    // suppressing both the target record's and the join record's
+    // validations (matches `Association#insert_record` /
+    // `HasManyAssociation#insert_record` in
+    // `activerecord/lib/active_record/associations/has_many_association.rb`).
+    const skipValidate = this._assocDef.options.validate === false;
+    const saveOpts = skipValidate ? { validate: false } : undefined;
 
     for (const record of records) {
       if (
@@ -1216,9 +1224,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Save the target record if it's new
       if (record.isNewRecord()) {
         if (bang) {
-          await record.saveBang(); // raises RecordInvalid if invalid
+          if (skipValidate) {
+            const saved = await record.save(saveOpts);
+            if (!saved) continue;
+          } else {
+            await record.saveBang();
+          }
         } else {
-          const saved = await record.save();
+          const saved = await record.save(saveOpts);
           if (!saved) continue;
         }
       }
@@ -1242,7 +1255,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (bang) {
         // Bang form: raise RecordInvalid if join record is invalid (mirrors Rails' save!)
         joinRecord = new throughModel(joinAttrs);
-        await joinRecord.saveBang();
+        if (skipValidate) {
+          await joinRecord.save(saveOpts);
+        } else {
+          await joinRecord.saveBang();
+        }
+      } else if (skipValidate) {
+        joinRecord = new throughModel(joinAttrs);
+        await joinRecord.save(saveOpts);
       } else {
         joinRecord = await throughModel.create(joinAttrs);
       }
@@ -1268,6 +1288,47 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (assocInstance as any).reset();
       }
     }
+  }
+
+  /**
+   * Walk the through-chain looking for `record` in already-loaded sources.
+   * Returns the boolean answer when the through-target is loaded; returns
+   * `null` to signal "not determinable in memory, caller should fall back
+   * to the database path". Mirrors Rails'
+   * `HasManyThroughAssociation#include_in_memory?`.
+   */
+  private async _includeInMemoryThrough(record: T): Promise<boolean | null> {
+    const ctor = this._record.constructor as typeof Base;
+    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
+    const throughName = this._assocDef.options.through!;
+    const throughAssoc = associations.find((a: any) => a.name === throughName);
+    if (!throughAssoc) return null;
+    // Only consult the cache when the through proxy was already populated;
+    // otherwise we'd issue extra queries to answer `include?`.
+    const throughProxy = (this._record as any)._collectionProxies?.get(throughName) as
+      | CollectionProxy<Base>
+      | undefined;
+    if (!throughProxy || !(throughProxy as any)._targetLoaded) return null;
+    const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
+    const targetPk = (record.constructor as typeof Base).primaryKey;
+    if (Array.isArray(targetPk)) return null;
+    const targetId = record._readAttribute(targetPk);
+    if (targetId == null) return null;
+    for (const joinRecord of (throughProxy as any)._target as Base[]) {
+      const source = (joinRecord as any)[sourceName];
+      if (source == null) continue;
+      const candidates: Base[] = Array.isArray(source)
+        ? source
+        : source instanceof Promise
+          ? []
+          : [source as Base];
+      for (const cand of candidates) {
+        const pk = (cand.constructor as typeof Base).primaryKey;
+        if (Array.isArray(pk)) continue;
+        if (cand._readAttribute(pk) === targetId) return true;
+      }
+    }
+    return false;
   }
 
   private _raiseOnTypeMismatch(records: T[]): void {
@@ -1516,8 +1577,31 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#include?
    */
   async isInclude(record: T): Promise<boolean> {
+    // Rails `include?` short-circuits on type mismatch — a record whose
+    // class is unrelated to the reflection's `klass` can never be in the
+    // target. Without this guard, a bogus record would issue a needless
+    // `exists?` query and might silently match a row with the same PK on
+    // the wrong table.
+    // Mirrors `ActiveRecord::Associations::CollectionAssociation#include?`
+    // (`return false unless record.is_a?(reflection.klass)`).
+    if (!this._assocDef.options.polymorphic) {
+      const className =
+        (this._assocDef.options.className as string | undefined) ??
+        camelize(singularize(this._assocName));
+      const klass = resolveAssocClass(this._record, this._assocName, className);
+      if (!(record instanceof klass)) return false;
+    }
     if (record.isNewRecord()) {
       return this._target.includes(record);
+    }
+
+    // Through associations: when the through-target is already loaded in
+    // memory, walk the chain rather than re-querying. Matches Rails'
+    // `HasManyThroughAssociation#include_in_memory?` (recursively walks
+    // `through_reflection.target` looking for `source_reflection`).
+    if (this._assocDef.options.through) {
+      const inMemory = await this._includeInMemoryThrough(record);
+      if (inMemory !== null) return inMemory;
     }
 
     if (this._targetLoaded) {
@@ -2314,6 +2398,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async appendBang(...records: T[]): Promise<void> {
     this._ensureThroughWritable();
+    this._raiseOnTypeMismatch(records);
     if (this._assocDef.options.through) {
       await this._pushThrough(records, false, true);
       return;
