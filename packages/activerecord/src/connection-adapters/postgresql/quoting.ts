@@ -183,16 +183,16 @@ export function quoteDefaultExpression(
     const castType = sqlType ? typeMap?.lookup(sqlType) : null;
     if (column.array === true && globalThis.Array.isArray(value)) {
       // Rails routes the JS array through OID::Array.serialize so each
-      // element is cast by the element subtype before quoting. Type-map
-      // lookup keyed by sqlType returns the element SUBTYPE (e.g.
-      // IntegerType for an `integer[]` column); wrap it in OidArray so
-      // .serialize() walks the elements and emits a `{…}` Data wrapper
-      // for quote(). If a caller's TypeMapLike happens to return an
-      // already-array-aware type (an OID::Array instance), skip the
-      // wrapper and let it serialize directly — re-wrapping would
-      // produce a nested array literal.
-      if (castType instanceof OidArray) {
-        serialized = castType.serialize(value);
+      // element is cast by the element subtype before quoting. Trails'
+      // TypeMapLike contract permits two return shapes here: an
+      // already-array-aware type (whose serialize() returns ArrayData
+      // for the whole array) or an element subtype (e.g. IntegerType
+      // for an `integer[]` column). Run serialize first; if the result
+      // is ArrayData the type was already array-aware, otherwise wrap
+      // the original value in OidArray(subtype) so each element is cast.
+      const fromTypeMap = castType?.serialize ? castType.serialize(value) : value;
+      if (fromTypeMap instanceof ArrayData) {
+        serialized = fromTypeMap;
       } else {
         const subtype = (castType ?? new ValueType()) as ConstructorParameters<typeof OidArray>[0];
         serialized = new OidArray(subtype).serialize(value);

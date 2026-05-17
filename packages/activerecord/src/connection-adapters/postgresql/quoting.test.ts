@@ -93,6 +93,21 @@ describe("PostgreSQL quoting", () => {
     expect(quoteDefaultExpression(["a", "b"], column, typeMap)).toBe(" DEFAULT '{a,b}'");
   });
 
+  it("serializes array defaults via an element subtype (per-element coercion)", () => {
+    // Mirrors Rails postgresql/quoting.rb:161-163 where
+    // lookup_cast_type_from_column returns OID::Array(IntegerType) and
+    // serialize walks each element through Integer#serialize. Trails'
+    // TypeMapLike returns the element subtype here; quoteDefaultExpression
+    // must wrap it in OidArray so per-element casting fires.
+    const column = { sqlType: "integer", array: true };
+    const typeMap = {
+      lookup() {
+        return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
+      },
+    };
+    expect(quoteDefaultExpression([1, 2, 3], column, typeMap)).toBe(" DEFAULT '{101,102,103}'");
+  });
+
   it("supports nested function calls up to 2 levels deep", () => {
     expect(columnNameMatcher().test("lower(name)")).toBe(true);
     expect(columnNameMatcher().test("lower(trim(name))")).toBe(true);
