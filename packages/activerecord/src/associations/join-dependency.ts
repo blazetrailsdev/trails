@@ -687,15 +687,36 @@ export class JoinDependency {
     }
 
     if (sourceAssocDef.type === "belongsTo") {
+      // Polymorphic belongs_to as the source of a has_many :through must
+      // be paired with `source_type:` on the outer association so the target
+      // class is resolvable; without it Rails raises HasManyThroughSourceAssociationPolymorphicError.
+      const isPoly = sourceAssocDef.options.polymorphic === true;
+      if (isPoly && !assocDef.options.sourceType) return null;
       const targetFk = sourceAssocDef.options.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       if (Array.isArray(targetFk)) return null;
-      const className = sourceAssocDef.options.className ?? _camelize(sourceName);
+      const className = isPoly
+        ? assocDef.options.sourceType
+        : (sourceAssocDef.options.className ?? _camelize(sourceName));
       targetModel = modelRegistry.get(className) as typeof Base | undefined;
       if (!targetModel) return null;
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
       targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
+      if (isPoly) {
+        // Mirrors Rails ThroughReflection / BelongsToReflection: the
+        // polymorphic type column is `foreign_type` (options[:foreign_type]
+        // || "#{name}_type"), and the value is the literal :source_type.
+        const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
+        // Escape backslash first, then single-quote — order matters so we
+        // don't double-escape an already-escaped quote. MySQL/MariaDB treat
+        // `\` as a string escape by default (NO_BACKSLASH_ESCAPES off), so
+        // both must be escaped to be portable across adapters.
+        const sourceTypeLit = String(assocDef.options.sourceType)
+          .replaceAll("\\", "\\\\")
+          .replaceAll("'", "''");
+        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${sourceTypeLit}'`;
+      }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
       targetModel = modelRegistry.get(className) as typeof Base | undefined;

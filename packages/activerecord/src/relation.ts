@@ -1506,7 +1506,16 @@ export class Relation<T extends Base> {
       throughModelAssocs.find((a: any) => a.name === sourceName) ??
       throughModelAssocs.find((a: any) => a.name === _pluralize(sourceName));
 
-    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocDef.name));
+    // Polymorphic source: when the source belongs_to on the through model is
+    // polymorphic, `source_type:` on the outer through declares which concrete
+    // class to join against (Rails HasManyThroughAssociation, reflection.rb).
+    const isPolySource =
+      sourceAssocDef?.type === "belongsTo" && sourceAssocDef.options?.polymorphic === true;
+    const targetClassName =
+      (isPolySource ? assocDef.options.sourceType : undefined) ??
+      assocDef.options.className ??
+      _camelize(_singularize(assocDef.name));
+    if (isPolySource && !assocDef.options.sourceType) return null;
     const targetModel = modelRegistry.get(targetClassName);
     if (!targetModel) return null;
     const targetTable = (targetModel as any).tableName;
@@ -1519,6 +1528,12 @@ export class Relation<T extends Base> {
       const targetFk = sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
       const targetPk = sourceAssocDef?.options?.primaryKey ?? targetModel.primaryKey ?? "id";
       targetPredicates.push(tgtTable.get(targetPk).eq(thrTable.get(targetFk)));
+      if (isPolySource) {
+        // Mirrors Rails BelongsToReflection: type column is `foreign_type`
+        // (options[:foreign_type] || "#{name}_type").
+        const typeCol = sourceAssocDef!.options?.foreignType ?? `${_toUnderscore(sourceName)}_type`;
+        targetPredicates.push(thrTable.get(typeCol).eq(assocDef.options.sourceType));
+      }
     } else {
       const sourceAsName = sourceAssocDef?.options?.as;
       const sourceFk = sourceAsName
