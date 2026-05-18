@@ -3173,9 +3173,16 @@ describe("EagerAssociationTest", () => {
   });
 
   it.skip("exceptions have suggestions for fix", async () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+    // BLOCKED: associations — top-level eagerLoad/includes of an unknown association does not raise
+    // ROOT-CAUSE: associations/preloader/branch.ts groupedRecords() silently skips missing reflections (line ~161)
+    //   instead of raising AssociationNotFoundError + "Did you mean?" suggestion for top-level
+    //   names (Rails eager_test.rb:878 — Post.all.merge!(includes: :taggingz).find(6) raises with `Did you mean? tagging`).
+    //   Rails nested-through-null behavior (eager_test.rb:380, :386) must stay silent — but note: existing tests at
+    //   eager.test.ts:966 and :979 ("nested loading does not raise...") currently pass a flat top-level string instead
+    //   of Rails' nested-hash form `{ author: :non_existing_association }`; closing this gap must also rework those
+    //   two tests to the nested form so the silent-skip + raise-on-top-level contract is consistent.
+    // SCOPE: ~30 LOC in preloader/branch.ts to raise on unknown top-level association; +~10 LOC rework of the two
+    //   misnamed flat-string tests to nested-hash form per Rails source.
     class ExSugAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -5009,10 +5016,7 @@ describe("EagerAssociationTest", () => {
     // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
     // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
   });
-  it.skip("preloading belongs_to with cpk", async () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading belongs_to with cpk", async () => {
     class CpkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -5040,17 +5044,16 @@ describe("EagerAssociationTest", () => {
     await CpkOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
     await CpkLineItem.create({ order_shop_id: 1, order_id: 1, product: "Widget" });
 
-    const items = await CpkLineItem.all().includes("cpkOrder").toArray();
-    expect(items).toHaveLength(1);
-    const order = (items[0] as any)._preloadedAssociations.get("cpkOrder");
+    const lineItem = (await CpkLineItem.first()) as any;
+    const found = (await CpkLineItem.all()
+      .eagerLoad("cpkOrder")
+      .findBy({ id: lineItem.id })) as any;
+    const order = found._preloadedAssociations.get("cpkOrder");
     expect(order).not.toBeNull();
     expect(order.name).toBe("Order1");
   });
 
-  it.skip("preloading has_many with cpk", async () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading has_many with cpk", async () => {
     class CpkHmOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -5079,16 +5082,13 @@ describe("EagerAssociationTest", () => {
     await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "A" });
     await CpkHmItem.create({ order_shop_id: 1, order_id: 1, product: "B" });
 
-    const orders = await CpkHmOrder.all().includes("cpkHmItems").toArray();
-    expect(orders).toHaveLength(1);
-    const items = (orders[0] as any)._preloadedAssociations.get("cpkHmItems");
+    const order = (await CpkHmOrder.first()) as any;
+    const found = (await CpkHmOrder.all().eagerLoad("cpkHmItems").findBy({ id: order.id })) as any;
+    const items = found._preloadedAssociations.get("cpkHmItems");
     expect(items).toHaveLength(2);
   });
 
-  it.skip("preloading has_one with cpk", async () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading has_one with cpk", async () => {
     class CpkHoOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -5116,9 +5116,11 @@ describe("EagerAssociationTest", () => {
     await CpkHoOrder.insertAll([{ shop_id: 1, id: 1, name: "Order1" }]);
     await CpkHoReceipt.create({ order_shop_id: 1, order_id: 1, number: "R001" });
 
-    const orders = await CpkHoOrder.all().includes("cpkHoReceipt").toArray();
-    expect(orders).toHaveLength(1);
-    const receipt = (orders[0] as any)._preloadedAssociations.get("cpkHoReceipt");
+    const order = (await CpkHoOrder.first()) as any;
+    const found = (await CpkHoOrder.all()
+      .eagerLoad("cpkHoReceipt")
+      .findBy({ id: order.id })) as any;
+    const receipt = found._preloadedAssociations.get("cpkHoReceipt");
     expect(receipt).not.toBeNull();
     expect(receipt.number).toBe("R001");
   });
