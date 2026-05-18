@@ -16,3 +16,5 @@ export {
   PersistedSecure,
   SessionId,
 } from "./abstract-store.js";
+
+export { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
