@@ -169,9 +169,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const needsCreateInfo = fields.some((f) => {
       const def = (f["Default"] as string | null) ?? null;
       const extra = ((f["Extra"] as string | null) ?? "").trim();
+      const sqlType = ((f["Type"] as string | null) ?? "").toLowerCase();
       if (def == null || /^\d/.test(def) || def.startsWith("'")) return false;
       if (extra.startsWith("DEFAULT_GENERATED")) return false;
-      if (/^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)) return false;
+      // newColumnFromField's datetime+CURRENT_TIMESTAMP short-circuit only fires when the
+      // semantic type is "datetime" (sqlType startsWith "datetime"/"timestamp"); for
+      // non-datetime columns with a CURRENT_TIMESTAMP default we still need SHOW CREATE TABLE
+      // for the broader function-default detection.
+      const isDatetimeLike = /^(datetime|timestamp)/.test(sqlType);
+      if (isDatetimeLike && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)) return false;
       return true;
     });
     const createInfo = needsCreateInfo ? await this.createTableInfo(tableName) : null;
@@ -1573,8 +1579,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       collation: column.collation ?? undefined,
       comment: column.comment ?? undefined,
       autoIncrement: column.autoIncrement || undefined,
+      onUpdate: column.onUpdate ?? undefined,
     };
-    const colDef = new ColumnDefinition(newColumnName, column.sqlType ?? "", colOpts);
+    if (column.sqlType == null || column.sqlType.length === 0) {
+      throw new Error(
+        `renameColumnForAlter fallback: missing sqlType for column "${columnName}" in table ` +
+          `"${tableName}" — cannot rebuild CHANGE clause without the full column type. ` +
+          `This indicates the column metadata was not fully populated by columns().`,
+      );
+    }
+    const colDef = new ColumnDefinition(newColumnName, column.sqlType, colOpts);
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);
   }

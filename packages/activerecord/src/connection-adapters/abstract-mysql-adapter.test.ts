@@ -108,6 +108,27 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     expect(sql).toContain("CURRENT_TIMESTAMP");
   });
 
+  it("preserves bare ON UPDATE Extra when Default is null (not folded into defaultFunction)", async () => {
+    // Datetime column with `on update CURRENT_TIMESTAMP` but Default=null — newColumnFromField's
+    // datetime+CURRENT_TIMESTAMP short-circuit doesn't fire (default is null), so on_update
+    // can't be folded into defaultFunction. Must round-trip via column.onUpdate / MysqlAddColumnOptions.
+    const adapter = await makeAdapter("ts", "on update CURRENT_TIMESTAMP");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "ts",
+        Type: "datetime",
+        Null: "YES",
+        Default: null,
+        Extra: "on update CURRENT_TIMESTAMP",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "ts", "ts2");
+    expect(sql).toContain("ON UPDATE CURRENT_TIMESTAMP");
+    expect(sql).not.toContain("DEFAULT");
+  });
+
   it("preserves MySQL 8 compound DEFAULT_GENERATED on update Extra", async () => {
     const adapter = await makeAdapter("col", "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)");
     adapter.columnDefinitions = async () => [

@@ -1113,7 +1113,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !==
         "NO";
       const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
-      const extra = String((r.extra ?? r.EXTRA ?? "") as string).toLowerCase();
+      const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
+      const extra = extraRaw.toLowerCase();
       return new MysqlColumn(
         name,
         r.default_value ?? r.DEFAULT_VALUE ?? null,
@@ -1132,6 +1133,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           autoIncrement: extra === "auto_increment",
           unsigned: /\bunsigned(?: zerofill)?\b/i.test(sqlType),
           virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
+          onUpdate: extraRaw.match(/on update (.+)$/i)?.[1] ?? null,
         },
       );
     });

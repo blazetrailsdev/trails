@@ -573,10 +573,12 @@ export class SchemaStatements {
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    // Mirrors Rails (abstract/schema_statements.rb:1459) for adapters that bulk-alter (MySQL,
-    // PG): one combined ALTER TABLE. SQLite-style adapters that don't support bulk ALTER fall
-    // back to two sequential addColumn calls — Rails' sqlite3_adapter#add_timestamps overrides
-    // to use the alter_table rebuild path instead, which trails replicates on its sqlite3 adapter.
+    // Rails (abstract/schema_statements.rb:1459) issues a single combined ALTER TABLE for every
+    // adapter and relies on SQLite's adapter-level override to swap in the alter_table rebuild
+    // path. trails uses a wrapper SchemaAdapter that cannot dispatch back to inner-adapter
+    // overrides, so we branch on supportsBulkAlter() here: bulk-alter adapters (MySQL, PG) get
+    // the combined ALTER TABLE; non-bulk adapters fall back to two sequential addColumn calls.
+    // trails' SQLite3Adapter still defines its own addTimestamps override for direct callers.
     if ((this.adapter as any).supportsBulkAlter?.() === true) {
       const fragments = this.addTimestampsForAlter(tableName, options);
       await this.adapter.executeMutation(
