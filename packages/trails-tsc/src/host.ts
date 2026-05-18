@@ -119,10 +119,14 @@ export function buildCompilerHost(
 }
 
 function extensionOf(filePath: string): string {
-  // Return everything from the first dot in the basename so plugins
-  // can claim compound suffixes (`.tse.ts`, `.d.ts`) directly.
+  // Return only the trailing extension (after the LAST dot). Compound
+  // forms like `.test-d.ts` or `.d.ts` collapse to `.ts`, which is
+  // what AR's `ar-models` plugin expects — it filters internally on
+  // file content (`shouldVirtualize`), not on path suffix. Plugins
+  // that want to claim a compound suffix should match on it inside
+  // their own `virtualize()` after the host dispatches by `.ts`.
   const base = path.basename(filePath);
-  const dot = base.indexOf(".");
+  const dot = base.lastIndexOf(".");
   return dot === -1 ? "" : base.slice(dot);
 }
 
