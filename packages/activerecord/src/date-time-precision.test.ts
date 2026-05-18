@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instantToS } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 
 function nsec(v: Temporal.Instant): number {
   let ns = v.epochNanoseconds % 1_000_000_000n;
@@ -13,18 +15,22 @@ function nsec(v: Temporal.Instant): number {
   return Number(ns);
 }
 
+// See time-precision.test.ts — placeholder schema; tests recreate `foos` per-test
+// with the precision under test via `ctx.createTable("foos", { force: true }, ...)`.
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, { foos: { name: "string" } });
+  return adapter;
+}
+
 describe("DateTimePrecisionTest", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(() => {
-    adapter = new SQLite3Adapter(":memory:");
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     ctx = new MigrationContext(adapter);
   });
-  afterEach(async () => {
-    await adapter.close();
-  });
-
   function makeFoo() {
     class Foo extends Base {
       static override tableName = "foos";

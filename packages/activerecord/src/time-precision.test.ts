@@ -1,27 +1,35 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 
 function nsecTime(v: Temporal.PlainTime): number {
   return v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond;
 }
 
+// Tests recreate `foos` per-test via `ctx.createTable("foos", { force: true }, ...)`
+// with varying precision options, so the schema seeded here is a placeholder that
+// satisfies AR_NO_AUTO_SCHEMA=1's "schema must be declared up front" requirement;
+// the `force: true` migrations drop and rebuild it with the precision under test.
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, { foos: { name: "string" } });
+  return adapter;
+}
+
 describe("TimePrecisionTest", () => {
-  let adapter: SQLite3Adapter;
+  let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(() => {
-    adapter = new SQLite3Adapter(":memory:");
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     ctx = new MigrationContext(adapter);
   });
-  afterEach(async () => {
-    await adapter.close();
-  });
-
   function makeFoo() {
     class Foo extends Base {
       static override tableName = "foos";
