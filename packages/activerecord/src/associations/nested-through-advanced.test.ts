@@ -11,6 +11,32 @@ import { Base, registerModel } from "../index.js";
 import { Associations, loadHasManyThrough } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+
+const TEST_SCHEMA: Schema = {
+  nta_authors: { name: "string" },
+  nta_posts: { nta_author_id: "integer", title: "string" },
+  nta_taggings: {
+    taggable_id: "integer",
+    taggable_type: "string",
+    nta_tag_id: "integer",
+  },
+  nta_tags: { name: "string" },
+  nse_hotels: { name: "string" },
+  nse_chefs: {
+    nse_hotel_id: "integer",
+    employable_id: "integer",
+    employable_type: "string",
+  },
+  nse_cake_designers: { name: "string" },
+  nse_drink_designers: { name: "string" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
+}
 
 describe("HMT Slot E — nested-through advanced", () => {
   let adapter: DatabaseAdapter;
@@ -43,8 +69,8 @@ describe("HMT Slot E — nested-through advanced", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     NtaAuthor.adapter = adapter;
     NtaPost.adapter = adapter;
     NtaTagging.adapter = adapter;

@@ -37,6 +37,25 @@ import { Base, registerModel, registerSubclass, enableSti } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+
+const TEST_SCHEMA: Schema = {
+  ps_hotels: { name: "string" },
+  ps_departments: { ps_hotel_id: "integer", name: "string" },
+  ps_chefs: {
+    ps_department_id: "integer",
+    employable_id: "integer",
+    employable_type: "string",
+  },
+  ps_cake_designers: { name: "string", type: "string" },
+  ps_drink_designers: { name: "string" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
+}
 
 describe("HABTM Slot E — polymorphic + STI through", () => {
   let adapter: DatabaseAdapter;
@@ -82,8 +101,8 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
   enableSti(PsCakeDesigner);
   registerSubclass(PsSpecialCakeDesigner);
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     PsHotel.adapter = adapter;
     PsDepartment.adapter = adapter;
     PsChef.adapter = adapter;
