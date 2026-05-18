@@ -996,7 +996,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#empty?
    */
   async isEmpty(): Promise<boolean> {
-    return (await this.count()) === 0;
+    if (this._targetLoaded) return this._target.length === 0;
+    if (this._target.length > 0) return false;
+    // Through associations: #exists always loads the full target, so prefer
+    // count() which routes through AssociationScope as a SQL COUNT for the
+    // common shapes (loadHasMany fallback still loads for the rest).
+    if (this._isThrough) return (await this.count()) === 0;
+    return !(await this.exists());
   }
 
   /**

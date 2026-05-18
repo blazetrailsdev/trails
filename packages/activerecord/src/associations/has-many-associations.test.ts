@@ -22,6 +22,7 @@ import {
   isAssociationCached,
 } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -1690,104 +1691,143 @@ describe("HasManyAssociationsTest", () => {
   // -- Calling size/empty --
 
   it("calling size on an association that has not been loaded performs a query", async () => {
-    class Author extends Base {
+    class SizeUnAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class SizeUnPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(SizeUnAuthor, "sizeUnPosts", {
+      className: "SizeUnPost",
       foreignKey: "author_id",
     });
-    expect(posts.length).toBe(1);
+    registerModel("SizeUnAuthor", SizeUnAuthor);
+    registerModel("SizeUnPost", SizeUnPost);
+    const author = await SizeUnAuthor.create({ name: "Alice" });
+    await SizeUnPost.create({ author_id: author.id, title: "A" });
+    const author2 = await SizeUnAuthor.create({ name: "Bob" });
+    const proxy = association(author, "sizeUnPosts");
+    const proxy2 = association(author2, "sizeUnPosts");
+    expect(proxy.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await proxy.size()).toBe(1);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await proxy2.size()).toBe(0);
+    });
+    expect(proxy.loaded).toBe(false);
   });
 
   it("calling size on an association that has been loaded does not perform query", async () => {
-    class Author extends Base {
+    class SizeLdAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class SizeLdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(SizeLdAuthor, "sizeLdPosts", {
+      className: "SizeLdPost",
       foreignKey: "author_id",
     });
-    expect(posts.length).toBe(1);
-    // Second access: still same length
-    expect(posts.length).toBe(1);
+    registerModel("SizeLdAuthor", SizeLdAuthor);
+    registerModel("SizeLdPost", SizeLdPost);
+    const author = await SizeLdAuthor.create({ name: "Alice" });
+    await SizeLdPost.create({ author_id: author.id, title: "A" });
+    const author2 = await SizeLdAuthor.create({ name: "Bob" });
+    const proxy = association(author, "sizeLdPosts");
+    const proxy2 = association(author2, "sizeLdPosts");
+    await proxy.load();
+    await proxy2.load();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy2.loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(await proxy.size()).toBe(1);
+      expect(await proxy2.size()).toBe(0);
+    });
   });
 
   it("calling empty on an association that has not been loaded performs a query", async () => {
-    class Author extends Base {
+    class EmptyUnAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class EmptyUnPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(EmptyUnAuthor, "emptyUnPosts", {
+      className: "EmptyUnPost",
       foreignKey: "author_id",
     });
-    expect(posts.length === 0).toBe(true);
+    registerModel("EmptyUnAuthor", EmptyUnAuthor);
+    registerModel("EmptyUnPost", EmptyUnPost);
+    const author = await EmptyUnAuthor.create({ name: "Alice" });
+    await EmptyUnPost.create({ author_id: author.id, title: "A" });
+    const author2 = await EmptyUnAuthor.create({ name: "Bob" });
+    const proxy = association(author, "emptyUnPosts");
+    const proxy2 = association(author2, "emptyUnPosts");
+    expect(proxy.loaded).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await proxy.isEmpty()).toBe(false);
+    });
+    await assertQueriesCount(1, false, async () => {
+      expect(await proxy2.isEmpty()).toBe(true);
+    });
+    expect(proxy.loaded).toBe(false);
   });
 
   it("calling empty on an association that has been loaded does not performs query", async () => {
-    class Author extends Base {
+    class EmptyLdAuthor extends Base {
       static {
         this.attribute("name", "string");
         this.adapter = adapter;
       }
     }
-    class Post extends Base {
+    class EmptyLdPost extends Base {
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
+    Associations.hasMany.call(EmptyLdAuthor, "emptyLdPosts", {
+      className: "EmptyLdPost",
       foreignKey: "author_id",
     });
-    expect(posts.length > 0).toBe(true);
+    registerModel("EmptyLdAuthor", EmptyLdAuthor);
+    registerModel("EmptyLdPost", EmptyLdPost);
+    const author = await EmptyLdAuthor.create({ name: "Alice" });
+    await EmptyLdPost.create({ author_id: author.id, title: "A" });
+    const author2 = await EmptyLdAuthor.create({ name: "Bob" });
+    const proxy = association(author, "emptyLdPosts");
+    const proxy2 = association(author2, "emptyLdPosts");
+    await proxy.load();
+    await proxy2.load();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy2.loaded).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(await proxy.isEmpty()).toBe(false);
+      expect(await proxy2.isEmpty()).toBe(true);
+    });
   });
 
   it("calling many should return false if none or one", async () => {
