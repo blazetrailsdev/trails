@@ -3,10 +3,8 @@
  *
  * Mixed into Base via include(Base, AutosaveAssociation).
  * Instance methods are this-typed functions on the module object.
- * The [included] hook registers validateAssociations onto the class.
  */
 import type { Base } from "./base.js";
-import type { ValidationContextArg } from "./validations.js";
 import { RecordInvalid } from "./validations.js";
 import {
   AssociationNotFoundError,
@@ -16,7 +14,6 @@ import { NestedError as AssociationsNestedError } from "./associations/nested-er
 import type { AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
-import { included } from "@blazetrails/activesupport";
 import { afterCreate, afterUpdate, afterValidation, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
@@ -208,11 +205,6 @@ export const AutosaveAssociation = {
     return map?.get(_guardKey(association)) ?? false;
   },
 
-  // Ruby's Module#included(base) — fires when include(Base, AutosaveAssociation) runs
-  [included](klass: any) {
-    klass._validateAssociationsFn = validateAssociations;
-  },
-
   associatedRecordsToValidateOrSave,
   isNestedRecordsChangedForAutosave,
   validateHasOneAssociation,
@@ -312,97 +304,7 @@ export function clearAutosaveState(record: Base): void {
 // Validate & autosave (called from Base.isValid and Base.save)
 // ---------------------------------------------------------------------------
 
-const _validatingRecords = new WeakSet<object>();
 const _autosavingRecords = new WeakSet<object>();
-
-export function validateAssociations(record: Base, context?: ValidationContextArg): void {
-  if (_validatingRecords.has(record)) return;
-  _validatingRecords.add(record);
-
-  try {
-    const ctor = record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-
-    for (const assoc of associations) {
-      if (assoc.options.validate === false) continue;
-      // Rails only validates has_one/belongs_to children when autosave or validate: true is set.
-      // has_many and habtm validate by default (unless validate: false above).
-      const isCollection = assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany";
-      if (!isCollection && !assoc.options.autosave && assoc.options.validate !== true) continue;
-
-      const inst = _loadedAssociation(record, assoc.name);
-      if (!inst || inst.target == null) continue;
-
-      const reflectionLike = { name: assoc.name, options: assoc.options };
-
-      // _validationContext is restored before validateAssociations runs
-      // (base.ts:3192-3201), so derive the custom context from the parameter
-      // directly rather than reading off the owner.
-      const customCtx: ValidationContextArg | undefined =
-        context != null && context !== "create" && context !== "update" ? context : undefined;
-
-      if (isCollection) {
-        // Mirrors Rails validate_collection_association: filter via
-        // associated_records_to_validate_or_save, then association_valid? each.
-        // A custom validation context bypasses the changed/new filter so that
-        // unchanged persisted children still run their context-specific validators —
-        // matches the `|| context` arm in `association_valid?` (autosave_association.rb:384).
-        const filtered = customCtx
-          ? Array.isArray(inst.target)
-            ? (inst.target as any[])
-            : inst.target != null
-              ? [inst.target as any]
-              : null
-          : associatedRecordsToValidateOrSave(
-              inst,
-              typeof record.isNewRecord === "function" ? record.isNewRecord() : false,
-              !!assoc.options.autosave,
-            );
-        if (!filtered) continue;
-        for (const child of filtered) {
-          isAssociationValid(reflectionLike, child, record, inst, customCtx);
-        }
-      } else {
-        // has_one / belongs_to — Rails gate is changed_for_autosave? || custom_validation_context?
-        // (autosave_association.rb:332,346). When that gate passes, isAssociationValid runs and
-        // applies the Rails associated_errors filter: a persisted-unchanged child with cached
-        // NestedError instances still re-propagates them (but only NestedError-kind errors).
-        const child = inst.target as Base;
-        if (typeof (child as any).isDestroyed === "function" && (child as any).isDestroyed())
-          continue;
-        if (!((child as any).changedForAutosave?.() ?? false) && !customCtx) continue;
-        if (assoc.type === "belongsTo") {
-          _setValidatingBelongsToFor(record, assoc, true);
-          try {
-            isAssociationValid(reflectionLike, child, record, inst, customCtx);
-          } finally {
-            _setValidatingBelongsToFor(record, assoc, false);
-          }
-        } else {
-          // has_one — mirror Rails validate_has_one_association inverse guard
-          // (autosave_association.rb:333-336): skip when the inverse belongs_to
-          // on the child is currently validating or autosaving, to break cycles.
-          const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name) ?? null;
-          const inverse =
-            typeof reflection?.inverseOf === "function" ? reflection.inverseOf() : null;
-          if (inverse) {
-            const inverseInst = _loadedAssociation(child, inverse.name);
-            if (
-              inverseInst &&
-              ((child as any).isValidatingBelongsToFor?.(inverseInst) ||
-                (child as any).isAutosavingBelongsToFor?.(inverseInst))
-            ) {
-              continue;
-            }
-          }
-          isAssociationValid(reflectionLike, child, record, inst, customCtx);
-        }
-      }
-    }
-  } finally {
-    _validatingRecords.delete(record);
-  }
-}
 
 export async function autosaveBelongsTo(record: Base): Promise<boolean> {
   if (_autosavingRecords.has(record)) return true;
@@ -1013,11 +915,23 @@ export function validateCollectionAssociation(
   // Pass the real Association instance so downstream readers can reach
   // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
   const association = _loadedAssociation(this, reflection.name);
-  const records = associatedRecordsToValidateOrSave(
-    association,
-    typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
-    !!reflection.options?.autosave,
-  );
+  // Mirrors Rails autosave_association.rb:298-305 — a custom validation context
+  // bypasses the changed/new filter so unchanged persisted children still run
+  // their context-specific validators (the `|| custom_validation_context?` arm).
+  const customCtx =
+    typeof (this as any).customValidationContext === "function" &&
+    (this as any).customValidationContext();
+  const records = customCtx
+    ? association?.target == null
+      ? null
+      : Array.isArray(association.target)
+        ? (association.target as any[])
+        : [association.target as any]
+    : associatedRecordsToValidateOrSave(
+        association,
+        typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
+        !!reflection.options?.autosave,
+      );
   if (!records) return;
   for (const record of records) {
     isAssociationValid(reflection, record, this, association);
@@ -1030,16 +944,14 @@ export function isAssociationValid(
   record: any,
   owner: any,
   association: any,
-  contextOverride?: ValidationContextArg,
 ): boolean {
   // Mirrors Rails `association_valid?` (autosave_association.rb:371-398).
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
-  const context: ValidationContextArg | undefined =
-    contextOverride ??
-    (typeof owner?.customValidationContext === "function" && owner.customValidationContext()
+  const context =
+    typeof owner?.customValidationContext === "function" && owner.customValidationContext()
       ? owner._validationContext
-      : undefined);
+      : undefined;
   const isChildValid = typeof record.isValid === "function" ? record.isValid(context) : true;
   if (isChildValid) return true;
 
@@ -1402,14 +1314,14 @@ function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
       return validateBelongsToAssociation.call(this, reflection);
     });
   }
-  // Rails autosave_association.rb:231 calls `validate validationName` to
-  // register the per-association validator as a before_validate callback.
-  // Our `validateAssociations` (wired through `_validateAssociationsFn` /
-  // base.ts:3186) already iterates every association and invokes child
-  // validation in one pass, so registering klass.validate(validationName)
-  // here would fire the same child errors twice. The per-association
-  // validation methods are still defined on the prototype for Rails-shape
-  // parity; the dispatch path is just centralized rather than per-callback.
+  // Mirrors Rails autosave_association.rb:231 — `validate validation_method`
+  // registers the per-association validator as a before_validate callback.
+  // Cycle-breaking is handled per-record by `defineNonCyclicMethod`'s
+  // `_alreadyCalled` guard, so co-recursive owner/child chains terminate
+  // even though each validator runs independently.
+  if (typeof klass.validate === "function") {
+    klass.validate(validationName);
+  }
   // Mirrors Rails: after_validation :_ensure_no_duplicate_errors (once per class).
   // Own-property check mirrors the same pattern as the validation method guard above —
   // a subclass inheriting the flag from its parent does NOT inherit the registered

@@ -3193,10 +3193,6 @@ export class Base extends Model {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
     const result = validationsIsValid.call(this, effectiveContext);
-    const ctor = this.constructor as any;
-    if (typeof ctor._validateAssociationsFn === "function") {
-      ctor._validateAssociationsFn(this, effectiveContext);
-    }
     return result && !this.errors.any;
   }
 
