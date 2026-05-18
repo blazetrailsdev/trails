@@ -148,12 +148,21 @@ export function newColumnFromField(
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
+  const extraRaw = field["Extra"] ?? "";
+  const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
+
   if (meta.type === "datetime" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def ?? "")) {
-    if (/on update CURRENT_TIMESTAMP/i.test(field["Extra"] ?? "")) def = `${def} ON UPDATE ${def}`;
+    if (/on update CURRENT_TIMESTAMP/i.test(extraRaw)) def = `${def} ON UPDATE ${def}`;
     [def, defFn] = [null, def];
-  } else if (meta.extra === "DEFAULT_GENERATED") {
+  } else if (meta.extra.toUpperCase().startsWith("DEFAULT_GENERATED")) {
+    // MySQL 8 emits "DEFAULT_GENERATED" alone (function default) or compound
+    // "DEFAULT_GENERATED on update CURRENT_TIMESTAMP". Both flow through the
+    // function-default path; fold on_update into the function expression so
+    // renameColumnForAlter can rebuild the column from defaultFunction alone.
     if (def != null && !def.startsWith("(")) def = `(${def})`;
-    [def, defFn] = [null, def?.replace(/\\'/g, "'") ?? null];
+    let folded = def?.replace(/\\'/g, "'") ?? null;
+    if (folded != null && onUpdateMatch) folded = `${folded} ON UPDATE ${onUpdateMatch[1]}`;
+    [def, defFn] = [null, folded];
   } else if (meta.type === "text" && def?.startsWith("'")) {
     def = def.slice(1, -1).replace(/\\'/g, "'");
   } else if (def != null && !/^\d/.test(def)) {
@@ -161,12 +170,20 @@ export function newColumnFromField(
       [def, defFn] = [null, def];
   }
 
+  // Capture ON UPDATE <expr> only when it wasn't already folded into defFn. The datetime
+  // CURRENT_TIMESTAMP and DEFAULT_GENERATED branches fold ON UPDATE into the function-default
+  // string; for the remaining cases (e.g. datetime column with no default and a bare
+  // `on update CURRENT_TIMESTAMP` Extra) we preserve it as a first-class column attribute so
+  // renameColumnForAlter's rebuild can pass it through MysqlAddColumnOptions.onUpdate.
+  const onUpdateForColumn =
+    onUpdateMatch && (defFn == null || !/ ON UPDATE /i.test(defFn)) ? onUpdateMatch[1] : null;
   return new Column(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
     unsigned: /unsigned/i.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
-    virtual: /VIRTUAL GENERATED|STORED GENERATED/i.test(field["Extra"] ?? ""),
+    virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
+    onUpdate: onUpdateForColumn,
   });
 }
 
