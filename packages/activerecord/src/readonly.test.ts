@@ -283,8 +283,13 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => adapter);
+
   it("allows setting readonly attributes on create", async () => {
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -303,7 +308,6 @@ describe("ReadonlyTest", () => {
     // on a persisted-record write to an attr_readonly column (readonly_attributes.rb
     // line 49). The Rails test by this name in newer Rails asserts that
     // behavior — the "ignores" wording pre-dates the raise being added.
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -327,7 +331,6 @@ describe("ReadonlyTest", () => {
   });
 
   it("exposes readonlyAttributes list", async () => {
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
