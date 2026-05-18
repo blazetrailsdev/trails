@@ -56,9 +56,11 @@ export class HasOne extends SingularAssociation {
     if (options.touch) {
       this.addTouchCallbacks(model, reflection);
     }
-    if (options.autosave) {
-      addAutosaveAssociationCallbacks(model, reflection);
-    }
+    // Mirrors Rails AutosaveAssociation::AssociationBuilderExtension.build —
+    // registered for every has_one regardless of the `autosave:` option.
+    // The save callbacks gate on `options.autosave` internally; the validate
+    // callback gates on `reflection.validate?` (true for `validate: true`).
+    addAutosaveAssociationCallbacks(model, reflection);
   }
 
   static override addDestroyCallbacks(model: any, reflection: any): void {
