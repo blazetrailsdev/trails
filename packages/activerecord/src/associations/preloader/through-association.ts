@@ -235,11 +235,20 @@ export class ThroughAssociation extends Association {
   }
 
   /**
-   * Mirror Rails: when `owners.first.association(through_reflection.name).loaded?`,
-   * reuse the loaded through records instead of letting the through preloader
-   * refetch them. Keeps record identity stable so `sourceRecordsByOwner` lookups
-   * (keyed on through-record object identity) succeed for the
-   * polymorphic-source + sourceType path.
+   * Identity-preservation gate for the polymorphic-source + `sourceType` path.
+   *
+   * Rails' `records_by_owner` filter (`owners.first.association(through).loaded?`,
+   * preloader/through_association.rb:20) is mirrored verbatim in the
+   * `recordsByOwner` loop above. This helper is the stricter intercept that
+   * runs *before* the through preloader fetches: it only fires when the
+   * reflection has a `sourceType` AND **every** owner already has the through
+   * preloaded — that combination is the empty-result gap, and the
+   * `every`-gate keeps mixed loaded/unloaded preloads on the standard
+   * LoaderRecords merge path (see "preload through records with already
+   * loaded middle record" in associations.test.ts). Reusing the loaded
+   * through records keeps middleRecords and throughRecordsByOwner referencing
+   * the same instances so the source preloader's identity-keyed lookups
+   * succeed.
    * @internal
    */
   private _alreadyLoadedThroughByOwner(): Map<Base, Base[]> | null {
