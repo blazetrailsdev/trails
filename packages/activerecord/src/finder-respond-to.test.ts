@@ -1,18 +1,20 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 let Topic: typeof Base;
 
-beforeAll(() => {
+beforeAll(async () => {
   adapter = createTestAdapter();
-});
-beforeEach(async () => {
-  await defineSchema(adapter, { topics: { title: "string", author_name: "string" } });
+  // `status` is added dynamically by one test below; declare it up front so
+  // a later test's INSERT doesn't trigger ALTER ADD COLUMN inside the
+  // transactional fixture (MariaDB implicit-commits on DDL).
+  await defineSchema(adapter, {
+    topics: { title: "string", author_name: "string", status: "string" },
+  });
   Topic = class extends Base {
     static {
       this.attribute("title", "string");
@@ -21,9 +23,7 @@ beforeEach(async () => {
     }
   };
 });
-afterAll(async () => {
-  await dropAllTables(adapter);
-});
+withTransactionalFixtures(() => adapter);
 
 describe("FinderRespondToTest", () => {
   it("should preserve normal respond to behavior on base", () => {

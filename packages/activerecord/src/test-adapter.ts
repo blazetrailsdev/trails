@@ -413,6 +413,65 @@ async function processPendingModels(inner: any): Promise<void> {
   _pendingCpk.clear();
 }
 
+/**
+ * Extract the top-level column names from a `CREATE TABLE ... (...)` body.
+ * Used to seed `_createdColumns` so `processPendingModels()` skips an
+ * ALTER ADD on a column the CREATE TABLE just defined — important on
+ * MariaDB, where ALTER inside a transaction implicit-commits the BEGIN
+ * and breaks `withTransactionalFixtures` isolation.
+ *
+ * Tracks paren depth so a nested type like `DECIMAL(10,2)` doesn't count
+ * as a top-level comma; identifiers may be quoted with `"`, `` ` ``, or
+ * unquoted. Returns `Set(["id"])` if no body is found.
+ */
+function parseCreateTableColumns(sql: string): Set<string> {
+  const m = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`]?\w+["`]?\s*\(/i);
+  if (!m) return new Set(["id"]);
+  const start = m.index! + m[0].length;
+  let depth = 1;
+  let end = -1;
+  for (let i = start; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (end < 0) return new Set(["id"]);
+
+  const cols = new Set<string>();
+  const body = sql.slice(start, end);
+  let part = "";
+  let pd = 0;
+  const flush = () => {
+    const piece = part.trim();
+    part = "";
+    if (!piece) return;
+    // Skip table-level constraints: PRIMARY KEY (...), FOREIGN KEY, UNIQUE, INDEX, KEY, CHECK, CONSTRAINT.
+    if (/^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE\b|INDEX\b|KEY\b|CHECK\b|CONSTRAINT\b)/i.test(piece))
+      return;
+    const colMatch = piece.match(/^(?:["`](\w+)["`]|(\w+))/);
+    if (colMatch) cols.add(colMatch[1] ?? colMatch[2]);
+  };
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === "(") pd++;
+    else if (ch === ")") pd--;
+    if (ch === "," && pd === 0) {
+      flush();
+      continue;
+    }
+    part += ch;
+  }
+  flush();
+  if (cols.size === 0) cols.add("id");
+  return cols;
+}
+
 let _ddlSpCounter = 0;
 
 /**
@@ -863,8 +922,12 @@ class SchemaAdapter implements DatabaseAdapter {
         if (useSp) await this.inner.releaseSavepoint(sp);
         if (createMatch) {
           _createdTables.add(createMatch[1]);
+          // Parse the column list from the CREATE TABLE body so subsequent
+          // processPendingModels() doesn't try to ALTER ADD an already-present
+          // column. On MariaDB ALTER causes an implicit commit that breaks
+          // any enclosing BEGIN/ROLLBACK (transactional fixtures rely on this).
           if (!_createdColumns.has(createMatch[1])) {
-            _createdColumns.set(createMatch[1], new Set(["id"]));
+            _createdColumns.set(createMatch[1], parseCreateTableColumns(sql));
           }
         }
         if (dropMatch) {
