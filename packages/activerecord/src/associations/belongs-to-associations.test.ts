@@ -14,6 +14,7 @@ import {
 } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -22,8 +23,16 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+    });
+  });
+
   it("destroy linked models", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -40,8 +49,12 @@ describe("BelongsToWithForeignKeyTest", () => {
 describe("touch on belongs_to", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", updated_at: "datetime" },
+      comments: { body: "string", post_id: "integer" },
+    });
   });
 
   it("touches parent updated_at when child is saved", async () => {
@@ -3740,8 +3753,12 @@ describe("BelongsToAssociationsTest", () => {
 
 describe("AsyncBelongsToAssociationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      albt_companies: { name: "string" },
+      albt_accounts: { company_id: "integer" },
+    });
   });
 
   it("async load belongs to", async () => {
@@ -3772,8 +3789,14 @@ describe("AsyncBelongsToAssociationsTest", () => {
 
 describe("BelongsToAssociationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      bt_companies: { name: "string" },
+      bt_accounts: { company_id: "integer", credit_limit: "integer" },
+      pk_firms: { name: "string", firm_name: "string" },
+      pk_clients: { firm_name: "string" },
+    });
   });
 
   it("belongs to", async () => {
