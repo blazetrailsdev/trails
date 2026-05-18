@@ -9,6 +9,8 @@ import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
+import { OptionRedirect, PathRedirect, Redirect, type RedirectBlock } from "./redirection.js";
+import type { Request } from "../http/request.js";
 
 const PATHFOR_SEPARATORS = "/.?";
 
@@ -107,6 +109,39 @@ export class Route {
   get isRedirect(): boolean {
     return this.redirectTarget !== undefined;
   }
+
+  /**
+   * The {@link Redirect} endpoint built from {@link redirectTarget}, used by
+   * `RouteSet#call` as the production redirect dispatch path. Lazy so the
+   * `Redirect` classes (which pull in `Request`/`Response`) aren't constructed
+   * for non-redirect routes.
+   */
+  get redirectEndpoint(): Redirect | undefined {
+    if (this._redirectEndpoint !== undefined) return this._redirectEndpoint ?? undefined;
+    const target = this.redirectTarget;
+    if (target === undefined) {
+      this._redirectEndpoint = null;
+      return undefined;
+    }
+    let endpoint: Redirect;
+    if (typeof target === "function") {
+      const fn = target;
+      const block: RedirectBlock = (params, request: Request) =>
+        fn(params, { method: request.method, path: request.path });
+      endpoint = new Redirect(301, block);
+    } else if (typeof target === "string") {
+      endpoint = new PathRedirect(301, target);
+    } else {
+      const status = target.status ?? 301;
+      const { status: _s, ...opts } = target;
+      endpoint = new OptionRedirect(status, opts);
+    }
+    this._redirectEndpoint = endpoint;
+    return endpoint;
+  }
+
+  /** @internal */
+  private _redirectEndpoint: Redirect | null | undefined = undefined;
 
   /**
    * Returns the path-capture (dynamic/glob) parameter names declared by
