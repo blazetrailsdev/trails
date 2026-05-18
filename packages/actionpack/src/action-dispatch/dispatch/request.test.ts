@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "../request.js";
 import { MimeType } from "../http/mime-type.js";
-import "../http/mime-types.js";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -230,23 +229,35 @@ describe("RequestMethod", () => {
 
 describe("RequestMimeType", () => {
   it("content type", () => {
-    const req = new Request({ CONTENT_TYPE: "application/json" });
-    expect(req.contentType).toBe("application/json");
+    const req = new Request({ CONTENT_TYPE: "text/html" });
+    expect(req.contentMimeType).toBe(MimeType.HTML);
+    expect(req.mediaType).toBe("text/html");
+    expect(req.contentType).toBe("text/html");
   });
 
   it("no content type", () => {
     const req = new Request({});
+    expect(req.contentMimeType).toBeNull();
+    expect(req.mediaType).toBeUndefined();
     expect(req.contentType).toBeUndefined();
   });
 
   it("content type is XML", () => {
     const req = new Request({ CONTENT_TYPE: "application/xml" });
+    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.mediaType).toBe("application/xml");
     expect(req.contentType).toBe("application/xml");
   });
 
   it("content type with charset", () => {
-    const req = new Request({ CONTENT_TYPE: "text/html; charset=utf-8" });
-    expect(req.contentType).toBe("text/html");
+    const req = new Request({ CONTENT_TYPE: "application/xml; charset=UTF-8" });
+    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.mediaType).toBe("application/xml");
+  });
+
+  it("has_content_type?", () => {
+    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
+    expect(new Request({}).hasContentType()).toBe(false);
   });
 
   it("user agent", () => {
@@ -387,8 +398,8 @@ describe("RequestFormat", () => {
   });
 
   it("ignore_accept_header", () => {
-    const prev = Request.ignoreAcceptHeader();
-    Request.setIgnoreAcceptHeader(true);
+    const prev = Request.ignoreAcceptHeader;
+    Request.ignoreAcceptHeader = true;
     try {
       const r1 = new Request({ HTTP_ACCEPT: "application/xml", QUERY_STRING: "" });
       expect(r1.formats).toEqual([MimeType.HTML]);
@@ -407,41 +418,8 @@ describe("RequestFormat", () => {
       });
       expect(r4.formats.map((m) => m?.symbol)).toEqual(["json"]);
     } finally {
-      Request.setIgnoreAcceptHeader(prev);
+      Request.ignoreAcceptHeader = prev;
     }
-  });
-});
-
-describe("RequestMimeType", () => {
-  it("content type", () => {
-    const req = new Request({ CONTENT_TYPE: "text/html" });
-    expect(req.contentMimeType).toBe(MimeType.HTML);
-    expect(req.mediaType).toBe("text/html");
-    expect(req.contentType).toBe("text/html");
-  });
-
-  it("no content type", () => {
-    const req = new Request({});
-    expect(req.contentMimeType).toBeNull();
-    expect(req.mediaType).toBeUndefined();
-    expect(req.contentType).toBeUndefined();
-  });
-
-  it("content type is XML", () => {
-    const req = new Request({ CONTENT_TYPE: "application/xml" });
-    expect(req.contentMimeType?.symbol).toBe("xml");
-    expect(req.mediaType).toBe("application/xml");
-  });
-
-  it("content type with charset", () => {
-    const req = new Request({ CONTENT_TYPE: "application/xml; charset=UTF-8" });
-    expect(req.contentMimeType?.symbol).toBe("xml");
-    expect(req.mediaType).toBe("application/xml");
-  });
-
-  it("has_content_type?", () => {
-    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
-    expect(new Request({}).hasContentType()).toBe(false);
   });
 });
 

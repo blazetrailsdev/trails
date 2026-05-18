@@ -257,10 +257,13 @@ export class Request {
   declare setFormat: (extension: unknown) => void;
   declare setFormats: (extensions: unknown[]) => void;
 
-  static ignoreAcceptHeader(): boolean {
+  // Class-level attribute mirroring Rails' `mattr_accessor :ignore_accept_header`.
+  // Exposed as a static getter/setter so call sites read as `Request.ignoreAcceptHeader`
+  // / `Request.ignoreAcceptHeader = true`.
+  static get ignoreAcceptHeader(): boolean {
     return _ignoreAcceptHeader();
   }
-  static setIgnoreAcceptHeader(value: boolean): void {
+  static set ignoreAcceptHeader(value: boolean) {
     _setIgnoreAcceptHeader(value);
   }
 
