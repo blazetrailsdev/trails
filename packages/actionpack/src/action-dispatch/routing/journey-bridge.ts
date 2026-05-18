@@ -11,7 +11,11 @@ import { Ast } from "../journey/ast.js";
 import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, VerbMatchers } from "../journey/route.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
-import { Router as JourneyRouter, type RouterRequest } from "../journey/router.js";
+import {
+  Router as JourneyRouter,
+  type RoutableApp,
+  type RouterRequest,
+} from "../journey/router.js";
 import { normalizePath, unescapeUri } from "../journey/router/utils.js";
 import type { Route as LocalRoute } from "./route.js";
 
@@ -34,6 +38,13 @@ export interface BuildJourneyRouterOptions {
    * on the synthetic RouterRequest.
    */
   skipRequestConstraints?: boolean;
+  /**
+   * App attached to every synthesized Journey route. When omitted, routes
+   * carry a throwing stub — callers that only use `Router.recognize` /
+   * `journeyRecognize` never trigger it. Pass a `RouteDispatcher` here to
+   * make `Router.serve` actually dispatch.
+   */
+  app?: RoutableApp;
 }
 
 export function buildJourneyRouter(
@@ -57,17 +68,19 @@ export function buildJourneyRouter(
     // controller/action are authoritative on the local Route; user defaults
     // must not overwrite them. Precedence is the insertion index so
     // Router.recognize's precedence sort preserves RouteSet order.
+    const fallbackApp: RoutableApp = {
+      serve: () => {
+        throw new Error(
+          `Journey-bridge route '${name}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
+        );
+      },
+    };
+    const app = opts.app ?? fallbackApp;
     journeyRoutes.addRoute(name, {
       makeRoute: (routeName, index) => {
         const journeyRoute = new JourneyRoute({
           name: routeName,
-          app: {
-            serve: () => {
-              throw new Error(
-                `Journey-bridge route '${routeName}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
-              );
-            },
-          },
+          app,
           path: pattern,
           constraints: opts.skipRequestConstraints ? {} : r.requestConstraints,
           defaults: { ...r.defaults, controller: r.controller, action: r.action },
