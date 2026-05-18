@@ -56,9 +56,12 @@ export class BelongsTo extends SingularAssociation {
     if (options.default != null) {
       this.addDefaultCallbacks(model, reflection);
     }
-    if (options.autosave) {
-      addAutosaveAssociationCallbacks(model, reflection);
-    }
+    // Rails registers autosave callbacks for every belongs_to via
+    // AssociationBuilderExtension (autosave_association.rb:143-150) — not
+    // gated on the `autosave` option. The option only steers behavior inside
+    // save_belongs_to_association (validate flag, destroy of marked-for-
+    // destruction targets, save of changed-but-persisted records).
+    addAutosaveAssociationCallbacks(model, reflection);
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {

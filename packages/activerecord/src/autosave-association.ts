@@ -444,7 +444,10 @@ async function autosaveAssociation(record: Base, assoc: AssociationDefinition): 
   // short-circuits on a null target — no need for a dispatch-level gate.
   if (assoc.type === "hasMany") return autosaveHasMany(record, assoc);
   if (assoc.type === "hasOne") return autosaveHasOne(record, assoc);
-  if (assoc.type === "belongsTo") return _autosaveBelongsTo(record, assoc);
+  if (assoc.type === "belongsTo") {
+    const reflection = (record.constructor as any)._reflectOnAssociation?.(assoc.name);
+    return _autosaveBelongsTo(record, assoc, reflection);
+  }
   if (assoc.type === "hasAndBelongsToMany") return autosaveHabtm(record, assoc);
   return true;
 }
@@ -671,7 +674,121 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   return true;
 }
 
-async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): Promise<boolean> {
+/**
+ * Resolve the foreign-key column(s) for a belongs_to association in the
+ * same shape `BelongsToAssociation#foreignKeyNames` produces, so the
+ * autosave path writes to the columns the writer populated at
+ * assignment time. Mirrors `Array(reflection.foreign_key)` plus the
+ * Trails-specific composite-PK inference (`${name}_${pk}`) that the
+ * belongs_to writer applies when the target has a composite PK and no
+ * explicit `foreignKey` was configured (see
+ * `belongs-to-association.ts#foreignKeyNames` and the
+ * `setBelongsTo infers composite foreign key from target primary key`
+ * coverage in `associations.test.ts`).
+ *
+ * @internal
+ */
+function _resolveBelongsToForeignKey(
+  assoc: AssociationDefinition,
+  assocRecord?: Base,
+  reflection?: any,
+): string[] {
+  if (assoc.options.foreignKey != null) {
+    const fk = assoc.options.foreignKey;
+    return Array.isArray(fk) ? fk : [fk];
+  }
+  if (assoc.options.queryConstraints != null) {
+    const qc = assoc.options.queryConstraints;
+    return Array.isArray(qc) ? qc : [qc];
+  }
+  // Composite-PK inference (`${name}_${pk}`) when target has composite
+  // PK — matches `BelongsToAssociation#foreignKeyNames` so autosave FK
+  // propagation writes the same columns the writer populated at
+  // assignment time. Skip when the association has an explicit
+  // `primaryKey`: `associationPrimaryKeys()` collapses the configured PK
+  // to a single-element array, so the writer's foreignKeyNames falls
+  // through to the scalar `${name}_id` rather than expanding.
+  if (assoc.options.primaryKey == null && assocRecord) {
+    const pk = (assocRecord.constructor as typeof Base).primaryKey;
+    if (Array.isArray(pk) && pk.length > 1) {
+      const prefix = underscore(assoc.name);
+      return pk.map((part) => `${prefix}_${part}`);
+    }
+  }
+  // Deferred reflection.foreignKey lookup: the getter runs
+  // `deriveFkQueryConstraints` (reflection.ts), which expands the scalar
+  // `${name}_id` FK into a composite `[fk, qc_key]` pair when the owner
+  // has class-level query_constraints. Without this, owners with
+  // query_constraints would only get the scalar column written and
+  // leave the QC partner stale. The getter can raise
+  // ConfigurationError; that surfaces only on write/null branches that
+  // actually need the FK, never at callback registration.
+  const reflFk = reflection?.foreignKey;
+  if (reflFk != null) {
+    return Array.isArray(reflFk) ? reflFk : [reflFk];
+  }
+  return [`${underscore(assoc.name)}_id`];
+}
+
+/**
+ * Resolve the primary-key column(s) on the target side of a belongs_to
+ * association, paired against `_resolveBelongsToForeignKey` so the
+ * autosave FK propagation zips matching columns. Mirrors
+ * `BelongsToAssociation#associationPrimaryKeys` for the no-`foreignKey`
+ * composite-PK branch (each FK position pairs with the matching target
+ * PK column), and Rails' `compute_primary_key(reflection, record)`
+ * otherwise (autosave_association.rb:576-589).
+ *
+ * @internal
+ */
+function _resolveBelongsToPrimaryKey(
+  assoc: AssociationDefinition,
+  assocRecord: Base,
+  reflection?: any,
+): string[] {
+  // Composite-PK inference branch: when neither `foreignKey` nor
+  // `queryConstraints` is set and the target has composite PK, the
+  // writer pairs PK columns 1:1 with the `${name}_${pk}` FK columns.
+  // Rails' compute_primary_key would collapse [tenant_id, id] → "id"
+  // (autosave_association.rb:585) — that collapse only matches when the
+  // FK is scalar; with composite-FK inference we need the full PK.
+  if (assoc.options.primaryKey == null) {
+    // Defer to computePrimaryKey when the target has *explicit*
+    // class-level query_constraints and Rails' compute_primary_key
+    // (steps 2/3 at autosave_association.rb:577-582) would pick that
+    // list: i.e. the assoc has `queryConstraints`, OR the assoc has no
+    // `foreignKey` option. Use hasQueryConstraints (the explicit flag),
+    // not queryConstraintsList — the latter falls back to the
+    // composite-PK array for any composite-PK target, which would
+    // misroute composite-PK-only targets through the QC branch.
+    const targetHasQc = hasQueryConstraints.call(assocRecord.constructor as any);
+    const targetQcWouldApply =
+      targetHasQc && (assoc.options.queryConstraints != null || assoc.options.foreignKey == null);
+    if (!targetQcWouldApply) {
+      // Trails-specific override of Rails' composite-PK collapse-to-"id"
+      // (autosave_association.rb:585): pair the full composite PK
+      // against composite FKs (explicit, queryConstraints array,
+      // reflection-derived, or the no-FK inference path) so the zip
+      // hits every column the writer populates.
+      const explicitFk = assoc.options.foreignKey ?? assoc.options.queryConstraints;
+      const fkIsComposite = Array.isArray(explicitFk) && explicitFk.length > 1;
+      const reflFk = reflection?.foreignKey;
+      const reflFkIsComposite = Array.isArray(reflFk) && reflFk.length > 1;
+      if (fkIsComposite || reflFkIsComposite || explicitFk == null) {
+        const pk = (assocRecord.constructor as typeof Base).primaryKey;
+        if (Array.isArray(pk) && pk.length > 1) return pk;
+      }
+    }
+  }
+  const rawPk = computePrimaryKey.call(assocRecord as any, { options: assoc.options });
+  return Array.isArray(rawPk) ? rawPk : [rawPk];
+}
+
+async function _autosaveBelongsTo(
+  record: Base,
+  assoc: AssociationDefinition,
+  reflection?: any,
+): Promise<boolean> {
   const inst = _loadedAssociation(record, assoc.name);
   // Rails save_belongs_to_association:538 — skip when the loaded target is
   // stale (FK changed since the target was cached).
@@ -683,63 +800,69 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
   if (typeof (assocRecord as any).isDestroyed === "function" && (assocRecord as any).isDestroyed())
     return true;
 
-  if (isMarkedForDestruction(assocRecord)) {
-    // Rails save_belongs_to_association:544-547 — when destroying the
-    // associated record, null out the FK on self first so the owner save
-    // doesn't keep a dangling reference.
-    const foreignKey =
-      assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
-    const fkList: string[] = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+  const autosave = assoc.options.autosave;
+  // Rails save_belongs_to_association:548 — `elsif autosave != false`.
+  // Explicit `autosave: false` opts out entirely.
+  if (autosave === false) return true;
+
+  if (autosave && isMarkedForDestruction(assocRecord)) {
+    // Rails save_belongs_to_association:544-547 — destroy path is only
+    // reached when `autosave` is truthy; the destruction nulls the FK on
+    // self first so the owner save doesn't keep a dangling reference.
+    const fkList = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
     for (const key of fkList) record._writeAttribute(key, null);
     if (!assocRecord.isNewRecord()) await assocRecord.destroy();
     return true;
   }
+
   // Rails save_belongs_to_association:549 — `record.new_record? || (autosave && record.changed_for_autosave?)`.
-  // autosave is always true on this path (gated in autosaveAssociation).
   const beChangedForSave =
-    typeof (assocRecord as any).changedForAutosave === "function"
+    autosave &&
+    (typeof (assocRecord as any).changedForAutosave === "function"
       ? (assocRecord as any).changedForAutosave()
-      : !!(assocRecord as any).changed;
+      : !!(assocRecord as any).changed);
   if (assocRecord.isNewRecord() || beChangedForSave) {
     _setAutosavingBelongsToFor(record, assoc, true);
+    let saved: boolean | undefined;
     try {
       // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
-      // autosave is always true on this code path (gated in autosaveAssociation).
-      const saved = await assocRecord.save({ validate: false });
-      if (!saved) {
-        propagateErrors(record, assocRecord, assoc.name);
-        return false;
-      }
+      saved = await assocRecord.save({ validate: !autosave });
     } finally {
       _setAutosavingBelongsToFor(record, assoc, false);
     }
-
-    const foreignKey =
-      assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(assoc.name)}_id`;
-    const primaryKey =
-      assoc.options.primaryKey ?? (assocRecord.constructor as typeof Base).primaryKey ?? "id";
-    if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-      if (primaryKey.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError(
-          (record.constructor as typeof Base).name,
-          assoc.name,
-        );
+    if (!saved) {
+      // Rails save_belongs_to_association:571 — `saved if autosave`. Only
+      // autosave==true propagates the failure to abort the owner save (and
+      // surfaces child errors via the validate_belongs_to_association path).
+      // Default belongs_to leaves owner.errors untouched on save failure.
+      if (autosave) {
+        propagateErrors(record, assocRecord, assoc.name);
+        return false;
       }
-      primaryKey.forEach((pk: string, i: number) => {
-        const pkValue = assocRecord._readAttribute(pk);
-        if (pkValue != null) record._writeAttribute((foreignKey as string[])[i], pkValue);
-      });
-    } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-      const pkValue = assocRecord._readAttribute(primaryKey);
-      if (pkValue != null) record._writeAttribute(foreignKey, pkValue);
-    } else {
-      throw new CompositePrimaryKeyMismatchError(
-        (record.constructor as typeof Base).name,
-        assoc.name,
-      );
+      return true;
     }
-    // Rails save_belongs_to_association:559-568: `association.loaded!` only
-    // fires inside the `if association.updated?` branch — after the FK write.
+
+    const foreignKey = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
+    // Pair against the target's PK columns in the same shape the writer
+    // (BelongsToAssociation#replaceKeys) used, so autosave FK
+    // propagation lands on the same columns the writer populated.
+    const primaryKey = _resolveBelongsToPrimaryKey(assoc, assocRecord, reflection);
+    // Rails save_belongs_to_association:563: `primary_key.zip(foreign_key)`.
+    // Ruby's Array#zip drops trailing args when the argument is longer than
+    // the receiver, and pads with nil when the argument is shorter. Mirror
+    // that here so shape mismatches don't raise — they just don't write FK
+    // columns we have no PK source for (and vice versa).
+    for (let i = 0; i < primaryKey.length; i++) {
+      const fkCol = foreignKey[i];
+      if (fkCol == null) continue;
+      const associationId = assocRecord._readAttribute(primaryKey[i]);
+      // Rails save_belongs_to_association:566 — `unless self[fk] == id`.
+      if (record._readAttribute(fkCol) !== associationId) {
+        record._writeAttribute(fkCol, associationId);
+      }
+    }
+    // Rails save_belongs_to_association:568 — `association.loaded!` fires
+    // inside the `if association.updated?` branch after the FK write.
     if (inst?.isUpdated?.()) inst.loadedBang?.();
   }
   return true;
@@ -1026,11 +1149,22 @@ export async function saveBelongsToAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<boolean> {
-  return _autosaveBelongsTo(this as unknown as Base, {
-    name: reflection.name,
-    type: "belongsTo",
-    options: reflection.options ?? {},
-  });
+  // Pass the raw reflection options through — FK resolution is deferred
+  // to `_resolveBelongsToForeignKey`, which only runs on the branches that
+  // need to write or null columns. Eagerly reading `reflection.foreignKey`
+  // here would trip its query-constraints-derivation ConfigurationError
+  // paths (reflection.ts deriveFkQueryConstraints) on every belongs_to
+  // save, even for an unloaded/untouched association — undesirable now
+  // that the autosave callback is registered for every belongs_to.
+  return _autosaveBelongsTo(
+    this as unknown as Base,
+    {
+      name: reflection.name,
+      type: "belongsTo",
+      options: reflection.options ?? {},
+    },
+    reflection,
+  );
 }
 
 /** @internal */
@@ -1205,7 +1339,14 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     beforeSave(
       model,
       (record: any): Promise<void> =>
-        record[saveMethod]().then((ok: boolean) => (ok ? undefined : (false as unknown as void))),
+        // Wrap with Promise.resolve so the re-entrant branch of
+        // defineNonCyclicMethod (returns sync `true` to mirror Rails'
+        // cyclic-guard early return) doesn't blow up on `.then`. Mirrors
+        // Rails' callback chain, which tolerates both throw-abort and
+        // truthy returns.
+        Promise.resolve(record[saveMethod]()).then((ok: boolean) =>
+          ok ? undefined : (false as unknown as void),
+        ),
     );
   }
 

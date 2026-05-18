@@ -2454,6 +2454,204 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(post.author_id).toBe(author.id);
   });
 
+  it("default belongs_to saves new associated record and propagates the FK", async () => {
+    // Rails autosave_association.rb:548-572 — `elsif autosave != false`
+    // branch fires even when `autosave` is unset, so default belongs_to
+    // saves a new target during owner save and writes the parent PK back
+    // onto the owner's foreign key.
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("Author", Author);
+    registerModel("Post", Post);
+    // No `autosave:` option — exercises the default-on registration path.
+    Associations.belongsTo.call(Post, "author", {
+      foreignKey: "author_id",
+      className: "Author",
+    });
+
+    const author = new Author({ name: "New Author" });
+    const post = new Post({ title: "Default autosave" });
+    cacheAssoc(post, "author", author);
+    await post.save();
+    expect(author.isNewRecord()).toBe(false);
+    expect(post.author_id).toBe(author.id);
+  });
+
+  it("belongs_to autosave with mismatched composite FK/PK uses zip semantics", async () => {
+    // Rails autosave_association.rb:563 — `primary_key.zip(foreign_key)`.
+    // When the FK array is longer than the PK array, Ruby Array#zip
+    // drops the extra FK entries; the loop only writes the positions
+    // where both sides exist. No CompositePrimaryKeyMismatchError.
+    const adapter = freshAdapter();
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Child extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+        this.attribute("region", "string");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("ZipParent", Parent);
+    registerModel("ZipChild", Child);
+    // PK ["id"] (scalar) zipped against FK ["parent_id", "region"] →
+    // pairs [("id", "parent_id")]; the trailing "region" FK is dropped.
+    Associations.belongsTo.call(Child, "parent", {
+      primaryKey: "id",
+      foreignKey: ["parent_id", "region"],
+      className: "ZipParent",
+      autosave: true,
+    });
+
+    const parent = new Parent({ name: "P" });
+    const child = new Child({ label: "c", region: "us-west" });
+    cacheAssoc(child, "parent", parent);
+    await child.save();
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child.parent_id).toBe(parent.id);
+    // Trailing FK "region" was dropped from the zip; the existing
+    // owner value must survive untouched (no overwrite to undefined/null).
+    expect(child.region).toBe("us-west");
+  });
+
+  it("default belongs_to runs validations on the new target via validate: !autosave", async () => {
+    // Rails autosave_association.rb:553 — `record.save(validate: !autosave)`.
+    // With autosave unset, `!autosave` is truthy → the target's validations
+    // run during owner save. A failing validation makes record.save return
+    // false; Rails' `saved if autosave` clamps the return to nil for the
+    // default branch, so the lambda doesn't `throw(:abort)` and the owner
+    // save still succeeds — the child simply remains unpersisted.
+    const adapter = freshAdapter();
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+        this.validates("name", { presence: true });
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("DefaultAutosaveAuthor", Author);
+    registerModel("DefaultAutosavePost", Post);
+    Associations.belongsTo.call(Post, "author", {
+      foreignKey: "author_id",
+      className: "DefaultAutosaveAuthor",
+    });
+
+    const author = new Author({}); // name missing — validation fails
+    const post = new Post({ title: "ok" });
+    cacheAssoc(post, "author", author);
+    const saved = await post.save();
+    // Owner save succeeds — default branch swallows child failure.
+    expect(saved).toBe(true);
+    expect(post.isNewRecord()).toBe(false);
+    // Child remained unsaved because record.save(validate: true) failed.
+    expect(author.isNewRecord()).toBe(true);
+    // Owner.errors stays clean — propagateErrors is gated on autosave.
+    expect(post.errors.size).toBe(0);
+  });
+
+  it("belongs_to autosave with PK longer than FK skips trailing PK positions", async () => {
+    // Rails autosave_association.rb:563 — `primary_key.zip(foreign_key)`.
+    // When PK is longer, the trailing pairs have `foreign_key = nil`;
+    // Ruby's `self[nil] = id` would raise — our impl skips the nil-FK
+    // partner so a misconfigured pair doesn't blow up the owner save.
+    const adapter = freshAdapter();
+    class Parent extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Child extends Base {
+      static {
+        this.attribute("parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("LongPkParent", Parent);
+    registerModel("LongPkChild", Child);
+    // Explicit composite PK ["id", "name"] zipped against scalar FK
+    // ["parent_id"] → only ("id", "parent_id") pairs; ("name", nil) drops.
+    Associations.belongsTo.call(Child, "parent", {
+      primaryKey: ["id", "name"],
+      foreignKey: "parent_id",
+      className: "LongPkParent",
+      autosave: true,
+    });
+
+    const parent = new Parent({ name: "P" });
+    const child = new Child({ label: "c" });
+    cacheAssoc(child, "parent", parent);
+    await child.save();
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child.parent_id).toBe(parent.id);
+    // The dropped ("name", nil) pair didn't attempt to write — no throw,
+    // no spurious column write.
+  });
+
+  it("default belongs_to populates inferred composite FK columns after autosave", async () => {
+    // Mirrors `BelongsToAssociation#foreignKeyNames` composite-PK
+    // inference: when the target has composite PK and no `foreignKey`
+    // option, the writer fills `${assoc}_${pk}` columns at assignment.
+    // After autosave, FK propagation must hit the same columns so a
+    // newly-saved parent's PK lands on the owner.
+    const adapter = freshAdapter();
+    class CompParent extends Base {
+      static {
+        this.primaryKey = ["region_id", "id"];
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CompChild extends Base {
+      static {
+        this.attribute("comp_parent_region_id", "integer");
+        this.attribute("comp_parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CompParent", CompParent);
+    registerModel("CompChild", CompChild);
+    // No foreignKey/queryConstraints — exercises the composite-PK inference
+    // branch in _resolveBelongsToForeignKey.
+    Associations.belongsTo.call(CompChild, "compParent", { className: "CompParent" });
+
+    const parent = new CompParent({ region_id: 5, id: 11, name: "P" });
+    const child = new CompChild({ label: "c" });
+    cacheAssoc(child, "compParent", parent);
+    await child.save();
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child.comp_parent_region_id).toBe(5);
+    expect(child.comp_parent_id).toBe(11);
+  });
+
   it("should not add the same callbacks multiple times for has one", async () => {
     const adapter = freshAdapter();
     let saveCount = 0;
