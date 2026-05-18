@@ -288,23 +288,22 @@ describe("ErrorTest", () => {
     expect(e.get("name")).toEqual(["tooShort"]);
   });
 
-  // P10: fullMessage strips array notation from attribute
+  // Rails error.rb:51-55: strip array notation, then pass full dotted attribute
+  // to human_attribute_name with `attribute.tr(".", "_").humanize` as the default —
+  // so the prefix segment is preserved when no translation matches.
   it("fullMessage strips array notation from attribute", () => {
     const e = new Errors(null);
     e.add("items[0].name", "blank");
     const msg = e.fullMessages[0];
-    // Should humanize "name" not "items[0].name"
-    expect(msg).toBe("Name can't be blank");
+    expect(msg).toBe("Items name can't be blank");
     expect(msg).not.toContain("[0]");
   });
 
-  // P10: fullMessage uses last segment of dotted attribute
   it("fullMessage uses last segment of dotted attribute", () => {
     const e = new Errors(null);
     e.add("profile.bio", "blank");
     const msg = e.fullMessages[0];
-    expect(msg).toBe("Bio can't be blank");
-    expect(msg).not.toContain("Profile");
+    expect(msg).toBe("Profile bio can't be blank");
   });
 
   // P10: fullMessage non-nested regression guard

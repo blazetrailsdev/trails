@@ -9,7 +9,7 @@ interface ModelClass {
   name?: string;
   i18nScope?: string;
   modelName?: { i18nKey?: string };
-  humanAttributeName?: (attr: string) => string;
+  humanAttributeName?: (attr: string, options?: { default?: string }) => string;
   lookupAncestors?: () => ModelClass[];
 }
 
@@ -156,9 +156,15 @@ export class Error {
     const attrName = parts[parts.length - 1];
     const namespace = parts.length > 1 ? parts.slice(0, -1).join("/") : undefined;
 
+    // Rails error.rb:51-55: pass the full dotted attribute (post array-strip)
+    // to human_attribute_name with `default: attribute.remove(/\.base\z/).tr(".", "_").humanize`
+    // so nested-association keys like "reference.job_id" resolve via the
+    // nested translation path and fall back to "Reference job"; the `.base`
+    // trailing strip means "reference.base" defaults to "Reference".
+    const humanDefault = humanize(stripped.replace(/\.base$/, "").replace(/\./g, "_"));
     const humanAttr = modelClass?.humanAttributeName
-      ? modelClass.humanAttributeName(attrName)
-      : humanize(attrName);
+      ? modelClass.humanAttributeName(stripped, { default: humanDefault })
+      : humanDefault;
 
     let format: string;
     if (Error.i18nCustomizeFullMessage) {
