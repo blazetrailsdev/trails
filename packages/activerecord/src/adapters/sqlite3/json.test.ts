@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { Base } from "../../index.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
 
 let adapter: SQLite3Adapter;
 
@@ -17,9 +18,9 @@ afterEach(() => {
 
 describe("SQLite3JSONTest", () => {
   it("json string cast round-trip", async () => {
-    await adapter.exec(
-      `CREATE TABLE "json_string_cast" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "data" JSON)`,
-    );
+    await defineSchema(adapter, {
+      json_string_cast: { data: "json" },
+    });
     class JsonStringCast extends Base {
       static {
         this.tableName = "json_string_cast";
@@ -35,11 +36,12 @@ describe("SQLite3JSONTest", () => {
   });
 
   it("test_default", async () => {
-    adapter.exec(`CREATE TABLE "json_data_type" (
-      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-      "payload" JSON DEFAULT '{}',
-      "settings" JSON
-    )`);
+    await defineSchema(adapter, {
+      json_data_type: {
+        payload: { type: "json", default: "{}" },
+        settings: "json",
+      },
+    });
 
     const defaultVal = { users: "read", posts: ["read", "write"] };
     await adapter.addColumn("json_data_type", "permissions", "json", {

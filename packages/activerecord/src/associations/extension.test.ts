@@ -8,17 +8,36 @@ import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  ext_posts: { title: "string" },
+  ext_comments: { body: "string", ext_post_id: "integer" },
+  h_projects: { name: "string" },
+  h_developers: { name: "string" },
+  h_developers_h_projects: { h_developer_id: "integer", h_project_id: "integer" },
+  n_projects: { name: "string" },
+  n_developers: { name: "string" },
+  n_developers_n_projects: { n_developer_id: "integer", n_project_id: "integer" },
+  t2_projects: { name: "string" },
+  t2_developers: { name: "string" },
+  t2_developers_t2_projects: { t2_developer_id: "integer", t2_project_id: "integer" },
+  nb_projects: { name: "string" },
+  nb_developers: { name: "string" },
+  nb_developers_nb_projects: { nb_developer_id: "integer", nb_project_id: "integer" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("AssociationsExtensionsTest", () => {
   let extAdapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    extAdapter = freshAdapter();
+  beforeEach(async () => {
+    extAdapter = await freshAdapter();
   });
 
   function setupExtModels() {

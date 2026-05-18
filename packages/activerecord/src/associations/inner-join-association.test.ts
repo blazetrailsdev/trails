@@ -8,16 +8,31 @@ import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  authors: { name: "string" },
+  posts: { title: "string", author_id: "integer" },
+  comments: { body: "string", type: "string", post_id: "integer" },
+  thr_authors: { name: "string" },
+  thr_posts: { title: "string", thr_author_id: "integer" },
+  thr_taggings: { thr_post_id: "integer", thr_tag_id: "integer" },
+  thr_tags: { name: "string" },
+  habtm_posts: { title: "string" },
+  habtm_tags: { name: "string" },
+  habtm_posts_habtm_tags: { habtm_post_id: "integer", habtm_tag_id: "integer" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("InnerJoinAssociationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModels() {
@@ -210,7 +225,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const a = createTestAdapter();
+    const a = await freshAdapter();
     class Comment extends Base {
       static {
         this.attribute("body", "string");
