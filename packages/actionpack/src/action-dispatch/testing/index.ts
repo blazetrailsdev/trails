@@ -14,3 +14,17 @@ export {
   type AssertionResponseHost,
   type AssertionResponseLike,
 } from "./assertions.js";
+export {
+  TestProcess,
+  FixtureFile,
+  fileFixtureUpload,
+  fixtureFileUpload,
+  assigns,
+  session,
+  flash,
+  cookies,
+  redirectToUrl,
+  type TestProcessHost,
+  type TestProcessRequest,
+  type TestProcessResponse,
+} from "./test-process.js";

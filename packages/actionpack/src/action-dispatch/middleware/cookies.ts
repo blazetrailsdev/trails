@@ -55,6 +55,28 @@ export class CookieJar implements Iterable<[string, string]> {
     this._options = options;
   }
 
+  /**
+   * Build a CookieJar seeded with `cookies` from a request. Mirrors
+   * `Cookies::CookieJar.build(request, cookies)` used by
+   * `ActionDispatch::TestProcess#cookies`.
+   *
+   * @internal
+   */
+  static build(
+    request: { cookiesAppOptions?: CookieJarOptions } | null | undefined,
+    cookies: Record<string, string>,
+  ): CookieJar {
+    // Rails: `jar = new(req); jar.update(cookies); jar` — the request stores
+    // the options used by signed/encrypted jars. We forward
+    // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
+    // accessors can find their secrets in test setups.
+    const jar = new CookieJar(request?.cookiesAppOptions ?? {});
+    for (const [k, v] of Object.entries(cookies ?? {})) {
+      jar._cookies.set(k, v);
+    }
+    return jar;
+  }
+
   // --- Read ---
 
   get(key: string): string | undefined {
