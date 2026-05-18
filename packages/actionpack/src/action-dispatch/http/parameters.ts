@@ -185,8 +185,19 @@ export function logParseErrorOnce(this: ParametersHost): void {
   // so persist the guard on the env via getHeader/setHeader instead.
   if (this.getHeader(PARSE_ERROR_LOGGED_KEY)) return;
   this.setHeader(PARSE_ERROR_LOGGED_KEY, true);
-  const logger = this.logger ?? new Logger({ write: (s) => stderr.write(s) });
-  logger.debug(`Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`);
+  const msg = `Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`;
+  if (this.logger) {
+    this.logger.debug(msg);
+    return;
+  }
+  // Rails uses `ActiveSupport::Logger.new($stderr)` as the fallback; in
+  // browser hosts no process adapter is registered, so guard the write so
+  // the log attempt never replaces the caller's `ParseError`.
+  try {
+    new Logger({ write: (s) => stderr.write(s) }).debug(msg);
+  } catch {
+    // no-op: log is informational, the ParseError remains the real signal.
+  }
 }
 
 const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";

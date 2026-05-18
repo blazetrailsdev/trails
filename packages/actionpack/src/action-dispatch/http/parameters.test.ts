@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { MimeType } from "./mime-type.js";
+import { Request } from "./request.js";
 import {
   DEFAULT_PARSERS,
   PARAMETERS_KEY,
@@ -145,6 +146,19 @@ describe("parameterParsers registry", () => {
     setParameterParsers({ xml });
     const host = makeHost();
     expect(paramsParsers.call(host)).toEqual({ xml });
+  });
+
+  it("Request.parameterParsers static accessor drives Request#requestParameters", () => {
+    const xml: ParameterParser = (raw) => ({ parsed: raw });
+    Request.parameterParsers = { ...DEFAULT_PARSERS, xml };
+    expect(Request.parameterParsers).toMatchObject({ xml });
+    const req = new Request({
+      REQUEST_METHOD: "POST",
+      CONTENT_TYPE: "application/xml",
+      "rack.input": "<root/>",
+    });
+    expect(req.requestParameters).toEqual({ parsed: "<root/>" });
+    expect(req.params).toMatchObject({ parsed: "<root/>" });
   });
 });
 

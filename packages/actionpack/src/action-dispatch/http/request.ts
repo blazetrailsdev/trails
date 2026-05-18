@@ -32,7 +32,6 @@ import {
 } from "./mime-negotiation.js";
 import type { MimeType } from "./mime-type.js";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
-import { MimeType } from "./mime-type.js";
 import {
   parameters as _parameters,
   parameterParsers as _parameterParsers,
@@ -240,11 +239,6 @@ export class Request {
     if (!cl) return undefined;
     const n = parseInt(cl, 10);
     return isNaN(n) ? undefined : n;
-  }
-
-  get contentMimeType(): MimeType | null {
-    const ct = this.contentType;
-    return ct ? (MimeType.lookup(ct.toLowerCase()) ?? null) : null;
   }
 
   get userAgent(): string {
