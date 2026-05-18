@@ -32,6 +32,19 @@ import {
 } from "./mime-negotiation.js";
 import type { MimeType } from "./mime-type.js";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
+import { MimeType } from "./mime-type.js";
+import {
+  parameters as _parameters,
+  parameterParsers as _parameterParsers,
+  paramsParsers as _paramsParsers,
+  parseFormattedParameters as _parseFormattedParameters,
+  pathParameters as _pathParameters,
+  setParameterParsers as _setParameterParsers,
+  setPathParameters as _setPathParameters,
+  type ParameterParser,
+  type ParameterParsers,
+  type ParametersHost,
+} from "./parameters.js";
 
 export class Request {
   readonly env: RackEnv;
@@ -229,6 +242,11 @@ export class Request {
     return isNaN(n) ? undefined : n;
   }
 
+  get contentMimeType(): MimeType | null {
+    const ct = this.contentType;
+    return ct ? (MimeType.lookup(ct) ?? null) : null;
+  }
+
   get userAgent(): string {
     return (this.env["HTTP_USER_AGENT"] as string) || "";
   }
@@ -316,18 +334,7 @@ export class Request {
   // --- Parameters ---
 
   get params(): Record<string, unknown> {
-    if (this.env["action_dispatch.request.parameters"]) {
-      return this.env["action_dispatch.request.parameters"] as Record<string, unknown>;
-    }
-    // Mirrors Rails `ActionDispatch::Http::Parameters#parameters` —
-    // request_parameters.merge(query_parameters).merge!(path_parameters).
-    const merged: Record<string, unknown> = {
-      ...this.requestParameters,
-      ...this.queryParameters,
-      ...this.pathParameters,
-    };
-    this.env["action_dispatch.request.parameters"] = merged;
-    return merged;
+    return _parameters.call(this._paramsHost);
   }
 
   get queryParameters(): Record<string, unknown> {
@@ -345,47 +352,10 @@ export class Request {
       return cached as Record<string, unknown>;
     }
 
-    const raw = this.env["rack.input"];
-    if (!raw) {
-      this.env["action_dispatch.request.request_parameters"] = {};
-      return {};
-    }
-
-    let input: string | null;
-    if (typeof raw === "string") {
-      input = raw;
-    } else if (typeof (raw as any).read === "function") {
-      input = (raw as any).read();
-      if (typeof (raw as any).rewind === "function") {
-        try {
-          (raw as any).rewind();
-        } catch {
-          // ignore rewind errors
-        }
-      }
-    } else {
-      input = null;
-    }
-
-    if (!input || typeof input !== "string") {
-      this.env["action_dispatch.request.request_parameters"] = {};
-      return {};
-    }
-
-    let params: Record<string, unknown> = {};
-    const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
-    if (ct.includes("application/json")) {
-      try {
-        const parsed = JSON.parse(input);
-        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-          params = parsed;
-        }
-      } catch {
-        // ignore
-      }
-    } else if (ct.includes("application/x-www-form-urlencoded")) {
-      params = parseNestedQuery(input);
-    }
+    const host = this._paramsHost;
+    const params = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
+      this._fallbackRequestParameters(),
+    );
 
     const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
       string,
@@ -396,16 +366,74 @@ export class Request {
   }
 
   get pathParameters(): Record<string, unknown> {
-    return (this.env["action_dispatch.request.path_parameters"] as Record<string, unknown>) || {};
+    return _pathParameters.call(this._paramsHost);
   }
 
   set pathParameters(params: Record<string, unknown>) {
-    // Mirrors `Rails::ActionDispatch::Http::Parameters#path_parameters=` —
-    // invalidate the merged-parameters cache so subsequent `params` reads
-    // pick up the new path captures. Matches `setPathParameters` in
-    // http/parameters.ts.
-    delete this.env["action_dispatch.request.parameters"];
-    this.env["action_dispatch.request.path_parameters"] = params;
+    _setPathParameters.call(this._paramsHost, params);
+  }
+
+  /** Class-level parameter parser registry. Mirrors Rails `Request.parameter_parsers`. */
+  static get parameterParsers(): ParameterParsers {
+    return _parameterParsers();
+  }
+
+  static set parameterParsers(parsers: Record<string | symbol, ParameterParser>) {
+    _setParameterParsers(parsers);
+  }
+
+  /** @internal */
+  private get _paramsHost(): ParametersHost {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const req = this;
+    return {
+      getHeader: (k) => req.env[k],
+      setHeader: (k, v) => ((req.env[k] = v), v),
+      deleteHeader: (k) => void delete req.env[k],
+      get queryParameters() {
+        return req.queryParameters;
+      },
+      get requestParameters() {
+        return req.requestParameters;
+      },
+      get contentLength() {
+        return req.contentLength;
+      },
+      get contentMimeType() {
+        return req.contentMimeType;
+      },
+      get rawPost() {
+        return req.rawPost;
+      },
+    };
+  }
+
+  /** @internal */
+  private _fallbackRequestParameters(): Record<string, unknown> {
+    const raw = this.env["rack.input"];
+    if (!raw) return {};
+    let input: string | null;
+    if (typeof raw === "string") {
+      input = raw;
+    } else if (typeof (raw as { read?: unknown }).read === "function") {
+      input = (raw as { read(): string }).read();
+      const rewind = (raw as { rewind?: unknown }).rewind;
+      if (typeof rewind === "function") {
+        try {
+          (rewind as () => void).call(raw);
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      input = null;
+    }
+    if (!input || typeof input !== "string") return {};
+    const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
+    if (ct.includes("application/x-www-form-urlencoded")) {
+      return parseNestedQuery(input);
+    }
+    return {};
   }
 
   // --- Format ---

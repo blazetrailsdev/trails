@@ -12,6 +12,8 @@
  * assigned directly onto the host class.
  */
 
+import { Logger } from "@blazetrails/activesupport";
+import { stderr } from "@blazetrails/activesupport/process-adapter";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -154,7 +156,7 @@ export function parseFormattedParameters(
   parsers: ParameterParsers,
   fallback: () => Record<string, unknown>,
 ): Record<string, unknown> {
-  if (!this.contentLength || this.contentMimeType === null) {
+  if (this.contentLength === 0 || this.contentMimeType === null) {
     return fallback();
   }
   const strategy = parsers[this.contentMimeType.symbol];
@@ -179,7 +181,7 @@ export function logParseErrorOnce(this: ParametersHost): void {
   const host = this as ParametersHost & { _parseErrorLogged?: boolean };
   if (host._parseErrorLogged) return;
   host._parseErrorLogged = true;
-  const logger = this.logger ?? { debug: (m: string) => console.error(m) };
+  const logger = this.logger ?? new Logger({ write: (s) => stderr.write(s) });
   logger.debug(`Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`);
 }
 
