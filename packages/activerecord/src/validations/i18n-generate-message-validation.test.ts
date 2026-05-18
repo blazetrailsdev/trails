@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
@@ -18,6 +18,9 @@ describe("I18nGenerateMessageValidationTest", () => {
   withTransactionalFixtures(() => adapter);
   afterEach(() => {
     I18n.reset();
+  });
+  afterAll(() => {
+    vi.unstubAllEnvs();
   });
 
   function makeTopic() {
