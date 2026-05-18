@@ -10,19 +10,20 @@ import type { LookupContext } from "./lookup-context.js";
 
 export interface DigestorOptions {
   name: string;
-  format?: string;
+  format?: string | null;
   finder: LookupContext;
-  dependencies?: string[];
+  dependencies?: string[] | null;
 }
 
 export class Digestor {
   /** @internal stub - real impl in Phase 6 */
-  static digest({ name, format = "html", finder }: DigestorOptions): string {
+  static digest({ name, format, finder }: DigestorOptions): string {
     const slash = name.lastIndexOf("/");
     const prefix = slash >= 0 ? name.slice(0, slash) : "";
     const action = slash >= 0 ? name.slice(slash + 1) : name;
-    const source = finder.findTemplate(action, prefix, format)?.source ?? "";
-    return fnv1a64Hex(`${name}|${format}|${source}`);
+    const fmt = format ?? "html";
+    const source = finder.findTemplate(action, prefix, fmt)?.source ?? "";
+    return fnv1a64Hex(`${name}|${format ?? ""}|${source}`);
   }
 }
 
