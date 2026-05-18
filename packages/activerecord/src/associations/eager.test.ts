@@ -3174,7 +3174,8 @@ describe("EagerAssociationTest", () => {
 
   it.skip("exceptions have suggestions for fix", async () => {
     // BLOCKED: associations — top-level eagerLoad/includes of an unknown association does not raise
-    // ROOT-CAUSE: associations/preloader.ts: missing AssociationNotFoundError + "Did you mean?" suggestion for top-level
+    // ROOT-CAUSE: associations/preloader/branch.ts groupedRecords() silently skips missing reflections (line ~161)
+    //   instead of raising AssociationNotFoundError + "Did you mean?" suggestion for top-level
     //   names (Rails eager_test.rb:878 — Post.all.merge!(includes: :taggingz).find(6) raises with `Did you mean? tagging`).
     //   Nested-through-null behavior (eager_test.rb:380, :386) must stay silent — see existing passing tests
     //   "nested loading does not raise..." and "three level nested preloading does not raise...".
