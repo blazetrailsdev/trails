@@ -21,11 +21,20 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
 /**
- * Invoke a scope lambda with Rails' `instance_exec(owner, &scope)` arity
- * semantics: 0-arg lambdas get `this=rel` with no positional args;
- * 1+-arg lambdas get `this=rel` with positional `(rel, owner)`. Returns
- * the raw lambda result; callers apply `|| rel` if they want Ruby-style
- * `instance_exec(owner, &scope) || relation` truthy-fallback semantics.
+ * Invoke a scope lambda using this port's calling convention:
+ * 0-arg lambdas → `fn.call(rel)` (`this=rel`, no positional args);
+ * 1+-arg lambdas → `fn.call(rel, rel, owner)` (`this=rel`, positional
+ * `(rel, owner)`). Returns the raw lambda result; callers apply `|| rel`
+ * if they want Ruby-style `instance_exec(owner, &scope) || relation`
+ * truthy-fallback semantics.
+ *
+ * NOT a 1:1 port of Rails' `relation.instance_exec(owner, &scope)`
+ * (reflection.rb:449), which passes `owner` as the sole positional
+ * arg. Every call site in this codebase writes scopes as
+ * `(rel) => rel.where(...)`, so a 1-arg lambda here receives the
+ * relation; arity-2 declarations can opt into `(rel, owner)`. The
+ * `this`-binding only applies to `function`-keyword scopes — arrow
+ * functions have lexical `this` and ignore `.call`.
  *
  * @internal
  */
