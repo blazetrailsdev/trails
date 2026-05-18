@@ -1230,7 +1230,7 @@ describe("NestedThroughAssociationsTest", () => {
     // SCOPE: ~200 LOC rewire of throughAlias/effectiveName plus 30+ existing
     // nested-through tests whose SQL snapshots may drift.
     //
-    // Rails body, lifted verbatim:
+    // Rails body (ported/translated to TS):
     //   const bob = await Author.find_by({ name: "bob" });
     //   const similar = (await bob.similarPosts.toArray()).sort((a, b) => a.id - b.id);
     //   expect(similar.map((p) => p.title)).toEqual([
@@ -1269,9 +1269,13 @@ describe("NestedThroughAssociationsTest", () => {
   // emit `taggable_type='Post'` on the canonical-aliased `taggings` join.
   it.skip("nested has many through with scope on polymorphic reflection", () => {
     // BLOCKED: AliasTracker integration into JoinDependency — see batch 28b
-    // follow-up. Same root cause as the sibling test above; this case also
+    // follow-up. ROOT-CAUSE: same as the sibling test above —
+    // `_addThroughAssociation` emits `tN` aliases for collided table names
+    // instead of Rails-canonical `${table}_${parent}_join`. This case also
     // exercises a scoped through (`-> { order("taggings.id DESC") }`).
+    // SCOPE: subsumed by the sibling test's ~200 LOC rewire; no extra LOC.
     //
+    // Rails body (ported/translated to TS):
     //   const authors = await Author.joins("ordered_posts")
     //     .where({ "posts.id": miscByBobId }).distinct().toArray();
     //   expect(authors.map((a) => a.name).sort()).toEqual(["bob", "mary"]);
