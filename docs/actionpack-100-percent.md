@@ -25,7 +25,7 @@ Current (2026-05-18): actiondispatch 628/1351 methods (46.5%), files 72/83.
 
 - **system_testing/** (5 files), **system_test_case.rb**, **testing/test_helpers/page_dump_helper.rb** — defer indefinitely; trails will use Playwright / Vitest browser mode, not Capybara/Selenium.
 - **http/rack_cache.rb** — intentional skip (Rack-specific).
-- **middleware/session/cache_store.rb**, **middleware/session/mem_cache_store.rb** — defer pending memcached integration.
+- ~~**middleware/session/cache_store.rb**, **middleware/session/mem_cache_store.rb**~~ — `cache_store.rb` ported in #1872; `mem_cache_store.rb` ported as a `CacheStore` subclass (real `@blazetrails/activesupport` MemCacheStore still pending).
 - **deprecator.rb** — 0/18; small port, no blockers.
 
 Everything else has a TS file; gaps are method-level.
