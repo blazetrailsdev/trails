@@ -11,14 +11,15 @@
 
 import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
+import type { AnyClass } from "../internal/any-class.js";
+
+type AnyCallable = (...args: any[]) => any;
 
 /**
  * The Delegation module interface.
  *
  * Mirrors: ActiveRecord::Delegation
  */
-type AnyClass = abstract new (...args: any[]) => any;
-type AnyCallable = (...args: any[]) => any;
 
 export interface Delegation {
   delegatedClasses: Set<AnyClass>;

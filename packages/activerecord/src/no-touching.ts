@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::NoTouching
  */
 
-type AnyClass = abstract new (...args: any[]) => any;
+import type { AnyClass } from "./internal/any-class.js";
 
 const _noTouchingDepth = new Map<AnyClass, number>();
 

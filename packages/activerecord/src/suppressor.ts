@@ -7,6 +7,7 @@
 
 import { getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
+import type { AnyClass } from "./internal/any-class.js";
 
 /**
  * The suppressor registry: a map from class name → `true` when that
@@ -61,8 +62,6 @@ export function registry(): Record<string, true | undefined> {
  *
  * Mirrors: ActiveRecord::Suppressor.suppress
  */
-type AnyClass = abstract new (...args: any[]) => any;
-
 export async function suppress<R>(modelClass: AnyClass, fn: () => R | Promise<R>): Promise<R> {
   const name = modelClass.name;
   if (!name) {

@@ -4,11 +4,13 @@
  * Mirrors: ActiveRecord::AttributeMethods::CompositePrimaryKey
  */
 
+import type { AnyClass } from "../internal/any-class.js";
+
 interface CompositePKRecord {
   id: unknown;
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  constructor: (abstract new (...args: any[]) => any) & {
+  constructor: AnyClass & {
     primaryKey: string | string[];
     compositePrimaryKey: boolean;
   };

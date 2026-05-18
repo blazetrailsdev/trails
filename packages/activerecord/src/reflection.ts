@@ -1800,6 +1800,18 @@ export function reflections(
   return normalizedReflections(modelClass);
 }
 
+/**
+ * Minimal shape of values stored in `Base._reflections`. They are always
+ * `AssociationReflection | ThroughReflection`, but `normalizedReflections`
+ * only consumes the `name` and `parentReflection` fields — captured here so
+ * the lookup loop stays free of `as any` casts.
+ *
+ * @internal
+ */
+type RawReflection = (AssociationReflection | ThroughReflection) & {
+  readonly parentReflection?: AssociationReflection | ThroughReflection | null;
+};
+
 const _normalizedReflectionsCache = new WeakMap<
   typeof Base,
   Readonly<Record<string, AssociationReflection | ThroughReflection>>
@@ -1811,10 +1823,10 @@ export function normalizedReflections(
   const cached = _normalizedReflectionsCache.get(modelClass);
   if (cached) return cached;
 
-  const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
-  const result: Record<string, unknown> = {};
-  for (const [name, rawRef] of Object.entries(rawReflections)) {
-    const ref = rawRef as any;
+  const rawReflections: Record<string, RawReflection> =
+    (modelClass as { _reflections?: Record<string, RawReflection> })._reflections ?? {};
+  const result: Record<string, AssociationReflection | ThroughReflection> = {};
+  for (const [name, ref] of Object.entries(rawReflections)) {
     const parent = ref.parentReflection;
     if (parent) {
       result[parent.name] = parent;
