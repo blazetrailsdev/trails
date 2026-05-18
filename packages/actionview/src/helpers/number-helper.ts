@@ -40,9 +40,63 @@ export interface NumberHelperOptions {
 
 type NumberLike = number | string | SafeBuffer | null | undefined;
 
+const asArg = (n: NumberLike): unknown => (n instanceof SafeBuffer ? n.toString() : n);
+
+export function numberToPhone(
+  number: NumberLike,
+  options: NumberHelperOptions = {},
+): string | SafeBuffer | null {
+  if (number == null) return null;
+  const { raise: raiseOnInvalid, ...rest } = options;
+  if (raiseOnInvalid) parseFloat(number, true);
+  const opts: Record<string, unknown> = { ...rest };
+  if (opts.delimiter instanceof SafeBuffer) opts.delimiter = opts.delimiter.toString();
+  return htmlEscape(NumberHelper.numberToPhone(asArg(number), opts));
+}
+
+export function numberToCurrency(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberToCurrency, number, options);
+}
+
+export function numberToPercentage(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberToPercentage, number, options);
+}
+
+export function numberWithDelimiter(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberWithDelimiter, number, options);
+}
+
+export function numberWithPrecision(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberToRounded, number, options);
+}
+
+export function numberToHumanSize(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberToHumanSize, number, options);
+}
+
+export function numberToHuman(number: NumberLike, options: NumberHelperOptions = {}) {
+  return delegateNumberHelperMethod(NumberHelper.numberToHuman, number, options);
+}
+
+/** @internal */
+export function delegateNumberHelperMethod(
+  method: (n: unknown, o: Record<string, unknown>) => string,
+  number: NumberLike,
+  options: NumberHelperOptions,
+): string | SafeBuffer | null {
+  if (number == null) return null;
+  const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions(options);
+  return wrapWithOutputSafetyHandling(
+    number,
+    !!raiseOnInvalid,
+    method(asArg(number), rest as Record<string, unknown>),
+  );
+}
+
 const ESCAPE_KEYS = ["format", "negativeFormat", "separator", "delimiter"] as const;
 
-function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions {
+/** @internal */
+export function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions {
   const out: NumberHelperOptions = { ...options };
   for (const k of ESCAPE_KEYS) {
     if (out[k] !== undefined) out[k] = htmlEscape(out[k]).toString();
@@ -52,69 +106,48 @@ function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions 
       ? (out.unit as SafeBuffer).toString()
       : htmlEscape(out.unit).toString();
   }
-  if (out.units && typeof out.units === "object") {
-    const escaped: Record<string, string> = {};
-    for (const [k, v] of Object.entries(out.units)) escaped[k] = htmlEscape(v).toString();
-    out.units = escaped;
-  }
+  if (out.units && typeof out.units === "object") out.units = escapeUnits(out.units);
   return out;
 }
 
-function parseFloatStrict(number: unknown): number | null {
-  if (number == null) return null;
-  if (typeof number === "number") return Number.isFinite(number) ? number : null;
-  if (typeof number === "boolean") return null;
-  const str =
-    number instanceof SafeBuffer ? number.toString() : typeof number === "string" ? number : null;
-  if (str === null) return null;
-  const trimmed = str.trim();
-  // Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
-  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
+/** @internal */
+export function escapeUnits(units: Record<string, string | SafeBuffer>): Record<string, string> {
+  const escaped: Record<string, string> = {};
+  for (const [k, v] of Object.entries(units)) escaped[k] = htmlEscape(v).toString();
+  return escaped;
 }
 
-const isValidFloat = (n: unknown) => parseFloatStrict(n) !== null;
-
-function wrap(number: unknown, raiseOnInvalid: boolean, formatted: string): string | SafeBuffer {
-  const valid = isValidFloat(number);
+/** @internal */
+export function wrapWithOutputSafetyHandling(
+  number: unknown,
+  raiseOnInvalid: boolean,
+  formatted: string,
+): string | SafeBuffer {
+  const valid = validFloat(number);
   if (raiseOnInvalid && !valid) throw new InvalidNumberError(number);
   return valid || isHtmlSafe(number) ? htmlSafe(formatted) : formatted;
 }
 
-const asArg = (n: NumberLike): unknown => (n instanceof SafeBuffer ? n.toString() : n);
-
-export function numberToPhone(
-  number: NumberLike,
-  options: NumberHelperOptions = {},
-): string | SafeBuffer | null {
-  if (number == null) return null;
-  const { raise: raiseOnInvalid, ...rest } = options;
-  if (raiseOnInvalid && !isValidFloat(number)) throw new InvalidNumberError(number);
-  const opts: Record<string, unknown> = { ...rest };
-  if (opts.delimiter instanceof SafeBuffer) opts.delimiter = opts.delimiter.toString();
-  return htmlEscape(NumberHelper.numberToPhone(asArg(number), opts));
+/** @internal */
+export function validFloat(number: unknown): boolean {
+  return parseFloat(number, false) !== null;
 }
 
-function delegate(
-  method: (n: unknown, o: Record<string, unknown>) => string,
-  number: NumberLike,
-  options: NumberHelperOptions,
-): string | SafeBuffer | null {
-  if (number == null) return null;
-  const { raise: raiseOnInvalid, ...rest } = escapeUnsafeOptions(options);
-  return wrap(number, !!raiseOnInvalid, method(asArg(number), rest as Record<string, unknown>));
+/** @internal */
+export function parseFloat(number: unknown, raiseError: boolean): number | null {
+  let str: string | null = null;
+  if (typeof number === "number") return Number.isFinite(number) ? number : null;
+  if (typeof number === "string") str = number;
+  else if (number instanceof SafeBuffer) str = number.toString();
+  let result: number | null = null;
+  if (str !== null) {
+    const trimmed = str.trim();
+    // Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
+    if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) {
+      const n = Number(trimmed);
+      if (Number.isFinite(n)) result = n;
+    }
+  }
+  if (result === null && raiseError) throw new InvalidNumberError(number);
+  return result;
 }
-
-export const numberToCurrency = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberToCurrency, n, o);
-export const numberToPercentage = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberToPercentage, n, o);
-export const numberWithDelimiter = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberWithDelimiter, n, o);
-export const numberWithPrecision = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberToRounded, n, o);
-export const numberToHumanSize = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberToHumanSize, n, o);
-export const numberToHuman = (n: NumberLike, o: NumberHelperOptions = {}) =>
-  delegate(NumberHelper.numberToHuman, n, o);
