@@ -5,10 +5,9 @@ import {
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   makeEncryptedBookWithBinaryMessagePackSerialized,
+  makeMsgPackTextBook,
   assertEncryptedAttribute,
-  Base,
 } from "./test-helpers.js";
-import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 import { Encoding as EncodingError } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
@@ -42,15 +41,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
   });
 
   it("text columns cannot be serialized with message pack", async () => {
-    const adapter = await freshAdapter();
-    const MsgPackTextBook = class extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.adapter = adapter;
-        this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
-      }
-    } as any;
+    const MsgPackTextBook = makeMsgPackTextBook(await freshAdapter());
     await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(EncodingError);
   });
 });

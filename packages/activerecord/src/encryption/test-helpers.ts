@@ -420,6 +420,23 @@ export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: Databa
   } as any;
 }
 
+/**
+ * MsgPackTextBook: a string `name` column encrypted with a MessagePack
+ * serializer. Used to assert that text columns reject MessagePack encoding
+ * (encrypted_record_message_pack_serialized_test.rb).
+ */
+export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
+  return class MsgPackTextBook extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
+    }
+  } as any;
+}
+
 // ─── Assertion helpers ────────────────────────────────────────────────────────
 
 /**
