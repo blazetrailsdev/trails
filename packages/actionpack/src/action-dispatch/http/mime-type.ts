@@ -2,6 +2,8 @@
  * Mime::Type — MIME type registry and parsing.
  */
 
+import { registerDefaultMimeTypes } from "./mime-types.js";
+
 export class MimeType {
   /** @internal */
   readonly string: string;
@@ -57,7 +59,9 @@ export class MimeType {
     for (const syn of synonyms) {
       MimeType.registry.set(syn, type);
     }
-    for (const ext of extensions) {
+    // Rails registers `[symbol.to_s] + extension_synonyms` into
+    // EXTENSION_LOOKUP, so the symbol itself is always a valid extension key.
+    for (const ext of [symbol, ...extensions]) {
       MimeType.extensionMap.set(ext, type);
     }
     for (const cb of MimeType.callbacks) {
@@ -155,61 +159,88 @@ export class MimeType {
   }
 
   // --- Built-in types ---
+  //
+  // Default registrations live in `./mime-types.ts` (Rails: `mime_types.rb`).
+  // The constants below resolve through the registry, so each access returns
+  // the singleton registered by that file.
 
-  static readonly HTML = MimeType.register(
-    "text/html",
-    "html",
-    ["application/xhtml+xml"],
-    ["html", "htm"],
-  );
-  static readonly TEXT = MimeType.register("text/plain", "text", [], ["txt"]);
-  static readonly JS = MimeType.register(
-    "text/javascript",
-    "js",
-    ["application/javascript"],
-    ["js"],
-  );
-  static readonly CSS = MimeType.register("text/css", "css", [], ["css"]);
-  static readonly ICS = MimeType.register("text/calendar", "ics", [], ["ics"]);
-  static readonly CSV = MimeType.register("text/csv", "csv", [], ["csv"]);
-  static readonly VCF = MimeType.register("text/vcard", "vcf", [], ["vcf"]);
-
-  static readonly PNG = MimeType.register("image/png", "png", [], ["png"]);
-  static readonly GIF = MimeType.register("image/gif", "gif", [], ["gif"]);
-  static readonly BMP = MimeType.register("image/bmp", "bmp", [], ["bmp"]);
-  static readonly TIFF = MimeType.register("image/tiff", "tiff", [], ["tif", "tiff"]);
-  static readonly SVG = MimeType.register("image/svg+xml", "svg", [], ["svg"]);
-  static readonly WEBP = MimeType.register("image/webp", "webp", [], ["webp"]);
-
-  static readonly MPEG = MimeType.register("video/mpeg", "mpeg", [], ["mpeg", "mpg"]);
-
-  static readonly XML = MimeType.register("application/xml", "xml", ["text/xml"], ["xml"]);
-  static readonly RSS = MimeType.register("application/rss+xml", "rss", [], ["rss"]);
-  static readonly ATOM = MimeType.register("application/atom+xml", "atom", [], ["atom"]);
-  static readonly YAML = MimeType.register(
-    "application/x-yaml",
-    "yaml",
-    ["text/yaml"],
-    ["yml", "yaml"],
-  );
-
-  static readonly MULTIPART_FORM = MimeType.register(
-    "multipart/form-data",
-    "multipart_form",
-    [],
-    [],
-  );
-  static readonly URL_ENCODED_FORM = MimeType.register(
-    "application/x-www-form-urlencoded",
-    "url_encoded_form",
-    [],
-    [],
-  );
-
-  static readonly JSON = MimeType.register("application/json", "json", ["text/x-json"], ["json"]);
-  static readonly PDF = MimeType.register("application/pdf", "pdf", [], ["pdf"]);
-  static readonly ZIP = MimeType.register("application/zip", "zip", [], ["zip"]);
-  static readonly GZIP = MimeType.register("application/gzip", "gzip", [], ["gz"]);
+  static get HTML(): MimeType {
+    return MimeType.lookup("html")!;
+  }
+  static get TEXT(): MimeType {
+    return MimeType.lookup("text")!;
+  }
+  static get JS(): MimeType {
+    return MimeType.lookup("js")!;
+  }
+  static get CSS(): MimeType {
+    return MimeType.lookup("css")!;
+  }
+  static get ICS(): MimeType {
+    return MimeType.lookup("ics")!;
+  }
+  static get CSV(): MimeType {
+    return MimeType.lookup("csv")!;
+  }
+  static get VCF(): MimeType {
+    return MimeType.lookup("vcf")!;
+  }
+  static get PNG(): MimeType {
+    return MimeType.lookup("png")!;
+  }
+  static get JPEG(): MimeType {
+    return MimeType.lookup("jpeg")!;
+  }
+  static get GIF(): MimeType {
+    return MimeType.lookup("gif")!;
+  }
+  static get BMP(): MimeType {
+    return MimeType.lookup("bmp")!;
+  }
+  static get TIFF(): MimeType {
+    return MimeType.lookup("tiff")!;
+  }
+  static get SVG(): MimeType {
+    return MimeType.lookup("svg")!;
+  }
+  static get WEBP(): MimeType {
+    return MimeType.lookup("webp")!;
+  }
+  static get MPEG(): MimeType {
+    return MimeType.lookup("mpeg")!;
+  }
+  static get XML(): MimeType {
+    return MimeType.lookup("xml")!;
+  }
+  static get RSS(): MimeType {
+    return MimeType.lookup("rss")!;
+  }
+  static get ATOM(): MimeType {
+    return MimeType.lookup("atom")!;
+  }
+  static get YAML(): MimeType {
+    return MimeType.lookup("yaml")!;
+  }
+  static get MULTIPART_FORM(): MimeType {
+    return MimeType.lookup("multipart_form")!;
+  }
+  static get URL_ENCODED_FORM(): MimeType {
+    return MimeType.lookup("url_encoded_form")!;
+  }
+  static get JSON(): MimeType {
+    return MimeType.lookup("json")!;
+  }
+  static get PDF(): MimeType {
+    return MimeType.lookup("pdf")!;
+  }
+  static get ZIP(): MimeType {
+    return MimeType.lookup("zip")!;
+  }
+  static get GZIP(): MimeType {
+    return MimeType.lookup("gzip")!;
+  }
 
   static readonly ALL = new MimeType("*/*", "all");
 }
+
+registerDefaultMimeTypes(MimeType);
