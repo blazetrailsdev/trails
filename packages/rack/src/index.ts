@@ -44,3 +44,4 @@ export async function bodyToString(body: RackBody): Promise<string> {
 }
 
 export { parseNestedQuery, buildNestedQuery, HTTP_STATUS_CODES, statusCode } from "./utils.js";
+export { BodyProxy } from "./body-proxy.js";

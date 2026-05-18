@@ -30,6 +30,16 @@ export class ExceptionWrapper {
     this.statusText = STATUS_TEXTS[this.statusCode] ?? "Internal Server Error";
   }
 
+  /**
+   * Unwraps the inner cause when `this.exception` is a known wrapper exception
+   * (e.g. ActionView::Template::Error). For now we have no wrapper classes
+   * to unwrap, so this always returns `this.exception`. Mirrors Rails'
+   * `ExceptionWrapper#unwrapped_exception`.
+   */
+  get unwrappedException(): Error {
+    return this.exception;
+  }
+
   /** The exception class/constructor name. */
   get exceptionName(): string {
     const name = this.exception.name;

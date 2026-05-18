@@ -24,6 +24,16 @@ export class BodyProxy {
     return this._closed;
   }
 
+  async *[Symbol.asyncIterator](): AsyncIterator<any> {
+    if (this.body && typeof this.body[Symbol.asyncIterator] === "function") {
+      for await (const item of this.body) yield item;
+    } else if (Array.isArray(this.body)) {
+      for (const item of this.body) yield item;
+    } else if (this.body && typeof this.body[Symbol.iterator] === "function") {
+      for (const item of this.body) yield item;
+    }
+  }
+
   each(callback: (item: any) => void): void {
     if (Array.isArray(this.body)) {
       for (const item of this.body) callback(item);
