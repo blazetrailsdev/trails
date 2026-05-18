@@ -33,6 +33,12 @@ export interface RateLimitOptions {
   only?: string | string[];
   /** Standard before_action `except:` filter. */
   except?: string | string[];
+  /** Standard before_action `if:` filter. */
+  if?: CallbackOptions["if"];
+  /** Standard before_action `unless:` filter. */
+  unless?: CallbackOptions["unless"];
+  /** Prepend the before_action (Rails `prepend: true`). */
+  prepend?: boolean;
 }
 
 /**
@@ -117,7 +123,19 @@ export interface RateLimitingHost {
  *     end
  */
 export function rateLimit(this: RateLimitingClassHost, options: RateLimitOptions): void {
-  const { to, within, by, with: withCallback, store, name, only, except } = options;
+  const {
+    to,
+    within,
+    by,
+    with: withCallback,
+    store,
+    name,
+    only,
+    except,
+    if: ifFilter,
+    unless: unlessFilter,
+    prepend,
+  } = options;
   const resolvedStore = store ?? this.cacheStore;
   if (!resolvedStore) {
     throw new Error(
@@ -127,6 +145,9 @@ export function rateLimit(this: RateLimitingClassHost, options: RateLimitOptions
   const filter: CallbackOptions = {};
   if (only !== undefined) filter.only = Array.isArray(only) ? only : [only];
   if (except !== undefined) filter.except = Array.isArray(except) ? except : [except];
+  if (ifFilter !== undefined) filter.if = ifFilter;
+  if (unlessFilter !== undefined) filter.unless = unlessFilter;
+  if (prepend !== undefined) filter.prepend = prepend;
 
   this.beforeAction(async function (controller) {
     await rateLimiting.call(controller, {
@@ -161,7 +182,7 @@ export async function rateLimiting(
 ): Promise<void> {
   const identity = args.by ? args.by.call(this) : (this.request?.remoteIp ?? "");
   const cacheKey = ["rate-limit", this.controllerPath, args.name, identity]
-    .filter((part) => part != null && part !== "")
+    .filter((part): part is string => part != null)
     .join(":");
   const count = await args.store.increment(cacheKey, 1, { expiresIn: args.within });
   if (count != null && isRateLimited(count, args.to)) {

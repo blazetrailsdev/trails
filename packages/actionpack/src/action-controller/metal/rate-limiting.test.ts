@@ -68,11 +68,18 @@ describe("rateLimiting (instance helper)", () => {
     expect(host.head).not.toHaveBeenCalled();
   });
 
-  it('omits null/blank parts from the cache key (mirrors Rails `compact.join(":")`)', async () => {
+  it('drops null/undefined parts but keeps empty strings (mirrors Rails `compact.join(":")`)', async () => {
     const store: RateLimitStore = { increment: vi.fn().mockReturnValue(1) };
     const host: RateLimitingHost = { request: { remoteIp: "1.2.3.4" } };
     await rateLimiting.call(host, { to: 10, within: 60, store });
     expect(store.increment).toHaveBeenCalledWith("rate-limit:1.2.3.4", 1, { expiresIn: 60 });
+  });
+
+  it('preserves empty-string identity in the cache key (Ruby `compact` keeps "")', async () => {
+    const store: RateLimitStore = { increment: vi.fn().mockReturnValue(1) };
+    const host: RateLimitingHost = { controllerPath: "posts", request: { remoteIp: "" } };
+    await rateLimiting.call(host, { to: 10, within: 60, store });
+    expect(store.increment).toHaveBeenCalledWith("rate-limit:posts:", 1, { expiresIn: 60 });
   });
 
   it("calls `with` (instance_exec) when count exceeds `to`", async () => {
@@ -173,6 +180,20 @@ describe("rateLimit class DSL", () => {
     rateLimit.call(makeHost(), { to: 10, within: 60, store, except: ["index", "show"] });
     expect(registered[0].options).toEqual({ only: ["create"] });
     expect(registered[1].options).toEqual({ except: ["index", "show"] });
+  });
+
+  it("forwards if/unless/prepend to beforeAction (Rails **options)", () => {
+    const ifFn = () => true;
+    const unlessFn = () => false;
+    rateLimit.call(makeHost(), {
+      to: 10,
+      within: 60,
+      store,
+      if: ifFn,
+      unless: unlessFn,
+      prepend: true,
+    });
+    expect(registered[0].options).toEqual({ if: ifFn, unless: unlessFn, prepend: true });
   });
 
   it("supports multiple named rate limits stacked on the same host", () => {
