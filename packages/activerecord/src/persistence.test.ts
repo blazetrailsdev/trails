@@ -2370,8 +2370,19 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", age: "integer", email: "string" },
+      posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("update column", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
 
     class User extends Base {
@@ -2395,8 +2406,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2416,8 +2425,6 @@ describe("PersistenceTest", () => {
   });
 
   it("persists to database", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2433,8 +2440,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update column should raise exception if new record", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2449,8 +2454,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update column should not leave the object dirty", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2465,9 +2468,19 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  it("update does not run sql if record has not changed", async () => {
-    const adapter = freshAdapter();
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", email: "string" },
+      posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
 
+  it("update does not run sql if record has not changed", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2482,8 +2495,6 @@ describe("PersistenceTest", () => {
   });
 
   it("reload clears dirty tracking", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2501,8 +2512,6 @@ describe("PersistenceTest", () => {
   });
 
   it("assignAttributes triggers dirty tracking", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2520,8 +2529,6 @@ describe("PersistenceTest", () => {
   });
 
   it("created_at is never overwritten on subsequent saves", async () => {
-    const adapter = freshAdapter();
-
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -2544,8 +2551,6 @@ describe("PersistenceTest", () => {
   });
 
   it("updateColumn does not auto-update updated_at", async () => {
-    const adapter = freshAdapter();
-
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -2674,8 +2679,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("skips validation when validate: false", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -2694,8 +2707,18 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", updated_at: "datetime" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("skips timestamp updates on save", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
@@ -2716,7 +2739,6 @@ describe("PersistenceTest", () => {
   });
 
   it("does not update updated_at when touch: false", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static _tableName = "posts";
     }
@@ -2736,8 +2758,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string", email: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("updates a single attribute and saves, skipping validations", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -2756,8 +2786,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("destroys a single record by id", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -2771,7 +2809,6 @@ describe("PersistenceTest", () => {
   });
 
   it("destroys multiple records by array of ids", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -2789,8 +2826,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("updates and raises on validation failure", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
