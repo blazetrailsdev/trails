@@ -15,13 +15,23 @@
 import {
   _routesContext,
   _withRoutes,
+  editPolymorphicPath,
+  editPolymorphicUrl,
   fullUrlFor,
+  newPolymorphicPath,
+  newPolymorphicUrl,
   optimizeRoutesGeneration,
+  polymorphicMapping,
+  polymorphicPath,
+  polymorphicPathForAction,
+  polymorphicUrl,
+  polymorphicUrlForAction,
   routeFor,
   urlFor,
   type UrlForHost,
   type UrlForRoutes,
 } from "./url-for.js";
+import type { PolymorphicHost } from "./polymorphic-routes.js";
 
 /** The minimal helpers-module surface RoutesProxy dispatches into. */
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -41,9 +51,10 @@ export class RoutesProxy implements UrlForHost {
   scope: UrlForHost;
   routes: UrlForRoutes;
   /**
-   * UrlForHost field. Rails relies on `@_routes` set by `UrlFor#initialize`;
-   * here we expose it as a getter aliased to `routes` (mirrors the Ruby
-   * `alias :_routes :routes`).
+   * Rails: `UrlFor` declares `class_attribute :default_url_options` and
+   * initializes it to `{}` in its `included` block. RoutesProxy inherits
+   * that writable accessor — callers may set `proxy.defaultUrlOptions =
+   * { host: "..." }` per-instance.
    */
   defaultUrlOptions: Record<string, unknown> = {};
   /** @internal Rails: `@helpers` */
@@ -61,6 +72,23 @@ export class RoutesProxy implements UrlForHost {
   _withRoutes = _withRoutes;
   /** @internal Rails: `private def _routes_context` */
   _routesContext = _routesContext;
+
+  // PolymorphicRoutes mixin — Rails `UrlFor` `include`s it, so it's
+  // transitively present on RoutesProxy. Attaching here makes the methods
+  // visible on the instance for `api:compare` and direct callers.
+  polymorphicUrl = polymorphicUrl;
+  polymorphicPath = polymorphicPath;
+  editPolymorphicUrl = editPolymorphicUrl;
+  editPolymorphicPath = editPolymorphicPath;
+  newPolymorphicUrl = newPolymorphicUrl;
+  newPolymorphicPath = newPolymorphicPath;
+  /** @internal Rails-private helper. */
+  polymorphicUrlForAction = polymorphicUrlForAction;
+  /** @internal Rails-private helper. */
+  polymorphicPathForAction = polymorphicPathForAction;
+  /** @internal Rails-private helper. */
+  polymorphicMapping = (record: unknown) =>
+    polymorphicMapping(this as unknown as PolymorphicHost, record);
 
   constructor(
     routes: UrlForRoutes,
