@@ -1280,8 +1280,17 @@ describe("AutomaticInverseFindingTests", () => {
 
 describe("InversePolymorphicBelongsToTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      faces: { description: "string", man_id: "integer" },
+      tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModels() {
@@ -1496,8 +1505,18 @@ describe("InversePolymorphicBelongsToTests", () => {
 describe("InverseCachedPathTests", () => {
   // Tests for the _cachedAssociations / _preloadedAssociations fast-paths in loadBelongsTo.
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      cached_men: { name: "string" },
+      cached_faces: { cached_man_id: "integer" },
+      null_men: { name: "string" },
+      null_faces: { man_id: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("wires inverseOf on the cached-associations fast-path", async () => {
@@ -1573,8 +1592,18 @@ describe("InverseCachedPathTests", () => {
 
 describe("InverseAssociationTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      faces: { man_id: "integer" },
+      interests: { topic: "string", man_id: "integer" },
+      comments: { commentable_id: "integer", commentable_type: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("should allow for inverse of options in associations", () => {
@@ -1682,8 +1711,18 @@ describe("InverseAssociationTests", () => {
 
 describe("inverse_of", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      posts: { title: "string" },
+      comments: { body: "string", post_id: "integer" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("sets inverse reference on loaded belongs_to", async () => {
@@ -1747,8 +1786,17 @@ describe("inverse_of", () => {
 
 describe("InverseHasOneTests", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      men: { name: "string" },
+      faces: { description: "string", man_id: "integer", human_id: "integer" },
+      humen: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   function makeModels() {
