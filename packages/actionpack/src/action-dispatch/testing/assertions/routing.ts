@@ -45,7 +45,10 @@ export function withRouting<T>(
     cb = configOrBlock as (routes: RouteSet) => T;
   } else {
     config = configOrBlock;
-    cb = block as (routes: RouteSet) => T;
+    if (typeof block !== "function") {
+      throw new TypeError("withRouting requires a callback block");
+    }
+    cb = block;
   }
   const oldRoutes = this.routes;
   const oldController = this.controller;

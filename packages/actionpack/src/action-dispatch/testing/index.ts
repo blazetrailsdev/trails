@@ -11,8 +11,15 @@ export { AssertionResponse } from "./assertion-response.js";
 export {
   assertResponse,
   assertRedirectedTo,
+  assertRecognizes,
+  assertGenerates,
+  assertRouting,
+  withRouting,
+  setup,
   type AssertionResponseHost,
   type AssertionResponseLike,
+  type RoutingAssertionsHost,
+  type PathWithMethod,
 } from "./assertions.js";
 export {
   TestProcess,

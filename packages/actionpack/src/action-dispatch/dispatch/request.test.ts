@@ -396,6 +396,21 @@ describe("RequestParameters", () => {
     const req = new Request({});
     expect(req.pathParameters).toEqual({});
   });
+
+  it("pathParameters= invalidates the merged params cache and feeds future params reads", () => {
+    const req = new Request({ QUERY_STRING: "view=print" });
+    expect(req.params).toEqual({ view: "print" });
+    req.pathParameters = { controller: "items", action: "show", id: "1" };
+    expect(req.params).toEqual({
+      view: "print",
+      controller: "items",
+      action: "show",
+      id: "1",
+    });
+    // Path params win over query string on key collision (Rails: merge!).
+    req.pathParameters = { view: "edit" };
+    expect(req.params).toEqual({ view: "edit" });
+  });
 });
 
 describe("LocalhostTest", () => {

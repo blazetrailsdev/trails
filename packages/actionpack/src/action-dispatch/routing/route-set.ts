@@ -207,8 +207,16 @@ export class RouteSet {
     options: Record<string, unknown>,
     defaults: Record<string, unknown> = {},
   ): [string, string[]] {
+    // Rails: `route_key = options.delete :use_route` — when present, look
+    // the route up by its named-route key, mirroring `RouteSet#generate`.
+    let route: Route | undefined;
+    const useRoute = options["use_route"];
+    if (typeof useRoute === "string") {
+      delete options["use_route"];
+      route = this.namedRoutes.get(useRoute);
+    }
     const { controller, action } = options;
-    const route = this.routes.find((r) => r.controller === controller && r.action === action);
+    route ??= this.routes.find((r) => r.controller === controller && r.action === action);
     if (!route) {
       throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
     }

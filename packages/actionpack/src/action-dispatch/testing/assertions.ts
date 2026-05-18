@@ -19,10 +19,9 @@ export {
   assertRouting,
   withRouting,
   setup,
-  createRoutes,
-  resetRoutes,
-  recognizedRequestFor,
-  failOn,
   type RoutingAssertionsHost,
   type PathWithMethod,
 } from "./assertions/routing.js";
+// recognizedRequestFor / createRoutes / resetRoutes / failOn are @internal
+// — they're still exported from ./assertions/routing.js so api:compare
+// sees the full surface, but they aren't part of the public barrel.
