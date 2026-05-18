@@ -7,6 +7,15 @@
 
 import type { RackEnv } from "@blazetrails/rack";
 import { parseNestedQuery } from "@blazetrails/rack";
+import {
+  etagMatches as _etagMatches,
+  fresh as _fresh,
+  ifModifiedSince as _ifModifiedSince,
+  ifNoneMatch as _ifNoneMatch,
+  ifNoneMatchEtags as _ifNoneMatchEtags,
+  notModified as _notModified,
+  type CacheResponseLike,
+} from "./cache.js";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
 
 export class Request {
@@ -213,18 +222,14 @@ export class Request {
     return (this.env["HTTP_ACCEPT"] as string) || "";
   }
 
-  get ifNoneMatch(): string | undefined {
-    return this.env["HTTP_IF_NONE_MATCH"] as string | undefined;
-  }
-
-  get ifNoneMatchEtags(): string[] {
-    const header = this.ifNoneMatch;
-    if (!header) return [];
-    return header
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
+  // --- Conditional-GET (ActionDispatch::Http::Cache::Request) ---
+  // Mixed in onto Request.prototype below; declared here for typing.
+  declare readonly ifModifiedSince: Date | undefined;
+  declare readonly ifNoneMatch: string | undefined;
+  declare readonly ifNoneMatchEtags: string[];
+  declare notModified: (modifiedAt: Date | undefined) => boolean;
+  declare etagMatches: (etag: string | undefined) => boolean;
+  declare fresh: (response: CacheResponseLike) => boolean;
 
   // --- Request type checks ---
 
@@ -444,3 +449,28 @@ export class Request {
     return new Request(env);
   }
 }
+
+// Mix in ActionDispatch::Http::Cache::Request. Property-style helpers
+// (Rails: no-arg methods) are wired as getters for parity with the existing
+// Request surface; methods that take arguments are wired as prototype methods.
+Object.defineProperty(Request.prototype, "ifModifiedSince", {
+  get(this: Request) {
+    return _ifModifiedSince.call(this);
+  },
+  configurable: true,
+});
+Object.defineProperty(Request.prototype, "ifNoneMatch", {
+  get(this: Request) {
+    return _ifNoneMatch.call(this);
+  },
+  configurable: true,
+});
+Object.defineProperty(Request.prototype, "ifNoneMatchEtags", {
+  get(this: Request) {
+    return _ifNoneMatchEtags.call(this);
+  },
+  configurable: true,
+});
+Request.prototype.notModified = _notModified;
+Request.prototype.etagMatches = _etagMatches;
+Request.prototype.fresh = _fresh;

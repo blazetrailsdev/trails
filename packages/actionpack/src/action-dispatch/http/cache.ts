@@ -38,11 +38,7 @@ export interface CacheResponseLike {
 }
 
 export function ifModifiedSince(this: RequestCacheHost): Date | undefined {
-  const since = this.getHeader(HTTP_IF_MODIFIED_SINCE);
-  if (!since) return undefined;
-  const t = Date.parse(since);
-  // boundary: HTTP-date wire-format header value parsed as JS Date.
-  return Number.isNaN(t) ? undefined : new Date(t);
+  return parseRfc2822Date(this.getHeader(HTTP_IF_MODIFIED_SINCE));
 }
 
 export function ifNoneMatch(this: RequestCacheHost): string | undefined {
@@ -92,9 +88,99 @@ function hdrSet(host: ResponseCacheHost, key: string): boolean {
   return host.hasHeader ? host.hasHeader(key) : host.getHeader(key) !== undefined;
 }
 
-function parseHttpDate(s: string | undefined): Date | undefined {
+const RFC1123_RE =
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/;
+const MONTHS: Record<string, number> = {
+  Jan: 0,
+  Feb: 1,
+  Mar: 2,
+  Apr: 3,
+  May: 4,
+  Jun: 5,
+  Jul: 6,
+  Aug: 7,
+  Sep: 8,
+  Oct: 9,
+  Nov: 10,
+  Dec: 11,
+};
+
+const RFC2822_ZONE_RE = /^(?:GMT|UT|UTC|Z|[+-]\d{4}|EDT|EST|CDT|CST|MDT|MST|PDT|PST)$/;
+
+/**
+ * Parse an RFC 2822 date — Rails' `Time.rfc2822` is used by
+ * `ActionDispatch::Http::Cache::Request#if_modified_since`. Accepts numeric
+ * zone offsets (`+0000`, `-0500`) and the obsolete zone names from RFC 2822
+ * §4.3, plus `GMT` which is what real-world HTTP clients send.
+ *
+ * @internal
+ */
+export function parseRfc2822Date(s: string | undefined): Date | undefined {
   if (!s) return undefined;
-  const t = Date.parse(s);
+  const m =
+    /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{2,4}) (\d{2}):(\d{2}):(\d{2}) (\S+)$/.exec(
+      s,
+    );
+  if (!m) return undefined;
+  const [, day, mon, yr, hh, mm, ss, zone] = m;
+  if (!RFC2822_ZONE_RE.test(zone)) return undefined;
+  const d = Number(day),
+    h = Number(hh),
+    mi = Number(mm),
+    s2 = Number(ss);
+  // Rails' Time.rfc2822 raises ArgumentError on out-of-range components.
+  if (d < 1 || d > 31 || h > 23 || mi > 59 || s2 > 60) return undefined;
+  let year = Number(yr);
+  if (year < 50) year += 2000;
+  else if (year < 1000) year += 1900;
+  // Round-trip-validate calendar day (rejects 31 Feb, 30 Feb, etc.).
+  // boundary: probe Date used only to read normalized UTC components.
+  const probe = new Date(Date.UTC(year, MONTHS[mon], d));
+  if (probe.getUTCMonth() !== MONTHS[mon] || probe.getUTCDate() !== d) return undefined;
+  let offsetMin = 0;
+  if (/^[+-]\d{4}$/.test(zone)) {
+    const oh = Number(zone.slice(1, 3));
+    const om = Number(zone.slice(3, 5));
+    if (oh > 23 || om > 59) return undefined;
+    const sign = zone[0] === "-" ? -1 : 1;
+    offsetMin = sign * (oh * 60 + om);
+  } else if (zone === "EDT") offsetMin = -4 * 60;
+  else if (zone === "EST" || zone === "CDT") offsetMin = -5 * 60;
+  else if (zone === "CST" || zone === "MDT") offsetMin = -6 * 60;
+  else if (zone === "MST" || zone === "PDT") offsetMin = -7 * 60;
+  else if (zone === "PST") offsetMin = -8 * 60;
+  const t = Date.UTC(year, MONTHS[mon], Number(day), Number(hh), Number(mm), Number(ss));
+  if (Number.isNaN(t)) return undefined;
+  // boundary: HTTP-date wire-format header value parsed as JS Date.
+  return new Date(t - offsetMin * 60_000);
+}
+
+/**
+ * Parse an HTTP-date header value, strict RFC 1123 (IMF-fixdate) per RFC 9110.
+ * Returns undefined for any non-conforming value — including the obsolete
+ * RFC 850 and asctime forms, and any locale-sensitive `Date.parse` interpretations.
+ *
+ * Rails' `Time.httpdate` is similarly strict (accepts only RFC 1123 / RFC 2616).
+ *
+ * @internal
+ */
+export function parseHttpDate(s: string | undefined): Date | undefined {
+  if (!s) return undefined;
+  const m = RFC1123_RE.exec(s);
+  if (!m) return undefined;
+  const [, day, mon, year, hh, mm, ss] = m;
+  const d = Number(day),
+    h = Number(hh),
+    mi = Number(mm),
+    s2 = Number(ss);
+  // Rails' Time.httpdate raises ArgumentError on out-of-range components.
+  if (d < 1 || d > 31 || h > 23 || mi > 59 || s2 > 60) return undefined;
+  const yr = Number(year);
+  // Round-trip-validate calendar day (rejects 31 Feb, 30 Feb, etc.).
+  // boundary: probe Date used only to read normalized UTC components.
+  const probe = new Date(Date.UTC(yr, MONTHS[mon], d));
+  if (probe.getUTCMonth() !== MONTHS[mon] || probe.getUTCDate() !== d) return undefined;
+  const t = Date.UTC(yr, MONTHS[mon], d, h, mi, s2);
   // boundary: HTTP-date wire-format header value parsed as JS Date.
   return Number.isNaN(t) ? undefined : new Date(t);
 }
