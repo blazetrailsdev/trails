@@ -2613,6 +2613,45 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // no spurious column write.
   });
 
+  it("default belongs_to populates inferred composite FK columns after autosave", async () => {
+    // Mirrors `BelongsToAssociation#foreignKeyNames` composite-PK
+    // inference: when the target has composite PK and no `foreignKey`
+    // option, the writer fills `${assoc}_${pk}` columns at assignment.
+    // After autosave, FK propagation must hit the same columns so a
+    // newly-saved parent's PK lands on the owner.
+    const adapter = freshAdapter();
+    class CompParent extends Base {
+      static {
+        this.primaryKey = ["region_id", "id"];
+        this.attribute("region_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class CompChild extends Base {
+      static {
+        this.attribute("comp_parent_region_id", "integer");
+        this.attribute("comp_parent_id", "integer");
+        this.attribute("label", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel("CompParent", CompParent);
+    registerModel("CompChild", CompChild);
+    // No foreignKey/queryConstraints — exercises the composite-PK inference
+    // branch in _resolveBelongsToForeignKey.
+    Associations.belongsTo.call(CompChild, "compParent", { className: "CompParent" });
+
+    const parent = new CompParent({ region_id: 5, id: 11, name: "P" });
+    const child = new CompChild({ label: "c" });
+    cacheAssoc(child, "compParent", parent);
+    await child.save();
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child.comp_parent_region_id).toBe(5);
+    expect(child.comp_parent_id).toBe(11);
+  });
+
   it("should not add the same callbacks multiple times for has one", async () => {
     const adapter = freshAdapter();
     let saveCount = 0;
