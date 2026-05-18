@@ -147,8 +147,8 @@ describe("AdapterTest", () => {
     // SCOPE: ~5 LOC fix in default branch; affects ~1 test
   });
   it.skip("current database", () => {
-    // BLOCKED: fixture
-    // ROOT-CAUSE: test-helpers: needs MySQL/PG adapter context (Rails skips on adapters without currentDatabase) + ARTest.test_configuration_hashes wiring
+    // BLOCKED: adapter-mysql
+    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#currentDatabase + postgresql-adapter.ts#currentDatabase: needs MySQL/PG test context (Rails respond_to? gate skips on SQLite) + ARTest.test_configuration_hashes wiring
     // SCOPE: ~15 LOC port; affects ~1 test
   });
 });
