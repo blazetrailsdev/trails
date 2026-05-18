@@ -1,5 +1,6 @@
 import type { DatabaseAdapter } from "../adapter.js";
 import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
+import { setUseTransactionalTests } from "../test-adapter.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -64,6 +65,15 @@ export type Schema = Record<string, TableSchema>;
 
 export interface DefineSchemaOpts {
   dropExisting?: boolean;
+  /**
+   * Mirror of Rails' `self.use_transactional_tests = false`. When `false`,
+   * the global per-test `BEGIN`/`ROLLBACK` wrap (Phase 6.3) is bypassed for
+   * tests using this adapter. Required for tests that mutate schema
+   * mid-body (migration tests, schema-dump tests, DDL tests) — DDL inside a
+   * transaction either commits implicitly (MySQL) or breaks rollback
+   * semantics (PG/SQLite savepoint interactions). Defaults to `true`.
+   */
+  useTransactionalTests?: boolean;
 }
 
 /** @internal */
@@ -261,6 +271,12 @@ export async function defineSchema(
 
   const cache = getCache(adapter);
   const known = adapterKnownTables(adapter);
+
+  // Record the per-adapter opt-out flag *before* any DDL runs. Phase 6.3's
+  // global `beforeEach` will read this via `getUseTransactionalTests()` to
+  // decide whether to wrap the test in BEGIN/ROLLBACK. Default is true; only
+  // an explicit `false` opts out.
+  setUseTransactionalTests(adapter, opts?.useTransactionalTests !== false);
 
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
