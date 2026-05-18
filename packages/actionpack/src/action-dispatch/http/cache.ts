@@ -38,7 +38,7 @@ export interface CacheResponseLike {
 }
 
 export function ifModifiedSince(this: RequestCacheHost): Date | undefined {
-  return parseHttpDate(this.getHeader(HTTP_IF_MODIFIED_SINCE));
+  return parseRfc2822Date(this.getHeader(HTTP_IF_MODIFIED_SINCE));
 }
 
 export function ifNoneMatch(this: RequestCacheHost): string | undefined {
@@ -104,6 +104,43 @@ const MONTHS: Record<string, number> = {
   Nov: 10,
   Dec: 11,
 };
+
+const RFC2822_ZONE_RE = /^(?:GMT|UT|UTC|Z|[+-]\d{4}|EDT|EST|CDT|CST|MDT|MST|PDT|PST)$/;
+
+/**
+ * Parse an RFC 2822 date — Rails' `Time.rfc2822` is used by
+ * `ActionDispatch::Http::Cache::Request#if_modified_since`. Accepts numeric
+ * zone offsets (`+0000`, `-0500`) and the obsolete zone names from RFC 2822
+ * §4.3, plus `GMT` which is what real-world HTTP clients send.
+ *
+ * @internal
+ */
+export function parseRfc2822Date(s: string | undefined): Date | undefined {
+  if (!s) return undefined;
+  const m =
+    /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{2,4}) (\d{2}):(\d{2}):(\d{2}) (\S+)$/.exec(
+      s,
+    );
+  if (!m) return undefined;
+  const [, day, mon, yr, hh, mm, ss, zone] = m;
+  if (!RFC2822_ZONE_RE.test(zone)) return undefined;
+  let year = Number(yr);
+  if (year < 50) year += 2000;
+  else if (year < 1000) year += 1900;
+  let offsetMin = 0;
+  if (/^[+-]\d{4}$/.test(zone)) {
+    const sign = zone[0] === "-" ? -1 : 1;
+    offsetMin = sign * (Number(zone.slice(1, 3)) * 60 + Number(zone.slice(3, 5)));
+  } else if (zone === "EDT") offsetMin = -4 * 60;
+  else if (zone === "EST" || zone === "CDT") offsetMin = -5 * 60;
+  else if (zone === "CST" || zone === "MDT") offsetMin = -6 * 60;
+  else if (zone === "MST" || zone === "PDT") offsetMin = -7 * 60;
+  else if (zone === "PST") offsetMin = -8 * 60;
+  const t = Date.UTC(year, MONTHS[mon], Number(day), Number(hh), Number(mm), Number(ss));
+  if (Number.isNaN(t)) return undefined;
+  // boundary: HTTP-date wire-format header value parsed as JS Date.
+  return new Date(t - offsetMin * 60_000);
+}
 
 /**
  * Parse an HTTP-date header value, strict RFC 1123 (IMF-fixdate) per RFC 9110.

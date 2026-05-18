@@ -30,6 +30,19 @@ describe("Cache::Request", () => {
     expect(notModified.call(r, new Date("1994-11-06T08:49:38Z"))).toBe(false);
   });
 
+  it("if_modified_since parses RFC 2822 numeric zone offsets (Time.rfc2822 parity)", () => {
+    const r = req({ "If-Modified-Since": "Sun, 06 Nov 1994 03:49:37 -0500" });
+    // Same instant as "Sun, 06 Nov 1994 08:49:37 GMT"
+    expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(true);
+  });
+
+  it("if_modified_since rejects malformed values (no permissive Date.parse fallback)", () => {
+    const r = req({ "If-None-Match": '"abc"', "If-Modified-Since": "yesterday" });
+    expect(fresh.call(r, { etag: '"abc"' })).toBe(true); // etag still matches
+    // not_modified? returns false because the date is unparseable
+    expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(false);
+  });
+
   it("etag_matches? handles list and wildcard", () => {
     expect(etagMatches.call(req({ "If-None-Match": '"a", "b"' }), '"a"')).toBe(true);
     expect(etagMatches.call(req({ "If-None-Match": "*" }), '"x"')).toBe(true);
