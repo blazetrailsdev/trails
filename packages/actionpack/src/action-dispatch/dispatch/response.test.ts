@@ -381,6 +381,18 @@ describe("ResponseTest", () => {
   it("defaultCharset static is utf-8", () => {
     expect(Response.defaultCharset).toBe("utf-8");
   });
+
+  it("contentType setter honors a customized Response.defaultCharset", () => {
+    const prior = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "iso-8859-1";
+      const res = new Response();
+      res.contentType = "text/plain";
+      expect(res.headers["content-type"]).toBe("text/plain; charset=iso-8859-1");
+    } finally {
+      Response.defaultCharset = prior;
+    }
+  });
 });
 
 describe("ResponseFilterRedirect", () => {
