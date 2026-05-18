@@ -21,6 +21,18 @@ export { htmlEscape, h, htmlEscapeOnce, jsonEscape } from "./ejs-util.js";
 export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./javascript-helper.js";
 
 export {
+  numberToPhone,
+  numberToCurrency,
+  numberToPercentage,
+  numberWithDelimiter,
+  numberWithPrecision,
+  numberToHumanSize,
+  numberToHuman,
+  InvalidNumberError,
+} from "./number-helper.js";
+export type { NumberHelperOptions } from "./number-helper.js";
+
+export {
   sanitize,
   sanitizeCss,
   stripTags,
