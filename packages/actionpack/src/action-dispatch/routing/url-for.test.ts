@@ -177,10 +177,23 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(host._routes).toBe(original);
   });
 
-  it("_withRoutes rejects an async block (would restore _routes too early)", () => {
+  it("_withRoutes rejects an AsyncFunction block before invoking it", async () => {
+    const host = makeHost();
+    const original = host._routes;
+    let ran = false;
+    const block = async () => {
+      ran = true;
+      await Promise.resolve();
+    };
+    expect(() => _withRoutes.call(host, makeRoutes(), block as never)).toThrow(/AsyncFunction/);
+    expect(ran).toBe(false);
+    expect(host._routes).toBe(original);
+  });
+
+  it("_withRoutes rejects a sync block that returns a Promise", () => {
     const host = makeHost();
     expect(() => _withRoutes.call(host, makeRoutes(), (() => Promise.resolve(1)) as never)).toThrow(
-      /synchronous/,
+      /Promise/,
     );
   });
 

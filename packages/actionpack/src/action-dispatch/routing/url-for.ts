@@ -156,6 +156,15 @@ export function _withRoutes<T>(
   routes: UrlForRoutes,
   block: () => Exclude<T, Promise<unknown>>,
 ): Exclude<T, Promise<unknown>> {
+  // Pre-call guard: an async function executes synchronously up to its
+  // first `await` and schedules its continuation, so detecting a Promise
+  // *after* `block()` returns is too late — the continuation still runs
+  // after `_routes` is restored in `finally`. Reject before invocation.
+  if (block.constructor?.name === "AsyncFunction") {
+    throw new Error(
+      "_withRoutes block must be synchronous; got an AsyncFunction. Use an async-aware helper instead.",
+    );
+  }
   const old = this._routes;
   this._routes = routes;
   try {
