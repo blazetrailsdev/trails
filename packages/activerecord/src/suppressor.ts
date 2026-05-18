@@ -7,7 +7,7 @@
 
 import { getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
-import type { AnyClass } from "./internal/any-class.js";
+import type { Base } from "./base.js";
 
 /**
  * The suppressor registry: a map from class name → `true` when that
@@ -62,7 +62,7 @@ export function registry(): Record<string, true | undefined> {
  *
  * Mirrors: ActiveRecord::Suppressor.suppress
  */
-export async function suppress<R>(modelClass: AnyClass, fn: () => R | Promise<R>): Promise<R> {
+export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
   const name = modelClass.name;
   if (!name) {
     // Anonymous classes can't participate in the name-keyed registry
@@ -82,11 +82,11 @@ export async function suppress<R>(modelClass: AnyClass, fn: () => R | Promise<R>
  * Check if the given model class (or any ancestor) is currently
  * suppressed in the active scope.
  */
-export function isSuppressed(modelClass: AnyClass): boolean {
+export function isSuppressed(modelClass: typeof Base): boolean {
   const reg = currentRegistry();
-  let current: unknown = modelClass;
+  let current: typeof Base | null = modelClass;
   while (current && typeof current === "function") {
-    const klassName = (current as AnyClass).name;
+    const klassName = current.name;
     if (klassName && reg[klassName]) return true;
     current = Object.getPrototypeOf(current);
   }

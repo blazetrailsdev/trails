@@ -11,7 +11,6 @@
 
 import type { Base } from "../base.js";
 import { Delegation as ASDelegation } from "@blazetrails/activesupport";
-import type { AnyClass } from "../internal/any-class.js";
 
 type AnyCallable = (...args: any[]) => any;
 
@@ -22,7 +21,7 @@ type AnyCallable = (...args: any[]) => any;
  */
 
 export interface Delegation {
-  delegatedClasses: Set<AnyClass>;
+  delegatedClasses: Set<typeof Base>;
 }
 
 /**
@@ -69,19 +68,19 @@ export class GeneratedRelationMethods {
  * Mirrors: ActiveRecord::Delegation::DelegateCache
  */
 export class DelegateCache {
-  private _cache: Map<AnyClass, Set<string>> = new Map();
+  private _cache: Map<typeof Base, Set<string>> = new Map();
 
-  initialize(modelClass: AnyClass): void {
+  initialize(modelClass: typeof Base): void {
     if (!this._cache.has(modelClass)) {
       this._cache.set(modelClass, new Set());
     }
   }
 
-  hasDelegated(modelClass: AnyClass, method: string): boolean {
+  hasDelegated(modelClass: typeof Base, method: string): boolean {
     return this._cache.get(modelClass)?.has(method) ?? false;
   }
 
-  register(modelClass: AnyClass, method: string): void {
+  register(modelClass: typeof Base, method: string): void {
     this.initialize(modelClass);
     this._cache.get(modelClass)!.add(method);
   }
@@ -94,11 +93,11 @@ export class DelegateCache {
  * Constrained to `object` because Relation._modelClass is private;
  * internal access uses `any` casts.
  */
-const _delegatedClasses = new Set<AnyClass>();
+const _delegatedClasses = new Set<typeof Base>();
 const _uncacheableMethods = new Set<string>(["to_a", "to_ary", "records", "inspect"]);
 const _delegateCache = new DelegateCache();
 
-export function delegatedClasses(): Set<AnyClass> {
+export function delegatedClasses(): Set<typeof Base> {
   return _delegatedClasses;
 }
 
@@ -106,23 +105,25 @@ export function uncacheableMethods(): Set<string> {
   return _uncacheableMethods;
 }
 
-export function delegateBaseMethods(klass: AnyClass): void {
+export function delegateBaseMethods(klass: typeof Base): void {
   _delegatedClasses.add(klass);
   _delegateCache.initialize(klass);
 }
 
-export function relationDelegateClass(klass: AnyClass): AnyClass {
+export function relationDelegateClass(klass: typeof Base): typeof Base {
   _delegatedClasses.add(klass);
   return klass;
 }
 
 export function initializeRelationDelegateCache(): void {
-  _delegateCache.initialize(Object);
+  for (const klass of _delegatedClasses) {
+    _delegateCache.initialize(klass);
+  }
 }
 
-const _generatedMethodsByModel = new WeakMap<AnyClass, GeneratedRelationMethods>();
+const _generatedMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
 
-function generatedMethodsFor(modelClass: AnyClass): GeneratedRelationMethods {
+function generatedMethodsFor(modelClass: typeof Base): GeneratedRelationMethods {
   let methods = _generatedMethodsByModel.get(modelClass);
   if (!methods) {
     methods = new GeneratedRelationMethods();
@@ -131,7 +132,11 @@ function generatedMethodsFor(modelClass: AnyClass): GeneratedRelationMethods {
   return methods;
 }
 
-export function generateRelationMethod(modelClass: AnyClass, name: string, fn: AnyCallable): void {
+export function generateRelationMethod(
+  modelClass: typeof Base,
+  name: string,
+  fn: AnyCallable,
+): void {
   generatedMethodsFor(modelClass).generate(name, fn);
 }
 
@@ -183,7 +188,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 }
 
 /** @internal */
-function relationClassFor(klass: AnyClass): typeof GeneratedRelationMethods {
+function relationClassFor(klass: typeof Base): typeof GeneratedRelationMethods {
   return GeneratedRelationMethods;
 }
 
@@ -195,6 +200,6 @@ function includeRelationMethods(target: object, methods: GeneratedRelationMethod
 }
 
 /** @internal */
-function generatedRelationMethods(modelClass: AnyClass): GeneratedRelationMethods {
+function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
   return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
 }

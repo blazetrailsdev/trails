@@ -4,9 +4,9 @@
  * Mirrors: ActiveRecord::NoTouching
  */
 
-import type { AnyClass } from "./internal/any-class.js";
+import type { Base } from "./base.js";
 
-const _noTouchingDepth = new Map<AnyClass, number>();
+const _noTouchingDepth = new Map<typeof Base, number>();
 
 /**
  * Execute a block with touch callbacks suppressed for the given model class.
@@ -14,7 +14,7 @@ const _noTouchingDepth = new Map<AnyClass, number>();
  *
  * Mirrors: ActiveRecord::NoTouching.no_touching
  */
-export async function noTouching<R>(modelClass: AnyClass, fn: () => R | Promise<R>): Promise<R> {
+export async function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
   const depth = _noTouchingDepth.get(modelClass) ?? 0;
   _noTouchingDepth.set(modelClass, depth + 1);
   try {
@@ -34,10 +34,10 @@ export async function noTouching<R>(modelClass: AnyClass, fn: () => R | Promise<
  *
  * Mirrors: ActiveRecord::NoTouching.applied_to?
  */
-export function isAppliedTo(modelClass: AnyClass): boolean {
-  let current: unknown = modelClass;
+export function isAppliedTo(modelClass: typeof Base): boolean {
+  let current: typeof Base | null = modelClass;
   while (current && typeof current === "function") {
-    if ((_noTouchingDepth.get(current as AnyClass) ?? 0) > 0) return true;
+    if ((_noTouchingDepth.get(current) ?? 0) > 0) return true;
     current = Object.getPrototypeOf(current);
   }
   return false;
