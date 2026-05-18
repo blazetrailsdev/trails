@@ -2765,9 +2765,15 @@ describe("CalculationsTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      products: { name: "string", price: "integer", category: "string" },
+    });
     Product.adapter = adapter;
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test_sum_on_empty_table
@@ -7054,8 +7060,14 @@ describe("CalculationsTest", () => {
 
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: { name: "string", age: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("pick returns single column value from first record", async () => {
@@ -7095,11 +7107,25 @@ describe("CalculationsTest", () => {
 
   beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      products: {
+        name: "string",
+        price: "integer",
+        quantity: "integer",
+        category: "string",
+      },
+      topics: { title: "string", status: "string" },
+      orders: { amount: "integer", status: "string" },
+      users: { name: "string", email: "string" },
+    });
     Product.adapter = adapter;
     await Product.create({ name: "Apple", price: 1, quantity: 10, category: "fruit" });
     await Product.create({ name: "Banana", price: 2, quantity: 20, category: "fruit" });
     await Product.create({ name: "Carrot", price: 3, quantity: 30, category: "vegetable" });
     await Product.create({ name: "Donut", price: 5, quantity: 5, category: "pastry" });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   describe("count", () => {
@@ -7363,8 +7389,6 @@ describe("CalculationsTest", () => {
     });
   });
   it("should sum scoped field with conditions", async () => {
-    const adapter = freshAdapter();
-
     class Order extends Base {
       static {
         this.attribute("amount", "integer");
@@ -7382,8 +7406,6 @@ describe("CalculationsTest", () => {
   });
 
   it("count with column parameter", async () => {
-    const adapter = freshAdapter();
-
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -7408,15 +7430,26 @@ describe("CalculationsTest", () => {
 //   count  → always integer (not through type)
 // ==========================================================================
 describe("bigint aggregates (big_integer columns)", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      scores: { value: "big_integer", category: "string" },
+      items: { qty: "integer" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   function makeBigModel() {
-    const adapter = freshAdapter();
     class Score extends Base {
       static {
         this.attribute("value", "big_integer");
         this.attribute("category", "string");
-        this.adapter = adapter;
       }
     }
+    Score.adapter = adapter;
     return Score;
   }
 
@@ -7466,13 +7499,12 @@ describe("bigint aggregates (big_integer columns)", () => {
   });
 
   it("sum of integer column still returns number", async () => {
-    const adapter = freshAdapter();
     class Item extends Base {
       static {
         this.attribute("qty", "integer");
-        this.adapter = adapter;
       }
     }
+    Item.adapter = adapter;
     await Item.create({ qty: 3 });
     await Item.create({ qty: 7 });
     const result = await Item.sum("qty");
