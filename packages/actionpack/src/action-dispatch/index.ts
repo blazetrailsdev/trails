@@ -88,6 +88,12 @@ export {
   type ParameterParsers,
   type ParametersHost,
 } from "./http/parameters.js";
+export {
+  ParamError,
+  ParameterTypeError,
+  InvalidParameterError,
+  ParamsTooDeepError,
+} from "./http/param-error.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
 export {
   BasicAuth,
