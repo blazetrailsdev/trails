@@ -7,6 +7,31 @@ import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Associations, association, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+
+const TEST_SCHEMA: Schema = {
+  dj_authors: { name: "string" },
+  dj_posts: {
+    dj_author_id: "integer",
+    title: "string",
+    body: "string",
+  },
+  dj_comments: {
+    dj_post_id: "integer",
+    body: "string",
+    origin_id: "integer",
+    origin_type: "string",
+  },
+  dj_ratings: {
+    dj_comment_id: "integer",
+    value: "integer",
+  },
+  dj_members: {
+    name: "string",
+    dj_member_type_id: "integer",
+  },
+  dj_member_types: { name: "string" },
+};
 
 /**
  * Build a DJAS scope for `assocName` on `owner`. Returns the deferred
@@ -27,8 +52,10 @@ function djasScope(owner: Base, assocName: string): any {
   });
 }
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
@@ -83,8 +110,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     DjAuthor.adapter = adapter;
     DjPost.adapter = adapter;
     DjComment.adapter = adapter;
