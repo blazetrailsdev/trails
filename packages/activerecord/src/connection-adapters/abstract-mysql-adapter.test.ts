@@ -66,34 +66,85 @@ describe("AbstractMysqlAdapter#renameColumnForAlter fallback", () => {
     return adapter;
   }
 
+  it("rejects virtual/generated columns: rebuild path cannot preserve AS (<expr>)", async () => {
+    const adapter = await makeAdapter("gen_col", "VIRTUAL GENERATED");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "gen_col",
+        Type: "int(11)",
+        Null: "YES",
+        Default: null,
+        Extra: "VIRTUAL GENERATED",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    await expect(adapter.renameColumnForAlter("users", "gen_col", "gen_col2")).rejects.toThrow(
+      /virtual\/generated column/,
+    );
+  });
+
   it("allows auto_increment Extra without throwing", async () => {
     const adapter = await makeAdapter("id", "auto_increment");
     const sql: string = await adapter.renameColumnForAlter("users", "id", "user_id");
     expect(sql).toContain("AUTO_INCREMENT");
   });
 
-  it("preserves on update CURRENT_TIMESTAMP Extra without throwing", async () => {
+  it("preserves on update CURRENT_TIMESTAMP for datetime column", async () => {
     const adapter = await makeAdapter("updated_at", "on update CURRENT_TIMESTAMP");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "updated_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "on update CURRENT_TIMESTAMP",
+        Collation: null,
+        Comment: "",
+      },
+    ];
     const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
     expect(sql).toContain("ON UPDATE");
     expect(sql).toContain("CURRENT_TIMESTAMP");
   });
 
-  it("preserves MySQL 8 compound DEFAULT_GENERATED on update Extra", async () => {
-    const adapter = await makeAdapter(
-      "updated_at",
-      "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)",
-    );
-    const sql: string = await adapter.renameColumnForAlter("users", "updated_at", "ts");
-    expect(sql).toContain("ON UPDATE");
-    expect(sql).toContain("CURRENT_TIMESTAMP(6)");
+  it("preserves bare ON UPDATE Extra when Default is null (not folded into defaultFunction)", async () => {
+    // Datetime column with `on update CURRENT_TIMESTAMP` but Default=null — newColumnFromField's
+    // datetime+CURRENT_TIMESTAMP short-circuit doesn't fire (default is null), so on_update
+    // can't be folded into defaultFunction. Must round-trip via column.onUpdate / MysqlAddColumnOptions.
+    const adapter = await makeAdapter("ts", "on update CURRENT_TIMESTAMP");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "ts",
+        Type: "datetime",
+        Null: "YES",
+        Default: null,
+        Extra: "on update CURRENT_TIMESTAMP",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "ts", "ts2");
+    expect(sql).toContain("ON UPDATE CURRENT_TIMESTAMP");
+    expect(sql).not.toContain("DEFAULT");
   });
 
-  it("throws for unrecognised Extra values", async () => {
-    const adapter = await makeAdapter("gen_col", "VIRTUAL GENERATED");
-    await expect(adapter.renameColumnForAlter("users", "gen_col", "gen_col2")).rejects.toThrow(
-      "renameColumnForAlter fallback",
-    );
+  it("preserves MySQL 8 compound DEFAULT_GENERATED on update Extra", async () => {
+    const adapter = await makeAdapter("col", "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)");
+    adapter.columnDefinitions = async () => [
+      {
+        Field: "col",
+        Type: "json",
+        Null: "YES",
+        Default: "json_array()",
+        Extra: "DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6)",
+        Collation: null,
+        Comment: "",
+      },
+    ];
+    const sql: string = await adapter.renameColumnForAlter("users", "col", "col2");
+    expect(sql).toContain("ON UPDATE");
+    expect(sql).toContain("CURRENT_TIMESTAMP(6)");
   });
 
   it("emits DEFAULT CURRENT_TIMESTAMP unquoted when default is a timestamp function", async () => {

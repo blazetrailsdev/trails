@@ -1113,10 +1113,34 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !==
         "NO";
       const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
-      const extra = String((r.extra ?? r.EXTRA ?? "") as string).toLowerCase();
+      const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
+      const extra = extraRaw.toLowerCase();
+      // Mirror newColumnFromField's function-default detection (mysql/schema-statements.ts):
+      // information_schema doesn't surface SHOW CREATE TABLE's bare-keyword default branch, but
+      // the two cases that matter for renameColumnForAlter — datetime+CURRENT_TIMESTAMP and
+      // DEFAULT_GENERATED — are detectable from extra + default_value alone.
+      let def: unknown = r.default_value ?? r.DEFAULT_VALUE ?? null;
+      let defFn: string | null = null;
+      const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
+      if (
+        semanticType === "datetime" &&
+        typeof def === "string" &&
+        /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)
+      ) {
+        defFn = onUpdateMatch ? `${def} ON UPDATE ${onUpdateMatch[1]}` : def;
+        def = null;
+      } else if (extraRaw.toUpperCase().startsWith("DEFAULT_GENERATED")) {
+        if (typeof def === "string") {
+          const wrapped = def.startsWith("(") ? def : `(${def})`;
+          defFn = onUpdateMatch ? `${wrapped} ON UPDATE ${onUpdateMatch[1]}` : wrapped;
+        }
+        def = null;
+      }
+      const onUpdateForColumn =
+        onUpdateMatch && (defFn == null || !/ ON UPDATE /i.test(defFn)) ? onUpdateMatch[1] : null;
       return new MysqlColumn(
         name,
-        r.default_value ?? r.DEFAULT_VALUE ?? null,
+        def,
         {
           sqlType: meta.sqlType,
           type: meta.type ?? undefined,
@@ -1128,10 +1152,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         {
           collation: (r.collation ?? r.COLLATION ?? null) as string | null,
           comment: (r.comment ?? r.COMMENT ?? null) as string | null,
+          defaultFunction: defFn,
           primaryKey: colKey === "PRI",
           autoIncrement: extra === "auto_increment",
           unsigned: /\bunsigned(?: zerofill)?\b/i.test(sqlType),
           virtual: /\b(?:virtual|stored|persistent)\b/i.test(extra),
+          onUpdate: onUpdateForColumn,
         },
       );
     });

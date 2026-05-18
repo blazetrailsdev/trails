@@ -65,9 +65,10 @@ import type { ColumnType, ColumnOptions } from "./abstract/schema-definitions.js
 import { TableDefinition as MysqlTableDefinition } from "./mysql/schema-definitions.js";
 import {
   isRowFormatDynamicByDefault,
-  defaultType,
+  newColumnFromField,
   quotedScope,
 } from "./mysql/schema-statements.js";
+import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
   StringType,
@@ -127,11 +128,6 @@ const CR_SERVER_GONE_ERROR = 2006;
 const CR_SERVER_LOST = 2013;
 const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
-// Function defaults emitted without DEFAULT_GENERATED in Extra (e.g. CURRENT_TIMESTAMP on
-// datetime columns). Used by renameColumnForAlter to emit them unquoted in the CHANGE clause.
-const RENAME_FUNC_DEFAULT_RE =
-  /^(CURRENT_TIMESTAMP(\([0-6]?\))?|NOW(\([0-6]?\))?|CURRENT_DATE|CURRENT_TIME(\([0-6]?\))?|UUID\(\))$/i;
-
 // eslint-disable-next-line no-control-regex
 const QUOTE_STRING_RE = /['\\\x00\n\r\x1a]/g;
 const QUOTE_STRING_MAP: Record<string, string> = {
@@ -157,12 +153,42 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   static dbWarningsIgnore: (string | RegExp)[] = [];
 
   /**
-   * Return Column objects for a table. Concrete adapters (Mysql2Adapter,
-   * TrilogyAdapter) override this. The default throws so that unimplemented
-   * adapters fail loudly if FK enrichment is ever triggered.
+   * Return Column objects for a table. Mirrors Rails'
+   * `AbstractMysqlAdapter#columns` (via `SchemaStatements#columns`):
+   * `column_definitions` rows mapped through `new_column_from_field`, which
+   * centralizes function-default and on_update detection. Concrete adapters
+   * (Mysql2Adapter, TrilogyAdapter) may still override for performance.
    */
-  async columns(_tableName: string): Promise<Column[]> {
-    throw new Error(`${this.constructor.name} must implement columns()`);
+  async columns(tableName: string): Promise<Column[]> {
+    const fields = await this.columnDefinitions(tableName);
+    // newColumnFromField's broader function-default detection calls SHOW CREATE TABLE via the
+    // sync createTableInfoFn callback. Pre-fetch once iff any field default falls through the
+    // earlier branches (non-digit literal, non-quoted string, non-CURRENT_TIMESTAMP datetime,
+    // non-DEFAULT_GENERATED) so the sync callback has data when needed and we keep a single
+    // round-trip per columns() call.
+    const needsCreateInfo = fields.some((f) => {
+      const def = (f["Default"] as string | null) ?? null;
+      const extra = ((f["Extra"] as string | null) ?? "").trim();
+      const sqlType = ((f["Type"] as string | null) ?? "").toLowerCase();
+      if (def == null || /^\d/.test(def) || def.startsWith("'")) return false;
+      if (extra.toUpperCase().startsWith("DEFAULT_GENERATED")) return false;
+      // newColumnFromField's datetime+CURRENT_TIMESTAMP short-circuit only fires when the
+      // semantic type is "datetime" (sqlType startsWith "datetime"/"timestamp"); for
+      // non-datetime columns with a CURRENT_TIMESTAMP default we still need SHOW CREATE TABLE
+      // for the broader function-default detection.
+      const isDatetimeLike = /^(datetime|timestamp)/.test(sqlType);
+      if (isDatetimeLike && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)) return false;
+      return true;
+    });
+    const createInfo = needsCreateInfo ? await this.createTableInfo(tableName) : null;
+    return fields.map((field) =>
+      newColumnFromField(
+        tableName,
+        field as Record<string, string | null>,
+        () => createInfo,
+        (sqlType) => this.lookupCastType(sqlType) as never,
+      ),
+    );
   }
 
   /**
@@ -1522,73 +1548,47 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (this.supportsRenameColumn()) {
       return `RENAME COLUMN ${this.quoteIdentifier(columnName)} TO ${this.quoteIdentifier(newColumnName)}`;
     }
-    // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter fallback.
-    // columnDefinitions (SHOW FULL FIELDS) fires a "SCHEMA" notification and returns the full
-    // column definition including Collation, Extra (auto_increment), and Comment — more complete
-    // than SHOW COLUMNS which omits those fields.
-    const cols = await this.columnDefinitions(tableName);
-    const col = cols.find((c) => (c["Field"] as string) === columnName);
-    if (!col) throw new Error(`Column not found: ${columnName} in ${tableName}`);
-    // Guard against silently dropping Extra attributes we cannot reconstruct (e.g. generated
-    // columns). Allowed values: AUTO_INCREMENT (via ColumnOptions.autoIncrement), ON UPDATE <expr>
-    // (via MysqlAddColumnOptions.onUpdate, including the MySQL 8 compound form
-    // "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"), and DEFAULT_GENERATED alone (function
-    // default — reconstructed via RENAME_FUNC_DEFAULT_RE / paren-wrap lambda in colDefault below).
-    // Anything else triggers an explicit throw so callers know to upgrade MySQL.
-    const extraRaw = ((col["Extra"] as string | undefined) ?? "").trim();
-    const extra = extraRaw.toLowerCase();
-    const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
-    if (extra && extra !== "auto_increment" && extra !== "default_generated" && !onUpdateMatch) {
+    // Fallback for MySQL <8.0.3 / MariaDB <10.5.2: mirrors Rails' rename_column_for_alter
+    // (abstract_mysql_adapter.rb:863-878). Route through columnFor so function-default and
+    // on_update detection happens once in newColumnFromField — no second-pass parsing here.
+    const column = (await this.columnFor(tableName, columnName)) as MysqlColumn;
+    // Rails' rename_column_for_alter has no equivalent guard, but the rebuild path here
+    // (and in Rails) reconstructs columns from {default,null,auto_increment,comment} only —
+    // the `AS (<expr>) [VIRTUAL|STORED]` generation clause has no slot. Emitting a plain
+    // CHANGE for a virtual/generated column would silently drop the generation expression,
+    // which is unrecoverable. Fail loud instead; callers must upgrade to MySQL ≥8.0.3 or
+    // MariaDB ≥10.5.2 to use the RENAME COLUMN path above.
+    if (column.isVirtual()) {
       throw new Error(
-        `renameColumnForAlter fallback: cannot safely CHANGE column "${columnName}" in table "${tableName}" ` +
-          `— Extra="${col["Extra"]}" is not preserved by this path. ` +
+        `renameColumnForAlter fallback: cannot safely CHANGE virtual/generated column ` +
+          `"${columnName}" in table "${tableName}" — generation expression would be dropped. ` +
           `Upgrade to MySQL ≥8.0.3 or MariaDB ≥10.5.2 to use RENAME COLUMN instead.`,
       );
     }
-    const rawDefault = col["Default"] !== null ? (col["Default"] as string) : undefined;
-    // SHOW FULL FIELDS returns function defaults as plain strings (e.g. "CURRENT_TIMESTAMP", "NOW()").
-    // Rails' column.default is nil for function defaults; pass as a lambda so
-    // quoteDefaultExpression emits it unquoted: DEFAULT NOW(), not DEFAULT 'NOW()'.
-    // Mirrors newColumnFromField: CURRENT_TIMESTAMP datetime cols and DEFAULT_GENERATED cols
-    // always go through the function-default path; everything else only when RENAME_FUNC_DEFAULT_RE matches.
-    // RENAME_FUNC_DEFAULT_RE catches well-known keyword defaults without a DB round-trip;
-    // anything that isn't a literal digit-led default also gets a SHOW CREATE TABLE check
-    // via defaultType(), mirroring Rails' new_column_from_field broader function-default
-    // detection (mysql/schema_statements.rb:189-208).
-    let colDefault: (() => string) | string | undefined;
-    if (typeof rawDefault === "string") {
-      if (extra === "default_generated") {
-        // Mirrors newColumnFromField (mysql/schema-statements.ts): DEFAULT_GENERATED expressions
-        // must be wrapped in parens so MySQL accepts them in ALTER TABLE … CHANGE.
-        const expr = rawDefault.startsWith("(") ? rawDefault : `(${rawDefault})`;
-        colDefault = () => expr;
-      } else if (RENAME_FUNC_DEFAULT_RE.test(rawDefault)) {
-        // Well-known keyword defaults (e.g. CURRENT_TIMESTAMP): emit as-is, no parens.
-        colDefault = () => rawDefault;
-      } else if (!/^\d/.test(rawDefault) && !rawDefault.startsWith("'")) {
-        // Broader function-default detection via SHOW CREATE TABLE — Rails' default_type
-        // returns :function for any DEFAULT followed by a bare keyword identifier.
-        const createInfo = await this.createTableInfo(tableName);
-        colDefault =
-          defaultType(createInfo, columnName) === "function" ? () => rawDefault : rawDefault;
-      } else {
-        colDefault = rawDefault;
-      }
-    } else {
-      colDefault = rawDefault;
-    }
+    const defFn = column.defaultFunction;
+    // newColumnFromField sets column.default to null when defaultFunction is present, so we can
+    // pass either through ColumnDefinition's `default` slot: a lambda for function defaults
+    // (emitted unquoted by quoteDefaultExpression) or the literal value otherwise. SHOW FULL
+    // FIELDS returns null Default both when there is no default and when DEFAULT NULL; treat
+    // null as "no explicit default" to avoid emitting DEFAULT NULL on NOT NULL columns.
+    const colDefault: (() => string) | string | undefined =
+      defFn != null ? () => defFn : column.default == null ? undefined : (column.default as string);
     const colOpts: MysqlAddColumnOptions = {
-      // SHOW FULL FIELDS returns NULL for Default both when there is no default and when
-      // DEFAULT NULL. Treat null as "no explicit default" (undefined) to avoid emitting
-      // DEFAULT NULL on NOT NULL columns — mirrors Rails column_for + new_column_definition.
       default: colDefault,
-      null: (col["Null"] as string) === "YES",
-      collation: (col["Collation"] as string | undefined) || undefined,
-      comment: (col["Comment"] as string | undefined) || undefined,
-      autoIncrement: extra === "auto_increment" || undefined,
-      onUpdate: onUpdateMatch ? onUpdateMatch[1] : undefined,
+      null: column.null,
+      collation: column.collation ?? undefined,
+      comment: column.comment ?? undefined,
+      autoIncrement: column.autoIncrement || undefined,
+      onUpdate: column.onUpdate ?? undefined,
     };
-    const colDef = new ColumnDefinition(newColumnName, col["Type"] as string, colOpts);
+    if (column.sqlType == null || column.sqlType.length === 0) {
+      throw new Error(
+        `renameColumnForAlter fallback: missing sqlType for column "${columnName}" in table ` +
+          `"${tableName}" — cannot rebuild CHANGE clause without the full column type. ` +
+          `This indicates the column metadata was not fully populated by columns().`,
+      );
+    }
+    const colDef = new ColumnDefinition(newColumnName, column.sqlType, colOpts);
     const cd = new ChangeColumnDefinition(colDef, columnName);
     return new MysqlSchemaCreation().accept(cd);
   }
