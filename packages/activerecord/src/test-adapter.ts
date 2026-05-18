@@ -516,6 +516,41 @@ export function parseCreateTableColumns(sql: string): Set<string> {
   return cols;
 }
 
+/**
+ * Update `_createdTables`/`_createdColumns` after a CREATE TABLE or DROP TABLE
+ * has successfully executed. Shared between {@link SchemaAdapter.executeMutation}
+ * and {@link SchemaAdapter.exec} so both schema-setup paths keep tracking in
+ * sync — otherwise tests that issue raw DDL via `adapter.exec(...)` would
+ * leave the recovery path to add columns via ALTER inside a per-test
+ * transactional fixture (MariaDB implicit-commits on ALTER and breaks the
+ * fixture's BEGIN/ROLLBACK).
+ *
+ * For CREATE: when the table was already tracked, the CREATE was likely
+ * `IF NOT EXISTS` against a pre-existing table whose real column set may
+ * differ from the SQL we're parsing — fall back to `{id}` (mirroring the
+ * pre-#1938 behavior) rather than recording columns that might not exist.
+ *
+ * @internal
+ */
+function recordDdlTracking(
+  sql: string,
+  createMatch: RegExpMatchArray | null,
+  dropMatch: RegExpMatchArray | null,
+): void {
+  if (createMatch) {
+    const table = createMatch[1];
+    const wasTracked = _createdTables.has(table);
+    _createdTables.add(table);
+    if (!_createdColumns.has(table)) {
+      _createdColumns.set(table, wasTracked ? new Set(["id"]) : parseCreateTableColumns(sql));
+    }
+  }
+  if (dropMatch) {
+    _createdTables.delete(dropMatch[1]);
+    _createdColumns.delete(dropMatch[1]);
+  }
+}
+
 let _ddlSpCounter = 0;
 
 /**
@@ -964,20 +999,7 @@ class SchemaAdapter implements DatabaseAdapter {
         if (useSp) await this.inner.createSavepoint(sp);
         const result = await this.inner.executeMutation(sql, binds, name);
         if (useSp) await this.inner.releaseSavepoint(sp);
-        if (createMatch) {
-          _createdTables.add(createMatch[1]);
-          // Parse the column list from the CREATE TABLE body so subsequent
-          // processPendingModels() doesn't try to ALTER ADD an already-present
-          // column. On MariaDB ALTER causes an implicit commit that breaks
-          // any enclosing BEGIN/ROLLBACK (transactional fixtures rely on this).
-          if (!_createdColumns.has(createMatch[1])) {
-            _createdColumns.set(createMatch[1], parseCreateTableColumns(sql));
-          }
-        }
-        if (dropMatch) {
-          _createdTables.delete(dropMatch[1]);
-          _createdColumns.delete(dropMatch[1]);
-        }
+        recordDdlTracking(sql, createMatch, dropMatch);
         return result;
       } catch (e: any) {
         lastError = e;
@@ -1231,6 +1253,8 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async exec(sql: string): Promise<void> {
     await this.setup();
+    const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
+    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
     // Auto-add IF NOT EXISTS / IF EXISTS
     if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
       sql = sql.replace(/CREATE\s+TABLE\s+/i, "CREATE TABLE IF NOT EXISTS ");
@@ -1238,7 +1262,8 @@ class SchemaAdapter implements DatabaseAdapter {
     if (/DROP\s+TABLE\s+(?!IF)/i.test(sql)) {
       sql = sql.replace(/DROP\s+TABLE\s+/i, "DROP TABLE IF EXISTS ");
     }
-    return execDdlWithSavepoint(this.inner, sql);
+    await execDdlWithSavepoint(this.inner, sql);
+    recordDdlTracking(sql, createMatch, dropMatch);
   }
 
   async explain(
