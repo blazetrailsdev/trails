@@ -19,7 +19,7 @@ import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
  *
  *     PostsController.rateLimit<PostsController>({
  *       to: 10, within: 60,
- *       by() { return this.request.headers["x-api-key"] ?? this.request.remoteIp; },
+ *       by() { return this.request.getHeader("x-api-key") ?? this.request.remoteIp; },
  *     });
  */
 export interface RateLimitOptions<TController = RateLimitingHost> {
@@ -85,16 +85,15 @@ export interface RateLimitStore {
  */
 export class MemoryRateLimitStore implements RateLimitStore {
   private static readonly _PRUNE_BASELINE = 1024;
-  /**
-   * Hard cap on the dynamic threshold. With a 16× ceiling, peak memory is
-   * bounded by `_PRUNE_MAX` entries even if a burst drives the threshold up
-   * and traffic later goes quiet — once the map hits this cap, every
-   * subsequent insert triggers a sweep, so expired identities can't linger
-   * waiting for a next-burst-that-never-comes.
-   */
   private static readonly _PRUNE_MAX = MemoryRateLimitStore._PRUNE_BASELINE * 16;
   private _entries = new Map<string, { count: number; expiresAt: number }>();
   private _pruneThreshold = MemoryRateLimitStore._PRUNE_BASELINE;
+  /**
+   * Inserts to skip before re-sweeping after a sterile sweep (nothing
+   * expired). Without this, sustained all-live traffic at the cap would turn
+   * every insert into an O(N) walk — see review #8 comment 2.
+   */
+  private _skipSweepInserts = 0;
 
   increment(key: string, amount: number, options: { expiresIn: number }): number {
     const now = Date.now();
@@ -104,7 +103,13 @@ export class MemoryRateLimitStore implements RateLimitStore {
       return entry.count;
     }
     this._entries.set(key, { count: amount, expiresAt: now + options.expiresIn * 1000 });
-    if (this._entries.size >= this._pruneThreshold) this._pruneExpired(now);
+    if (this._entries.size >= this._pruneThreshold) {
+      if (this._skipSweepInserts > 0) {
+        this._skipSweepInserts -= 1;
+      } else {
+        this._pruneExpired(now);
+      }
+    }
     return amount;
   }
 
@@ -115,11 +120,16 @@ export class MemoryRateLimitStore implements RateLimitStore {
     }
     if (this._entries.size < before) {
       this._pruneThreshold = Math.max(MemoryRateLimitStore._PRUNE_BASELINE, this._entries.size * 2);
+      this._skipSweepInserts = 0;
     } else {
+      // Nothing freed: every entry is live. Double threshold up to the cap.
+      // Once at the cap, defer the next sweep by a full baseline of inserts
+      // so the all-live state can't make every request O(N).
       this._pruneThreshold *= 2;
-    }
-    if (this._pruneThreshold > MemoryRateLimitStore._PRUNE_MAX) {
-      this._pruneThreshold = MemoryRateLimitStore._PRUNE_MAX;
+      if (this._pruneThreshold >= MemoryRateLimitStore._PRUNE_MAX) {
+        this._pruneThreshold = MemoryRateLimitStore._PRUNE_MAX;
+        this._skipSweepInserts = MemoryRateLimitStore._PRUNE_BASELINE;
+      }
     }
   }
 }
@@ -176,6 +186,13 @@ export interface RateLimitingHost {
    * type aligned so `with() { this.head("too_many_requests") }` typechecks.
    */
   head?: (status: number | string) => void;
+  /**
+   * Per-request enforcement entrypoint. Rails' `before_action` block calls
+   * `self.rate_limiting(...)` so subclass overrides win
+   * (rate_limiting.rb:56). Wired as a static-bound method on Base/API; the
+   * DSL dispatches through this slot to preserve override semantics.
+   */
+  rateLimiting?: typeof rateLimiting;
 }
 
 /**
@@ -223,7 +240,12 @@ export function rateLimit<TController extends RateLimitingHost = RateLimitingHos
   if (prepend !== undefined) filter.prepend = prepend;
 
   const callback = async (controller: RateLimitingHost): Promise<void> => {
-    await rateLimiting.call(controller, {
+    // Dispatch through the instance's own `rateLimiting` slot so subclass
+    // overrides win (matches Rails' `before_action -> { rate_limiting(...) }`
+    // which calls `self.rate_limiting`). Fall back to the module function so
+    // hosts that haven't wired the instance method still work.
+    const fn = controller.rateLimiting ?? rateLimiting;
+    await fn.call(controller, {
       to,
       within,
       by: by as ((this: RateLimitingHost) => string | null | undefined) | undefined,

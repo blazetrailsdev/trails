@@ -8,7 +8,7 @@
 import { Metal } from "./metal.js";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
-import { rateLimit } from "./metal/rate-limiting.js";
+import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 
 export class API extends Metal {
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
@@ -22,6 +22,9 @@ export class API extends Metal {
    * (actionpack/lib/action_controller/api.rb:125).
    */
   static rateLimit = rateLimit;
+
+  /** @internal Private in Rails; instance slot enables subclass overrides. */
+  rateLimiting = rateLimiting;
 
   render(options: RenderOptions = {}): void {
     if (this.performed) {

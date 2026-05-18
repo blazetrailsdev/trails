@@ -22,7 +22,7 @@ import { LookupContext } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
-import { rateLimit } from "./metal/rate-limiting.js";
+import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -390,6 +390,14 @@ export class Base extends Metal {
    * Mirrors Rails `rate_limit` class DSL.
    */
   static rateLimit = rateLimit;
+
+  /**
+   * Per-request enforcement. Private in Rails; exposed as an instance
+   * method so subclass overrides win (the DSL dispatches through
+   * `this.rateLimiting`).
+   * @internal
+   */
+  rateLimiting = rateLimiting;
 
   // --- Rescue ---
 

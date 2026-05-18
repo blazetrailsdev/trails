@@ -352,4 +352,31 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     expect(r2.status).toBe(429);
     expect(actionRan).toBe(1);
   });
+
+  it("dispatches through the instance's rateLimiting slot so subclass overrides win", async () => {
+    const store = new MemoryRateLimitStore();
+    const overrideCalls: string[] = [];
+
+    class OverridingController extends Base {
+      async show() {
+        this.head(200);
+      }
+      override rateLimiting = async function (
+        this: RateLimitingHost,
+        args: Parameters<typeof rateLimiting>[0],
+      ) {
+        overrideCalls.push("override");
+        await rateLimiting.call(this, args);
+      };
+    }
+    OverridingController.rateLimit({ to: 1, within: 60, store });
+
+    const c = new OverridingController();
+    await c.dispatch(
+      "show",
+      new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/show", HTTP_HOST: "x" }),
+      new Response(),
+    );
+    expect(overrideCalls).toEqual(["override"]);
+  });
 });
