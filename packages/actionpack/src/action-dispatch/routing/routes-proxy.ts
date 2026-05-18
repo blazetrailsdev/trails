@@ -15,8 +15,17 @@
 import {
   _routesContext,
   _withRoutes,
+  editPolymorphicPath,
+  editPolymorphicUrl,
   fullUrlFor,
+  newPolymorphicPath,
+  newPolymorphicUrl,
   optimizeRoutesGeneration,
+  polymorphicMapping,
+  polymorphicPath,
+  polymorphicPathForAction,
+  polymorphicUrl,
+  polymorphicUrlForAction,
   routeFor,
   urlFor,
   type UrlForHost,
@@ -40,12 +49,6 @@ export type RoutesProxyInstance = RoutesProxy & {
 export class RoutesProxy implements UrlForHost {
   scope: UrlForHost;
   routes: UrlForRoutes;
-  /**
-   * UrlForHost field. Rails relies on `@_routes` set by `UrlFor#initialize`;
-   * here we expose it as a getter aliased to `routes` (mirrors the Ruby
-   * `alias :_routes :routes`).
-   */
-  defaultUrlOptions: Record<string, unknown> = {};
   /** @internal Rails: `@helpers` */
   private _helpers: RoutesProxyHelpers;
   /** @internal Rails: `@script_namer` */
@@ -61,6 +64,22 @@ export class RoutesProxy implements UrlForHost {
   _withRoutes = _withRoutes;
   /** @internal Rails: `private def _routes_context` */
   _routesContext = _routesContext;
+
+  // PolymorphicRoutes mixin — Rails `UrlFor` `include`s it, so it's
+  // transitively present on RoutesProxy. Attaching here makes the methods
+  // visible on the instance for `api:compare` and direct callers.
+  polymorphicUrl = polymorphicUrl;
+  polymorphicPath = polymorphicPath;
+  editPolymorphicUrl = editPolymorphicUrl;
+  editPolymorphicPath = editPolymorphicPath;
+  newPolymorphicUrl = newPolymorphicUrl;
+  newPolymorphicPath = newPolymorphicPath;
+  /** @internal Rails-private helper. */
+  polymorphicUrlForAction = polymorphicUrlForAction;
+  /** @internal Rails-private helper. */
+  polymorphicPathForAction = polymorphicPathForAction;
+  /** @internal Rails-private helper. */
+  polymorphicMapping = (record: unknown) => polymorphicMapping(this as never, record);
 
   constructor(
     routes: UrlForRoutes,
@@ -96,6 +115,15 @@ export class RoutesProxy implements UrlForHost {
   }
   set _routes(value: UrlForRoutes | null) {
     if (value != null) this.routes = value;
+  }
+
+  /**
+   * Rails: RoutesProxy doesn't own `default_url_options` — it's inherited
+   * from `UrlFor`, which delegates through to the wrapped scope. Mirror that
+   * by reading off `scope` so callers see one source of truth.
+   */
+  get defaultUrlOptions(): Record<string, unknown> {
+    return this.scope.defaultUrlOptions;
   }
 
   urlOptions(): Record<string, unknown> {

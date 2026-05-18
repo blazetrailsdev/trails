@@ -11,6 +11,22 @@
 
 import { NO_ROUTES_MESSAGE } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
+import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
+
+// Re-export the PolymorphicRoutes mixin functions. Rails: `module UrlFor;
+// include PolymorphicRoutes`. The functions are `this`-typed and hosts attach
+// them via the module-mixin pattern (see routes-proxy.ts).
+export {
+  polymorphicUrl,
+  polymorphicPath,
+  editPolymorphicUrl,
+  editPolymorphicPath,
+  newPolymorphicUrl,
+  newPolymorphicPath,
+  polymorphicUrlForAction,
+  polymorphicPathForAction,
+  polymorphicMapping,
+} from "./polymorphic-routes.js";
 
 /**
  * The minimal RouteSet surface UrlFor calls into. Matches Rails'
@@ -23,6 +39,13 @@ import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 export interface UrlForRoutes {
   urlFor(options: Record<string, unknown>, routeName?: string | null): string;
   optimizeRoutesGeneration?(): boolean;
+  /**
+   * Rails' UrlFor includes PolymorphicRoutes, whose helpers read
+   * `_routes.polymorphic_mappings`. Optional here so existing test doubles
+   * keep working; `polymorphicUrl`/`polymorphicPath` treat a missing map as
+   * "no custom direct routes".
+   */
+  polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
 }
 
 export interface UrlForHost {
