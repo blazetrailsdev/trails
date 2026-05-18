@@ -3464,9 +3464,17 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Topic.adapter = adapter;
+    await defineSchema(adapter, {
+      topics: { title: "string", content: "string", approved: "boolean" },
+      validateds: { title: "string" },
+      trackeds: { title: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("update column", async () => {
@@ -3573,9 +3581,21 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Topic.adapter = adapter;
+    await defineSchema(adapter, {
+      topics: {
+        title: "string",
+        created_at: "datetime",
+        updated_at: "datetime",
+        replied_at: "datetime",
+      },
+      trackeds: { title: "string", updated_at: "datetime" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("touching a record updates its timestamp", async () => {
@@ -3630,9 +3650,21 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     User.adapter = adapter;
+    await defineSchema(adapter, {
+      users: {
+        name: "string",
+        email: "string",
+        age: "integer",
+        created_at: "datetime",
+        updated_at: "datetime",
+      },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test_save_with_no_changes
@@ -3725,8 +3757,14 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", status: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test_update_all
@@ -3826,8 +3864,19 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      users: {
+        name: "string",
+        email: "string",
+        updated_at: "datetime",
+        last_login_at: "datetime",
+      },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   // Rails: test_update_column_does_not_trigger_callbacks
@@ -3927,8 +3976,16 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("returns false before first save", () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -3941,7 +3998,6 @@ describe("PersistenceTest", () => {
   });
 
   it("returns true after first save", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -3956,7 +4012,6 @@ describe("PersistenceTest", () => {
   });
 
   it("returns false after subsequent saves", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -3973,8 +4028,15 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      counters: { hits: "integer", count: "integer", stock: "integer" },
+      features: { enabled: "boolean", active: "boolean" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("increment attribute", () => {
@@ -4056,11 +4118,23 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      counters: { count: "integer", a: "integer", b: "integer" },
+      features: { active: "boolean" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("increment attribute", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4072,7 +4146,7 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 5 });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4084,7 +4158,7 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 10 });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4096,7 +4170,7 @@ describe("PersistenceTest", () => {
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 10 });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4108,7 +4182,7 @@ describe("PersistenceTest", () => {
     class Feature extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const f = new Feature();
@@ -4119,7 +4193,6 @@ describe("PersistenceTest", () => {
   });
 
   it("incrementBang persists to DB", async () => {
-    const adapter = freshAdapter();
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -4133,7 +4206,6 @@ describe("PersistenceTest", () => {
   });
 
   it("decrementBang persists to DB", async () => {
-    const adapter = freshAdapter();
     class Counter extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -4147,7 +4219,6 @@ describe("PersistenceTest", () => {
   });
 
   it("toggleBang persists to DB", async () => {
-    const adapter = freshAdapter();
     class Feature extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
@@ -4165,7 +4236,7 @@ describe("PersistenceTest", () => {
       static {
         this.attribute("a", "integer", { default: 0 });
         this.attribute("b", "integer", { default: 0 });
-        this.adapter = freshAdapter();
+        this.adapter = adapter;
       }
     }
     const c = new Counter();
@@ -4177,8 +4248,12 @@ describe("PersistenceTest", () => {
 
 describe("PersistenceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   it("createBang throws on validation failure", async () => {
@@ -4268,9 +4343,20 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Article.adapter = adapter;
+    await defineSchema(adapter, {
+      articles: { title: "string", body: "string", views: "integer" },
+      validateds: { name: "string" },
+      requireds: { name: "string" },
+      trackeds: { name: "string" },
+      posts: { title: "string", body: "string" },
+      users: { name: "string" },
+    });
+  });
+  afterAll(async () => {
+    await dropAllTables(adapter);
   });
 
   describe("save", () => {
@@ -4749,12 +4835,11 @@ describe("PersistenceTest", () => {
     });
   });
   it("save valid record", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = new Post({ title: "Hello", body: "World" });
@@ -4779,12 +4864,11 @@ describe("PersistenceTest", () => {
   });
 
   it("update object", async () => {
-    const adp = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
-        this.adapter = adp;
+        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "Old", body: "Content" });
@@ -4794,7 +4878,6 @@ describe("PersistenceTest", () => {
   });
 
   it("persisted returns boolean", async () => {
-    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
