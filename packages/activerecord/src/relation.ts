@@ -1573,7 +1573,10 @@ export class Relation<T extends Base> {
     modelClass: any,
     assocDef: any,
   ): Array<{ table: string; on: string }> | null {
-    const sourcePkOption = assocDef.options.primaryKey ?? modelClass.primaryKey ?? "id";
+    // Rails' HABTM macro does not forward `:primary_key` to the generated
+    // through-`has_many` (Builder::HasAndBelongsToMany#middle_options); the
+    // owner-side join always resolves to the model's primary key.
+    const sourcePkOption = modelClass.primaryKey ?? "id";
     if (Array.isArray(sourcePkOption)) return null;
     const sourcePk: string = sourcePkOption;
     const sourceTable = modelClass.tableName;

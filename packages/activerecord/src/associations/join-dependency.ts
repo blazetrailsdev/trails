@@ -646,12 +646,23 @@ export class JoinDependency {
       : (throughAssocDef.options.foreignKey ?? `${_toUnderscore(modelClass.name)}_id`);
     if (Array.isArray(throughFk)) return null;
 
-    let throughJoinOn = `"${throughAlias}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
+    // Mirror addAssociation collision-check (Rails AliasTracker): use the
+    // real table name unless it's already in use, in which case fall back
+    // to the sequential tN alias. The mutation of `_usedTableNames` is
+    // deferred to the commit points below so failure paths don't pollute
+    // the set with tables we never actually joined.
+    const throughEffective = this._usedTableNames.has(throughTable) ? throughAlias : throughTable;
+
+    let throughJoinOn = `"${throughEffective}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
     if (throughAssocDef.options.as) {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
-      throughJoinOn += ` AND "${throughAlias}"."${typeCol}" = '${modelClass.name}'`;
+      throughJoinOn += ` AND "${throughEffective}"."${typeCol}" = ${this._quoteString(String(modelClass.name))}`;
     }
-    const throughJoinSql = `LEFT OUTER JOIN "${throughTable}" "${throughAlias}" ON ${throughJoinOn}`;
+    const throughJoinTableExpr =
+      throughEffective === throughTable
+        ? `"${throughTable}"`
+        : `"${throughTable}" "${throughEffective}"`;
+    const throughJoinSql = `LEFT OUTER JOIN ${throughJoinTableExpr} ON ${throughJoinOn}`;
 
     const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
     const throughAssocs: any[] = (throughModel as any)._associations ?? [];
@@ -672,10 +683,15 @@ export class JoinDependency {
       // We already consumed a table index for the target, give it back
       this._nextTableIndex--;
 
-      // Snapshot state for rollback if recursive call fails
+      // Snapshot state for rollback if recursive call fails. Includes a
+      // copy of `_usedTableNames` because the recursive `addAssociation`
+      // (and any nested `_addThroughAssociation`) can mutate it before
+      // returning null on its own failure guards (e.g. composite-PK on
+      // a deeper target).
       const snapshotNodes = this._nodes.length;
       const snapshotAliases = this._aliases.length;
       const snapshotNextIndex = this._nextTableIndex;
+      const snapshotUsedTableNames = new Set(this._usedTableNames);
 
       // Add the through table JOIN as a standalone node (intermediate)
       const throughColumns = getModelColumns(throughModel);
@@ -688,6 +704,11 @@ export class JoinDependency {
         });
       }
 
+      // Commit-point: the through-node push below is the first
+      // observable side-effect that depends on the alias decision.
+      // The pre-recursion snapshot above covers rollback of this add.
+      this._usedTableNames.add(throughTable);
+
       const throughNodeName = parentAssocName
         ? `${parentAssocName}._through_${assocDef.options.through}`
         : `_through_${assocDef.options.through}`;
@@ -695,7 +716,7 @@ export class JoinDependency {
         tableIndex: throughTableIndex,
         tableAlias: throughAlias,
         tableName: throughTable,
-        effectiveSqlName: throughAlias,
+        effectiveSqlName: throughEffective,
         modelClass: throughModel as typeof Base,
         columns: throughColumns,
         assocName: throughNodeName,
@@ -708,15 +729,19 @@ export class JoinDependency {
       // Now recursively add the source association from the through model
       const recursiveNode = this.addAssociation(sourceName, {
         fromModel: throughModel,
-        fromAlias: throughAlias,
+        fromAlias: throughEffective,
         parentAssocName: parentAssocName,
       });
 
       if (!recursiveNode) {
-        // Roll back intermediate state
+        // Roll back intermediate state. Restore `_usedTableNames` from
+        // the pre-recursion snapshot so any mutation by the recursive
+        // call (including its own through additions) is undone — the
+        // `throughTableWasNew` delete alone wouldn't cover that.
         this._nodes.length = snapshotNodes;
         this._aliases.length = snapshotAliases;
         this._nextTableIndex = snapshotNextIndex;
+        this._usedTableNames = snapshotUsedTableNames;
         return null;
       }
 
@@ -747,13 +772,13 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
-      targetJoinOn = `"${targetAlias}"."${targetPk}" = "${throughAlias}"."${targetFk}"`;
+      targetJoinOn = `"TARGET_PLACEHOLDER"."${targetPk}" = "${throughEffective}"."${targetFk}"`;
       if (isPoly) {
         // Mirrors Rails ThroughReflection / BelongsToReflection: the
         // polymorphic type column is `foreign_type` (options[:foreign_type]
         // || "#{name}_type"), and the value is the literal :source_type.
         const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        targetJoinOn += ` AND "${throughAlias}"."${typeCol}" = ${this._quoteString(String(assocDef.options.sourceType))}`;
+        targetJoinOn += ` AND "${throughEffective}"."${typeCol}" = ${this._quoteString(String(assocDef.options.sourceType))}`;
       }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
@@ -765,8 +790,18 @@ export class JoinDependency {
       if (Array.isArray(targetFk)) return null;
       const throughPk = (throughModel as any).primaryKey ?? "id";
       if (Array.isArray(throughPk)) return null;
-      targetJoinOn = `"${targetAlias}"."${targetFk}" = "${throughAlias}"."${throughPk}"`;
+      targetJoinOn = `"TARGET_PLACEHOLDER"."${targetFk}" = "${throughEffective}"."${throughPk}"`;
     }
+
+    // Mirror addAssociation collision-check for the target table too.
+    // Read-only here; the commit-point below pushes the resolved name
+    // into `_usedTableNames` after all failure guards have passed.
+    // Treat the pending through-table join as already occupying its name
+    // so a self-through (target table == through table) is forced to a
+    // tN alias rather than colliding on the same unaliased identifier.
+    const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
+    const targetEffective = targetCollides ? targetAlias : targetTable;
+    targetJoinOn = targetJoinOn.replaceAll("TARGET_PLACEHOLDER", targetEffective);
 
     // Apply association scope
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
@@ -775,18 +810,24 @@ export class JoinDependency {
       if (scopeSql) {
         const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
         if (whereMatch) {
-          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable}"`, `"${targetAlias}"`);
+          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable}"`, `"${targetEffective}"`);
           targetJoinOn += ` AND ${scopeWhere}`;
         }
       }
     }
 
     // Add STI type constraint on target
-    targetJoinOn = this._addStiConstraint(targetJoinOn, targetModel, targetAlias);
+    targetJoinOn = this._addStiConstraint(targetJoinOn, targetModel, targetEffective);
 
     // Guard against composite PK on target
     const targetModelPk = (targetModel as any).primaryKey ?? "id";
     if (Array.isArray(targetModelPk)) return null;
+
+    // Commit-point for the non-recursive path: all failure guards have
+    // passed, so register both joined tables for AliasTracker collision
+    // checks by later joins.
+    this._usedTableNames.add(throughTable);
+    this._usedTableNames.add(targetTable);
 
     const targetColumns = getModelColumns(targetModel);
 
@@ -801,10 +842,14 @@ export class JoinDependency {
 
     const fullAssocName = parentAssocName ? `${parentAssocName}.${assocDef.name}` : assocDef.name;
 
+    const targetJoinTableExpr =
+      targetEffective === targetTable
+        ? `"${targetTable}"`
+        : `"${targetTable}" "${targetEffective}"`;
     const node: JoinNode = {
       tableIndex: targetTableIndex,
       tableAlias: targetAlias,
-      effectiveSqlName: targetAlias,
+      effectiveSqlName: targetEffective,
       tableName: targetTable,
       modelClass: targetModel,
       columns: targetColumns,
@@ -812,7 +857,7 @@ export class JoinDependency {
       immediateAssocName: assocDef.name,
       parentPath: parentAssocName ?? null,
       assocType: assocDef.type === "hasAndBelongsToMany" ? "hasMany" : assocDef.type,
-      joinSql: `${throughJoinSql} LEFT OUTER JOIN "${targetTable}" "${targetAlias}" ON ${targetJoinOn}`,
+      joinSql: `${throughJoinSql} LEFT OUTER JOIN ${targetJoinTableExpr} ON ${targetJoinOn}`,
     };
 
     this._nodes.push(node);

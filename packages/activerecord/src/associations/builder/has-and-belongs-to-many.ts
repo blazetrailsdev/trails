@@ -257,11 +257,15 @@ export class HasAndBelongsToMany {
     // Rails' `hm_options` allowlist for the generated `has_many :through`
     // is the canonical set: before/after_add/remove, autosave, validate,
     // join_table, class_name, extend, strict_loading (associations.rb:1899).
-    // We additionally retain `foreignKey`/`primaryKey` because our public
-    // HABTM reflection plays the dual role Rails splits between
+    // We additionally retain `foreignKey` because our public HABTM
+    // reflection plays the dual role Rails splits between
     // `habtm_reflection` (which keeps the full options) and the generated
     // through-`has_many` — join-key resolution (`_resolveHabtmJoin`,
-    // `loadHabtm`) reads these directly off the public reflection.
+    // `loadHabtm`) reads this directly off the public reflection.
+    // `primaryKey` is intentionally NOT forwarded: Rails'
+    // `Builder::HasAndBelongsToMany` does not pass `:primary_key` to the
+    // middle has_many or rhs belongs_to, so the owner join always uses
+    // the model's primary key.
     // Spreading `...options` previously leaked `readonly`/`dependent`
     // into through-hasMany semantics — Rails drops those. `inverseOf` IS
     // retained because Rails' `habtm_reflection` is constructed with the
@@ -278,7 +282,6 @@ export class HasAndBelongsToMany {
       "extend",
       "strictLoading",
       "foreignKey",
-      "primaryKey",
       "inverseOf",
       "indexErrors",
       "associationForeignKey",
