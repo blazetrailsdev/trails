@@ -704,8 +704,11 @@ function _resolveBelongsToForeignKey(
   // Composite-PK inference (`${name}_${pk}`) when target has composite
   // PK — matches `BelongsToAssociation#foreignKeyNames` so autosave FK
   // propagation writes the same columns the writer populated at
-  // assignment time.
-  if (assocRecord) {
+  // assignment time. Skip when the association has an explicit
+  // `primaryKey`: `associationPrimaryKeys()` collapses the configured PK
+  // to a single-element array, so the writer's foreignKeyNames falls
+  // through to the scalar `${name}_id` rather than expanding.
+  if (assoc.options.primaryKey == null && assocRecord) {
     const pk = (assocRecord.constructor as typeof Base).primaryKey;
     if (Array.isArray(pk) && pk.length > 1) {
       const prefix = underscore(assoc.name);
@@ -749,7 +752,11 @@ function _resolveBelongsToPrimaryKey(
   // Rails' compute_primary_key would collapse [tenant_id, id] → "id"
   // (autosave_association.rb:585) — that collapse only matches when the
   // FK is scalar; with composite-FK inference we need the full PK.
-  if (assoc.options.foreignKey == null && assoc.options.queryConstraints == null) {
+  if (
+    assoc.options.primaryKey == null &&
+    assoc.options.foreignKey == null &&
+    assoc.options.queryConstraints == null
+  ) {
     const pk = (assocRecord.constructor as typeof Base).primaryKey;
     if (Array.isArray(pk) && pk.length > 1) return pk;
     // QC-derived composite FK branch: reflection.foreignKey came from
