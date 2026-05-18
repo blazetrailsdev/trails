@@ -1117,9 +1117,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("joins and includes from through models not included in association", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("has one through has one through with belongs to source reflection preload", async () => {
@@ -1203,9 +1203,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("distinct has many through a has many through association on through reflection", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   // Mirrors Rails test_nested_has_many_through_with_a_table_referenced_multiple_times
@@ -1510,9 +1510,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("has many through with sti on nested through reflection", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through writers should raise error", async () => {
@@ -1729,9 +1729,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("nested has many through with conditions on through associations preload via joins", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through with conditions on source associations", async () => {
@@ -1802,15 +1802,15 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("through association preload doesnt reset source association if already preloaded", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("nested has many through with conditions on source associations preload via joins", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through with foreign key option on the source reflection through reflection", async () => {
@@ -1883,9 +1883,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("nested has many through should not be autosaved", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("polymorphic has many through when through association has not loaded", async () => {
@@ -2026,21 +2026,21 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("polymorphic has many through joined different table twice", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("has many through polymorphic with scope", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("has many through reset source reflection after loading is complete", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 });
 

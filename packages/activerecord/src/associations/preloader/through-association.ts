@@ -43,13 +43,42 @@ export class ThroughAssociation extends Association {
     const throughRecordsByOwner = await this._getThroughRecordsByOwner();
     const sourceRecordsByOwner = await this._getSourceRecordsByOwner();
 
+    const throughRefl = this._throughReflection;
+    const firstOwner = this.owners[0] as any;
+    const throughLoadedOnFirst =
+      throughRefl != null &&
+      firstOwner != null &&
+      ((firstOwner._preloadedAssociations?.has(throughRefl.name) ?? false) ||
+        (() => {
+          try {
+            return !!firstOwner.association?.(throughRefl.name)?.loaded;
+          } catch {
+            return false;
+          }
+        })());
+
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
         result.set(owner, this.targetFor(owner));
         continue;
       }
 
-      const throughRecords = throughRecordsByOwner.get(owner) ?? [];
+      let throughRecords = throughRecordsByOwner.get(owner) ?? [];
+
+      // Mirror Rails: when the through reflection is already loaded on the
+      // owners, narrow through_records by source_type. (Identity preservation
+      // for the polymorphic+sourceType path is handled up-front in
+      // _getThroughRecordsByOwner / _getMiddleRecords.)
+      if (throughLoadedOnFirst) {
+        const sourceType = (this.reflection as any).options?.sourceType;
+        const foreignType =
+          (this.reflection as any).foreignType ?? (this._sourceReflection as any)?.foreignType;
+        if (sourceType && foreignType) {
+          throughRecords = throughRecords.filter(
+            (record) => (record as any)._readAttribute(foreignType) === sourceType,
+          );
+        }
+      }
 
       let records = throughRecords.flatMap((tr) => sourceRecordsByOwner.get(tr) ?? []);
       records = records.filter((r) => r != null);
