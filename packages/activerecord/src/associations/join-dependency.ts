@@ -656,7 +656,7 @@ export class JoinDependency {
     let throughJoinOn = `"${throughEffective}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
     if (throughAssocDef.options.as) {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
-      throughJoinOn += ` AND "${throughEffective}"."${typeCol}" = '${modelClass.name}'`;
+      throughJoinOn += ` AND "${throughEffective}"."${typeCol}" = ${this._quoteString(String(modelClass.name))}`;
     }
     const throughJoinTableExpr =
       throughEffective === throughTable
@@ -788,7 +788,11 @@ export class JoinDependency {
     // Mirror addAssociation collision-check for the target table too.
     // Read-only here; the commit-point below pushes the resolved name
     // into `_usedTableNames` after all failure guards have passed.
-    const targetEffective = this._usedTableNames.has(targetTable) ? targetAlias : targetTable;
+    // Treat the pending through-table join as already occupying its name
+    // so a self-through (target table == through table) is forced to a
+    // tN alias rather than colliding on the same unaliased identifier.
+    const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
+    const targetEffective = targetCollides ? targetAlias : targetTable;
     targetJoinOn = targetJoinOn.replaceAll("TARGET_PLACEHOLDER", targetEffective);
 
     // Apply association scope

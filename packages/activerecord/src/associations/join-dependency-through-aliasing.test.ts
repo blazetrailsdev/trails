@@ -68,6 +68,22 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(node!.effectiveSqlName).toBe("jdt_comments");
   });
 
+  it("falls back to tN alias when the target real name collides", () => {
+    const jd = new JoinDependency(JdtAuthor);
+    // Pre-occupy "jdt_comments" via a sibling direct hasMany on the author.
+    Associations.hasMany.call(JdtAuthor, "directComments", {
+      className: "JdtComment",
+      foreignKey: "post_id",
+    });
+    jd.addAssociation("directComments");
+    const node = jd.addAssociation("jdtComments");
+    expect(node).not.toBeNull();
+    // Through table still uses real name; target now aliased to tN.
+    expect(node!.joinSql).toContain(`LEFT OUTER JOIN "jdt_posts"`);
+    expect(node!.joinSql).toMatch(/LEFT OUTER JOIN "jdt_comments" "t\d+"/);
+    expect(node!.effectiveSqlName).toMatch(/^t\d+$/);
+  });
+
   it("falls back to tN alias when the real name collides", () => {
     const jd = new JoinDependency(JdtAuthor);
     // First, occupy "jdt_posts" via the direct join so the through table collides.
