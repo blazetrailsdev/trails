@@ -178,12 +178,16 @@ export function parseFormattedParameters(
  * @internal
  */
 export function logParseErrorOnce(this: ParametersHost): void {
-  const host = this as ParametersHost & { _parseErrorLogged?: boolean };
-  if (host._parseErrorLogged) return;
-  host._parseErrorLogged = true;
+  // Rails stores `@parse_error_logged` on the Request instance. The trails
+  // host adapter on `Request` can be a throwaway object created per access,
+  // so persist the guard on the env via getHeader/setHeader instead.
+  if (this.getHeader(PARSE_ERROR_LOGGED_KEY)) return;
+  this.setHeader(PARSE_ERROR_LOGGED_KEY, true);
   const logger = this.logger ?? new Logger({ write: (s) => stderr.write(s) });
   logger.debug(`Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`);
 }
+
+const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";
 
 /**
  * Returns the currently-registered parameter parsers. Mirrors Rails'

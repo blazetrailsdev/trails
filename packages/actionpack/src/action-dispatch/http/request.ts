@@ -244,7 +244,7 @@ export class Request {
 
   get contentMimeType(): MimeType | null {
     const ct = this.contentType;
-    return ct ? (MimeType.lookup(ct) ?? null) : null;
+    return ct ? (MimeType.lookup(ct.toLowerCase()) ?? null) : null;
   }
 
   get userAgent(): string {
@@ -321,14 +321,29 @@ export class Request {
   get body(): string {
     const input = this.env["rack.input"];
     if (typeof input === "string") return input;
+    if (input && typeof (input as { read?: unknown }).read === "function") {
+      const buf = (input as { read(): string }).read();
+      const rewind = (input as { rewind?: unknown }).rewind;
+      if (typeof rewind === "function") {
+        try {
+          (rewind as () => void).call(input);
+        } catch {
+          // ignore
+        }
+      }
+      return typeof buf === "string" ? buf : "";
+    }
     return "";
   }
 
   get rawPost(): string {
-    if (this.env["RAW_POST_DATA"]) {
-      return String(this.env["RAW_POST_DATA"]);
-    }
-    return this.body;
+    const cached = this.env["RAW_POST_DATA"];
+    if (cached != null) return String(cached);
+    // Rails caches raw_post under RAW_POST_DATA so repeated reads of a
+    // stream-backed rack.input don't yield "" after the first drain.
+    const body = this.body;
+    this.env["RAW_POST_DATA"] = body;
+    return body;
   }
 
   // --- Parameters ---
@@ -378,7 +393,9 @@ export class Request {
     return _parameterParsers();
   }
 
-  static set parameterParsers(parsers: Record<string | symbol, ParameterParser>) {
+  static set parameterParsers(
+    parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
+  ) {
     _setParameterParsers(parsers);
   }
 
@@ -410,25 +427,8 @@ export class Request {
 
   /** @internal */
   private _fallbackRequestParameters(): Record<string, unknown> {
-    const raw = this.env["rack.input"];
-    if (!raw) return {};
-    let input: string | null;
-    if (typeof raw === "string") {
-      input = raw;
-    } else if (typeof (raw as { read?: unknown }).read === "function") {
-      input = (raw as { read(): string }).read();
-      const rewind = (raw as { rewind?: unknown }).rewind;
-      if (typeof rewind === "function") {
-        try {
-          (rewind as () => void).call(raw);
-        } catch {
-          // ignore
-        }
-      }
-    } else {
-      input = null;
-    }
-    if (!input || typeof input !== "string") return {};
+    const input = this.rawPost;
+    if (!input) return {};
     const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
     if (ct.includes("application/x-www-form-urlencoded")) {
       return parseNestedQuery(input);
