@@ -85,6 +85,14 @@ export interface RateLimitStore {
  */
 export class MemoryRateLimitStore implements RateLimitStore {
   private static readonly _PRUNE_BASELINE = 1024;
+  /**
+   * Hard cap on the dynamic threshold. With a 16× ceiling, peak memory is
+   * bounded by `_PRUNE_MAX` entries even if a burst drives the threshold up
+   * and traffic later goes quiet — once the map hits this cap, every
+   * subsequent insert triggers a sweep, so expired identities can't linger
+   * waiting for a next-burst-that-never-comes.
+   */
+  private static readonly _PRUNE_MAX = MemoryRateLimitStore._PRUNE_BASELINE * 16;
   private _entries = new Map<string, { count: number; expiresAt: number }>();
   private _pruneThreshold = MemoryRateLimitStore._PRUNE_BASELINE;
 
@@ -109,6 +117,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
       this._pruneThreshold = Math.max(MemoryRateLimitStore._PRUNE_BASELINE, this._entries.size * 2);
     } else {
       this._pruneThreshold *= 2;
+    }
+    if (this._pruneThreshold > MemoryRateLimitStore._PRUNE_MAX) {
+      this._pruneThreshold = MemoryRateLimitStore._PRUNE_MAX;
     }
   }
 }
