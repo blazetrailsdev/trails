@@ -57,7 +57,7 @@ export interface ParametersHost {
   deleteHeader(key: string): void;
   queryParameters: Record<string, unknown>;
   requestParameters: Record<string, unknown>;
-  contentLength: number;
+  contentLength: number | undefined;
   contentMimeType: MimeType | null;
   rawPost: string;
   logger?: { debug(message: string): void } | null;
@@ -74,10 +74,25 @@ export function parameterParsers(): ParameterParsers {
   return _parameterParsers;
 }
 
-export function setParameterParsers(parsers: Record<string, ParameterParser>): void {
+export function setParameterParsers(
+  parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
+): void {
   const normalized: ParameterParsers = {};
-  for (const key of Object.keys(parsers)) {
-    normalized[key] = parsers[key];
+  const entries: Iterable<[unknown, ParameterParser]> =
+    parsers instanceof Map
+      ? parsers.entries()
+      : (Reflect.ownKeys(parsers).map((k) => [
+          k,
+          (parsers as Record<string | symbol, ParameterParser>)[k as never],
+        ]) as Array<[unknown, ParameterParser]>);
+  for (const [key, value] of entries) {
+    const sym =
+      key !== null && typeof key === "object" && "symbol" in (key as object)
+        ? String((key as { symbol: unknown }).symbol)
+        : typeof key === "symbol"
+          ? (key.description ?? String(key))
+          : String(key);
+    normalized[sym] = value;
   }
   _parameterParsers = normalized;
 }
@@ -90,12 +105,12 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   const cached = this.getHeader("action_dispatch.request.parameters");
   if (cached) return cached as Record<string, unknown>;
 
-  let params: Record<string, unknown>;
-  try {
-    params = { ...this.requestParameters, ...this.queryParameters };
-  } catch {
-    params = { ...this.queryParameters };
-  }
+  // Rails rescues only `EOFError` from `request_parameters.merge(...)`; ParseError
+  // and other failures propagate so malformed bodies surface as 400s upstream
+  // instead of being silently dropped. TS has no EOFError equivalent and the
+  // trails `requestParameters` getter returns `{}` for empty bodies, so no
+  // try/catch is needed.
+  let params: Record<string, unknown> = { ...this.requestParameters, ...this.queryParameters };
   params = { ...params, ...pathParameters.call(this) };
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
@@ -117,8 +132,10 @@ export function pathParameters(this: ParametersHost): Record<string, unknown> {
 /**
  * Sets the path parameters, invalidating the merged-parameters cache. Mirrors
  * Rails' `path_parameters=` setter. Encoding-normalization (Rails calls
- * `Request::Utils.set_binary_encoding` + `check_param_encoding`) is left to
- * the caller since trails strings are already UTF-8.
+ * `Request::Utils.set_binary_encoding` + `check_param_encoding`) is omitted —
+ * JS strings are UTF-16 and TS lacks Ruby's ASCII-8BIT vs UTF-8 distinction,
+ * so there's nothing to coerce. Callers that need encoding validation should
+ * apply it themselves before invoking this setter.
  */
 export function setPathParameters(this: ParametersHost, parameters: Record<string, unknown>): void {
   this.deleteHeader("action_dispatch.request.parameters");
@@ -137,7 +154,7 @@ export function parseFormattedParameters(
   parsers: ParameterParsers,
   fallback: () => Record<string, unknown>,
 ): Record<string, unknown> {
-  if (this.contentLength === 0 || this.contentMimeType === null) {
+  if (!this.contentLength || this.contentMimeType === null) {
     return fallback();
   }
   const strategy = parsers[this.contentMimeType.symbol];

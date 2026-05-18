@@ -89,14 +89,14 @@ describe("parameters", () => {
     expect(second).toBe(first);
   });
 
-  it("falls back to query parameters when requestParameters throws", () => {
+  it("propagates ParseError from requestParameters (Rails rescues only EOFError)", () => {
     const host = makeHost({ queryParameters: { q: 1 } });
     Object.defineProperty(host, "requestParameters", {
       get() {
-        throw new Error("EOF");
+        throw new ParseError("bad JSON");
       },
     });
-    expect(parameters.call(host)).toEqual({ q: 1 });
+    expect(() => parameters.call(host)).toThrow(ParseError);
   });
 });
 
@@ -130,6 +130,13 @@ describe("parameterParsers registry", () => {
   it("setParameterParsers replaces the registry", () => {
     const xml: ParameterParser = (raw) => ({ xml: raw });
     setParameterParsers({ xml });
+    expect(parameterParsers()).toEqual({ xml });
+  });
+
+  it("normalizes MimeType keys via .symbol (Rails transform_keys parity)", () => {
+    const xml: ParameterParser = () => ({});
+    const fakeMime = { symbol: "xml" };
+    setParameterParsers(new Map<unknown, ParameterParser>([[fakeMime, xml]]));
     expect(parameterParsers()).toEqual({ xml });
   });
 
