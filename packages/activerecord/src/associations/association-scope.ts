@@ -21,6 +21,29 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
 /**
+ * Invoke a scope lambda with Rails' `instance_exec(owner, &scope)` arity
+ * semantics: 0-arg lambdas get `this=rel` with no positional args;
+ * 1+-arg lambdas get `this=rel` with positional `(rel, owner)`. Returns
+ * the raw lambda result; callers apply `|| rel` if they want Ruby-style
+ * `instance_exec(owner, &scope) || relation` truthy-fallback semantics.
+ *
+ * @internal
+ */
+export function invokeScopeLambda<R>(
+  fn: (this: R, ...args: never[]) => R | false | null | undefined,
+  rel: R,
+  owner: Base,
+): R | false | null | undefined {
+  return fn.length === 0
+    ? (fn as unknown as (this: R) => R | false | null | undefined).call(rel)
+    : (fn as unknown as (this: R, rel: R, owner: Base) => R | false | null | undefined).call(
+        rel,
+        rel,
+        owner,
+      );
+}
+
+/**
  * Minimum shape `AssociationScope.scope` needs from its argument. Rails
  * passes a concrete `Association` instance (see
  * `activerecord/lib/active_record/associations/association.rb`); we
@@ -580,11 +603,11 @@ export class AssociationScope {
     if (!isThrough && typeof head.scopeFor === "function") {
       scope = head.scopeFor.call(head, scope, owner);
     } else if (typeof head.scope === "function") {
-      // Match Rails instance_exec arity: 0-arg scope → this=scope;
-      // 1+-arg → (scope, owner).
-      const fn = head.scope;
-      const result =
-        fn.length === 0 ? (fn as () => unknown).call(scope) : fn.call(scope, scope, owner);
+      const result = invokeScopeLambda(
+        head.scope as (this: unknown, ...args: never[]) => unknown,
+        scope,
+        owner,
+      );
       if (result) scope = result;
     }
     return scope;

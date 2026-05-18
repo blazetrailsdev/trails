@@ -1599,6 +1599,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (unsaved.length > 0) {
         this._removeFromTarget(unsaved);
       }
+      this._invalidateAssociationIds();
     });
   }
 
@@ -1842,6 +1843,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   async destroyAll(): Promise<T[]> {
     const records = await this.toArray();
     await this.destroy(...records);
+    this._invalidateAssociationIds();
     return records;
   }
 
