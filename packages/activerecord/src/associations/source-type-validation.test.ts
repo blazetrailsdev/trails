@@ -33,7 +33,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
+
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
+}
 
 describe("ThroughReflection — checkValidityBang at first use", () => {
   let adapter: DatabaseAdapter;
@@ -65,8 +70,18 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      stv_authors: { name: "string" },
+      stv_comments: {
+        stv_author_id: "integer",
+        origin_id: "integer",
+        origin_type: "string",
+      },
+      stv_posts: { stv_author_id: "integer" },
+      stv_members: { name: "string" },
+    });
     StvAuthor.adapter = adapter;
     StvComment.adapter = adapter;
     StvPost.adapter = adapter;

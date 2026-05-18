@@ -27,7 +27,12 @@ import { Associations } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
+
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
+}
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
   let adapter: DatabaseAdapter;
@@ -40,8 +45,11 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      at_users: { parent_id: "integer", name: "string" },
+    });
     AtUser.adapter = adapter;
     registerModel("AtUser", AtUser);
     (AtUser as any)._associations = [];
