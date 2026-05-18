@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { Substitute } from "../statement-cache.js";
@@ -6,17 +6,43 @@ import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
+import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+
+// -- Helpers --
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
+}
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
   // Teardown: Topic.class_eval { @predicate_builder = nil }
   // We use a local custom class instead of Regexp to keep the test self-contained.
 
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: { title: "string" },
+      replies: { parent_id: "integer" },
+      products: { metadata: "string" },
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("registering new handlers", () => {
     class PbTopic extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
+        this.adapter = adapter;
       }
     }
     class RegexFilter {
@@ -39,6 +65,7 @@ describe("PredicateBuilderTest", () => {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
+        this.adapter = adapter;
       }
     }
     class PbReply2 extends Base {
@@ -46,6 +73,7 @@ describe("PredicateBuilderTest", () => {
         this.tableName = "replies";
         this.attribute("parent_id", "integer");
         this.belongsTo("pbTopic2");
+        this.adapter = adapter;
       }
     }
     registerModel("PbTopic2", PbTopic2);
@@ -90,7 +118,7 @@ describe("PredicateBuilderTest", () => {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
-        this.adapter = createTestAdapter();
+        this.adapter = adapter;
       }
     }
     // Use TableMetadata-backed PB to enable associated_table fallback expansion,
@@ -112,6 +140,7 @@ describe("PredicateBuilderTest", () => {
         this.tableName = "topics";
         this.attribute("title", "string");
         this.attribute("approved", "boolean");
+        this.adapter = adapter;
       }
     }
     const defaults: Record<string, unknown> = { title: "rails", approved: true };
@@ -260,7 +289,9 @@ describe("PredicateBuilderTest", () => {
       }
     }
 
-    beforeAll(() => {
+    beforeEach(() => {
+      PbTestAuthor.adapter = adapter;
+      PbTestPost.adapter = adapter;
       registerModel("Author", PbTestAuthor);
       registerModel("Post", PbTestPost);
     });
@@ -296,6 +327,7 @@ describe("PredicateBuilderTest", () => {
         static {
           this.tableName = "products";
           this.attribute("metadata", "string");
+          this.adapter = adapter;
           registerModel("PbTestProduct", this);
         }
       }

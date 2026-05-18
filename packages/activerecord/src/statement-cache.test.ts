@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
 import {
   StatementCache,
@@ -9,8 +9,31 @@ import {
   Params,
   BindMap,
 } from "./statement-cache.js";
+import { createTestAdapter } from "./test-adapter.js";
+import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+
+// -- Helpers --
+function freshAdapter(): DatabaseAdapter {
+  return createTestAdapter();
+}
 
 describe("StatementCacheTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      books: { name: "string", title: "string" },
+      authors: { name: "string" },
+    });
+  });
+
+  afterAll(async () => {
+    await dropAllTables(adapter);
+  });
+
   it("statement cache", () => {
     const sub = new Substitute();
     expect(sub).toBeInstanceOf(Substitute);
@@ -106,16 +129,20 @@ describe("StatementCacheTest", () => {
     const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const adapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await adapter.executeMutation('CREATE TABLE "books" ("id" INTEGER PRIMARY KEY, "name" TEXT)');
-      await adapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["Rails Guide"]);
-      await adapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', ["TS Handbook"]);
+      await defineSchema(roundTripAdapter, { books: { name: "string" } });
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
+        "Rails Guide",
+      ]);
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("name") VALUES (?)', [
+        "TS Handbook",
+      ]);
 
       class Book extends Base {
         static {
           this.tableName = "books";
-          this.adapter = adapter;
+          this.adapter = roundTripAdapter;
         }
       }
 
@@ -123,15 +150,15 @@ describe("StatementCacheTest", () => {
       const bindMap = new BindMap([new Substitute()]);
       const cache = new StatementCache(new Query(sql), bindMap, Book);
 
-      const r1 = await cache.execute(["Rails Guide"], adapter);
+      const r1 = await cache.execute(["Rails Guide"], roundTripAdapter);
       expect(r1).toHaveLength(1);
       expect(r1[0].readAttribute("name")).toBe("Rails Guide");
 
-      const r2 = await cache.execute(["TS Handbook"], adapter);
+      const r2 = await cache.execute(["TS Handbook"], roundTripAdapter);
       expect(r2).toHaveLength(1);
       expect(r2[0].readAttribute("name")).toBe("TS Handbook");
     } finally {
-      adapter.disconnectBang();
+      roundTripAdapter.disconnectBang();
     }
   });
 
@@ -140,35 +167,33 @@ describe("StatementCacheTest", () => {
     const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const adapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await adapter.executeMutation(
-        'CREATE TABLE "authors" ("id" INTEGER PRIMARY KEY, "name" TEXT)',
-      );
-      await adapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
-      await adapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["DHH"]);
+      await defineSchema(roundTripAdapter, { authors: { name: "string" } });
+      await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["Matz"]);
+      await roundTripAdapter.executeMutation('INSERT INTO "authors" ("name") VALUES (?)', ["DHH"]);
 
       class Author extends Base {
         static {
           this.tableName = "authors";
-          this.adapter = adapter;
+          this.adapter = roundTripAdapter;
         }
       }
 
-      adapter.preparedStatements = true;
-      const cache = StatementCache.create(adapter, (params) => {
+      roundTripAdapter.preparedStatements = true;
+      const cache = StatementCache.create(roundTripAdapter, (params) => {
         return Author.where({ name: params.bind() }) as any;
       });
 
-      const r1 = await cache.execute(["Matz"], adapter);
+      const r1 = await cache.execute(["Matz"], roundTripAdapter);
       expect(r1).toHaveLength(1);
       expect(r1[0].readAttribute("name")).toBe("Matz");
 
-      const r2 = await cache.execute(["DHH"], adapter);
+      const r2 = await cache.execute(["DHH"], roundTripAdapter);
       expect(r2).toHaveLength(1);
       expect(r2[0].readAttribute("name")).toBe("DHH");
     } finally {
-      adapter.disconnectBang();
+      roundTripAdapter.disconnectBang();
     }
   });
 
@@ -215,35 +240,35 @@ describe("StatementCacheTest", () => {
     const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
     const { Base } = await import("./base.js");
 
-    const adapter = new SQLite3Adapter(":memory:");
+    const roundTripAdapter = new SQLite3Adapter(":memory:");
     try {
-      await adapter.executeMutation(
-        'CREATE TABLE "books" ("id" INTEGER PRIMARY KEY, "title" TEXT)',
-      );
-      await adapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["Ruby"]);
-      await adapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["TypeScript"]);
+      await defineSchema(roundTripAdapter, { books: { title: "string" } });
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', ["Ruby"]);
+      await roundTripAdapter.executeMutation('INSERT INTO "books" ("title") VALUES (?)', [
+        "TypeScript",
+      ]);
 
       class Book extends Base {
         static {
           this.tableName = "books";
-          this.adapter = adapter;
+          this.adapter = roundTripAdapter;
         }
       }
 
       // preparedStatements defaults to false — uses PartialQuery path
-      const cache = StatementCache.create(adapter, (params) => {
+      const cache = StatementCache.create(roundTripAdapter, (params) => {
         return Book.where({ title: params.bind() }) as any;
       });
 
-      const r1 = await cache.execute(["Ruby"], adapter);
+      const r1 = await cache.execute(["Ruby"], roundTripAdapter);
       expect(r1).toHaveLength(1);
       expect(r1[0].readAttribute("title")).toBe("Ruby");
 
-      const r2 = await cache.execute(["TypeScript"], adapter);
+      const r2 = await cache.execute(["TypeScript"], roundTripAdapter);
       expect(r2).toHaveLength(1);
       expect(r2[0].readAttribute("title")).toBe("TypeScript");
     } finally {
-      adapter.disconnectBang();
+      roundTripAdapter.disconnectBang();
     }
   });
 });
