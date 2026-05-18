@@ -516,33 +516,38 @@ export class Request {
     return this.env[envName(name)] as string | undefined;
   }
 
-  /** Returns true if the env has a value for `name`. Mirrors `has_header?`. */
-  hasHeader(name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.env, envName(name));
+  /**
+   * Returns true if the env has a value for `key`. Mirrors Rails'
+   * `Rack::Request::Env#has_header?` — raw env access, no HTTP-name
+   * conversion. Callers passing HTTP-style names (e.g. `"Content-Type"`)
+   * should reach for `headers[]` (or `getHeader`, which applies the
+   * `Headers#env_name` mapping).
+   */
+  hasHeader(key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.env, key);
   }
 
-  /** Sets `name` on the env. Returns the assigned value. Mirrors `set_header`. */
-  setHeader(name: string, value: unknown): unknown {
-    this.env[envName(name)] = value;
+  /** Sets `key` on the env. Returns the assigned value. Mirrors `set_header`. */
+  setHeader(key: string, value: unknown): unknown {
+    this.env[key] = value;
     return value;
   }
 
-  /** Deletes `name` from the env. Mirrors `delete_header`. */
-  deleteHeader(name: string): void {
-    delete this.env[envName(name)];
+  /** Deletes `key` from the env. Mirrors `delete_header`. */
+  deleteHeader(key: string): void {
+    delete this.env[key];
   }
 
   /**
-   * Returns the value for `name`, or invokes `fallback` with the key when
+   * Returns the value for `key`, or invokes `fallback` with `key` when
    * absent. Mirrors `fetch_header`, which yields the key on miss.
    */
-  fetchHeader<T = unknown>(name: string): unknown;
-  fetchHeader<T>(name: string, fallback: (key: string) => T): unknown | T;
-  fetchHeader<T>(name: string, fallback?: (key: string) => T): unknown | T {
-    const key = envName(name);
+  fetchHeader<T = unknown>(key: string): unknown;
+  fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
+  fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
     if (Object.prototype.hasOwnProperty.call(this.env, key)) return this.env[key];
     if (fallback) return fallback(key);
-    throw new Error(`key not found: ${name}`);
+    throw new Error(`key not found: ${key}`);
   }
 
   // --- Inspect ---
