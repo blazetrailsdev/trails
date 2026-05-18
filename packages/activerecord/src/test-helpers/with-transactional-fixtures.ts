@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import type { DatabaseAdapter } from "../adapter.js";
 import {
   getUseTransactionalTests,
   popSkipGlobalReset,
@@ -7,7 +8,7 @@ import {
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 
-interface TxnAdapter {
+interface TxnHost {
   transactionManager: {
     beginTransaction: (opts: { joinable: boolean; _lazy: boolean }) => Promise<unknown>;
     rollbackTransaction: () => Promise<void>;
@@ -15,15 +16,29 @@ interface TxnAdapter {
   };
 }
 
-function tm(adapter: TestDatabaseAdapter): TxnAdapter["transactionManager"] {
-  const inner = adapter.innerAdapter as unknown as Partial<TxnAdapter>;
-  if (!inner.transactionManager) {
+/**
+ * The helper accepts either the {@link TestDatabaseAdapter} produced by
+ * {@link createTestAdapter} (whose `transactionManager` lives on the wrapped
+ * `innerAdapter`) or a raw `DatabaseAdapter` constructed directly by a test
+ * file (`new PostgreSQLAdapter(...)`, `new SQLite3Adapter(...)`, etc.) which
+ * exposes `transactionManager` on itself via `AbstractAdapter`. Adapter-cluster
+ * tests under `adapters/**` predominantly take the raw path. Not every
+ * `DatabaseAdapter` shape in the repo carries `transactionManager` (e.g. the
+ * `QueryCacheAdapter` wrapper in `query-cache.ts`), so the union narrows to
+ * adapters that do — type-checking matches runtime behavior.
+ */
+export type TransactionalFixturesAdapter = TestDatabaseAdapter | (DatabaseAdapter & TxnHost);
+
+function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"] {
+  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
+  const host = (wrapped ?? adapter) as unknown as Partial<TxnHost>;
+  if (!host.transactionManager) {
     throw new Error(
       `withTransactionalFixtures: adapter ${(adapter as { adapterName?: string }).adapterName ?? "unknown"} ` +
         `does not expose transactionManager`,
     );
   }
-  return inner.transactionManager;
+  return host.transactionManager;
 }
 
 /**
@@ -78,8 +93,16 @@ function tm(adapter: TestDatabaseAdapter): TxnAdapter["transactionManager"] {
  *   withTransactionalFixtures(() => adapter);
  *
  *   it("inserts a row", async () => { ... });  // rolled back in afterEach
+ *
+ * @example  // adapter-cluster file using a raw adapter directly
+ *   let adapter: PostgreSQLAdapter;
+ *   beforeAll(async () => {
+ *     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+ *     await defineSchema(adapter, { ... });
+ *   });
+ *   withTransactionalFixtures(() => adapter);
  */
-export function withTransactionalFixtures(getAdapter: () => TestDatabaseAdapter): void {
+export function withTransactionalFixtures(getAdapter: () => TransactionalFixturesAdapter): void {
   let active = true;
 
   beforeAll(() => {

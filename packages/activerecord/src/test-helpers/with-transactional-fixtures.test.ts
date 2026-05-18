@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   createTestAdapter,
   shouldSkipGlobalReset,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
+import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { defineSchema } from "./define-schema.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 
@@ -100,5 +101,37 @@ describe("withTransactionalFixtures (useTransactionalTests=false opt-out)", () =
     // pushSkipGlobalReset — otherwise opted-out files would silently
     // bypass the global resetTestAdapterState beforeEach they rely on.
     expect(shouldSkipGlobalReset()).toBe(false);
+  });
+});
+
+// Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
+// raw DatabaseAdapter directly instead of going through createTestAdapter().
+// The helper must accept that shape — `transactionManager` lives on the
+// adapter itself via AbstractAdapter, not behind an `innerAdapter` wrapper.
+describe("withTransactionalFixtures (raw adapter)", () => {
+  let adapter: SQLite3Adapter;
+  const exec = (sql: string) => adapter.exec(sql);
+  const query = (sql: string) => adapter.execute(sql);
+
+  beforeAll(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+    await defineSchema(adapter, { raw_fixture_users: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("rolls back inserts between tests (first run)", async () => {
+    await exec(`INSERT INTO raw_fixture_users (id, name) VALUES (1, 'alice')`);
+    const rows = await query(`SELECT * FROM raw_fixture_users`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("sees zero rows because the previous insert rolled back", async () => {
+    const rows = await query(`SELECT * FROM raw_fixture_users`);
+    expect(rows).toHaveLength(0);
   });
 });
