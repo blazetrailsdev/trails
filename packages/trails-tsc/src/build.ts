@@ -1,7 +1,7 @@
 import ts from "typescript";
 import * as path from "node:path";
 import { buildCompilerHost, type TrailsCompilerHost } from "./host.js";
-import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
+import type { TscPlugin } from "./plugin.js";
 import { remapDiagnostics } from "./remap.js";
 
 export interface TrailsSolutionBuilder {
@@ -9,40 +9,39 @@ export interface TrailsSolutionBuilder {
   clean(): ts.ExitStatus;
 }
 
+/**
+ * Factory called once per project the solution builder loads. Receives
+ * a plain (non-virtualizing) `ts.Program` for the project plus its
+ * resolved compiler options, and returns the plugin list for that
+ * project. AR uses this to walk the checker for transitive Base
+ * descendants before building its `ar-models` plugin; plugins that
+ * don't need per-project state can ignore both arguments.
+ */
+export type PluginFactory = (
+  plainProgram: ts.Program,
+  options: ts.CompilerOptions,
+) => readonly TscPlugin[];
+
 export interface TrailsBuildOptions {
-  /** Emit solution-builder status messages (e.g., "Building project..."). */
+  /** Emit solution-builder status messages (e.g. "Building project..."). */
   verbose?: boolean;
   /** Called with each diagnostic AFTER virtualized-source remap. */
   onDiagnostic?: (d: ts.Diagnostic) => void;
   /** Called with each solution-builder status message. */
   onStatus?: (d: ts.Diagnostic) => void;
   /**
-   * Schema columns keyed by table name — same shape as
-   * `createTrailsProgram`'s option. Threaded into every per-project
-   * virtualizing host so schema-only columns get declares across the
-   * whole solution.
+   * Construct the plugin list for each project as it's loaded. Runs
+   * after a preliminary plain pass so plugins can resolve symbols.
    */
-  schemaColumnsByTable?: Readonly<
-    Record<
-      string,
-      Readonly<Record<string, import("../type-virtualization/synthesize.js").SchemaColumnValue>>
-    >
-  >;
+  pluginFactory?: PluginFactory;
 }
 
 /**
  * Wrap `ts.createSolutionBuilder` so every project built with `-b`
- * uses the trails-tsc virtualizing compiler host. Each project is
- * processed in two passes (plain checker → walker → virtualizing
- * host) exactly like `createTrailsProgram`, so transitive-extends
- * and auto-import resolution work per-project.
- *
- * Auto-import resolution is scoped to each project's own source
- * files — cross-project models referenced via `references:` still
- * resolve through TypeScript's normal project-reference handling
- * (the referencing project imports them explicitly, either because
- * the user wrote the import or because the referenced project's
- * emitted `.d.ts` declares them).
+ * uses the trails-tsc plugin-driven compiler host. Each project is
+ * processed in two passes (plain checker → `pluginFactory` →
+ * virtualizing host) so plugins that need a checker (e.g. AR's
+ * `ar-models`) can build themselves per-project.
  */
 export function createTrailsSolutionBuilder(
   rootConfigs: readonly string[],
@@ -60,18 +59,17 @@ export function createTrailsSolutionBuilder(
   ) => {
     if (!rootNames || !options) {
       // Reuse the previous builder program if we have one — the
-      // solution builder only invokes createProgram without
-      // resolved inputs on a no-op incremental tick. Otherwise
-      // this is unreachable for a well-formed solution, so fail
-      // loudly rather than passing undefined into the TS factory.
+      // solution builder only invokes createProgram without resolved
+      // inputs on a no-op incremental tick. Otherwise this is
+      // unreachable for a well-formed solution.
       if (oldProgram) return oldProgram;
       throw new Error(
         "createTrailsSolutionBuilder received unresolved rootNames or compiler options",
       );
     }
 
-    // Pass 1: plain host — we only need a checker to walk extends
-    // chains and collect the per-project model registry.
+    // Pass 1: plain host — gives the plugin factory a checker to
+    // inspect before it constructs the per-project plugin list.
     const pass1Host = ts.createCompilerHost(options, true);
     const pass1Program = ts.createProgram({
       rootNames: [...rootNames],
@@ -79,14 +77,12 @@ export function createTrailsSolutionBuilder(
       host: pass1Host,
       projectReferences: projectReferences ? [...projectReferences] : undefined,
     });
-    const { baseNames, modelRegistry } = collectBaseDescendants(pass1Program);
+    const plugins = buildOpts.pluginFactory?.(pass1Program, options) ?? [];
 
-    // Pass 2: virtualizing host + registry feed the real builder
-    // program. Cache the host per-project so diagnostics remap can
+    // Pass 2: virtualizing host + plugins feed the real builder
+    // program. Cache the host per-project so diagnostic remap can
     // look up deltas and original text after build completes.
-    const host = buildCompilerHost(options, [...baseNames], modelRegistry, {
-      schemaColumnsByTable: buildOpts.schemaColumnsByTable,
-    });
+    const host = buildCompilerHost(options, { plugins });
     const configFilePath = options.configFilePath;
     if (typeof configFilePath === "string") {
       hostsByProject.set(path.resolve(configFilePath), host);
@@ -106,8 +102,7 @@ export function createTrailsSolutionBuilder(
   // absolute path. Lets `remapDiagnostics` remap a diagnostic whose
   // primary file lives in project A AND whose `relatedInformation`
   // entries point into project B's virtualized files. Results are
-  // memoized per path so large solutions don't re-scan every host
-  // for every diagnostic.
+  // memoized per path so large solutions don't re-scan every host.
   const fileOwner = new Map<string, TrailsCompilerHost | null>();
   const ownerOf = (fileName: string): TrailsCompilerHost | null => {
     const cached = fileOwner.get(fileName);
@@ -126,8 +121,6 @@ export function createTrailsSolutionBuilder(
     getOriginalText: (fileName: string) => ownerOf(fileName)?.getOriginalText(fileName),
   } as unknown as TrailsCompilerHost;
 
-  // Share the original-SourceFile cache across every diagnostic so
-  // we only reparse each virtualized file once per build.
   const originalSfCache = new Map<string, ts.SourceFile>();
 
   const reportDiagnostic: ts.DiagnosticReporter = (d) => {
@@ -135,10 +128,7 @@ export function createTrailsSolutionBuilder(
     const remapped = remapDiagnostics([d], compositeRemapHost, originalSfCache)[0]!;
     buildOpts.onDiagnostic(remapped);
   };
-
-  const reportStatus: ts.DiagnosticReporter = (d) => {
-    buildOpts.onStatus?.(d);
-  };
+  const reportStatus: ts.DiagnosticReporter = (d) => buildOpts.onStatus?.(d);
 
   const solutionHost = ts.createSolutionBuilderHost(
     ts.sys,

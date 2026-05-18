@@ -2,29 +2,38 @@ import ts from "typescript";
 import * as path from "node:path";
 import type { LineDelta, TscPlugin } from "./plugin.js";
 
-export interface PluginCompilerHost extends ts.CompilerHost {
-  /** Line-delta records for a virtualized file, if any. */
+export interface TrailsCompilerHost extends ts.CompilerHost {
   getDeltasForFile(fileName: string): readonly LineDelta[] | undefined;
-  /** Original (pre-virtualized) text for a file the host rewrote. */
   getOriginalText(fileName: string): string | undefined;
+}
+
+export interface BuildCompilerHostOptions {
+  /**
+   * Plugins consulted in order for each source file. The first plugin
+   * whose `extensions` match the file and whose `virtualize()` returns
+   * a non-null result wins. Files matching no plugin pass through.
+   */
+  plugins?: readonly TscPlugin[];
 }
 
 /**
  * Build a `ts.CompilerHost` that routes every source file through the
- * registered plugins. The first plugin whose `extensions` match and
- * whose `virtualize()` returns a non-null result wins for that file;
- * files that match no plugin pass through unchanged. Virtualized text
- * and original text are cached per resolved path so the diagnostic
- * remapper can recover user coordinates without re-reading disk.
+ * registered `TscPlugin`s before TypeScript sees them. Original text
+ * and line deltas are cached per resolved path so `remapDiagnostics`
+ * can recover the user's coordinates without re-reading disk.
  */
-export function buildPluginHost(
+export function buildCompilerHost(
   options: ts.CompilerOptions,
-  plugins: readonly TscPlugin[],
-): PluginCompilerHost {
+  hostOpts: BuildCompilerHostOptions = {},
+): TrailsCompilerHost {
+  // Incremental host seeds `createHash` and attaches file versions —
+  // required by `ts.createEmitAndSemanticDiagnosticsBuilderProgram`
+  // (used by `--build`) and harmless for plain `createProgram`.
   const baseHost = ts.createIncrementalCompilerHost(options);
+  const plugins = hostOpts.plugins ?? [];
+  const deltaMap = new Map<string, readonly LineDelta[]>();
   const virtualizedTextCache = new Map<string, string>();
   const originalTextCache = new Map<string, string>();
-  const deltaMap = new Map<string, readonly LineDelta[]>();
   const sourceFileCache = new Map<string, ts.SourceFile>();
 
   const pluginsByExt = new Map<string, TscPlugin[]>();
@@ -40,8 +49,7 @@ export function buildPluginHost(
     if (virtualizedTextCache.has(resolved)) return virtualizedTextCache.get(resolved)!;
     const originalText = baseHost.readFile(resolved);
     if (originalText == null) return undefined;
-    const ext = extensionOf(resolved);
-    const candidates = pluginsByExt.get(ext);
+    const candidates = pluginsByExt.get(extensionOf(resolved));
     if (!candidates) {
       virtualizedTextCache.set(resolved, originalText);
       return originalText;
@@ -51,26 +59,29 @@ export function buildPluginHost(
       if (!result) continue;
       virtualizedTextCache.set(resolved, result.ts);
       originalTextCache.set(resolved, originalText);
-      if (result.deltas && result.deltas.length > 0) {
-        deltaMap.set(resolved, result.deltas);
-      }
+      if (result.deltas && result.deltas.length > 0) deltaMap.set(resolved, result.deltas);
       return result.ts;
     }
     virtualizedTextCache.set(resolved, originalText);
     return originalText;
   }
 
-  const host: PluginCompilerHost = {
+  const host: TrailsCompilerHost = {
     ...baseHost,
 
     getSourceFile(fileName, languageVersionOrOptions, onError, shouldCreateNewSourceFile) {
       const resolved = path.resolve(fileName);
+
+      // In watch/incremental mode, `shouldCreateNewSourceFile` signals
+      // that the file changed on disk. Flush all caches for this path
+      // so we re-read, re-virtualize, and re-parse.
       if (shouldCreateNewSourceFile) {
         virtualizedTextCache.delete(resolved);
         originalTextCache.delete(resolved);
         deltaMap.delete(resolved);
         sourceFileCache.delete(resolved);
       }
+
       const text = getVirtualizedText(resolved);
       if (text == null) {
         return baseHost.getSourceFile(
@@ -115,7 +126,12 @@ function extensionOf(filePath: string): string {
   return dot === -1 ? "" : base.slice(dot);
 }
 
-/** djb2 fallback when the base host doesn't expose `createHash`. */
+/**
+ * djb2 string hash — content-sensitive fallback used for
+ * `SourceFile.version` when the base host doesn't expose a hash
+ * function. Not cryptographic, but distinguishes texts of the same
+ * length so the incremental builder doesn't reuse stale SourceFiles.
+ */
 function djb2Hash(text: string): string {
   let hash = 5381;
   for (let i = 0; i < text.length; i++) {

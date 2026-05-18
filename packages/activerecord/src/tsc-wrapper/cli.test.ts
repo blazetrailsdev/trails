@@ -4,9 +4,49 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
-import { createTrailsProgram } from "./program.js";
-import { createTrailsSolutionBuilder } from "./build.js";
-import { remapDiagnostics } from "./remap.js";
+import {
+  createPlainProgram,
+  createTrailsProgram,
+  createTrailsSolutionBuilder,
+  remapDiagnostics,
+  type CreateTrailsProgramOptions,
+} from "@blazetrails/trails-tsc";
+import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
+import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
+
+/**
+ * Build the `ar-models` plugin for a tsconfig (walks the plain
+ * program for Base descendants), then create a virtualizing program
+ * with that plugin attached. Mirrors what the AR CLI does in
+ * single-project mode.
+ */
+function createProgramWithArPlugin(
+  configPath: string,
+  schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"],
+): ReturnType<typeof createTrailsProgram> {
+  const pass1 = createPlainProgram(configPath);
+  const { baseNames, modelRegistry } = collectBaseDescendants(pass1.program);
+  const plugin = createArModelsPlugin({
+    baseNames: [...baseNames],
+    modelRegistry,
+    schemaColumnsByTable,
+  });
+  const opts: CreateTrailsProgramOptions = { plugins: [plugin] };
+  return createTrailsProgram(configPath, opts);
+}
+
+function createBuilderWithArPlugin(
+  rootConfigs: readonly string[],
+  buildOpts: Parameters<typeof createTrailsSolutionBuilder>[1],
+): ReturnType<typeof createTrailsSolutionBuilder> {
+  return createTrailsSolutionBuilder(rootConfigs, {
+    ...buildOpts,
+    pluginFactory: (plainProgram) => {
+      const { baseNames, modelRegistry } = collectBaseDescendants(plainProgram);
+      return [createArModelsPlugin({ baseNames: [...baseNames], modelRegistry })];
+    },
+  });
+}
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
@@ -14,7 +54,7 @@ const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
 describe("trails-tsc CLI — Phase 1b.1", () => {
   it("virtualizes a single-file model: post.title types as string with no declares", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
 
     const diagnostics = [...program.getSemanticDiagnostics(), ...program.getSyntacticDiagnostics()];
 
@@ -23,7 +63,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
 
   it("consumer.ts types `post.title` as string, `post.published` as boolean", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const checker = program.getTypeChecker();
 
     const consumerFile = program.getSourceFile(path.join(FIXTURES_DIR, "consumer.ts"));
@@ -45,7 +85,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
 
   it("non-Base files pass through unchanged (no virtualization)", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
 
     const modelFile = program.getSourceFile(path.join(FIXTURES_DIR, "model.ts"));
     expect(modelFile).toBeDefined();
@@ -56,7 +96,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
 
   it("zero diagnostics across all diagnostic categories", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const allDiags = [...ts.getPreEmitDiagnostics(program)];
     expect(allDiags).toHaveLength(0);
   });
@@ -84,7 +124,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
 describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
   it("remaps error line from virtualized coordinates to original source line", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
-    const { program, host } = createTrailsProgram(configPath);
+    const { program, host } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
 
     // The error is TS2322 (Type 'string' is not assignable to type 'number')
@@ -121,7 +161,7 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
 
   it("non-virtualized file diagnostics pass through unchanged", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
-    const { program, host } = createTrailsProgram(configPath);
+    const { program, host } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
     const remapped = remapDiagnostics(diagnostics, host);
     // Every diagnostic without deltas should have the same start position
@@ -141,14 +181,14 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
 
   it("virtualizes `class Admin extends User` where User extends Base", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
     expect(diagnostics).toHaveLength(0);
   });
 
   it("admin.role types as string, admin.name inherited from User types as string", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const checker = program.getTypeChecker();
 
     const consumerFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "consumer.ts"));
@@ -171,7 +211,7 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
 
   it("User (direct extends Base) still virtualizes correctly", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const userFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "user.ts"));
     expect(userFile).toBeDefined();
     expect(userFile!.text).toContain("declare name: string");
@@ -179,7 +219,7 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
 
   it("Admin (transitive via User) gets declares injected", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const adminFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "admin.ts"));
     expect(adminFile).toBeDefined();
     expect(adminFile!.text).toContain("declare role: string");
@@ -191,7 +231,7 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
 
   it("auto-injects `import type { Author }` into post.ts (no user-written import)", () => {
     const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
 
     const postFile = program.getSourceFile(path.join(AUTO_IMPORT_DIR, "post.ts"));
     expect(postFile).toBeDefined();
@@ -200,7 +240,7 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
 
   it("zero diagnostics — auto-imported Author resolves for the belongsTo declare", () => {
     const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
 
     for (const d of diagnostics) {
@@ -233,7 +273,7 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
       }
 
       const configPath = path.join(tempDir, "tsconfig.json");
-      const { program } = createTrailsProgram(configPath);
+      const { program } = createProgramWithArPlugin(configPath);
       const postFile = program.getSourceFile(path.resolve(postPath));
       expect(postFile).toBeDefined();
 
@@ -263,7 +303,7 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
   it("builds a composite solution with a virtualizing host on every project", () => {
     withTempComposite((dir) => {
       const diagnostics: ts.Diagnostic[] = [];
-      const builder = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+      const builder = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => {
           diagnostics.push(d);
           const msg =
@@ -315,7 +355,7 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
   it("re-build after editing a model reflects the new declares in dependents", () => {
     withTempComposite((dir) => {
       const firstDiags: ts.Diagnostic[] = [];
-      const first = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+      const first = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => firstDiags.push(d),
       });
       expect(first.build()).toBe(ts.ExitStatus.Success);
@@ -335,7 +375,7 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
       );
 
       const secondDiags: ts.Diagnostic[] = [];
-      const second = createTrailsSolutionBuilder([path.join(dir, "tsconfig.json")], {
+      const second = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => secondDiags.push(d),
       });
       expect(second.build()).toBe(ts.ExitStatus.Success);
@@ -376,10 +416,8 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
 
   it("types schema-only columns through createTrailsProgram", () => {
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath, {
-      schemaColumnsByTable: {
-        users: { name: "string", age: "integer", is_admin: "boolean" },
-      },
+    const { program } = createProgramWithArPlugin(configPath, {
+      users: { name: "string", age: "integer", is_admin: "boolean" },
     });
     const checker = program.getTypeChecker();
 
@@ -471,7 +509,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
 
   it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
-    const { program } = createTrailsProgram(configPath);
+    const { program } = createProgramWithArPlugin(configPath);
     const checker = program.getTypeChecker();
 
     const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));

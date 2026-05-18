@@ -1,20 +1,27 @@
-export { buildCompilerHost, type TrailsCompilerHost } from "./host.js";
-export { createTrailsProgram, type TrailsProgram } from "./program.js";
-export {
-  createTrailsSolutionBuilder,
-  type TrailsSolutionBuilder,
-  type TrailsBuildOptions,
-} from "./build.js";
-export { remapDiagnostics } from "./remap.js";
-
-// Re-export the new plugin surface so downstream packages can already
-// program against it. Slot B will move host/program/build into
-// `@blazetrails/trails-tsc` and refactor the AR virtualize +
-// auto-import logic into a first-class `ar-models` plugin.
+// Re-export the trails-tsc plugin surface and program/builder
+// primitives so AR consumers can use a single barrel. The actual
+// host/program/build/remap implementations now live in
+// `@blazetrails/trails-tsc` — this package contributes only the
+// `ar-models` plugin and the CLI shim that wires it up.
 export type {
+  BuildCompilerHostOptions,
+  CreateTrailsProgramOptions,
   LineDelta,
-  PluginCompilerHost,
+  PluginFactory,
+  TrailsBuildOptions,
+  TrailsCompilerHost,
+  TrailsProgram,
+  TrailsSolutionBuilder,
   TscPlugin,
   VirtualizeOutput,
 } from "@blazetrails/trails-tsc";
-export { buildPluginHost } from "@blazetrails/trails-tsc";
+export {
+  buildCompilerHost,
+  createPlainProgram,
+  createTrailsProgram,
+  createTrailsSolutionBuilder,
+  remapDiagnostics,
+  remapLine,
+} from "@blazetrails/trails-tsc";
+
+export { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
