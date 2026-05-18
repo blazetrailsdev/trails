@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
@@ -8,6 +9,16 @@ import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js
 import { Configurable } from "./encryption/configurable.js";
 import { Decryption as DecryptionError } from "./encryption/errors.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
+
+const TEST_SCHEMA = {
+  users: {
+    name: "string",
+    ssn: "string",
+    secret: "string",
+    token: "string",
+    email: "string",
+  },
+} as const;
 
 class TestEncryptor implements EncryptorLike {
   constructor(private readonly map: Record<string, string>) {}
@@ -35,15 +46,17 @@ class TestEncryptor implements EncryptorLike {
 
 // -- Helpers --
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // -- Phase 2000: Core --
 
 describe("encrypts()", () => {
   it("encrypts and decrypts attributes transparently", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -64,7 +77,7 @@ describe("encrypts()", () => {
   });
 
   it("persists encrypted value to database and decrypts on load", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -81,7 +94,7 @@ describe("encrypts()", () => {
   });
 
   it("supports custom encryptor", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     const customEncryptor = {
       encrypt: (v: string) => `ENC:${v}`,
       decrypt: (v: string) => v.replace(/^ENC:/, ""),
@@ -102,8 +115,8 @@ describe("encrypts()", () => {
     expect(dbValues.token).toBe("ENC:abc123");
   });
 
-  it("wires scheme options (deterministic, downcase) through to the attribute type", () => {
-    const adapter = freshAdapter();
+  it("wires scheme options (deterministic, downcase) through to the attribute type", async () => {
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -121,8 +134,8 @@ describe("encrypts()", () => {
     expect(def.type.scheme.downcase).toBe(true);
   });
 
-  it("registers encrypted attributes on the class", () => {
-    const adapter = freshAdapter();
+  it("registers encrypted attributes on the class", async () => {
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
