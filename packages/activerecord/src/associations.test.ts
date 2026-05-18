@@ -8307,8 +8307,62 @@ describe("PreloaderTest", () => {
     const loadedMary = fav._preloadedAssociations.get("iaAuthor");
     expect(loadedMary._cachedAssociations?.get("iaFavs")).toBe(fav);
   });
-  it.skip("preload can group separate levels", () => {
-    /* deferred to Slot B: requires multi-round batch coalescing across through */
+  it("preload can group separate levels", async () => {
+    const adapter = freshAdapter();
+    class SLAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class SLPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("sl_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class SLAuthorFavorite extends Base {
+      static {
+        this.attribute("sl_author_id", "integer");
+        this.attribute("sl_favorite_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(SLAuthor, "slPosts", {
+      className: "SLPost",
+      foreignKey: "sl_author_id",
+    });
+    Associations.hasMany.call(SLAuthor, "slAuthorFavorites", {
+      className: "SLAuthorFavorite",
+      foreignKey: "sl_author_id",
+    });
+    Associations.hasMany.call(SLAuthor, "slFavoriteAuthors", {
+      through: "slAuthorFavorites",
+      source: "slFavoriteAuthor",
+      className: "SLAuthor",
+    });
+    Associations.belongsTo.call(SLAuthorFavorite, "slFavoriteAuthor", {
+      className: "SLAuthor",
+      foreignKey: "sl_favorite_author_id",
+    });
+    registerModel("SLAuthor", SLAuthor);
+    registerModel("SLPost", SLPost);
+    registerModel("SLAuthorFavorite", SLAuthorFavorite);
+    const mary = await SLAuthor.create({ name: "Mary" });
+    const bob = await SLAuthor.create({ name: "Bob" });
+    await SLAuthorFavorite.create({ sl_author_id: mary.id, sl_favorite_author_id: bob.id });
+    await SLPost.create({ title: "M1", sl_author_id: mary.id });
+    await SLPost.create({ title: "B1", sl_author_id: bob.id });
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [mary],
+      associations: ["slPosts", { slFavoriteAuthors: "slPosts" }],
+    }).call();
+    // Rails: 3 queries. Through-target authors share the slAuthorFavorites
+    // load, and the two slPosts loaders (mary's + bob's) coalesce into one
+    // batched call.
+    expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload does not group same class different scope", async () => {
     const adapter = freshAdapter();
@@ -8348,8 +8402,50 @@ describe("PreloaderTest", () => {
     // must NOT coalesce.
     expect(spy).toHaveBeenCalledTimes(2);
   });
-  it.skip("preload does not group same scope different key name", () => {
-    /* needs Postesque-style mixed-FK fixture; behavior verified by inverse-assoc test */
+  it("preload does not group same scope different key name", async () => {
+    const adapter = freshAdapter();
+    class DKNAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DKNPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.attribute("dkn_author_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class DKNPostesque extends Base {
+      static {
+        this.attribute("dkn_author_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(DKNPost, "dknAuthor", {
+      className: "DKNAuthor",
+      foreignKey: "dkn_author_id",
+    });
+    // Mirrors Rails Postesque.belongs_to :author, foreign_key: :author_name, primary_key: :name.
+    // Same scope (no WHERE), same class, but distinct join-primary-key → must NOT coalesce.
+    Associations.belongsTo.call(DKNPostesque, "dknAuthor", {
+      className: "DKNAuthor",
+      foreignKey: "dkn_author_name",
+      primaryKey: "name",
+    });
+    registerModel("DKNAuthor", DKNAuthor);
+    registerModel("DKNPost", DKNPost);
+    registerModel("DKNPostesque", DKNPostesque);
+    const author = await DKNAuthor.create({ name: "Alice" });
+    const post = await DKNPost.create({ title: "P1", dkn_author_id: author.id });
+    const postesque = await DKNPostesque.create({ dkn_author_name: author.name });
+    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
+    await new Preloader({
+      records: [post, postesque],
+      associations: ["dknAuthor"],
+    }).call();
+    expect(spy).toHaveBeenCalledTimes(2);
   });
   it("multi database polymorphic preload with same table name", async () => {
     const adapterA = freshAdapter();
