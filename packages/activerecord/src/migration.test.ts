@@ -15,6 +15,22 @@ import { Migration } from "./migration.js";
 import { Logger } from "@blazetrails/activesupport";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { Schema } from "./schema.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
+
+// Tables some tests rely on existing before any migration runs. Under
+// AR_NO_AUTO_SCHEMA=1 the test adapter no longer auto-creates missing
+// tables, so we materialize them up front via defineSchema().
+const TEST_SCHEMA = {
+  people: { name: "string" },
+  posts: { title: "string" },
+  events: { name: "string" },
+} as const;
+
+async function freshAdapterWithSchema(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
+}
 
 function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   const adapter = createTestAdapter();
@@ -888,7 +904,7 @@ describe("Migration DDL (extended)", () => {
   });
 
   it("reversible renameTable reverses correctly", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema();
     class RenameUsers extends Migration {
       async change() {
         await this.renameTable("people", "users");
@@ -1045,7 +1061,8 @@ describe("Rails-guided: migrations", () => {
     expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(1);
 
     await m.run(adapter, "down");
-    expect(await adapter.execute(`SELECT * FROM "widgets"`)).toHaveLength(0);
+    // Auto-reverse of createTable is dropTable, so widgets no longer exists.
+    expect(await m.schema.tableExists("widgets")).toBe(false);
   });
 
   it("reversible removeColumn with type auto-reverses", async () => {
@@ -1165,8 +1182,8 @@ describe("Rails-guided: migrations", () => {
 describe("MigrationTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapterWithSchema();
   });
 
   it("migration version matches component version", () => {
