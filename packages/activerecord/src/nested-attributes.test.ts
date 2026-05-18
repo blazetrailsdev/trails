@@ -17,10 +17,133 @@ import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { defineSchema } from "./test-helpers/define-schema.js";
+
+// All tables referenced by tests in this file. Tests declare ad-hoc
+// model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
+// be materialized up front rather than auto-derived by the test adapter.
+const TEST_SCHEMA = {
+  ae1_articles: { title: "string" },
+  ae1_tags: { name: "string", ae1_article_id: "integer" },
+  ant_articles: { title: "string" },
+  articles: { title: "string" },
+  tags: { name: "string", article_id: "integer" },
+  ant_tags: { name: "string", ant_article_id: "integer" },
+  birds: { name: "string", pirate_id: "integer" },
+  comments: { body: "string", post_id: "integer" },
+  dt_comments: { body: "string" },
+  dt_comments2: { body: "string", dt_entry2_id: "integer" },
+  dt_entries: { entryable_type: "string", entryable_id: "integer" },
+  dt_entries2: { title: "string" },
+  ext_articles: { title: "string" },
+  ext_tags: { name: "string", ext_article_id: "integer" },
+  gc_comment2s: { body: "string", gc_post2_id: "integer" },
+  gc_comments: { body: "string", gc_post_id: "integer" },
+  gc_post2s: { title: "string" },
+  gc_posts: { title: "string" },
+  gc_tag2s: { name: "string", gc_comment2_id: "integer" },
+  gc_tags: { name: "string", gc_comment_id: "integer" },
+  gcd_comments: { body: "string", gc_d_post_id: "integer" },
+  gcd_posts: { title: "string" },
+  gcd_tags: { name: "string", gc_d_comment_id: "integer" },
+  gga_comments: { body: "string", gga_post_id: "integer" },
+  gga_posts: { title: "string" },
+  gga_replies: { text: "string", gga_comment_id: "integer" },
+  ggc_comments: { body: "string", ggc_post_id: "integer" },
+  ggc_posts: { title: "string" },
+  ggc_replies: { text: "string", ggc_comment_id: "integer" },
+  ggd_comments: { body: "string", ggd_post_id: "integer" },
+  ggd_posts: { title: "string" },
+  ggd_replies: { text: "string", ggd_comment_id: "integer" },
+  hi_articles: { title: "string" },
+  hi_tags: { name: "string", hi_article_id: "integer" },
+  ien_tags: { name: "string", ien_article_id: "integer" },
+  ier_articles: { title: "string" },
+  ier_tags: { name: "string", ier_article_id: "integer" },
+  items: { name: "string" },
+  n_article_as: { title: "string" },
+  n_article_bs: { title: "string" },
+  n_article_cs: { title: "string" },
+  n_article_ds: { title: "string" },
+  n_article_es: { title: "string" },
+  n_article_fs: { title: "string" },
+  n_article_hs: { title: "string" },
+  n_article6s: { title: "string" },
+  n_article7s: { title: "string" },
+  n_article8s: { title: "string" },
+  n_article9s: { title: "string" },
+  n_bird1s: { name: "string", npirate1_id: "integer" },
+  n_boat3s: { name: "string" },
+  n_comment5s: { body: "string", npost5_id: "integer" },
+  n_human4s: { name: "string" },
+  n_interest4s: { topic: "string", nhuman4_id: "integer" },
+  n_part3s: { name: "string", nboat3_id: "integer" },
+  n_pirate0s: { catchphrase: "string" },
+  n_pirate1s: { catchphrase: "string" },
+  n_pirate2s: { catchphrase: "string" },
+  n_post5s: { title: "string" },
+  n_ship2s: { name: "string", npirate2_id: "integer" },
+  n_tag_as: { name: "string", narticleA_id: "integer" },
+  n_tag_bs: { name: "string", narticleB_id: "integer" },
+  n_tag_cs: { name: "string", narticleC_id: "integer" },
+  n_tag_ds: { name: "string", narticleD_id: "integer" },
+  n_tag_es: { name: "string", narticleE_id: "integer" },
+  n_tag_fs: { name: "string", narticleF_id: "integer" },
+  n_tag_hs: { name: "string", narticleH_id: "integer" },
+  n_tag0s: { name: "string", npirate0_id: "integer" },
+  n_tag6s: { name: "string", narticle6_id: "integer" },
+  n_tag7s: { name: "string", narticle7_id: "integer" },
+  n_tag8s: { name: "string", narticle8_id: "integer" },
+  n_tag9s: { name: "string", narticle9_id: "integer" },
+  nad_articles: { title: "string" },
+  nad_tags: { name: "string", nad_article_id: "integer" },
+  narr_articles: { title: "string" },
+  narr_tags: { name: "string", narr_article_id: "integer" },
+  nbuild_articles: { title: "string" },
+  nbuild_tags: { name: "string", nbuild_article_id: "integer" },
+  nd_articles: { title: "string" },
+  nd_tags: { name: "string", nd_article_id: "integer" },
+  nh_articles: { title: "string" },
+  nh_tags: { name: "string", nh_article_id: "integer" },
+  nil_articles: { title: "string" },
+  nil_tags: { name: "string", nil_article_id: "integer" },
+  nlu_articles: { title: "string" },
+  nlu_tags: { name: "string", nlu_article_id: "integer" },
+  nsave_articles: { title: "string" },
+  nsave_tags: { name: "string", nsave_article_id: "integer" },
+  nsh_articles: { title: "string" },
+  nsh_tags: { name: "string", nsh_article_id: "integer" },
+  nsym_articles: { title: "string" },
+  nsym_tags: { name: "string", nsym_article_id: "integer" },
+  num_posts: { title: "string", score: "integer" },
+  nupd_articles: { title: "string" },
+  nupd_tags: { name: "string", nupd_article_id: "integer" },
+  ov_pirates: { catchphrase: "string" },
+  ov_ships: { name: "string", ov_pirate_id: "integer" },
+  parts: { name: "string", ship_id: "integer" },
+  pirates: { catchphrase: "string" },
+  plains: { name: "string" },
+  poly_owners: { target_type: "string", target_id: "integer" },
+  poly_targets: { name: "string" },
+  posts: { title: "string" },
+  rae_articles: { title: "string" },
+  rae_tags: { name: "string", rae_article_id: "integer" },
+  rnf_articles: { title: "string" },
+  rnf_tags: { name: "string", rnf_article_id: "integer" },
+  ships: { name: "string", pirate_id: "integer" },
+  sub_birds: { name: "string", sub_pirate_id: "integer" },
+  sub_pirates: { catchphrase: "string" },
+  ua_pirates: { catchphrase: "string" },
+  ua_ships: { name: "string", ua_pirate_id: "integer" },
+  uahm_articles: { title: "string" },
+  uahm_tags: { name: "string", uahm_article_id: "integer" },
+} as const;
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -29,8 +152,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("NestedAttributesTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("should not build a new record if reject all blank does not return false", async () => {
@@ -417,8 +540,8 @@ describe("NestedAttributesTest", () => {
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModels(
@@ -700,8 +823,8 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModels(
@@ -936,8 +1059,8 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
 describe("TestNestedAttributesInGeneral", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("base should have an empty nested attributes options", () => {
@@ -1523,7 +1646,7 @@ describe("TestNestedAttributesWithNonStandardPrimaryKeys", () => {
 
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   it("index in nested_attributes_order order", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class IENTag extends Base {
       static {
         this._tableName = "ien_tags";
@@ -1542,7 +1665,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   });
 
   it("index unaffected by reject_if", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class IERTag extends Base {
       static {
         this._tableName = "ier_tags";
@@ -1577,7 +1700,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 
 describe("TestNestedAttributesWithExtend", () => {
   it("extend affects nested attributes", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class ExtTag extends Base {
       static {
         this._tableName = "ext_tags";
@@ -1617,7 +1740,7 @@ describe("TestNestedAttributesWithExtend", () => {
 
 describe("TestNestedAttributesForDelegatedType", () => {
   it("should build a new record based on the delegated type", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class DTComment extends Base {
       static {
         this._tableName = "dt_comments";
@@ -1675,7 +1798,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
 
 describe("assigning nested attributes target", () => {
   it("assigning nested attributes target", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class ANTTag extends Base {
       static {
         this._tableName = "ant_tags";
@@ -1709,7 +1832,7 @@ describe("assigning nested attributes target", () => {
 
 describe("assigning nested attributes target with nil placeholder for rejected item", () => {
   it("assigning nested attributes target with nil placeholder for rejected item", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NilTag extends Base {
       static {
         this._tableName = "nil_tags";
@@ -1747,7 +1870,7 @@ describe("can use symbols as object identifier", () => {
   it("can use symbols as object identifier", async () => {
     // In TypeScript there are no symbols-as-keys in the Ruby sense,
     // but string keys should work as identifiers for nested attributes
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NSymTag extends Base {
       static {
         this._tableName = "nsym_tags";
@@ -1780,7 +1903,7 @@ describe("can use symbols as object identifier", () => {
 
 describe("numeric column changes from zero to no empty string", () => {
   it("numeric column changes from zero to no empty string", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NumPost extends Base {
       static {
         this._tableName = "num_posts";
@@ -1801,7 +1924,7 @@ describe("numeric column changes from zero to no empty string", () => {
 
 describe("should also work with a HashWithIndifferentAccess", () => {
   it("should also work with a HashWithIndifferentAccess", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class HITag extends Base {
       static {
         this._tableName = "hi_tags";
@@ -1836,7 +1959,7 @@ describe("should also work with a HashWithIndifferentAccess", () => {
 
 describe("should automatically build new associated models for each entry in a hash where the id is missing", () => {
   it("should automatically build new associated models for each entry in a hash where the id is missing", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NBuildTag extends Base {
       static {
         this._tableName = "nbuild_tags";
@@ -1872,7 +1995,7 @@ describe("should automatically build new associated models for each entry in a h
 
 describe("should not assign destroy key to a record", () => {
   it("should not assign destroy key to a record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NADTag extends Base {
       static {
         this._tableName = "nad_tags";
@@ -1907,7 +2030,7 @@ describe("should not assign destroy key to a record", () => {
 
 describe("should not destroy the associated model until the parent is saved", () => {
   it("should not destroy the associated model until the parent is saved", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NDTag extends Base {
       static {
         this._tableName = "nd_tags";
@@ -1944,7 +2067,7 @@ describe("should not destroy the associated model until the parent is saved", ()
 
 describe("should not load association when updating existing records", () => {
   it("should not load association when updating existing records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NLUTag extends Base {
       static {
         this._tableName = "nlu_tags";
@@ -2006,7 +2129,7 @@ describe("should preserve order when not overwriting unsaved updates", () => {
 
 describe("should raise RecordNotFound if an id belonging to a different record is given", () => {
   it("should raise RecordNotFound if an id belonging to a different record is given", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class RNFTag extends Base {
       static {
         this._tableName = "rnf_tags";
@@ -2038,7 +2161,7 @@ describe("should raise RecordNotFound if an id belonging to a different record i
 
 describe("should raise an UnknownAttributeError for non existing nested attributes for has many", () => {
   it("should raise an UnknownAttributeError for non existing nested attributes for has many", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class UAHMTag extends Base {
       static {
         this._tableName = "uahm_tags";
@@ -2068,8 +2191,8 @@ describe("should raise an UnknownAttributeError for non existing nested attribut
 });
 
 describe("should raise an argument error if something else than a hash is passed", () => {
-  it("should raise an argument error if something else than a hash is passed", () => {
-    const adapter = freshAdapter();
+  it("should raise an argument error if something else than a hash is passed", async () => {
+    const adapter = await freshAdapter();
     class RAETag extends Base {
       static {
         this._tableName = "rae_tags";
@@ -2110,7 +2233,7 @@ describe("should refresh saved records when not overwriting unsaved updates", ()
 
 describe("should save only one association on create", () => {
   it("should save only one association on create", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NSaveTag extends Base {
       static {
         this._tableName = "nsave_tags";
@@ -2144,7 +2267,7 @@ describe("should save only one association on create", () => {
 
 describe("should sort the hash by the keys before building new associated models", () => {
   it("should sort the hash by the keys before building new associated models", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NSHTag extends Base {
       static {
         this._tableName = "nsh_tags";
@@ -2184,7 +2307,7 @@ describe("should sort the hash by the keys before building new associated models
 
 describe("should take a hash and assign the attributes to the associated models", () => {
   it("should take a hash and assign the attributes to the associated models", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NHTag extends Base {
       static {
         this._tableName = "nh_tags";
@@ -2227,7 +2350,7 @@ describe("should take a hash with composite id keys and assign the attributes to
 
 describe("should take an array and assign the attributes to the associated models", () => {
   it("should take an array and assign the attributes to the associated models", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NArrTag extends Base {
       static {
         this._tableName = "narr_tags";
@@ -2260,7 +2383,7 @@ describe("should take an array and assign the attributes to the associated model
 
 describe("should work with update as well", () => {
   it("should work with update as well", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class NUpdTag extends Base {
       static {
         this._tableName = "nupd_tags";
@@ -2304,8 +2427,8 @@ describe("validate presence of parent works with inverse of", () => {
 
 describe("acceptsNestedAttributesFor", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("creates child records through parent", async () => {
@@ -2374,8 +2497,8 @@ describe("acceptsNestedAttributesFor", () => {
 describe("Nested Attributes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -2568,8 +2691,8 @@ describe("Nested Attributes (Rails-guided)", () => {
     const comments = await Comment.all().toArray();
     expect(comments.length).toBe(2);
   });
-  it("should automatically enable autosave on the association", () => {
-    const adapter = freshAdapter();
+  it("should automatically enable autosave on the association", async () => {
+    const adapter = await freshAdapter();
     class AE1Tag extends Base {
       static {
         this._tableName = "ae1_tags";
@@ -2601,8 +2724,8 @@ describe("Nested Attributes (Rails-guided)", () => {
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   afterEach(() => {
@@ -2826,8 +2949,8 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -3079,8 +3202,8 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
   afterEach(() => {
     Notifications.unsubscribeAll();
