@@ -7,6 +7,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -14,9 +15,39 @@ function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
 
+// Cluster A schema — covers `UniquenessValidationTest` (first describe).
+// Remaining describes still use sync `freshAdapter()` and will be migrated
+// in cluster B/C/D follow-up PRs.
+const CLUSTER_A_SCHEMA = {
+  posts: {
+    title: "string",
+    author: "string",
+    category: "string",
+    year: "integer",
+    month: "integer",
+    org_id: "integer",
+    code: "integer",
+    active: "integer",
+    body: "string",
+    uuid: "string",
+    saved_count: "integer",
+    order: "string",
+  },
+  items: { code: "integer", name: "string" },
+  comments: { body: "string", commentable_type: "string", commentable_id: "integer" },
+  articles: { title: "string" },
+  special_posts: { title: "string" },
+} as const;
+
+async function freshAdapterA(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, CLUSTER_A_SCHEMA);
+  return adapter;
+}
+
 describe("UniquenessValidationTest", () => {
   it("validate uniqueness with alias attribute", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -35,7 +66,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with nil value", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -50,7 +81,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with validates", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -66,7 +97,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness when integer out of range", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Item extends Base {
       static {
         this.attribute("code", "integer");
@@ -80,7 +111,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness when integer out of range show order does not matter", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Item extends Base {
       static {
         this.attribute("code", "integer");
@@ -95,7 +126,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness with newline chars", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -111,7 +142,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -130,7 +161,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with aliases", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -157,7 +188,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with object scope", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -174,7 +205,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with polymorphic object scope", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Comment extends Base {
       static {
         this.attribute("body", "string");
@@ -192,7 +223,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with composed attribute scope", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -210,7 +241,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with object arg", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -225,7 +256,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness scoped to defining class", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -246,7 +277,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with scope array", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -264,7 +295,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -278,7 +309,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with special sql like chars", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -294,7 +325,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness with special sql like chars", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -308,7 +339,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness by default database collation", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -322,7 +353,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -338,7 +369,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("code", "integer");
@@ -352,7 +383,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non standard table names", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class SpecialPost extends Base {
       static {
         this.attribute("title", "string");
@@ -366,7 +397,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validates uniqueness inside scoping", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -381,7 +412,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with columns which are sql keywords", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("order", "string");
@@ -395,7 +426,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with limit", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -409,7 +440,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with limit and utf8", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -423,7 +454,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate straight inheritance uniqueness", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -436,7 +467,7 @@ describe("UniquenessValidationTest", () => {
     expect(await p2.save()).toBe(false);
   });
   it("validate uniqueness with conditions", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -460,7 +491,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with non callable conditions is not supported", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -473,7 +504,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with conditions with record arg", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -489,7 +520,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness on existing relation", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -503,7 +534,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness on empty relation", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -516,7 +547,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness of custom primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -530,7 +561,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness without primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -544,7 +575,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness ignores itself when primary key changed", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -558,7 +589,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with after create performing save", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -575,7 +606,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness uuid", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("uuid", "string");
@@ -589,7 +620,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness regular id", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -603,7 +634,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate uniqueness with singleton class", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapterA();
     class Post extends Base {
       static {
         this.attribute("title", "string");
