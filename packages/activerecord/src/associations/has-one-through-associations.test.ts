@@ -14,9 +14,67 @@ import {
 } from "../associations.js";
 import { HasOneThroughCantAssociateThroughCollection } from "./errors.js";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  clubs: { name: "string" },
+  memberships: { member_id: "integer", club_id: "integer", type: "string" },
+  members: { name: "string" },
+  hotp_clubs: { name: "string" },
+  hotp_sponsors: {
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+    club_id: "integer",
+  },
+  hotp_members: { name: "string" },
+  hotep_clubs: { name: "string" },
+  hotep_sponsors: {
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+    club_id: "integer",
+  },
+  hotep_members: { name: "string" },
+  st_clubs: { name: "string" },
+  st_sponsors: {
+    club_id: "integer",
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+  },
+  st_members: { name: "string" },
+  st_orgs: { name: "string" },
+  es_clubs: { name: "string" },
+  es_sponsors: {
+    club_id: "integer",
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+  },
+  es_members: { name: "string" },
+  es_orgs: { name: "string" },
+  many_members: { name: "string" },
+  things: {},
+  cpk_clubs3: {
+    columns: { region_id: "integer", id: "integer", name: "string" },
+    primaryKey: ["region_id", "id"],
+  },
+  cpk_memberships3: {
+    cpk_club_region_id: "integer",
+    cpk_club_id: "integer",
+    member_name: "string",
+  },
+  cpk_clubs2: {
+    columns: { region_id: "integer", id: "integer", name: "string" },
+    primaryKey: ["region_id", "id"],
+  },
+  cpk_memberships2: {
+    cpk_club2_region_id: "integer",
+    cpk_club2_id: "integer",
+  },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("HasOneThroughAssociationsTest", () => {
@@ -42,8 +100,8 @@ describe("HasOneThroughAssociationsTest", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Club.adapter = adapter;
     Membership.adapter = adapter;
     Member.adapter = adapter;
