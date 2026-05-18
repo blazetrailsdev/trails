@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { setSchemaCacheIgnoredTables } from "../ar-config.js";
+import { StatementInvalid } from "../errors.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -86,20 +88,38 @@ describe("SchemaCacheTest", () => {
     expect(loaded!.isCached("posts")).toBe(true);
   });
 
-  it.skip("yaml dump and load with gzip", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("yaml dump and load with gzip", () => {
+    // Trails serializes the schema cache as JSON (not YAML), but the
+    // gzip-round-trip property the Rails test asserts — dump_to a .gz
+    // path and load_from the same path produces a populated cache —
+    // applies to our JSON encoding too. dumpTo(".gz") writes gzipped
+    // JSON; _loadFrom auto-detects the .gz extension and gunzips first.
+    const cache = new SchemaCache();
+    cache.setColumns("courses", [
+      makeColumn("id", "integer", { primaryKey: true, null: false }),
+      makeColumn("name", "varchar(255)"),
+      makeColumn("created_at", "timestamp"),
+    ]);
+    cache.setPrimaryKeys("courses", "id");
+
+    const filename = path.join(tmpDir, "schema_cache.json.gz");
+    cache.dumpTo(filename);
+    expect(fs.existsSync(filename)).toBe(true);
+
+    const loaded = SchemaCache._loadFrom(filename);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.isCached("courses")).toBe(true);
+    const cols = loaded!.getCachedColumnsHash("courses");
+    expect(Object.keys(cols!)).toEqual(["id", "name", "created_at"]);
+    expect(cols!["id"]).toBeInstanceOf(Column);
   });
   it.skip("yaml loads 5 1 dump", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+    // SKIPPED:rails-specific — exercises a fixture written by Rails 5.1's
+    // YAML serializer (test/assets/schema_dump_5_1.yml). Trails uses JSON
+    // throughout the schema cache, so the on-disk shape can't round-trip.
   });
   it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+    // SKIPPED:rails-specific — see "yaml loads 5 1 dump".
   });
 
   it("primary key for existent table", async () => {
@@ -219,15 +239,71 @@ describe("SchemaCacheTest", () => {
     expect(hash!["title"].sqlType).toBe("text");
   });
 
-  it.skip("marshal dump and load with ignored tables", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("marshal dump and load with ignored tables", async () => {
+    setSchemaCacheIgnoredTables(["professors"]);
+    try {
+      const fakeConn = {
+        primaryKey: async (t: string) => (t === "courses" ? "id" : null),
+        dataSourceExists: async (t: string) => t === "courses" || t === "professors",
+        dataSources: async () => ["courses", "professors"],
+        columns: async (t: string) =>
+          t === "courses"
+            ? [
+                makeColumn("id", "integer", { primaryKey: true }),
+                makeColumn("name", "varchar(255)"),
+                makeColumn("created_at", "timestamp"),
+              ]
+            : [makeColumn("id", "integer")],
+        indexes: async (t: string) =>
+          t === "courses" ? [{ name: "idx_courses_name", columns: ["name"] }] : [],
+      };
+      const pool = new FakePool(fakeConn);
+      const source = new SchemaCache();
+      await source.add(pool, "courses");
+      await source.add(pool, "professors");
+
+      const dumped = JSON.parse(JSON.stringify(source.marshalDump()));
+      const cache = new SchemaCache();
+      cache.marshalLoad(dumped);
+
+      // courses is cached as normal
+      expect((await cache.columns(pool, "courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash(pool, "courses"))!)).toHaveLength(3);
+      expect(await cache.dataSourceExists(pool, "courses")).toBe(true);
+      expect(await cache.primaryKeys(pool, "courses")).toBe("id");
+      expect((await cache.indexes(pool, "courses")).length).toBe(1);
+
+      // professors is filtered out — behavior matches a non-existent table
+      expect(await cache.dataSourceExists(pool, "professors")).toBeUndefined();
+      await expect(cache.columns(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
+      await expect(cache.columnsHash(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
+      expect(await cache.primaryKeys(pool, "professors")).toBeNull();
+      expect(await cache.indexes(pool, "professors")).toEqual([]);
+    } finally {
+      setSchemaCacheIgnoredTables([]);
+    }
   });
-  it.skip("marshal dump and load with gzip", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("marshal dump and load with gzip", () => {
+    // Rails' equivalent gzips a Marshal payload to a `.dump.gz` file and
+    // round-trips it through `dump_to` / `_load_from`. Trails serializes
+    // via `encodeWith` (JSON) rather than Marshal, but the on-disk
+    // property the Rails test asserts — write a `.gz` file, read it back,
+    // cached columns survive — still applies. `dumpTo(".gz")` gzips the
+    // JSON payload and `_loadFrom` auto-detects the `.gz` suffix.
+    const cache = new SchemaCache();
+    cache.setColumns("courses", [
+      makeColumn("id", "integer", { primaryKey: true }),
+      makeColumn("name", "varchar(255)"),
+      makeColumn("created_at", "timestamp"),
+    ]);
+    cache.setPrimaryKeys("courses", "id");
+
+    const filename = path.join(tmpDir, "schema_cache.dump.gz");
+    cache.dumpTo(filename);
+    const loaded = SchemaCache._loadFrom(filename);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.isCached("courses")).toBe(true);
+    expect(loaded!.getCachedColumnsHash("courses")!["id"].primaryKey).toBe(true);
   });
   it("gzip dumps identical", () => {
     // Rails: two .gz dumps of the same cache (with a 1s sleep between) must
@@ -286,10 +362,34 @@ describe("SchemaCacheTest", () => {
     expect(cache.isColumnsHashCached(null, "users")).toBe(false);
   });
 
-  it.skip("when lazily load schema cache is set cache is lazily populated when est connection", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-cache
-    // ROOT-CAUSE: schema-cache.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-cache.test.ts
+  it("when lazily load schema cache is set cache is lazily populated when est connection", async () => {
+    // Rails: when ActiveRecord.lazily_load_schema_cache is on, the
+    // SchemaReflection's @cache stays nil until first access and is
+    // populated from the schema_cache_path on demand. The end-to-end
+    // connection-pool wiring is covered in connection-pool.test.ts
+    // ("lazily loads the schema cache on first connection when enabled");
+    // here we cover the SchemaReflection-level contract that backs it.
+    const cachePath = path.join(tmpDir, "schema_cache.json");
+    const cache = new SchemaCache();
+    cache.setColumns("gadgets", [makeColumn("id", "integer", { primaryKey: true })]);
+    cache.setPrimaryKeys("gadgets", "id");
+    cache.dumpTo(cachePath);
+
+    const prevCheck = SchemaReflection.checkSchemaCacheDumpVersion;
+    SchemaReflection.checkSchemaCacheDumpVersion = false;
+    try {
+      const reflection = new SchemaReflection(cachePath);
+      // Cache starts nil
+      expect(reflection.loadedCache).toBeNull();
+      // load! populates it from disk (this is the building block
+      // ConnectionPool.adoptConnection invokes when the lazy-load
+      // flag is enabled).
+      await reflection.loadBang(new FakePool({}));
+      expect(reflection.loadedCache).not.toBeNull();
+      expect(reflection.loadedCache!.isCached("gadgets")).toBe(true);
+    } finally {
+      SchemaReflection.checkSchemaCacheDumpVersion = prevCheck;
+    }
   });
   it("#init_with skips deduplication if told to", () => {
     // Mirrors Rails: when coder["deduplicated"] is set, init_with uses the

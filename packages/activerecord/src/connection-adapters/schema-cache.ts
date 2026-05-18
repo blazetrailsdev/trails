@@ -10,6 +10,8 @@ import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import type { ColumnJSON } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
+import { isSchemaCacheIgnoredTable } from "../ar-config.js";
+import { StatementInvalid } from "../errors.js";
 
 // ---------------------------------------------------------------------------
 // Helper: run callback inside pool.withConnection if available
@@ -179,6 +181,8 @@ export class SchemaCache {
       return this._primaryKeys.get(tableName);
     }
 
+    if (isSchemaCacheIgnoredTable(tableName)) return null;
+
     return withConnection(pool, async (connection) => {
       if (await this.dataSourceExists(connection, tableName)) {
         const pk =
@@ -193,6 +197,7 @@ export class SchemaCache {
   }
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
+    if (isSchemaCacheIgnoredTable(name)) return undefined;
     // Rails: eager-load all data sources on first cache miss
     if (this._dataSourceExists.size === 0) {
       const tables = await this.tablesToCache(pool);
@@ -227,6 +232,10 @@ export class SchemaCache {
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
+    if (isSchemaCacheIgnoredTable(tableName)) {
+      throw new StatementInvalid(`Table '${tableName}' doesn't exist`);
+    }
+
     if (this._columns.has(tableName)) {
       return this._columns.get(tableName);
     }
@@ -277,6 +286,8 @@ export class SchemaCache {
     if (this._indexes.has(tableName)) {
       return this._indexes.get(tableName)!;
     }
+
+    if (isSchemaCacheIgnoredTable(tableName)) return [];
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.indexes === "function") {
@@ -420,11 +431,13 @@ export class SchemaCache {
     this._version = null;
   }
 
-  // Rails: tables_to_cache(pool) — gets data_sources from connection
+  // Rails: tables_to_cache(pool) — gets data_sources from connection,
+  // filtering out anything matched by ActiveRecord.schema_cache_ignored_tables.
   private async tablesToCache(pool: unknown): Promise<string[]> {
     return withConnection(pool, async (connection) => {
       if (typeof connection.dataSources === "function") {
-        return (await connection.dataSources()) as string[];
+        const tables = (await connection.dataSources()) as string[];
+        return tables.filter((t) => !isSchemaCacheIgnoredTable(t));
       }
       return [];
     });
@@ -748,15 +761,13 @@ export function emptyCache(): SchemaCache {
 
 /**
  * Returns true when the table name matches the schema_cache_ignored_tables list.
- * Rails delegates to ActiveRecord.schema_cache_ignored_table?(table_name); trails
- * has no global ignored-tables registry yet so this always returns false.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SchemaCache#ignored_table? (private)
  *
  * @internal
  */
-export function isIgnoredTable(_tableName: string): boolean {
-  return false;
+export function isIgnoredTable(tableName: string): boolean {
+  return isSchemaCacheIgnoredTable(tableName);
 }
 
 /**

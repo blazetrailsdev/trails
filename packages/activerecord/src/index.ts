@@ -118,7 +118,13 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export { delegate } from "./delegate.js";
-export { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./ar-config.js";
+export {
+  indexNestedAttributeErrors,
+  setIndexNestedAttributeErrors,
+  schemaCacheIgnoredTables,
+  setSchemaCacheIgnoredTables,
+  isSchemaCacheIgnoredTable,
+} from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
 export {
   enableSti,

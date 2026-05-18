@@ -587,6 +587,18 @@ export class SchemaStatements {
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
+    // Rails: single combined ALTER TABLE via add_timestamps_for_alter.
+    // SQLite-style adapters that don't support bulk ALTER fall back to
+    // two sequential addColumn calls (sqlite3_adapter.rb#add_timestamps
+    // uses the alter_table rebuild path instead of a combined ALTER).
+    if ((this.adapter as any).supportsBulkAlter?.() === true) {
+      const fragments = this.addTimestampsForAlter(tableName, options);
+      await this.adapter.executeMutation(
+        `ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`,
+      );
+      return;
+    }
+
     const opts: ColumnOptions = { ...options, null: options.null ?? false };
     if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
       opts.precision = 6;
