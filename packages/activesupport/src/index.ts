@@ -479,7 +479,7 @@ export {
 } from "./range-ext.js";
 export type { Range as RangeExt } from "./range-ext.js";
 
-export { I18n } from "./i18n.js";
+export { I18n, MissingTranslationData } from "./i18n.js";
 export { Scalar } from "./duration.js";
 export { NumberHelper } from "./number-helper.js";
 export { NumberConverter } from "./number-helper/number-converter.js";
