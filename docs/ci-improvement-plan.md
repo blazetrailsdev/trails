@@ -2,7 +2,7 @@
 
 Focus: separate the actionpack test footprint from activerecord at the
 CI level, ahead of the actionpack restructure waves
-([actionpack-restructure-audit.md](actionpack-restructure-audit.md)).
+([actionpack-100-percent.md](actionpack-100-percent.md)).
 
 > **Scope note.** A prior version of this doc covered a broader CI
 > roadmap (composite setup action, shared build artifact, DB-per-worker
@@ -225,6 +225,6 @@ Estimated total: **~50 LOC** of workflow YAML, well under the
 
 ## Cross-references
 
-- [actionpack-restructure-audit.md](actionpack-restructure-audit.md)
+- [actionpack-100-percent.md](actionpack-100-percent.md)
   — wave plan that this CI split rides alongside (Wave 1.5,
   between skeleton and journey port).

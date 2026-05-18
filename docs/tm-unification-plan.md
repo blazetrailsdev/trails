@@ -117,21 +117,14 @@ the TM stack — the TM stack is the truth.
 - **HABTM/HMT insert-record parity (deferred)** — `insertHabtmRecord` still bypasses Rails' two-step (target save + through save via `save_through_record`). We persist the join row only. Larger semantic change, out of plan-doc scope.
 - **Phase 8 cross-file PG flakes** — observed during local verification: HABTM/HMT/nested-through files green in isolation, mixed runs surface 5–18 cross-file races. Tracked under Phase 8 (TM-internal mutex, `connection-adapters/abstract/transaction.ts:1009`).
 
-## Phase 5 — Universal `defineSchema` adoption — partial (#1633, #1686, #1690, #1693, #1697, #1734, #1737, #1738)
+## Phase 5 — Universal `defineSchema` adoption — partial
 
-**Latest wave merged (2026-05-16):**
+**Remaining (sized via `pnpm tsx scripts/audit-define-schema.ts`, 82 offenders as of 2026-05-17):**
 
-- Root cluster B finder + validations — #1734.
-- Root cluster C enum cluster — #1737.
-- `relation/where.test.ts` — #1738.
-
-**Remaining (sized via `pnpm tsx scripts/audit-define-schema.ts`):**
-
-- `calculations.test.ts` (~150 LOC, ~101 sites) + `persistence.test.ts` (~200 LOC, ~141 sites) — see Batch 113 in `activerecord-100-plan.md`.
-- `attribute-methods.test.ts` + `attributes.test.ts` + `attribute-methods/` subtree — see Batch 114.
-- `enum.test.ts` (~250 LOC, ~77 sites) — see Batch 115. (Note: `enum.test.ts` was named as a target for #1737 but the actual sub-PR shipped the surrounding cluster instead; verify with audit script.)
-- `associations/association-scope.test.ts` — 1118 LOC standalone.
-- `associations/inverse-associations.test.ts` — 1717 LOC, may need 2 PRs.
+- `attribute-methods.test.ts` — see Batch 124 (~250 LOC, ~79 sites).
+- `attribute-methods/{query,read,write,time-zone-conversion}.test.ts` — already pass under `AR_NO_AUTO_SCHEMA=1` (in-memory only). No migration needed.
+- `associations/inverse-associations.test.ts` — see Batch 122a/b for remainder describes.
+- `batches.test.ts` / `counter-cache.test.ts` — see Batch 129a/b.
 
 **Pattern note from #1697:** `core.test.ts` async-freshAdapter pattern (shared `TEST_SCHEMA` constant, helper async, sed-replace, flip sync `it()` to async) reusable for `enum.test.ts`. `calculations.test.ts` has too many distinct tables for one shared schema — per-describe `beforeEach` `defineSchema` (the pattern from `callbacks.test.ts`).
 
@@ -142,8 +135,6 @@ the TM stack — the TM stack is the truth.
 - ~80 LOC — Migrate all `EncryptedBook*` factories to one shared `encrypted_books` table (Rails fixtures all set `self.table_name = "encrypted_books"`; we get per-class inflected tables). Behavior-equivalent for current tests; fidelity gap if cross-class sharing is asserted.
 - ~30 LOC — Real `binary` → BLOB mapping in `defineSchema`'s `COLUMN_TYPE_MAP_MYSQL` (today routes `binary` → `string`/VARCHAR; MariaDB CI caught 255-char ceiling on encrypted ciphertext, fixed via `text` workaround in #1693). BLOB mapping with opt-in flag cleaner; alt: document gotcha in JSDoc.
 - ~5 LOC — Narrow `Schema[string]` cast in `makeFreshModel` local type.
-
-**#1633 migrated 32 of 100 files** (smaller files, full `scoping/` cluster, contained `associations/` files, most of `relation/` except `where.test.ts`). 68 files remain.
 
 **Phase 5 remainder (~1500 LOC over 4–5 PRs, ≤300 LOC each by directory):**
 
@@ -161,7 +152,7 @@ the TM stack — the TM stack is the truth.
 - **Common bug:** calling `freshAdapter()` more than once per test sets `_needsCleanup = true` and wipes the schema. One adapter per test, reused everywhere.
 - **Rails inflector parity:** trails matches `String#underscore` consecutive-caps rule (`RAUser` → `ra_users`, not `r_a_users`).
 
-**Audit script** (`scripts/audit-define-schema.ts`) reports 108 offenders — higher than the 68 real failures because it surfaces files that declare models without exercising the DB. AR_NO_AUTO_SCHEMA=1 test run is the gate, not zero audit offenders.
+**Audit script** (`pnpm tsx scripts/audit-define-schema.ts`) reports 82 offenders as of 2026-05-17 — higher than the real failure count because it surfaces files that declare models without exercising the DB. AR_NO_AUTO_SCHEMA=1 test run is the gate, not zero audit offenders.
 
 ## Phase 6 — Hoist `defineSchema` from `beforeEach` to once-per-file
 
@@ -217,7 +208,7 @@ reorganization in test files.
 
 ## Phase 7 — Delete `SchemaAdapter` recovery infrastructure — BLOCKED on Phase 5 completion
 
-**Attempted** post-#1669 (Phase 8 unblocked the mutex side); deletion is not actually mechanical because **Phase 5 is only partially done** (32 of 100 files migrated via #1633; 68 remain). `SchemaAdapter`'s lazy-setup is load-bearing for the unmigrated files — deleting it would break the unmigrated test suite.
+**Attempted** post-#1669 (Phase 8 unblocked the mutex side); deletion is not actually mechanical because **Phase 5 is only partially done** (82 audit offenders as of 2026-05-17). `SchemaAdapter`'s lazy-setup is load-bearing for the unmigrated files — deleting it would break the unmigrated test suite.
 
 **Sequencing fix:** Phase 5 (universal `defineSchema` adoption) must complete first. Phase 7 follows mechanically once `SchemaAdapter`'s consumers are all on the explicit `defineSchema` path.
 
