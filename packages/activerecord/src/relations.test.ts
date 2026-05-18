@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base, Relation, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
@@ -33,6 +34,17 @@ class Post extends Base {
 async function seedPosts() {
   adapter = freshAdapter();
   Post.adapter = adapter;
+  await defineSchema(adapter, {
+    posts: {
+      title: "string",
+      body: "string",
+      author: "string",
+      status: "string",
+      views: "integer",
+      category: "string",
+      published: "boolean",
+    },
+  });
   await Post.create({
     title: "First",
     body: "body1",
@@ -1087,6 +1099,14 @@ describe("RelationTest", () => {
   beforeEach(async () => {
     adapter = freshAdapter();
     Article.adapter = adapter;
+    await defineSchema(adapter, {
+      articles: {
+        title: "string",
+        status: "string",
+        author: "string",
+        views: "integer",
+      },
+    });
     // Clear scopes between tests
     if (Object.prototype.hasOwnProperty.call(Article, "_scopes")) {
       Article._scopes = new Map();
@@ -1213,6 +1233,13 @@ describe("RelationTest", () => {
   beforeEach(async () => {
     adapter = freshAdapter();
     Item.adapter = adapter;
+    await defineSchema(adapter, {
+      items: {
+        name: "string",
+        price: "integer",
+        category: "string",
+      },
+    });
     await Item.create({ name: "Apple", price: 1, category: "fruit" });
     await Item.create({ name: "Banana", price: 2, category: "fruit" });
     await Item.create({ name: "Carrot", price: 3, category: "vegetable" });
@@ -1970,6 +1997,14 @@ describe("RelationTest", () => {
   beforeEach(async () => {
     adapter = freshAdapter();
     Widget.adapter = adapter;
+    await defineSchema(adapter, {
+      widgets: {
+        name: "string",
+        color: "string",
+        weight: "integer",
+        active: { type: "boolean", default: true },
+      },
+    });
     await Widget.create({ name: "A", color: "red", weight: 10, active: true });
     await Widget.create({ name: "B", color: "blue", weight: 20, active: true });
     await Widget.create({ name: "C", color: "red", weight: 30, active: false });
