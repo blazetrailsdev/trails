@@ -169,6 +169,18 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Tests class reloading via ActiveSupport::Dependencies / Zeitwerk in a forked process. " +
       "No Node.js equivalent; ES modules are cached for the process lifetime.",
   },
+  {
+    testFile: "adapter_test.rb",
+    className: "AdapterThreadSafetyTest",
+    tests: ["#active? is synchronized", "#verify! is synchronized"],
+    reason:
+      "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency " +
+      "on a single shared connection, asserting mutex-style serialization of " +
+      "#active?/#verify!/#disconnect! under the GVL. Node Worker threads use " +
+      "isolated heaps and structured-clone message passing, not the " +
+      "shared-memory Thread.new model this test relies on, so the GVL interleaving " +
+      "this test pins has no equivalent in our runtime target.",
+  },
   // --- Permanently not-portable: Rake tasks / dbconsole PTY ---
   {
     testFile: "adapters/postgresql/postgresql_rake_test.rb",
