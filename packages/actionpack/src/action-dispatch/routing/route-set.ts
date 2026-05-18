@@ -23,7 +23,7 @@ import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
-import { RoutingError } from "../../action-controller/metal/exceptions.js";
+import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -202,24 +202,34 @@ export class RouteSet {
    */
   generateExtras(
     options: Record<string, unknown>,
-
-    _defaults: Record<string, unknown> = {},
+    defaults: Record<string, unknown> = {},
   ): [string, string[]] {
     const { controller, action } = options;
     const route = this.routes.find((r) => r.controller === controller && r.action === action);
     if (!route) {
-      throw new RoutingError(`No route matches ${JSON.stringify(options)}`);
+      throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
     }
     const captureNames = new Set<string>(route.pathParamNames);
-    const captureParams: Record<string, string | number> = {};
+    // Null-prototype map so a capture named `__proto__` becomes an own
+    // property — Route#pathFor preserves the value when fed a null-proto
+    // hash (route.test.ts:175-184); a plain object would silently hit the
+    // inherited setter instead.
+    const captureParams: Record<string, unknown> = Object.create(null);
     for (const name of captureNames) {
       const v = options[name];
-      if (v != null) captureParams[name] = v as string | number;
+      if (v != null) captureParams[name] = v;
     }
-    const path = route.pathFor(captureParams);
+    const path = route.pathFor(captureParams as Record<string, string | number>);
+    // Mirrors Rails' `generate_extras`: extras are the keys of `options`
+    // not consumed by the route. Keys present in the route's `defaults`
+    // (and the caller-supplied `defaults`/recall hash) are consumed too,
+    // so callers can pass e.g. `format: "json"` without it surfacing as a
+    // query-string extra when the route already pins it.
+    const routeDefaults = route.defaults as Record<string, unknown>;
     const extras: string[] = [];
     for (const k of Object.keys(options)) {
       if (k === "controller" || k === "action" || captureNames.has(k)) continue;
+      if (Object.hasOwn(routeDefaults, k) || Object.hasOwn(defaults, k)) continue;
       extras.push(k);
     }
     return [path, extras];

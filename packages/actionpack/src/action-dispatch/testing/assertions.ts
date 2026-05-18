@@ -1,7 +1,7 @@
 /**
  * ActionDispatch::Assertions — aggregates the test assertions provided by
  * ActionDispatch. Mirrors `action_dispatch/testing/assertions.rb`.
- * `withRouting` and `htmlDocument` follow as separate PRs.
+ * `htmlDocument` follows once rails-dom-testing is ported.
  */
 
 export {

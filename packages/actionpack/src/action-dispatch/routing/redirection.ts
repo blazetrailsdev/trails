@@ -124,7 +124,7 @@ export class Redirect extends Endpoint {
   }
 
   buildResponse(req: Request): Response {
-    const uri = parseUri(this.path(req.pathParameters, req));
+    const uri = parseUri(this.path(req.pathParameters as Record<string, string>, req));
 
     if (!uri.host) {
       if (this.relativePath(uri.path)) {
