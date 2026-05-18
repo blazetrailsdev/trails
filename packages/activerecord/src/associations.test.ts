@@ -20,6 +20,7 @@ import {
   touchBelongsToParents,
 } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
@@ -62,12 +63,23 @@ describe("BelongsToAssociations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Company.adapter = adapter;
     Account.adapter = adapter;
     registerModel(Company);
     registerModel(Account);
+    await defineSchema(adapter, {
+      companies: { name: "string" },
+      accounts: { company_id: "integer", credit_limit: "integer" },
+      firms: { name: "string", uuid: "string" },
+      clients: { firm_uuid: "string" },
+      sponsors: { sponsor_club_id: "integer" },
+      posts: { title: "string" },
+      comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
+      authors: { name: "string" },
+      books: { author_id: "integer" },
+    });
   });
 
   // Rails: test_belongs_to
@@ -279,12 +291,18 @@ describe("HasOneAssociations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Firm.adapter = adapter;
     AccountDetail.adapter = adapter;
     registerModel("Firm", Firm);
     registerModel("AccountDetail", AccountDetail);
+    await defineSchema(adapter, {
+      firms: { name: "string" },
+      account_details: { firm_id: "integer", credit_limit: "integer" },
+      profiles: { owner_id: "integer", firm_id: "integer", bio: "string" },
+      images: { imageable_id: "integer", imageable_type: "string", url: "string" },
+    });
   });
 
   // Rails: test_has_one
@@ -387,12 +405,19 @@ describe("HasManyAssociations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Author.adapter = adapter;
     Post.adapter = adapter;
     registerModel(Author);
     registerModel(Post);
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { title: "string", author_id: "integer" },
+      articles: { writer_id: "integer", title: "string" },
+      blog_entries: { author_id: "integer", title: "string" },
+      taggings: { taggable_id: "integer", taggable_type: "string", tag: "string" },
+    });
   });
 
   // Rails: test_has_many
@@ -532,7 +557,7 @@ describe("HasManyThroughAssociations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Doctor.adapter = adapter;
     Appointment.adapter = adapter;
@@ -540,6 +565,12 @@ describe("HasManyThroughAssociations", () => {
     registerModel(Doctor);
     registerModel(Appointment);
     registerModel(Patient);
+    await defineSchema(adapter, {
+      doctors: { name: "string" },
+      appointments: { doctor_id: "integer", patient_id: "integer" },
+      patients: { name: "string" },
+      orphans: { name: "string" },
+    });
 
     Associations.hasMany.call(Doctor, "appointments", { className: "Appointment" });
 
@@ -633,12 +664,16 @@ describe("CollectionProxy", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Team.adapter = adapter;
     Player.adapter = adapter;
     registerModel(Team);
     registerModel(Player);
+    await defineSchema(adapter, {
+      teams: { name: "string" },
+      players: { name: "string", team_id: "integer" },
+    });
     Associations.hasMany.call(Team, "players", { className: "Player", foreignKey: "team_id" });
   });
 
