@@ -1,24 +1,19 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Validation Contexts (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
-  });
-  beforeEach(async () => {
     await defineSchema(adapter, {
       users: { name: "string", terms: "string", change_reason: "string" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "validation on: :create"
   it("valid uses create context when new", async () => {
