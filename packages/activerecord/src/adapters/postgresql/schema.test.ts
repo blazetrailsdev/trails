@@ -1,10 +1,29 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+// Tables here are PG-schema-qualified (test_schema.things, music.songs, …),
+// which defineSchema can't express — they're provisioned via raw DDL in
+// setupSchemas. The empty defineSchema(adapter, {}) call only flips the
+// Phase-5 marker so the file satisfies the AR_NO_AUTO_SCHEMA=1 audit.
+async function freshAdapter(): Promise<PostgreSQLAdapter> {
+  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  await defineSchema(adapter, {});
+  return adapter;
+}
 
 const SCHEMA_NAME = "test_schema";
 const SCHEMA2_NAME = "test_schema2";
@@ -102,7 +121,7 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = await freshAdapter();
   });
   afterEach(async () => {
     await adapter.close();
