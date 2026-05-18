@@ -8,16 +8,26 @@ import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  authors: { name: "string" },
+  posts: { title: "string", author_id: "integer" },
+  comments: { body: "string", post_id: "integer" },
+  l_posts: { title: "string" },
+  l_comments: { body: "string", type: "string", post_id: "integer" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("LeftOuterJoinAssociationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModels() {
@@ -164,7 +174,7 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const a = createTestAdapter();
+    const a = await freshAdapter();
     class LComment extends Base {
       static {
         this.attribute("body", "string");
