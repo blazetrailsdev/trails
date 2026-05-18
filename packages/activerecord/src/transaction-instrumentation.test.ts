@@ -4,26 +4,26 @@ import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import type { DatabaseAdapter } from "./adapter.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 
-// Isolated per-test SQLite3 adapter for the TM-path tests below. They spy
-// on `addTransactionRecord` and assert that `after_commit` fires; the
-// shared inner adapter behind `createTestAdapter()` carries residual
-// transaction-manager state across tests in this file that masks the
-// callback. A dedicated adapter keeps the assertions deterministic.
+// Use an isolated in-memory SQLite3 adapter per test. The transaction
+// instrumentation assertions exercise the TransactionManager directly
+// (spies on commitDbTransaction / rollbackTransaction, savepoint flows,
+// after_commit dispatch). Routing through the shared inner adapter
+// behind `createTestAdapter()` carries residual TM state across tests
+// in this file — on MariaDB that surfaces as a stray ROLLBACK TO
+// SAVEPOINT `active_record_1` after a prior test's spy abandoned the
+// stack. A dedicated adapter keeps assertions deterministic and
+// adapter-agnostic; the instrumentation paths under test live in
+// `connection-adapters/abstract/transaction.ts`, not in the driver.
 async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
   const adapter = new SQLite3Adapter(":memory:");
   await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
   return adapter;
 }
 
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
-  return adapter;
-}
+const freshAdapter = freshIsolatedAdapter;
 
 function makeTopic(adapter: DatabaseAdapter) {
   class Topic extends Base {
@@ -37,13 +37,14 @@ function makeTopic(adapter: DatabaseAdapter) {
 }
 
 describe("TransactionInstrumentationTest", () => {
-  let sharedAdapter: TestDatabaseAdapter;
+  let sharedAdapter: SQLite3Adapter;
   beforeEach(async () => {
     sharedAdapter = await freshAdapter();
   });
   afterEach(() => {
     Notifications.unsubscribeAll();
     vi.restoreAllMocks();
+    sharedAdapter?.close();
   });
 
   it("start transaction is triggered when the transaction is materialized", async () => {
@@ -353,8 +354,7 @@ describe("TransactionInstrumentationTest", () => {
       await Topic.create({ title: "test" });
       // Register directly on the transaction to avoid the save-path
       // ordering issue between state-restore and rolledbackBang callbacks.
-      const txn = ((adapter as TestDatabaseAdapter).innerAdapter as any).transactionManager
-        .currentTransaction as any;
+      const txn = (adapter as any).transactionManager.currentTransaction as any;
       txn?.afterRollback?.(() => {
         order.push("after_rollback");
       });
@@ -372,8 +372,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     const MyError = class extends Error {};
-    const inner = (adapter as TestDatabaseAdapter).innerAdapter as any;
-    vi.spyOn(inner, "commitDbTransaction").mockImplementationOnce(async () => {
+    vi.spyOn(adapter as any, "commitDbTransaction").mockImplementationOnce(async () => {
       throw new MyError("commit failed");
     });
 
@@ -402,7 +401,7 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     const MyError = class extends Error {};
-    const tm = ((adapter as TestDatabaseAdapter).innerAdapter as any).transactionManager;
+    const tm = (adapter as any).transactionManager;
     vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
       throw new MyError("rollback failed");
     });
