@@ -8,11 +8,112 @@ import { Associations, association } from "./associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA: Schema = {
+  topics: {
+    title: "string",
+    replies_count: "integer",
+    views_count: "integer",
+    unique_replies_count: "integer",
+    num_replies: "integer",
+    updated_at: "string",
+    written_on: "datetime",
+  },
+  replies: {
+    content: "string",
+    topic_id: "integer",
+  },
+  unique_replies: {
+    content: "string",
+    topic_id: "integer",
+  },
+  containers: {
+    name: "string",
+    items_count: "integer",
+  },
+  items: {
+    name: "string",
+    container_id: "integer",
+  },
+  parents: {
+    name: "string",
+    children_count: "integer",
+  },
+  children: {
+    name: "string",
+    parent_id: "integer",
+  },
+  posts: {
+    title: "string",
+    comments_count: "integer",
+    taggings_count: "integer",
+    tags_count: "integer",
+    writer_id: "integer",
+  },
+  comments: {
+    body: "string",
+    post_id: "integer",
+  },
+  authors: {
+    name: "string",
+    posts_count: "integer",
+    num_books: "integer",
+  },
+  books: {
+    title: "string",
+    author_id: "integer",
+  },
+  cars: {
+    name: "string",
+    num_engines: "integer",
+    engines_count: "integer",
+    person_id: "integer",
+  },
+  engines: {
+    car_id: "integer",
+  },
+  tags: {
+    name: "string",
+  },
+  taggings: {
+    post_id: "integer",
+    tag_id: "integer",
+    taggable_id: "integer",
+    taggable_type: "string",
+  },
+  categories: {
+    name: "string",
+    parent_id: "integer",
+    children_count: "integer",
+  },
+  cpk_orders: {
+    columns: {
+      shop_id: "integer",
+      id: "integer",
+      items_count: "integer",
+    },
+    primaryKey: ["shop_id", "id"],
+  },
+  friend_people: {
+    name: "string",
+    friends_too_count: "integer",
+  },
+  friendships: {
+    friend_id: "integer",
+  },
+  people: {
+    name: "string",
+    cars_count: "integer",
+  },
+};
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -21,8 +122,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("CounterCacheTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
@@ -301,8 +402,8 @@ describe("CounterCacheTest", () => {
 describe("CounterCacheTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   afterEach(() => {
@@ -2288,8 +2389,8 @@ describe("CounterCacheTest", () => {
 describe("counter_cache", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("increment counter", async () => {
@@ -2358,8 +2459,8 @@ describe("counter_cache", () => {
 describe("Counter Cache (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test "increment counter cache on create"
