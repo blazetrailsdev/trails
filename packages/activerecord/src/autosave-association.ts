@@ -333,48 +333,69 @@ export function validateAssociations(record: Base, context?: ValidationContextAr
       const inst = _loadedAssociation(record, assoc.name);
       if (!inst || inst.target == null) continue;
 
-      const records: Base[] = Array.isArray(inst.target) ? inst.target : [inst.target];
-      for (const child of records) {
-        if (typeof child.isDestroyed === "function" && child.isDestroyed()) continue;
-        if (isMarkedForDestruction(child)) continue;
-        // Mirrors Rails `association_valid?` + `custom_validation_context?`:
-        // only pass the context to the child if it is truly custom (not :create/:update).
-        // _validationContext is already restored by this point, so we check the context
-        // parameter directly rather than calling customValidationContext().
-        const childContext: ValidationContextArg | undefined =
-          context != null && context !== "create" && context !== "update" ? context : undefined;
-        // Rails association_valid? always validates; error propagation uses `|| context`
-        // to include all errors for custom contexts even on unchanged persisted children
-        // (autosave_association.rb:380-388). Skip only when no custom context.
-        if (!child.isNewRecord() && !child.changed && !childContext) continue;
-        let isChildValid: boolean;
+      const reflectionLike = { name: assoc.name, options: assoc.options };
+
+      // _validationContext is restored before validateAssociations runs
+      // (base.ts:3192-3201), so derive the custom context from the parameter
+      // directly rather than reading off the owner.
+      const customCtx: ValidationContextArg | undefined =
+        context != null && context !== "create" && context !== "update" ? context : undefined;
+
+      if (isCollection) {
+        // Mirrors Rails validate_collection_association: filter via
+        // associated_records_to_validate_or_save, then association_valid? each.
+        // A custom validation context bypasses the changed/new filter so that
+        // unchanged persisted children still run their context-specific validators —
+        // matches the `|| context` arm in `association_valid?` (autosave_association.rb:384).
+        const filtered = customCtx
+          ? Array.isArray(inst.target)
+            ? (inst.target as any[])
+            : inst.target != null
+              ? [inst.target as any]
+              : null
+          : associatedRecordsToValidateOrSave(
+              inst,
+              typeof record.isNewRecord === "function" ? record.isNewRecord() : false,
+              !!assoc.options.autosave,
+            );
+        if (!filtered) continue;
+        for (const child of filtered) {
+          isAssociationValid(reflectionLike, child, record, inst, customCtx);
+        }
+      } else {
+        // has_one / belongs_to — Rails gate is changed_for_autosave? || custom_validation_context?
+        // (autosave_association.rb:332,346). When that gate passes, isAssociationValid runs and
+        // applies the Rails associated_errors filter: a persisted-unchanged child with cached
+        // NestedError instances still re-propagates them (but only NestedError-kind errors).
+        const child = inst.target as Base;
+        if (typeof (child as any).isDestroyed === "function" && (child as any).isDestroyed())
+          continue;
+        if (!((child as any).changedForAutosave?.() ?? false) && !customCtx) continue;
         if (assoc.type === "belongsTo") {
           _setValidatingBelongsToFor(record, assoc, true);
           try {
-            isChildValid = typeof child.isValid === "function" ? child.isValid(childContext) : true;
+            isAssociationValid(reflectionLike, child, record, inst, customCtx);
           } finally {
             _setValidatingBelongsToFor(record, assoc, false);
           }
         } else {
-          isChildValid = typeof child.isValid === "function" ? child.isValid(childContext) : true;
-        }
-
-        if (!isChildValid) {
-          const parentErrors = (record as any).errors;
-          if (parentErrors) {
-            if (assoc.options.autosave) {
-              const childErrors = (child as any).errors;
-              const errorObjects: any[] = childErrors?.objects ?? [];
-              // Wrap each child error as Associations::NestedError so the
-              // parent's error attribute reads `assoc.attr` (or
-              // `assoc[i].attr` when index_errors is set / global flag).
-              for (const err of errorObjects) {
-                parentErrors.objects.push(new AssociationsNestedError(inst, err));
-              }
-            } else {
-              parentErrors.add(assoc.name, "invalid");
+          // has_one — mirror Rails validate_has_one_association inverse guard
+          // (autosave_association.rb:333-336): skip when the inverse belongs_to
+          // on the child is currently validating or autosaving, to break cycles.
+          const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name) ?? null;
+          const inverse =
+            typeof reflection?.inverseOf === "function" ? reflection.inverseOf() : null;
+          if (inverse) {
+            const inverseInst = _loadedAssociation(child, inverse.name);
+            if (
+              inverseInst &&
+              ((child as any).isValidatingBelongsToFor?.(inverseInst) ||
+                (child as any).isAutosavingBelongsToFor?.(inverseInst))
+            ) {
+              continue;
             }
           }
+          isAssociationValid(reflectionLike, child, record, inst, customCtx);
         }
       }
     }
@@ -1009,14 +1030,16 @@ export function isAssociationValid(
   record: any,
   owner: any,
   association: any,
+  contextOverride?: ValidationContextArg,
 ): boolean {
   // Mirrors Rails `association_valid?` (autosave_association.rb:371-398).
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
   const context: ValidationContextArg | undefined =
-    typeof owner?.customValidationContext === "function" && owner.customValidationContext()
+    contextOverride ??
+    (typeof owner?.customValidationContext === "function" && owner.customValidationContext()
       ? owner._validationContext
-      : undefined;
+      : undefined);
   const isChildValid = typeof record.isValid === "function" ? record.isValid(context) : true;
   if (isChildValid) return true;
 
