@@ -12,16 +12,34 @@ import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
 import { createTestAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+// Tables referenced by ad-hoc model classes declared per-test in this
+// file. Each `class X extends Base` derives its table via Rails-style
+// inflection on the class name; this schema mirrors those tables so the
+// file passes under AR_NO_AUTO_SCHEMA=1.
+const TEST_SCHEMA: Schema = {
+  users: { name: "string" },
+  toys: {
+    columns: { toy_id: "string", name: "string" },
+    primaryKey: ["toy_id"],
+  },
+  animals: { name: "string", type: "string" },
+  vehicles: { name: "string", type: "string" },
+  user_shorts: { name: "string" },
+  mateys: { columns: { name: "string" }, primaryKey: false },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("SignedIdTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     setSignedIdVerifierSecret("blazetrails-test-secret");
   });
 
@@ -366,7 +384,7 @@ describe("toGid", () => {
 
   it("returns a GlobalID-like URI", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -379,7 +397,7 @@ describe("toGid", () => {
   });
 
   it("throws when no app is configured", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -396,7 +414,7 @@ describe("Base.findGlobalId", () => {
 
   it("locates a record by its toGid() URI via the AR model registry", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -419,7 +437,7 @@ describe("Base.findGlobalId", () => {
 
   it("resolves an inherited-adapter STI subclass via the descendants fallback", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("id", "integer");
@@ -445,7 +463,7 @@ describe("Base.toGlobalId / toGidParam", () => {
 
   it("toGlobalId returns a GlobalID instance; toGidParam round-trips through findGlobalId", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -468,7 +486,7 @@ describe("Base.findSignedGlobalId", () => {
 
   it("locates a record by SignedGlobalID token", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -490,7 +508,7 @@ describe("Base.findSignedGlobalId", () => {
 
   it("findSignedGlobalId honors for: purpose scoping", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -510,7 +528,7 @@ describe("Base.findSignedGlobalId", () => {
 
   it("toSignedGlobalId is an alias of toSgid (same URI + purpose)", async () => {
     setApp("MyApp");
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -528,7 +546,7 @@ describe("Base.findSignedGlobalId", () => {
 
 describe("signedId / findSigned / findSignedBang", () => {
   it("generates a signed ID for a persisted record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -554,7 +572,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned recovers the record from its signed ID", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -570,7 +588,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned returns null for invalid signed ID", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -583,7 +601,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSigned respects purpose option", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -603,7 +621,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("findSignedBang throws when not found", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -615,7 +633,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("toSgid returns SignedGlobalID whose toParam round-trips to same instance", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -636,7 +654,7 @@ describe("signedId / findSigned / findSignedBang", () => {
   });
 
   it("toSgidParam returns a string token identical to toSgid().toParam()", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("name", "string");
