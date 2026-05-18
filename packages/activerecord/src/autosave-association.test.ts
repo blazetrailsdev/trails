@@ -506,8 +506,21 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      companies: { name: "string" },
+      clients: { name: "string", company_id: "integer" },
+      unvalidated_clients: { name: "string", company_id: "integer" },
+      cpk_order_pks: {
+        columns: { shop_id: "integer", id: "integer", status: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_book_fks: { order_id: "integer", title: "string" },
+      aid_firms: { name: "string" },
+      aid_contracts: { aid_firm_id: "integer", aid_developer_id: "integer" },
+      aid_developers: { name: "string" },
+    });
   });
 
   function makeModels() {
