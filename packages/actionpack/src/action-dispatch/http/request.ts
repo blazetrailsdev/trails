@@ -39,6 +39,18 @@ import {
 } from "./filter-parameters.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
+import {
+  parameters as _parameters,
+  parameterParsers as _parameterParsers,
+  paramsParsers as _paramsParsers,
+  parseFormattedParameters as _parseFormattedParameters,
+  pathParameters as _pathParameters,
+  setParameterParsers as _setParameterParsers,
+  setPathParameters as _setPathParameters,
+  type ParameterParser,
+  type ParameterParsers,
+  type ParametersHost,
+} from "./parameters.js";
 
 const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
 const CGI_VARIABLES: ReadonlySet<string> = new Set([
@@ -346,31 +358,35 @@ export class Request {
   get body(): string {
     const input = this.env["rack.input"];
     if (typeof input === "string") return input;
+    if (input && typeof (input as { read?: unknown }).read === "function") {
+      const buf = (input as { read(): string }).read();
+      const rewind = (input as { rewind?: unknown }).rewind;
+      if (typeof rewind === "function") {
+        try {
+          (rewind as () => void).call(input);
+        } catch {
+          // ignore
+        }
+      }
+      return typeof buf === "string" ? buf : "";
+    }
     return "";
   }
 
   get rawPost(): string {
-    if (this.env["RAW_POST_DATA"]) {
-      return String(this.env["RAW_POST_DATA"]);
-    }
-    return this.body;
+    const cached = this.env["RAW_POST_DATA"];
+    if (cached != null) return String(cached);
+    // Rails caches raw_post under RAW_POST_DATA so repeated reads of a
+    // stream-backed rack.input don't yield "" after the first drain.
+    const body = this.body;
+    this.env["RAW_POST_DATA"] = body;
+    return body;
   }
 
   // --- Parameters ---
 
   get params(): Record<string, unknown> {
-    if (this.env["action_dispatch.request.parameters"]) {
-      return this.env["action_dispatch.request.parameters"] as Record<string, unknown>;
-    }
-    // Mirrors Rails `ActionDispatch::Http::Parameters#parameters` —
-    // request_parameters.merge(query_parameters).merge!(path_parameters).
-    const merged: Record<string, unknown> = {
-      ...this.requestParameters,
-      ...this.queryParameters,
-      ...this.pathParameters,
-    };
-    this.env["action_dispatch.request.parameters"] = merged;
-    return merged;
+    return _parameters.call(this._paramsHost);
   }
 
   get queryParameters(): Record<string, unknown> {
@@ -388,47 +404,10 @@ export class Request {
       return cached as Record<string, unknown>;
     }
 
-    const raw = this.env["rack.input"];
-    if (!raw) {
-      this.env["action_dispatch.request.request_parameters"] = {};
-      return {};
-    }
-
-    let input: string | null;
-    if (typeof raw === "string") {
-      input = raw;
-    } else if (typeof (raw as any).read === "function") {
-      input = (raw as any).read();
-      if (typeof (raw as any).rewind === "function") {
-        try {
-          (raw as any).rewind();
-        } catch {
-          // ignore rewind errors
-        }
-      }
-    } else {
-      input = null;
-    }
-
-    if (!input || typeof input !== "string") {
-      this.env["action_dispatch.request.request_parameters"] = {};
-      return {};
-    }
-
-    let params: Record<string, unknown> = {};
-    const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
-    if (ct.includes("application/json")) {
-      try {
-        const parsed = JSON.parse(input);
-        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-          params = parsed;
-        }
-      } catch {
-        // ignore
-      }
-    } else if (ct.includes("application/x-www-form-urlencoded")) {
-      params = parseNestedQuery(input);
-    }
+    const host = this._paramsHost;
+    const params = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
+      this._fallbackRequestParameters(),
+    );
 
     const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
       string,
@@ -439,16 +418,63 @@ export class Request {
   }
 
   get pathParameters(): Record<string, unknown> {
-    return (this.env["action_dispatch.request.path_parameters"] as Record<string, unknown>) || {};
+    return _pathParameters.call(this._paramsHost);
   }
 
   set pathParameters(params: Record<string, unknown>) {
-    // Mirrors `Rails::ActionDispatch::Http::Parameters#path_parameters=` —
-    // invalidate the merged-parameters cache so subsequent `params` reads
-    // pick up the new path captures. Matches `setPathParameters` in
-    // http/parameters.ts.
-    delete this.env["action_dispatch.request.parameters"];
-    this.env["action_dispatch.request.path_parameters"] = params;
+    _setPathParameters.call(this._paramsHost, params);
+  }
+
+  /** Class-level parameter parser registry. Mirrors Rails `Request.parameter_parsers`. */
+  static get parameterParsers(): ParameterParsers {
+    return _parameterParsers();
+  }
+
+  static set parameterParsers(
+    parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
+  ) {
+    _setParameterParsers(parsers);
+  }
+
+  /** @internal */
+  private get _paramsHost(): ParametersHost {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const req = this;
+    return {
+      getHeader: (k) => req.env[k],
+      setHeader: (k, v) => ((req.env[k] = v), v),
+      deleteHeader: (k) => void delete req.env[k],
+      get queryParameters() {
+        return req.queryParameters;
+      },
+      get requestParameters() {
+        return req.requestParameters;
+      },
+      get contentLength() {
+        return req.contentLength;
+      },
+      get contentMimeType() {
+        return req.contentMimeType;
+      },
+      get rawPost() {
+        return req.rawPost;
+      },
+      get logger() {
+        const l = req.env["action_dispatch.logger"] ?? req.env["rack.logger"];
+        return (l as { debug(m: string): void } | null | undefined) ?? null;
+      },
+    };
+  }
+
+  /** @internal */
+  private _fallbackRequestParameters(): Record<string, unknown> {
+    const input = this.rawPost;
+    if (!input) return {};
+    const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
+    if (ct.includes("application/x-www-form-urlencoded")) {
+      return parseNestedQuery(input);
+    }
+    return {};
   }
 
   // --- Format ---

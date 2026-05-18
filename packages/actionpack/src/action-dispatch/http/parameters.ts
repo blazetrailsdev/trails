@@ -12,6 +12,8 @@
  * assigned directly onto the host class.
  */
 
+import { Logger } from "@blazetrails/activesupport";
+import { stderr } from "@blazetrails/activesupport/process-adapter";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -154,7 +156,12 @@ export function parseFormattedParameters(
   parsers: ParameterParsers,
   fallback: () => Record<string, unknown>,
 ): Record<string, unknown> {
-  if (!this.contentLength || this.contentMimeType === null) {
+  // Rails: `content_length.zero? || content_mime_type.nil?` → yield. Our
+  // `contentLength` returns `undefined` when the header is absent, so also
+  // treat an empty `rawPost` as no body — otherwise JSON requests without a
+  // `CONTENT_LENGTH` header would feed `""` to `JSON.parse` and raise
+  // `ParseError` instead of returning the documented empty-body `{}`.
+  if (this.contentLength === 0 || this.contentMimeType === null || !this.rawPost) {
     return fallback();
   }
   const strategy = parsers[this.contentMimeType.symbol];
@@ -170,18 +177,35 @@ export function parseFormattedParameters(
 
 /**
  * Logs the parse failure exactly once per request. Mirrors Rails'
- * `log_parse_error_once`; the once-per-request guard lives on the host as
- * `_parseErrorLogged` (Rails uses `@parse_error_logged`).
+ * `log_parse_error_once`; the guard is persisted on the env under
+ * `action_dispatch.request.parse_error_logged` so it survives across
+ * throwaway host adapters (Rails uses `@parse_error_logged` on the
+ * Request instance directly).
  *
  * @internal
  */
 export function logParseErrorOnce(this: ParametersHost): void {
-  const host = this as ParametersHost & { _parseErrorLogged?: boolean };
-  if (host._parseErrorLogged) return;
-  host._parseErrorLogged = true;
-  const logger = this.logger ?? { debug: (m: string) => console.error(m) };
-  logger.debug(`Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`);
+  // Rails stores `@parse_error_logged` on the Request instance. The trails
+  // host adapter on `Request` can be a throwaway object created per access,
+  // so persist the guard on the env via getHeader/setHeader instead.
+  if (this.getHeader(PARSE_ERROR_LOGGED_KEY)) return;
+  this.setHeader(PARSE_ERROR_LOGGED_KEY, true);
+  const msg = `Error occurred while parsing request parameters.\nContents:\n\n${this.rawPost}`;
+  if (this.logger) {
+    this.logger.debug(msg);
+    return;
+  }
+  // Rails uses `ActiveSupport::Logger.new($stderr)` as the fallback; in
+  // browser hosts no process adapter is registered, so guard the write so
+  // the log attempt never replaces the caller's `ParseError`.
+  try {
+    new Logger({ write: (s) => stderr.write(s) }).debug(msg);
+  } catch {
+    // no-op: log is informational, the ParseError remains the real signal.
+  }
 }
+
+const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";
 
 /**
  * Returns the currently-registered parameter parsers. Mirrors Rails'

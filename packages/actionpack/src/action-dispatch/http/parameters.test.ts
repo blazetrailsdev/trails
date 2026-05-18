@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { MimeType } from "./mime-type.js";
+import { Request } from "./request.js";
 import {
   DEFAULT_PARSERS,
   PARAMETERS_KEY,
@@ -146,6 +147,38 @@ describe("parameterParsers registry", () => {
     const host = makeHost();
     expect(paramsParsers.call(host)).toEqual({ xml });
   });
+
+  it("stream-backed rack.input is drained once and cached under RAW_POST_DATA", () => {
+    let reads = 0;
+    const input = {
+      read() {
+        reads += 1;
+        return '{"a":1}';
+      },
+    };
+    const req = new Request({
+      REQUEST_METHOD: "POST",
+      CONTENT_TYPE: "application/json",
+      "rack.input": input,
+    });
+    expect(req.rawPost).toBe('{"a":1}');
+    expect(req.rawPost).toBe('{"a":1}');
+    expect(req.params).toMatchObject({ a: 1 });
+    expect(reads).toBe(1);
+  });
+
+  it("Request.parameterParsers static accessor drives Request#requestParameters", () => {
+    const xml: ParameterParser = (raw) => ({ parsed: raw });
+    Request.parameterParsers = { ...DEFAULT_PARSERS, xml };
+    expect(Request.parameterParsers).toMatchObject({ xml });
+    const req = new Request({
+      REQUEST_METHOD: "POST",
+      CONTENT_TYPE: "application/xml",
+      "rack.input": "<root/>",
+    });
+    expect(req.requestParameters).toEqual({ parsed: "<root/>" });
+    expect(req.params).toMatchObject({ parsed: "<root/>" });
+  });
 });
 
 describe("logParseErrorOnce", () => {
@@ -168,6 +201,26 @@ describe("parseFormattedParameters", () => {
     const host = makeHost();
     const out = parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({ y: 1 }));
     expect(out).toEqual({ y: 1 });
+  });
+
+  it("parses when content-length is absent but a body is present (Rails content_length.zero? parity)", () => {
+    const host = makeHost({
+      contentLength: undefined,
+      contentMimeType: MimeType.JSON,
+      rawPost: '{"a":1}',
+    });
+    expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({ y: 1 }))).toEqual({
+      a: 1,
+    });
+  });
+
+  it("yields when rawPost is empty even if content-length is absent", () => {
+    const host = makeHost({
+      contentLength: undefined,
+      contentMimeType: MimeType.JSON,
+      rawPost: "",
+    });
+    expect(parseFormattedParameters.call(host, DEFAULT_PARSERS, () => ({}))).toEqual({});
   });
 
   it("yields when no parser registered for the MIME type", () => {
