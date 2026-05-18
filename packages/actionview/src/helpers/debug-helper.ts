@@ -5,8 +5,9 @@ import { htmlEscape } from "./ejs-util.js";
 
 /**
  * debug — returns a YAML representation of `object` wrapped with `<pre>`.
- * Falls back to a Node.js `util.inspect`-style string inside `<code>` if YAML
- * serialization throws (e.g. circular references).
+ * Falls back to a best-effort JSON / `Object.prototype.toString` rendering
+ * inside `<code>` if YAML serialization throws (e.g. circular references).
+ * Mirrors `ActionView::Helpers::DebugHelper#debug`'s Marshal/YAML rescue path.
  */
 export function debug(object: unknown): SafeBuffer {
   try {

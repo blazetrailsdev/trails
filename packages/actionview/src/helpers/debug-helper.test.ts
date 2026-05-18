@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SafeBuffer } from "@blazetrails/activesupport";
 import { debug } from "./debug-helper.js";
+import * as yaml from "@blazetrails/activesupport/yaml";
 
 describe("DebugHelperTest", () => {
   it("test_debug", () => {
@@ -25,9 +26,16 @@ describe("DebugHelperTest", () => {
   });
 
   it("test_debug_with_marshal_error falls back to inspect inside code", () => {
-    const circular: Record<string, unknown> = {};
-    circular.self = circular;
-    const out = debug(circular).toString();
-    expect(out).toContain('class="debug_dump"');
+    const spy = vi.spyOn(yaml, "stringify").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    try {
+      const out = debug({ html: "<b>x</b>" }).toString();
+      expect(out).toContain('<code class="debug_dump">');
+      expect(out).toContain("</code>");
+      expect(out).not.toContain("<pre");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
