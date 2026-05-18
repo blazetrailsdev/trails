@@ -101,6 +101,12 @@ export { ActionableExceptions } from "./middleware/actionable-exceptions.js";
 export { Callbacks } from "./middleware/callbacks.js";
 export { ServerTiming } from "./middleware/server-timing.js";
 export {
+  DebugLocks,
+  type InterlockLike,
+  type ThreadLike,
+  type ThreadInfo,
+} from "./middleware/debug-locks.js";
+export {
   Executor,
   type ExecutorLike,
   type ExecutorState,
