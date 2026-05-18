@@ -31,6 +31,7 @@ export interface Rendering {
   render(options: RenderOptions | string, extra?: RenderOptions): string;
   renderToString(options: RenderOptions | string, extra?: RenderOptions): string;
   renderToBody(options?: RenderOptions): string;
+  /** @internal */
   _normalizeArgs(action: unknown, options?: RenderOptions): RenderOptions;
   _normalizeOptions(options: RenderOptions): RenderOptions;
   _normalizeRender(options: RenderOptions): RenderOptions;

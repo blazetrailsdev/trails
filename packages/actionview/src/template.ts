@@ -4,6 +4,20 @@
  * A resolved template with source, handler reference, and metadata.
  */
 
+import { TemplateError } from "./template/error.js";
+
+/**
+ * `Template.Error` mirrors Rails' `ActionView::Template::Error` nesting so
+ * downstream code (actionpack `ExceptionWrapper`) can reference the
+ * canonical name. The class itself lives in `./template/error.js` to keep
+ * the Rails file layout.
+ */
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Template {
+  export const Error = TemplateError;
+  export type Error = TemplateError;
+}
+
 export interface Template {
   /** Raw template source code */
   source: string;

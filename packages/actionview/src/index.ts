@@ -4,7 +4,9 @@ export {
   TemplateHandlerRegistry,
 } from "./template-handler.js";
 
-export { type Template } from "./template.js";
+// Merged: `Template` is both the interface (data shape) and a namespace
+// exposing the Rails-spelled `Template.Error` class.
+export { Template } from "./template.js";
 
 export {
   type TemplateResolver,

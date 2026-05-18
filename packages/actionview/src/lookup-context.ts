@@ -49,6 +49,13 @@ export class MissingTemplate extends Error {
 }
 
 export class LookupContext {
+  /**
+   * Nested cache-key class, exposed at the value level by the runtime
+   * assignment near the bottom of this file and at the type level here.
+   * @internal stub - real impl in Phase 1d
+   */
+  static DetailsKey: typeof DetailsKey;
+
   private resolvers: TemplateResolver[] = [];
   private layoutName: string | false | null = "application";
   private _prefixes: string[] = [];
@@ -263,6 +270,10 @@ export class LookupContext {
  * Hooked by the `action_view` load callback to clear the cache between
  * request cycles. Real cache wiring lands in Phase 1d.
  *
+ * Also exported as `LookupContext.DetailsKey` via namespace merging so
+ * downstream code can mirror Rails' `ActionView::LookupContext::DetailsKey`
+ * spelling without `as any` casts.
+ *
  * @internal stub - real impl in Phase 1d
  */
 export class DetailsKey {
@@ -270,4 +281,9 @@ export class DetailsKey {
   static clear(): void {}
 }
 
-(LookupContext as unknown as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
+// Install DetailsKey as a static on LookupContext so consumers can write
+// `LookupContext.DetailsKey.clear()` — matching the Rails
+// `ActionView::LookupContext::DetailsKey` nesting both at the value and
+// the type level (see the corresponding `static DetailsKey: typeof
+// DetailsKey` field declared inside LookupContext above).
+(LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
