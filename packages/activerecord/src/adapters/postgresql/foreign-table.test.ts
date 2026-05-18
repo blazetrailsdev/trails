@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
 
 const url = new URL(PG_TEST_URL);
 const fdwHost = url.hostname || "localhost";
@@ -36,9 +37,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       ctx.skip();
       return;
     }
-    await adapter.exec(
-      `CREATE TABLE professors (id serial primary key, name character varying NOT NULL)`,
-    );
+    await defineSchema(adapter, {
+      professors: { name: { type: "string", null: false } },
+    });
     await adapter.exec(
       `CREATE SERVER foreign_server FOREIGN DATA WRAPPER postgres_fdw ` +
         `OPTIONS (host ${quoteLit(fdwHost)}, port ${quoteLit(fdwPort)}, dbname ${quoteLit(fdwDb)})`,
