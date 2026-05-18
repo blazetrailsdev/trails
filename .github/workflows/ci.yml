@@ -214,10 +214,21 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/rack
-          packages/actionpack
           packages/actionview
           packages/trailties
           scripts/guides-typecheck
+
+  actionpack-tests:
+    name: Action Pack Tests
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run packages/actionpack
 
   sqlite-tests:
     name: SQLite Tests
@@ -651,6 +662,7 @@ jobs:
       - dx-type-tests
       - virtualized-dx-type-tests
       - unit-tests
+      - actionpack-tests
       - sqlite-tests
       - postgres-tests
       - mariadb-tests
