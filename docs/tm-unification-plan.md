@@ -125,6 +125,7 @@ the TM stack — the TM stack is the truth.
 - `attribute-methods/{query,read,write,time-zone-conversion}.test.ts` — already pass under `AR_NO_AUTO_SCHEMA=1` (in-memory only). No migration needed.
 - `associations/inverse-associations.test.ts` — see Batch 122a/b for remainder describes.
 - `batches.test.ts` / `counter-cache.test.ts` — see Batch 129a/b.
+- `strict-loading.test.ts` — cluster A migrated in #1909 (first `StrictLoadingTest` describe). Remaining: second `StrictLoadingTest` describe (~lines 437–1291, ~30 `it()` blocks) and `StrictLoadingFixturesTest` + `strict_loading` + `strictLoadingByDefault` tail (~lines 1292–end). Audit script no longer flags this file (it's per-file, not per-describe) — track here.
 
 **Pattern note from #1697:** `core.test.ts` async-freshAdapter pattern (shared `TEST_SCHEMA` constant, helper async, sed-replace, flip sync `it()` to async) reusable for `enum.test.ts`. `calculations.test.ts` has too many distinct tables for one shared schema — per-describe `beforeEach` `defineSchema` (the pattern from `callbacks.test.ts`).
 

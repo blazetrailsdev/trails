@@ -13,6 +13,7 @@ import {
 } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -26,8 +27,16 @@ function freshAdapter(): DatabaseAdapter {
 describe("StrictLoadingTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer", publisher_id: "integer" },
+      profiles: { bio: "string", author_id: "integer" },
+      publishers: { name: "string" },
+      tags: { name: "string", taggable_id: "integer", taggable_type: "string" },
+      animals: { name: "string" },
+    });
   });
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
