@@ -12,6 +12,7 @@ import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
 import {
   escapeFragment as journeyEscapeFragment,
   escapePath as journeyEscapePath,
+  rackEscape,
 } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import type { RackEnv } from "@blazetrails/rack";
@@ -73,11 +74,6 @@ function uriToString(uri: ParsedUri): string {
   if (uri.query !== null) out += `?${uri.query}`;
   if (uri.fragment !== null) out += `#${uri.fragment}`;
   return out;
-}
-
-/** Rack::Utils.escape — form-encoded value (space → +). */
-function rackEscape(value: string): string {
-  return encodeURIComponent(value).replace(/%20/g, "+");
 }
 
 function transformValues(
