@@ -16,6 +16,21 @@ import {
   notModified as _notModified,
   type CacheResponseLike,
 } from "./cache.js";
+import {
+  accepts as _accepts,
+  contentMimeType as _contentMimeType,
+  formats as _formats,
+  hasContentType as _hasContentType,
+  ignoreAcceptHeader as _ignoreAcceptHeader,
+  negotiateMime as _negotiateMime,
+  setFormat as _setFormat,
+  setFormats as _setFormats,
+  setIgnoreAcceptHeader as _setIgnoreAcceptHeader,
+  shouldApplyVaryHeader as _shouldApplyVaryHeader,
+  type MimeNegotiationHost,
+  type NullType,
+} from "./mime-negotiation.js";
+import type { MimeType } from "./mime-type.js";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
 
 export class Request {
@@ -230,6 +245,27 @@ export class Request {
   declare notModified: (modifiedAt: Date | undefined) => boolean;
   declare etagMatches: (etag: string | undefined) => boolean;
   declare fresh: (response: CacheResponseLike) => boolean;
+
+  // --- MIME negotiation (ActionDispatch::Http::MimeNegotiation) ---
+  // Mixed in onto Request.prototype below; declared here for typing.
+  declare readonly contentMimeType: MimeType | null;
+  declare readonly accepts: MimeType[];
+  declare readonly formats: MimeType[];
+  declare hasContentType: () => boolean;
+  declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
+  declare shouldApplyVaryHeader: () => boolean;
+  declare setFormat: (extension: unknown) => void;
+  declare setFormats: (extensions: unknown[]) => void;
+
+  // Class-level attribute mirroring Rails' `mattr_accessor :ignore_accept_header`.
+  // Exposed as a static getter/setter so call sites read as `Request.ignoreAcceptHeader`
+  // / `Request.ignoreAcceptHeader = true`.
+  static get ignoreAcceptHeader(): boolean {
+    return _ignoreAcceptHeader();
+  }
+  static set ignoreAcceptHeader(value: boolean) {
+    _setIgnoreAcceptHeader(value);
+  }
 
   // --- Request type checks ---
 
@@ -474,3 +510,68 @@ Object.defineProperty(Request.prototype, "ifNoneMatchEtags", {
 Request.prototype.notModified = _notModified;
 Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
+
+// --- ActionDispatch::Http::MimeNegotiation wiring ---
+// The mixin's host shape (getHeader/setHeader) reads env keys directly,
+// while Request#getHeader normalizes to `HTTP_*` for case-insensitive HTTP
+// header lookup. We adapt via a per-Request host stored in a WeakMap so the
+// mixin's `_variant` slot persists across calls. The mixin's getHeader/
+// setHeader semantics treat `undefined` as "not cached" (calls fall through
+// to compute and `setHeader` writes the value, including `null`).
+const MIME_HOSTS = new WeakMap<Request, MimeNegotiationHost>();
+function mimeHost(req: Request): MimeNegotiationHost {
+  let h = MIME_HOSTS.get(req);
+  if (!h) {
+    h = {
+      getHeader: (k) => req.env[k],
+      setHeader: (k, v) => {
+        req.env[k] = v;
+        return v;
+      },
+      get parameters() {
+        return req.params;
+      },
+      get accept() {
+        return req.accept;
+      },
+      get xhr() {
+        return req.xhr;
+      },
+    };
+    MIME_HOSTS.set(req, h);
+  }
+  return h;
+}
+Object.defineProperty(Request.prototype, "contentMimeType", {
+  get(this: Request) {
+    return _contentMimeType.call(mimeHost(this));
+  },
+  configurable: true,
+});
+Object.defineProperty(Request.prototype, "accepts", {
+  get(this: Request) {
+    return _accepts.call(mimeHost(this));
+  },
+  configurable: true,
+});
+Object.defineProperty(Request.prototype, "formats", {
+  get(this: Request) {
+    return _formats.call(mimeHost(this));
+  },
+  configurable: true,
+});
+Request.prototype.hasContentType = function (this: Request) {
+  return _hasContentType.call(mimeHost(this));
+};
+Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
+  return _negotiateMime.call(mimeHost(this), order);
+};
+Request.prototype.shouldApplyVaryHeader = function (this: Request) {
+  return _shouldApplyVaryHeader.call(mimeHost(this));
+};
+Request.prototype.setFormat = function (this: Request, extension: unknown) {
+  _setFormat.call(mimeHost(this), extension);
+};
+Request.prototype.setFormats = function (this: Request, extensions: unknown[]) {
+  _setFormats.call(mimeHost(this), extensions);
+};

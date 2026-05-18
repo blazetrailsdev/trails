@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "../request.js";
+import { MimeType } from "../http/mime-type.js";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -228,23 +229,35 @@ describe("RequestMethod", () => {
 
 describe("RequestMimeType", () => {
   it("content type", () => {
-    const req = new Request({ CONTENT_TYPE: "application/json" });
-    expect(req.contentType).toBe("application/json");
+    const req = new Request({ CONTENT_TYPE: "text/html" });
+    expect(req.contentMimeType).toBe(MimeType.HTML);
+    expect(req.mediaType).toBe("text/html");
+    expect(req.contentType).toBe("text/html");
   });
 
   it("no content type", () => {
     const req = new Request({});
+    expect(req.contentMimeType).toBeNull();
+    expect(req.mediaType).toBeUndefined();
     expect(req.contentType).toBeUndefined();
   });
 
   it("content type is XML", () => {
     const req = new Request({ CONTENT_TYPE: "application/xml" });
+    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.mediaType).toBe("application/xml");
     expect(req.contentType).toBe("application/xml");
   });
 
   it("content type with charset", () => {
-    const req = new Request({ CONTENT_TYPE: "text/html; charset=utf-8" });
-    expect(req.contentType).toBe("text/html");
+    const req = new Request({ CONTENT_TYPE: "application/xml; charset=UTF-8" });
+    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.mediaType).toBe("application/xml");
+  });
+
+  it("has_content_type?", () => {
+    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
+    expect(new Request({}).hasContentType()).toBe(false);
   });
 
   it("user agent", () => {
@@ -253,17 +266,28 @@ describe("RequestMimeType", () => {
   });
 
   it("negotiate_mime", () => {
-    const req = new Request({ HTTP_ACCEPT: "text/html" });
-    expect(req.format).toBe("html");
+    const req = new Request({
+      HTTP_ACCEPT: "text/html",
+      HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+    });
+    const xml = MimeType.lookup("xml")!;
+    const json = MimeType.lookup("json")!;
+    expect(req.negotiateMime([xml, json])).toBeNull();
+    expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
+    // Mime::ALL: any "*/*" entry — fall back to the request's first format.
+    const all = MimeType.parse("*/*")[0];
+    expect(req.negotiateMime([xml, all])?.symbol).toBe("html");
   });
 
   it("negotiate_mime with content_type", () => {
     const req = new Request({
-      HTTP_ACCEPT: "application/json",
-      CONTENT_TYPE: "application/xml",
+      CONTENT_TYPE: "application/xml; charset=UTF-8",
+      HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
     });
-    expect(req.format).toBe("json");
-    expect(req.contentType).toBe("application/xml");
+    const xml = MimeType.lookup("xml")!;
+    const csv = MimeType.lookup("csv")!;
+    expect(req.negotiateMime([xml, csv])).toBe(xml);
+    expect(req.contentMimeType?.symbol).toBe("xml");
   });
 });
 
@@ -347,6 +371,55 @@ describe("RequestFormat", () => {
       "action_dispatch.request.parameters": { format: "json" },
     });
     expect(req.format).toBe("json");
+  });
+
+  it("formats with xhr request", () => {
+    const req = new Request({
+      HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+      QUERY_STRING: "",
+    });
+    expect(req.formats).toEqual([MimeType.JS]);
+  });
+
+  it("format taken from the path extension", () => {
+    const r1 = new Request({ PATH_INFO: "/foo.xml", QUERY_STRING: "" });
+    expect(r1.formats.map((m) => m.symbol)).toEqual(["xml"]);
+    const r2 = new Request({ PATH_INFO: "/foo.123", QUERY_STRING: "" });
+    expect(r2.formats).toEqual([MimeType.HTML]);
+  });
+
+  it("formats from accept headers have higher precedence than path extension", () => {
+    const req = new Request({
+      HTTP_ACCEPT: "application/json",
+      PATH_INFO: "/foo.xml",
+      QUERY_STRING: "",
+    });
+    expect(req.formats.map((m) => m.symbol)).toEqual(["json"]);
+  });
+
+  it("ignore_accept_header", () => {
+    const prev = Request.ignoreAcceptHeader;
+    Request.ignoreAcceptHeader = true;
+    try {
+      const r1 = new Request({ HTTP_ACCEPT: "application/xml", QUERY_STRING: "" });
+      expect(r1.formats).toEqual([MimeType.HTML]);
+      const r2 = new Request({ HTTP_ACCEPT: "*/*;q=0.1", QUERY_STRING: "" });
+      expect(r2.formats).toEqual([MimeType.HTML]);
+      const r3 = new Request({
+        HTTP_ACCEPT: "application/xml",
+        HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+        QUERY_STRING: "",
+      });
+      expect(r3.formats).toEqual([MimeType.JS]);
+      const r4 = new Request({
+        HTTP_ACCEPT: "application/xml",
+        HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+        "action_dispatch.request.parameters": { format: "json" },
+      });
+      expect(r4.formats.map((m) => m?.symbol)).toEqual(["json"]);
+    } finally {
+      Request.ignoreAcceptHeader = prev;
+    }
   });
 });
 
