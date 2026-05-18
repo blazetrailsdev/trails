@@ -35,7 +35,12 @@ export interface FilterParametersHost extends ParametersHost {
   env: Record<string, unknown>;
   path: string;
   queryString: string;
-  parameters(): Record<string, unknown>;
+  /**
+   * The merged parameter hash. Rails calls this `parameters`; trails exposes
+   * the same value via the `params` getter on `Request`, so the mixin reads
+   * from `params` to keep wiring onto `Request` collision-free.
+   */
+  params: Record<string, unknown>;
 }
 
 interface CachedState {
@@ -50,7 +55,7 @@ export function filteredParameters(this: FilterParametersHost): Record<string, u
   const host = this as FilterParametersHost & CachedState;
   if (host._filteredParameters !== undefined) return host._filteredParameters;
   try {
-    host._filteredParameters = parameterFilter.call(this).filter(this.parameters());
+    host._filteredParameters = parameterFilter.call(this).filter(this.params);
   } catch (e) {
     if (e instanceof ParseError) {
       host._filteredParameters = {};

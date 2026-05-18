@@ -5,6 +5,8 @@
  */
 
 import type { CookieExpires } from "../middleware/cookies.js";
+import type { Request } from "./request.js";
+import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
 
 export class Response {
   private _status: number;
@@ -14,7 +16,7 @@ export class Response {
   private _charset: string | undefined;
   private _cookies: Map<string, CookieValue> = new Map();
   private _sending = false;
-  request: { host?: string; method?: string; path?: string } | null = null;
+  request: Request | null = null;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;
@@ -125,6 +127,26 @@ export class Response {
 
   get committed(): boolean {
     return this._committed;
+  }
+
+  // --- Location ---
+
+  /** The value of the `Location` header. Mirrors `Response#location`. */
+  get location(): string {
+    return this._headers["location"] ?? this._headers["Location"] ?? "";
+  }
+
+  set location(url: string) {
+    delete this._headers["Location"];
+    this._headers["location"] = url;
+  }
+
+  /**
+   * Returns the redirect location with sensitive query parameters filtered
+   * out. See `ActionDispatch::Http::FilterRedirect`.
+   */
+  filteredLocation(): string {
+    return _filteredLocation.call(this);
   }
 
   // --- Cookies ---
