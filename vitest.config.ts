@@ -116,6 +116,7 @@ const alias = {
     "packages/globalid/src/signed-global-id.ts",
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
+  "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
 };
 
 export default defineConfig({

@@ -13,6 +13,7 @@
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
-    "@blazetrails/globalid": "workspace:*"
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   }
 }

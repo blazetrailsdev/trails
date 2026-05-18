@@ -7,5 +7,10 @@
   },
   "include": ["src"],
   "exclude": ["src/type-virtualization/fixtures", "src/tsc-wrapper/__fixtures__"],
-  "references": [{ "path": "../arel" }, { "path": "../activemodel" }, { "path": "../globalid" }]
+  "references": [
+    { "path": "../arel" },
+    { "path": "../activemodel" },
+    { "path": "../globalid" },
+    { "path": "../trails-tsc" }
+  ]
 }
