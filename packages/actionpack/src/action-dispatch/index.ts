@@ -97,6 +97,7 @@ export {
 } from "./http-authentication.js";
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
+export { ActionableExceptions } from "./middleware/actionable-exceptions.js";
 export { Callbacks } from "./middleware/callbacks.js";
 export { ServerTiming } from "./middleware/server-timing.js";
 export {

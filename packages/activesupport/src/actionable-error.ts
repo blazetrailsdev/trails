@@ -8,9 +8,26 @@ export class NonActionable extends Error {
 export class ActionableError extends Error {
   static _actions: Record<string, () => void> = {};
 
+  /**
+   * Registry of error classes keyed by their `.name`. The trails equivalent
+   * of Ruby's `String#safe_constantize`: middleware (e.g. ActionableExceptions)
+   * looks up classes here instead of walking the global namespace.
+   */
+  static _registry: Map<string, typeof ActionableError> = new Map();
+
   constructor(message?: string) {
     super(message);
     this.name = "ActionableError";
+  }
+
+  /** Register an actionable error class so it can be resolved by name. */
+  static register(cls: typeof ActionableError): void {
+    ActionableError._registry.set(cls.name, cls);
+  }
+
+  /** Resolve a registered actionable error class by name. */
+  static lookup(name: string): typeof ActionableError | undefined {
+    return ActionableError._registry.get(name);
   }
 
   static actions(error: any): Record<string, () => void> {
@@ -53,5 +70,6 @@ export class ActionableError extends Error {
       });
     }
     this._actions[name] = block;
+    ActionableError.register(this as unknown as typeof ActionableError);
   }
 }
