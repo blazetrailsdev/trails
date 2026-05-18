@@ -137,6 +137,7 @@ export class Response {
   }
 
   set location(url: string) {
+    delete this._headers["Location"];
     this._headers["location"] = url;
   }
 

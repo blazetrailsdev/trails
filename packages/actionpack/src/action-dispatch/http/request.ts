@@ -310,7 +310,6 @@ export class Request {
   declare filteredPath: () => string;
   declare parameterFilter: () => ParameterFilter;
 
-
   // --- Request type checks ---
 
   get isXmlHttpRequest(): boolean {
@@ -542,7 +541,7 @@ export class Request {
    * Returns the value for `key`, or invokes `fallback` with `key` when
    * absent. Mirrors `fetch_header`, which yields the key on miss.
    */
-  fetchHeader<T = unknown>(key: string): unknown;
+  fetchHeader(key: string): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
     if (Object.prototype.hasOwnProperty.call(this.env, key)) return this.env[key];
