@@ -13,31 +13,12 @@ import {
   escapeFragment as journeyEscapeFragment,
   escapePath as journeyEscapePath,
 } from "../journey/router/utils.js";
+import { Endpoint } from "./endpoint.js";
 import type { RackEnv } from "@blazetrails/rack";
 
-export type RedirectBlock = (params: Record<string, string>, request: Request) => string;
+export { Endpoint } from "./endpoint.js";
 
-/** @internal */
-export class Endpoint {
-  dispatcher(): boolean {
-    return false;
-  }
-  redirect(): boolean {
-    return false;
-  }
-  matches(_req: Request): boolean {
-    return true;
-  }
-  app(): unknown {
-    return this;
-  }
-  rackApp(): unknown {
-    return this.app();
-  }
-  engine(): boolean {
-    return false;
-  }
-}
+export type RedirectBlock = (params: Record<string, string>, request: Request) => string;
 
 /** Parsed pieces of a URI, mirroring Ruby's URI::Generic. */
 interface ParsedUri {

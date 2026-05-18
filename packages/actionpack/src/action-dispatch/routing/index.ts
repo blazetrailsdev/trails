@@ -29,6 +29,7 @@ export {
   type ModelClass,
   type ToModel,
 } from "./polymorphic-routes.js";
+export { Endpoint } from "./endpoint.js";
 export {
   redirect,
   Redirect,
