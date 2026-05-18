@@ -606,3 +606,61 @@ describe("RequestCookie", () => {
     expect(req.env["HTTP_COOKIE"]).toBe("foo=bar; baz=qux");
   });
 });
+
+describe("RequestHeaderEnvAccess", () => {
+  it("hasHeader/setHeader/deleteHeader/fetchHeader operate on env for non-HTTP keys", () => {
+    const req = new Request({});
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
+    req.setHeader("action_dispatch.parameter_filter", ["password"]);
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(true);
+    expect(req.env["action_dispatch.parameter_filter"]).toEqual(["password"]);
+    expect(req.fetchHeader("action_dispatch.parameter_filter")).toEqual(["password"]);
+    req.deleteHeader("action_dispatch.parameter_filter");
+    expect(req.hasHeader("action_dispatch.parameter_filter")).toBe(false);
+  });
+
+  it("fetchHeader invokes fallback on miss", () => {
+    const req = new Request({});
+    expect(req.fetchHeader("missing", () => "fallback")).toBe("fallback");
+  });
+
+  it("getHeader maps HTTP-style names to HTTP_* env keys", () => {
+    const req = new Request({ HTTP_IF_NONE_MATCH: '"abc"' });
+    expect(req.getHeader("If-None-Match")).toBe('"abc"');
+  });
+
+  it("getHeader maps CGI-variable names without HTTP_ prefix", () => {
+    const req = new Request({ CONTENT_TYPE: "text/html" });
+    expect(req.getHeader("Content-Type")).toBe("text/html");
+  });
+});
+
+describe("RequestFilterParameters", () => {
+  it("filteredParameters replaces sensitive params with [FILTERED]", () => {
+    const req = new Request({
+      "action_dispatch.request.parameters": { password: "hunter2", name: "alice" },
+      "action_dispatch.parameter_filter": ["password"],
+    });
+    expect(req.filteredParameters()).toEqual({ password: "[FILTERED]", name: "alice" });
+  });
+
+  it("filteredPath replaces sensitive query params", () => {
+    const req = new Request({
+      PATH_INFO: "/users",
+      QUERY_STRING: "password=hunter2&name=alice",
+      "action_dispatch.parameter_filter": ["password"],
+    });
+    expect(req.filteredPath()).toBe("/users?password=[FILTERED]&name=alice");
+  });
+
+  it("filteredEnv strips RAW_POST_DATA by default", () => {
+    const req = new Request({ RAW_POST_DATA: "secret" });
+    expect(req.filteredEnv()["RAW_POST_DATA"]).toBe("[FILTERED]");
+  });
+
+  it("parameterFilter returns NULL_PARAM_FILTER when no header is configured", () => {
+    const req = new Request({});
+    // No filter list set → identity-style filter.
+    expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
+  });
+});

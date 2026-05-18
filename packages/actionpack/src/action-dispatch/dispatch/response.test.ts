@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Request } from "../request.js";
 import { Response } from "../response.js";
 
 describe("ResponseTest", () => {
@@ -342,5 +343,47 @@ describe("ResponseTest", () => {
 
   it("inspect for redirect", () => {
     expect(new Response(302).inspect()).toBe("#<ActionDispatch::Response 302 Found>");
+  });
+});
+
+describe("ResponseFilterRedirect", () => {
+  it("location getter/setter round-trips through the Location header", () => {
+    const res = new Response();
+    res.location = "https://example.com/foo";
+    expect(res.location).toBe("https://example.com/foo");
+    expect(res.headers["location"]).toBe("https://example.com/foo");
+  });
+
+  it("filteredLocation strips sensitive query params using the request filter", () => {
+    const req = new Request({
+      "action_dispatch.parameter_filter": ["token"],
+    });
+    const res = new Response();
+    res.request = req;
+    res.location = "https://example.com/foo?token=secret&name=alice";
+    // WHATWG URL parser may URL-encode the brackets; check key behaviour
+    // (the `secret` value must be filtered).
+    const filtered = res.filteredLocation();
+    expect(filtered).toContain("name=alice");
+    expect(filtered).not.toContain("secret");
+    expect(filtered).toContain("token=");
+  });
+
+  it("filteredLocation replaces the entire location when redirect_filter matches", () => {
+    const req = new Request({
+      "action_dispatch.redirect_filter": [/secret/],
+    });
+    const res = new Response();
+    res.request = req;
+    res.location = "https://example.com/secret/path";
+    expect(res.filteredLocation()).toBe("[FILTERED]");
+  });
+
+  it("filteredLocation returns the unmodified location when no filters are configured", () => {
+    const req = new Request({});
+    const res = new Response();
+    res.request = req;
+    res.location = "https://example.com/foo";
+    expect(res.filteredLocation()).toBe("https://example.com/foo");
   });
 });
