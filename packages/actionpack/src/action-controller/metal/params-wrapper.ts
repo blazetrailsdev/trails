@@ -75,12 +75,17 @@ export function wrapParameters(
 export interface ParamsWrapperHost {
   request: {
     hasContentType(): boolean;
-    contentMimeType: { ref?: string | null } | null;
+    contentMimeType: { ref(): string | null } | null;
     requestParameters: Record<string, unknown>;
     filteredParameters(): Record<string, unknown>;
     parameters: Record<string, unknown>;
   };
   _wrapperOptions: Options;
+}
+
+/** @internal */
+export interface WrapperHostClass {
+  name?: string | null;
 }
 
 /**
@@ -156,7 +161,7 @@ export function _wrapParameters(
 export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
   try {
     if (!this.request.hasContentType()) return false;
-    const ref = this.request.contentMimeType?.ref;
+    const ref = this.request.contentMimeType?.ref();
     if (!ref) return false;
     const formats = _wrapperFormats.call(this);
     const key = _wrapperKey.call(this);
@@ -199,7 +204,7 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
  * @internal
  */
 export function _defaultWrapModel(this: { _wrapperOptions: Options }): string | null {
-  const klass = this._wrapperOptions.klass as { name?: string | null } | null | undefined;
+  const klass = this._wrapperOptions.klass as WrapperHostClass | null | undefined;
   const name = klass?.name;
   if (!name) return null;
   const stripped = name.replace(/Controller$/, "");

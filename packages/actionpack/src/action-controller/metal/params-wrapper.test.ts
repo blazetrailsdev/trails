@@ -27,7 +27,7 @@ function makeHost(
   );
   const request: ParamsWrapperHost["request"] = {
     hasContentType: () => true,
-    contentMimeType: { ref: "json" },
+    contentMimeType: { ref: () => "json" },
     requestParameters: {},
     filteredParameters: () => ({}),
     parameters: {},
@@ -94,7 +94,10 @@ describe("ParamsWrapper privates", () => {
   });
 
   it("_wrapperEnabled false when format does not match", () => {
-    const host = makeHost({ name: "user", format: ["xml"] }, { contentMimeType: { ref: "json" } });
+    const host = makeHost(
+      { name: "user", format: ["xml"] },
+      { contentMimeType: { ref: () => "json" } },
+    );
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
