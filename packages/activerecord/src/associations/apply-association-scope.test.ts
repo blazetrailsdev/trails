@@ -13,9 +13,14 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-// `applyAssociationScope` is `@internal` — imported directly from
-// `associations.ts` rather than re-exported through the package entry,
-// so it stays out of the public API surface.
+// `applyAssociationScope` is `@internal`. It's imported from
+// `associations.ts` directly (not re-exported through the package
+// entry) so it stays out of generated TypeDoc / index types — the
+// repo-wide pattern for Rails-private helpers (see CLAUDE.md's
+// `@internal` policy + the `blazetrails/rails-private-jsdoc` lint
+// rule). The `exports` map's `./*` subpath still allows reach via
+// `@blazetrails/activerecord/associations.js`; encapsulation here is
+// the same convention every other `_`-prefixed helper relies on.
 import { applyAssociationScope } from "../associations.js";
 
 describe("applyAssociationScope", () => {
