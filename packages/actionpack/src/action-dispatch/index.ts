@@ -116,6 +116,7 @@ export {
 } from "./middleware/executor.js";
 export { Reloader } from "./middleware/reloader.js";
 export { PublicExceptions } from "./middleware/public-exceptions.js";
+export { DebugView } from "./middleware/debug-view.js";
 export {
   RemoteIp,
   GetIp,
