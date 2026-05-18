@@ -7,11 +7,49 @@ import { Base, Relation } from "./index.js";
 import { activeRecordConfig } from "./relation/batches.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA: Schema = {
+  posts: {
+    title: "string",
+    updated: "boolean",
+    updated_at: "datetime",
+    active: "boolean",
+    processed: "boolean",
+    done: "boolean",
+  },
+  subscribers: {
+    columns: {
+      nick: "string",
+      name: "string",
+    },
+    primaryKey: ["nick"],
+  },
+  orders: {
+    columns: {
+      shopId: "integer",
+      id: "integer",
+    },
+    primaryKey: ["shopId", "id"],
+  },
+  users: {
+    name: "string",
+    active: "boolean",
+  },
+  items: {
+    name: "string",
+  },
+  records: {
+    value: "integer",
+  },
+};
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -20,8 +58,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("EachTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("find_each should honor limit if passed a block", async () => {
@@ -89,7 +127,10 @@ describe("EachTest", () => {
 // More EachTest — targets batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  const adapter = freshAdapter();
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = await freshAdapter();
+  });
 
   it("in batches has attribute readers", async () => {
     class Post extends Base {
@@ -106,7 +147,7 @@ describe("EachTest", () => {
   });
 
   it("each should return a sized enumerator", async () => {
-    const freshAdp = freshAdapter();
+    const freshAdp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -157,7 +198,7 @@ describe("EachTest", () => {
 // ==========================================================================
 describe("EachTest", () => {
   it("each should execute one query per batch", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -173,7 +214,7 @@ describe("EachTest", () => {
   });
 
   it("each should not return query chain and execute only one query", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -189,7 +230,7 @@ describe("EachTest", () => {
   });
 
   it("each should raise if select is set without id", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -205,7 +246,7 @@ describe("EachTest", () => {
   });
 
   it("each should execute if id is in select", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -222,7 +263,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should return batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -238,7 +279,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should start from the start option", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -260,7 +301,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should return an enumerator", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -276,7 +317,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should not execute any query", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -292,7 +333,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should yield relation if block given", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -309,7 +350,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should be enumerable if no block given", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -325,7 +366,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should yield record if block is given", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -341,7 +382,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should be ordered by id", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -358,7 +399,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should return relations", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -372,7 +413,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should start from the start option", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -388,7 +429,7 @@ describe("EachTest", () => {
   });
 
   it("in batches shouldnt execute query unless needed", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -404,7 +445,7 @@ describe("EachTest", () => {
   });
 
   it("in batches update all affect all records", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -421,7 +462,7 @@ describe("EachTest", () => {
   });
 
   it("in batches delete all should not delete records in other batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -437,7 +478,7 @@ describe("EachTest", () => {
   });
 
   it("in batches destroy all should not destroy records in other batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -453,7 +494,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should not be loaded", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -467,7 +508,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should be loaded", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -482,7 +523,7 @@ describe("EachTest", () => {
   });
 
   it("in batches relations should not overlap with each other", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -503,7 +544,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should return a sized enumerator", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -521,7 +562,7 @@ describe("EachTest", () => {
   });
 
   it("each should return an enumerator if no block is present", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -534,7 +575,7 @@ describe("EachTest", () => {
   });
 
   it("each enumerator should execute one query per batch", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -550,7 +591,7 @@ describe("EachTest", () => {
   });
 
   it("in batches touch all affect all records", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -570,7 +611,7 @@ describe("EachTest", () => {
   it.skip("find in batches should ignore the order default scope", () => {});
 
   it("find in batches should error on ignore the order", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -588,7 +629,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not error if config overridden", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -615,7 +656,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should error on config specified to error", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -636,7 +677,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not error by default", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -658,7 +699,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should use any column as primary key when start is not specified", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Subscriber extends Base {
       static {
         this.primaryKey = "nick";
@@ -679,7 +720,7 @@ describe("EachTest", () => {
   });
 
   it("in batches update all returns zero when no batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -697,7 +738,7 @@ describe("EachTest", () => {
   });
 
   it("in batches touch all returns rows affected", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -716,7 +757,7 @@ describe("EachTest", () => {
   });
 
   it("in batches touch all returns zero when no batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -734,7 +775,7 @@ describe("EachTest", () => {
   });
 
   it("in batches delete all returns zero when no batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -752,7 +793,7 @@ describe("EachTest", () => {
   });
 
   it("in batches destroy all returns zero when no batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -771,7 +812,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should use any column as primary key when start is not specified", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Subscriber extends Base {
       static {
         this.primaryKey = "nick";
@@ -792,7 +833,7 @@ describe("EachTest", () => {
   });
 
   it("in_batches should return no records if the limit is 0 and load is ", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -812,7 +853,7 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Order extends Base {
       static {
         this.primaryKey = ["shopId", "id"];
@@ -837,7 +878,7 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Order extends Base {
       static {
         this.primaryKey = ["shopId", "id"];
@@ -862,7 +903,7 @@ describe("EachTest", () => {
   });
 
   it("in batches with useRanges emits range predicate and covers all rows", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -892,7 +933,7 @@ describe("EachTest", () => {
 // ==========================================================================
 describe("EachTest", () => {
   it("each should return a sized enumerator", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -905,7 +946,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches shouldnt execute query unless needed", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -921,7 +962,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not use records after yielding them in case original array is modified", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -937,7 +978,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not ignore the default scope if it is other then order", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -954,7 +995,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should end at the finish option", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -971,7 +1012,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should use any column as primary key", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -988,7 +1029,7 @@ describe("EachTest", () => {
   });
 
   it("in batches relations with condition should not overlap with each other", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1010,7 +1051,7 @@ describe("EachTest", () => {
   });
 
   it("in batches relations update all should not affect matching records in other batches", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1027,7 +1068,7 @@ describe("EachTest", () => {
   });
 
   it("in batches when loaded can return an enum", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1043,7 +1084,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should return an enumerator", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1056,7 +1097,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should return enumerator if no block given", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1069,7 +1110,7 @@ describe("EachTest", () => {
   });
 
   it("in batches update all returns rows affected", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1087,7 +1128,7 @@ describe("EachTest", () => {
   });
 
   it("in batches delete all returns rows affected", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1104,7 +1145,7 @@ describe("EachTest", () => {
   });
 
   it("in batches destroy all returns rows affected", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1120,7 +1161,7 @@ describe("EachTest", () => {
   });
 
   it("in batches if not loaded executes more queries", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1136,7 +1177,7 @@ describe("EachTest", () => {
   });
 
   it("in batches when loaded runs no queries", async () => {
-    const adp = freshAdapter();
+    const adp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1160,8 +1201,8 @@ describe("EachTest", () => {
 describe("EachTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("in_batches each_batch should yield batch relations if block is given", async () => {
@@ -1289,8 +1330,8 @@ describe("EachTest", () => {
 // ==========================================================================
 describe("EachTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("warn if order scope is set", () => {
@@ -1712,7 +1753,7 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   it("find in batches should return batches", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1737,7 +1778,7 @@ describe("EachTest", () => {
   });
 
   it("findEach yields individual records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1759,7 +1800,7 @@ describe("EachTest", () => {
   });
 
   it("findInBatches with where clause", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1784,7 +1825,7 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   it("findInBatches with batchSize 1", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1809,7 +1850,7 @@ describe("EachTest", () => {
   });
 
   it("findEach can be used with early break", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
 
     class User extends Base {
       static {
@@ -1832,8 +1873,8 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("findEach yields each record", async () => {
@@ -1873,7 +1914,7 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   it("yields Relation objects for each batch", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1896,7 +1937,7 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   it("finds records within a range", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1918,7 +1959,7 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   it("supports order: desc option", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1942,8 +1983,8 @@ describe("EachTest", () => {
 
 describe("EachTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("find_in_batches returns batches", async () => {
@@ -2025,7 +2066,7 @@ describe("EachTest", () => {
   }
 
   beforeEach(async () => {
-    adapter = freshAdapter();
+    adapter = await freshAdapter();
     Record.adapter = adapter;
   });
 
@@ -2105,8 +2146,8 @@ describe("EachTest", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Record.adapter = adapter;
   });
 
