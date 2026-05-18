@@ -22,4 +22,6 @@ export {
 
 export { EjsHandler } from "./ejs-handler.js";
 
+export { OutputBuffer, RawOutputBuffer } from "./buffers.js";
+
 export * from "./helpers/index.js";
