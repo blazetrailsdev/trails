@@ -9,7 +9,7 @@
  */
 
 import { toParam, toQuery } from "@blazetrails/activesupport";
-import { escapeFragment } from "../journey/router/utils.js";
+import { escapeFragment, rackEscape } from "../journey/router/utils.js";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
@@ -30,10 +30,6 @@ export interface UrlOptions {
   tldLength?: number;
   subdomain?: string | boolean | { toParam(): string };
   domain?: string;
-}
-
-function rackEscape(value: string): string {
-  return encodeURIComponent(value).replace(/%20/g, "+");
 }
 
 function isBlank(s: string): boolean {

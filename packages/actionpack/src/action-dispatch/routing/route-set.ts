@@ -352,19 +352,21 @@ export class RouteSet {
 
     const { route, params } = matched;
 
-    // Handle redirect routes
-    if (route.isRedirect) {
-      const host = (env["HTTP_HOST"] as string) ?? "www.example.com";
-      const { url, status } = route.resolveRedirect(params, {
-        method,
-        path,
-        host,
-      });
-      return [
-        status,
-        { location: url, "content-type": "text/html" },
-        bodyFromString(`<html><body>You are being <a href="${url}">redirected</a>.</body></html>`),
-      ];
+    // Handle redirect routes by dispatching through the Redirect endpoint
+    // (PathRedirect / OptionRedirect / Redirect). Path captures are surfaced
+    // to the endpoint via `path_parameters` on the env, matching how Rails'
+    // routing layer hands captures to ActionDispatch::Routing::Redirect.
+    const redirectEndpoint = route.redirectEndpoint;
+    if (redirectEndpoint) {
+      env["action_dispatch.request.path_parameters"] = {
+        controller: route.controller,
+        action: route.action,
+        ...params,
+      };
+      const [status, headers, bodyArr] = redirectEndpoint.call(env);
+      const lowerHeaders: Record<string, string> = {};
+      for (const [k, v] of Object.entries(headers)) lowerHeaders[k.toLowerCase()] = v;
+      return [status, lowerHeaders, bodyFromString(bodyArr.join(""))];
     }
 
     // Merge route params into the env (like Rails does with request.params)

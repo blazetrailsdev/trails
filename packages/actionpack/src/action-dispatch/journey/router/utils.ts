@@ -54,6 +54,20 @@ export function escapeFragment(fragment: string): string {
   return escapeWith(fragment, UNSAFE_FRAGMENT);
 }
 
+/**
+ * Form-component percent-encoding, matching Ruby's
+ * `Rack::Utils.escape` / `URI.encode_www_form_component`.
+ *
+ * Encodes every byte except `*-._0-9A-Za-z`; space becomes `+`. JS's
+ * `encodeURIComponent` leaves `!'()~` unencoded (RFC 3986 unreserved),
+ * so we manually pct-encode those single-byte chars to match Rack.
+ */
+export function rackEscape(value: string): string {
+  return encodeURIComponent(value)
+    .replace(/[!'()~]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase())
+    .replace(/%20/g, "+");
+}
+
 export function unescapeUri(uri: string): string {
   const bytes: number[] = [];
   const encoder = new TextEncoder();
