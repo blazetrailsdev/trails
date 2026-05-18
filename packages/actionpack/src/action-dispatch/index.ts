@@ -69,6 +69,22 @@ export {
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";
 export { QueryParser, type QueryPair } from "./http/query-parser.js";
+export {
+  PARAMETERS_KEY,
+  DEFAULT_PARSERS,
+  ParseError,
+  parameters,
+  pathParameters,
+  setPathParameters,
+  parseFormattedParameters,
+  parameterParsers,
+  setParameterParsers,
+  logParseErrorOnce,
+  paramsParsers,
+  type ParameterParser,
+  type ParameterParsers,
+  type ParametersHost,
+} from "./http/parameters.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
 export {
   BasicAuth,
