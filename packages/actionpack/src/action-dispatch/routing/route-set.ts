@@ -18,8 +18,9 @@ import {
   journeyRecognize as recognizeViaJourney,
   type JourneyMatch,
 } from "./journey-bridge.js";
-import type { Router as JourneyRouter } from "../journey/router.js";
+import type { Router as JourneyRouter, RackishResponse, RouterRequest } from "../journey/router.js";
 import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
+import { DispatcherRegistry, RouteDispatcher, type DispatchHandler } from "./dispatcher.js";
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -41,8 +42,16 @@ export class RouteSet {
    * (not yet ported). Mirrors `RouteSet#polymorphic_mappings`.
    */
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
+  /**
+   * Per-RouteSet registry mapping controller name → handler. The single
+   * `RouteDispatcher` shared by every Journey route consults this at
+   * serve-time, matching Rails' `RouteSet::Dispatcher` lookup pattern.
+   */
+  readonly dispatcherRegistry: DispatcherRegistry = new DispatcherRegistry();
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
+  /** @internal */
+  private readonly _routeDispatcher: RouteDispatcher = new RouteDispatcher(this.dispatcherRegistry);
 
   /**
    * Draw routes using the Mapper DSL. Can be called multiple times;
@@ -68,7 +77,7 @@ export class RouteSet {
    */
   get journeyRouter(): JourneyRouter {
     if (!this._journeyRouter) {
-      this._journeyRouter = buildJourneyRouter(this.routes);
+      this._journeyRouter = buildJourneyRouter(this.routes, { app: this._routeDispatcher });
     }
     return this._journeyRouter;
   }
@@ -76,6 +85,28 @@ export class RouteSet {
   /** Route lookup via the Journey-backed router. */
   journeyRecognize(method: string, path: string): JourneyMatch | null {
     return recognizeViaJourney(this.journeyRouter, method, path);
+  }
+
+  /**
+   * Register a synchronous handler invoked by the Journey-backed
+   * `Router.serve` path when a route resolves to `controller`. Mirrors the
+   * outcome of `RouteSet::Dispatcher`'s controller-class lookup in Rails
+   * — there the dispatcher resolves a class from `path_parameters[:controller]`;
+   * here we resolve a registered handler since trails has no
+   * ActionController port yet.
+   */
+  registerController(controller: string, handler: DispatchHandler): void {
+    this.dispatcherRegistry.register(controller, handler);
+  }
+
+  /**
+   * Dispatch through the Journey router end-to-end (`Router.serve`) using
+   * the controller handlers registered via `registerController`. Returns
+   * a Rack-shaped tuple — `[404, { 'x-cascade': 'pass' }, []]` when no
+   * route matches or no handler is registered for the matched controller.
+   */
+  serve(req: RouterRequest): RackishResponse {
+    return this.journeyRouter.serve(req);
   }
 
   /**
@@ -140,6 +171,7 @@ export class RouteSet {
     this.routes = [];
     this.namedRoutes.clear();
     this.polymorphicMappings.clear();
+    this.dispatcherRegistry.clear();
     this._journeyRouter = null;
   }
 
