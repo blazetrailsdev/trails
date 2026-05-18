@@ -7,17 +7,57 @@ import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } fr
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA: Schema = {
+  vehicles: {
+    name: "string",
+    type: "string",
+    kind: "string",
+  },
+  companies: {
+    name: "string",
+    type: "string",
+  },
+  vegetables: {
+    name: "string",
+    type: "string",
+    custom_type: "string",
+  },
+  subscribers: {
+    columns: {
+      nick: "string",
+      name: "string",
+      type: "string",
+    },
+    primaryKey: ["nick"],
+  },
+  entries: {
+    entryable_type: "string",
+    entryable_id: "integer",
+  },
+  user2s: {
+    name: "string",
+    type: "string",
+  },
+  user3s: {
+    name: "string",
+    type: "string",
+  },
+};
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("InheritanceTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeHierarchy() {
@@ -1019,14 +1059,15 @@ describe("InheritanceTest", () => {
   // inheritance new with base class
   // -------------------------------------------------------------------------
 
-  it("inheritance new with base class", () => {
+  it("inheritance new with base class", async () => {
+    const innerAdapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.attribute("type", "string");
         this._tableName = "companies";
-        this.adapter = createTestAdapter();
+        this.adapter = innerAdapter;
         enableSti(Company);
       }
     }
@@ -1040,8 +1081,8 @@ describe("InheritanceTest", () => {
   // inheritance new with subclass
   // -------------------------------------------------------------------------
 
-  it("inheritance new with subclass", () => {
-    const adapter = createTestAdapter();
+  it("inheritance new with subclass", async () => {
+    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -1083,7 +1124,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("a bad type column", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -1108,7 +1149,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("becomes bang resets inheritance type column", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1150,7 +1191,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("update all within inheritance", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Company extends Base {
       static {
         this.attribute("id", "integer");
@@ -1196,7 +1237,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt update all within inheritance", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1240,7 +1281,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("alt destroy all within inheritance", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vegetable extends Base {
       static {
         this.attribute("id", "integer");
@@ -1281,8 +1322,8 @@ describe("InheritanceTest", () => {
   // descends from active record
   // -------------------------------------------------------------------------
 
-  it("descends from active record", () => {
-    const adapter = createTestAdapter();
+  it("descends from active record", async () => {
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
@@ -1315,8 +1356,8 @@ describe("InheritanceTest", () => {
   // base_class?
   // -------------------------------------------------------------------------
 
-  it("base class predicate", () => {
-    const adapter = createTestAdapter();
+  it("base class predicate", async () => {
+    const adapter = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("id", "integer");
@@ -1361,7 +1402,7 @@ describe("InheritanceTest", () => {
   // -------------------------------------------------------------------------
 
   it("inheritance without mapping", async () => {
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Subscriber extends Base {
       static {
         this.attribute("nick", "string");
@@ -1494,8 +1535,8 @@ describe("InheritanceTest", () => {
 
 describe("InheritanceComputeTypeTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeHierarchy() {
@@ -1530,7 +1571,7 @@ describe("InheritanceComputeTypeTest", () => {
 
 describe("InheritanceAttributeMappingTest", () => {
   it("sti with custom type", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("name", "string");
@@ -1545,7 +1586,7 @@ describe("InheritanceAttributeMappingTest", () => {
   });
 
   it("polymorphic associations custom type", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Entry extends Base {
       static {
         this.attribute("entryable_type", "string");
@@ -1560,7 +1601,7 @@ describe("InheritanceAttributeMappingTest", () => {
 
 describe("InheritanceAttributeTest", () => {
   it("inheritance new with subclass as default", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this.attribute("name", "string");
@@ -1578,8 +1619,8 @@ describe("InheritanceAttributeTest", () => {
 describe("STI", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("subclasses share the parent table", () => {
@@ -1676,8 +1717,8 @@ describe("STI", () => {
 describe("STI (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test "subclass uses parent table"
@@ -1949,7 +1990,7 @@ describe("typeCondition", () => {
 
   it("discriminateClassForRecord casts the inheritance column value through its type", async () => {
     const { discriminateClassForRecord } = await import("./inheritance.js");
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
@@ -1972,7 +2013,7 @@ describe("typeCondition", () => {
 
   it("subclassFromAttributes casts the inheritance column value through its type", async () => {
     const { subclassFromAttributes } = await import("./inheritance.js");
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
@@ -2096,7 +2137,7 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 
   it("_instantiate (DB hydration) does NOT fire initializeInternalsCallback", async () => {
     const { enableSti } = await import("./inheritance.js");
-    const adapter = createTestAdapter();
+    const adapter = await freshAdapter();
     class Vehicle extends Base {
       static {
         this._tableName = "vehicles";
@@ -2116,8 +2157,8 @@ describe("Base constructor wires initializeInternalsCallback", () => {
 });
 
 describe("base_class? / isBaseClass", () => {
-  it("base_class? returns true for the STI root and false for subclasses", () => {
-    const adapter2 = createTestAdapter();
+  it("base_class? returns true for the STI root and false for subclasses", async () => {
+    const adapter2 = await freshAdapter();
     class User2 extends Base {
       static {
         this.attribute("id", "integer");
@@ -2141,7 +2182,7 @@ describe("base_class? / isBaseClass", () => {
 
 describe("STI subclass routing via find", () => {
   it("subclass from find returns the subclass instance", async () => {
-    const adapter3 = createTestAdapter();
+    const adapter3 = await freshAdapter();
     class User3 extends Base {
       static {
         this.attribute("id", "integer");
@@ -2168,8 +2209,8 @@ describe("STI subclass routing via find", () => {
 });
 
 describe("set_base_class / setBaseClass", () => {
-  it("setBaseClass caches the base class using the Rails hierarchy logic", () => {
-    const adapter4 = createTestAdapter();
+  it("setBaseClass caches the base class using the Rails hierarchy logic", async () => {
+    const adapter4 = await freshAdapter();
     class Animal2 extends Base {
       static {
         this.attribute("id", "integer");
