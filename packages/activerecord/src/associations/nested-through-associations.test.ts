@@ -12,9 +12,72 @@ import {
   loadHasMany,
   loadHasManyThrough,
 } from "../associations.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  authors: { name: "string" },
+  posts: { author_id: "integer", title: "string", body: "string" },
+  tags: { name: "string" },
+  taggings: {
+    tag_id: "integer",
+    taggable_id: "integer",
+    taggable_type: "string",
+  },
+  pst_tags: { name: "string" },
+  pst_taggings: {
+    pst_tag_id: "integer",
+    taggable_id: "integer",
+    taggable_type: "string",
+  },
+  pst_posts: { title: "string" },
+  fk_thr_authors: { name: "string" },
+  fk_thr_posts: { writer_id: "integer", title: "string" },
+  fk_thr_comments: { fk_thr_post_id: "integer", body: "string" },
+  fk_src_authors: { name: "string" },
+  fk_src_posts: { fk_src_author_id: "integer", title: "string" },
+  fk_src_comments: { article_id: "integer", body: "string" },
+  sti_thr_clubs: { name: "string" },
+  sti_thr_memberships: {
+    sti_thr_club_id: "integer",
+    sti_thr_member_id: "integer",
+    type: "string",
+  },
+  sti_thr_members: { name: "string" },
+  nwr_authors: { name: "string" },
+  nwr_posts: { nwr_author_id: "integer", title: "string" },
+  nwr_taggings: { nwr_post_id: "integer", nwr_tag_id: "integer" },
+  nwr_tags: { name: "string" },
+  nho_authors: { name: "string" },
+  nho_posts: { nho_author_id: "integer" },
+  nho_comments: { nho_post_id: "integer", body: "string" },
+  nfk_organizations: { name: "string" },
+  nfk_authors: { name: "string", organization_id: "integer" },
+  nfk_essays: { writer_id: "integer", nfk_category_id: "integer" },
+  nfk_categories: { name: "string" },
+  phmt_hotels: { name: "string" },
+  phmt_departments: { phmt_hotel_id: "integer" },
+  phmt_chefs: {
+    phmt_department_id: "integer",
+    employable_id: "integer",
+    employable_type: "string",
+  },
+  phmt_cake_designers: { name: "string" },
+  phmt_drink_designers: { name: "string" },
+  phmt_hotel2s: { name: "string" },
+  phmt_department2s: { phmt_hotel2_id: "integer" },
+  phmt_chef2s: {
+    phmt_department2_id: "integer",
+    employable_id: "integer",
+    employable_type: "string",
+  },
+  phmt_cake_designer2s: { name: "string" },
+  phmt_drink_designer2s: { name: "string" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("NestedThroughAssociationsTest", () => {
@@ -48,8 +111,8 @@ describe("NestedThroughAssociationsTest", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Author.adapter = adapter;
     Post.adapter = adapter;
     Tag.adapter = adapter;
