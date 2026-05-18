@@ -32,9 +32,62 @@ import {
   setHasOne,
   buildHasOne,
 } from "../associations.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+const TEST_SCHEMA: Schema = {
+  firms: { name: "string" },
+  accounts: {
+    firm_id: "integer",
+    credit_limit: "integer",
+    company_id: "integer",
+  },
+  companies: { name: "string", city: "string" },
+  account2s: { company_id: "integer" },
+  poly_tags: {
+    name: "string",
+    taggable_id: "integer",
+    taggable_type: "string",
+  },
+  poly_posts: { title: "string" },
+  cpk_firms: {
+    columns: { region_id: "integer", id: "integer", name: "string" },
+    primaryKey: ["region_id", "id"],
+  },
+  cpk_accounts: {
+    cpk_firm_region_id: "integer",
+    cpk_firm_id: "integer",
+    credit_limit: "integer",
+  },
+  del_firms: { name: "string" },
+  del_accts: { firm_id: "integer", credit_limit: "integer" },
+  dest_firms: { name: "string" },
+  dest_accts: { firm_id: "integer", credit_limit: "integer" },
+  excl_firms: { name: "string" },
+  excl_accounts: { firm_id: "integer", credit_limit: "integer" },
+  nil_firms: { name: "string" },
+  nil_accts: { firm_id: "integer" },
+  rs_firms: { name: "string" },
+  rs_accts: { firm_id: "integer" },
+  miss_firms: { name: "string" },
+  miss_accts: { firm_id: "integer" },
+  miss_n_firms: { name: "string" },
+  miss_n_accts: { firm_id: "integer" },
+  touch_firms: { name: "string", updated_at: "datetime" },
+  touch_accounts: { touch_firm_id: "integer", credit_limit: "integer" },
+  touch_upd_firms: { name: "string", updated_at: "datetime" },
+  touch_upd_accounts: { touch_upd_firm_id: "integer", credit_limit: "integer" },
+  touch_des_firms: { name: "string", updated_at: "datetime" },
+  touch_des_accounts: { touch_des_firm_id: "integer", credit_limit: "integer" },
+  dep_halt_firms: { name: "string" },
+  dep_halt_accounts: { firm_id: "integer", credit_limit: "integer" },
+  ah_firms: { name: "string" },
+  ah_accounts: { credit_limit: "integer", ah_firm_id: "integer" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 // ==========================================================================
@@ -57,8 +110,8 @@ describe("HasOneAssociationsTest", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     Firm.adapter = adapter;
     Account.adapter = adapter;
     registerModel(Firm);
@@ -189,7 +242,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("nullify on polymorphic association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class PolyTag extends Base {
       static {
         this.attribute("name", "string");
@@ -280,7 +333,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("association change calls delete", async () => {
     // When a has_one dependent: delete is set and FK changes, the old record gets deleted
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class DelFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -309,7 +362,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("association change calls destroy", async () => {
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class DestFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -367,7 +420,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("exclusive dependence", async () => {
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class ExclFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -396,7 +449,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with nil associate", async () => {
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class NilFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -421,7 +474,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("restrict with error", async () => {
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class RsFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -476,8 +529,8 @@ describe("HasOneAssociationsTest", () => {
     expect(loaded).toBeNull();
   });
 
-  it("building the associated object with implicit sti base class", () => {
-    const a = freshAdapter();
+  it("building the associated object with implicit sti base class", async () => {
+    const a = await freshAdapter();
     class HoCompany extends Base {
       static {
         this.attribute("name", "string");
@@ -512,8 +565,8 @@ describe("HasOneAssociationsTest", () => {
     expect(company).toBeInstanceOf(HoCompany);
   });
 
-  it("building the associated object with explicit sti base class", () => {
-    const a = freshAdapter();
+  it("building the associated object with explicit sti base class", async () => {
+    const a = await freshAdapter();
     class HoCompany2 extends Base {
       static {
         this.attribute("name", "string");
@@ -543,8 +596,8 @@ describe("HasOneAssociationsTest", () => {
     expect(company).toBeInstanceOf(HoCompany2);
   });
 
-  it("building the associated object with sti subclass", () => {
-    const a = freshAdapter();
+  it("building the associated object with sti subclass", async () => {
+    const a = await freshAdapter();
     class HoCompany3 extends Base {
       static {
         this.attribute("name", "string");
@@ -577,8 +630,8 @@ describe("HasOneAssociationsTest", () => {
     expect(company).toBeInstanceOf(HoClient3);
   });
 
-  it("building the associated object with an invalid type", () => {
-    const a = freshAdapter();
+  it("building the associated object with an invalid type", async () => {
+    const a = await freshAdapter();
     class HoCompany4 extends Base {
       static {
         this.attribute("name", "string");
@@ -609,8 +662,8 @@ describe("HasOneAssociationsTest", () => {
     ).toThrow(SubclassNotFound);
   });
 
-  it("building the associated object with an unrelated type", () => {
-    const a = freshAdapter();
+  it("building the associated object with an unrelated type", async () => {
+    const a = await freshAdapter();
     class HoCompany5 extends Base {
       static {
         this.attribute("name", "string");
@@ -790,7 +843,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("dependence with missing association", async () => {
     // When dependent association record doesn't exist, processDependentAssociations should not error
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class MissFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -816,7 +869,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence with missing association and nullify", async () => {
-    const a2 = createTestAdapter();
+    const a2 = await freshAdapter();
     class MissNFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -1072,8 +1125,8 @@ describe("HasOneAssociationsTest", () => {
     expect(result).toBeNull();
   });
 
-  it("has one relationship cannot have a counter cache", () => {
-    const ad = freshAdapter();
+  it("has one relationship cannot have a counter cache", async () => {
+    const ad = await freshAdapter();
     class CcFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -1295,7 +1348,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependency should halt parent destruction", async () => {
-    const ad = freshAdapter();
+    const ad = await freshAdapter();
     class DepHaltFirm extends Base {
       static {
         this.attribute("name", "string");
@@ -1408,7 +1461,7 @@ describe("HasOneAssociationsTest", () => {
 
 describe("AsyncHasOneAssociationsTest", () => {
   it("async load has one", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class AHFirm extends Base {
       static {
         this._tableName = "ah_firms";
