@@ -72,6 +72,7 @@ export {
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";
 export { QueryParser, type QueryPair } from "./http/query-parser.js";
+export { ParamBuilder, type EncodingTemplate } from "./http/param-builder.js";
 export {
   PARAMETERS_KEY,
   DEFAULT_PARSERS,

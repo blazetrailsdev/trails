@@ -48,8 +48,8 @@ export {
   buildNestedQuery,
   HTTP_STATUS_CODES,
   statusCode,
-  ParameterTypeError,
   InvalidParameterError,
+  ParameterTypeError,
   ParamsTooDeepError,
 } from "./utils.js";
 export { BodyProxy } from "./body-proxy.js";

@@ -10,6 +10,7 @@ export {
 } from "./permissions-policy.js";
 export { Headers } from "./headers.js";
 export { QueryParser, type QueryPair } from "./query-parser.js";
+export { ParamBuilder, type EncodingTemplate } from "./param-builder.js";
 export { URL, type UrlOptions } from "./url.js";
 export {
   PARAMETERS_KEY,

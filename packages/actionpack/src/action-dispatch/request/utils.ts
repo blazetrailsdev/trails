@@ -43,11 +43,15 @@ export class RequestUtils {
   }
 
   /**
-   * Returns a normalized clone of `params`. Hashes are rebuilt with a
-   * null prototype so attacker-controlled `__proto__` keys (e.g. from
+   * Returns a normalized copy of `params`. Plain hashes (null-proto or
+   * Object.prototype) and arrays are rebuilt — hashes with a null
+   * prototype, so attacker-controlled `__proto__` keys (e.g. from
    * `JSON.parse`) land as plain data rather than mutating the prototype
-   * chain. When `performDeepMunge` is true (the Rails default), `null`
-   * entries are additionally compacted out of arrays.
+   * chain. Class instances (e.g. UploadedFile) pass through unchanged
+   * to preserve their prototype and methods, matching Rails'
+   * `normalize_encode_params`, which only walks Hash/Array. When
+   * `performDeepMunge` is true (the Rails default), `null` entries are
+   * additionally compacted out of arrays.
    *
    * Mirrors `Request::Utils.normalize_encode_params` — Rails' choice
    * between `NoNilParamEncoder` and `ParamEncoder` (HashWithIndifferent-
@@ -73,6 +77,11 @@ function normalize(params: ParamValue, stripNil: boolean): ParamValue {
     return stripNil ? mapped.filter((el) => el !== null) : mapped;
   }
   if (params !== null && typeof params === "object") {
+    // Rails normalize_encode_params only walks Hash/Array; class
+    // instances (UploadedFile, etc.) pass through as opaque leaves so
+    // their prototype + methods survive.
+    const proto = Object.getPrototypeOf(params);
+    if (proto !== null && proto !== Object.prototype) return params;
     // Null-prototype to (a) match parseNestedQuery's shape and (b) make
     // `__proto__` in an own key land as data instead of mutating the
     // prototype chain.
