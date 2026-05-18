@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import {
+  getUseTransactionalTests,
   popSkipGlobalReset,
   pushSkipGlobalReset,
   resetTestAdapterState,
@@ -48,22 +49,47 @@ function tm(adapter: TestDatabaseAdapter): TxnAdapter["transactionManager"] {
  * Nested `transaction { ... }` calls inside a test become savepoints because
  * the outer transaction is opened with `joinable: false`.
  *
+ * Honors the per-adapter `useTransactionalTests` flag set by `defineSchema`:
+ * when `false` at `beforeAll` time, the helper deactivates and the file
+ * falls back to the global `resetTestAdapterState` beforeEach. Mirrors
+ * Rails' per-test-class `self.use_transactional_tests = false`
+ * (test_fixtures.rb:108 `run_in_transaction?`).
+ *
+ * Timing: the flag is read once in `beforeAll`. To opt out, callers must
+ * set the flag BEFORE `withTransactionalFixtures(...)`'s beforeAll runs —
+ * either via `defineSchema(adapter, ..., { useTransactionalTests: false })`
+ * inside a user `beforeAll` that runs first, or by calling
+ * `setUseTransactionalTests(adapter, false)` directly. Setting the flag
+ * per-test (in `beforeEach`) is too late: the helper has already decided.
+ * Files that need per-test schema registration AND opt-out should simply
+ * not call `withTransactionalFixtures` at all — there's no benefit.
+ *
+ * When opted out, the global reset drops all tables before each test, so
+ * opted-out files using this helper still need per-test schema setup
+ * (matching Rails' non-transactional path in test_fixtures.rb:135-138,
+ * which reloads fixtures every test).
+ *
  * @example
  *   let adapter: TestDatabaseAdapter;
  *   beforeAll(async () => {
  *     adapter = createTestAdapter();
- *     // Use adapter directly for schema setup (see test for cast pattern).
+ *     await defineSchema(adapter, { ... });
  *   });
  *   withTransactionalFixtures(() => adapter);
  *
  *   it("inserts a row", async () => { ... });  // rolled back in afterEach
  */
 export function withTransactionalFixtures(getAdapter: () => TestDatabaseAdapter): void {
+  let active = true;
+
   beforeAll(() => {
+    active = getUseTransactionalTests(getAdapter());
+    if (!active) return;
     pushSkipGlobalReset();
   });
 
   afterAll(async () => {
+    if (!active) return;
     // Only reset when the outermost scope exits, mirroring Rails
     // ConnectionPool#unpin_connection! finalizing at depth zero
     // (connection_pool.rb:347).
@@ -71,12 +97,14 @@ export function withTransactionalFixtures(getAdapter: () => TestDatabaseAdapter)
   });
 
   beforeEach(async () => {
+    if (!active) return;
     // Mirrors Rails ConnectionPool#pin_connection!:
     //   @pinned_connection.begin_transaction joinable: false, _lazy: false
     await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
   });
 
   afterEach(async () => {
+    if (!active) return;
     const t = tm(getAdapter());
     while (t.openTransactions > 0) await t.rollbackTransaction();
   });
