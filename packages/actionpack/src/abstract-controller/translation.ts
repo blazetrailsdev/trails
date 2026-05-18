@@ -1,4 +1,4 @@
-import { I18n } from "@blazetrails/activesupport";
+import { I18n, MissingTranslationData } from "@blazetrails/activesupport";
 
 /**
  * Host shape `translate` / `localize` mix into. Trails' `Metal` provides
@@ -43,10 +43,13 @@ export function translate(
     const fallbackKey = `${path}${key}`;
 
     // Forward caller options (interpolation vars, locale, etc.) to
-    // every internal lookup, but strip `default` — the chain below
-    // implements its own default-walking semantics.
-    const passOptions = { ...options };
+    // every internal lookup, but strip `default` and `raise` — the
+    // chain below implements its own default-walking semantics, and
+    // `raise: true` must only fire after the *whole* chain (scoped →
+    // fallback → user defaults) is exhausted, not at the first miss.
+    const passOptions = { ...options } as Record<string, unknown>;
     delete passOptions.default;
+    delete passOptions.raise;
 
     const direct = I18n.translate(scopedKey, passOptions as Parameters<typeof I18n.translate>[1]);
     if (!isMissing(direct)) return direct;
@@ -73,6 +76,17 @@ export function translate(
       }
     }
 
+    // Chain exhausted — honor `raise: true`. Throw directly rather
+    // than re-entering I18n.translate with the original options:
+    // `default` is still in there and I18n returns it before honoring
+    // raise, so we'd silently return the already-exhausted defaults
+    // array instead of raising.
+    if ((options as { raise?: boolean }).raise) {
+      const locale =
+        (passOptions as { locale?: string }).locale ??
+        (I18n as unknown as { locale: string }).locale;
+      throw new MissingTranslationData(locale, scopedKey);
+    }
     return direct; // "Translation missing: ..." from the scoped lookup
   }
   return I18n.translate(key, options as Parameters<typeof I18n.translate>[1]);

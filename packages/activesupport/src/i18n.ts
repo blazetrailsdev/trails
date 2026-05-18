@@ -205,6 +205,26 @@ interface LocalizeOptions {
 interface TranslateOptions {
   locale?: string;
   default?: TranslationValue;
+  /** When true, raise `MissingTranslationData` instead of returning a
+   * "Translation missing: …" string for unknown keys. Mirrors Rails
+   * `I18n.t(key, raise: true)`. A supplied `default` still wins. */
+  raise?: boolean;
+}
+
+/**
+ * Thrown by `I18n.translate(key, { raise: true })` when the key is
+ * not found and no `default` is supplied. Mirrors Ruby
+ * `I18n::MissingTranslationData`.
+ */
+export class MissingTranslationData extends Error {
+  readonly key: string;
+  readonly locale: string;
+  constructor(locale: string, key: string) {
+    super(`Translation missing: ${locale}.${key}`);
+    this.name = "MissingTranslationData";
+    this.locale = locale;
+    this.key = key;
+  }
 }
 
 class I18nModule {
@@ -255,6 +275,7 @@ class I18nModule {
     const result = this.backend.lookup(locale, keyStr);
     if (result !== undefined) return result;
     if (options.default !== undefined) return options.default;
+    if (options.raise) throw new MissingTranslationData(locale, keyStr);
     return `Translation missing: ${locale}.${keyStr}`;
   }
 
