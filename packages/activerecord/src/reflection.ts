@@ -1734,44 +1734,6 @@ function reflectionClassFor(
 }
 
 /**
- * Create a reflection from an association definition.
- * Returns ThroughReflection wrapper for :through associations.
- */
-export function createReflection(
-  assocDef: { name: string; type: string; options: Record<string, unknown> },
-  ownerClass: typeof Base,
-): AssociationReflection | ThroughReflection {
-  const normalizedType =
-    assocDef.type === "hasManyThrough"
-      ? "hasMany"
-      : assocDef.type === "hasOneThrough"
-        ? "hasOne"
-        : assocDef.type;
-
-  const ReflectionClass = reflectionClassFor(normalizedType);
-  const { scope: assocScope, ...restOptions } = assocDef.options as {
-    scope?: (...args: any[]) => any;
-  } & Record<string, unknown>;
-  const reflection = new ReflectionClass(
-    assocDef.name,
-    assocScope ?? null,
-    restOptions,
-    ownerClass,
-  );
-
-  if (
-    assocDef.type !== "hasAndBelongsToMany" &&
-    (assocDef.options.through ||
-      assocDef.type === "hasManyThrough" ||
-      assocDef.type === "hasOneThrough")
-  ) {
-    return new ThroughReflection(reflection);
-  }
-
-  return reflection;
-}
-
-/**
  * Mirrors: ActiveRecord::Reflection.create
  */
 export function create(
