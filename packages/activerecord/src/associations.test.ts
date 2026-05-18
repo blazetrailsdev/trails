@@ -890,8 +890,16 @@ describe("CollectionProxy", () => {
 describe("DependentAssociations", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      comments: { body: "string", post_id: "integer" },
+      items: { name: "string" },
+      tags: { name: "string", item_id: "integer" },
+      users: { name: "string" },
+      profiles: { user_id: "integer", bio: "string" },
+    });
   });
 
   // Rails: test_dependent_destroy
@@ -1169,7 +1177,7 @@ describe("StrictLoading", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Author.adapter = adapter;
     Book.adapter = adapter;
@@ -1177,6 +1185,11 @@ describe("StrictLoading", () => {
     registerModel(Author);
     registerModel(Book);
     registerModel(Profile);
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      profiles: { bio: "string", author_id: "integer" },
+    });
   });
 
   // Rails: test_strict_loading_on_belongs_to
@@ -1474,8 +1487,12 @@ describe("AssociationReflection", () => {
 describe("HasAndBelongsToManyAssociations", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      developers: { name: "string" },
+      projects: { name: "string" },
+    });
   });
 
   // Rails: test_habtm
