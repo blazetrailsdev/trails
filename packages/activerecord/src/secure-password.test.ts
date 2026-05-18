@@ -4,12 +4,26 @@ import { Base } from "./index.js";
 import { hasSecurePassword } from "./secure-password.js";
 import { setTokenForSecret } from "./generates-token-for.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
 
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+// Union of every column referenced by tests in this file; per-test attribute
+// differences are immaterial (sqlite ignores unread columns).
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    users: {
+      name: "string",
+      token: "string",
+      email: "string",
+      password_digest: "string",
+      auth_token_digest: "string",
+      recovery_password_digest: "string",
+    },
+  });
+  return adapter;
 }
 
 // -- Phase 2000: Core --
@@ -17,8 +31,8 @@ function freshAdapter(): DatabaseAdapter {
 describe("secure_password", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("hashes password on save and authenticates", async () => {
@@ -86,8 +100,8 @@ describe("secure_password", () => {
 describe("SecurePassword (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test "authenticate with correct password"
@@ -169,8 +183,8 @@ describe("SecurePassword (Rails-guided)", () => {
 describe("password reset token", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     setTokenForSecret("test-reset-token-secret");
   });
 
@@ -295,8 +309,8 @@ describe("password reset token", () => {
 describe("SecurePasswordTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Builds a User class with the union of attributes used across these tests.
@@ -478,8 +492,8 @@ describe("SecurePasswordTest", () => {
 
 describe("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   const makeModel = () => {
