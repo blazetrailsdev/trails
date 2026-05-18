@@ -98,14 +98,9 @@ const ESCAPE_KEYS = ["format", "negativeFormat", "separator", "delimiter"] as co
 /** @internal */
 export function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions {
   const out: NumberHelperOptions = { ...options };
-  for (const k of ESCAPE_KEYS) {
-    if (out[k] !== undefined) out[k] = htmlEscape(out[k]).toString();
-  }
-  if (out.unit !== undefined) {
-    out.unit = isHtmlSafe(out.unit)
-      ? (out.unit as SafeBuffer).toString()
-      : htmlEscape(out.unit).toString();
-  }
+  for (const k of ESCAPE_KEYS) if (out[k] !== undefined) out[k] = htmlEscape(out[k]).toString();
+  if (out.unit !== undefined && !isHtmlSafe(out.unit)) out.unit = htmlEscape(out.unit).toString();
+  else if (out.unit instanceof SafeBuffer) out.unit = out.unit.toString();
   if (out.units && typeof out.units === "object") out.units = escapeUnits(out.units);
   return out;
 }
@@ -129,25 +124,18 @@ export function wrapWithOutputSafetyHandling(
 }
 
 /** @internal */
-export function validFloat(number: unknown): boolean {
-  return parseFloat(number, false) !== null;
-}
+export const validFloat = (n: unknown) => parseFloat(n, false) !== null;
+
+// Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
+const FLOAT_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 /** @internal */
 export function parseFloat(number: unknown, raiseError: boolean): number | null {
-  let str: string | null = null;
   if (typeof number === "number") return Number.isFinite(number) ? number : null;
-  if (typeof number === "string") str = number;
-  else if (number instanceof SafeBuffer) str = number.toString();
-  let result: number | null = null;
-  if (str !== null) {
-    const trimmed = str.trim();
-    // Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
-    if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) {
-      const n = Number(trimmed);
-      if (Number.isFinite(n)) result = n;
-    }
-  }
-  if (result === null && raiseError) throw new InvalidNumberError(number);
-  return result;
+  const str =
+    typeof number === "string" ? number : number instanceof SafeBuffer ? number.toString() : null;
+  const n = str && FLOAT_RE.test(str.trim()) ? Number(str.trim()) : NaN;
+  if (Number.isFinite(n)) return n;
+  if (raiseError) throw new InvalidNumberError(number);
+  return null;
 }
