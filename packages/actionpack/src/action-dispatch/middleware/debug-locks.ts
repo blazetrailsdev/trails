@@ -32,22 +32,25 @@ export interface InterlockLike {
   rawState<T>(block: (threads: Map<ThreadLike, ThreadInfo>) => T): T;
 }
 
-export interface DebugLocksConfig {
-  interlock: InterlockLike;
-  defaultCharset?: string;
-}
-
 export class DebugLocks {
+  /**
+   * Source of `raw_state`. Mirrors Ruby's `ActiveSupport::Dependencies.interlock`,
+   * which has no port yet — assign before mounting the middleware.
+   */
+  static interlock: InterlockLike | null = null;
+
+  /**
+   * Charset used for the response `content-type`. Mirrors
+   * `ActionDispatch::Response.default_charset`.
+   */
+  static defaultCharset = "utf-8";
+
   private app: RackApp;
   private path: string;
-  private interlock: InterlockLike;
-  private defaultCharset: string;
 
-  constructor(app: RackApp, config: DebugLocksConfig, path = "/rails/locks") {
+  constructor(app: RackApp, path = "/rails/locks") {
     this.app = app;
     this.path = path;
-    this.interlock = config.interlock;
-    this.defaultCharset = config.defaultCharset ?? "utf-8";
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
@@ -65,7 +68,13 @@ export class DebugLocks {
 
   /** @internal */
   private renderDetails(): RackResponse {
-    const threads = this.interlock.rawState<Map<ThreadLike, ThreadInfo>>((rawThreads) => {
+    const interlock = DebugLocks.interlock;
+    if (!interlock) {
+      throw new Error(
+        "ActionDispatch::DebugLocks.interlock is not configured (no autoload interlock port available)",
+      );
+    }
+    const threads = interlock.rawState<Map<ThreadLike, ThreadInfo>>((rawThreads) => {
       // The Interlock comes to a complete halt while this block runs, so do as
       // little as possible here.
       let idx = 0;
@@ -132,8 +141,8 @@ export class DebugLocks {
     return [
       200,
       {
-        "content-type": `text/plain; charset=${this.defaultCharset}`,
-        "content-length": Buffer.byteLength(str).toString(),
+        "content-type": `text/plain; charset=${DebugLocks.defaultCharset}`,
+        "content-length": str.length.toString(),
       },
       bodyFromString(str),
     ];
