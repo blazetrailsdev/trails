@@ -79,14 +79,13 @@ Sequencing rules:
 
 ## Wave 0 — single-file peripherals (remaining)
 
-| PR  | Rails file                                           | Missing | TS file (api:compare row) | Methods                                                                                                                                                                              |
-| --- | ---------------------------------------------------- | ------: | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P2  | `metal/rate_limiting.rb`                             |       2 | `metal/rate-limiting.ts`  | `rateLimit` (class DSL), `rateLimiting` (private instance). Mirror Rails options `to:`, `within:`, `by:`, `with:`, `store:`, `name:`, `only:`/`except:`. Cache backend is divergent. |
-| P3  | `form_builder.rb`                                    |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                                       |
-| P4  | `metal/data_streaming.rb` **(re-audit, 10 missing)** |      10 | `metal/data-streaming.ts` | Originally scoped as `sendFileHeadersBang` only; api:compare now reports 10 missing. Re-list before opening PR.                                                                      |
-| P5  | `caching.rb`                                         |       2 | `caching.ts`              | `instrumentPayload(key)` → `{ controller, action, key }`; `instrumentName()` → `"action_controller"`. Both private.                                                                  |
-| P7  | `metal/renderers.rb`                                 |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve.           |
-| P9  | `deprecator.rb`                                      |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                           |
+| PR  | Rails file                                           | Missing | TS file (api:compare row) | Methods                                                                                                                                                                    |
+| --- | ---------------------------------------------------- | ------: | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P3  | `form_builder.rb`                                    |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                             |
+| P4  | `metal/data_streaming.rb` **(re-audit, 10 missing)** |      10 | `metal/data-streaming.ts` | Originally scoped as `sendFileHeadersBang` only; api:compare now reports 10 missing. Re-list before opening PR.                                                            |
+| P5  | `caching.rb`                                         |       2 | `caching.ts`              | `instrumentPayload(key)` → `{ controller, action, key }`; `instrumentName()` → `"action_controller"`. Both private.                                                        |
+| P7  | `metal/renderers.rb`                                 |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve. |
+| P9  | `deprecator.rb`                                      |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                 |
 
 ## Wave 1 — small bundle peripherals
 

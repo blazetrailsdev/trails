@@ -103,6 +103,26 @@ up, the modified directives don't round-trip into the response header. The
 class-DSL surface and parity-test coverage are complete; the response-header
 wiring is the remaining work.
 
+### `RateLimiting` — cache backend is divergent
+
+**Rails:** `rate_limit` defaults `store:` to `cache_store`, which Rails wires from
+`config.action_controller.cache_store` / `config.cache_store` — an
+`ActiveSupport::Cache::Store` instance whose `increment(key, amount, expires_in:)`
+returns the new counter atomically (Redis/Memcached in production).
+**Us:** No global `Rails.cache` equivalent yet. The class DSL falls back to a
+`cacheStore` static on the host controller class if not given `store:`, and
+throws if neither is set. A `MemoryRateLimitStore` ships in this package for
+tests and single-process apps; production deployments must supply a
+`RateLimitStore` whose `increment(key, amount, { expiresIn })` (1) accepts
+`expiresIn` in **seconds** (Rails parity, not the activesupport cache
+`CacheOptions.expiresIn` which is milliseconds) and (2) initializes a
+missing counter to `amount` (Redis/Memcached behavior — the in-memory
+activesupport cache returns `nil` for missing keys and is not a suitable
+backend on its own). The
+DSL surface, key composition (`rate-limit:controllerPath:name:identity`),
+`429` fallback, and `rate_limit.action_controller` instrumentation are all
+parity-faithful — only the cache backend resolution differs.
+
 ### `BrowserBlocker.versions` — returns a copy
 
 **Rails:** `attr_reader :versions` returns the object directly (mutations affect the blocker).
@@ -180,13 +200,12 @@ Sequencing rules:
 
 ### Wave 0 — single-file peripherals
 
-| PR  | Rails file                | Missing | TS file (api:compare row) | Methods                                                                                                                                                                              |
-| --- | ------------------------- | ------: | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P2  | `metal/rate_limiting.rb`  |       2 | `metal/rate-limiting.ts`  | `rateLimit` (class DSL), `rateLimiting` (private instance). Mirror Rails options `to:`, `within:`, `by:`, `with:`, `store:`, `name:`, `only:`/`except:`. Cache backend is divergent. |
-| P3  | `form_builder.rb`         |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                                       |
-| P4  | `metal/data_streaming.rb` |       1 | `metal/data-streaming.ts` | `sendFileHeadersBang` (`send_file_headers!`). Refactor existing `send_file`/`send_data` to delegate. RFC 6266 with both `filename="..."` ASCII fallback and `filename*=UTF-8''...`.  |
-| P7  | `metal/renderers.rb`      |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve.           |
-| P9  | `deprecator.rb`           |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                           |
+| PR  | Rails file                | Missing | TS file (api:compare row) | Methods                                                                                                                                                                             |
+| --- | ------------------------- | ------: | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P3  | `form_builder.rb`         |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                                      |
+| P4  | `metal/data_streaming.rb` |       1 | `metal/data-streaming.ts` | `sendFileHeadersBang` (`send_file_headers!`). Refactor existing `send_file`/`send_data` to delegate. RFC 6266 with both `filename="..."` ASCII fallback and `filename*=UTF-8''...`. |
+| P7  | `metal/renderers.rb`      |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve.          |
+| P9  | `deprecator.rb`           |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                          |
 
 ### Wave 1 — small bundle peripherals
 

@@ -8,11 +8,23 @@
 import { Metal } from "./metal.js";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
+import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 
 export class API extends Metal {
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;
   }
+
+  /**
+   * Apply a rate limit to all actions (or those selected by `only:`/`except:`).
+   * Mirrors Rails `rate_limit` class DSL — Rails includes `RateLimiting` in
+   * both `ActionController::Base` and `ActionController::API`
+   * (actionpack/lib/action_controller/api.rb:125).
+   */
+  static rateLimit = rateLimit;
+
+  /** @internal Private in Rails; instance slot enables subclass overrides. */
+  rateLimiting = rateLimiting;
 
   render(options: RenderOptions = {}): void {
     if (this.performed) {
