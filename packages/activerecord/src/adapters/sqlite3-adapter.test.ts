@@ -9,6 +9,7 @@ import {
   loadBelongsTo,
   loadHasMany,
 } from "../index.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
@@ -127,15 +128,10 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
-        CREATE TABLE "users" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-          "name" TEXT,
-          "email" TEXT,
-          "age" INTEGER
-        )
-      `);
+    beforeEach(async () => {
+      await defineSchema(adapter, {
+        users: { name: "string", email: "string", age: "integer" },
+      });
       User.adapter = adapter;
     });
 
@@ -240,14 +236,9 @@ describe("SqliteAdapter", () => {
     }
 
     beforeEach(async () => {
-      adapter.exec(`
-        CREATE TABLE "products" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-          "name" TEXT,
-          "price" INTEGER,
-          "category" TEXT
-        )
-      `);
+      await defineSchema(adapter, {
+        products: { name: "string", price: "integer", category: "string" },
+      });
       Product.adapter = adapter;
       await Product.create({ name: "Apple", price: 1, category: "fruit" });
       await Product.create({ name: "Banana", price: 2, category: "fruit" });
@@ -416,14 +407,13 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
-        CREATE TABLE "accounts" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-          "name" TEXT,
-          "balance" INTEGER DEFAULT 0
-        )
-      `);
+    beforeEach(async () => {
+      await defineSchema(adapter, {
+        accounts: {
+          name: "string",
+          balance: { type: "integer", default: 0 },
+        },
+      });
       Account.adapter = adapter;
     });
 
@@ -493,20 +483,11 @@ describe("SqliteAdapter", () => {
       }
     }
 
-    beforeEach(() => {
-      adapter.exec(`
-        CREATE TABLE "authors" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-          "name" TEXT
-        )
-      `);
-      adapter.exec(`
-        CREATE TABLE "books" (
-          "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-          "title" TEXT,
-          "author_id" INTEGER
-        )
-      `);
+    beforeEach(async () => {
+      await defineSchema(adapter, {
+        authors: { name: "string" },
+        books: { title: "string", author_id: "integer" },
+      });
       Author.adapter = adapter;
       Book.adapter = adapter;
       registerModel(Author);
