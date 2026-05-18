@@ -78,6 +78,9 @@ export class AbstractController {
     "inspect",
     "controllerPath",
     "controllerName",
+    "isContentSecurityPolicy",
+    "contentSecurityPolicyNonce",
+    "currentContentSecurityPolicy",
   ]);
 
   private static _actionMethodCache?: Set<string>;
