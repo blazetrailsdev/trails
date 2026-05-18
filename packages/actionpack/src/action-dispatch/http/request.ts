@@ -278,9 +278,12 @@ export class Request {
     if (this.env["action_dispatch.request.parameters"]) {
       return this.env["action_dispatch.request.parameters"] as Record<string, unknown>;
     }
+    // Mirrors Rails `ActionDispatch::Http::Parameters#parameters` —
+    // request_parameters.merge(query_parameters).merge!(path_parameters).
     const merged: Record<string, unknown> = {
-      ...this.queryParameters,
       ...this.requestParameters,
+      ...this.queryParameters,
+      ...this.pathParameters,
     };
     this.env["action_dispatch.request.parameters"] = merged;
     return merged;
@@ -351,8 +354,17 @@ export class Request {
     return normalized;
   }
 
-  get pathParameters(): Record<string, string> {
-    return (this.env["action_dispatch.request.path_parameters"] as Record<string, string>) || {};
+  get pathParameters(): Record<string, unknown> {
+    return (this.env["action_dispatch.request.path_parameters"] as Record<string, unknown>) || {};
+  }
+
+  set pathParameters(params: Record<string, unknown>) {
+    // Mirrors `Rails::ActionDispatch::Http::Parameters#path_parameters=` —
+    // invalidate the merged-parameters cache so subsequent `params` reads
+    // pick up the new path captures. Matches `setPathParameters` in
+    // http/parameters.ts.
+    delete this.env["action_dispatch.request.parameters"];
+    this.env["action_dispatch.request.path_parameters"] = params;
   }
 
   // --- Format ---

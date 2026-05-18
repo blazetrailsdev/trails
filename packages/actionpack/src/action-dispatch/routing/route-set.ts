@@ -23,6 +23,7 @@ import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
+import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -174,6 +175,83 @@ export class RouteSet {
   /** End-to-end `Router.serve` using registered handlers. */
   serve(req: RouterRequest): RackishResponse {
     return this.journeyRouter.serve(req);
+  }
+
+  /** Mirrors Rails' `RouteSet#recognize_path` shape for `assert_recognizes`. */
+  recognizePath(
+    path: string,
+    options: { method?: string | null; extras?: Record<string, unknown> } = {},
+  ): Record<string, unknown> {
+    const method = String(options.method ?? "GET").toUpperCase();
+    const matched = this.recognize(method, path);
+    if (!matched) {
+      throw new RoutingError(`No route matches [${method}] ${JSON.stringify(path)}`);
+    }
+    // Mirrors Rails: recognize_path returns route defaults merged with the
+    // matched captures (Journey hands defaults back as path_parameters).
+    return {
+      ...matched.route.defaults,
+      controller: matched.route.controller,
+      action: matched.route.action,
+      ...matched.params,
+      ...(options.extras ?? {}),
+    };
+  }
+
+  /**
+   * Inverse of `recognizePath`. Returns `[path, extraKeys]` where extraKeys
+   * are option keys not consumed by the route. The caller-supplied
+   * `defaults` hash and the route's own defaults suppress matching keys
+   * from `extras` when the supplied value equals the default (Rails
+   * threads `defaults` through `generate` as the recall hash).
+   */
+  generateExtras(
+    options: Record<string, unknown>,
+    defaults: Record<string, unknown> = {},
+  ): [string, string[]] {
+    // Rails: `route_key = options.delete :use_route` — when present, look
+    // the route up by its named-route key, mirroring `RouteSet#generate`.
+    let route: Route | undefined;
+    const useRoute = options["use_route"];
+    if (typeof useRoute === "string") {
+      delete options["use_route"];
+      route = this.namedRoutes.get(useRoute);
+    }
+    const { controller, action } = options;
+    route ??= this.routes.find((r) => r.controller === controller && r.action === action);
+    if (!route) {
+      throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
+    }
+    const captureNames = new Set<string>(route.pathParamNames);
+    // Null-prototype map so a capture named `__proto__` becomes an own
+    // property — Route#pathFor preserves the value when fed a null-proto
+    // hash (route.test.ts:175-184); a plain object would silently hit the
+    // inherited setter instead.
+    const captureParams: Record<string, unknown> = Object.create(null);
+    for (const name of captureNames) {
+      const v = options[name];
+      if (v != null) captureParams[name] = v;
+    }
+    const path = route.pathFor(captureParams as Record<string, string | number>);
+    // Mirrors Rails' `generate_extras`: extras are the keys of `options`
+    // not consumed by the route. Keys present in the route's `defaults`
+    // (and the caller-supplied `defaults`/recall hash) are consumed too,
+    // so callers can pass e.g. `format: "json"` without it surfacing as a
+    // query-string extra when the route already pins it.
+    const routeDefaults = route.defaults as Record<string, unknown>;
+    const extras: string[] = [];
+    for (const k of Object.keys(options)) {
+      if (k === "controller" || k === "action" || captureNames.has(k)) continue;
+      // Only suppress the key when the supplied value matches the default
+      // — a caller passing `format: "html"` against a route defaulting
+      // `format: "json"` still surfaces as an extra, since the generated
+      // path can't represent the conflicting value.
+      const v = options[k];
+      if (Object.hasOwn(routeDefaults, k) && routeDefaults[k] === v) continue;
+      if (Object.hasOwn(defaults, k) && defaults[k] === v) continue;
+      extras.push(k);
+    }
+    return [path, extras];
   }
 
   /**
