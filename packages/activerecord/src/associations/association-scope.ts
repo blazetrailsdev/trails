@@ -21,6 +21,37 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
 /**
+ * Invoke a scope lambda using this port's calling convention:
+ * 0-arg lambdas → `fn.call(rel)` (`this=rel`, no positional args);
+ * 1+-arg lambdas → `fn.call(rel, rel, owner)` (`this=rel`, positional
+ * `(rel, owner)`). Returns the raw lambda result; callers apply `|| rel`
+ * if they want Ruby-style `instance_exec(owner, &scope) || relation`
+ * truthy-fallback semantics.
+ *
+ * NOT a 1:1 port of Rails' `relation.instance_exec(owner, &scope)`
+ * (reflection.rb:449), which passes `owner` as the sole positional
+ * arg. Every call site in this codebase writes scopes as
+ * `(rel) => rel.where(...)`, so a 1-arg lambda here receives the
+ * relation; arity-2 declarations can opt into `(rel, owner)`. The
+ * `this`-binding only applies to `function`-keyword scopes — arrow
+ * functions have lexical `this` and ignore `.call`.
+ *
+ * @internal
+ */
+export type ScopeLambda<R> = (this: R, rel: R, owner: Base) => R | false | null | undefined;
+
+/** @internal */
+export function invokeScopeLambda<R>(
+  fn: ScopeLambda<R>,
+  rel: R,
+  owner: Base,
+): R | false | null | undefined {
+  return fn.length === 0
+    ? (fn as (this: R) => ReturnType<ScopeLambda<R>>).call(rel)
+    : fn.call(rel, rel, owner);
+}
+
+/**
  * Minimum shape `AssociationScope.scope` needs from its argument. Rails
  * passes a concrete `Association` instance (see
  * `activerecord/lib/active_record/associations/association.rb`); we
@@ -580,11 +611,7 @@ export class AssociationScope {
     if (!isThrough && typeof head.scopeFor === "function") {
       scope = head.scopeFor.call(head, scope, owner);
     } else if (typeof head.scope === "function") {
-      // Match Rails instance_exec arity: 0-arg scope → this=scope;
-      // 1+-arg → (scope, owner).
-      const fn = head.scope;
-      const result =
-        fn.length === 0 ? (fn as () => unknown).call(scope) : fn.call(scope, scope, owner);
+      const result = invokeScopeLambda(head.scope as ScopeLambda<unknown>, scope, owner);
       if (result) scope = result;
     }
     return scope;

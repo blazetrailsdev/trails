@@ -322,4 +322,26 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(reader.target.length).toBe(1);
     expect(reader[0]?.title).toBe("z");
   });
+
+  it("clear() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts");
+    const instance = (
+      blog as unknown as { _associationInstances: Map<string, unknown> }
+    )._associationInstances.get("apPosts") as { _associationIds: unknown[] | null };
+    instance._associationIds = [1, 2, 3];
+    await proxy.clear();
+    expect(instance._associationIds).toBeNull();
+  });
+
+  it("destroyAll() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
+    const blog = await blogWithPosts();
+    const proxy = association<ApPost>(blog, "apPosts");
+    const instance = (
+      blog as unknown as { _associationInstances: Map<string, unknown> }
+    )._associationInstances.get("apPosts") as { _associationIds: unknown[] | null };
+    instance._associationIds = [1, 2, 3];
+    await proxy.destroyAll();
+    expect(instance._associationIds).toBeNull();
+  });
 });

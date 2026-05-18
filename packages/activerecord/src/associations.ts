@@ -60,7 +60,7 @@ import {
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
 import { ForeignAssociation } from "./associations/foreign-association.js";
-import { AssociationScope } from "./associations/association-scope.js";
+import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
 import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
@@ -602,27 +602,12 @@ export function applyAssociationScope<R>(
 ): R {
   if (!scope) return rel;
   if (reflectionScope !== undefined && scope === reflectionScope) return rel;
-  // Match the head-scope dispatch in `association-scope.ts:583-589`:
-  // 0-arg scope → `fn.call(rel)` (`this=rel`); 1+-arg → `fn.call(rel,
-  // rel, owner)` (`this=rel`, positional `(rel, owner)`).
-  //
-  // Caveat re: Rails parity: Rails' `instance_exec(owner, &scope)` makes
-  // a 1-arg Ruby block `->(owner) { ... }` receive OWNER as the sole
-  // positional. This codebase's convention is different — every scope
-  // call site is `(rel) => rel.where(...)`, so a 1-arg lambda must
-  // receive the RELATION. We preserve that convention here for symmetry
-  // with `association-scope.ts`. Function-keyword scopes that want
-  // owner access can either declare arity-2 `function (rel, owner)` or
-  // close over `this` (set to rel via `.call`).
-  //
-  // `|| rel` (not `??`) mirrors Ruby's `instance_exec(owner, &scope) ||
-  // relation` — truthiness-based, so a scope returning `false` (idiomatic
-  // JS `cond && rel.where(...)` short-circuit) falls back to the input.
-  const result =
-    scope.length === 0
-      ? (scope as unknown as (this: R) => R | false | null | undefined).call(rel)
-      : scope.call(rel, rel, owner);
-  return result || rel;
+  // See `invokeScopeLambda` in association-scope.ts for the arity /
+  // `this`-binding contract. `|| rel` (not `??`) mirrors Ruby's
+  // `instance_exec(owner, &scope) || relation` — truthiness-based, so a
+  // scope returning `false` (idiomatic JS `cond && rel.where(...)`
+  // short-circuit) falls back to the input.
+  return invokeScopeLambda(scope, rel, owner) || rel;
 }
 
 /**
