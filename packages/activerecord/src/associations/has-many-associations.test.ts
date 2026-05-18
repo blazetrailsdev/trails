@@ -26,11 +26,42 @@ import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions
 
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
 }
+
+async function freshAdapterWithSchema(schema: Schema): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, schema);
+  return adapter;
+}
+
+// Schema for the small head-of-file describes migrated to defineSchema
+// under TM Phase 5. The main `HasManyAssociationsTest` block further down
+// in this file still relies on auto-derived schema and is a follow-up.
+const HEAD_SCHEMA: Schema = {
+  cpk_authors: {
+    columns: { name: "string", author_code: "string" },
+    primaryKey: ["author_code"],
+  },
+  cpk_posts: { title: "string", author_code: "string" },
+  apk_authors: { name: "string", author_code: "string" },
+  apk_posts: { title: "string", author_code: "string" },
+  ids_authors: {
+    columns: { name: "string", author_code: "string" },
+    primaryKey: ["author_code"],
+  },
+  ids_posts: { title: "string", author_code: "string" },
+  blank_pk_authors: {
+    columns: { name: "string", author_code: "string" },
+    primaryKey: ["author_code"],
+  },
+  blank_pk_posts: { title: "string", author_code: "string" },
+  posts: { title: "string" },
+};
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
   afterEach(() => {
@@ -38,7 +69,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("custom primary key on new record should fetch with query", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class CpkAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -72,7 +103,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("association primary key on new record should fetch with query", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class ApkAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -105,7 +136,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("ids on unloaded association with custom primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class IdsAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -148,7 +179,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class BlankPkAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -186,7 +217,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
 describe("HasManyAssociationsTest", () => {
   it("transaction when deleting persisted", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -200,7 +231,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transaction when deleting new record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapterWithSchema(HEAD_SCHEMA);
     class Post extends Base {
       static {
         this.attribute("title", "string");
