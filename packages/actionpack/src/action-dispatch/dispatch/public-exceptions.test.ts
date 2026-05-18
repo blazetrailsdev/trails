@@ -65,6 +65,18 @@ describe("PublicExceptions", () => {
     });
   });
 
+  it("renders xml when requested", async () => {
+    const [status, headers, body] = await app.call({
+      PATH_INFO: "/500",
+      HTTP_ACCEPT: "application/xml",
+    });
+    expect(status).toBe(500);
+    expect(headers["content-type"]).toBe("application/xml; charset=utf-8");
+    const xml = await bodyToString(body);
+    expect(xml).toContain('<status type="integer">500</status>');
+    expect(xml).toContain("<error>Internal Server Error</error>");
+  });
+
   it("falls back to html when content type is invalid", async () => {
     const [status, headers] = await app.call({
       PATH_INFO: "/500",

@@ -16,12 +16,15 @@
  * Port of `actionpack/lib/action_dispatch/middleware/public_exceptions.rb`.
  */
 
-import { I18n, getFs } from "@blazetrails/activesupport";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { I18n, getFs, getPath } from "@blazetrails/activesupport";
+import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
-import { InvalidType } from "../http/mime-negotiation.js";
 import { MimeType } from "../http/mime-type.js";
+
+async function* emptyBody(): RackBody {}
+
+const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
 
 const DEFAULT_CHARSET = "utf-8";
 
@@ -38,16 +41,12 @@ export class PublicExceptions {
     const pathInfo = String(env["PATH_INFO"] ?? "");
     const status = parseInt(pathInfo.slice(1), 10) || 0;
 
-    let contentType: MimeType | undefined;
-    try {
-      contentType = this.firstFormat(env);
-    } catch (e) {
-      if (e instanceof InvalidType) {
-        contentType = MimeType.lookup("text");
-      } else {
-        throw e;
-      }
-    }
+    // Rails wraps this in a `rescue ActionDispatch::Http::MimeNegotiation::InvalidType`
+    // and falls back to `Mime[:text]`. Our `MimeType.parse` is forgiving (creates
+    // ad-hoc types for unknown ranges and never raises), so the rescue is a no-op
+    // until `Request.formats` lands and surfaces `InvalidType` for malformed
+    // Accept headers. See PR follow-ups.
+    const contentType = this.firstFormat(env);
 
     const body: ErrorBody = {
       status,
@@ -88,20 +87,24 @@ export class PublicExceptions {
   }
 
   private renderHtml(status: number): RackResponse {
-    const localized = `${this.publicPath}/${status}.${I18n.locale}.html`;
-    let path = localized;
-    let found = getFs().existsSync(path);
+    // Sanitize locale before string-interpolating into a file path so a
+    // misconfigured `I18n.locale` can never escape `publicPath`.
+    const locale = LOCALE_RE.test(I18n.locale) ? I18n.locale : null;
+    let file: string | null = locale
+      ? getPath().join(this.publicPath, `${status}.${locale}.html`)
+      : null;
+    let found = file != null && getFs().existsSync(file);
     if (!found) {
-      path = `${this.publicPath}/${status}.html`;
-      found = getFs().existsSync(path);
+      file = getPath().join(this.publicPath, `${status}.html`);
+      found = getFs().existsSync(file);
     }
 
-    if (found) {
-      const html = getFs().readFileSync(path, "utf8");
+    if (found && file != null) {
+      const html = getFs().readFileSync(file, "utf8");
       const htmlType = MimeType.lookup("html") ?? new MimeType("text/html", "html");
       return this.renderFormat(status, htmlType, html);
     }
-    return [404, { [X_CASCADE]: "pass" }, bodyFromString("")];
+    return [404, { [X_CASCADE]: "pass" }, emptyBody()];
   }
 }
 
