@@ -6,6 +6,7 @@ import { Base, registerModel, AssociationTypeMismatch } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { Associations, loadHasMany, loadHabtm, association } from "../associations.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -41,8 +42,18 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    // Schema covers the shared Developer/Project/DeveloperProject family
+    // used by the majority of tests in this describe. Tests further down
+    // that build their own `createTestAdapter()` adapter and declare
+    // inline classes seed their own schema inline next to the adapter
+    // construction.
+    await defineSchema(adapter, {
+      developers: { name: "string", salary: "integer" },
+      projects: { name: "string", approved: "boolean", featured: "boolean" },
+      developer_projects: { developer_id: "integer", project_id: "integer" },
+    });
     Developer.adapter = adapter;
     Project.adapter = adapter;
     DeveloperProject.adapter = adapter;
@@ -1176,6 +1187,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("association with validate false does not run associated validation callbacks on update", async () => {
     const a2 = createTestAdapter();
+    await defineSchema(a2, {
+      rich_person2s: { first_name: "string" },
+      treasure2s: { name: "string" },
+      treasures_rich_people2: { rich_person2_id: "integer", treasure2_id: "integer" },
+    });
     class RichPerson2 extends Base {
       static {
         this.attribute("first_name", "string");
@@ -1211,6 +1227,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("custom join table", async () => {
     // Use a differently-named join table model but with conventional FK columns
     const a2 = createTestAdapter();
+    await defineSchema(a2, {
+      cj_developers: { name: "string" },
+      cj_projects: { name: "string" },
+      custom_joins: { cj_developer_id: "integer", cj_project_id: "integer" },
+    });
     class CjDeveloper extends Base {
       static {
         this.attribute("name", "string");
@@ -1314,6 +1335,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("association name is the same as join table name", async () => {
     // Use a join table model whose name matches the association name
     const a2 = createTestAdapter();
+    await defineSchema(a2, {
+      same_devs: { name: "string" },
+      same_projs: { name: "string" },
+      same_joins: { same_dev_id: "integer", same_proj_id: "integer" },
+    });
     class SameDev extends Base {
       static {
         this.attribute("name", "string");
@@ -1454,6 +1480,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("layers destroyAssociations chain for multiple HABTMs on one class", async () => {
     const a2 = createTestAdapter();
+    await defineSchema(a2, {
+      multi_owners: { name: "string" },
+      tag_as: { name: "string" },
+      tag_bs: { name: "string" },
+      multi_owners_tag_as: { multi_owner_id: "integer", tag_a_id: "integer" },
+      multi_owners_tag_bs: { multi_owner_id: "integer", tag_b_id: "integer" },
+    });
     class MultiOwner extends Base {
       static {
         this.attribute("name", "string");
@@ -1508,6 +1541,12 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("subclass HABTM extends destroyAssociations chain via super", async () => {
     const a2 = createTestAdapter();
+    await defineSchema(a2, {
+      parent_owners: { name: "string" },
+      child_owners: { name: "string" },
+      parent_owners_p_tags: { parent_owner_id: "integer", tag_a_id: "integer" },
+      child_owners_c_tags: { child_owner_id: "integer", tag_b_id: "integer" },
+    });
     class ParentOwner extends Base {
       static {
         this.attribute("name", "string");
