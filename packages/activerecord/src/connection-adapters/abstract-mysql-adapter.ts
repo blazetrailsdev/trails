@@ -1476,6 +1476,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   static override initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
+    /**
+     * Mirrors: abstract_mysql_adapter.rb#extract_precision — for the
+     * `(date)?time(stamp)?` family, a missing `(N)` modifier resolves to 0
+     * (TIME ≡ TIME(0) on MySQL/MariaDB), not nil.
+     */
+    function extractMysqlTimePrecision(sqlType: string): number {
+      const m = sqlType.match(/\((\d+)\)/);
+      return m ? Number(m[1]) : 0;
+    }
+
     // Base types (mirrors AbstractAdapter#initialize_type_map via super)
     m.registerType(/^boolean/i, undefined, () => new BooleanType());
     m.registerType(/^char/i, undefined, () => new StringType());
@@ -1485,8 +1495,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(/^binary/i, undefined, () => new BinaryType());
     m.registerType(/^varbinary/i, undefined, () => new BinaryType());
     m.registerType(/^date$/i, new DateType());
-    m.registerType(/^time\b/i, undefined, () => new TimeType());
-    m.registerType(/^datetime/i, undefined, () => new MysqlDateTimeType());
+    m.registerType(
+      /^time\b/i,
+      undefined,
+      (sqlType) => new TimeType({ precision: extractMysqlTimePrecision(sqlType) }),
+    );
+    m.registerType(
+      /^datetime/i,
+      undefined,
+      (sqlType) => new MysqlDateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
+    );
     m.registerType(/decimal/i, undefined, () => new DecimalType());
     m.registerType(/numeric/i, undefined, () => new DecimalType());
     m.registerType("json", new JsonType());
@@ -1509,7 +1527,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
     m.registerType(/^year/i, undefined, () => new IntegerType());
     m.registerType(/^bit/i, undefined, () => new BinaryType());
-    m.registerType(/^timestamp/i, undefined, () => new MysqlDateTimeType());
+    m.registerType(
+      /^timestamp/i,
+      undefined,
+      (sqlType) => new MysqlDateTimeType({ precision: extractMysqlTimePrecision(sqlType) }),
+    );
   }
 
   /** @internal */

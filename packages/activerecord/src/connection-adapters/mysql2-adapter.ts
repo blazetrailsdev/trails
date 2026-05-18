@@ -1102,11 +1102,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // MysqlDateTimeType.name is "datetime" for both "datetime" and "timestamp" DATA_TYPEs.
       const castName = castType.name;
       const semanticType = (castName === "value" ? baseType : castName).toLowerCase();
+      // information_schema.numeric_precision is NULL for date/time/datetime/timestamp.
+      // MariaDB/MySQL encode fractional-seconds precision in the column_type string
+      // (e.g. "time(3)", "datetime(6)", "timestamp(0)") — parse it directly. Mirrors
+      // abstract_mysql_adapter.rb#extract_precision: for `(date)?time(stamp)?` types,
+      // a missing `(N)` defaults to 0 (TIME ≡ TIME(0) on MySQL/MariaDB), not null.
+      let precision: number | null = numPrec != null ? Number(numPrec) : null;
+      if (precision == null && /^(?:datetime|timestamp|time)\b/i.test(baseType)) {
+        const m = sqlType.match(/^(?:datetime|timestamp|time)\((\d+)\)/i);
+        precision = m ? Number(m[1]) : 0;
+      }
       const meta = new SqlTypeMetadata({
         sqlType,
         type: semanticType,
         limit: charLimitVal ?? typeMapLimit,
-        precision: numPrec != null ? Number(numPrec) : null,
+        precision,
         scale: numScale != null ? Number(numScale) : null,
       });
       const nullable =

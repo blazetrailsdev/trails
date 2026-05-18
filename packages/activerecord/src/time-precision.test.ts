@@ -3,7 +3,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { DatabaseAdapter } from "./adapter.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, adapterType } from "./test-adapter.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
@@ -71,7 +71,10 @@ describe("TimePrecisionTest", () => {
     expect(nsecTime((foo as any).finish)).toBe(123456000);
   });
 
-  it("no time precision isnt truncated on assignment", async () => {
+  // Rails skips this on Mysql2Adapter/TrilogyAdapter: a `TIME` column without
+  // explicit precision is `TIME(0)` on MySQL/MariaDB, so the assignment does
+  // truncate. See vendor/rails/activerecord/test/cases/time_precision_test.rb.
+  it.skipIf(adapterType === "mysql")("no time precision isnt truncated on assignment", async () => {
     await ctx.createTable("foos", { force: true }, () => {});
     await ctx.addColumn("foos", "start", "time");
     await ctx.addColumn("foos", "finish", "time", { precision: 6 });
