@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "@blazetrails/rack";
+import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
 import { ParamBuilder } from "./param-builder.js";
 
 function plain(v: unknown): unknown {
