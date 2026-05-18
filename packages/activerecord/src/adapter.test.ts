@@ -89,7 +89,7 @@ describe("AdapterTest", () => {
     // BLOCKED: schema — sqlite3 typeToSql uppercases unknown types; Rails preserves the original symbol-as-string
   });
   it.skip("current database", () => {
-    // BLOCKED: adapter-mysql — currentDatabase only on MySQL/PG adapters; SQLite branch skips
+    // BLOCKED: fixture — needs MySQL/PG adapter context (Rails skips on adapters without currentDatabase) + ARTest configurations wiring
   });
 });
 
