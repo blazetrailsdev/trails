@@ -458,7 +458,6 @@ export class Base extends Metal {
   /** @internal Rails parity — caching instrumentation name. */
   instrumentName = instrumentName;
 
-
   // --- Rescue ---
 
   /** Register a rescue handler for a specific error class. */
