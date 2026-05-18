@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -68,35 +69,34 @@ describeIfMysql("Mysql2Adapter", () => {
       // paths — plain "contains the table name" would pass either
       // way.
       const { Base } = await import("../../index.js");
+      await defineSchema(adapter, {
+        ex_rel_mysqls: { name: "string" },
+      });
       class ExRelMysql extends Base {
         static {
           this.attribute("name", "string");
           this.adapter = adapter;
         }
       }
-      await adapter.exec(`DROP TABLE IF EXISTS \`ex_rel_mysqls\``);
-      await adapter.exec(
-        `CREATE TABLE \`ex_rel_mysqls\` (\`id\` BIGINT AUTO_INCREMENT PRIMARY KEY, \`name\` VARCHAR(255))`,
-      );
-      try {
-        await ExRelMysql.create({ name: "r" });
-        const plan = await ExRelMysql.all().explain();
-        expect(typeof plan).toBe("string");
-        // The captured SQL came from `payload.sql` (post-mysqlQuote),
-        // so it uses backtick-quoted identifiers. The fallback
-        // `toSql()` path would emit `"ex_rel_mysqls"` with double
-        // quotes instead.
-        expect(plan).toContain("`ex_rel_mysqls`");
-        expect(plan).not.toMatch(/"ex_rel_mysqls"/);
-        // MySQL buildExplainClause header format:
-        expect(plan).toMatch(/EXPLAIN.*for:/);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS \`ex_rel_mysqls\``);
-      }
+      await ExRelMysql.create({ name: "r" });
+      const plan = await ExRelMysql.all().explain();
+      expect(typeof plan).toBe("string");
+      // The captured SQL came from `payload.sql` (post-mysqlQuote),
+      // so it uses backtick-quoted identifiers. The fallback
+      // `toSql()` path would emit `"ex_rel_mysqls"` with double
+      // quotes instead.
+      expect(plan).toContain("`ex_rel_mysqls`");
+      expect(plan).not.toMatch(/"ex_rel_mysqls"/);
+      // MySQL buildExplainClause header format:
+      expect(plan).toMatch(/EXPLAIN.*for:/);
     });
 
     it("Relation#explain on MySQL captures preload queries", async () => {
       const { Base, registerModel } = await import("../../index.js");
+      await defineSchema(adapter, {
+        ex_mysql_authors: { name: "string" },
+        ex_mysql_books: { title: "string", ex_mysql_author_id: "integer" },
+      });
       class ExMysqlAuthor extends Base {
         static {
           this.attribute("name", "string");
@@ -113,35 +113,22 @@ describeIfMysql("Mysql2Adapter", () => {
       ExMysqlAuthor.hasMany("exMysqlBooks", { className: "ExMysqlBook" });
       registerModel(ExMysqlAuthor);
       registerModel(ExMysqlBook);
-      await adapter.exec(`DROP TABLE IF EXISTS \`ex_mysql_books\``);
-      await adapter.exec(`DROP TABLE IF EXISTS \`ex_mysql_authors\``);
-      await adapter.exec(
-        `CREATE TABLE \`ex_mysql_authors\` (\`id\` BIGINT AUTO_INCREMENT PRIMARY KEY, \`name\` VARCHAR(255))`,
-      );
-      await adapter.exec(
-        `CREATE TABLE \`ex_mysql_books\` (\`id\` BIGINT AUTO_INCREMENT PRIMARY KEY, \`title\` VARCHAR(255), \`ex_mysql_author_id\` INT)`,
-      );
-      try {
-        const a = (await ExMysqlAuthor.create({ name: "A" })) as any;
-        await ExMysqlBook.create({ title: "B", ex_mysql_author_id: a.id });
+      const a = (await ExMysqlAuthor.create({ name: "A" })) as any;
+      await ExMysqlBook.create({ title: "B", ex_mysql_author_id: a.id });
 
-        const plan = await ExMysqlAuthor.all().preload("exMysqlBooks").explain();
-        const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
-        // The fallback path emits exactly one block (toSql() of the
-        // outer relation only, no preload query). Requiring ≥ 2
-        // blocks proves the preload query was captured through
-        // sql.active_record, not substituted from toSql().
-        expect(blocks.length).toBeGreaterThanOrEqual(2);
-        // Both blocks came from `payload.sql` and therefore carry
-        // backtick-quoted identifiers — the fallback form would use
-        // double quotes.
-        expect(plan).toContain("`ex_mysql_authors`");
-        expect(plan).toContain("`ex_mysql_books`");
-        expect(plan).not.toMatch(/"ex_mysql_(authors|books)"/);
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS \`ex_mysql_books\``);
-        await adapter.exec(`DROP TABLE IF EXISTS \`ex_mysql_authors\``);
-      }
+      const plan = await ExMysqlAuthor.all().preload("exMysqlBooks").explain();
+      const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+      // The fallback path emits exactly one block (toSql() of the
+      // outer relation only, no preload query). Requiring ≥ 2
+      // blocks proves the preload query was captured through
+      // sql.active_record, not substituted from toSql().
+      expect(blocks.length).toBeGreaterThanOrEqual(2);
+      // Both blocks came from `payload.sql` and therefore carry
+      // backtick-quoted identifiers — the fallback form would use
+      // double quotes.
+      expect(plan).toContain("`ex_mysql_authors`");
+      expect(plan).toContain("`ex_mysql_books`");
+      expect(plan).not.toMatch(/"ex_mysql_(authors|books)"/);
     });
   });
 });
