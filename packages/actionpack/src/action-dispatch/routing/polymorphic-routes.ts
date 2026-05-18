@@ -46,9 +46,16 @@ export interface PolymorphicMappingEntry {
   call(host: PolymorphicHost, args: unknown[], onlyPath: boolean): string;
 }
 
-/** Surface the host's `_routes` must expose for polymorphic dispatch. */
+/**
+ * Surface the host's `_routes` must expose for polymorphic dispatch.
+ *
+ * Optional because not every RouteSet-shaped object has been wired with the
+ * `direct(:name) { ... }` registry yet; {@link polymorphicMapping} treats a
+ * missing map as "no custom direct routes" so test doubles and partial
+ * implementations don't trip a `TypeError` on the first polymorphic call.
+ */
 export interface PolymorphicRoutesAccessor {
-  polymorphicMappings: Map<string, PolymorphicMappingEntry>;
+  polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
 }
 
 /**
@@ -211,12 +218,14 @@ export function polymorphicMapping(
   host: PolymorphicHost,
   record: unknown,
 ): PolymorphicMappingEntry | undefined {
+  const mappings = host._routes.polymorphicMappings;
+  if (!mappings) return undefined;
   if (isToModel(record)) {
-    return host._routes.polymorphicMappings.get(record.toModel().modelName.name);
+    return mappings.get(record.toModel().modelName.name);
   }
   const ctor = (record as { constructor?: { name?: string } })?.constructor;
   const key = ctor?.name ?? "";
-  return host._routes.polymorphicMappings.get(key);
+  return mappings.get(key);
 }
 
 type KeyStrategy = (name: ModelName) => string;

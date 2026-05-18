@@ -49,6 +49,13 @@ export type RoutesProxyInstance = RoutesProxy & {
 export class RoutesProxy implements UrlForHost {
   scope: UrlForHost;
   routes: UrlForRoutes;
+  /**
+   * Rails: `UrlFor` declares `class_attribute :default_url_options` and
+   * initializes it to `{}` in its `included` block. RoutesProxy inherits
+   * that writable accessor — callers may set `proxy.defaultUrlOptions =
+   * { host: "..." }` per-instance.
+   */
+  defaultUrlOptions: Record<string, unknown> = {};
   /** @internal Rails: `@helpers` */
   private _helpers: RoutesProxyHelpers;
   /** @internal Rails: `@script_namer` */
@@ -115,15 +122,6 @@ export class RoutesProxy implements UrlForHost {
   }
   set _routes(value: UrlForRoutes | null) {
     if (value != null) this.routes = value;
-  }
-
-  /**
-   * Rails: RoutesProxy doesn't own `default_url_options` — it's inherited
-   * from `UrlFor`, which delegates through to the wrapped scope. Mirror that
-   * by reading off `scope` so callers see one source of truth.
-   */
-  get defaultUrlOptions(): Record<string, unknown> {
-    return this.scope.defaultUrlOptions;
   }
 
   urlOptions(): Record<string, unknown> {

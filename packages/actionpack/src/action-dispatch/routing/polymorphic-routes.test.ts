@@ -109,7 +109,7 @@ describe("polymorphicUrl/Path", () => {
 
   test("polymorphic_mappings shortcut wins over RESTful dispatch", () => {
     const host = makeHost();
-    host._routes.polymorphicMappings.set("Post", {
+    host._routes.polymorphicMappings!.set("Post", {
       call: (_h, _args, onlyPath) => (onlyPath ? "/custom" : "http://example.com/custom"),
     });
     expect(polymorphicPath.call(host, new Post(1))).toBe("/custom");
