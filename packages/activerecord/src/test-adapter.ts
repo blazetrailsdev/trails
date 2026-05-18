@@ -538,7 +538,8 @@ function recordDdlTracking(
   dropMatch: RegExpMatchArray | null,
 ): void {
   if (createMatch) {
-    const table = createMatch[1];
+    // `["`](\w+)["`]` lives in group 1, bare `\w+` in group 2.
+    const table = createMatch[1] ?? createMatch[2];
     const wasTracked = _createdTables.has(table);
     _createdTables.add(table);
     if (!_createdColumns.has(table)) {
@@ -546,8 +547,9 @@ function recordDdlTracking(
     }
   }
   if (dropMatch) {
-    _createdTables.delete(dropMatch[1]);
-    _createdColumns.delete(dropMatch[1]);
+    const table = dropMatch[1] ?? dropMatch[2];
+    _createdTables.delete(table);
+    _createdColumns.delete(table);
   }
 }
 
@@ -978,8 +980,10 @@ class SchemaAdapter implements DatabaseAdapter {
     // Detect DDL shape ahead of time. We record table tracking only AFTER the
     // SQL succeeds — recording up front poisons _createdTables when the SQL
     // fails, which then makes handleMissingSchemaError refuse to recover.
-    const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
-    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
+    const createMatch = sql.match(
+      /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i,
+    );
+    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i);
 
     // Auto-add IF NOT EXISTS to CREATE TABLE to prevent "already exists" errors
     if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
@@ -1253,8 +1257,10 @@ class SchemaAdapter implements DatabaseAdapter {
 
   async exec(sql: string): Promise<void> {
     await this.setup();
-    const createMatch = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`](\w+)["`]/i);
-    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`](\w+)["`]/i);
+    const createMatch = sql.match(
+      /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i,
+    );
+    const dropMatch = sql.match(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i);
     // Auto-add IF NOT EXISTS / IF EXISTS
     if (/CREATE\s+TABLE\s+(?!IF)/i.test(sql)) {
       sql = sql.replace(/CREATE\s+TABLE\s+/i, "CREATE TABLE IF NOT EXISTS ");
