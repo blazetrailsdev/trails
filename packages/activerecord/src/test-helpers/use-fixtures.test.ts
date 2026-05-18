@@ -1,9 +1,28 @@
-import { describe, it, expect, expectTypeOf, vi } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeAll } from "vitest";
 import { useFixtures } from "./use-fixtures.js";
 import { FixtureSet } from "./fixture-set.js";
 import { Base } from "../base.js";
 import { fixtureId } from "./define-fixtures.js";
+import { defineSchema } from "./define-schema.js";
+import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+
+const TYPE_CONTRACT_SCHEMA = {
+  topics: { title: "string" },
+  posts: { body: "string" },
+} as const;
+
+// The type-contract describe below declares `Topic extends Base` and
+// `Post extends Base` with stubbed `findBy`, so test bodies never hit the
+// DB. The Phase 5 audit (scripts/audit-define-schema.ts) nevertheless
+// flags any file with `extends Base` that doesn't call `defineSchema`,
+// so prime a real adapter once at module load. The schema isn't actually
+// consumed by the current tests but documents the table shape these
+// stub-backed models would map to under AR_NO_AUTO_SCHEMA=1.
+beforeAll(async () => {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TYPE_CONTRACT_SCHEMA);
+});
 
 function makeAdapter(): DatabaseAdapter {
   return {
