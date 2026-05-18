@@ -68,6 +68,20 @@ function stripCommentsAndStrings(src: string): string {
     .replace(/"(?:\\.|[^"\\])*"/g, '""');
 }
 
+// Method-call patterns that imply the test actually executes against a live
+// adapter (INSERT/SELECT/UPDATE/DELETE round-trips). Tests that only build
+// queries and inspect `.toSql()`, or that exercise in-memory model behavior
+// (`queryAttribute`, `writeAttribute`, dirty tracking on unsaved instances),
+// pass under `AR_NO_AUTO_SCHEMA=1` even with no `defineSchema` call — the
+// schema simply never gets loaded because nothing asks the adapter for it.
+// Treat those as not-offending. The list mirrors AR's persistence/finder/
+// calculation surface. `loadSchemaFromAdapter` is *not* in the list — tests
+// that exercise schema loading typically do so against a stubbed adapter
+// (e.g. `attribute-methods/time-zone-conversion.test.ts` injects its own
+// `columnsHash`), so the real schema lifecycle never runs.
+const EXECUTION_MARKERS =
+  /\.(save|saveBang|create|createBang|createOrFindBy|update|updateBang|updateAll|updateAttribute|updateAttributes|updateColumn|updateColumns|upsert|upsertAll|insert|insertAll|destroy|destroyBang|destroyAll|destroyBy|delete|deleteAll|deleteBy|reload|touch|touchAll|increment|decrement|incrementCounter|decrementCounter|resetCounters|findBy|findByBang|findOrCreateBy|findOrInitializeBy|findEach|findInBatches|inBatches|pluck|pick|exists|sum|average|minimum|maximum|calculate|loadAsync|toArray)\b/;
+
 const offenders: string[] = [];
 for (const f of files) {
   const src = stripCommentsAndStrings(readFileSync(f, "utf8"));
@@ -79,6 +93,9 @@ for (const f of files) {
   // into a class body if no Base reference exists.
   if (!/class(?:\s+\w+)?\s+extends\s+\(?[^{(]*?\bBase\b/.test(src)) continue;
   if (/\bdefineSchema\s*\(/.test(src)) continue;
+  // Files that declare models but never hit the adapter for execution or
+  // schema reflection are inherently safe under `AR_NO_AUTO_SCHEMA=1`.
+  if (!EXECUTION_MARKERS.test(src)) continue;
   offenders.push(f);
 }
 
