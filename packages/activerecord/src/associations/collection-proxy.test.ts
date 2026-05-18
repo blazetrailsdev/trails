@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, association, registerModel } from "../index.js";
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
@@ -36,12 +37,16 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   // can find ApPost in the model registry.
   ApBlog.hasMany("apPosts", { className: "ApPost" });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
     ApBlog.adapter = adapter;
     ApPost.adapter = adapter;
     registerModel(ApBlog);
     registerModel(ApPost);
+    await defineSchema(adapter, {
+      ap_blogs: { name: "string" },
+      ap_posts: { title: "string", ap_blog_id: "integer" },
+    });
   });
 
   async function blogWithPosts(): Promise<ApBlog> {
