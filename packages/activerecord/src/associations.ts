@@ -1570,9 +1570,19 @@ function singleFk(fk: string | string[] | undefined, fallback: string): string {
   return fk ?? fallback;
 }
 
-/** Resolve the owner primary key column for HABTM, respecting options.primaryKey. */
-function habtmOwnerPk(options: AssociationOptions, ctor: typeof Base): string {
-  const pk = options.primaryKey ?? ctor.primaryKey;
+/**
+ * Resolve the owner primary key column for HABTM.
+ *
+ * Rails' `Builder::HasAndBelongsToMany` does not forward `:primary_key`
+ * to the generated middle `has_many :through` or to the rhs `belongs_to`
+ * (see `middle_options` / `belongs_to_options` —
+ * activerecord/lib/active_record/associations/builder/has_and_belongs_to_many.rb).
+ * The owner-side join always resolves to the model's primary key.
+ *
+ * @internal
+ */
+function habtmOwnerPk(_options: AssociationOptions, ctor: typeof Base): string {
+  const pk = ctor.primaryKey;
   if (Array.isArray(pk)) {
     throw new ConfigurationError("HABTM associations do not support composite primary keys");
   }
