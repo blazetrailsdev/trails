@@ -7,11 +7,19 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA = {
+  books: { name: "string", type: "string" },
+  authors: { name: "string" },
+} as const;
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("InstrumentationTest", () => {
@@ -87,7 +95,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on load", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -103,7 +111,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on create", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -119,7 +127,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on update", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -136,7 +144,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on update all", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -153,7 +161,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on destroy", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -170,7 +178,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on delete all", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -187,7 +195,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on pluck", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -204,7 +212,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on count", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -221,7 +229,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload name on grouped count", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -240,7 +248,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on select all", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -261,7 +269,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload row count on pluck", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -296,7 +304,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache disabled", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -321,7 +329,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("no instantiation notification when no records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Author extends Base {
       static {
         this.attribute("name", "string");
@@ -344,7 +352,7 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
   });
 
   it("payload without an open transaction", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");
@@ -373,7 +381,7 @@ describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
   });
 
   it("payload without an open transaction", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Book extends Base {
       static {
         this.attribute("name", "string");

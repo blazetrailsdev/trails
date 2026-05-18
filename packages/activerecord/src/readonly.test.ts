@@ -7,17 +7,28 @@ import { Base, ReadOnlyRecord } from "./index.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
+const TEST_SCHEMA = {
+  posts: { title: "string" },
+  devs: { name: "string", updated_at: "datetime" },
+  users: { name: "string" },
+  items: { name: "string" },
+  products: { sku: "string", name: "string" },
+} as const;
+
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
 }
 
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModel() {
@@ -167,8 +178,8 @@ describe("ReadonlyTest", () => {
 
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   function makeModel() {
@@ -185,7 +196,7 @@ describe("ReadonlyTest", () => {
     class Dev extends Base {
       static {
         this.attribute("name", "string");
-        this.attribute("updated_at", "string");
+        this.attribute("updated_at", "datetime");
         this.adapter = adapter;
       }
     }
@@ -212,8 +223,8 @@ describe("ReadonlyTest", () => {
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("cant save readonly record", async () => {
@@ -248,8 +259,8 @@ describe("ReadonlyTest", () => {
 
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("marks loaded records as readonly", async () => {
@@ -269,7 +280,7 @@ describe("ReadonlyTest", () => {
 
 describe("ReadonlyTest", () => {
   it("allows setting readonly attributes on create", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -288,7 +299,7 @@ describe("ReadonlyTest", () => {
     // on a persisted-record write to an attr_readonly column (readonly_attributes.rb
     // line 49). The Rails test by this name in newer Rails asserts that
     // behavior — the "ignores" wording pre-dates the raise being added.
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -311,8 +322,8 @@ describe("ReadonlyTest", () => {
     expect(product.name).toBe("Updated Widget");
   });
 
-  it("exposes readonlyAttributes list", () => {
-    const adapter = freshAdapter();
+  it("exposes readonlyAttributes list", async () => {
+    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -327,8 +338,8 @@ describe("ReadonlyTest", () => {
 
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   it("readonly records cannot be saved", async () => {
@@ -349,8 +360,8 @@ describe("ReadonlyTest", () => {
 describe("ReadonlyTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
 
   // Rails: test "readonly record cannot be saved"
