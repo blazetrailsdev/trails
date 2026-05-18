@@ -264,26 +264,12 @@ export class SchemaStatements {
     columns: string | string[],
     options: AddIndexOptions = {},
   ): Promise<void> {
-    const cols = Array.isArray(columns) ? columns : [columns];
-    const indexName = options.name ?? this.indexName(tableName, { column: cols });
-    this._validateIndexLength(tableName, indexName);
-    const indexDef = new IndexDefinition(tableName, indexName, options.unique ?? false, cols, {
-      where: options.where,
-      orders: options.order ?? {},
-      lengths: options.length ?? {},
-      opclasses: options.opclass ?? {},
-      using: options.using,
-      type: options.type,
-      comment: options.comment,
-      include: options.include,
-      nullsNotDistinct: options.nullsNotDistinct,
-    });
-    const createDef = new CreateIndexDefinition(
-      indexDef,
-      options.ifNotExists ?? false,
-      this.indexAlgorithm(options.algorithm),
+    const createIndex = this.buildCreateIndexDefinition(
+      tableName,
+      columns,
+      options as Record<string, unknown>,
     );
-    await this.adapter.executeMutation(this.schemaCreation.accept(createDef));
+    await this.adapter.executeMutation(this.schemaCreation.accept(createIndex));
   }
 
   async removeIndex(
@@ -1186,21 +1172,8 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): CreateIndexDefinition {
-    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
-    const indexName = options.name ?? this.indexName(tableName, { column: columnNames });
-    this._validateIndexLength(tableName, indexName);
-    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
-      where: options.where as string | undefined,
-      orders: (options.order ?? {}) as Record<string, string>,
-      lengths: (options.length ?? {}) as Record<string, number>,
-      opclasses: (options.opclass ?? {}) as Record<string, string>,
-      type: options.type as string | undefined,
-      using: options.using as string | undefined,
-      include: options.include as string[] | undefined,
-      nullsNotDistinct: options.nullsNotDistinct as boolean | undefined,
-      comment: options.comment as string | undefined,
-    });
-    return new CreateIndexDefinition(idx, !!options.ifNotExists, options.algorithm);
+    const [idx, algorithm, ifNotExists] = this.addIndexOptions(tableName, columnName, options);
+    return new CreateIndexDefinition(idx, ifNotExists, algorithm);
   }
 
   async isIndexNameExists(tableName: string, indexName: string): Promise<boolean> {
