@@ -3,6 +3,7 @@
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
 import { describe, it, expect, beforeEach } from "vitest";
+import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import {
   Base,
   registerModel,
@@ -2170,39 +2171,111 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     expect(parent.errors.details.get("kids[1].base")?.length ?? 0).toBeGreaterThan(0);
   });
   it("indexed errors should be properly translated", () => {
-    const { Parent, Child } = makeIndexedHasMany({ indexErrors: true });
-    const parent = new Parent({ name: "p" });
-    cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-    expect(parent.isValid()).toBe(false);
-    expect(parent.errors.where("children[1].name")).toHaveLength(1);
-    expect(parent.errors.where("children.name")).toHaveLength(0);
+    const oldCustomize = ModelError.i18nCustomizeFullMessage;
+    ModelError.i18nCustomizeFullMessage = true;
+    I18n.storeTranslations("en", {
+      activerecord: {
+        errors: {
+          models: {
+            "person/references": { format: "%{message}" },
+          },
+        },
+      },
+    });
+    try {
+      class Reference extends Base {
+        static {
+          this.attribute("favorite", "boolean");
+          this.attribute("job_id", "integer");
+          this.attribute("person_id", "integer");
+          this.validate(function (record: any) {
+            if (!record.favorite) record.errors.add("base", "should be favorite");
+          });
+          this.validates("job_id", { presence: true });
+        }
+      }
+      class Person extends Base {
+        static {
+          this.attribute("name", "string");
+        }
+      }
+      Person.adapter = adapter;
+      Reference.adapter = adapter;
+      registerModel("Person", Person);
+      registerModel("Reference", Reference);
+      Associations.hasMany.call(Person, "references", {
+        autosave: true,
+        indexErrors: true,
+        className: "Reference",
+        foreignKey: "person_id",
+      });
+
+      const refValid = new Reference({ favorite: true, job_id: 1 });
+      const refInvalid = new Reference({ favorite: false });
+      const p = new Person({});
+      cacheAssoc(p, "references", [refValid, refInvalid]);
+
+      expect(refValid.isValid()).toBe(true);
+      expect(refInvalid.isValid()).toBe(false);
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.fullMessages).toEqual(["should be favorite", "can't be blank"]);
+    } finally {
+      ModelError.i18nCustomizeFullMessage = oldCustomize;
+      I18n.reset();
+    }
   });
   it("indexed errors on base attribute should be properly translated", () => {
-    class O extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Pt extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("o_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    O.adapter = adapter;
-    Pt.adapter = adapter;
-    registerModel("OwnerHO", O);
-    registerModel("PetHO", Pt);
-    Associations.hasOne.call(O, "pet", {
-      autosave: true,
-      foreignKey: "o_id",
-      className: "PetHO",
+    I18n.storeTranslations("en", {
+      activerecord: {
+        attributes: {
+          person: { reference: "Super reference" },
+          reference: { base: "" },
+        },
+      },
     });
-    const owner = new O({ name: "Alice" });
-    cacheAssoc(owner, "pet", new Pt({ name: "" }));
-    expect(owner.isValid()).toBe(false);
-    expect(owner.errors.include("pet.name")).toBe(true);
+    try {
+      class Reference extends Base {
+        static {
+          this.attribute("favorite", "boolean");
+          this.attribute("job_id", "integer");
+          this.attribute("person_id", "integer");
+          this.validate(function (record: any) {
+            if (!record.favorite) record.errors.add("base", "should be favorite");
+          });
+          this.validates("job_id", { presence: true });
+        }
+      }
+      class Person extends Base {
+        static {
+          this.attribute("name", "string");
+          this.validates("reference", { presence: true });
+        }
+      }
+      Person.adapter = adapter;
+      Reference.adapter = adapter;
+      registerModel("Person", Person);
+      registerModel("Reference", Reference);
+      Associations.hasOne.call(Person, "reference", {
+        autosave: true,
+        className: "Reference",
+        foreignKey: "person_id",
+      });
+
+      const p = new Person({});
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.fullMessages).toEqual(["Super reference can't be blank"]);
+
+      const refInvalid = new Reference({ favorite: false });
+      cacheAssoc(p, "reference", refInvalid);
+      expect(refInvalid.isValid()).toBe(false);
+      expect(p.isValid()).toBe(false);
+      expect(p.errors.fullMessages).toEqual([
+        " should be favorite",
+        "Reference job can't be blank",
+      ]);
+    } finally {
+      I18n.reset();
+    }
   });
   it("errors details should be indexed when global flag is set", () => {
     const old = indexNestedAttributeErrors;
