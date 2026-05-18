@@ -36,6 +36,12 @@ interface ContentSecurityPolicyClassHost {
 
 interface ContentSecurityPolicyInstanceHost {
   request: CspRequest;
+  /**
+   * Rails resolves `current_content_security_policy` via `self`, so subclass
+   * overrides win (content_security_policy.rb:42). Wired as an instance slot
+   * on Base; the DSL dispatches through it to preserve that semantics.
+   */
+  currentContentSecurityPolicy?: typeof currentContentSecurityPolicy;
 }
 
 /**
@@ -75,7 +81,8 @@ export function contentSecurityPolicy(
   this.beforeAction(function (controller: unknown) {
     const host = controller as ContentSecurityPolicyInstanceHost;
     if (block) {
-      const policy = currentContentSecurityPolicy.call(host);
+      const resolveCurrent = host.currentContentSecurityPolicy ?? currentContentSecurityPolicy;
+      const policy = resolveCurrent.call(host);
       block.call(controller, policy);
       host.request.contentSecurityPolicy = policy;
     }
