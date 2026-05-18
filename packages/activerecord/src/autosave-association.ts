@@ -718,15 +718,18 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
       : !!(assocRecord as any).changed);
   if (assocRecord.isNewRecord() || beChangedForSave) {
     _setAutosavingBelongsToFor(record, assoc, true);
+    let saved: boolean | undefined;
     try {
       // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
-      const saved = await assocRecord.save({ validate: !autosave });
-      if (!saved) {
-        propagateErrors(record, assocRecord, assoc.name);
-        return false;
-      }
+      saved = await assocRecord.save({ validate: !autosave });
     } finally {
       _setAutosavingBelongsToFor(record, assoc, false);
+    }
+    if (!saved) {
+      propagateErrors(record, assocRecord, assoc.name);
+      // Rails save_belongs_to_association:571 — `saved if autosave`. Only
+      // autosave==true propagates the failure to abort the owner save.
+      return autosave ? false : true;
     }
 
     const foreignKey = _resolveBelongsToForeignKey(assoc);
@@ -741,11 +744,14 @@ async function _autosaveBelongsTo(record: Base, assoc: AssociationDefinition): P
     for (let i = 0; i < primaryKey.length; i++) {
       const fkCol = foreignKey[i];
       if (fkCol == null) continue;
-      const pkValue = assocRecord._readAttribute(primaryKey[i]);
-      if (pkValue != null) record._writeAttribute(fkCol, pkValue);
+      const associationId = assocRecord._readAttribute(primaryKey[i]);
+      // Rails save_belongs_to_association:566 — `unless self[fk] == id`.
+      if (record._readAttribute(fkCol) !== associationId) {
+        record._writeAttribute(fkCol, associationId);
+      }
     }
-    // Rails save_belongs_to_association:559-568: `association.loaded!` only
-    // fires inside the `if association.updated?` branch — after the FK write.
+    // Rails save_belongs_to_association:568 — `association.loaded!` fires
+    // inside the `if association.updated?` branch after the FK write.
     if (inst?.isUpdated?.()) inst.loadedBang?.();
   }
   return true;
