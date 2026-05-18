@@ -170,10 +170,15 @@ export class ParamBuilder {
 }
 
 function classNameOf(v: unknown): string {
+  // Mirrors Rails' `obj.class.name` in ParameterTypeError messages.
   if (v === null) return "NilClass";
   if (Array.isArray(v)) return "Array";
   if (typeof v === "string") return "String";
-  if (typeof v === "object") return "Hash";
+  if (typeof v === "object") {
+    const proto = Object.getPrototypeOf(v);
+    if (proto === null || proto === Object.prototype) return "Hash";
+    return (v as object).constructor?.name ?? "Object";
+  }
   return typeof v;
 }
 
