@@ -18,18 +18,26 @@ export function debug(object: unknown): SafeBuffer {
   }
 }
 
-function inspect(value: unknown): string {
+function inspect(value: unknown, seen: WeakSet<object> = new WeakSet()): string {
   if (value === null) return "null";
   if (value === undefined) return "undefined";
   if (typeof value === "string") return JSON.stringify(value);
   if (typeof value === "bigint") return `${value.toString()}n`;
-  if (typeof value === "function") return value.toString();
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return Object.prototype.toString.call(value);
-    }
+  if (typeof value === "symbol") return value.toString();
+  if (typeof value === "function") {
+    const name = (value as { name?: string }).name;
+    return `[Function${name ? `: ${name}` : " (anonymous)"}]`;
   }
-  return String(value);
+  if (typeof value !== "object") return String(value);
+
+  if (seen.has(value as object)) return "[Circular]";
+  seen.add(value as object);
+
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => inspect(v, seen)).join(", ")}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>).map(
+    ([k, v]) => `${k}: ${inspect(v, seen)}`,
+  );
+  return `{ ${entries.join(", ")} }`;
 }

@@ -1,9 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { SafeBuffer } from "@blazetrails/activesupport";
 import { debug } from "./debug-helper.js";
 import * as yaml from "@blazetrails/activesupport/yaml";
 
 describe("DebugHelperTest", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("test_debug", () => {
     const obj = { name: "firebase", count: 42 };
     const output = debug(obj).toString();
@@ -26,16 +30,23 @@ describe("DebugHelperTest", () => {
   });
 
   it("test_debug_with_marshal_error falls back to inspect inside code", () => {
-    const spy = vi.spyOn(yaml, "stringify").mockImplementation(() => {
+    vi.spyOn(yaml, "stringify").mockImplementation(() => {
       throw new Error("boom");
     });
-    try {
-      const out = debug({ html: "<b>x</b>" }).toString();
-      expect(out).toContain('<code class="debug_dump">');
-      expect(out).toContain("</code>");
-      expect(out).not.toContain("<pre");
-    } finally {
-      spy.mockRestore();
-    }
+    const out = debug({ html: "<b>x</b>" }).toString();
+    expect(out).toContain('<code class="debug_dump">');
+    expect(out).toContain("</code>");
+    expect(out).not.toContain("<pre");
+  });
+
+  it("fallback inspect renders circular references as [Circular]", () => {
+    vi.spyOn(yaml, "stringify").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const circular: Record<string, unknown> = { name: "x" };
+    circular.self = circular;
+    const out = debug(circular).toString();
+    expect(out).toContain("[Circular]");
+    expect(out).toContain("name:");
   });
 });
