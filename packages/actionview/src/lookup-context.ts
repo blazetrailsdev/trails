@@ -18,6 +18,17 @@ import type { TemplateResolver } from "./template-resolver.js";
 import type { Template } from "./template.js";
 
 export class MissingTemplate extends Error {
+  /** Rails-shape accessors — refined in Phase 1d. @internal stub - real impl in Phase 1d */
+  readonly path: string;
+  /** @internal stub - real impl in Phase 1d */
+  readonly paths: string[];
+  /** @internal stub - real impl in Phase 1d */
+  readonly prefixes: string[];
+  /** @internal stub - real impl in Phase 1d */
+  readonly partial: boolean;
+  /** @internal stub - real impl in Phase 1d */
+  readonly templateKeys: readonly string[];
+
   constructor(
     public readonly controller: string,
     public readonly action: string,
@@ -29,10 +40,22 @@ export class MissingTemplate extends Error {
         `Searched in: ${searchedPaths.length > 0 ? searchedPaths.join(", ") : "(no resolvers)"}`,
     );
     this.name = "MissingTemplate";
+    this.path = `${controller}/${action}`;
+    this.paths = searchedPaths;
+    this.prefixes = controller ? [controller] : [];
+    this.partial = action.startsWith("_");
+    this.templateKeys = [format];
   }
 }
 
 export class LookupContext {
+  /**
+   * Nested cache-key class, exposed at the value level by the runtime
+   * assignment near the bottom of this file and at the type level here.
+   * @internal stub - real impl in Phase 1d
+   */
+  static DetailsKey: typeof DetailsKey;
+
   private resolvers: TemplateResolver[] = [];
   private layoutName: string | false | null = "application";
   private _prefixes: string[] = [];
@@ -241,3 +264,26 @@ export class LookupContext {
     return this.resolvers.map((r) => r.constructor.name);
   }
 }
+
+/**
+ * Cache key for `{locale, formats, variants, handlers}` detail tuples.
+ * Hooked by the `action_view` load callback to clear the cache between
+ * request cycles. Real cache wiring lands in Phase 1d.
+ *
+ * Also exported as `LookupContext.DetailsKey` via namespace merging so
+ * downstream code can mirror Rails' `ActionView::LookupContext::DetailsKey`
+ * spelling without `as any` casts.
+ *
+ * @internal stub - real impl in Phase 1d
+ */
+export class DetailsKey {
+  /** @internal stub - real impl in Phase 1d */
+  static clear(): void {}
+}
+
+// Install DetailsKey as a static on LookupContext so consumers can write
+// `LookupContext.DetailsKey.clear()` — matching the Rails
+// `ActionView::LookupContext::DetailsKey` nesting both at the value and
+// the type level (see the corresponding `static DetailsKey: typeof
+// DetailsKey` field declared inside LookupContext above).
+(LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
