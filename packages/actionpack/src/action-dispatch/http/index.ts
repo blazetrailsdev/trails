@@ -63,6 +63,12 @@ export {
   type MimeNegotiationHost,
 } from "./mime-negotiation.js";
 export {
+  ParamError,
+  ParameterTypeError,
+  InvalidParameterError,
+  ParamsTooDeepError,
+} from "./param-error.js";
+export {
   FILTERED,
   filteredLocation,
   locationFilters,
