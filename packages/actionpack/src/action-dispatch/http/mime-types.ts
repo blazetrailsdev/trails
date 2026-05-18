@@ -22,7 +22,8 @@ export function registerDefaultMimeTypes(MimeType: MimeTypeRegistrar): void {
   MimeType.register("text/calendar", "ics");
   MimeType.register("text/csv", "csv");
   MimeType.register("text/vcard", "vcf");
-  MimeType.register("text/vtt", "vtt", [], ["vtt"]);
+  // Rails passes %w(vtt) in the synonyms slot (not extensions); mirror 1:1.
+  MimeType.register("text/vtt", "vtt", ["vtt"]);
 
   MimeType.register("image/png", "png", [], ["png"]);
   MimeType.register("image/jpeg", "jpeg", [], ["jpg", "jpeg", "jpe", "pjpeg"]);
