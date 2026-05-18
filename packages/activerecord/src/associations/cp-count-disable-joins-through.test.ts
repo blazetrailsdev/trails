@@ -18,16 +18,16 @@
  * DJAR materializes records to enforce the in-memory reorder.
  * We don't need to materialize for the count, so we emit COUNT.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("CollectionProxy#count — disable_joins through", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class CdAuthor extends Base {
     static {
@@ -50,7 +50,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       cd_authors: { name: "string" },
@@ -86,6 +86,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => Notifications.unsubscribeAll());
 

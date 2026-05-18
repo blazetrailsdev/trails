@@ -10,16 +10,16 @@
  *
  * Reset on init and on `reload()` via `reset_scope`.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Association scope cache", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class CacheAuthor extends Base {
     static {
@@ -39,7 +39,7 @@ describe("Association scope cache", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       cache_authors: { name: "string" },
@@ -64,6 +64,7 @@ describe("Association scope cache", () => {
       foreignKey: "cache_post_id",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Restore spies even if a test throws — leaked spies on
   // AssociationScope.scope can corrupt sibling tests in this file.

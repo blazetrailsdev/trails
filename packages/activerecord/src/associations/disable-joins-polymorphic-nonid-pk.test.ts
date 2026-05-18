@@ -25,13 +25,13 @@
  * (reflection.rb:968); our ReflectionProxy forwards it, and DJAS'
  * `_addConstraintsDj` threads it through the chain walk.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   dp_authors: { name: "string" },
@@ -50,14 +50,8 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class DpAuthor extends Base {
     static {
@@ -90,8 +84,9 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     DpAuthor.adapter = adapter;
     DpGallery.adapter = adapter;
     DpNonIdPhoto.adapter = adapter;
@@ -136,6 +131,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => Notifications.unsubscribeAll());
 

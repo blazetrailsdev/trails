@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   djs_authors: { name: "string" },
@@ -14,14 +14,8 @@ const TEST_SCHEMA: Schema = {
   djs_comments: { djs_post_id: "integer", body: "string" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("DisableJoinsAssociationScope", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class DjsAuthor extends Base {
     static {
@@ -44,8 +38,9 @@ describe("DisableJoinsAssociationScope", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     DjsAuthor.adapter = adapter;
     DjsPost.adapter = adapter;
     DjsComment.adapter = adapter;
@@ -81,6 +76,7 @@ describe("DisableJoinsAssociationScope", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Backstop in case a test throws before reaching its in-test
   // unsubscribe — leaked sql.active_record subscribers can corrupt

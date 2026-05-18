@@ -3,14 +3,14 @@
 // and loaded target stay wired up. Mirrors Rails'
 // ActiveRecord::AssociationRelation behavior.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, AssociationRelation } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("AssociationRelation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class ArBlog extends Base {
     declare name: string;
@@ -32,7 +32,7 @@ describe("AssociationRelation", () => {
 
   ArBlog.hasMany("arPosts", { className: "ArPost" });
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       ar_blogs: { name: "string" },
@@ -49,6 +49,7 @@ describe("AssociationRelation", () => {
     registerModel(ArBlog);
     registerModel(ArPost);
   });
+  withTransactionalFixtures(() => adapter);
 
   async function freshBlog(): Promise<ArBlog> {
     const blog = new ArBlog({ name: "Dev" });

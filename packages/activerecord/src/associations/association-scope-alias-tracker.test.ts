@@ -21,21 +21,17 @@
  * cases like `has_many :grandparents, through: :parents, source:
  * :parent` where self-joins are common.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
-
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class AtUser extends Base {
     static {
@@ -45,8 +41,8 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       at_users: { parent_id: "integer", name: "string" },
     });
@@ -68,6 +64,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
       source: "children",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("AliasTracker: bare table on first visit, aliased on repeat, thunk only invoked on repeat", () => {
     // Seed with an unrelated table so the first AtUser visit is

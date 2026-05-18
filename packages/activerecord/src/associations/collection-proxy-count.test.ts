@@ -18,16 +18,16 @@
  * path. Nested-through and `disable_joins: true` through shapes
  * fall back to load-and-length — tracked in task #22.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("CollectionProxy#count — non-through fast path", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class CpcAuthor extends Base {
     static {
@@ -43,7 +43,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       cpc_authors: { name: "string" },
@@ -61,6 +61,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
       foreignKey: "cpc_author_id",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => Notifications.unsubscribeAll());
 

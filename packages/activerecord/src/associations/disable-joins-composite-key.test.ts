@@ -14,14 +14,14 @@
  * joins through associations: tuple-style matching across the
  * intermediate records, no JOIN in the generated query shape.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   ck_shops: { name: "string" },
@@ -40,14 +40,8 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("DJAS — composite key support", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   // Shopify-style composite-PK shape: (shop_id, order_number). We
   // avoid `id` as the second PK column because Base.id is an accessor
@@ -76,8 +70,9 @@ describe("DJAS — composite key support", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     CkShop.adapter = adapter;
     CkOrder.adapter = adapter;
     CkLineItem.adapter = adapter;
@@ -104,6 +99,7 @@ describe("DJAS — composite key support", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Backstop in case a test throws before reaching its in-test
   // unsubscribe. Same pattern as instrumentation.test.ts.

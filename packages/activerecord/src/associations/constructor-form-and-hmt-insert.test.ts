@@ -5,15 +5,15 @@
  *   - HMT insert_record two-step alignment (super.insertRecord →
  *     save_through_record) for HABTM
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
-let _adapter: DatabaseAdapter;
-beforeEach(async () => {
+let _adapter: TestDatabaseAdapter;
+beforeAll(async () => {
   _adapter = createTestAdapter();
   await defineSchema(_adapter, {
     b30_owners: { name: "string" },
@@ -27,6 +27,7 @@ beforeEach(async () => {
     b30_posts_b30_tags: { b30_post_id: "integer", b30_tag_id: "integer" },
   });
 });
+withTransactionalFixtures(() => _adapter);
 
 describe("constructor-form association writer", () => {
   function makeHasManyModels() {

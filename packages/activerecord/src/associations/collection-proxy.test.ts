@@ -5,14 +5,14 @@
 // associations return today. No reader change yet — these methods
 // just exist on the proxy returned by `association(record, name)`.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class ApBlog extends Base {
     declare name: string;
@@ -37,7 +37,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   // can find ApPost in the model registry.
   ApBlog.hasMany("apPosts", { className: "ApPost" });
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     ApBlog.adapter = adapter;
     ApPost.adapter = adapter;
@@ -48,6 +48,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
       ap_posts: { title: "string", ap_blog_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   async function blogWithPosts(): Promise<ApBlog> {
     const blog = new ApBlog({ name: "Dev" });

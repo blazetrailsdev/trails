@@ -18,16 +18,16 @@
  * that re-introduces the gate — or any future change that silently
  * falls back to AssociationScope — is caught.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class RwAuthor extends Base {
     static {
@@ -56,7 +56,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       rw_authors: { name: "string" },
@@ -110,6 +110,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => {
     Notifications.unsubscribeAll();

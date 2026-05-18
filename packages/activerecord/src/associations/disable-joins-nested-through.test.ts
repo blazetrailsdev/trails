@@ -19,16 +19,16 @@
  * the gate, or a change to `_getChain` that silently falls back,
  * gets caught.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("DJAS routing widening — nested-through", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   // Author → Post → Comment → Rating (4-level chain).
   // `noJoinsNtRatings` on the author is nested: it goes through
@@ -61,7 +61,7 @@ describe("DJAS routing widening — nested-through", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       nt_authors: { name: "string" },
@@ -112,6 +112,7 @@ describe("DJAS routing widening — nested-through", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => {
     Notifications.unsubscribeAll();

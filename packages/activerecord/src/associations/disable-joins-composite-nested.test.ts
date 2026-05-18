@@ -25,13 +25,13 @@
  * line_item_tags) — the middle step emits an Arel OR-of-AND
  * composite predicate from PredicateBuilder.buildComposite.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   ck_shops: { name: "string" },
@@ -51,14 +51,8 @@ const TEST_SCHEMA: Schema = {
   ck_tags: { ck_line_item_id: "integer", value: "string" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("DJAS composite-key + nested-through", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class CkShop extends Base {
     static {
@@ -91,8 +85,9 @@ describe("DJAS composite-key + nested-through", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     CkShop.adapter = adapter;
     CkOrder.adapter = adapter;
     CkLineItem.adapter = adapter;
@@ -134,6 +129,7 @@ describe("DJAS composite-key + nested-through", () => {
       disableJoins: true,
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => Notifications.unsubscribeAll());
 
