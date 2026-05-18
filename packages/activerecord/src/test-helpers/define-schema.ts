@@ -202,6 +202,49 @@ const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   datetime: "string",
 };
 
+/**
+ * Per-adapter cache of the last-applied normalized table signatures. Lets
+ * `defineSchema` skip DDL when an identical schema is requested again —
+ * the Phase 6 hoist (`defineSchema` in `beforeAll` instead of `beforeEach`)
+ * relies on this being a no-op when nothing changed.
+ *
+ * @internal
+ */
+const _appliedSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>();
+
+/** @internal */
+function getCache(adapter: DatabaseAdapter): Map<string, string> {
+  let cache = _appliedSchemaSignatures.get(adapter);
+  if (!cache) {
+    cache = new Map();
+    _appliedSchemaSignatures.set(adapter, cache);
+  }
+  return cache;
+}
+
+/** @internal */
+function tableSignature(table: TableSchema): string {
+  const columns = columnsOf(table);
+  const pk = primaryKeyOf(table);
+  const sortedCols: Record<string, ColumnSpec> = {};
+  for (const k of Object.keys(columns).sort()) sortedCols[k] = columns[k];
+  return JSON.stringify({ columns: sortedCols, primaryKey: pk ?? null });
+}
+
+/**
+ * Some adapters (notably the test adapter) expose the set of currently
+ * created tables. When available, use it to invalidate stale cache entries
+ * — e.g. when an external `resetTestAdapterState` dropped tables out from
+ * under us. Returns `null` when the adapter doesn't expose this signal, in
+ * which case we trust the cache alone.
+ *
+ * @internal
+ */
+function adapterKnownTables(adapter: DatabaseAdapter): Set<string> | null {
+  const candidate = (adapter as unknown as { tables?: unknown }).tables;
+  return candidate instanceof Set ? (candidate as Set<string>) : null;
+}
+
 export async function defineSchema(
   adapter: DatabaseAdapter,
   schema: Schema,
@@ -216,14 +259,32 @@ export async function defineSchema(
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
 
+  const cache = getCache(adapter);
+  const known = adapterKnownTables(adapter);
+
   if (opts?.dropExisting) {
     for (const table of [...order].reverse()) {
       await ss.dropTable(table, { ifExists: true });
+      cache.delete(table);
     }
   }
 
   for (const table of order) {
     const raw = schema[table];
+    const newSig = tableSignature(raw);
+    const cachedSig = cache.get(table);
+    const stillExists = known ? known.has(table) : cachedSig !== undefined;
+    if (cachedSig === newSig && stillExists) {
+      continue;
+    }
+    if (stillExists) {
+      await ss.dropTable(table, { ifExists: true });
+    } else if (cachedSig !== undefined) {
+      // Cache says we created it, but the adapter no longer reports it as
+      // present (e.g. resetTestAdapterState wiped state). Forget the stale
+      // entry and create fresh.
+      cache.delete(table);
+    }
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
     const createOpts: { id?: boolean; primaryKey?: string[] } = {};
@@ -277,5 +338,6 @@ export async function defineSchema(
         t.column(colName, arType, options);
       }
     });
+    cache.set(table, newSig);
   }
 }

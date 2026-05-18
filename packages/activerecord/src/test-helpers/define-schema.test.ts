@@ -248,6 +248,83 @@ describe("defineSchema", () => {
     });
   });
 
+  describe("idempotency", () => {
+    function ddlCounts(sqls: string[]): { creates: number; drops: number } {
+      return {
+        creates: sqls.filter((s) => /CREATE TABLE/i.test(s)).length,
+        drops: sqls.filter((s) => /DROP TABLE/i.test(s)).length,
+      };
+    }
+
+    it("re-running with the same schema emits no DDL", async () => {
+      await defineSchema(adapter, {
+        widgets: { name: "string", count: "integer" },
+      });
+
+      const spy = vi.spyOn(adapter, "executeMutation");
+      await defineSchema(adapter, {
+        widgets: { name: "string", count: "integer" },
+      });
+
+      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
+      expect(creates).toBe(0);
+      expect(drops).toBe(0);
+    });
+
+    it("changed column type drops + recreates only the changed table", async () => {
+      await defineSchema(adapter, {
+        a: { name: "string" },
+        b: { count: "integer" },
+        c: { ratio: "float" },
+      });
+
+      const spy = vi.spyOn(adapter, "executeMutation");
+      await defineSchema(adapter, {
+        a: { name: "string" },
+        b: { count: "string" }, // type changed
+        c: { ratio: "float" },
+      });
+
+      const sqls = spy.mock.calls.map((c) => c[0] as string);
+      const creates = sqls.filter((s) => /CREATE TABLE/i.test(s));
+      const drops = sqls.filter((s) => /DROP TABLE/i.test(s));
+      expect(drops).toHaveLength(1);
+      expect(drops[0]).toMatch(/\bb\b/);
+      expect(creates).toHaveLength(1);
+      expect(creates[0]).toMatch(/\bb\b/);
+    });
+
+    it("adding a column to one table leaves siblings alone", async () => {
+      await defineSchema(adapter, {
+        p: { title: "string" },
+        q: { label: "string" },
+      });
+
+      const spy = vi.spyOn(adapter, "executeMutation");
+      await defineSchema(adapter, {
+        p: { title: "string", extra: "integer" }, // column added
+        q: { label: "string" },
+      });
+
+      const sqls = spy.mock.calls.map((c) => c[0] as string);
+      const touchedQ = sqls.some((s) => /\bq\b/.test(s) && /(CREATE|DROP) TABLE/i.test(s));
+      expect(touchedQ).toBe(false);
+      const createsP = sqls.filter((s) => /CREATE TABLE/i.test(s) && /\bp\b/.test(s));
+      expect(createsP).toHaveLength(1);
+    });
+
+    it("dropExisting forces full drop+recreate even when schemas match", async () => {
+      await defineSchema(adapter, { items: { name: "string" } });
+
+      const spy = vi.spyOn(adapter, "executeMutation");
+      await defineSchema(adapter, { items: { name: "string" } }, { dropExisting: true });
+
+      const { creates, drops } = ddlCounts(spy.mock.calls.map((c) => c[0] as string));
+      expect(creates).toBeGreaterThanOrEqual(1);
+      expect(drops).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   it("dropExisting drops first then creates", async () => {
     await defineSchema(adapter, { items: { name: "string" } });
     await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('old')`);
