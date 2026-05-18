@@ -2631,11 +2631,56 @@ describe("AssociationsTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.title).toBe("Following best practices");
   });
-  it.skip("polymorphic belongs to uses parent query constraints", () => {
-    // BLOCKED: associations — collection/singular feature gap
-    // ROOT-CAUSE: associations/associations.ts or preloader.ts missing collection/singular semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in associations.test.ts
-    /* needs composite key / query constraints support */
+  it("polymorphic belongs to uses parent query constraints", async () => {
+    // Rails: test_polymorphic_belongs_to_uses_parent_query_constraints (associations_test.rb:279).
+    // Owner has query_constraints :blog_id, :id. Polymorphic belongs_to :parent must derive
+    // the composite FK [blog_id, parent_id] and resolve against the target's
+    // [blog_id, id] query-constraints key — not just scalar parent_id.
+    const adapter = freshAdapter();
+    class PbtBlogPost extends Base {
+      static {
+        this._tableName = "pbt_blog_posts";
+        this.attribute("blog_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("parent_id", "integer");
+        this.attribute("parent_type", "string");
+        // Match Rails sharded_blog_posts: single auto-increment PK; the
+        // composite key is enforced at the model layer via query_constraints
+        // only. derive_fk_query_constraints in Rails reflection.rb:865-868
+        // depends on primary_key being a string for the first_key/last_key
+        // comparison, so an array PK would break the FK derivation entirely.
+        this.adapter = adapter;
+        (this as any)._queryConstraintsList = ["blog_id", "id"];
+        (this as any)._hasQueryConstraints = true;
+      }
+    }
+    registerModel("PbtBlogPost", PbtBlogPost);
+    Associations.belongsTo.call(PbtBlogPost, "parent", { polymorphic: true });
+    const parent = await PbtBlogPost.create({ blog_id: 1, id: 10, title: "Parent" });
+    const child = await PbtBlogPost.create({
+      blog_id: 1,
+      id: 11,
+      title: "Child",
+      parent_id: parent.id,
+      parent_type: "PbtBlogPost",
+    });
+    const loaded = await loadBelongsTo(child, "parent", { polymorphic: true });
+    expect(loaded).not.toBeNull();
+    expect(loaded!.id).toBe(parent.id);
+    expect(loaded!.title).toBe("Parent");
+    // Cross-tenant negative case: a child in blog 2 pointing at parent_id=10
+    // must NOT resolve to the blog-1 parent — proves blog_id participates
+    // (a buggy lookup using only parent_id would return the blog-1 parent).
+    const fakeChild = await PbtBlogPost.create({
+      blog_id: 2,
+      id: 12,
+      title: "WrongTenant",
+      parent_id: parent.id,
+      parent_type: "PbtBlogPost",
+    });
+    const wrong = await loadBelongsTo(fakeChild, "parent", { polymorphic: true });
+    expect(wrong).toBeNull();
   });
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
     const adapter = freshAdapter();
