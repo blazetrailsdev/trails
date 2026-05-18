@@ -1230,6 +1230,13 @@ describe("NestedThroughAssociationsTest", () => {
     // SCOPE: ~200 LOC rewire of throughAlias/effectiveName plus 30+ existing
     // nested-through tests whose SQL snapshots may drift.
     //
+    // Rails body, lifted verbatim:
+    //   const bob = await Author.find_by({ name: "bob" });
+    //   const similar = (await bob.similarPosts.toArray()).sort((a, b) => a.id - b.id);
+    //   expect(similar.map((p) => p.title)).toEqual([
+    //     "misc_by_bob", "misc_by_mary", "other_by_bob", "other_by_mary",
+    //   ]);
+    //
     // Mary and Bob both have posts in misc:
     //   const misc = await Author.joins("similar_posts")
     //     .where({ "posts.id": miscByBobId }).distinct().toArray();
