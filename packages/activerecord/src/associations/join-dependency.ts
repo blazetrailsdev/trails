@@ -683,10 +683,15 @@ export class JoinDependency {
       // We already consumed a table index for the target, give it back
       this._nextTableIndex--;
 
-      // Snapshot state for rollback if recursive call fails
+      // Snapshot state for rollback if recursive call fails. Includes a
+      // copy of `_usedTableNames` because the recursive `addAssociation`
+      // (and any nested `_addThroughAssociation`) can mutate it before
+      // returning null on its own failure guards (e.g. composite-PK on
+      // a deeper target).
       const snapshotNodes = this._nodes.length;
       const snapshotAliases = this._aliases.length;
       const snapshotNextIndex = this._nextTableIndex;
+      const snapshotUsedTableNames = new Set(this._usedTableNames);
 
       // Add the through table JOIN as a standalone node (intermediate)
       const throughColumns = getModelColumns(throughModel);
@@ -701,7 +706,7 @@ export class JoinDependency {
 
       // Commit-point: the through-node push below is the first
       // observable side-effect that depends on the alias decision.
-      const throughTableWasNew = !this._usedTableNames.has(throughTable);
+      // The pre-recursion snapshot above covers rollback of this add.
       this._usedTableNames.add(throughTable);
 
       const throughNodeName = parentAssocName
@@ -729,11 +734,14 @@ export class JoinDependency {
       });
 
       if (!recursiveNode) {
-        // Roll back intermediate state
+        // Roll back intermediate state. Restore `_usedTableNames` from
+        // the pre-recursion snapshot so any mutation by the recursive
+        // call (including its own through additions) is undone — the
+        // `throughTableWasNew` delete alone wouldn't cover that.
         this._nodes.length = snapshotNodes;
         this._aliases.length = snapshotAliases;
         this._nextTableIndex = snapshotNextIndex;
-        if (throughTableWasNew) this._usedTableNames.delete(throughTable);
+        this._usedTableNames = snapshotUsedTableNames;
         return null;
       }
 
