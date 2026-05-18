@@ -73,6 +73,11 @@ function normalize(params: ParamValue, stripNil: boolean): ParamValue {
     return stripNil ? mapped.filter((el) => el !== null) : mapped;
   }
   if (params !== null && typeof params === "object") {
+    // Rails normalize_encode_params only walks Hash/Array; class
+    // instances (UploadedFile, etc.) pass through as opaque leaves so
+    // their prototype + methods survive.
+    const proto = Object.getPrototypeOf(params);
+    if (proto !== null && proto !== Object.prototype) return params;
     // Null-prototype to (a) match parseNestedQuery's shape and (b) make
     // `__proto__` in an own key land as data instead of mutating the
     // prototype chain.

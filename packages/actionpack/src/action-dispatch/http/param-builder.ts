@@ -147,10 +147,10 @@ export class ParamBuilder {
 
   /** @internal */
   paramsHashType(obj: unknown): obj is ParamHash {
-    // Rails: `Hash === obj` — class-strict, excludes subclasses-of-Object
-    // like UploadedFile. Match by only accepting the null-prototype shape
-    // we build via makeParams(); custom classes (UploadedFile) fall
-    // through and trigger ParameterTypeError on hash-container paths.
+    // Rails: `Hash === obj` — true for any Hash (literal `{}` or
+    // makeParams-built). Class-strict, so subclasses-of-Object like
+    // UploadedFile do NOT qualify and fall through to trigger
+    // ParameterTypeError on hash-container paths.
     if (obj === null || typeof obj !== "object" || Array.isArray(obj)) return false;
     const proto = Object.getPrototypeOf(obj);
     return proto === null || proto === Object.prototype;
