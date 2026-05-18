@@ -9,6 +9,8 @@
 
 import { demodulize, singularize, underscore } from "@blazetrails/activesupport";
 
+import { ParseError } from "../../action-dispatch/http/parameters.js";
+
 /** @internal */
 export const EXCLUDE_PARAMETERS = ["authenticity_token", "_method", "utf8"];
 
@@ -78,7 +80,7 @@ export interface ParamsWrapperHost {
     contentMimeType: { ref(): string | null } | null;
     requestParameters: Record<string, unknown>;
     filteredParameters(): Record<string, unknown>;
-    parameters: Record<string, unknown>;
+    params: Record<string, unknown>;
   };
   _wrapperOptions: Options;
 }
@@ -167,9 +169,10 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
     const key = _wrapperKey.call(this);
     if (!formats || !formats.includes(ref)) return false;
     if (!key) return false;
-    return !Object.hasOwn(this.request.parameters, key);
-  } catch {
-    return false;
+    return !Object.hasOwn(this.request.params, key);
+  } catch (err) {
+    if (err instanceof ParseError) return false;
+    throw err;
   }
 }
 
@@ -188,7 +191,7 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
     if (Object.hasOwn(filtered, k)) slice[k] = filtered[k];
   }
   const wrappedFiltered = _wrapParameters.call(this, slice);
-  Object.assign(this.request.parameters, wrappedHash);
+  Object.assign(this.request.params, wrappedHash);
   Object.assign(this.request.requestParameters, wrappedHash);
   Object.assign(filtered, wrappedFiltered);
 }

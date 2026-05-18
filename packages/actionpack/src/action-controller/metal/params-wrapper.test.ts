@@ -12,6 +12,7 @@ import {
   _wrapperEnabled,
   type ParamsWrapperHost,
 } from "./params-wrapper.js";
+import { ParseError } from "../../action-dispatch/http/parameters.js";
 
 function makeHost(
   opts: Partial<Options> = {},
@@ -30,7 +31,7 @@ function makeHost(
     contentMimeType: { ref: () => "json" },
     requestParameters: {},
     filteredParameters: () => ({}),
-    parameters: {},
+    params: {},
     ...requestOverrides,
   };
   return { _wrapperOptions: merged, request };
@@ -83,13 +84,13 @@ describe("ParamsWrapper privates", () => {
   it("_wrapperEnabled true when format matches and key absent", () => {
     const host = makeHost(
       { name: "user", format: ["json"] },
-      { requestParameters: { name: "a" }, parameters: { name: "a" } },
+      { requestParameters: { name: "a" }, params: { name: "a" } },
     );
     expect(_wrapperEnabled.call(host)).toBe(true);
   });
 
   it("_wrapperEnabled false when wrapper key already present", () => {
-    const host = makeHost({ name: "user", format: ["json"] }, { parameters: { user: {} } });
+    const host = makeHost({ name: "user", format: ["json"] }, { params: { user: {} } });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
@@ -106,7 +107,19 @@ describe("ParamsWrapper privates", () => {
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
-  it("_wrapperEnabled false on parse error (rescue)", () => {
+  it("_wrapperEnabled false on ParseError (rescue ActionDispatch::Http::Parameters::ParseError)", () => {
+    const host = makeHost(
+      { name: "user", format: ["json"] },
+      {
+        hasContentType: () => {
+          throw new ParseError("bad json");
+        },
+      },
+    );
+    expect(_wrapperEnabled.call(host)).toBe(false);
+  });
+
+  it("_wrapperEnabled rethrows non-ParseError exceptions", () => {
     const host = makeHost(
       { name: "user", format: ["json"] },
       {
@@ -115,23 +128,23 @@ describe("ParamsWrapper privates", () => {
         },
       },
     );
-    expect(_wrapperEnabled.call(host)).toBe(false);
+    expect(() => _wrapperEnabled.call(host)).toThrow("boom");
   });
 
   it("_performParameterWrapping merges into request hashes", () => {
     const requestParameters: Record<string, unknown> = { name: "Dean", age: 30 };
-    const parameters: Record<string, unknown> = { ...requestParameters };
+    const params: Record<string, unknown> = { ...requestParameters };
     const filtered: Record<string, unknown> = { name: "Dean", age: 30 };
     const host = makeHost(
       { name: "user", include: ["name"] },
       {
         requestParameters,
-        parameters,
+        params,
         filteredParameters: () => filtered,
       },
     );
     _performParameterWrapping.call(host);
-    expect(parameters.user).toEqual({ name: "Dean" });
+    expect(params.user).toEqual({ name: "Dean" });
     expect(requestParameters.user).toEqual({ name: "Dean" });
     expect(filtered.user).toEqual({ name: "Dean" });
   });
