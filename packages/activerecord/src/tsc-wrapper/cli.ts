@@ -4,10 +4,9 @@ import ts from "typescript";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createTrailsProgram } from "./program.js";
-import { createTrailsSolutionBuilder } from "./build.js";
-import { remapDiagnostics } from "./remap.js";
+import { remapDiagnostics } from "@blazetrails/trails-tsc";
 import { virtualize } from "../type-virtualization/virtualize.js";
+import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js";
 import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 
 /**
@@ -251,7 +250,7 @@ function handleBuildMode(args: string[]): void {
   const fh = formatHost();
   const pretty = parsePretty(args, {});
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const builder = createTrailsSolutionBuilder(rootConfigs, {
+  const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
     onDiagnostic: (d) => {
@@ -302,7 +301,7 @@ function main(): void {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const { program, host, configDiagnostics } = createTrailsProgram(configPath, {
+  const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
   });
 

@@ -126,6 +126,9 @@ importers:
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -177,6 +180,12 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+
+  packages/trails-tsc:
+    dependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
   packages/trailties:
     dependencies:
@@ -282,6 +291,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../../packages/trails-tsc
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../../packages/trailties

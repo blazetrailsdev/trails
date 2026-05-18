@@ -51,7 +51,8 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
-    "@blazetrails/globalid": "workspace:*"
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   },
   "peerDependencies": {
     "better-sqlite3": "^12.6.2",

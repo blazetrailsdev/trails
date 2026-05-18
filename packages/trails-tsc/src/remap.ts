@@ -1,7 +1,25 @@
 import ts from "typescript";
 import * as path from "node:path";
-import { remapLine } from "../type-virtualization/virtualize.js";
+import type { LineDelta } from "./plugin.js";
 import type { TrailsCompilerHost } from "./host.js";
+
+/**
+ * Translate a 0-indexed line in the virtualized text back to the
+ * original source line, walking deltas in reverse. Returns `null`
+ * when the position falls inside an injected block.
+ */
+export function remapLine(virtualLine: number, deltas: readonly LineDelta[]): number | null {
+  let line = virtualLine;
+  for (let i = deltas.length - 1; i >= 0; i--) {
+    const d = deltas[i];
+    if (!d) continue;
+    const injectedStart = d.insertedAtLine;
+    const injectedEnd = d.insertedAtLine + d.lineCount;
+    if (line > injectedEnd) line -= d.lineCount;
+    else if (line > injectedStart && line <= injectedEnd) return null;
+  }
+  return line;
+}
 
 /**
  * Remap diagnostics from virtualized-source coordinates back to the

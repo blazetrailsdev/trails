@@ -21,6 +21,7 @@
     { "path": "packages/activesupport" },
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },
+    { "path": "packages/trails-tsc" },
     { "path": "packages/activerecord" },
     { "path": "packages/rack" },
     { "path": "packages/actionview" },
