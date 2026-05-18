@@ -94,12 +94,16 @@ export class ParamBuilder {
       }
     } catch (e) {
       // Rails rescues ArgumentError here — in Ruby, malformed percent-
-      // encoding in QueryParser raises ArgumentError. In JS the
-      // equivalent is URIError from decodeURIComponent.
+      // encoding in QueryParser raises ArgumentError, and UploadedFile
+      // raises ArgumentError on missing :tempfile/:content. In JS the
+      // analogs are URIError (from decodeURIComponent) and the codebase
+      // convention of `new Error("ArgumentError: …")` for Ruby-style
+      // ArgumentErrors that haven't been promoted to a dedicated class.
       if (
         e instanceof URIError ||
         e instanceof RangeError ||
-        (e instanceof Error && e.name === "ArgumentError")
+        (e instanceof Error &&
+          (e.name === "ArgumentError" || e.message.startsWith("ArgumentError:")))
       ) {
         throw new InvalidParameterError((e as Error).message);
       }
