@@ -23,6 +23,13 @@ import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.j
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
+import {
+  contentSecurityPolicy,
+  contentSecurityPolicyNonce,
+  contentSecurityPolicyReportOnly,
+  currentContentSecurityPolicy,
+  isContentSecurityPolicy,
+} from "./metal/content-security-policy.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -384,6 +391,39 @@ export class Base extends Metal {
    * Mirrors Rails `permissions_policy` class DSL.
    */
   static permissionsPolicy = permissionsPolicy;
+
+  // --- Content Security Policy ---
+
+  /**
+   * Override the globally configured Content-Security-Policy on a
+   * per-action basis. Mirrors Rails `content_security_policy` class DSL.
+   */
+  static contentSecurityPolicy = contentSecurityPolicy;
+
+  /**
+   * Override the globally configured Content-Security-Policy-Report-Only
+   * header. Mirrors Rails `content_security_policy_report_only` class DSL.
+   */
+  static contentSecurityPolicyReportOnly = contentSecurityPolicyReportOnly;
+
+  /**
+   * Defined as prototype methods (not instance fields) so subclasses can
+   * override via the normal class-method syntax — the DSL dispatches through
+   * `this.currentContentSecurityPolicy` (content-security-policy.ts:80) for
+   * Rails parity (content_security_policy.rb:42 resolves via `self`).
+   */
+  /** @internal Private in Rails; exposed for parity coverage. */
+  isContentSecurityPolicy(): boolean {
+    return isContentSecurityPolicy.call(this as never);
+  }
+  /** @internal Private in Rails; exposed for parity coverage. */
+  contentSecurityPolicyNonce(): string | null {
+    return contentSecurityPolicyNonce.call(this as never);
+  }
+  /** @internal Private in Rails; exposed for parity coverage. */
+  currentContentSecurityPolicy(): ReturnType<typeof currentContentSecurityPolicy> {
+    return currentContentSecurityPolicy.call(this as never);
+  }
 
   /**
    * Apply a rate limit to all actions (or those selected by `only:`/`except:`).
