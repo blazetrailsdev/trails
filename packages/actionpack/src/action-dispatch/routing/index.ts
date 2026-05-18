@@ -31,6 +31,13 @@ export {
 } from "./polymorphic-routes.js";
 export { Endpoint } from "./endpoint.js";
 export {
+  RoutesProxy,
+  mergeScriptNames,
+  type RoutesProxyHelpers,
+  type RoutesProxyInstance,
+  type ScriptNamer,
+} from "./routes-proxy.js";
+export {
   redirect,
   Redirect,
   PathRedirect,

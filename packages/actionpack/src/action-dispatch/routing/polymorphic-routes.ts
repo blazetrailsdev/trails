@@ -15,13 +15,15 @@
  *     polymorphicUrl([Symbol.for("admin"), post]) // admin_post_url(post)
  *     polymorphicUrl(Comment)                    // comments_url()
  *
- * `RoutesProxy` is not yet ported; the corresponding `record_or_hash_or_array.first
- * .is_a?(RoutesProxy)` branch in Rails is omitted here and will be wired when
- * `routes_proxy.rb` lands.
+ * When the first element of the array is a `RoutesProxy`, it becomes the
+ * recipient of the resolved helper call (mirroring Rails' `shift` in
+ * `HelperMethodBuilder.polymorphic_method`).
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
+
+import { RoutesProxy } from "./routes-proxy.js";
 
 /** Record-shaped argument: anything with `toModel()`. */
 export interface ToModel {
@@ -64,7 +66,7 @@ export type PolymorphicArg =
   | ModelClass
   | string
   | symbol
-  | ReadonlyArray<ToModel | ModelClass | string | symbol | null | undefined>
+  | ReadonlyArray<ToModel | ModelClass | string | symbol | RoutesProxy | null | undefined>
   // Hash form: { id: record, ...opts }
   | Record<string, unknown>;
 
@@ -285,12 +287,15 @@ export class HelperMethodBuilder {
 
     let method: string;
     let args: unknown[];
+    let target: PolymorphicHost = recipient;
     if (Array.isArray(recordOrHashOrArray)) {
       const compact = recordOrHashOrArray.filter((x) => x != null);
       if (compact.length === 0) {
         throw new ArgumentError("Nil location provided. Can't build URI.");
       }
-      // RoutesProxy branch omitted — not yet ported.
+      if (compact[0] instanceof RoutesProxy) {
+        target = compact.shift() as unknown as PolymorphicHost;
+      }
       [method, args] = builder.handleList(compact);
     } else if (typeof recordOrHashOrArray === "string") {
       [method, args] = builder.handleString(recordOrHashOrArray);
@@ -304,13 +309,13 @@ export class HelperMethodBuilder {
       [method, args] = builder.handleModel(recordOrHashOrArray as ToModel);
     }
 
-    const helper = recipient[method];
+    const helper = (target as unknown as Record<string, unknown>)[method];
     if (typeof helper !== "function") {
       throw new ArgumentError(`undefined route helper ${method}`);
     }
     return Object.keys(options).length === 0
-      ? (helper as (...a: unknown[]) => string).call(recipient, ...args)
-      : (helper as (...a: unknown[]) => string).call(recipient, ...args, options);
+      ? (helper as (...a: unknown[]) => string).call(target, ...args)
+      : (helper as (...a: unknown[]) => string).call(target, ...args, options);
   }
 
   readonly suffix: string;

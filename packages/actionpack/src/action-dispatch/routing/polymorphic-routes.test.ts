@@ -9,6 +9,8 @@ import {
   type PolymorphicHost,
   type PolymorphicMappingEntry,
 } from "./polymorphic-routes.js";
+import { RoutesProxy } from "./routes-proxy.js";
+import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 
 class Post {
   static readonly modelName = new ModelName("Post");
@@ -112,6 +114,35 @@ describe("polymorphicUrl/Path", () => {
     });
     expect(polymorphicPath.call(host, new Post(1))).toBe("/custom");
     expect(polymorphicUrl.call(host, new Post(1))).toBe("http://example.com/custom");
+  });
+});
+
+describe("polymorphic dispatch with leading RoutesProxy", () => {
+  test("invokes resolved helper on the proxy with merged options", () => {
+    const seen: unknown[][] = [];
+    const helpers = {
+      post_path: (...args: unknown[]) => {
+        seen.push(args);
+        return `/mounted/posts/${(args[0] as Post).id}`;
+      },
+    };
+    const routes: UrlForRoutes = { urlFor: () => "" };
+    const scope: UrlForHost = {
+      _routes: routes,
+      defaultUrlOptions: { locale: "en" },
+      urlOptions() {
+        return urlOptions.call(this);
+      },
+    };
+    const proxy = new RoutesProxy(routes, scope, helpers);
+
+    const host = makeHost();
+    const out = polymorphicPath.call(host, [proxy, new Post(7)]);
+    expect(out).toBe("/mounted/posts/7");
+    // helper invoked through proxy → merged options appended as last arg
+    expect(seen.length).toBe(1);
+    const finalArg = seen[0][seen[0].length - 1] as Record<string, unknown>;
+    expect(finalArg.locale).toBe("en");
   });
 });
 
