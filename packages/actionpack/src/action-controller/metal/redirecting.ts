@@ -44,9 +44,8 @@ export function redirectBackOrTo(
   fallbackLocation: string,
   options: { allowOtherHost?: boolean } & Record<string, unknown> = {},
 ): void {
-  const allowOtherHost = options.allowOtherHost ?? _allowOtherHost.call(this as PrivateHost);
-  const { allowOtherHost: _ignored, ...redirectOptions } = options;
-  void _ignored;
+  const { allowOtherHost: explicitAllow, ...redirectOptions } = options;
+  const allowOtherHost = explicitAllow ?? _allowOtherHost.call(this as PrivateHost);
   const referer = this.request.referer;
   if (referer && (allowOtherHost || _urlHostAllowed.call(this, referer))) {
     this.redirectTo(referer, { allowOtherHost, ...redirectOptions });
@@ -114,6 +113,7 @@ export function _extractRedirectToStatus(
   if (
     options !== null &&
     typeof options === "object" &&
+    !Array.isArray(options) &&
     Object.hasOwn(options as object, "status")
   ) {
     const opts = options as Record<string, unknown>;
@@ -151,22 +151,21 @@ export function _enforceOpenRedirectProtection(
  */
 export function _urlHostAllowed(this: RedirectingHost, url: unknown): boolean {
   const raw = url == null ? "" : String(url);
-  let host: string | null;
-  try {
-    if (raw.startsWith("//")) {
-      const parsed = new URL(`http:${raw}`);
-      host = parsed.hostname;
-    } else if (/^[a-z][a-z\d\-+.]*:/i.test(raw)) {
-      const parsed = new URL(raw);
-      host = parsed.hostname;
-    } else {
-      host = null;
+  // Mirrors Ruby's `URI(url).host`, which is nil for any input without an
+  // explicit scheme — protocol-relative `//foo` URLs included. That's the
+  // load-bearing piece of the open-redirect guard: every `//`-prefixed URL
+  // falls through to the trailing `!raw.startsWith("//")` rejection,
+  // regardless of whether the post-`//` authority happens to match
+  // `request.host`.
+  let host: string | null = null;
+  if (/^[a-z][a-z\d\-+.]*:/i.test(raw)) {
+    try {
+      host = new URL(raw).hostname || null;
+    } catch {
+      return false;
     }
-  } catch {
-    return false;
   }
-  if (host === (this.request.host ?? "")) return true;
-  if (host !== null) return false;
+  if (host !== null) return host === (this.request.host ?? "");
   if (!raw.startsWith("/")) return false;
   return !raw.startsWith("//");
 }
