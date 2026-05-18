@@ -16,6 +16,7 @@ import {
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   markForDestruction,
@@ -40,8 +41,16 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      pirates: { catchphrase: "string" },
+      ships: { name: "string", pirate_id: "integer" },
+      birds: { name: "string", pirate_id: "integer" },
+      parts: { name: "string", ship_id: "integer" },
+      parrots: { name: "string" },
+      parrots_pirates: { pirate_id: "integer", parrot_id: "integer" },
+    });
   });
 
   function makePirateShip() {
