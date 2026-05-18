@@ -89,9 +89,8 @@ export class PathSet implements Iterable<PathSetResolver> {
   ): unknown {
     const found = this.findAll(path, prefixes, partial, details, detailsKey, locals);
     if (found.length > 0) return found[0];
-    throw new Error(
-      `Missing template ${String(path)} with prefixes [${[].concat(prefixes as never).join(", ")}]`,
-    );
+    const pfxs = Array.isArray(prefixes) ? prefixes : [prefixes];
+    throw new Error(`Missing template ${String(path)} with prefixes [${pfxs.join(", ")}]`);
   }
 
   findAll(
