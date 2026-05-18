@@ -44,6 +44,18 @@ export class ThroughAssociation extends Association {
     const sourceRecordsByOwner = await this._getSourceRecordsByOwner();
 
     const throughRefl = this._throughReflection;
+    const firstOwner = this.owners[0] as any;
+    const throughLoadedOnFirst =
+      throughRefl != null &&
+      firstOwner != null &&
+      ((firstOwner._preloadedAssociations?.has(throughRefl.name) ?? false) ||
+        (() => {
+          try {
+            return !!firstOwner.association?.(throughRefl.name)?.loaded;
+          } catch {
+            return false;
+          }
+        })());
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -53,20 +65,18 @@ export class ThroughAssociation extends Association {
 
       let throughRecords = throughRecordsByOwner.get(owner) ?? [];
 
-      // source_type filtering on through records when already loaded
-      if (throughRefl) {
-        try {
-          if ((owner as any).association(throughRefl.name)?.loaded) {
-            const sourceType = (this.reflection as any).options?.sourceType;
-            const foreignType = (this.reflection as any).foreignType;
-            if (sourceType && foreignType) {
-              throughRecords = throughRecords.filter(
-                (record) => (record as any)._readAttribute(foreignType) === sourceType,
-              );
-            }
-          }
-        } catch {
-          // association may not exist
+      // Mirror Rails: when the through reflection is already loaded on the
+      // owners, narrow through_records by source_type. (Identity preservation
+      // for the polymorphic+sourceType path is handled up-front in
+      // _getThroughRecordsByOwner / _getMiddleRecords.)
+      if (throughLoadedOnFirst) {
+        const sourceType = (this.reflection as any).options?.sourceType;
+        const foreignType =
+          (this.reflection as any).foreignType ?? (this._sourceReflection as any)?.foreignType;
+        if (sourceType && foreignType) {
+          throughRecords = throughRecords.filter(
+            (record) => (record as any)._readAttribute(foreignType) === sourceType,
+          );
         }
       }
 
@@ -207,7 +217,87 @@ export class ThroughAssociation extends Association {
   }
 
   private _getMiddleRecords(): Base[] {
+    const loaded = this._alreadyLoadedThroughByOwner();
+    if (loaded) {
+      const seen = new Set<Base>();
+      const out: Base[] = [];
+      for (const arr of loaded.values()) {
+        for (const r of arr) {
+          if (!seen.has(r)) {
+            seen.add(r);
+            out.push(r);
+          }
+        }
+      }
+      return out;
+    }
     return this._getThroughPreloaders().flatMap((l) => l.preloadedRecords);
+  }
+
+  /**
+   * Identity-preservation gate for the polymorphic-source + `sourceType` path.
+   *
+   * Rails' `records_by_owner` filter (`owners.first.association(through).loaded?`,
+   * preloader/through_association.rb:20) is mirrored verbatim in the
+   * `recordsByOwner` loop above. This helper is the stricter intercept that
+   * runs *before* the through preloader fetches: it only fires when the
+   * reflection has a `sourceType` AND **every** owner already has the through
+   * preloaded — that combination is the empty-result gap, and the
+   * `every`-gate keeps mixed loaded/unloaded preloads on the standard
+   * LoaderRecords merge path (see "preload through records with already
+   * loaded middle record" in associations.test.ts). Reusing the loaded
+   * through records keeps middleRecords and throughRecordsByOwner referencing
+   * the same instances so the source preloader's identity-keyed lookups
+   * succeed.
+   * @internal
+   */
+  private _alreadyLoadedThroughByOwner(): Map<Base, Base[]> | null {
+    const throughRefl = this._throughReflection;
+    if (!throughRefl || this.owners.length === 0) return null;
+
+    // Conservative gate: only intercept when the through reflection is a
+    // polymorphic source with a `sourceType` filter AND every owner already has
+    // the through association preloaded. This is the Rails-source-mirrored
+    // empty-result gap (records re-fetched by a separate preloader run no
+    // longer identity-match the source preloader's middle records). Mixed
+    // loaded/unloaded owners stay on the standard LoaderRecords path so it
+    // can merge already-loaded keys with newly queried ones.
+    const sourceType = (this.reflection as any).options?.sourceType;
+    if (!sourceType) return null;
+    let foreignType: string | null | undefined = (this.reflection as any).foreignType;
+    if (!foreignType) {
+      foreignType = (this._sourceReflection as any)?.foreignType ?? null;
+    }
+    if (!foreignType) return null;
+
+    const throughName = throughRefl.name;
+    const loadedForOwner = (owner: any): boolean => {
+      if (owner._preloadedAssociations?.has(throughName)) return true;
+      try {
+        return !!owner.association?.(throughName)?.loaded;
+      } catch {
+        return false;
+      }
+    };
+    if (!this.owners.every(loadedForOwner)) return null;
+
+    const map = new Map<Base, Base[]>();
+    for (const owner of this.owners) {
+      let recs: any = (owner as any)._preloadedAssociations?.get(throughName);
+      if (recs == null) {
+        try {
+          recs = (owner as any).association?.(throughName)?.target;
+        } catch {
+          recs = null;
+        }
+      }
+      const arr: Base[] = Array.isArray(recs) ? [...recs] : recs != null ? [recs] : [];
+      const filtered = arr.filter(
+        (record) => (record as any)._readAttribute(foreignType!) === sourceType,
+      );
+      map.set(owner, filtered);
+    }
+    return map;
   }
 
   private async _getSourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
@@ -229,6 +319,11 @@ export class ThroughAssociation extends Association {
 
   private async _getThroughRecordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._throughRecordsByOwner !== undefined) return this._throughRecordsByOwner;
+    const loaded = this._alreadyLoadedThroughByOwner();
+    if (loaded) {
+      this._throughRecordsByOwner = loaded;
+      return this._throughRecordsByOwner;
+    }
     const maps = await Promise.all(this._getThroughPreloaders().map((l) => l.recordsByOwner()));
     this._throughRecordsByOwner = new Map();
     for (const map of maps) {

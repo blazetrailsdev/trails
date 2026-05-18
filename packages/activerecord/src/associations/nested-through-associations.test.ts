@@ -1117,9 +1117,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("joins and includes from through models not included in association", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("has one through has one through with belongs to source reflection preload", async () => {
@@ -1203,9 +1203,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("distinct has many through a has many through association on through reflection", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   // Mirrors Rails test_nested_has_many_through_with_a_table_referenced_multiple_times
@@ -1510,9 +1510,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("has many through with sti on nested through reflection", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through writers should raise error", async () => {
@@ -1729,9 +1729,9 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("nested has many through with conditions on through associations preload via joins", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through with conditions on source associations", async () => {
@@ -1802,15 +1802,15 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("through association preload doesnt reset source association if already preloaded", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("nested has many through with conditions on source associations preload via joins", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("nested has many through with foreign key option on the source reflection through reflection", async () => {
@@ -1883,13 +1883,13 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it.skip("nested has many through should not be autosaved", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it("polymorphic has many through when through association has not loaded", async () => {
-    // Hotel -> departments -> chefs -> cake_designers (polymorphic)
+    // Hotel -> departments -> chefs -> cake_designers / drink_designers (polymorphic)
     class PhmtHotel extends Base {
       static {
         this.attribute("name", "string");
@@ -1916,6 +1916,12 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
+    class PhmtDrinkDesigner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
     Associations.hasMany.call(PhmtHotel, "phmtDepartments", {
       className: "PhmtDepartment",
       foreignKey: "phmt_hotel_id",
@@ -1933,6 +1939,12 @@ describe("NestedThroughAssociationsTest", () => {
       source: "employable",
       sourceType: "PhmtCakeDesigner",
     });
+    Associations.hasMany.call(PhmtHotel, "phmtDrinkDesigners", {
+      className: "PhmtDrinkDesigner",
+      through: "phmtChefs",
+      source: "employable",
+      sourceType: "PhmtDrinkDesigner",
+    });
     Associations.hasMany.call(PhmtDepartment, "phmtChefs", {
       className: "PhmtChef",
       foreignKey: "phmt_department_id",
@@ -1945,8 +1957,10 @@ describe("NestedThroughAssociationsTest", () => {
     registerModel("PhmtDepartment", PhmtDepartment);
     registerModel("PhmtChef", PhmtChef);
     registerModel("PhmtCakeDesigner", PhmtCakeDesigner);
+    registerModel("PhmtDrinkDesigner", PhmtDrinkDesigner);
 
     const cakeDesigner = await PhmtCakeDesigner.create({ name: "Cake Boss" });
+    const drinkDesigner = await PhmtDrinkDesigner.create({ name: "Drink Boss" });
     const hotel = await PhmtHotel.create({ name: "Grand" });
     const dept = await PhmtDepartment.create({ phmt_hotel_id: hotel.id });
     await PhmtChef.create({
@@ -1954,17 +1968,26 @@ describe("NestedThroughAssociationsTest", () => {
       employable_id: cakeDesigner.id,
       employable_type: "PhmtCakeDesigner",
     });
+    await PhmtChef.create({
+      phmt_department_id: dept.id,
+      employable_id: drinkDesigner.id,
+      employable_type: "PhmtDrinkDesigner",
+    });
 
-    // Preload chefs through departments (tests the through path with polymorphic source defined)
-    const hotels = await PhmtHotel.all().preload("phmtChefs").toArray();
+    // Mirrors Rails: Hotel.includes(:cake_designers, :drink_designers).take
+    const hotels = await PhmtHotel.all()
+      .preload("phmtCakeDesigners", "phmtDrinkDesigners")
+      .toArray();
     expect(hotels).toHaveLength(1);
-    const chefs = (hotels[0] as any)._preloadedAssociations?.get("phmtChefs") ?? [];
-    expect(chefs).toHaveLength(1);
-    expect(chefs[0].employable_type).toBe("PhmtCakeDesigner");
+    const cakes = (hotels[0] as any)._preloadedAssociations?.get("phmtCakeDesigners") ?? [];
+    const drinks = (hotels[0] as any)._preloadedAssociations?.get("phmtDrinkDesigners") ?? [];
+    expect(cakes.map((r: any) => r.id)).toEqual([cakeDesigner.id]);
+    expect(drinks.map((r: any) => r.id)).toEqual([drinkDesigner.id]);
   });
 
   it("polymorphic has many through when through association has already loaded", async () => {
-    // Same setup, but preload both chefs and cake_designers
+    // Same setup as above, but include the chefs through-association in the preload list
+    // so the through reflection is already loaded when the polymorphic source is resolved.
     class PhmtHotel2 extends Base {
       static {
         this.attribute("name", "string");
@@ -1991,6 +2014,12 @@ describe("NestedThroughAssociationsTest", () => {
         this.adapter = adapter;
       }
     }
+    class PhmtDrinkDesigner2 extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
     Associations.hasMany.call(PhmtHotel2, "phmtDepartment2s", {
       className: "PhmtDepartment2",
       foreignKey: "phmt_hotel2_id",
@@ -2001,16 +2030,34 @@ describe("NestedThroughAssociationsTest", () => {
       through: "phmtDepartment2s",
       source: "phmtChef2s",
     });
+    Associations.hasMany.call(PhmtHotel2, "phmtCakeDesigner2s", {
+      className: "PhmtCakeDesigner2",
+      through: "phmtChef2s",
+      source: "employable",
+      sourceType: "PhmtCakeDesigner2",
+    });
+    Associations.hasMany.call(PhmtHotel2, "phmtDrinkDesigner2s", {
+      className: "PhmtDrinkDesigner2",
+      through: "phmtChef2s",
+      source: "employable",
+      sourceType: "PhmtDrinkDesigner2",
+    });
     Associations.hasMany.call(PhmtDepartment2, "phmtChef2s", {
       className: "PhmtChef2",
       foreignKey: "phmt_department2_id",
+    });
+    Associations.belongsTo.call(PhmtChef2, "employable", {
+      polymorphic: true,
+      foreignKey: "employable_id",
     });
     registerModel("PhmtHotel2", PhmtHotel2);
     registerModel("PhmtDepartment2", PhmtDepartment2);
     registerModel("PhmtChef2", PhmtChef2);
     registerModel("PhmtCakeDesigner2", PhmtCakeDesigner2);
+    registerModel("PhmtDrinkDesigner2", PhmtDrinkDesigner2);
 
     const cakeDesigner = await PhmtCakeDesigner2.create({ name: "Cake Boss" });
+    const drinkDesigner = await PhmtDrinkDesigner2.create({ name: "Drink Boss" });
     const hotel = await PhmtHotel2.create({ name: "Grand" });
     const dept = await PhmtDepartment2.create({ phmt_hotel2_id: hotel.id });
     await PhmtChef2.create({
@@ -2018,29 +2065,39 @@ describe("NestedThroughAssociationsTest", () => {
       employable_id: cakeDesigner.id,
       employable_type: "PhmtCakeDesigner2",
     });
+    await PhmtChef2.create({
+      phmt_department2_id: dept.id,
+      employable_id: drinkDesigner.id,
+      employable_type: "PhmtDrinkDesigner2",
+    });
 
-    const hotels = await PhmtHotel2.all().preload("phmtChef2s").toArray();
+    // Mirrors Rails: Hotel.includes(:chefs, :cake_designers, :drink_designers).take
+    const hotels = await PhmtHotel2.all()
+      .preload("phmtChef2s", "phmtCakeDesigner2s", "phmtDrinkDesigner2s")
+      .toArray();
     expect(hotels).toHaveLength(1);
-    const chefs = (hotels[0] as any)._preloadedAssociations?.get("phmtChef2s") ?? [];
-    expect(chefs).toHaveLength(1);
+    const cakes = (hotels[0] as any)._preloadedAssociations?.get("phmtCakeDesigner2s") ?? [];
+    const drinks = (hotels[0] as any)._preloadedAssociations?.get("phmtDrinkDesigner2s") ?? [];
+    expect(cakes.map((r: any) => r.id)).toEqual([cakeDesigner.id]);
+    expect(drinks.map((r: any) => r.id)).toEqual([drinkDesigner.id]);
   });
 
   it.skip("polymorphic has many through joined different table twice", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("has many through polymorphic with scope", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 
   it.skip("has many through reset source reflection after loading is complete", () => {
-    // BLOCKED: associations — nested-attributes feature gap
-    // ROOT-CAUSE: associations/nested-through-associations.ts or preloader.ts missing nested-attributes semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in nested-through-associations.test.ts
+    // BLOCKED: associations — nested-through edge case
+    // ROOT-CAUSE: associations/ or preloader/ — feature-specific (joins/distinct/STI/polymorphic-with-scope/autosave/source-reset)
+    // SCOPE: per-stub; see test name for the specific behavior. Tracked under Batch 34 follow-ups.
   });
 });
 
