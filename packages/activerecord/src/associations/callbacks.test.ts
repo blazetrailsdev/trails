@@ -2,24 +2,21 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
 
 // ==========================================================================
 // AssociationCallbacksTest — targets associations/callbacks_test.rb
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
+  let adapter: DatabaseAdapter;
   let cbIdx = 0;
-  function makePostWithCallbacks(adapter: DatabaseAdapter, callbacks: any) {
+  function makePostWithCallbacks(callbacks: any) {
     const idx = ++cbIdx;
     const commentName = `CBComment${idx}`;
     const postName = `CBPost${idx}`;
@@ -27,33 +24,40 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
-        Associations.hasMany.call(this, "comments", {
-          className: commentName,
-          foreignKey: "post_id",
-          ...callbacks,
-        });
       }
     }
+    Comment.adapter = adapter;
+    Post.adapter = adapter;
+    Associations.hasMany.call(Post, "comments", {
+      className: commentName,
+      foreignKey: "post_id",
+      ...callbacks,
+    });
     registerModel(commentName, Comment);
     registerModel(postName, Post);
     return { Post, Comment };
   }
 
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      comments: { body: "string", post_id: "integer" },
+      posts: { title: "string" },
+    });
+  });
+
   it("adding macro callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     // "macro" style: callback defined as a named function (equivalent to Ruby's method name symbol)
     function onAdd(_owner: any, record: any) {
       log.push("macro:add:" + record.body);
     }
-    const { Post, Comment } = makePostWithCallbacks(adapter, { afterAdd: onAdd });
+    const { Post, Comment } = makePostWithCallbacks({ afterAdd: onAdd });
     const post = await Post.create({ title: "Post" });
     const proxy = association(post, "comments");
     const c = new (Comment as any)({ body: "Hello", post_id: post.id });
@@ -62,9 +66,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("adding with proc callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("before:" + record.body);
       },
@@ -81,12 +84,11 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("removing with macro callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     function onRemove(_owner: any, record: any) {
       log.push("macro:remove:" + record.body);
     }
-    const { Post, Comment } = makePostWithCallbacks(adapter, { afterRemove: onRemove });
+    const { Post, Comment } = makePostWithCallbacks({ afterRemove: onRemove });
     const post = await Post.create({ title: "Post" });
     const c = await (Comment as any).create({ body: "ToRemove", post_id: post.id });
     const proxy = association(post, "comments");
@@ -95,9 +97,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("removing with proc callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeRemove: (_owner: any, record: any) => {
         log.push("before:remove:" + record.body);
       },
@@ -114,9 +115,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("multiple callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: (_owner: any, _record: any) => {
         log.push("b1");
       },
@@ -145,8 +145,9 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("AssociationCallbacksTest", () => {
+  let adapter: DatabaseAdapter;
   let cbIdx = 0;
-  function makePostWithCallbacks(adapter: DatabaseAdapter, callbacks: any) {
+  function makePostWithCallbacks(callbacks: any) {
     const idx = ++cbIdx;
     const commentName = `CBComment${idx}`;
     const postName = `CBPost${idx}`;
@@ -154,29 +155,38 @@ describe("AssociationCallbacksTest", () => {
       static {
         this.attribute("body", "string");
         this.attribute("post_id", "integer");
-        this.adapter = adapter;
       }
     }
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = adapter;
-        Associations.hasMany.call(this, "comments", {
-          className: commentName,
-          foreignKey: "post_id",
-          ...callbacks,
-        });
       }
     }
+    Comment.adapter = adapter;
+    Post.adapter = adapter;
+    Associations.hasMany.call(Post, "comments", {
+      className: commentName,
+      foreignKey: "post_id",
+      ...callbacks,
+    });
     registerModel(commentName, Comment);
     registerModel(postName, Post);
     return { Post, Comment };
   }
 
+  beforeEach(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      comments: { body: "string", post_id: "integer" },
+      posts: { title: "string" },
+      profiles: { bio: "string", user_id: "integer" },
+      users: { name: "string" },
+    });
+  });
+
   it("add callback on has many", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterAdd: (_owner: any, record: any) => {
         log.push("added:" + (record.id ?? "<new>"));
       },
@@ -190,9 +200,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("remove callback on has many", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterRemove: (_owner: any, record: any) => {
         log.push("removed:" + record.id);
       },
@@ -206,9 +215,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("add callback on has many with proc", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("before:" + (record.id ?? "<new>"));
       },
@@ -225,9 +233,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("add callback on has many with string", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterAdd: (_owner: any, record: any) => {
         log.push("string_cb:" + record.id);
       },
@@ -240,22 +247,21 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("add callback on has one", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     const idx = ++cbIdx;
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
+    Profile.adapter = adapter;
+    User.adapter = adapter;
     registerModel(`HOProfile${idx}`, Profile);
     registerModel(`HOUser${idx}`, User);
     Associations.hasMany.call(User, "profiles", {
@@ -273,22 +279,21 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("remove callback on has one", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     const idx = ++cbIdx;
     class Profile extends Base {
       static {
         this.attribute("bio", "string");
         this.attribute("user_id", "integer");
-        this.adapter = adapter;
       }
     }
     class User extends Base {
       static {
         this.attribute("name", "string");
-        this.adapter = adapter;
       }
     }
+    Profile.adapter = adapter;
+    User.adapter = adapter;
     registerModel(`HORProfile${idx}`, Profile);
     registerModel(`HORUser${idx}`, User);
     Associations.hasMany.call(User, "profiles", {
@@ -309,9 +314,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("add callback fires before save", async () => {
-    const adapter = freshAdapter();
     let wasNew: boolean | undefined;
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         wasNew = record.isNewRecord();
       },
@@ -324,9 +328,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("add callback fires after save", async () => {
-    const adapter = freshAdapter();
     let wasNew: boolean | undefined;
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterAdd: (_owner: any, record: any) => {
         wasNew = record.isNewRecord();
       },
@@ -339,8 +342,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("before add throwing abort prevents add", async () => {
-    const adapter = freshAdapter();
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: () => false as const,
     });
     const post = await Post.create({ title: "Post" });
@@ -352,9 +354,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("after add is called after adding to collection", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterAdd: (_owner: any, record: any) => {
         log.push("after:" + record.id);
       },
@@ -369,9 +370,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("before remove callback", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeRemove: (_owner: any, record: any) => {
         log.push("before_remove:" + record.id);
       },
@@ -384,9 +384,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("after remove callback", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       afterRemove: (_owner: any, record: any) => {
         log.push("after_remove:" + record.id);
       },
@@ -399,9 +398,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("ba:" + (record.id ?? "<new>"));
       },
@@ -429,9 +427,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks with create", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post } = makePostWithCallbacks(adapter, {
+    const { Post } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("before:" + (record.id ?? "<new>"));
       },
@@ -447,9 +444,8 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("has many callbacks with build", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
-    const { Post } = makePostWithCallbacks(adapter, {
+    const { Post } = makePostWithCallbacks({
       beforeAdd: (_owner: any, record: any) => {
         log.push("before:" + (record.id ?? "<new>"));
       },
@@ -464,8 +460,7 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("before add abort prevents create from saving", async () => {
-    const adapter = freshAdapter();
-    const { Post, Comment } = makePostWithCallbacks(adapter, {
+    const { Post, Comment } = makePostWithCallbacks({
       beforeAdd: () => false as const,
     });
     const post = await Post.create({ title: "Post" });
