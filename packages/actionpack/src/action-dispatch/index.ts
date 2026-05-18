@@ -1,6 +1,7 @@
 export const VERSION = "8.0.2";
 
 export { Deprecator, deprecator } from "./deprecator.js";
+export { Trailtie, type ActionDispatchConfig } from "./trailtie.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export * as Constants from "./constants.js";
 export * as Journey from "./journey/index.js";
