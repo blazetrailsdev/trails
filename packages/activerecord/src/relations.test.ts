@@ -2210,6 +2210,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", email: "string" } });
 
     await User.create({ name: "Alice", email: "a@b.com" });
     await User.create({ name: "Bob" }); // email null
@@ -2228,6 +2229,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -2250,6 +2252,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
 
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 30 });
@@ -2272,6 +2275,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     for (let i = 0; i < 5; i++) await User.create({ name: `U${i}` });
 
@@ -2288,6 +2292,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     for (let i = 0; i < 5; i++) await User.create({ name: `U${i}` });
 
@@ -2305,6 +2310,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", email: "string" } });
 
     await User.create({ name: "Alice", email: "a@b.com" });
 
@@ -2324,6 +2330,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
 
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 30 });
@@ -2344,6 +2351,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -2362,6 +2370,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -2379,6 +2388,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     // once none() is applied, additional conditions are irrelevant
@@ -2395,6 +2405,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Bob" });
     await User.create({ name: "Alice" });
@@ -2412,6 +2423,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Bob" });
     await User.create({ name: "Alice" });
@@ -2429,6 +2441,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     expect(await User.all().count()).toBe(0);
   });
@@ -2442,6 +2455,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     expect(await User.all().pluck("name")).toEqual([]);
   });
@@ -2456,6 +2470,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
 
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Alice", age: 30 });
@@ -2476,6 +2491,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
 
     await User.create({ name: "Bob", age: 30 });
     await User.create({ name: "Alice", age: 25 });
@@ -2495,6 +2511,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
     await User.create({ name: "Alice", age: 25 });
     await User.create({ name: "Bob", age: 30 });
     const result = await User.all().order("name").pick("name");
@@ -2509,6 +2526,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     expect(await User.all().pick("name")).toBe(null);
   });
 
@@ -2520,6 +2538,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "A" });
     await User.create({ name: "B" });
     await User.create({ name: "C" });
@@ -2535,6 +2554,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     const result = await User.all().none().first(2);
     expect(result).toEqual([]);
   });
@@ -2547,6 +2567,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "A" });
     await User.create({ name: "B" });
     await User.create({ name: "C" });
@@ -2562,6 +2583,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     const result = await User.all().none().last(2);
     expect(result).toEqual([]);
   });
@@ -2576,6 +2598,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     const result = await User.all().explain();
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
@@ -2592,6 +2615,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", age: "integer" } });
     await User.create({ name: "Alice", age: 20 });
     await User.create({ name: "Bob", age: 30 });
     await User.create({ name: "Charlie", age: 25 });
@@ -2610,6 +2634,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     const all1 = User.all();
     const all2 = User.all();
@@ -2626,6 +2651,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", active: "boolean" } });
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
 
@@ -2645,6 +2671,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string", active: "boolean" } });
     await User.create({ name: "Alice", active: true });
     await User.create({ name: "Bob", active: false });
 
