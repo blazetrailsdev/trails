@@ -23,28 +23,48 @@ export class Renderers {
     return new Set(RENDERERS);
   }
 
+  /**
+   * Mirrors Rails `Renderers._render_with_renderer_method_name(key)`.
+   * Returns the conventional dispatch method name for a renderer key.
+   */
+  static _renderWithRendererMethodName(key: string): string {
+    return `_render_with_renderer_${key}`;
+  }
+
   static add(key: string, block: RendererProc): void {
     RENDERERS.add(key);
-    this._registry.set(key, block);
+    this._registry.set(this._renderWithRendererMethodName(key), block);
   }
 
   static remove(key: string): void {
     RENDERERS.delete(key);
-    this._registry.delete(key);
+    this._registry.delete(this._renderWithRendererMethodName(key));
   }
 
   static get(key: string): RendererProc | undefined {
-    return this._registry.get(key);
+    return this._registry.get(this._renderWithRendererMethodName(key));
   }
 
-  static renderToBody(options: Record<string, unknown>): string | null {
+  /**
+   * Mirrors Rails `_render_to_body_with_renderer(options)`. Iterates the
+   * registered renderer names, and for the first key present in `options`
+   * dispatches to the renderer proc by its conventional method name.
+   * Returns `null` when no registered renderer key matches.
+   */
+  static _renderToBodyWithRenderer(options: Record<string, unknown>): string | null {
     for (const name of RENDERERS) {
-      if (name in options) {
-        const renderer = this._registry.get(name);
+      if (Object.hasOwn(options, name)) {
+        const methodName = this._renderWithRendererMethodName(name);
+        const renderer = this._registry.get(methodName);
         if (renderer) return renderer(options[name], options);
       }
     }
     return null;
+  }
+
+  /** @deprecated use {@link _renderToBodyWithRenderer} */
+  static renderToBody(options: Record<string, unknown>): string | null {
+    return this._renderToBodyWithRenderer(options);
   }
 
   static useRenderers(...renderers: string[]): void {
