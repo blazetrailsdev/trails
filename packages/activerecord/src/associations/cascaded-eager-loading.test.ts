@@ -7,11 +7,14 @@ import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema, type TableSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+async function freshAdapter(schema?: Record<string, TableSchema>): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  if (schema) await defineSchema(adapter, schema);
+  return adapter;
 }
 
 describe("CascadedEagerLoadingTest", () => {
@@ -64,7 +67,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading with nil associations", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      en_parents: { name: "string" },
+      en_children: { value: "string", en_parent_id: "integer" },
+    });
     class ENParent extends Base {
       static {
         this._tableName = "en_parents";
@@ -118,7 +124,9 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading with has many sti", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      sti_topics: { title: "string", type: "string", parent_id: "integer" },
+    });
     class StiTopic extends Base {
       static {
         this.attribute("title", "string");
@@ -159,7 +167,9 @@ describe("CascadedEagerLoadingTest", () => {
     expect(t2Replies).toHaveLength(0);
   });
   it("eager association loading with has many sti and subclasses", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      sti_topics2: { title: "string", type: "string", parent_id: "integer" },
+    });
     class StiTopic2 extends Base {
       static {
         this.attribute("title", "string");
@@ -201,7 +211,9 @@ describe("CascadedEagerLoadingTest", () => {
     expect(replies).toHaveLength(2);
   });
   it("eager association loading with belongs to sti", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      sti_topics3: { title: "string", type: "string", parent_id: "integer" },
+    });
     class StiTopic3 extends Base {
       static {
         this.attribute("title", "string");
@@ -241,7 +253,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("eager association loading where first level returns nil", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      ef_parents: { name: "string" },
+      ef_children: { value: "string", ef_parent_id: "integer" },
+    });
     class EFParent extends Base {
       static {
         this._tableName = "ef_parents";
@@ -271,7 +286,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("preload through missing records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      pm_authors: { name: "string" },
+      pm_posts: { title: "string", pm_author_id: "integer" },
+    });
     class PMAuthor extends Base {
       static {
         this._tableName = "pm_authors";
@@ -302,7 +320,10 @@ describe("CascadedEagerLoadingTest", () => {
   });
 
   it("eager association loading with missing first record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      em_authors: { name: "string" },
+      em_posts: { title: "string", em_author_id: "integer" },
+    });
     class EMAuthor extends Base {
       static {
         this._tableName = "em_authors";
@@ -353,7 +374,10 @@ describe("CascadedEagerLoadingTest", () => {
     /* fixture-dependent */
   });
   it("preloaded records are not duplicated", async () => {
-    const adapter = freshAdapter();
+    const adapter = await freshAdapter({
+      pd_authors: { name: "string" },
+      pd_posts: { title: "string", pd_author_id: "integer" },
+    });
     class PDAuthor extends Base {
       static {
         this._tableName = "pd_authors";
