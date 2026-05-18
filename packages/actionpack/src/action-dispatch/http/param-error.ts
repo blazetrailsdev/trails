@@ -29,12 +29,17 @@ export class ParamError extends ParseError {
   }
 
   static [Symbol.hasInstance](other: unknown): boolean {
-    if (
-      other instanceof RackParameterTypeError ||
-      other instanceof RackInvalidParameterError ||
-      other instanceof RackParamsTooDeepError
-    ) {
-      return true;
+    // Rails only overrides `self.===` on `ParamError`; subclasses fall back
+    // to the default semantics. Mirror that — only ParamError itself should
+    // claim Rack's parallel exceptions.
+    if (this === ParamError) {
+      if (
+        other instanceof RackParameterTypeError ||
+        other instanceof RackInvalidParameterError ||
+        other instanceof RackParamsTooDeepError
+      ) {
+        return true;
+      }
     }
     // Walk the prototype chain looking for ParamError.prototype, mirroring
     // the default `instanceof` semantics that this override replaces.
