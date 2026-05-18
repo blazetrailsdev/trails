@@ -36,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
+      activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
+      actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
@@ -60,11 +62,30 @@ jobs:
           # First push to a branch has a zero-SHA base; force-push may
           # rewrite history out from under us. In either case we can't
           # reliably compute a diff — fall back to running the full matrix.
+          # activerecord_affected gates the three AR test jobs (sqlite,
+          # postgres, mariadb). True when changes touch activerecord, its
+          # runtime deps (arel/activemodel/activesupport/globalid), or any
+          # cross-cutting file (lockfile, root tsconfig, vitest config,
+          # shared scripts, this workflow). Push to main / schedule /
+          # workflow_dispatch always force true. Pattern mirrors the
+          # AR-touching set in scripts/parity/run.ts.
+          # Cross-cutting paths force every per-package gate true. Anything
+          # here affects all packages: workspace topology, root tooling
+          # config, shared scripts, this workflow, composite actions.
+          INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
+          AR_PKGS_RE='^packages/(activerecord|arel|activemodel|activesupport|globalid)/'
+          # actionpack_affected gates actionpack-tests. True for actionpack +
+          # its runtime deps (actionview/activemodel/activesupport/rack).
+          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack)/'
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+            echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
           elif ! files=$(git diff --name-only "$base" "$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+            echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
           else
             echo "Changed files:"
             echo "$files"
@@ -79,6 +100,30 @@ jobs:
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
             fi
+            # On push to main / schedule / workflow_dispatch always run everything.
+            case "${{ github.event_name }}" in
+              push|schedule|workflow_dispatch)
+                echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+                echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                if [ -z "$files" ]; then
+                  echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
+                  echo "actionpack_affected=false" >> "$GITHUB_OUTPUT"
+                else
+                  if echo "$files" | grep -qE "$INFRA_RE|$AR_PKGS_RE"; then
+                    echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
+                  fi
+                  if echo "$files" | grep -qE "$INFRA_RE|$AP_PKGS_RE"; then
+                    echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "actionpack_affected=false" >> "$GITHUB_OUTPUT"
+                  fi
+                fi
+                ;;
+            esac
           fi
           # Per-adapter parity gates. Each suite is expensive (~15-20 CI
           # minutes across 7 jobs), so plain PRs skip all parity. Run on:
@@ -220,7 +265,9 @@ jobs:
   actionpack-tests:
     name: Action Pack Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.actionpack_affected == 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
@@ -244,7 +291,9 @@ jobs:
   sqlite-tests:
     name: SQLite Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -261,7 +310,9 @@ jobs:
   postgres-tests:
     name: PostgreSQL Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -300,7 +351,9 @@ jobs:
   mariadb-tests:
     name: MariaDB Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     services:
       mariadb:
@@ -695,6 +748,8 @@ jobs:
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          AR_AFFECTED: ${{ needs.changes.outputs.activerecord_affected }}
+          AP_AFFECTED: ${{ needs.changes.outputs.actionpack_affected }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
@@ -724,13 +779,21 @@ jobs:
               [ "$result" = "skipped" ] || continue
               case "$job" in
                 changes|ci) continue ;;
+                sqlite-tests|postgres-tests|mariadb-tests)
+                  # AR test skip is legitimate when no AR-affecting paths changed.
+                  [ "$AR_AFFECTED" = "false" ] && continue
+                  ;;
+                actionpack-tests)
+                  # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
+                  [ "$AP_AFFECTED" = "false" ] && continue
+                  ;;
                 schema-parity-rails|schema-parity-trails|schema-parity-diff|\
                 query-parity-frozen-at|query-parity-rails|query-parity-trails|query-parity-diff)
                   # Parity skip is legitimate when no parity gate is on.
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
