@@ -31,6 +31,30 @@ import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+
+const TEST_SCHEMA: Schema = {
+  dp_authors: { name: "string" },
+  dp_galleries: {
+    dp_author_id: "integer",
+    imageable_uuid: "string",
+    imageable_type: "string",
+  },
+  dp_non_id_photos: {
+    columns: { uuid: "string", title: "string" },
+    primaryKey: ["uuid"],
+  },
+  dp_non_id_articles: {
+    columns: { slug: "string", headline: "string" },
+    primaryKey: ["slug"],
+  },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
+}
 
 describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   let adapter: DatabaseAdapter;
@@ -66,8 +90,8 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     DpAuthor.adapter = adapter;
     DpGallery.adapter = adapter;
     DpNonIdPhoto.adapter = adapter;

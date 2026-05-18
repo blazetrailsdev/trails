@@ -6,6 +6,19 @@ import type { DatabaseAdapter } from "../adapter.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
+import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+
+const TEST_SCHEMA: Schema = {
+  djs_authors: { name: "string" },
+  djs_posts: { djs_author_id: "integer", title: "string" },
+  djs_comments: { djs_post_id: "integer", body: "string" },
+};
+
+async function freshAdapter(): Promise<DatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, TEST_SCHEMA);
+  return adapter;
+}
 
 describe("DisableJoinsAssociationScope", () => {
   let adapter: DatabaseAdapter;
@@ -31,8 +44,8 @@ describe("DisableJoinsAssociationScope", () => {
     }
   }
 
-  beforeEach(() => {
-    adapter = createTestAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapter();
     DjsAuthor.adapter = adapter;
     DjsPost.adapter = adapter;
     DjsComment.adapter = adapter;
