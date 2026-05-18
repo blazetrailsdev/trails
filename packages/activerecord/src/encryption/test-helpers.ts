@@ -175,6 +175,7 @@ const ENCRYPTION_SCHEMA: Schema = {
   encrypted_book_with_serialized_first_binaries: { logo: "text" },
   encrypted_book_with_serialized_second_binaries: { logo: "text" },
   encrypted_book_with_binary_message_pack_serializeds: { logo: "text" },
+  msg_pack_text_books: { name: { type: "string", limit: 1024 } },
 };
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
@@ -416,6 +417,22 @@ export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: Databa
       this.attribute("logo", "binary");
       this.adapter = adapter;
       this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
+    }
+  } as any;
+}
+
+/**
+ * MsgPackTextBook: a string `name` column encrypted with a MessagePack
+ * serializer. Used to assert that text columns reject MessagePack encoding
+ * (encrypted_record_message_pack_serialized_test.rb).
+ */
+export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
+  return class MsgPackTextBook extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+      this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
     }
   } as any;
 }
