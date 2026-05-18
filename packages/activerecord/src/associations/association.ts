@@ -416,12 +416,25 @@ export class Association {
   }
 
   private inverseAssociationFor(record: Base): Association | null {
-    const inverseOf = this.reflection.options.inverseOf;
-    if (!inverseOf) return null;
+    // Rails routes both polymorphic and non-polymorphic through
+    // `inverse_reflection_for(record)` (association.rb:350-361). For
+    // polymorphic belongs_to, the override raises
+    // `InverseOfAssociationNotFoundError` when the configured
+    // inverse name doesn't exist on the assigned record's class
+    // (belongs_to_polymorphic_association.rb:35-37, reflection.rb:678).
+    let inverseName: string | null = null;
+    if ((this.reflection.options as any).polymorphic) {
+      const inv = this.inverseReflectionFor(record) as any;
+      if (!inv) return null;
+      inverseName = typeof inv === "string" ? inv : (inv.name ?? null);
+    } else {
+      inverseName = (this.reflection.options.inverseOf as string | undefined) ?? null;
+    }
+    if (!inverseName) return null;
     const recordAny = record as any;
     if (typeof recordAny.association === "function") {
       try {
-        return recordAny.association(inverseOf);
+        return recordAny.association(inverseName);
       } catch {
         return null;
       }
@@ -497,7 +510,7 @@ export class Association {
     }
   }
 
-  private inverseReflectionFor(_record: Base): unknown {
+  protected inverseReflectionFor(_record: Base): unknown {
     return (this.reflection as any).inverseOf ?? null;
   }
 

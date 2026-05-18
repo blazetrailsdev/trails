@@ -1426,17 +1426,70 @@ describe("InversePolymorphicBelongsToTests", () => {
     expect(parent).not.toBeNull();
   });
 
-  it.skip("trying to set polymorphic inverses that dont exist at all should raise an error", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs inverse validation on polymorphic */
+  it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
+    const { Man, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Man has no association named "nonexistent" — set must raise.
+    expect(() =>
+      setBelongsTo(t, "taggable", m, {
+        polymorphic: true,
+        inverseOf: "nonexistent",
+        foreignKey: "taggable_id",
+      }),
+    ).toThrow(InverseOfAssociationNotFoundError);
   });
-  it.skip("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", () => {
-    // BLOCKED: associations — inverse-of feature gap
-    // ROOT-CAUSE: associations/inverse-associations.ts or preloader.ts missing inverse-of semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in inverse-associations.test.ts
-    /* needs inverse validation on polymorphic */
+  it("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", async () => {
+    const { Man, Face, Tag } = makeModels();
+    const m = await Man.create({ name: "Gordon" });
+    const f = await Face.create({ description: "pretty", man_id: m.id });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    // Man has :tags as the inverse; Face does not. Setting a Man passes,
+    // but setting a Face under the same inverseOf must raise.
+    expect(() =>
+      setBelongsTo(t, "taggable", m, {
+        polymorphic: true,
+        inverseOf: "tags",
+        foreignKey: "taggable_id",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      setBelongsTo(t, "taggable", f, {
+        polymorphic: true,
+        inverseOf: "tags",
+        foreignKey: "taggable_id",
+      }),
+    ).toThrow(InverseOfAssociationNotFoundError);
+  });
+
+  it("association-writer path also raises when polymorphic inverse missing", async () => {
+    // Cover the regular `record.association(name).writer(...)` path —
+    // BelongsToPolymorphicAssociation#inverseReflectionFor must reach
+    // polymorphicInverseOf during setInverseInstance and raise when the
+    // configured inverse name does not exist on the assigned record's
+    // class (Rails belongs_to_polymorphic_association.rb:35-37).
+    class Man extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class Tag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("taggable_id", "integer");
+        this.attribute("taggable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.belongsTo.call(Tag, "taggable", { polymorphic: true, inverseOf: "nonexistent" });
+    registerModel(Man);
+    registerModel(Tag);
+    const m = await Man.create({ name: "Gordon" });
+    const t = await Tag.create({ name: "cool", taggable_id: m.id, taggable_type: "Man" });
+    expect(() => (t as any).association("taggable").writer(m)).toThrow(
+      InverseOfAssociationNotFoundError,
+    );
   });
 });
 

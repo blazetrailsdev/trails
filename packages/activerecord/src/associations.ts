@@ -2149,6 +2149,22 @@ export function setBelongsTo(
       ? primaryKey.map((col: string) => `${underscore(assocName)}_${col}`)
       : `${underscore(assocName)}_id`);
 
+  // Rails BelongsToPolymorphicAssociation: `polymorphic_inverse_of` raises
+  // when the configured inverse name doesn't resolve on the assigned
+  // record's class. Validate up-front so a failed assignment leaves owner
+  // attributes / association cache untouched.
+  if (target && options.polymorphic && typeof options.inverseOf === "string") {
+    const inv = (targetCtor as any)?._reflectOnAssociation?.(options.inverseOf);
+    if (!inv) {
+      throw new InverseOfAssociationNotFoundError(
+        assocName,
+        options.inverseOf,
+        [],
+        targetCtor!.name,
+      );
+    }
+  }
+
   if (target) {
     if (Array.isArray(foreignKey) && !Array.isArray(primaryKey)) {
       throw new Error(
@@ -2199,7 +2215,7 @@ export function setBelongsTo(
   if (!record._cachedAssociations) record._cachedAssociations = new Map();
   record._cachedAssociations.set(assocName, target);
 
-  // Set inverse on target
+  // Set inverse on target (polymorphic existence validated above).
   if (target && typeof options.inverseOf === "string") {
     _wireInverseAssociation(record, target, options.inverseOf);
   }

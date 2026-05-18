@@ -55,10 +55,26 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 
   /**
-   * Override replace to also write/clear the polymorphic type column.
-   * Rails: BelongsToPolymorphicAssociation#replace_keys sets foreign_type.
+   * Write the polymorphic type column alongside the foreign key. Mirrors
+   * Rails `BelongsToPolymorphicAssociation#replace_keys` — both column
+   * writes happen here (after `super.replace` has already run
+   * `setInverseInstance`, so a missing-inverse raise leaves owner state
+   * untouched).
    */
-  protected override replace(record: Base | null): void {
+  protected override replaceKeys(record: Base | null): void {
+    // Write the polymorphic type column FIRST so that the dynamic
+    // `this.klass` resolves via the _type column before
+    // `super.replaceKeys` derives composite foreign-key names via
+    // `foreignKeyNames() → associationPrimaryKeys(null)`.
+    //
+    // Note: `replaceKeys` is called from both `replace(record)` (writer
+    // path) and `inversedFrom(record)` (inverse-wiring path). On the
+    // writer path, `setInverseInstance` runs in `replace()` before
+    // `replaceKeys`, so a missing-inverse raise leaves owner state
+    // untouched. On the `inversedFrom` path no inverse validation runs
+    // at all — the caller has already resolved the inverse pair — so
+    // the ordering inside `replaceKeys` is independent of that
+    // atomicity guarantee.
     const typeCol = this.foreignTypeName();
     // Rails: writes record.class.polymorphic_name, which is the Ruby class
     // name (including "::" for namespaced classes). JS class names can't
@@ -77,7 +93,56 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     } else {
       (this.owner as any)[typeCol] = typeName;
     }
-    super.replace(record);
+    super.replaceKeys(record);
+  }
+
+  /**
+   * Polymorphic belongs_to has no static target class, so when neither an
+   * explicit `primaryKey` option nor an owning record is given we fall
+   * back to the loaded target's class (the generic
+   * `BelongsToAssociation` path can't do this — it has no polymorphic
+   * type column to consult).
+   */
+  protected override associationPrimaryKeys(record: Base | null): string[] {
+    const configured = this.reflection.options.primaryKey;
+    if (configured) return Array.isArray(configured) ? configured : [configured];
+    if (record) {
+      const pk = (record.constructor as any).primaryKey;
+      if (pk) return Array.isArray(pk) ? pk : [pk];
+    }
+    // Polymorphic belongs_to: this.klass is dynamic — resolved at runtime
+    // from the _type column. Preserve the base class's klass-fallback for
+    // scope() / counter-cache paths that hit `associationPrimaryKeys(null)`
+    // once the _type column is set.
+    const pk = (this.klass as any)?.primaryKey;
+    if (pk) return Array.isArray(pk) ? pk : [pk];
+    const targetPk = (this.target as any)?.constructor?.primaryKey;
+    if (targetPk) return Array.isArray(targetPk) ? targetPk : [targetPk];
+    return ["id"];
+  }
+
+  /**
+   * Mirrors Rails `BelongsToPolymorphicAssociation#inverse_reflection_for`
+   * (associations/belongs_to_polymorphic_association.rb:35-37) — looks up
+   * the inverse on the assigned record's class via `polymorphic_inverse_of`,
+   * which raises `InverseOfAssociationNotFoundError` when the configured
+   * inverse name does not exist on that class.
+   */
+  protected override inverseReflectionFor(record: Base): unknown {
+    // `this.reflection` is the lightweight `AssociationDefinition` attached
+    // at macro time. The rich `Reflection` (carrying `polymorphicInverseOf`)
+    // lives on the owner class via `_reflectOnAssociation` — resolve it
+    // there so the Rails-parity raise actually fires on the regular
+    // association-writer path. Falls back to the lightweight reflection
+    // when polymorphicInverseOf is somehow present on it (test fixtures).
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const refl: any = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
+    if (typeof refl.polymorphicInverseOf === "function") {
+      return refl.polymorphicInverseOf(record.constructor as typeof Base);
+    }
+    return null;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
