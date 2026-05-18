@@ -18,6 +18,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
   let hadDeprecator: boolean;
+  let savedDeprecator: (typeof BaseRailtie.deprecators)[string];
 
   beforeEach(() => {
     savedConfig = structuredClone(cfg());
@@ -26,6 +27,7 @@ describe("ActionDispatch::Trailtie", () => {
     savedPerformDeepMunge = RequestUtils.performDeepMunge;
     savedStrictFreshness = CacheConfig.strictFreshness;
     hadDeprecator = "actionDispatch" in BaseRailtie.deprecators;
+    savedDeprecator = BaseRailtie.deprecators["actionDispatch"];
   });
 
   afterEach(() => {
@@ -34,7 +36,8 @@ describe("ActionDispatch::Trailtie", () => {
     QueryParser.strictQueryStringSeparator = savedStrictQuery;
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
     CacheConfig.strictFreshness = savedStrictFreshness;
-    if (!hadDeprecator) delete BaseRailtie.deprecators["actionDispatch"];
+    if (hadDeprecator) BaseRailtie.deprecators["actionDispatch"] = savedDeprecator;
+    else delete BaseRailtie.deprecators["actionDispatch"];
   });
 
   it("registers itself with the Railtie registry", () => {

@@ -6,8 +6,9 @@
  * Registers the ActionDispatch config namespace and two initializers:
  *   - `action_dispatch.deprecator` — installs the ActionDispatch deprecator
  *     into the shared `deprecators` registry.
- *   - `action_dispatch.configure` — copies `config.action_dispatch.*` values
- *     onto the framework-level holders (URL, QueryParser, Request::Utils,
+ *   - `action_dispatch.configure` — copies `config.actionDispatch.*` values
+ *     (trails camelCase mirror of Rails' `config.action_dispatch.*`) onto
+ *     the framework-level holders (URL, QueryParser, Request::Utils,
  *     Cache::Request, ...).
  *
  * Unported targets (ExceptionWrapper.rescue_responses/_templates,
