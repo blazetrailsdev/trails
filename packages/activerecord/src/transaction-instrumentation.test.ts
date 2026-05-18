@@ -1,18 +1,31 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
+import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 
-const openAdapters: SQLite3Adapter[] = [];
-
-function makeTopic() {
+// Isolated per-test SQLite3 adapter for the TM-path tests below. They spy
+// on `addTransactionRecord` and assert that `after_commit` fires; the
+// shared inner adapter behind `createTestAdapter()` carries residual
+// transaction-manager state across tests in this file that masks the
+// callback. A dedicated adapter keeps the assertions deterministic.
+async function freshIsolatedAdapter(): Promise<SQLite3Adapter> {
   const adapter = new SQLite3Adapter(":memory:");
-  openAdapters.push(adapter);
-  adapter.exec(
-    "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, updated_at DATETIME)",
-  );
+  await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
+  return adapter;
+}
+
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
+  const adapter = createTestAdapter();
+  await defineSchema(adapter, { topics: { title: "string", updated_at: "datetime" } });
+  return adapter;
+}
+
+function makeTopic(adapter: DatabaseAdapter) {
   class Topic extends Base {
     static {
       this.attribute("title", "string");
@@ -24,16 +37,17 @@ function makeTopic() {
 }
 
 describe("TransactionInstrumentationTest", () => {
+  let sharedAdapter: TestDatabaseAdapter;
+  beforeEach(async () => {
+    sharedAdapter = await freshAdapter();
+  });
   afterEach(() => {
     Notifications.unsubscribeAll();
     vi.restoreAllMocks();
-    for (const adapter of openAdapters.splice(0)) {
-      adapter.close();
-    }
   });
 
   it("start transaction is triggered when the transaction is materialized", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
@@ -48,7 +62,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is not triggered for ordinary nested calls", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
@@ -66,7 +80,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is triggered for requires new", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const startEvents: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
       startEvents.push(event);
@@ -87,7 +101,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on commit", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -104,7 +118,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on rollback", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -122,7 +136,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with savepoints", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -146,7 +160,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart parent transaction on commit", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -165,7 +179,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart parent transaction on rollback", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -189,7 +203,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with unmaterialized restart parent transactions", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -208,7 +222,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with materialized restart parent transactions", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -229,7 +243,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart savepoint parent transactions", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -259,7 +273,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart savepoint parent transactions on commit", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -275,7 +289,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation only fires if materialized", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -287,7 +301,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation only fires on rollback if materialized", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
@@ -308,7 +322,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation fires before after commit callbacks", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const order: string[] = [];
 
     let afterCommitTriggered = false;
@@ -328,7 +342,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation fires before after rollback callbacks", async () => {
-    const { Topic, adapter } = makeTopic();
+    const { Topic, adapter } = makeTopic(sharedAdapter);
     const order: string[] = [];
 
     Notifications.subscribe("transaction.active_record", () => {
@@ -339,7 +353,8 @@ describe("TransactionInstrumentationTest", () => {
       await Topic.create({ title: "test" });
       // Register directly on the transaction to avoid the save-path
       // ordering issue between state-restore and rolledbackBang callbacks.
-      const txn = adapter.transactionManager.currentTransaction as any;
+      const txn = ((adapter as TestDatabaseAdapter).innerAdapter as any).transactionManager
+        .currentTransaction as any;
       txn?.afterRollback?.(() => {
         order.push("after_rollback");
       });
@@ -350,14 +365,15 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on failed commit", async () => {
-    const { Topic, adapter } = makeTopic();
+    const { Topic, adapter } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     const MyError = class extends Error {};
-    vi.spyOn(adapter, "commitDbTransaction").mockImplementationOnce(async () => {
+    const inner = (adapter as TestDatabaseAdapter).innerAdapter as any;
+    vi.spyOn(inner, "commitDbTransaction").mockImplementationOnce(async () => {
       throw new MyError("commit failed");
     });
 
@@ -379,14 +395,14 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on failed rollback when unmaterialized", async () => {
-    const { Topic, adapter } = makeTopic();
+    const { Topic, adapter } = makeTopic(sharedAdapter);
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
     const MyError = class extends Error {};
-    const tm = adapter.transactionManager;
+    const tm = ((adapter as TestDatabaseAdapter).innerAdapter as any).transactionManager;
     vi.spyOn(tm, "rollbackTransaction").mockImplementationOnce(async () => {
       throw new MyError("rollback failed");
     });
@@ -401,7 +417,7 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on broken subscription", async () => {
-    const { Topic } = makeTopic();
+    const { Topic } = makeTopic(sharedAdapter);
     const MyError = class extends Error {};
     const sub: NotificationSubscriber = Notifications.subscribe("transaction.active_record", () => {
       throw new MyError("broken subscriber");
@@ -417,7 +433,8 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("TM path: addTransactionRecord called and after_commit fires on save", async () => {
-    const { Topic, adapter } = makeTopic();
+    const adapter = await freshIsolatedAdapter();
+    const { Topic } = makeTopic(adapter);
     const enrolled: unknown[] = [];
     const orig = (adapter as any).addTransactionRecord?.bind(adapter);
     (adapter as any).addTransactionRecord = (record: unknown, ...rest: unknown[]) => {
@@ -434,10 +451,12 @@ describe("TransactionInstrumentationTest", () => {
 
     expect(enrolled.length).toBeGreaterThan(0);
     expect(committed).toEqual(["tm-test"]);
+    await adapter.close();
   });
 
   it("TM path: after_rollback fires on explicit rollback", async () => {
-    const { Topic } = makeTopic();
+    const adapter = await freshIsolatedAdapter();
+    const { Topic } = makeTopic(adapter);
 
     const rolledBack: string[] = [];
     Topic.afterRollback(function (record: InstanceType<typeof Topic>) {
@@ -450,10 +469,12 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     expect(rolledBack).toEqual(["rollback-test"]);
+    await adapter.close();
   });
 
   it("TM path: nested transaction propagates enrollment to outer and fires after_commit once", async () => {
-    const { Topic } = makeTopic();
+    const adapter = await freshIsolatedAdapter();
+    const { Topic } = makeTopic(adapter);
 
     const committed: string[] = [];
     Topic.afterCommit(function (record: InstanceType<typeof Topic>) {
@@ -467,5 +488,6 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     expect(committed).toEqual(["nested-test"]);
+    await adapter.close();
   });
 });
