@@ -570,6 +570,62 @@ function _scopeForAssociation(model: typeof Base): Relation<Base> {
 }
 
 /**
+ * Apply a caller-supplied association `scope:` lambda to a built relation.
+ *
+ * Mirrors Rails' `AssociationScope#eval_scope`
+ * (`activerecord/lib/active_record/associations/association_scope.rb:169-172`):
+ *
+ *   relation.instance_exec(owner, &scope) || relation
+ *
+ * The owner is passed as a positional arg so JS scopes can declare
+ * `(rel, owner) => rel.where({user_id: owner.id})` — arity-0/1 scopes
+ * (the common `(rel) => rel.where(...)` shape used throughout this
+ * codebase) silently ignore the extra argument. A falsy return falls
+ * back to the input relation, matching Rails' `|| relation` so scopes
+ * with conditional bodies (`if owner.foo then rel.where(...); end`)
+ * don't accidentally null out the chain.
+ *
+ * When `reflectionScope` is provided, skip application if `scope` is
+ * the exact same function reference. AssociationScope already merges
+ * `reflection.scope` (the macro-time lambda) via `scopeFor`; re-applying
+ * would double-merge. Callers that synthesize a NEW lambda (e.g.
+ * `loadHasManyThrough` wrapping with `sourceType` filtering) pass a
+ * different reference and still run.
+ *
+ * @internal
+ */
+export function applyAssociationScope<R>(
+  rel: R,
+  scope: ((this: R, rel: R, owner: Base) => R | false | null | undefined) | null | undefined,
+  owner: Base,
+  reflectionScope?: unknown,
+): R {
+  if (!scope) return rel;
+  if (reflectionScope !== undefined && scope === reflectionScope) return rel;
+  // Match the head-scope dispatch in `association-scope.ts:583-589`:
+  // 0-arg scope → `fn.call(rel)` (`this=rel`); 1+-arg → `fn.call(rel,
+  // rel, owner)` (`this=rel`, positional `(rel, owner)`).
+  //
+  // Caveat re: Rails parity: Rails' `instance_exec(owner, &scope)` makes
+  // a 1-arg Ruby block `->(owner) { ... }` receive OWNER as the sole
+  // positional. This codebase's convention is different — every scope
+  // call site is `(rel) => rel.where(...)`, so a 1-arg lambda must
+  // receive the RELATION. We preserve that convention here for symmetry
+  // with `association-scope.ts`. Function-keyword scopes that want
+  // owner access can either declare arity-2 `function (rel, owner)` or
+  // close over `this` (set to rel via `.call`).
+  //
+  // `|| rel` (not `??`) mirrors Ruby's `instance_exec(owner, &scope) ||
+  // relation` — truthiness-based, so a scope returning `false` (idiomatic
+  // JS `cond && rel.where(...)` short-circuit) falls back to the input.
+  const result =
+    scope.length === 0
+      ? (scope as unknown as (this: R) => R | false | null | undefined).call(rel)
+      : scope.call(rel, rel, owner);
+  return result || rel;
+}
+
+/**
  * Build (or return cached) base AssociationScope. When the owner has
  * a registered `Association` instance for this name, route through
  * its `associationScope()` so calls hit Rails' `@association_scope`-
@@ -676,13 +732,10 @@ async function _loadThroughViaDisableJoinsScope(
     klass,
   });
   // Apply caller-supplied `options.scope` when it differs from the
-  // reflection's own scope — same rule the JOIN-based loaders use
-  // (line 488 etc.). Skipping when equal avoids double-application
-  // since DJAS already consumed the reflection's scope via constraints.
-  const reflScope = reflection.scope;
-  if (options?.scope && options.scope !== reflScope) {
-    rel = options.scope(rel as never);
-  }
+  // reflection's own scope — same rule the JOIN-based loaders use.
+  // Skipping when equal avoids double-application since DJAS already
+  // consumed the reflection's scope via constraints.
+  rel = applyAssociationScope(rel as never, options?.scope, record, reflection.scope);
   return (rel as { toArray: () => Promise<Base[]> }).toArray();
 }
 
@@ -811,9 +864,7 @@ export async function loadBelongsTo(
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== reflection.scope) {
-      rel = options.scope(rel);
-    }
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
     result = await rel.first();
   } else {
     // Inline fallback: no reflection registered.
@@ -941,9 +992,7 @@ export async function loadHasOne(
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     let rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== reflection.scope) {
-      rel = options.scope(rel);
-    }
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
     result = await rel.first();
   } else {
     // Inline fallback: no reflection registered.
@@ -967,7 +1016,7 @@ export async function loadHasOne(
       let rel = targetModel
         .all()
         .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
-      rel = options.scope(rel);
+      rel = applyAssociationScope(rel, options.scope, record);
       result = await rel.first();
     } else {
       result = await targetModel.findBy({
@@ -1155,9 +1204,7 @@ export async function loadHasMany(
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
-    if (options.scope && options.scope !== reflection.scope) {
-      rel = options.scope(rel);
-    }
+    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
   } else {
     // Inline fallback: no reflection (lower-level test helpers).
     if (Array.isArray(foreignKey)) {
@@ -1181,7 +1228,7 @@ export async function loadHasMany(
         .all()
         .where({ [foreignKey as string]: record._readAttribute(primaryKey as string) });
     }
-    if (options.scope) rel = options.scope(rel);
+    rel = applyAssociationScope(rel, options.scope, record);
   }
   const results: Base[] = await rel.toArray();
 
@@ -1277,7 +1324,7 @@ export function buildHasManyRelation(
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveAssocClass(record, assocName, className);
   let rel = targetModel.all().where(conditions);
-  if (options.scope) rel = options.scope(rel);
+  rel = applyAssociationScope(rel, options.scope, record);
   return rel;
 }
 
@@ -1393,7 +1440,7 @@ export async function loadHasManyThrough(
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
     let rel = targetModel.all().where({ [targetModel.primaryKey as string]: targetIds });
-    if (options.scope) rel = options.scope(rel);
+    rel = applyAssociationScope(rel, options.scope, record);
     return rel.toArray();
   } else {
     // Source is has_many/has_one: target has FK pointing back to through record
@@ -1410,7 +1457,7 @@ export async function loadHasManyThrough(
     const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
     if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
     let rel2 = targetModel.all().where(whereConditions);
-    if (options.scope) rel2 = options.scope(rel2);
+    rel2 = applyAssociationScope(rel2, options.scope, record);
     return rel2.toArray();
   }
 }
@@ -1642,7 +1689,7 @@ export async function loadHabtm(
   // filter and the caller-supplied scope lambda for query-method
   // composition (where/order/select/group/having/unscope).
   let rel: any = _scopeForAssociation(targetModel).where(inNode);
-  if (options.scope) rel = options.scope(rel);
+  rel = applyAssociationScope(rel, options.scope, record);
 
   return rel.toArray();
 }
