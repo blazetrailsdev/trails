@@ -98,6 +98,7 @@ export {
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
 export { Callbacks } from "./middleware/callbacks.js";
+export { ServerTiming } from "./middleware/server-timing.js";
 export {
   Executor,
   type ExecutorLike,
