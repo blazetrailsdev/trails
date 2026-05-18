@@ -212,8 +212,13 @@ export class Response {
 
   // --- Factory ---
 
-  static create(status = 200, headers: Record<string, string> = {}, body = ""): Response {
-    return new Response(status, headers, body ? [body] : []);
+  static create<T extends typeof Response>(
+    this: T,
+    status = 200,
+    headers: Record<string, string> = {},
+    body = "",
+  ): InstanceType<T> {
+    return new this(status, headers, body ? [body] : []) as InstanceType<T>;
   }
 }
 
