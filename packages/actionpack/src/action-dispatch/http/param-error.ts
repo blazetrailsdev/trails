@@ -3,12 +3,15 @@
  *
  * Port of `actionpack/lib/action_dispatch/http/param_error.rb`. Defines the
  * `ParamError` hierarchy raised when request parameters cannot be parsed or
- * have an unexpected shape, plus a {@link ParamError.matches} helper that
- * mirrors Rails' `def self.===(other)` override — Rails uses `===` so a
- * `rescue ParamError` catches Rack's parallel exception classes
- * (`Rack::Utils::ParameterTypeError`, `Rack::Utils::InvalidParameterError`,
- * `Rack::QueryParser::ParamsTooDeepError`). JavaScript's `instanceof` cannot
- * be overridden the same way, so consumers call `ParamError.matches(err)`.
+ * have an unexpected shape.
+ *
+ * Rails overrides `self.===` on `ParamError` so a `rescue ParamError` also
+ * catches the parallel Rack exception classes (`Rack::Utils::ParameterTypeError`,
+ * `Rack::Utils::InvalidParameterError`, `Rack::QueryParser::ParamsTooDeepError`).
+ * JavaScript exposes the same dispatch hook via `Symbol.hasInstance`: defining
+ * it on `ParamError` makes `err instanceof ParamError` return true for those
+ * Rack errors too, so `rescueFrom(ParamError)` (which uses `instanceof`) works
+ * the same as Rails' `rescue ParamError`.
  */
 
 import {
@@ -25,13 +28,22 @@ export class ParamError extends ParseError {
     this.name = "ActionDispatch::ParamError";
   }
 
-  static matches(other: unknown): boolean {
-    return (
-      other instanceof ParamError ||
+  static [Symbol.hasInstance](other: unknown): boolean {
+    if (
       other instanceof RackParameterTypeError ||
       other instanceof RackInvalidParameterError ||
       other instanceof RackParamsTooDeepError
-    );
+    ) {
+      return true;
+    }
+    // Walk the prototype chain looking for ParamError.prototype, mirroring
+    // the default `instanceof` semantics that this override replaces.
+    let proto: object | null = other == null ? null : Object.getPrototypeOf(other);
+    while (proto !== null) {
+      if (proto === this.prototype) return true;
+      proto = Object.getPrototypeOf(proto);
+    }
+    return false;
   }
 }
 

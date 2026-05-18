@@ -29,21 +29,21 @@ describe("ActionDispatch::ParamError", () => {
     expect(new ParamsTooDeepError()).toBeInstanceOf(ParamError);
   });
 
-  describe(".matches", () => {
-    it("returns true for ParamError instances", () => {
-      expect(ParamError.matches(new ParamError())).toBe(true);
-      expect(ParamError.matches(new ParameterTypeError())).toBe(true);
+  describe("instanceof (Symbol.hasInstance override mirrors Rails' self.===)", () => {
+    it("matches Rack parameter exceptions", () => {
+      expect(new RackParameterTypeError("x") instanceof ParamError).toBe(true);
+      expect(new RackInvalidParameterError("x") instanceof ParamError).toBe(true);
+      expect(new RackParamsTooDeepError("x") instanceof ParamError).toBe(true);
     });
 
-    it("returns true for Rack parameter exceptions", () => {
-      expect(ParamError.matches(new RackParameterTypeError("x"))).toBe(true);
-      expect(ParamError.matches(new RackInvalidParameterError("x"))).toBe(true);
-      expect(ParamError.matches(new RackParamsTooDeepError("x"))).toBe(true);
+    it("returns false for unrelated errors and non-objects", () => {
+      expect(new Error("nope") instanceof ParamError).toBe(false);
+      expect((null as unknown) instanceof ParamError).toBe(false);
+      expect((undefined as unknown) instanceof ParamError).toBe(false);
     });
 
-    it("returns false for unrelated errors", () => {
-      expect(ParamError.matches(new Error("nope"))).toBe(false);
-      expect(ParamError.matches("not an error")).toBe(false);
+    it("subclass instanceof check still resolves the default chain", () => {
+      expect(new ParameterTypeError() instanceof ParameterTypeError).toBe(true);
     });
   });
 });
