@@ -30,6 +30,7 @@ import {
   currentContentSecurityPolicy,
   isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
+import { helperMethod, type HelpersClassMethods } from "../abstract-controller/helpers.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -663,6 +664,16 @@ export class Base extends Metal {
     return false;
   }
 }
+
+// Rails: `included do helper_method :content_security_policy?,
+// :content_security_policy_nonce end` (content_security_policy.rb:13).
+// Trails wires mixins onto Base explicitly, so register the helper-method
+// proxies here so templates can call these via the helpers module.
+helperMethod(
+  Base as unknown as HelpersClassMethods,
+  "isContentSecurityPolicy",
+  "contentSecurityPolicyNonce",
+);
 
 export class DoubleRenderError extends AbstractControllerError {
   constructor(message = "Render and/or redirect were called multiple times in this action.") {

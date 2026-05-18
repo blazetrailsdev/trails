@@ -165,3 +165,30 @@ describe("private instance helpers", () => {
     expect(fresh).toBeInstanceOf(Policy);
   });
 });
+
+describe("helper_method registration on Base", () => {
+  it("exposes isContentSecurityPolicy and contentSecurityPolicyNonce as view helpers", async () => {
+    const { Base } = await import("../base.js");
+    const cls = Base as unknown as { _helperMethods?: string[] };
+    expect(cls._helperMethods).toEqual(
+      expect.arrayContaining(["isContentSecurityPolicy", "contentSecurityPolicyNonce"]),
+    );
+  });
+
+  it("helper proxies forward to the controller instance", async () => {
+    const { Base } = await import("../base.js");
+    const cls = Base as unknown as {
+      _helpers?: Record<
+        string,
+        (this: { controller: Record<string, unknown> }, ...args: unknown[]) => unknown
+      >;
+    };
+    const controller = {
+      isContentSecurityPolicy: () => true,
+      contentSecurityPolicyNonce: () => "abc123",
+    };
+    const proxy = { controller };
+    expect(cls._helpers!.isContentSecurityPolicy.call(proxy)).toBe(true);
+    expect(cls._helpers!.contentSecurityPolicyNonce.call(proxy)).toBe("abc123");
+  });
+});
