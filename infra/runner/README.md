@@ -118,7 +118,8 @@ emitting logs, and `gh api repos/<repo>/actions/runners` shows a runner
 with `status=offline` and `busy=true`. Cause: `docker stop` SIGKILLed an
 in-flight runner before the entrypoint's EXIT trap could deregister.
 Cancel the stuck workflow run (`gh run cancel`), wait for the registration
-to free, then `gh api -X DELETE .../runners/<id>`. Prevent recurrence by
+to free, then `gh api -X DELETE repos/<repo>/actions/runners/<id>`.
+Prevent recurrence by
 confirming `dokku ps:report gh-runner | grep stop-timeout` shows 1800s —
 existing deploys must run setup step 5 once.
 
