@@ -875,13 +875,12 @@ export class CallbackChain {
   ): boolean | Promise<boolean> {
     let blockExecuted = false;
     const trackedBlock = (): void | Promise<void> => {
-      const r = block?.();
-      if (isThenable(r)) {
-        return Promise.resolve(r).then(() => {
-          blockExecuted = true;
-        });
-      }
+      // Track invocation, not successful completion: in Rails an around that
+      // rescues an exception raised by yield still runs the outer invoke_after
+      // (callbacks.rb#run_callbacks). Setting the flag here means a block
+      // rejection caught by an around no longer looks like "around did not yield".
       blockExecuted = true;
+      return block?.() as void | Promise<void>;
     };
 
     let chain: () => void | Promise<void> = trackedBlock;
