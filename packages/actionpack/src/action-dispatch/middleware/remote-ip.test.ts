@@ -90,15 +90,20 @@ describe("RemoteIp middleware (smoke)", () => {
     expect(setMw.proxies).toEqual([/^8\.8\.8\.8$/]);
   });
 
-  it("empty array / Set / generator falls back to TRUSTED_PROXIES (Rails blank?)", () => {
+  it("empty Array / Set falls back to TRUSTED_PROXIES (Rails Array#empty?/Set#empty? → blank?)", () => {
     async function* emptyBody(): AsyncGenerator<string> {}
     const arr = new RemoteIp(async () => [200, {}, emptyBody()], true, []);
     expect(arr.proxies).toBe(TRUSTED_PROXIES);
     const set = new RemoteIp(async () => [200, {}, emptyBody()], true, new Set<Proxy>());
     expect(set.proxies).toBe(TRUSTED_PROXIES);
+  });
+
+  it("empty generator is accepted as-is (Rails: Enumerator doesn't respond_to?(:empty?), so not blank?)", () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
     function* emptyGen(): Generator<Proxy> {}
-    const gen = new RemoteIp(async () => [200, {}, emptyBody()], true, emptyGen());
-    expect(gen.proxies).toBe(TRUSTED_PROXIES);
+    const mw = new RemoteIp(async () => [200, {}, emptyBody()], true, emptyGen());
+    expect(mw.proxies).toEqual([]);
+    expect(mw.proxies).not.toBe(TRUSTED_PROXIES);
   });
 
   it("rejects a bare String CIDR (Rails: String doesn't respond_to?(:any?))", () => {

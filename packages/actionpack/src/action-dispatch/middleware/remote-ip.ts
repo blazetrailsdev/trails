@@ -37,7 +37,10 @@ export type Proxy = string | RegExp;
  * being silently spread into per-character entries. Rails treats String as
  * a single value and raises ArgumentError. The `length?: never` branch
  * shape excludes anything with a `length: number` (strings) while still
- * admitting generators and other non-indexed iterables.
+ * admitting generators and other non-indexed iterables. Custom iterables
+ * that happen to expose `length: number` for unrelated reasons should
+ * either pre-spread into an array or cast — runtime accepts any iterable
+ * other than `string`/`String`.
  */
 export type CustomProxies =
   | ReadonlyArray<Proxy>
@@ -188,6 +191,11 @@ export class RemoteIp {
     // include `Enumerable` and therefore doesn't respond to `:any?`, so a bare
     // CIDR like `"10.0.0.0/8"` must hit the "single value" raise, not be
     // spread into characters.
+    //
+    // `blank?` in Rails only fires on values that respond to `:empty?`. Arrays
+    // and Sets do; Enumerators / generators do not. So an empty Array/Set
+    // falls back to `TRUSTED_PROXIES`, but an empty generator is accepted as-is
+    // (and trusts no proxies, matching Rails' behavior with an `Enumerator`).
     if (customProxies == null) {
       this.proxies = TRUSTED_PROXIES;
     } else if (
@@ -195,8 +203,10 @@ export class RemoteIp {
       !(customProxies instanceof String) &&
       typeof (customProxies as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
     ) {
-      const arr = [...customProxies];
-      this.proxies = arr.length === 0 ? TRUSTED_PROXIES : arr;
+      const isEmptyCollection =
+        (Array.isArray(customProxies) && customProxies.length === 0) ||
+        (customProxies instanceof Set && customProxies.size === 0);
+      this.proxies = isEmptyCollection ? TRUSTED_PROXIES : [...customProxies];
     } else {
       throw new TypeError(
         "Setting config.action_dispatch.trusted_proxies to a single value isn't supported. " +
