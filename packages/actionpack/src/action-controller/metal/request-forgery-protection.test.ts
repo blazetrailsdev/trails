@@ -1,18 +1,40 @@
 import { describe, it, expect } from "vitest";
 import {
+  Exception,
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
-  isProtectAgainstForgery,
-  isValidRequestOrigin,
-  markForSameOriginVerificationBang,
+  NullSession,
+  ResetSession,
+  compareWithGlobalToken,
+  compareWithRealToken,
+  decodeCsrfToken,
+  formAuthenticityParam,
+  generateCsrfToken,
+  globalCsrfToken,
+  isAnyAuthenticityTokenValid,
   isMarkedForSameOriginVerification,
   isNonXhrJavascriptResponse,
-  verifySameOriginRequest,
-  unverifiedRequestWarningMessage,
+  isProtectAgainstForgery,
+  isStorageStrategy,
+  isValidAuthenticityToken,
+  isValidPerFormCsrfToken,
+  isValidRequestOrigin,
   isVerifiedRequest,
+  markForSameOriginVerificationBang,
+  maskToken,
+  maskedAuthenticityToken,
   normalizeActionPath,
   normalizeRelativeActionPath,
+  perFormCsrfToken,
+  protectionMethodClass,
+  realCsrfToken,
+  requestAuthenticityTokens,
+  storageStrategy,
+  unmaskToken,
+  unverifiedRequestWarningMessage,
+  verifySameOriginRequest,
   type CsrfController,
+  type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
 
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
@@ -195,6 +217,90 @@ describe("isVerifiedRequest", () => {
     expect(isVerifiedRequest(controller({ isAnyAuthenticityTokenValid: () => true }))).toBe(true);
     expect(isVerifiedRequest(controller({ isAnyAuthenticityTokenValid: () => false }))).toBe(false);
     expect(isVerifiedRequest(controller())).toBe(false);
+  });
+});
+
+describe("P20b/P20c smoke", () => {
+  function tokenC(overrides: Partial<CsrfController> = {}): CsrfController {
+    return {
+      request: {
+        method: "POST",
+        baseUrl: "https://example.com",
+        path: "/posts",
+        env: { "action_controller.csrf_token": generateCsrfToken() },
+      },
+      ...overrides,
+    };
+  }
+
+  it("mask/unmask round-trips and realCsrfToken is stable per request", () => {
+    const raw = decodeCsrfToken(generateCsrfToken());
+    expect(unmaskToken(decodeCsrfToken(maskToken(raw))).equals(raw)).toBe(true);
+    const c = tokenC();
+    expect(realCsrfToken(c).equals(realCsrfToken(c))).toBe(true);
+  });
+
+  it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", () => {
+    const raw = Buffer.from("?".repeat(32));
+    const encoded = maskToken(raw);
+    expect(encoded).not.toMatch(/[+/=]/);
+    expect(unmaskToken(decodeCsrfToken(encoded)).equals(raw)).toBe(true);
+    expect(() => decodeCsrfToken("!!! not base64 !!!")).toThrow();
+  });
+
+  it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
+    const c = tokenC();
+    const masked = maskToken(globalCsrfToken(c));
+    expect(isAnyAuthenticityTokenValid({ ...c, params: { authenticity_token: masked } })).toBe(
+      true,
+    );
+    expect(
+      isAnyAuthenticityTokenValid({ ...c, request: { ...c.request, xCsrfToken: masked } }),
+    ).toBe(true);
+    expect(isAnyAuthenticityTokenValid(c)).toBe(false);
+    expect(isValidAuthenticityToken(c, null, "")).toBe(false);
+  });
+
+  it("isValidPerFormCsrfToken + compareWith{Global,Real}Token", () => {
+    const c = tokenC({
+      perFormCsrfTokens: true,
+      request: {
+        method: "POST",
+        baseUrl: "https://example.com",
+        path: "/posts/",
+        env: { "action_controller.csrf_token": generateCsrfToken() },
+      },
+    });
+    expect(isValidPerFormCsrfToken(c, perFormCsrfToken(c, null, "/posts", "POST"))).toBe(true);
+    expect(compareWithGlobalToken(c, globalCsrfToken(c))).toBe(true);
+    expect(compareWithRealToken(c, realCsrfToken(c))).toBe(true);
+    expect(maskedAuthenticityToken(c, { action: "/posts", method: "POST" })).toBeTruthy();
+  });
+
+  it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {
+    const c = tokenC({
+      params: { my: "p" },
+      requestForgeryProtectionToken: "my",
+      request: { ...tokenC().request, xCsrfToken: "x" },
+    });
+    expect(formAuthenticityParam(c)).toBe("p");
+    expect(requestAuthenticityTokens(c)).toEqual(["p", "x"]);
+  });
+
+  it("protectionMethodClass maps names + passes class through", () => {
+    expect(protectionMethodClass("null_session")).toBe(NullSession);
+    expect(protectionMethodClass("reset_session")).toBe(ResetSession);
+    expect(protectionMethodClass("exception")).toBe(Exception);
+    expect(() => protectionMethodClass("nope" as never)).toThrow();
+  });
+
+  it("isStorageStrategy + storageStrategy dispatch and reject junk", () => {
+    expect(isStorageStrategy({ fetch() {}, store() {}, reset() {} })).toBe(true);
+    expect(isStorageStrategy(storageStrategy("session"))).toBe(true);
+    expect(isStorageStrategy(storageStrategy("cookie"))).toBe(true);
+    const c: CsrfTokenStorage = { fetch: () => null, store() {}, reset() {} };
+    expect(storageStrategy(c)).toBe(c);
+    expect(() => storageStrategy("bogus" as never)).toThrow();
   });
 });
 
