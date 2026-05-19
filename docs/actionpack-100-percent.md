@@ -64,22 +64,15 @@ Sized in LOC; all unblocked. Bundle to PR-ceiling (~250 LOC) per
 
 ### Tier 1 — tiny fidelity wins (≤30 LOC each)
 
-- ~~**http/url** (#1818)~~ — shipped #1953.
 - **http/mime-type** (#1848) — `MimeType.ALL` static now interned (`mime-type.ts:243`); remaining: identity compare in `negotiateMime` (still string-compares `m.string === "*/*"`, ~10); allow null symbol for ad-hoc types so `formats` filter isn't a no-op (~10); re-parent `InvalidType` onto `MimeType.InvalidMimeType` when base lands (~10); raise `InvalidType` on media ranges missing `/` (#1861).
-- ~~**http/mime_negotiation** (#1848)~~ — shipped #1953 (`paramsReadable` now uses `RESCUABLE_MIME_FORMAT_ERRORS`).
-- ~~**routing/url_for** (#1825)~~ — shipped (#1953 / #2014); `use_route: Symbol()` with no `.description` throws via `symbolToString`; `UrlForOptions` tightened.
 - **routing/endpoint** (#1836) — `engine()` returns false; ~5 LOC once `Rails::Engine` lands.
 - **middleware/actionable_exceptions** (#1853) — prototype-chain walk in `ActionableError.action` (~15); warn on `_registry` collision (~10); switch endpoint to `cattrAccessor` (~5).
-- ~~**middleware/remote-ip** (#1820)~~ — shipped #1953.
-- ~~**middleware/public_exceptions** (#1861)~~ — shipped #1953 (`Response.defaultCharset` static landed).
 - **middleware/session/abstract_store** (#1863) — `privateId` + comparison helpers on `SessionId` (~10); add `cookieJar` accessor to `Request` (~20).
 - **testing/assertions/routing** (#1866) — symbol `use_route` normalization shipped (#2014); URL-form path support in `assertRecognizes`/`assertGenerates` still open (~20).
 - **controller/allow_browser** (#1947) — known divergences from Rails (`useragent` gem):
   - `isBot` uses a regex (`bot|crawl|spider|slurp`) rather than `useragent`'s curated bot list — may miss exotic crawler UAs.
   - Mobile UAs fold into desktop families (`mobile chrome`/`mobile safari`/`mobile firefox` → `chrome`/`safari`/`firefox`); Rails distinguishes them and requires explicit `mobile_safari:` keys.
   - `compareVersions` is a dot-segment numeric compare; semver prerelease tags (`120.0.0-beta`) parse to `NaN` and compare as `0` (Rails delegates to `useragent`'s `OperatingSystem::Version` which is also non-strict but handles tags).
-- ~~**testing/test-response** (#1845)~~ — shipped #1953 (5 status predicates ported).
-- ~~**http/param_error** (#1879)~~ — shipped #1987 (`STATUS_MAP` extended for ParseError/ParamError family).
 - **http/param_builder** (#1877) — relocate ParamBuilder + QueryParser test files from `http/` to `dispatch/` for Rails layout parity (~20).
 - **processAction args** (#1829) — optional ESLint rule for rest-param signature on overrides (~30, non-urgent).
 
@@ -88,9 +81,7 @@ Sized in LOC; all unblocked. Bundle to PR-ceiling (~250 LOC) per
 - **http/cache wiring** (#1828) — `Cache::Request` shipped #1927, `Cache::Response` shipped #1992 (additive). Remaining: `Request.getHeader` HTTP\_ normalization audit; `params` getter must overlay `pathParameters` (~20).
 - **http/mime_negotiation wiring** (#1848) — mixin wired onto `Request` (#1934); `Request#variant` shipped #2010. Remaining: drop legacy `Request.format()`; reconcile `Request.accept`; port `request_test.rb` MIME cluster.
 - **http/parameters** (#1832) — `parameter_parsers=` promoted to static on `Request` shipped #1936. Remaining: `Request.params` must merge `pathParameters` (~20).
-- ~~**http/filter-parameters + filter-redirect** (#1838)~~ — shipped #1937 (FilterParameters + FilterRedirect mixins wired).
 - **routing/routes_proxy** (#1855) — `PolymorphicRoutes` wiring shipped #1940. Remaining: widen `_routes` type on `UrlForHost`; drop `defaultUrlOptions` placeholder (~5).
-- **routing/redirection** (#1827) — redirects now dispatch through `Redirect`/`PathRedirect`/`OptionRedirect` endpoints (#1926). Remaining: `rackEscape` parity with `Rack::Utils.escape` for `!*'()` — extract shared util from `url.ts` (~30).
 - **http/param_builder** (#1877) — rack-multipart→UploadedFile adapter (~30); `ParamValue` opaque-leaf widening with `OpaqueParamLeaf` branch removes 3 unsafe casts (~40); narrow rescue from `e.message.startsWith("ArgumentError:")` to `instanceof ArgumentError` once class exists.
 - **railtie wiring stubs** (#1842) — `Response.defaultCharset` landed (#1953); CSP middleware wired via railtie (#2007). Remaining future-wired stubs blocked on unported targets: `Response.defaultHeaders`, `CookieJar.alwaysWriteCookie`, `Mapper.routeSourceLocations`, `ActionDispatch.testApp`, `ParamBuilder.ignoreLeadingBrackets`, `Request.ignoreAcceptHeader`, `Http::URL.secureProtocol`. Add `action_dispatch/railtie.rb` → `action-dispatch/railtie.ts` to `FILE_OVERRIDES` (~5).
 

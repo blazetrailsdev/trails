@@ -200,57 +200,42 @@ Sequencing rules:
 
 ### Wave 0 — single-file peripherals
 
-| PR     | Rails file                    | Missing | TS file (api:compare row)     | Methods           |
-| ------ | ----------------------------- | ------: | ----------------------------- | ----------------- |
-| ~~P3~~ | ~~`form_builder.rb`~~         |   ~~1~~ | ~~`form-builder.ts`~~         | #1944 ✅.         |
-| ~~P4~~ | ~~`metal/data_streaming.rb`~~ |   ~~1~~ | ~~`metal/data-streaming.ts`~~ | #1945 + #2013 ✅. |
-| ~~P7~~ | ~~`metal/renderers.rb`~~      |   ~~2~~ | ~~`metal/renderers.ts`~~      | #1946 ✅.         |
-| ~~P9~~ | ~~`deprecator.rb`~~           |   ~~3~~ | ~~`deprecator.ts`~~           | #1944 ✅.         |
+All Wave 0 rows shipped (P3 #1944, P4 #1945 + #2013, P7 #1946, P9 #1944).
 
 ### Wave 1 — small bundle peripherals
 
-Ship after Wave 0 lands. One PR per row.
+| PR  | Rails file                           | Missing | Notes                                                                                                                                             |
+| --- | ------------------------------------ | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P11 | `metal/etag_with_template_digest.rb` |       3 | `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate`. Depends on actionview digestor — stub if not yet ported, document gap. |
+| P12 | `metal/helpers.rb`                   |       5 | `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers`. Requires actionview helper integration.                     |
 
-| PR      | Rails file                             | Missing | Notes                                                                                                                                             |
-| ------- | -------------------------------------- | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~P10~~ | ~~`metal/content_security_policy.rb`~~ |   ~~4~~ | #1948 + #1952 ✅.                                                                                                                                 |
-| P11     | `metal/etag_with_template_digest.rb`   |       3 | `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate`. Depends on actionview digestor — stub if not yet ported, document gap. |
-| P12     | `metal/helpers.rb`                     |       5 | `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers`. Requires actionview helper integration.                     |
+(P10 `metal/content_security_policy.rb` shipped #1948 + #1952.)
 
 ### Wave 2 — medium peripherals
 
-| PR      | Rails file                               | Missing | Notes             |
-| ------- | ---------------------------------------- | ------: | ----------------- |
-| ~~P14~~ | ~~`metal/redirecting.rb` (privates)~~    |   ~~6~~ | #1949 ✅.         |
-| ~~P15~~ | ~~`metal/params_wrapper.rb` (privates)~~ |   ~~8~~ | #1950 + #2033 ✅. |
+All Wave 2 rows shipped (P14 #1949, P15 #1950 + #2033).
 
 ### Wave 3 — split-file PRs
 
 Each Rails file below is too large for one ≤300-LOC PR. Sub-PRs serialize on
 the same TS file, so ship them in alphabetical order (a → b → c).
 
-#### `metal/http_authentication.rb` (33 missing) — `metal/http-authentication.ts`
+#### `metal/http_authentication.rb` — `metal/http-authentication.ts`
 
-| PR       | Module      | Missing | Methods                                                                                                                                                                                |
-| -------- | ----------- | ------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~P17a~~ | ~~`Basic`~~ |  ~~13~~ | #1970 ✅.                                                                                                                                                                              |
-| P17b     | `Digest`    |      12 | `validateDigestResponse`, `expectedResponse`, `ha1`, `decodeCredentialsHeader`, `authenticationHeader`, `secretToken`, `nonce`, `validateNonce`, `opaque` + 3 controller-side helpers. |
-| P17c     | `Token`     |       8 | `tokenAndOptions`, `tokenParamsFrom`, `paramsArrayFrom`, `rewriteParamValues`, `rawParams` + 3 controller-side helpers.                                                                |
+| PR   | Module   | Missing | Methods                                                                                                                                                                                |
+| ---- | -------- | ------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P17b | `Digest` |      12 | `validateDigestResponse`, `expectedResponse`, `ha1`, `decodeCredentialsHeader`, `authenticationHeader`, `secretToken`, `nonce`, `validateNonce`, `opaque` + 3 controller-side helpers. |
+| P17c | `Token`  |       8 | `tokenAndOptions`, `tokenParamsFrom`, `paramsArrayFrom`, `rewriteParamValues`, `rawParams` + 3 controller-side helpers.                                                                |
 
-#### `metal/live.rb` (22 missing) — `metal/live.ts`
+(P17a `Basic` shipped #1970.)
 
-| PR       | Subject                  | Missing | Methods   |
-| -------- | ------------------------ | ------: | --------- |
-| ~~P18a~~ | ~~`Live::Buffer` class~~ |  ~~12~~ | #1985 ✅. |
-| ~~P18b~~ | ~~`Live` mixin~~         |  ~~10~~ | #2004 ✅. |
+#### `metal/live.rb` — `metal/live.ts`
 
-#### `metal/request_forgery_protection.rb` (31 missing) — `metal/request-forgery-protection.ts`
+All Live sub-rows shipped (P18a #1985, P18b #2004).
 
-| PR       | Subject                                  | Missing | Methods   |
-| -------- | ---------------------------------------- | ------: | --------- |
-| ~~P20a~~ | ~~Verification predicates~~              |  ~~10~~ | #1988 ✅. |
-| ~~P20b~~ | ~~Token generation/encoding~~            |  ~~11~~ | #2003 ✅. |
-| ~~P20c~~ | ~~Token validation + strategy plumbing~~ |  ~~10~~ | #2003 ✅. |
+#### `metal/request_forgery_protection.rb` — `metal/request-forgery-protection.ts`
+
+All RFP sub-rows shipped (P20a #1988, P20b/P20c #2003).
 
 #### `test_case.rb` (36 missing) — `test-case.ts`
 
