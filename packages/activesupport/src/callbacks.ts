@@ -890,9 +890,20 @@ export class CallbackChain {
       const prev = chain;
       chain = () => {
         let pendingProceed: Promise<void> | undefined;
+        let proceedSettled = false;
         const next = (): void | Promise<void> => {
           const r = prev();
-          if (isThenable(r)) pendingProceed = Promise.resolve(r) as Promise<void>;
+          if (isThenable(r)) {
+            pendingProceed = Promise.resolve(r) as Promise<void>;
+            pendingProceed.then(
+              () => {
+                proceedSettled = true;
+              },
+              () => {
+                proceedSettled = true;
+              },
+            );
+          }
           return r;
         };
         let cbResult: void | Promise<void>;
@@ -915,7 +926,6 @@ export class CallbackChain {
               `Async callback on sync chain "${this.name}" — around callback or block returned a Promise`,
             );
           }
-          const cbWasThenable = isThenable(cbResult);
           return (async () => {
             try {
               await cbResult;
@@ -924,11 +934,11 @@ export class CallbackChain {
               throw err;
             }
             if (pendingProceed) {
-              // If the around returned a Promise it had an opportunity to await
-              // and rescue the inner rejection — consume silently to avoid
-              // re-throwing an error it just handled. A synchronous around
-              // could not have observed the rejection, so propagate.
-              if (cbWasThenable) await pendingProceed.catch(() => {});
+              // Swallow only when the around had observed next()'s outcome
+              // before resolving (proceedSettled set during its execution) —
+              // i.e., it awaited and may have rescued. Otherwise the around
+              // fired-and-forgot, so propagate the rejection.
+              if (proceedSettled) await pendingProceed.catch(() => {});
               else await pendingProceed;
             }
           })();
