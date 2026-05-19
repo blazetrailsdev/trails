@@ -206,7 +206,11 @@ Estimated LOC (source + tests, plus standalone-package scaffolding):
 the scaffolding (package.json, tsconfig, root README stub, pnpm-workspace
 recognition) wants to land together with at least one working module so
 the package isn't a hollow build target, and the Wave-1 PR has to add the
-package to any aggregate scripts that enumerate workspaces. Still three
+package to any aggregate scripts that enumerate workspaces. Concretely:
+add `{ "path": "packages/did-you-mean" }` to the root `tsconfig.json`
+`references` array — without it, `tsc --build` won't pick the package up.
+Also double-check `pnpm-workspace.yaml` already globs `packages/*` (it
+does today, so no change needed there). Still three
 PRs, but the first now bundles the package scaffolding with the
 pure-math modules instead of landing it standalone:
 
