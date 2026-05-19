@@ -14,6 +14,11 @@
 
 import { Logger } from "@blazetrails/activesupport";
 import { stderr } from "@blazetrails/activesupport/process-adapter";
+import {
+  ParameterTypeError as RackParameterTypeError,
+  InvalidParameterError as RackInvalidParameterError,
+  ParamsTooDeepError as RackParamsTooDeepError,
+} from "@blazetrails/rack";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -169,7 +174,20 @@ export function parseFormattedParameters(
 
   try {
     return strategy(this.rawPost);
-  } catch {
+  } catch (e) {
+    // Pass ParamError-family failures (and already-wrapped ParseErrors)
+    // through untouched so callers can `rescueFrom(ParamError)` and see the
+    // specific subclass — mirrors Rails, where `ParamError.===` covers the
+    // parallel Rack exceptions. Everything else collapses to a generic
+    // ParseError so JSON / strategy bugs surface as a 400.
+    if (e instanceof ParseError) throw e;
+    if (
+      e instanceof RackParameterTypeError ||
+      e instanceof RackInvalidParameterError ||
+      e instanceof RackParamsTooDeepError
+    ) {
+      throw e;
+    }
     logParseErrorOnce.call(this);
     throw new ParseError("Error occurred while parsing request parameters");
   }
