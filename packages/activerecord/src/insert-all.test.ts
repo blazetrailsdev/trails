@@ -267,9 +267,13 @@ describe("InsertAllTest", () => {
     }
     const b = await Book.create({ title: "Original", author: "A" });
     const newTitle = "Should Not Update";
-    await ReadonlyTitleBook.upsertAll([{ id: b.id, title: newTitle, author: "A" }]);
+    // Update a non-readonly column alongside the readonly one so the test
+    // distinguishes "readonly filtered out of update set" from "update set
+    // collapsed to empty / upsert silently no-op'd".
+    await ReadonlyTitleBook.upsertAll([{ id: b.id, title: newTitle, author: "B" }]);
     const found = await Book.find(b.id);
     expect(found.title).not.toBe(newTitle);
+    expect(found.author).toBe("B");
   });
 
   it.skip("upsert all updates changed columns only", () => {
