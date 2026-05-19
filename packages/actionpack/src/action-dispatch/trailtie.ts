@@ -13,7 +13,7 @@
  *
  * Unported targets (ExceptionWrapper.rescue_responses/_templates,
  * CookieJar.always_write_cookie, Mapper.route_source_locations,
- * Response.default_charset/_headers, Request.ignore_accept_header,
+ * Response.default_headers, Request.ignore_accept_header,
  * ParamBuilder.ignore_leading_brackets, ActionDispatch.test_app) are left
  * out of the configure body and will wire in as those classes gain the
  * matching surface — see actionpack-100-percent.md.
@@ -25,6 +25,7 @@ import { URL as HttpURL } from "./http/url.js";
 import { QueryParser } from "./http/query-parser.js";
 import { RequestUtils } from "./request/utils.js";
 import { CacheConfig } from "./http/cache.js";
+import { Response } from "./http/response.js";
 
 /**
  * Shape of `config.actionDispatch` — mirrors the
@@ -118,6 +119,13 @@ export class Trailtie extends BaseRailtie {
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
       RequestUtils.performDeepMunge = cfg.performDeepMunge;
       CacheConfig.strictFreshness = cfg.strictFreshness;
+      // Rails: `on_load(:action_dispatch_response) { self.default_charset =
+      //   app.config.action_dispatch.default_charset || app.config.encoding }`
+      // (railtie.rb:65-68). Rails assigns unconditionally — a null cfg
+      // falls through to `app.config.encoding` (defaults to "utf-8"). trails
+      // has no app-level `encoding` config yet, so a null cfg restores
+      // "utf-8" so initializer state doesn't leak across runs.
+      Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
     });
   }
 }

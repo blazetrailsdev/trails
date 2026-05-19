@@ -131,4 +131,5 @@ export {
   IpSpoofAttackError,
   TRUSTED_PROXIES,
   type Proxy,
+  type CustomProxies,
 } from "./middleware/remote-ip.js";

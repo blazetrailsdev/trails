@@ -344,6 +344,55 @@ describe("ResponseTest", () => {
   it("inspect for redirect", () => {
     expect(new Response(302).inspect()).toBe("#<ActionDispatch::Response 302 Found>");
   });
+
+  it("successful predicate", () => {
+    expect(new Response(200).successful).toBe(true);
+    expect(new Response(299).successful).toBe(true);
+    expect(new Response(300).successful).toBe(false);
+    expect(new Response(404).successful).toBe(false);
+  });
+
+  it("redirection predicate", () => {
+    expect(new Response(301).redirection).toBe(true);
+    expect(new Response(302).redirection).toBe(true);
+    expect(new Response(200).redirection).toBe(false);
+    expect(new Response(400).redirection).toBe(false);
+  });
+
+  it("clientError predicate", () => {
+    expect(new Response(400).clientError).toBe(true);
+    expect(new Response(404).clientError).toBe(true);
+    expect(new Response(499).clientError).toBe(true);
+    expect(new Response(500).clientError).toBe(false);
+  });
+
+  it("serverError predicate", () => {
+    expect(new Response(500).serverError).toBe(true);
+    expect(new Response(599).serverError).toBe(true);
+    expect(new Response(404).serverError).toBe(false);
+  });
+
+  it("notFound predicate", () => {
+    expect(new Response(404).notFound).toBe(true);
+    expect(new Response(400).notFound).toBe(false);
+    expect(new Response(200).notFound).toBe(false);
+  });
+
+  it("defaultCharset static is utf-8", () => {
+    expect(Response.defaultCharset).toBe("utf-8");
+  });
+
+  it("contentType setter honors a customized Response.defaultCharset", () => {
+    const prior = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "iso-8859-1";
+      const res = new Response();
+      res.contentType = "text/plain";
+      expect(res.headers["content-type"]).toBe("text/plain; charset=iso-8859-1");
+    } finally {
+      Response.defaultCharset = prior;
+    }
+  });
 });
 
 describe("ResponseFilterRedirect", () => {

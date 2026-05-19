@@ -6,6 +6,7 @@ import { I18n } from "@blazetrails/activesupport";
 import { bodyToString } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { PublicExceptions } from "../middleware/public-exceptions.js";
+import { Response } from "../http/response.js";
 
 let publicPath: string;
 let app: PublicExceptions;
@@ -97,5 +98,20 @@ describe("PublicExceptions", () => {
       HTTP_ACCEPT: "application/json",
     });
     expect(status).toBe(404);
+  });
+
+  it("honors a customized Response.defaultCharset across html/json/xml", async () => {
+    const prior = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "iso-8859-1";
+      const html = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "text/html" });
+      expect(html[1]["content-type"]).toBe("text/html; charset=iso-8859-1");
+      const json = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "application/json" });
+      expect(json[1]["content-type"]).toBe("application/json; charset=iso-8859-1");
+      const xml = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "application/xml" });
+      expect(xml[1]["content-type"]).toBe("application/xml; charset=iso-8859-1");
+    } finally {
+      Response.defaultCharset = prior;
+    }
   });
 });

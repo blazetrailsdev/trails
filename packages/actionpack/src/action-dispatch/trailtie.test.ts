@@ -5,6 +5,7 @@ import { URL as HttpURL } from "./http/url.js";
 import { QueryParser } from "./http/query-parser.js";
 import { RequestUtils } from "./request/utils.js";
 import { CacheConfig } from "./http/cache.js";
+import { Response } from "./http/response.js";
 import { X_REQUEST_ID } from "./constants.js";
 
 function cfg(): ActionDispatchConfig {
@@ -17,6 +18,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedStrictQuery: boolean | null;
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
+  let savedDefaultCharset: string;
   let hadDeprecator: boolean;
   let savedDeprecator: (typeof BaseRailtie.deprecators)[string];
 
@@ -26,6 +28,7 @@ describe("ActionDispatch::Trailtie", () => {
     savedStrictQuery = QueryParser.strictQueryStringSeparator;
     savedPerformDeepMunge = RequestUtils.performDeepMunge;
     savedStrictFreshness = CacheConfig.strictFreshness;
+    savedDefaultCharset = Response.defaultCharset;
     hadDeprecator = "actionDispatch" in BaseRailtie.deprecators;
     savedDeprecator = BaseRailtie.deprecators["actionDispatch"];
   });
@@ -36,6 +39,7 @@ describe("ActionDispatch::Trailtie", () => {
     QueryParser.strictQueryStringSeparator = savedStrictQuery;
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
     CacheConfig.strictFreshness = savedStrictFreshness;
+    Response.defaultCharset = savedDefaultCharset;
     if (hadDeprecator) BaseRailtie.deprecators["actionDispatch"] = savedDeprecator;
     else delete BaseRailtie.deprecators["actionDispatch"];
   });
@@ -71,5 +75,18 @@ describe("ActionDispatch::Trailtie", () => {
     expect(RequestUtils.performDeepMunge).toBe(false);
     expect(CacheConfig.strictFreshness).toBe(true);
     expect(BaseRailtie.deprecators["actionDispatch"]).toBeDefined();
+  });
+
+  it("runInitializers copies defaultCharset onto Response when configured", () => {
+    cfg().defaultCharset = "iso-8859-1";
+    Trailtie.runInitializers();
+    expect(Response.defaultCharset).toBe("iso-8859-1");
+  });
+
+  it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", () => {
+    Response.defaultCharset = "stale";
+    cfg().defaultCharset = null;
+    Trailtie.runInitializers();
+    expect(Response.defaultCharset).toBe("utf-8");
   });
 });

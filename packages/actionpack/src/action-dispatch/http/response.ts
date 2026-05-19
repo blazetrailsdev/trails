@@ -9,6 +9,9 @@ import type { Request } from "./request.js";
 import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
 
 export class Response {
+  /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
+  static defaultCharset = "utf-8";
+
   private _status: number;
   private _headers: Record<string, string>;
   private _body: string[];
@@ -44,6 +47,29 @@ export class Response {
     return STATUS_MESSAGES[this._status] || "";
   }
 
+  // --- Status predicates (Rack::Response::Helpers parity) ---
+
+  /** 2xx response. */
+  get successful(): boolean {
+    return this._status >= 200 && this._status < 300;
+  }
+  /** 3xx response. */
+  get redirection(): boolean {
+    return this._status >= 300 && this._status < 400;
+  }
+  /** 4xx response. */
+  get clientError(): boolean {
+    return this._status >= 400 && this._status < 500;
+  }
+  /** 5xx response. */
+  get serverError(): boolean {
+    return this._status >= 500 && this._status < 600;
+  }
+  /** Exact 404. */
+  get notFound(): boolean {
+    return this._status === 404;
+  }
+
   // --- Headers ---
 
   get headers(): Record<string, string> {
@@ -72,7 +98,7 @@ export class Response {
 
   set contentType(value: string | undefined) {
     if (value) {
-      const charset = this._charset ?? "utf-8";
+      const charset = this._charset ?? (this.constructor as typeof Response).defaultCharset;
       if (value.startsWith("text/")) {
         this._headers["content-type"] = `${value}; charset=${charset}`;
       } else {

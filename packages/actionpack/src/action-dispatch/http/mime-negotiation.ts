@@ -11,7 +11,17 @@
  */
 
 import { ArrayInquirer } from "@blazetrails/activesupport";
+import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType } from "./mime-type.js";
+import { ParseError } from "./parameters.js";
+
+/**
+ * Rails: `RESCUABLE_MIME_FORMAT_ERRORS = [ActionController::BadRequest,
+ * ActionDispatch::Http::Parameters::ParseError]`. Anything else thrown from
+ * `parameters` should propagate.
+ * @internal
+ */
+const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
 const CONTENT_TYPE_KEY = "action_dispatch.request.content_type";
 const ACCEPTS_KEY = "action_dispatch.request.accepts";
@@ -212,11 +222,11 @@ export function shouldApplyVaryHeader(this: MimeNegotiationHost): boolean {
 export function paramsReadable(this: MimeNegotiationHost): boolean {
   try {
     return this.parameters["format"] != null;
-  } catch {
-    // Rails rescues ActionController::BadRequest /
-    // ActionDispatch::Http::Parameters::ParseError. TS has no controller layer
-    // yet, so any parameter-access failure collapses to `false` the same way.
-    return false;
+  } catch (err) {
+    if (RESCUABLE_MIME_FORMAT_ERRORS.some((cls) => err instanceof cls)) {
+      return false;
+    }
+    throw err;
   }
 }
 

@@ -73,4 +73,70 @@ describe("RemoteIp middleware (smoke)", () => {
   it("Request#remoteIp falls back to REMOTE_ADDR without middleware", () => {
     expect(new Request({ REMOTE_ADDR: "127.0.0.1" }).remoteIp).toBe("127.0.0.1");
   });
+
+  it("accepts any iterable as custom_proxies (Rails: responds_to?(:any?))", async () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    function* gen(): Generator<Proxy> {
+      yield /^9\.9\.9\.9$/;
+    }
+    const mw = new RemoteIp(async () => [200, {}, emptyBody()], true, gen());
+    expect(mw.proxies).toEqual([/^9\.9\.9\.9$/]);
+
+    const setMw = new RemoteIp(
+      async () => [200, {}, emptyBody()],
+      true,
+      new Set<Proxy>([/^8\.8\.8\.8$/]),
+    );
+    expect(setMw.proxies).toEqual([/^8\.8\.8\.8$/]);
+  });
+
+  it("empty Array / Set falls back to TRUSTED_PROXIES (Rails Array#empty?/Set#empty? → blank?)", () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    const arr = new RemoteIp(async () => [200, {}, emptyBody()], true, []);
+    expect(arr.proxies).toBe(TRUSTED_PROXIES);
+    const set = new RemoteIp(async () => [200, {}, emptyBody()], true, new Set<Proxy>());
+    expect(set.proxies).toBe(TRUSTED_PROXIES);
+  });
+
+  it("empty generator is accepted as-is (Rails: Enumerator doesn't respond_to?(:empty?), so not blank?)", () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    function* emptyGen(): Generator<Proxy> {}
+    const mw = new RemoteIp(async () => [200, {}, emptyBody()], true, emptyGen());
+    expect(mw.proxies).toEqual([]);
+    expect(mw.proxies).not.toBe(TRUSTED_PROXIES);
+  });
+
+  it('blank scalars (false / "" / whitespace) fall back to TRUSTED_PROXIES (Rails blank?)', () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    const mk = (v: unknown) =>
+      new RemoteIp(async () => [200, {}, emptyBody()], true, v as Iterable<Proxy>);
+    expect(mk(false).proxies).toBe(TRUSTED_PROXIES);
+    expect(mk("").proxies).toBe(TRUSTED_PROXIES);
+    expect(mk("   ").proxies).toBe(TRUSTED_PROXIES);
+  });
+
+  it("rejects a bare String CIDR (Rails: String doesn't respond_to?(:any?))", () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    expect(
+      () =>
+        new RemoteIp(
+          async () => [200, {}, emptyBody()],
+          true,
+          "10.0.0.0/8" as unknown as Iterable<Proxy>,
+        ),
+    ).toThrow(/single value/);
+  });
+
+  it("rejects a non-iterable single value", () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    expect(
+      () =>
+        new RemoteIp(
+          async () => [200, {}, emptyBody()],
+          true,
+          // Numbers aren't iterable in JS.
+          42 as unknown as Iterable<Proxy>,
+        ),
+    ).toThrow(/single value/);
+  });
 });

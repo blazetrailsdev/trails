@@ -32,6 +32,14 @@ describe("URL.extractSubdomains", () => {
   it("returns [] for an IP host", () => {
     expect(URL.extractSubdomains("192.168.1.1", 1)).toEqual([]);
   });
+
+  it("returns [] when host has fewer parts than the TLD", () => {
+    // Rails: `parts[0..-(tld_length + 2)]` returns [] when out of range; a
+    // naive `slice(0, parts.length - tldLength - 1)` would drop host *parts*
+    // off the end via negative-`end` Array#slice semantics.
+    expect(URL.extractSubdomains("example.com", 2)).toEqual([]);
+    expect(URL.extractSubdomains("co.uk", 2)).toEqual([]);
+  });
 });
 
 describe("URL.extractSubdomain", () => {

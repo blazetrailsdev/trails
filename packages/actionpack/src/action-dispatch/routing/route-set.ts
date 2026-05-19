@@ -122,8 +122,11 @@ export class RouteSet {
   private defaultUrlOptions: { host?: string } = {};
   /**
    * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
-   * back to the standard RESTful helper. Populated by `direct(:name) { ... }`
-   * (not yet ported). Mirrors `RouteSet#polymorphic_mappings`.
+   * back to the standard RESTful helper. In Rails this is populated by the
+   * `direct(:name) { ... }` DSL on `Mapper`; the lookup/entry side lives in
+   * `polymorphic-routes.ts`, but the `direct` registration DSL is not yet
+   * ported, so this map is currently empty in practice. Mirrors
+   * `RouteSet#polymorphic_mappings`.
    */
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** Controller name → handler registry consulted by {@link Dispatcher}. */

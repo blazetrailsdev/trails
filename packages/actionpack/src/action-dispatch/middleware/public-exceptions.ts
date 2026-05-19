@@ -21,12 +21,11 @@ import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { MimeType } from "../http/mime-type.js";
+import { Response } from "../http/response.js";
 
 async function* emptyBody(): RackBody {}
 
 const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
-
-const DEFAULT_CHARSET = "utf-8";
 
 type ErrorBody = { status: number; error: string };
 
@@ -79,7 +78,7 @@ export class PublicExceptions {
     return [
       status,
       {
-        "content-type": `${contentType}; charset=${DEFAULT_CHARSET}`,
+        "content-type": `${contentType}; charset=${Response.defaultCharset}`,
         "content-length": String(bytes),
       },
       bodyFromString(body),

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { DebugLocks, type InterlockLike, type ThreadLike, type ThreadInfo } from "./debug-locks.js";
+import { Response } from "../http/response.js";
 
 const passthrough = async (_env: RackEnv): Promise<RackResponse> => [200, {}, bodyFromString("ok")];
 
@@ -130,6 +131,32 @@ describe("DebugLocks", () => {
     });
     const body = await bodyToString(res[2]);
     expect(body).toContain("Thread 0 [0x5 dead]");
+  });
+
+  it("Content-Type charset follows Response.defaultCharset", async () => {
+    setInterlock([[thread(0x1a), { exclusive: false, sharing: 0 }]]);
+    const prior = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "iso-8859-1";
+      const res = await new DebugLocks(passthrough).call({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/rails/locks",
+      });
+      expect(res[1]["content-type"]).toBe("text/plain; charset=iso-8859-1");
+    } finally {
+      Response.defaultCharset = prior;
+    }
+  });
+
+  it("DebugLocks.defaultCharset setter writes through to Response.defaultCharset", () => {
+    const prior = Response.defaultCharset;
+    try {
+      DebugLocks.defaultCharset = "us-ascii";
+      expect(Response.defaultCharset).toBe("us-ascii");
+      expect(DebugLocks.defaultCharset).toBe("us-ascii");
+    } finally {
+      Response.defaultCharset = prior;
+    }
   });
 
   it("throws when no interlock is configured", async () => {

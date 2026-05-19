@@ -10,6 +10,7 @@
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
 
 export interface ThreadLike {
   /**
@@ -45,10 +46,17 @@ export class DebugLocks {
   static interlock: InterlockLike | null = null;
 
   /**
-   * Charset used for the response `content-type`. Mirrors
-   * `ActionDispatch::Response.default_charset`.
+   * Charset used for the response `content-type`. Rails reads
+   * `ActionDispatch::Response.default_charset` directly at request time
+   * (`debug_locks.rb:104`); this getter mirrors that so the railtie's
+   * `config.actionDispatch.defaultCharset` flows through here as well.
    */
-  static defaultCharset = "utf-8";
+  static get defaultCharset(): string {
+    return Response.defaultCharset;
+  }
+  static set defaultCharset(value: string) {
+    Response.defaultCharset = value;
+  }
 
   private app: RackApp;
   private path: string;

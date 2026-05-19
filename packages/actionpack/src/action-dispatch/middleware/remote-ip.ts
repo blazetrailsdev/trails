@@ -30,6 +30,23 @@ export const TRUSTED_PROXIES: readonly string[] = [
 
 export type Proxy = string | RegExp;
 
+/**
+ * What `RemoteIp` accepts as `custom_proxies`. Iterable of proxies, but
+ * intentionally excludes bare `string` (which is technically `Iterable<string>`)
+ * so `new RemoteIp(app, true, "10.0.0.0/8")` fails to type-check rather than
+ * being silently spread into per-character entries. Rails treats String as
+ * a single value and raises ArgumentError. The `length?: never` branch
+ * shape excludes anything with a `length: number` (strings) while still
+ * admitting generators and other non-indexed iterables. Custom iterables
+ * that happen to expose `length: number` for unrelated reasons should
+ * either pre-spread into an array or cast — runtime accepts any iterable
+ * other than `string`/`String`.
+ */
+export type CustomProxies =
+  | ReadonlyArray<Proxy>
+  | ReadonlySet<Proxy>
+  | (Iterable<Proxy> & { readonly length?: never });
+
 interface ParsedIp {
   value: bigint;
   bits: 32 | 128;
@@ -166,13 +183,41 @@ export class RemoteIp {
   readonly proxies: readonly Proxy[];
   private readonly app: RackApp;
 
-  constructor(app: RackApp, ipSpoofingCheck = true, customProxies?: readonly Proxy[] | null) {
+  constructor(app: RackApp, ipSpoofingCheck = true, customProxies?: CustomProxies | null) {
     this.app = app;
     this.checkIp = ipSpoofingCheck;
-    if (customProxies == null || (Array.isArray(customProxies) && customProxies.length === 0)) {
+    // Rails: `if custom_proxies.blank?` then `elsif custom_proxies.respond_to?(:any?)`.
+    // The TS analogue is "iterable but not a String" — Ruby `String` does not
+    // include `Enumerable` and therefore doesn't respond to `:any?`, so a bare
+    // CIDR like `"10.0.0.0/8"` must hit the "single value" raise, not be
+    // spread into characters.
+    //
+    // `blank?` in Rails only fires on values that respond to `:empty?`. Arrays
+    // and Sets do; Enumerators / generators do not. So an empty Array/Set
+    // falls back to `TRUSTED_PROXIES`, but an empty generator is accepted as-is
+    // (and trusts no proxies, matching Rails' behavior with an `Enumerator`).
+    // Rails: ActiveSupport `blank?` is true for nil/false/empty/whitespace
+    // strings/empty collections. Treat the scalar-blank cases (false, "",
+    // whitespace) the same way before falling through to the iterable check.
+    // The cast to `unknown` is deliberate — the static `CustomProxies` type
+    // excludes strings/false, but callers can still hit this at runtime via
+    // `as Iterable<Proxy>` casts (Rails users coming from Ruby configs).
+    const raw = customProxies as unknown;
+    const isBlankScalar =
+      raw === false ||
+      (typeof raw === "string" && raw.trim() === "") ||
+      (raw instanceof String && String(raw).trim() === "");
+    if (customProxies == null || isBlankScalar) {
       this.proxies = TRUSTED_PROXIES;
-    } else if (Array.isArray(customProxies)) {
-      this.proxies = customProxies;
+    } else if (
+      typeof customProxies !== "string" &&
+      !(customProxies instanceof String) &&
+      typeof (customProxies as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+    ) {
+      const isEmptyCollection =
+        (Array.isArray(customProxies) && customProxies.length === 0) ||
+        (customProxies instanceof Set && customProxies.size === 0);
+      this.proxies = isEmptyCollection ? TRUSTED_PROXIES : [...customProxies];
     } else {
       throw new TypeError(
         "Setting config.action_dispatch.trusted_proxies to a single value isn't supported. " +
