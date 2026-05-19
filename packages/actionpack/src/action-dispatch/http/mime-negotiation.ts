@@ -194,13 +194,22 @@ export function setVariant(
   if (!arr.every((v) => typeof v === "string")) {
     throw new Error("request.variant must be set to a Symbol or an Array of Symbols.");
   }
-  (this as MimeNegotiationHost & { _variant?: ArrayInquirer<string> })._variant =
-    new ArrayInquirer<string>(...arr);
+  (
+    this as MimeNegotiationHost & {
+      _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
+    }
+  )._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
+    Record<string, () => boolean>;
 }
 
-export function variant(this: MimeNegotiationHost): ArrayInquirer<string> {
-  const host = this as MimeNegotiationHost & { _variant?: ArrayInquirer<string> };
-  return (host._variant ??= new ArrayInquirer<string>());
+export function variant(
+  this: MimeNegotiationHost,
+): ArrayInquirer<string> & Record<string, () => boolean> {
+  const host = this as MimeNegotiationHost & {
+    _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
+  };
+  return (host._variant ??= new ArrayInquirer<string>() as ArrayInquirer<string> &
+    Record<string, () => boolean>);
 }
 
 /** Sets the format by string extension (`request.format = :iphone`). */

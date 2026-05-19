@@ -313,7 +313,7 @@ export class Request {
   declare shouldApplyVaryHeader: () => boolean;
   declare setFormat: (extension: unknown) => void;
   declare setFormats: (extensions: unknown[]) => void;
-  get variant(): ArrayInquirer<string> {
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
     return _variant.call(mimeHost(this));
   }
   set variant(value: string | string[] | null | undefined) {

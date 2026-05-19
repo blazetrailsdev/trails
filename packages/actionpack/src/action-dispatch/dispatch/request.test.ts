@@ -525,32 +525,29 @@ describe("RequestEtag", () => {
 describe("RequestVariant", () => {
   it("setting variant to a symbol", () => {
     const req = new Request({});
-    req.variant = "phone" as any;
-    const v = req.variant as any;
-    expect(v.phone?.()).toBe(true);
-    expect(v.tablet?.()).toBe(false);
-    expect(v.any("phone", "tablet")).toBe(true);
-    expect(v.any("tablet", "desktop")).toBe(false);
+    req.variant = "phone";
+    expect(req.variant.phone()).toBe(true);
+    expect(req.variant.tablet()).toBe(false);
+    expect(req.variant.any("phone", "tablet")).toBe(true);
+    expect(req.variant.any("tablet", "desktop")).toBe(false);
   });
 
   it("setting variant to an array of symbols", () => {
     const req = new Request({});
-    req.variant = ["phone", "tablet"] as any;
-    const v = req.variant as any;
-    expect(v.phone?.()).toBe(true);
-    expect(v.tablet?.()).toBe(true);
-    expect(v.desktop?.()).toBe(false);
-    expect(v.any("tablet", "desktop")).toBe(true);
-    expect(v.any("desktop", "watch")).toBe(false);
+    req.variant = ["phone", "tablet"];
+    expect(req.variant.phone()).toBe(true);
+    expect(req.variant.tablet()).toBe(true);
+    expect(req.variant.desktop()).toBe(false);
+    expect(req.variant.any("tablet", "desktop")).toBe(true);
+    expect(req.variant.any("desktop", "watch")).toBe(false);
   });
 
   it("clearing variant", () => {
     const req = new Request({});
-    req.variant = null as any;
-    const v = req.variant as any;
-    expect(v.length).toBe(0);
-    expect(v.phone?.()).toBe(false);
-    expect(v.any("phone", "tablet")).toBe(false);
+    req.variant = null;
+    expect(req.variant.length).toBe(0);
+    expect(req.variant.phone()).toBe(false);
+    expect(req.variant.any("phone", "tablet")).toBe(false);
   });
 
   it("setting variant to a non-symbol value", () => {
