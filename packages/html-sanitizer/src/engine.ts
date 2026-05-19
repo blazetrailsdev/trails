@@ -45,6 +45,43 @@ export function stripAllTags(html: string): string {
 
 /**
  * @internal
+ * Options consumed by `safeListSanitize`. Mirrors the Rails
+ * `SafeListSanitizer` scrub options: allowed tags + attributes plus a
+ * `prune` switch that swaps the default "strip tag, keep content"
+ * behavior for "remove tag and its children".
+ */
+export interface SafeListEngineOptions {
+  allowedTags: readonly string[];
+  allowedAttributes: readonly string[];
+  prune?: boolean;
+}
+
+/**
+ * @internal
+ * Allowlist sanitize for SafeListSanitizer. Drops any tag not in
+ * `allowedTags` (keeping inner text by default, or pruning children when
+ * `prune` is true) and strips any attribute not in `allowedAttributes`.
+ * URL-bearing attributes are filtered to safe schemes by the engine.
+ */
+export function safeListSanitize(html: string, options: SafeListEngineOptions): string {
+  const allowedAttrs = [...options.allowedAttributes];
+
+  return sanitizeHtml(html, {
+    allowedTags: [...options.allowedTags],
+    // Apply the same allowlist to every tag — Rails' PermitScrubber
+    // doesn't gate attributes per-tag, it's one flat list.
+    allowedAttributes: { "*": allowedAttrs },
+    // Rails' `prune: true` → remove disallowed tags AND their content.
+    // Default behavior strips the tag but keeps inner text.
+    disallowedTagsMode: options.prune ? "completelyDiscard" : "discard",
+    // sanitize-html's default allowedSchemes (http/https/ftp/mailto/tel)
+    // matches Loofah's safe-URL set for href/src; javascript: and
+    // vbscript: are dropped automatically.
+  });
+}
+
+/**
+ * @internal
  * "Unwrap" the listed tags: drop the open/close markers but keep the
  * inner text, and strip the listed attributes from any element that
  * survives. Mirrors Loofah's TargetScrubber used by Rails' LinkSanitizer
