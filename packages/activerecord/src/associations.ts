@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
-import { fireAdapterSetHook } from "./_adapter-set-hook.js";
 import { Table as ArelTable } from "@blazetrails/arel";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -1612,13 +1611,6 @@ function createHabtmJoinModel(
     );
     Reflection.addReflection(JoinModel, assocDef.name, ref as any);
   }
-
-  // The JoinModel's `adapter` property is a getter delegating to lhsModel,
-  // so the normal Base.adapter-set hook never fires for it. Fire it manually
-  // so the test-adapter learns about the join table and creates it via
-  // processPendingModels at setup time, instead of falling into the regex
-  // recovery path on the first INSERT.
-  fireAdapterSetHook(JoinModel);
 
   return JoinModel;
 }

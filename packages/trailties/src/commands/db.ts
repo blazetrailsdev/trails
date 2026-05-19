@@ -426,11 +426,10 @@ async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>
   try {
     await fn();
   } finally {
-    // Preserve setter side effects (Base.adapter's setter fires the
-    // internal _onAdapterSet hook) when restoring a non-null adapter.
-    // Fall back to the backing field for a previous null because the
-    // public setter is typed as DatabaseAdapter, not DatabaseAdapter |
-    // null.
+    // Preserve setter side effects (schema reset, arel-visitor wiring)
+    // when restoring a non-null adapter. Fall back to the backing field
+    // for a previous null because the public setter is typed as
+    // DatabaseAdapter, not DatabaseAdapter | null.
     if (previous === null) {
       Base._adapter = previous;
     } else {

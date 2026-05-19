@@ -102,7 +102,6 @@ import { Association as AssociationInstance } from "./associations/association.j
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import * as ModelSchema from "./model-schema.js";
-import { fireAdapterSetHook } from "./_adapter-set-hook.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
@@ -371,9 +370,6 @@ export function _setRelationCtor(ctor: new (modelClass: typeof Base) => any): vo
 export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
   _wrapWithScopeProxy = wrapper;
 }
-
-/** @internal Hook called when a model's adapter is set. Used by test-adapter.ts. */
-export { setOnAdapterSetHook as _setOnAdapterSetHook } from "./_adapter-set-hook.js";
 
 // Mirrors Rails' AbstractAdapter#arel_visitor — routes Node#toSql() through the
 // dialect-specific visitor (e.g. SQLite booleans as 1/0, no FOR UPDATE, etc.).
@@ -992,7 +988,6 @@ export class Base extends Model {
     }
     this._adapter = adapter;
     _wireArelVisitor(adapter);
-    fireAdapterSetHook(this);
     if (this !== Base && this.name) Base._modelsByName.set(this.name, this as typeof Base);
 
     // Full schema reset on adapter swap: drops schema-sourced defs and
@@ -1063,7 +1058,6 @@ export class Base extends Model {
     if (modelPool) {
       this._adapter = modelPool.checkout();
       _wireArelVisitor(this._adapter);
-      fireAdapterSetHook(this);
       return this._adapter;
     }
 
@@ -1075,7 +1069,6 @@ export class Base extends Model {
       if (!connectionClass._adapter) {
         connectionClass._adapter = connPool.checkout();
         _wireArelVisitor(connectionClass._adapter);
-        fireAdapterSetHook(connectionClass);
       }
       return connectionClass._adapter;
     }

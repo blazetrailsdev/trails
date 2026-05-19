@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base, Relation } from "./index.js";
 import { registerModel } from "./associations.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { createTestAdapter } from "./test-adapter.js";
+import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 let adapter: DatabaseAdapter;
@@ -23,6 +24,12 @@ describe("QueryingTest — static forwarders on Base", () => {
       }
     }
     Post = PostClass;
+  });
+
+  beforeEach(async () => {
+    await defineSchema(adapter, {
+      post_classes: { title: "string", status: "string" },
+    });
   });
 
   it("includes() returns a Relation without throwing", () => {
@@ -121,8 +128,10 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(Post.withRecursive({ tree: "SELECT 1" })).toBeInstanceOf(Relation);
   });
 
-  it("asyncIds() returns a Promise", () => {
-    expect(Post.asyncIds()).toBeInstanceOf(Promise);
+  it("asyncIds() returns a Promise", async () => {
+    const p = Post.asyncIds();
+    expect(p).toBeInstanceOf(Promise);
+    await p;
   });
 
   it("includes().where() chains and produces valid SQL", () => {
