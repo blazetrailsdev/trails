@@ -182,10 +182,13 @@ export class DatabaseConfig {
   }
 
   get reapingFrequency(): number | null {
+    // Rails: `configuration_hash.fetch(:reaping_frequency, 60)&.to_f` —
+    // missing key defaults to 60; explicit `nil` stays nil; any other value
+    // (including "0") is coerced with `to_f`.
     const raw = this.configuration.reapingFrequency;
     if (raw === null) return null;
-    const freq = raw === undefined ? 60 : toFloat(raw);
-    return freq > 0 ? freq : null;
+    if (raw === undefined) return 60.0;
+    return toFloat(raw);
   }
 
   get queryCache(): unknown {

@@ -667,18 +667,17 @@ export class DatabaseTasks {
   static async dumpSchema(config: DatabaseConfig): Promise<void> {
     // Rails: `return unless db_config.schema_dump` — lets per-config
     // `schemaDump: false` (or null) suppress dumping. HashConfig.schemaDump()
-    // returns `string | false | null`; false AND null both mean "don't dump".
-    // Pass the current format so the check matches what's being dumped.
+    // normalizes both to null. Pass the current format so the check matches
+    // what's being dumped.
     const cfgWithDump = config as unknown as {
-      schemaDump?: (format?: string) => string | false | null;
+      schemaDump?: (format?: string) => string | null;
     };
     if (typeof cfgWithDump.schemaDump === "function") {
       // JS dumps use the same schema file path/config as TS; normalize
       // so HashConfig.schemaDump (which recognizes ruby/sql/ts but not
       // js) doesn't return null and accidentally suppress the dump.
       const format = this.schemaFormat === "js" ? "ts" : this.schemaFormat;
-      const result = cfgWithDump.schemaDump(format);
-      if (result === false || result === null) return;
+      if (cfgWithDump.schemaDump(format) == null) return;
     }
     const filename = this.schemaDumpPath(config);
     if (this.schemaFormat === "sql") {

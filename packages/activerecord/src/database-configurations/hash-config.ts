@@ -50,13 +50,19 @@ export class HashConfig extends DatabaseConfig {
   /**
    * Mirrors: HashConfig#schema_dump
    *
-   * Returns the schema dump filename for this config, or false/null if
-   * schema dumping is disabled.
+   * Returns the schema dump filename for this config, or null if schema
+   * dumping is disabled (configured as either `false` or `null`).
    */
-  schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | false | null {
-    if ("schemaDump" in this.configuration) {
+  schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
+    if (
+      Object.hasOwn(this.configuration, "schemaDump") &&
+      this.configuration.schemaDump !== undefined
+    ) {
       const val = this.configuration.schemaDump;
-      if (val === false || val === null) return val as false | null;
+      // Rails: `if config = configuration_hash[:schema_dump]` — both `nil` and
+      // `false` short-circuit to a nil return. JS `undefined` is treated as
+      // "key absent" (fall through to the default).
+      if (val === false || val === null) return null;
       return val as string;
     }
     const typeFile = this._schemaFileType(format);
