@@ -106,6 +106,15 @@ describe("RemoteIp middleware (smoke)", () => {
     expect(mw.proxies).not.toBe(TRUSTED_PROXIES);
   });
 
+  it('blank scalars (false / "" / whitespace) fall back to TRUSTED_PROXIES (Rails blank?)', () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    const mk = (v: unknown) =>
+      new RemoteIp(async () => [200, {}, emptyBody()], true, v as Iterable<Proxy>);
+    expect(mk(false).proxies).toBe(TRUSTED_PROXIES);
+    expect(mk("").proxies).toBe(TRUSTED_PROXIES);
+    expect(mk("   ").proxies).toBe(TRUSTED_PROXIES);
+  });
+
   it("rejects a bare String CIDR (Rails: String doesn't respond_to?(:any?))", () => {
     async function* emptyBody(): AsyncGenerator<string> {}
     expect(

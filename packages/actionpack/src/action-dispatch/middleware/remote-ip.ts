@@ -196,7 +196,18 @@ export class RemoteIp {
     // and Sets do; Enumerators / generators do not. So an empty Array/Set
     // falls back to `TRUSTED_PROXIES`, but an empty generator is accepted as-is
     // (and trusts no proxies, matching Rails' behavior with an `Enumerator`).
-    if (customProxies == null) {
+    // Rails: ActiveSupport `blank?` is true for nil/false/empty/whitespace
+    // strings/empty collections. Treat the scalar-blank cases (false, "",
+    // whitespace) the same way before falling through to the iterable check.
+    // The cast to `unknown` is deliberate — the static `CustomProxies` type
+    // excludes strings/false, but callers can still hit this at runtime via
+    // `as Iterable<Proxy>` casts (Rails users coming from Ruby configs).
+    const raw = customProxies as unknown;
+    const isBlankScalar =
+      raw === false ||
+      (typeof raw === "string" && raw.trim() === "") ||
+      (raw instanceof String && String(raw).trim() === "");
+    if (customProxies == null || isBlankScalar) {
       this.proxies = TRUSTED_PROXIES;
     } else if (
       typeof customProxies !== "string" &&

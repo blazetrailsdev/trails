@@ -31,6 +31,7 @@ import {
   type NullType,
 } from "./mime-negotiation.js";
 import type { MimeType } from "./mime-type.js";
+import { URL as HttpURL } from "./url.js";
 import {
   filteredEnv as _filteredEnv,
   filteredParameters as _filteredParameters,
@@ -245,18 +246,21 @@ export class Request {
 
   // --- Domain / subdomains ---
 
+  // Rails: `Request#{domain,subdomains,subdomain}` delegate to
+  // `ActionDispatch::Http::URL.extract_*` (`url.rb:320-340`). Keeping these
+  // as thin pass-throughs means the negative-`slice` clamp added in
+  // url.ts#extractSubdomainsFrom applies here too.
+
   domain(tldLength = 1): string {
-    const parts = this.host.split(".");
-    return parts.slice(-(tldLength + 1)).join(".");
+    return HttpURL.extractDomain(this.host, tldLength) ?? "";
   }
 
   subdomains(tldLength = 1): string[] {
-    const parts = this.host.split(".");
-    return parts.slice(0, -(tldLength + 1));
+    return HttpURL.extractSubdomains(this.host, tldLength);
   }
 
   subdomain(tldLength = 1): string {
-    return this.subdomains(tldLength).join(".");
+    return HttpURL.extractSubdomain(this.host, tldLength);
   }
 
   // --- Headers ---
