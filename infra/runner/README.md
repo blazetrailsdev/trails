@@ -45,7 +45,19 @@ dokku config:set --no-restart gh-runner \
 #    drains to zero after one CI run.
 dokku ps:set gh-runner restart-policy always
 
-# 5. Persistent pnpm store across ephemeral container lifetimes. CAS-safe
+# 5. Stop-timeout MUST be longer than the longest CI job. `docker stop`
+#    forwards SIGTERM, waits `stop-timeout-seconds`, then SIGKILLs. Default
+#    is 30s — shorter than nearly every job. If a scale operation lands
+#    while a runner is mid-job, SIGKILL bypasses the entrypoint's EXIT
+#    trap, the GitHub-side runner record is not deregistered, and the
+#    stale `offline busy=true` registration holds the job slot for the
+#    workflow's `timeout-minutes` (30 here) before GitHub gives up. The
+#    re-dispatch loses ~30 minutes of CI per stale runner. 900s (15 min)
+#    is generous headroom vs current job lengths; raise if jobs ever
+#    exceed that.
+dokku ps:set gh-runner stop-timeout-seconds 900
+
+# 6. Persistent pnpm store across ephemeral container lifetimes. CAS-safe
 #    for concurrent replicas (pnpm uses content-addressed storage).
 #    node_modules and dist remain per-container, never shared.
 sudo mkdir -p /var/lib/dokku/data/storage/gh-runner-pnpm
