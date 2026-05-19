@@ -1633,11 +1633,19 @@ function defaultJoinTableName(
   assocName: string,
   options?: { className?: string },
 ): string {
-  const lhsTable = (model1 as any).tableName ?? pluralize(underscore(model1.name));
+  const lhsTable = (model1 as any).tableName ?? fallbackTableName(model1.name);
   const className = options?.className ?? camelize(singularize(assocName));
   const targetModel = modelRegistry.get(className);
-  const rhsTable = (targetModel as any)?.tableName ?? pluralize(underscore(className));
+  const rhsTable = (targetModel as any)?.tableName ?? fallbackTableName(className);
   return joinHabtmTableNames(lhsTable, rhsTable);
+}
+
+// Mirrors builder/has-and-belongs-to-many.ts#_fallbackTableName: namespaced
+// class names (`Admin::Tag`) underscore to `admin/tag`, which would leak a
+// `/` into the join-table name. Rails' `klass.table_name` normalizes to
+// underscores, so do the same when the target model isn't registered yet.
+function fallbackTableName(name: string): string {
+  return underscore(pluralize(name)).replace(/\//g, "_");
 }
 
 /** @internal */
