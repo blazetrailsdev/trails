@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterAll } from "vitest";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { setupAdapterSuite } from "./setup-adapter-suite.js";
 
@@ -39,40 +39,62 @@ describe("setupAdapterSuite — schema + transactional rollback", () => {
   });
 });
 
-describe("setupAdapterSuite — teardown + closeOnTeardown", () => {
-  let captured: SQLite3Adapter | undefined;
-  const teardown = vi.fn(async (adapter: SQLite3Adapter) => {
-    captured = adapter;
+describe("setupAdapterSuite — close() and teardown semantics", () => {
+  // Shared observability across two sibling describes so we can assert the
+  // helper's afterAll ran (vitest runs afterAll in LIFO order, so a parent
+  // describe's afterAll fires after every child's).
+  const defaultCloseSpy = vi.fn(async () => {});
+  const defaultTeardown = vi.fn(async () => {});
+  const optOutCloseSpy = vi.fn(async () => {});
+  let optOutRealClose: (() => Promise<void>) | undefined;
+
+  describe("closeOnTeardown defaults to true", () => {
+    setupAdapterSuite({
+      factory: () => {
+        const adapter = new SQLite3Adapter(":memory:");
+        const realClose = adapter.close.bind(adapter);
+        adapter.close = async () => {
+          await defaultCloseSpy();
+          await realClose();
+        };
+        return adapter;
+      },
+      teardown: defaultTeardown,
+    });
+
+    it("teardown and close have not yet fired during the test phase", () => {
+      expect(defaultTeardown).not.toHaveBeenCalled();
+      expect(defaultCloseSpy).not.toHaveBeenCalled();
+    });
   });
 
-  const suite = setupAdapterSuite({
-    factory: () => new SQLite3Adapter(":memory:"),
-    teardown,
+  describe("closeOnTeardown:false skips close()", () => {
+    setupAdapterSuite({
+      factory: () => {
+        const adapter = new SQLite3Adapter(":memory:");
+        optOutRealClose = adapter.close.bind(adapter);
+        adapter.close = async () => {
+          await optOutCloseSpy();
+          await optOutRealClose!();
+        };
+        return adapter;
+      },
+      closeOnTeardown: false,
+    });
+
+    it("placeholder so the inner describe registers its hooks", () => {
+      expect(optOutCloseSpy).not.toHaveBeenCalled();
+    });
   });
 
-  it("creates an adapter", () => {
-    expect(suite.adapter).toBeInstanceOf(SQLite3Adapter);
-  });
-
-  it("teardown does not run before afterAll", () => {
-    // Probed via the next describe, since teardown won't have fired yet
-    // inside this suite's tests.
-    expect(teardown).not.toHaveBeenCalled();
-    expect(captured).toBeUndefined();
-  });
-});
-
-describe("setupAdapterSuite — accessing adapter before beforeAll throws", () => {
-  // We don't invoke setupAdapterSuite here (that would register hooks).
-  // Instead, simulate the handle's pre-init state by exercising the getter
-  // path indirectly: see helper unit semantics.
-  it("getter throws a clear message if read pre-init", () => {
-    // Build a fresh handle whose beforeAll hasn't run by constructing one
-    // outside a describe — but vitest disallows that, so verify the public
-    // contract via the message string compiled into the source.
-    // (Behavior is exercised in practice by the schema + rollback suite
-    // above: that suite's `a()` reads `suite.adapter` from inside `it`,
-    // which works precisely because beforeAll has run.)
-    expect(typeof setupAdapterSuite).toBe("function");
+  // Runs AFTER both inner describes' afterAlls (vitest LIFO).
+  afterAll(async () => {
+    expect(defaultTeardown).toHaveBeenCalledTimes(1);
+    expect(defaultCloseSpy).toHaveBeenCalledTimes(1);
+    expect(defaultTeardown.mock.invocationCallOrder[0]).toBeLessThan(
+      defaultCloseSpy.mock.invocationCallOrder[0],
+    );
+    expect(optOutCloseSpy).not.toHaveBeenCalled();
+    if (optOutRealClose) await optOutRealClose();
   });
 });

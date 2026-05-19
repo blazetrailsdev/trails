@@ -1,6 +1,21 @@
 import { beforeAll, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
-import { defineSchema, type Schema, type DefineSchemaOpts } from "./define-schema.js";
+import { defineSchema, type Schema } from "./define-schema.js";
+
+/**
+ * Subset of {@link DefineSchemaOpts} exposed through this helper.
+ *
+ * `useTransactionalTests: false` is intentionally rejected: the helper sets
+ * schema up exactly once in `beforeAll`, but when transactional fixtures are
+ * opted out, the global `resetTestAdapterState` beforeEach (in
+ * `test-setup-ar.ts`) drops every table before each test. The shared schema
+ * would vanish and subsequent tests would fail. Files needing per-test
+ * schema mutation should call `defineSchema` directly inside their own
+ * `beforeEach` rather than this helper.
+ */
+export interface AdapterSuiteSchemaOpts {
+  dropExisting?: boolean;
+}
 import {
   withTransactionalFixtures,
   type TransactionalFixturesAdapter,
@@ -15,7 +30,7 @@ export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
    * (e.g. PG-only types created via raw DDL in {@link setup}).
    */
   schema?: Schema;
-  schemaOptions?: DefineSchemaOpts;
+  schemaOptions?: AdapterSuiteSchemaOpts;
   /**
    * Extra DDL or raw setup (CREATE EXTENSION, CREATE FOREIGN TABLE, etc.)
    * that isn't expressible via {@link defineSchema}. Runs after
