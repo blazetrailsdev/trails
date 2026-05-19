@@ -1,5 +1,6 @@
 import { Ast } from "../ast.js";
-import type { Cat, Dot, Group, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
+import { Cat, Group } from "../nodes/node.js";
+import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
 import { FormatBuilder, Format, Visitor } from "../visitors.js";
 
 type Matchers = Record<string, RegExp | RegExp[]>;
@@ -237,6 +238,13 @@ export class Pattern {
   private _requirementsAnchoredCache?: Record<string, RegExp>;
 
   constructor(ast: Ast, requirements: Matchers, separators: string, anchored: boolean) {
+    // Apply the leading-optional normalization at the Ast level so that
+    // downstream consumers reading `path.ast.tree` (e.g. the GTG builder
+    // in `journey/routes.ts`) see the same tree as the regex/formatter.
+    const normalizedTree = normalizeLeadingOptionalSpec(ast.root);
+    if (normalizedTree !== ast.root) {
+      ast = new Ast(normalizedTree, true);
+    }
     this.ast = ast;
     this.spec = ast.root;
     this.requirements = requirements;
@@ -350,11 +358,6 @@ export class Pattern {
       if (!n.isSymbol()) continue;
       const name = n.toSym();
       if (Object.hasOwn(this.requirements, name)) {
-        // Count capture groups in the requirement regex by matching empty
-        // against `re|` (so the alternation succeeds with an empty match)
-        // and reading the resulting capture count. Mirrors Rails:
-        //   re = /#{Regexp.union(reqs)}|/
-        //   offsets.push((re.match("").length - 1) + last)
         const reqs = this.requirements[name]!;
         const src = regexUnion(reqs);
         const re = new RegExp(`(?:${src})|`, combinedFlagsFor([reqs], { outer: false }));
@@ -368,4 +371,64 @@ export class Pattern {
     this._offsets = offsets;
     return offsets;
   }
+}
+
+/**
+ * Normalize a spec whose first top-level node is a SLASH followed by a
+ * GROUP whose first descendant is also a SLASH. Mirrors Rails'
+ * `Mapper.normalize_path` — when a route is written as `(/:locale)/foo`
+ * and a caller has already prefixed `/`, the naive concatenation produces
+ * `^/(?:/(...))?/foo$` which matches neither `/foo` nor `/en/foo`. Two
+ * shapes need handling, both replicating the Mapper `gsub!`/restore pair:
+ *
+ *   1. Mixed (some non-optional top-level node, e.g. `/(/:locale)/foo`):
+ *      drop the duplicate top-level SLASH entirely so the optional group's
+ *      own SLASH provides the separator when the group fires.
+ *
+ *   2. All-optional (every top-level non-Slash is a Group, e.g.
+ *      `/(/:a)(/:b)`): keep the top-level SLASH (so `/` matches the
+ *      root-style empty case) and drop the leading SLASH inside the FIRST
+ *      group only (so `/en` matches with the leading `/` serving as the
+ *      separator for the first capture).
+ *
+ * Centralizing this in Pattern means any caller building a Pattern from a
+ * journey-normalized path string gets the right regex, without having to
+ * re-implement the Mapper-level workaround.
+ *
+ * @internal
+ */
+function normalizeLeadingOptionalSpec(spec: Node): Node {
+  const parts = flattenCat(spec);
+  if (parts.length < 2 || parts[0]!.type !== "SLASH") return spec;
+  const second = parts[1]!;
+  if (!second.isGroup()) return spec;
+  // The second top-level node must be a Group whose body starts with a
+  // SLASH terminal — otherwise there's no slash-doubling to undo.
+  const innerParts = flattenCat((second as Group).left as Node);
+  if (innerParts.length < 2 || innerParts[0]!.type !== "SLASH") return spec;
+  const allOptional = parts.slice(1).every((p) => p.isGroup());
+  const newParts = allOptional
+    ? [parts[0]!, new Group(buildCat(innerParts.slice(1))), ...parts.slice(2)]
+    : parts.slice(1);
+  return buildCat(newParts);
+}
+
+/** @internal Flatten a right-leaning Cat chain into an array of nodes. */
+function flattenCat(node: Node): Node[] {
+  const out: Node[] = [];
+  const walk = (n: Node): void => {
+    if (n.isCat()) {
+      walk((n as Cat).left as Node);
+      walk((n as Cat).right);
+    } else {
+      out.push(n);
+    }
+  };
+  walk(node);
+  return out;
+}
+
+/** @internal Rebuild a right-leaning Cat chain from a non-empty node list. */
+function buildCat(parts: readonly Node[]): Node {
+  return parts.slice(1).reduce((acc, n) => new Cat(acc, n), parts[0]!);
 }

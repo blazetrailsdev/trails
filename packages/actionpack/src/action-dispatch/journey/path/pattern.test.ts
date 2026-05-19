@@ -284,3 +284,61 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
     expect(symbol!.regexp.source).toBe("(.+)");
   });
 });
+
+describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalization", () => {
+  // The Pattern constructor rewrites a leading-optional spec so callers
+  // don't have to do Mapper-style path-string surgery before building one.
+  // Two shapes are handled, both mirroring Rails Mapper.normalize_path.
+
+  it("drops a duplicate top-level SLASH when followed by an optional group starting with SLASH", () => {
+    // `(/:locale)/posts` after journey-normalize is `/(/:locale)/posts`.
+    // Without the fix the regex would be `^/(?:/(...))?/posts$` (matches
+    // neither `/posts` nor `/en/posts`). The fix drops the leading `/`.
+    const p = buildPath("/(/:locale)/posts");
+    expect(p.match("/posts")).toBeDefined();
+    expect(p.match("/en/posts")).toBeDefined();
+  });
+
+  it("keeps the top-level SLASH but drops the inner SLASH of the first group for all-optional paths", () => {
+    // `(/:locale)(/:platform)` normalized → `/(/:locale)(/:platform)`. We
+    // want `/`, `/en`, and `/en/us` to all match. The fix moves the slash
+    // out of the first group so the leading `/` separates the first
+    // capture: regex becomes `^/(?:(...))?(?:/(...))?$`.
+    const p = buildPath("/(/:locale)(/:platform)");
+    expect(p.match("/")).toBeDefined();
+    expect(p.match("/en")).toBeDefined();
+    expect(p.match("/en/us")).toBeDefined();
+  });
+
+  it("handles all-optional paths with non-`/:` second group (e.g. `(.:format)`)", () => {
+    // `(/:locale)(.:format)` is all-optional but the second group starts
+    // with `.`; the fix should still classify the path as all-optional.
+    const p = buildPath("/(/:locale)(.:format)");
+    expect(p.match("/")).toBeDefined();
+    expect(p.match("/en")).toBeDefined();
+    expect(p.match("/en.json")).toBeDefined();
+  });
+
+  it("leaves paths whose second top-level node isn't a SLASH-led Group alone", () => {
+    // `/posts/:id` has no leading-optional group — no rewrite, regex
+    // stays `^/posts/([^/.?]+)$`.
+    const p = buildPath("/posts/:id");
+    expect(p.toRegexp().source).toBe("^\\/posts\\/([^/.?]+)$");
+  });
+
+  it("handles the single-group all-optional shape `/(/:locale)`", () => {
+    // Smallest all-optional path: one SLASH + one Group whose body
+    // starts with SLASH. Both `/` and `/en` should match.
+    const p = buildPath("/(/:locale)");
+    expect(p.match("/")).toBeDefined();
+    expect(p.match("/en")).toBeDefined();
+  });
+
+  it("doesn't rewrite when the second top-level Group's body is just a SLASH", () => {
+    // Degenerate body `(/)`: there's no symbol after the slash so the
+    // normalization can't safely drop it. Leave the spec alone.
+    const p = buildPath("/(/)/foo");
+    // No crash, no exception — that's the contract.
+    expect(p.toRegexp()).toBeInstanceOf(RegExp);
+  });
+});
