@@ -5,6 +5,9 @@
  * @see https://api.rubyonrails.org/classes/ActionController/Live.html
  */
 
+import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
+import { MimeType } from "../../action-dispatch/http/mime-type.js";
+import type { Request } from "../../action-dispatch/http/request.js";
 import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
 
 export class ClientDisconnected extends Error {
@@ -264,4 +267,157 @@ export class Response extends DispatchResponse {
     for (const part of body) buf.write(part);
     return buf;
   }
+}
+
+// === ActionController::Live mixin ===
+// JS has no threads, so newControllerThread runs the block on the next
+// microtask. Pre-commit errors propagate; post-commit errors route through
+// Buffer.callOnError + logError, matching Rails' control flow.
+
+interface LoggerLike {
+  fatal(message: string | (() => string)): void;
+}
+
+export interface LiveControllerHost {
+  request: { getHeader?(name: string): string | undefined; format?: unknown };
+  response: Response;
+  logger?: LoggerLike;
+}
+
+/** Mirrors `ActionController::Live#process`. `runAction` stands in for
+ *  Rails' `super(name)`, since TS has no super for assigned methods. */
+export async function process(
+  this: LiveControllerHost,
+  name: string,
+  runAction: (n: string) => void | Promise<void>,
+): Promise<void> {
+  let error: unknown = undefined;
+  let errorSet = false;
+  await newControllerThread.call(this, async () => {
+    try {
+      await runAction(name);
+    } catch (e) {
+      const resp = this.response;
+      if (resp?.committed) {
+        try {
+          resp.stream.callOnError();
+        } catch (inner) {
+          logError.call(this, inner);
+        } finally {
+          logError.call(this, e);
+          try {
+            resp.stream.close();
+          } catch {
+            /* already closed */
+          }
+        }
+      } else {
+        error = e;
+        errorSet = true;
+      }
+    } finally {
+      cleanUpThreadLocals.call(this, [], null);
+      if (!this.response.committed) this.response.close();
+    }
+  });
+  if (errorSet) throw error;
+}
+
+/** Mirrors `ActionController::Live#response_body=`. */
+export function responseBody(this: LiveControllerHost, body: string): void {
+  this.response.body = body;
+  this.response.close();
+}
+
+export interface SendStreamOptions {
+  filename: string;
+  disposition?: string;
+  type?: string | symbol | null;
+}
+
+/** Mirrors `ActionController::Live#send_stream`. */
+export async function sendStream(
+  this: LiveControllerHost,
+  options: SendStreamOptions,
+  block: (stream: Buffer) => void | Promise<void>,
+): Promise<void> {
+  const { filename, type } = options;
+  const disposition = options.disposition ?? "attachment";
+
+  let resolved =
+    typeof type === "string"
+      ? type
+      : typeof type === "symbol"
+        ? (MimeType.lookup(type.description ?? "")?.toString() ?? null)
+        : null;
+  if (!resolved) {
+    const dot = filename.lastIndexOf(".");
+    const ext = dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
+    resolved = (ext && MimeType.lookupByExtension(ext)?.toString()) || "application/octet-stream";
+  }
+
+  const res = this.response;
+  res.setHeader("content-type", resolved);
+  res.setHeader("content-disposition", ContentDisposition.format({ disposition, filename }));
+
+  try {
+    await block(res.stream);
+  } finally {
+    res.stream.close();
+  }
+}
+
+/** @internal */
+export async function newControllerThread(
+  this: LiveControllerHost,
+  block: () => void | Promise<void>,
+): Promise<void> {
+  await liveThreadPoolExecutor().post(block);
+}
+
+/** @internal No-op — Ruby clears copied thread-locals; JS shares one context. */
+export function cleanUpThreadLocals(this: LiveControllerHost, _l: unknown, _t: unknown): void {}
+
+/** Pre-test-override alias; Rails' test_case.rb re-aliases the public method
+ *  to run inline, so the originals stay available for parity. */
+export const originalNewControllerThread = newControllerThread;
+export const originalCleanUpThreadLocals = cleanUpThreadLocals;
+
+interface LiveExecutor {
+  post(fn: () => void | Promise<void>): Promise<void>;
+}
+let _liveExecutor: LiveExecutor | undefined;
+
+/** @internal */
+export function liveThreadPoolExecutor(): LiveExecutor {
+  return (_liveExecutor ??= {
+    post: async (fn) => {
+      await Promise.resolve();
+      await fn();
+    },
+  });
+}
+
+/** Mirrors `ActionController::Live::ClassMethods#make_response!`. HTTP/1.0
+ *  has no chunked transfer encoding, so streaming defers to the parent factory. */
+export function makeResponseBang(
+  request: Request,
+  superFactory: () => DispatchResponse,
+): DispatchResponse {
+  const protocol = request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION");
+  if (protocol === "HTTP/1.0") return superFactory();
+  const res = new Response();
+  res.request = request;
+  return res;
+}
+
+/** @internal Mirrors `ActionController::Live#log_error`. */
+export function logError(this: { logger?: LoggerLike }, exception: unknown): void {
+  const logger = this.logger;
+  if (!logger) return;
+  const err = exception as { name?: string; message?: string; stack?: string };
+  const name = err?.name ?? "Error";
+  const message = err?.message ?? String(exception);
+  const stack = err?.stack ?? "";
+  logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
 }
