@@ -248,7 +248,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
   it("should generate valid sql", () => {
-    const adapter = freshAdapter();
+    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -2092,7 +2092,10 @@ describe("HasManyAssociationsTest", () => {
 
   // Skipped tests — DB-specific features, STI, composites, HABTM, etc.
   it("sti subselect count", async () => {
-    const a = freshAdapter();
+    const a = createTestAdapter();
+    await defineSchema(a, {
+      sti_posts: { title: "string", type: "string", tag_id: "integer" },
+    });
     class StiPost extends Base {
       static {
         this.attribute("title", "string");
@@ -2398,7 +2401,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with implicit sti base class", () => {
     // DependentFirm has_many :companies; Company has STI with type column
-    const a = freshAdapter();
+    const a = createTestAdapter();
     class StiCompany extends Base {
       static {
         this.attribute("name", "string");
@@ -2442,7 +2445,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with explicit sti base class", () => {
-    const a = freshAdapter();
+    const a = createTestAdapter();
     class StiCompany2 extends Base {
       static {
         this.attribute("name", "string");
@@ -2476,7 +2479,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with sti subclass", () => {
-    const a = freshAdapter();
+    const a = createTestAdapter();
     class StiCompany3 extends Base {
       static {
         this.attribute("name", "string");
@@ -2510,7 +2513,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with an invalid type", () => {
-    const a = freshAdapter();
+    const a = createTestAdapter();
     class StiCompany4 extends Base {
       static {
         this.attribute("name", "string");
@@ -2540,7 +2543,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with an unrelated type", () => {
-    const a = freshAdapter();
+    const a = createTestAdapter();
     class StiCompany5 extends Base {
       static {
         this.attribute("name", "string");
