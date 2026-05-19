@@ -887,7 +887,7 @@ async function freshAdapterCompositeOrders(): Promise<DatabaseAdapter> {
       c: "integer",
       val: "string",
       active: "boolean",
-      price: "decimal",
+      price: "float",
     },
     order_as: { shop_id: "integer", order_num: "integer" },
     order_bs: { shop_id: "integer", order_num: "integer" },
@@ -1473,14 +1473,14 @@ describe("UniquenessWithCompositeKey", () => {
     const adp = await freshAdapterCompositeOrders();
     class Order extends Base {
       static {
-        this.attribute("price", "decimal");
+        this.attribute("price", "float");
         this.attribute("code", "string");
         this.adapter = adp;
         this.validatesUniqueness("code", { scope: "price" });
       }
     }
-    await Order.create({ price: 9.99, code: "A" });
-    const o2 = new Order({ price: 9.99, code: "A" });
+    await Order.create({ price: 9.5, code: "A" });
+    const o2 = new Order({ price: 9.5, code: "A" });
     expect(await o2.save()).toBe(false);
     const o3 = new Order({ price: 10.0, code: "A" });
     expect(await o3.save()).toBe(true);
