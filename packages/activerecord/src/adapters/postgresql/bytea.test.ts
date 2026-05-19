@@ -1,11 +1,12 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bytea_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Bytea } from "../../connection-adapters/postgresql/oid/bytea.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -15,24 +16,20 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
-  await defineSchema(adapter, {
-    bytea_data_type: { payload: "binary", serialized: "binary" },
-  });
-  return adapter;
-}
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
+    await defineSchema(adapter, {
+      bytea_data_type: { payload: "binary", serialized: "binary" },
+    });
   });
-  afterEach(async () => {
+  afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS bytea_data_type`);
     await adapter.close();
   });
+  withTransactionalFixtures(() => adapter);
 
   describe("PostgresqlByteaTest", () => {
     it("column", async () => {
