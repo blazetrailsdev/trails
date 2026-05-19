@@ -140,7 +140,8 @@ describe("MetalControllerInstanceTests", () => {
     const c = new TestController();
     const req = makeRequest();
     await c.dispatch("index", req, makeResponse());
-    expect(req.getHeader("action_controller.instance")).toBe(c);
+    expect(req.controllerInstance).toBe(c);
+    expect(req.env["action_controller.instance"]).toBe(c);
   });
 
   it("dispatch commits status to response", async () => {

@@ -563,6 +563,16 @@ export class Request {
     return value;
   }
 
+  /** @internal Rails: `request.controller_instance` (request.rb:190-192). */
+  get controllerInstance(): unknown {
+    return this.env["action_controller.instance"];
+  }
+
+  /** @internal Rails: `request.controller_instance=` (request.rb:194-196). */
+  set controllerInstance(controller: unknown) {
+    this.setHeader("action_controller.instance", controller);
+  }
+
   /** Deletes `key` from the env. Mirrors `delete_header`. */
   deleteHeader(key: string): void {
     delete this.env[key];
