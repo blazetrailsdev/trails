@@ -97,17 +97,18 @@ describe("ResponseTest", () => {
 
   it("read ETag and Cache-Control", () => {
     const res = new Response();
-    res.etag = "abc123";
-    res.cacheControl = "public, max-age=3600";
-    expect(res.etag).toBe('"abc123"');
-    expect(res.cacheControl).toBe("public, max-age=3600");
+    res.setWeakEtag("abc123");
+    res._cacheControl = "public, max-age=3600";
+    // Rails: `etag` reader returns the raw header set by weak_etag=.
+    expect(res.etag?.startsWith('W/"')).toBe(true);
+    expect(res._cacheControl).toBe("public, max-age=3600");
   });
 
   it("read strong ETag", () => {
     const res = new Response();
-    res.etag = '"strong-etag"';
-    expect(res.strongEtag).toBe(true);
-    expect(res.weakEtag).toBe(false);
+    res.setStrongEtag("strong-etag");
+    expect(res.isStrongEtag()).toBe(true);
+    expect(res.isWeakEtag()).toBe(false);
   });
 
   it("read charset and content type", () => {
@@ -119,14 +120,14 @@ describe("ResponseTest", () => {
 
   it("respect no-store cache-control", () => {
     const res = new Response();
-    res.cacheControl = "no-store";
-    expect(res.cacheControl).toBe("no-store");
+    res._cacheControl = "no-store";
+    expect(res._cacheControl).toBe("no-store");
   });
 
   it("respect private, no-store cache-control", () => {
     const res = new Response();
-    res.cacheControl = "private, no-store";
-    expect(res.cacheControl).toBe("private, no-store");
+    res._cacheControl = "private, no-store";
+    expect(res._cacheControl).toBe("private, no-store");
   });
 
   it("does not include Status header", () => {
@@ -222,8 +223,8 @@ describe("ResponseTest", () => {
   it("weak ETag detection", () => {
     const res = new Response();
     res.setHeader("etag", 'W/"abc"');
-    expect(res.weakEtag).toBe(true);
-    expect(res.strongEtag).toBe(false);
+    expect(res.isWeakEtag()).toBe(true);
+    expect(res.isStrongEtag()).toBe(false);
   });
 
   it("setting etag to undefined removes it", () => {
@@ -233,25 +234,20 @@ describe("ResponseTest", () => {
     expect(res.etag).toBeUndefined();
   });
 
-  it("etag auto-quotes unquoted value", () => {
+  it("etag= delegates to setWeakEtag (Rails parity)", () => {
     const res = new Response();
     res.etag = "abc";
-    expect(res.etag).toBe('"abc"');
-  });
-
-  it("etag preserves W/ prefix", () => {
-    const res = new Response();
-    res.etag = 'W/"weak"';
-    expect(res.etag).toBe('W/"weak"');
+    expect(res.etag?.startsWith('W/"')).toBe(true);
+    expect(res.isWeakEtag()).toBe(true);
   });
 
   // --- Cache-Control ---
 
-  it("setting cacheControl to undefined removes it", () => {
+  it("setting _cacheControl to undefined removes it", () => {
     const res = new Response();
-    res.cacheControl = "no-cache";
-    res.cacheControl = undefined;
-    expect(res.cacheControl).toBeUndefined();
+    res._cacheControl = "no-cache";
+    res._cacheControl = undefined;
+    expect(res._cacheControl).toBeUndefined();
   });
 
   // --- Content type ---
@@ -434,5 +430,109 @@ describe("ResponseFilterRedirect", () => {
     res.request = req;
     res.location = "https://example.com/foo";
     expect(res.filteredLocation()).toBe("https://example.com/foo");
+  });
+});
+
+describe("Response Cache::Response wiring", () => {
+  it("lastModified round-trips through Last-Modified header", () => {
+    const res = new Response();
+    const t = new Date("1994-11-06T08:49:37Z");
+    res.lastModified = t;
+    expect(res.hasLastModified).toBe(true);
+    expect(res.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
+    expect(res.lastModified?.getTime()).toBe(t.getTime());
+  });
+
+  it("lastModified returns undefined when absent", () => {
+    const res = new Response();
+    expect(res.hasLastModified).toBe(false);
+    expect(res.lastModified).toBeUndefined();
+  });
+
+  it("date round-trips through Date header", () => {
+    const res = new Response();
+    const t = new Date("1994-11-06T08:49:37Z");
+    res.date = t;
+    expect(res.hasDate).toBe(true);
+    expect(res.date?.getTime()).toBe(t.getTime());
+  });
+
+  it("setWeakEtag writes a W/-prefixed strong-form digest", () => {
+    const res = new Response();
+    res.setWeakEtag(["abc", 1]);
+    const e = res.getHeader("ETag")!;
+    expect(e.startsWith('W/"')).toBe(true);
+    expect(res.isWeakEtag()).toBe(true);
+    expect(res.isStrongEtag()).toBe(false);
+    expect(res.hasEtag).toBe(true);
+    // Case-insensitive read: same value via any casing.
+    expect(res.getHeader("etag")).toBe(e);
+    expect(res.getHeader("ETAG")).toBe(e);
+  });
+
+  it("setStrongEtag writes an unprefixed digest", () => {
+    const res = new Response();
+    res.setStrongEtag(["abc", 1]);
+    const e = res.getHeader("ETag")!;
+    expect(e.startsWith('"')).toBe(true);
+    expect(e.startsWith('W/"')).toBe(false);
+    expect(res.isStrongEtag()).toBe(true);
+    expect(res.isWeakEtag()).toBe(false);
+  });
+
+  it("cacheControl returns a parsed directive hash", () => {
+    const res = new Response();
+    res.setHeader("Cache-Control", "max-age=600, public, foo=bar");
+    const hash = res.cacheControl;
+    expect(hash["max_age"]).toBe("600");
+    expect(hash["public"]).toBe(true);
+    expect(hash.extras).toEqual(["foo=bar"]);
+  });
+
+  it("mergeAndNormalizeCacheControl writes back the combined directive set", () => {
+    const res = new Response();
+    res._cacheControl = "no-cache";
+    res.mergeAndNormalizeCacheControl({ public: true, max_age: 30 });
+    const cc = res._cacheControl!;
+    expect(cc).toContain("max-age=30");
+    expect(cc).toContain("public");
+  });
+
+  it("handleConditionalGet sets a default Cache-Control when an ETag is present", () => {
+    const res = new Response();
+    res.setWeakEtag("v1");
+    res.handleConditionalGet();
+    expect(res.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
+    expect(res.getHeader("cache-control")).toBe("max-age=0, private, must-revalidate");
+  });
+
+  it("lastModified = undefined clears the Last-Modified header", () => {
+    const res = new Response();
+    res.lastModified = new Date("1994-11-06T08:49:37Z");
+    res.lastModified = undefined;
+    expect(res.hasLastModified).toBe(false);
+    expect(res.lastModified).toBeUndefined();
+  });
+
+  it("date = undefined clears the Date header", () => {
+    const res = new Response();
+    res.date = new Date("1994-11-06T08:49:37Z");
+    res.date = undefined;
+    expect(res.hasDate).toBe(false);
+    expect(res.date).toBeUndefined();
+  });
+
+  it("handleConditionalGet is a no-op when Cache-Control is already set", () => {
+    const res = new Response();
+    res.setWeakEtag("v1");
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.handleConditionalGet();
+    expect(res.getHeader("Cache-Control")).toBe("public, max-age=60");
+  });
+
+  it("handleConditionalGet is a no-op without ETag or Last-Modified", () => {
+    const res = new Response();
+    res.handleConditionalGet();
+    expect(res.getHeader("Cache-Control")).toBeUndefined();
   });
 });
