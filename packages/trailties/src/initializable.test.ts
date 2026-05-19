@@ -112,6 +112,17 @@ describe("Basic", () => {
     foo.runInitializers();
     expect(foo.foo).toBe(1);
   });
+  test("opts is optional (Rails initializer(name, opts = {}, &blk))", () => {
+    class NoOpts extends Initializable {
+      static {
+        NoOpts.initializer("only", () => void arr.push(7));
+      }
+    }
+    arr = [];
+    new NoOpts().runInitializers();
+    expect(arr).toEqual([7]);
+  });
+
   test("creating initializer without a block raises an error", () => {
     expect(() => {
       class Bad extends Initializable {}

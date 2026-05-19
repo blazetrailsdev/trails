@@ -130,18 +130,26 @@ export class Initializable {
     return new Collection(...this.initializersChain().map((i) => i.bind(binding)));
   }
 
+  static initializer<C = unknown>(name: string, block: InitializerBlock<C>): void;
   static initializer<C = unknown>(
     name: string,
     opts: InitializerOptions,
     block: InitializerBlock<C>,
+  ): void;
+  static initializer<C = unknown>(
+    name: string,
+    optsOrBlock: InitializerOptions | InitializerBlock<C>,
+    maybeBlock?: InitializerBlock<C>,
   ): void {
+    const block = typeof optsOrBlock === "function" ? optsOrBlock : maybeBlock;
+    const opts: InitializerOptions = typeof optsOrBlock === "function" ? {} : { ...optsOrBlock };
     if (typeof block !== "function") {
       throw new TypeError("A block must be passed when defining an initializer");
     }
     const own = this._ownInitializers();
     const referencedBefore = opts.before !== undefined && own.some((i) => i.name === opts.before);
     if (own.length > 0 && !referencedBefore && opts.after === undefined) {
-      opts = { ...opts, after: own[own.length - 1].name };
+      opts.after = own[own.length - 1].name;
     }
     own.push(new Initializer<C>(name, null, opts, block) as Initializer);
   }
