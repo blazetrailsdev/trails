@@ -97,7 +97,7 @@ describe("ResponseTest", () => {
 
   it("read ETag and Cache-Control", () => {
     const res = new Response();
-    res.setWeakEtag("abc123");
+    res.weakEtag("abc123");
     res._cacheControl = "public, max-age=3600";
     // Rails: `etag` reader returns the raw header set by weak_etag=.
     expect(res.etag?.startsWith('W/"')).toBe(true);
@@ -106,7 +106,7 @@ describe("ResponseTest", () => {
 
   it("read strong ETag", () => {
     const res = new Response();
-    res.setStrongEtag("strong-etag");
+    res.strongEtag("strong-etag");
     expect(res.isStrongEtag()).toBe(true);
     expect(res.isWeakEtag()).toBe(false);
   });
@@ -459,7 +459,7 @@ describe("Response Cache::Response wiring", () => {
 
   it("setWeakEtag writes a W/-prefixed strong-form digest", () => {
     const res = new Response();
-    res.setWeakEtag(["abc", 1]);
+    res.weakEtag(["abc", 1]);
     const e = res.getHeader("ETag")!;
     expect(e.startsWith('W/"')).toBe(true);
     expect(res.isWeakEtag()).toBe(true);
@@ -472,7 +472,7 @@ describe("Response Cache::Response wiring", () => {
 
   it("setStrongEtag writes an unprefixed digest", () => {
     const res = new Response();
-    res.setStrongEtag(["abc", 1]);
+    res.strongEtag(["abc", 1]);
     const e = res.getHeader("ETag")!;
     expect(e.startsWith('"')).toBe(true);
     expect(e.startsWith('W/"')).toBe(false);
@@ -492,7 +492,7 @@ describe("Response Cache::Response wiring", () => {
   it("mergeAndNormalizeCacheControl writes back the combined directive set", () => {
     const res = new Response();
     res._cacheControl = "no-cache";
-    res.mergeAndNormalizeCacheControl({ public: true, max_age: 30 });
+    res.mergeAndNormalizeCacheControlBang({ public: true, max_age: 30 });
     const cc = res._cacheControl!;
     expect(cc).toContain("max-age=30");
     expect(cc).toContain("public");
@@ -500,8 +500,8 @@ describe("Response Cache::Response wiring", () => {
 
   it("handleConditionalGet sets a default Cache-Control when an ETag is present", () => {
     const res = new Response();
-    res.setWeakEtag("v1");
-    res.handleConditionalGet();
+    res.weakEtag("v1");
+    res.handleConditionalGetBang();
     expect(res.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
     expect(res.getHeader("cache-control")).toBe("max-age=0, private, must-revalidate");
   });
@@ -524,15 +524,15 @@ describe("Response Cache::Response wiring", () => {
 
   it("handleConditionalGet is a no-op when Cache-Control is already set", () => {
     const res = new Response();
-    res.setWeakEtag("v1");
+    res.weakEtag("v1");
     res.setHeader("Cache-Control", "public, max-age=60");
-    res.handleConditionalGet();
+    res.handleConditionalGetBang();
     expect(res.getHeader("Cache-Control")).toBe("public, max-age=60");
   });
 
   it("handleConditionalGet is a no-op without ETag or Last-Modified", () => {
     const res = new Response();
-    res.handleConditionalGet();
+    res.handleConditionalGetBang();
     expect(res.getHeader("Cache-Control")).toBeUndefined();
   });
 });

@@ -205,12 +205,14 @@ export function setDate(this: R, t: Date) {
   this.setHeader(DATE, t.toUTCString());
 }
 export function setEtag(this: R, v: unknown) {
-  setWeakEtag.call(this, v);
+  weakEtag.call(this, v);
 }
-export function setWeakEtag(this: R, v: unknown) {
+/** Rails' `Cache::Response#weak_etag=`. */
+export function weakEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateWeakEtag(v));
 }
-export function setStrongEtag(this: R, v: unknown) {
+/** Rails' `Cache::Response#strong_etag=`. */
+export function strongEtag(this: R, v: unknown) {
   this.setHeader(ETAG, generateStrongEtag(v));
 }
 export function getEtag(this: R) {
@@ -279,18 +281,18 @@ export function cacheControl(this: ResponseCacheHost): CacheControlHash {
 }
 
 /** @internal */
-export function prepareCacheControl(this: ResponseCacheHost): CacheControlHash {
+export function prepareCacheControlBang(this: ResponseCacheHost): CacheControlHash {
   return cacheControlHeaders.call(this);
 }
 
-export function handleConditionalGet(this: ResponseCacheHost): void {
+export function handleConditionalGetBang(this: ResponseCacheHost): void {
   if ((hasEtag.call(this) || hasLastModified.call(this)) && !this.getHeader(CACHE_CONTROL)) {
     this.setHeader(CACHE_CONTROL, DEFAULT_CACHE_CONTROL);
   }
 }
 
 /** @internal */
-export function mergeAndNormalizeCacheControl(
+export function mergeAndNormalizeCacheControlBang(
   this: ResponseCacheHost,
   cacheControl: CacheControlHash,
 ): void {

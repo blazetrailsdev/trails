@@ -6,9 +6,9 @@ import {
   generateStrongEtag,
   generateWeakEtag,
   getLastModified,
-  handleConditionalGet,
+  handleConditionalGetBang,
   isWeakEtag,
-  mergeAndNormalizeCacheControl,
+  mergeAndNormalizeCacheControlBang,
   notModified,
   setEtag,
   setLastModified,
@@ -113,26 +113,26 @@ describe("Cache::Response", () => {
     const h: Record<string, string> = {};
     const r = res(h);
     setEtag.call(r, "x");
-    handleConditionalGet.call(r);
+    handleConditionalGetBang.call(r);
     expect(h["Cache-Control"]).toBe("max-age=0, private, must-revalidate");
 
     const h2: Record<string, string> = { "Cache-Control": "public" };
     setEtag.call(res(h2), "x");
-    handleConditionalGet.call(res(h2));
+    handleConditionalGetBang.call(res(h2));
     expect(h2["Cache-Control"]).toBe("public");
   });
 
   it("merge_and_normalize_cache_control! emits directives in Rails order", () => {
     const h: Record<string, string> = {};
-    mergeAndNormalizeCacheControl.call(res(h), { max_age: 60, public: true });
+    mergeAndNormalizeCacheControlBang.call(res(h), { max_age: 60, public: true });
     expect(h["Cache-Control"]).toBe("max-age=60, public");
 
     const h2: Record<string, string> = {};
-    mergeAndNormalizeCacheControl.call(res(h2), { no_store: true, private: true });
+    mergeAndNormalizeCacheControlBang.call(res(h2), { no_store: true, private: true });
     expect(h2["Cache-Control"]).toBe("private, no-store");
 
     const h3: Record<string, string> = { "Cache-Control": "no-cache, community=internal" };
-    mergeAndNormalizeCacheControl.call(res(h3), { max_age: 10, public: true });
+    mergeAndNormalizeCacheControlBang.call(res(h3), { max_age: 10, public: true });
     expect(h3["Cache-Control"]).toBe("max-age=10, public, community=internal");
   });
 
