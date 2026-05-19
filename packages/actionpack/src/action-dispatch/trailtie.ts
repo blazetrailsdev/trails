@@ -26,6 +26,17 @@ import { QueryParser } from "./http/query-parser.js";
 import { RequestUtils } from "./request/utils.js";
 import { CacheConfig } from "./http/cache.js";
 import { Response } from "./http/response.js";
+import {
+  ContentSecurityPolicy,
+  type NonceGenerator,
+  type CspRequestHost,
+  setContentSecurityPolicy,
+  setContentSecurityPolicyReportOnly,
+  setContentSecurityPolicyNonceGenerator,
+  setContentSecurityPolicyNonceDirectives,
+} from "./http/content-security-policy.js";
+import { ContentSecurityPolicyMiddleware } from "./middleware/content-security-policy.js";
+import { MiddlewareStack } from "./middleware/stack.js";
 
 /**
  * Shape of `config.actionDispatch` — mirrors the
@@ -102,11 +113,31 @@ function defaultActionDispatchConfig(): ActionDispatchConfig {
   };
 }
 
+/**
+ * Shape of `config.contentSecurityPolicy` — mirrors the top-level CSP slots
+ * on `Rails::Application::Configuration` (`content_security_policy`,
+ * `_report_only`, `_nonce_generator`, `_nonce_directives`). Rails routes
+ * these into the env via `application.rb:342-346`; the
+ * `action_dispatch.content_security_policy` initializer below mirrors that
+ * by seeding per-request env keys via [[seedContentSecurityPolicyEnv]].
+ */
+export interface ContentSecurityPolicyConfig {
+  policy: ContentSecurityPolicy | null;
+  reportOnly: boolean;
+  nonceGenerator: NonceGenerator | null;
+  nonceDirectives: readonly string[] | null;
+}
+
+function defaultContentSecurityPolicyConfig(): ContentSecurityPolicyConfig {
+  return { policy: null, reportOnly: false, nonceGenerator: null, nonceDirectives: null };
+}
+
 export class Trailtie extends BaseRailtie {
   static {
     registerRailtie(this);
 
     this.config["actionDispatch"] = defaultActionDispatchConfig();
+    this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
 
     this.initializer("action_dispatch.deprecator", () => {
       BaseRailtie.deprecators["actionDispatch"] = deprecator;
@@ -127,5 +158,33 @@ export class Trailtie extends BaseRailtie {
       // "utf-8" so initializer state doesn't leak across runs.
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
     });
+  }
+
+  /**
+   * Default ActionDispatch middleware contributed by this trailtie. Apps
+   * compose this into their own stack on boot. Mirrors the per-framework
+   * middleware insertions Rails performs in
+   * `railties/lib/rails/application/default_middleware_stack.rb`.
+   */
+  static defaultMiddleware(): MiddlewareStack {
+    const stack = new MiddlewareStack();
+    stack.use(ContentSecurityPolicyMiddleware);
+    return stack;
+  }
+
+  /**
+   * Seed per-request CSP env keys from `config.contentSecurityPolicy`.
+   * Called by hosts at the start of request processing — mirrors the
+   * `env_config` propagation in `railties/lib/rails/application.rb:342-346`.
+   */
+  static seedContentSecurityPolicyEnv(request: CspRequestHost): void {
+    const cfg = this.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig;
+    // Mirror Rails application.rb:342-346 — all four slots are copied
+    // unconditionally so toggling app config back to a falsy value
+    // overwrites any stale env carried over from a prior request.
+    setContentSecurityPolicy.call(request, cfg.policy);
+    setContentSecurityPolicyReportOnly.call(request, cfg.reportOnly);
+    setContentSecurityPolicyNonceGenerator.call(request, cfg.nonceGenerator);
+    setContentSecurityPolicyNonceDirectives.call(request, cfg.nonceDirectives);
   }
 }
