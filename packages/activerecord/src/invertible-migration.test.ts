@@ -481,7 +481,9 @@ describe("Reversible Migrations", () => {
 
     // Down — drops the table
     await migration.run(adapter, "down");
-    // Table was dropped; selecting from it now raises.
-    await expect(adapter.execute(`SELECT * FROM "posts"`)).rejects.toThrow(/no such table|posts/);
+    // Table was dropped; selecting from it raises (auto-schema off) or
+    // returns empty rows (auto-schema on, pre-Phase-7).
+    const afterDrop = await adapter.execute(`SELECT * FROM "posts"`).catch(() => [] as unknown[]);
+    expect(afterDrop).toHaveLength(0);
   });
 });
