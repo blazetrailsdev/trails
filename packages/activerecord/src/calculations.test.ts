@@ -2847,8 +2847,69 @@ describe("CalculationsTest", () => {
 describe("CalculationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      accounts: { balance: "integer" },
+      authors: { name: "string" },
+      conversations: {
+        status: "integer",
+        comments_status: "integer",
+        question_type: "integer",
+      },
+      orders: { status: "string", total: "integer" },
+      people: { name: "string", age: "integer" },
+      posts: {
+        title: "string",
+        status: "string",
+        published: "boolean",
+        author_id: "integer",
+        body: "string",
+        comments_count: "integer",
+        likes_count: "integer",
+        views_count: "integer",
+        updated_at: "datetime",
+      },
+      products: { sku: "string", name: "string" },
+      rg_authors: { name: "string" },
+      rg_books: { rg_author_id: "integer", title: "string" },
+      rg_comments: { rg_post_id: "integer" },
+      rg_posts: { title: "string" },
+      rg_wa_authors: {},
+      rg_wa_posts: { rg_wa_author_id: "integer" },
+      rg_wm_authors: {},
+      rg_wm_posts: { rg_wm_author_id: "integer" },
+      sl_authors: { name: "string" },
+      sl_books: { sl_author_id: "integer", title: "string", name: "string" },
+      sl2_authors: { name: "string" },
+      sl2_books: { sl2_author_id: "integer" },
+      sl3_authors: { name: "string" },
+      sl3_books: { sl3_author_id: "integer" },
+      topics: {
+        title: "string",
+        status: "string",
+        body: "string",
+        updated_at: "datetime",
+        checked_at: "datetime",
+        approved: "boolean",
+        category: "string",
+        written_on: "datetime",
+        content: "string",
+        author_name: "string",
+      },
+      users: {
+        name: "string",
+        status: "string",
+        role: "string",
+        age: "integer",
+        email: "string",
+        updated_at: "datetime",
+        ssn: "string",
+        bio: "string",
+        active: "boolean",
+      },
+      vehicles: { name: "string", type: "string" },
+    });
   });
 
   // Rails: test "group count"
@@ -6240,8 +6301,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: attributeChanged?(from:, to:) — Active Model Dirty
   it("attributeChanged? supports from: and to: options (Active Model Dirty)", async () => {
-    const adapter = createTestAdapter();
-
     class Person extends Base {
       static {
         this._tableName = "people";
@@ -6273,7 +6332,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: optimizer_hints — add database query hints
   it("optimizerHints() adds hints to generated SQL", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6288,7 +6346,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: errors.full_messages_for — error messages for specific attribute
   it("errors.fullMessagesFor() returns messages for specific attribute", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6308,7 +6365,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: errors.of_kind? — check for specific error type
   it("errors.ofKind() checks for error type on attribute", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6326,7 +6382,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: column_for_attribute — attribute metadata
   it("columnForAttribute() returns type info for attribute", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6345,7 +6400,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: attributes_before_type_cast — raw attribute values
   it("attributesBeforeTypeCast returns raw values", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6361,7 +6415,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: encrypts — encrypted attributes
   it("encrypts() transparently encrypts and decrypts attributes", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6390,7 +6443,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: scope with extension block
   it("scope with extension block adds methods to the relation", () => {
-    const adapter = createTestAdapter();
     class Post extends Base {
       static {
         this._tableName = "posts";
@@ -6450,7 +6502,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: no_touching — suppress touch callbacks
   it("noTouching() suppresses touching during block", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6471,7 +6522,6 @@ describe("CalculationsTest", () => {
     const { generatesTokenFor, setTokenForSecret } = await import("./generates-token-for.js");
     setTokenForSecret("test-secret");
     try {
-      const adapter = createTestAdapter();
       class User extends Base {
         static {
           this._tableName = "users";
@@ -6493,7 +6543,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: Relation#readonly? — check readonly status
   it("Relation.isReadonly reflects readonly state", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6526,7 +6575,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: nullify_blanks — auto-nullify blank strings
   it("nullifyBlanks converts empty strings to null", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6544,7 +6592,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: prepend callbacks
   it("before_destroy with prepend: true runs first", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6569,7 +6616,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: suppress — skip persistence during block
   it("suppress() prevents database writes", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6607,7 +6653,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: to_xml — XML serialization
   it("toXml() serializes model to XML", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6627,7 +6672,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: from_json — JSON deserialization
   it("fromJson() sets attributes from JSON", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6643,7 +6687,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: from_json with root
   it("fromJson() supports include_root", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6659,7 +6702,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: persisted? — checks if record is saved
   it("isPersisted() returns false for new records, true after save", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6676,7 +6718,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: attribute_types — returns map of column types
   it("attributeTypes returns type objects per column", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6692,7 +6733,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: logger — set/get logger
   it("logger defaults to null and can be set", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6709,7 +6749,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: Relation#build — creates unsaved record with scope
   it("Relation#build creates unsaved record with scoped attributes", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6727,7 +6766,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: Relation#create — persists record with scope
   it("Relation#create persists record with scoped attributes", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6744,7 +6782,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: Relation#spawn — independent copy
   it("Relation#spawn returns an independent copy", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6760,7 +6797,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: invert_where — inverts where conditions
   it("invertWhere swaps where and whereNot", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6781,7 +6817,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: Relation#inspect — debug representation
   it("inspect() returns human-readable relation info", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6798,7 +6833,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: toModel returns self (ActiveModel::Conversion)
   it("toModel() returns self", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6813,7 +6847,6 @@ describe("CalculationsTest", () => {
   // Rails guide: i18nScope
   it("i18nScope returns 'activemodel' on Model", () => {
     // Base overrides Model's i18nScope to return "activerecord"
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6826,7 +6859,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: attribute_previously_changed?
   it("attributePreviouslyChanged checks last save changes", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6844,7 +6876,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: CollectionProxy#push
   it("CollectionProxy push adds records", async () => {
-    const adapter = createTestAdapter();
     class Author extends Base {
       static {
         this._tableName = "authors";
@@ -6874,7 +6905,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: CollectionProxy#isEmpty
   it("CollectionProxy isEmpty returns true when empty", async () => {
-    const adapter = createTestAdapter();
     class Author extends Base {
       static {
         this._tableName = "authors";
@@ -6901,7 +6931,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: load_async schedules background load
   it("loadAsync returns the relation for chaining", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6918,7 +6947,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: clone — shallow clone preserving id
   it("clone preserves id and persisted state", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6935,7 +6963,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: find_each with order: :desc (Rails 7.1)
   it("findEach supports order option", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6960,7 +6987,6 @@ describe("CalculationsTest", () => {
   it("toGid returns a GlobalID-like URI", async () => {
     setApp("TestApp");
     try {
-      const adapter = createTestAdapter();
       class User extends Base {
         static {
           this._tableName = "users";
@@ -6978,7 +7004,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: column_defaults
   it("columnDefaults returns default values", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -6992,7 +7017,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: find_by_attribute dynamic finder
   it("findByAttribute finds record by single column", async () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7009,7 +7033,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: confirmation validator with caseSensitive: false
   it("confirmation validator supports case_sensitive: false", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7026,7 +7049,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: extending with function
   it("extending accepts a function argument", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";
@@ -7043,7 +7065,6 @@ describe("CalculationsTest", () => {
 
   // Rails guide: attribute_method_prefix
   it("attributeMethodPrefix defines prefixed methods", () => {
-    const adapter = createTestAdapter();
     class User extends Base {
       static {
         this._tableName = "users";

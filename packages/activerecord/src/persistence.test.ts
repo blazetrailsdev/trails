@@ -1156,8 +1156,34 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = freshAdapter();
+    await defineSchema(adapter, {
+      animals: { name: "string", type: "string" },
+      dogs: { name: "string", type: "string" },
+      minimals: {},
+      order_items: {
+        shop_id: "integer",
+        order_id: "integer",
+        item_name: "string",
+      },
+      other_topics: { title: "string" },
+      posts: { title: "string", created_at: "datetime" },
+      topics: {
+        title: "string",
+        lock_version: "integer",
+        body: "string",
+        updated_at: "datetime",
+        created_at: "datetime",
+        active: "boolean",
+        count: "integer",
+      },
+    });
+  });
+
   it("fills auto populated columns on creation", async () => {
-    const adapter = freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -1174,7 +1200,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute does not invoke callbacks", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -1195,7 +1220,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute does not autoincrement lock version", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1210,7 +1234,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns should not modify specific columns", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1229,7 +1252,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns changing id", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1253,7 +1275,6 @@ describe("PersistenceTest", () => {
   });
 
   it("create bang many with block", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1267,7 +1288,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1280,7 +1300,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update with block", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1294,7 +1313,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update association", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1308,7 +1326,6 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes keeps the type column if an STI model", async () => {
-    const adapter = freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("name", "string");
@@ -1330,7 +1347,6 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes keeps errors", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1353,7 +1369,6 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes should not change current class", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1373,7 +1388,6 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes copies custom primary key", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1392,7 +1406,6 @@ describe("PersistenceTest", () => {
   });
 
   it("becomes! should copy attributes", async () => {
-    const adapter = freshAdapter();
     class Animal extends Base {
       static {
         this.attribute("name", "string");
@@ -1412,7 +1425,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save update with dirty timestamp", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1427,7 +1439,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save without N+1", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1442,7 +1453,6 @@ describe("PersistenceTest", () => {
   });
 
   it("create columns not equal to fields", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1456,7 +1466,6 @@ describe("PersistenceTest", () => {
   });
 
   it("instantiate creates a new record from the given hash", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1469,7 +1478,6 @@ describe("PersistenceTest", () => {
   });
 
   it("delete returns number of affected rows", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1482,7 +1490,6 @@ describe("PersistenceTest", () => {
   });
 
   it("delete many returns number of affected rows", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1498,7 +1505,6 @@ describe("PersistenceTest", () => {
   });
 
   it("create with timestamps record timestamps", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1513,7 +1519,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update_attribute_vs_update_column", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -1538,7 +1543,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update_all with limit", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1552,7 +1556,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update_all with order", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1566,7 +1569,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update_all with offset", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1579,7 +1581,6 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy with nil raises ActiveRecordError", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1590,7 +1591,6 @@ describe("PersistenceTest", () => {
   });
 
   it("reload refreshes the instance", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1604,7 +1604,6 @@ describe("PersistenceTest", () => {
   });
 
   it("reload does not forget the PK", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1618,7 +1617,6 @@ describe("PersistenceTest", () => {
   });
 
   it("reload returns self", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1631,7 +1629,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save returns self", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1645,7 +1642,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save bang should always save", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1658,7 +1654,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save with duped frozen attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1673,7 +1668,6 @@ describe("PersistenceTest", () => {
   });
 
   it("toggle!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("active", "boolean", { default: false });
@@ -1688,7 +1682,6 @@ describe("PersistenceTest", () => {
   });
 
   it("increment!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1705,7 +1698,6 @@ describe("PersistenceTest", () => {
   // Rails' increment! emits an atomic UPDATE via update_counters, so
   // two concurrent calls both land instead of racing on a read-then-write.
   it("increment! applies concurrent increments atomically", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1724,7 +1716,6 @@ describe("PersistenceTest", () => {
   // must no longer look dirty, otherwise a later save() would re-persist
   // the already-applied delta.
   it("increment! clears dirty tracking for the incremented attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1741,7 +1732,6 @@ describe("PersistenceTest", () => {
   // Rails: increment!(attribute, by, touch: :updated_at) updates the
   // timestamp in the same atomic statement.
   it("increment! with touch option updates the named timestamp column", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1759,7 +1749,6 @@ describe("PersistenceTest", () => {
   });
 
   it("populates non primary key autoincremented column for a cpk model", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1771,7 +1760,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update many!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1787,7 +1775,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level update without ids!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1801,7 +1788,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level update is affected by scoping!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1815,7 +1801,6 @@ describe("PersistenceTest", () => {
   });
 
   it("increment aliased attribute", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1828,7 +1813,6 @@ describe("PersistenceTest", () => {
   });
 
   it("increment nil attribute", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer");
@@ -1841,7 +1825,6 @@ describe("PersistenceTest", () => {
   });
 
   it("increment updates counter in db using offset", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1855,7 +1838,6 @@ describe("PersistenceTest", () => {
   });
 
   it("increment with touch updates timestamps", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("count", "integer", { default: 0 });
@@ -1869,7 +1851,6 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy many", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1883,7 +1864,6 @@ describe("PersistenceTest", () => {
   });
 
   it("destroy many with invalid id", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1896,7 +1876,6 @@ describe("PersistenceTest", () => {
   // Rails: Base.delete(ids[]) should delete every matching row — single-column
   // PK case routes through `where(pk: ids).delete_all` (delete_by semantics).
   it("delete with array of ids removes all matching rows", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1911,7 +1890,6 @@ describe("PersistenceTest", () => {
   });
 
   it("delete with nil / [] is a no-op returning 0", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -1931,7 +1909,6 @@ describe("PersistenceTest", () => {
   // — NOT a per-column IN cross-product (which would also match
   // [shop_id=2, order_id=10]).
   it("delete accepts an array of composite-PK tuples", async () => {
-    const adapter = freshAdapter();
     class OrderItem extends Base {
       static {
         this._tableName = "order_items";
@@ -1959,7 +1936,6 @@ describe("PersistenceTest", () => {
   // Rails: update(id, attrs) on a composite-PK model must treat a flat
   // tuple as ONE id (not parallel ids). Mirrors destroy's detection.
   it("update on composite PK treats a tuple as a single id", async () => {
-    const adapter = freshAdapter();
     class OrderItem extends Base {
       static {
         this._tableName = "order_items";
@@ -1980,7 +1956,6 @@ describe("PersistenceTest", () => {
   // Rails: destroy(id) on a composite-PK model with a single tuple must
   // destroy ONE record, not iterate the tuple as N ids.
   it("destroy on composite PK treats a tuple as a single id", async () => {
-    const adapter = freshAdapter();
     class OrderItem extends Base {
       static {
         this._tableName = "order_items";
@@ -2000,7 +1975,6 @@ describe("PersistenceTest", () => {
   });
 
   it("create prefetched pk", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2013,7 +1987,6 @@ describe("PersistenceTest", () => {
   });
 
   it("build many through factory with block", () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2026,7 +1999,6 @@ describe("PersistenceTest", () => {
   });
 
   it("save for record with only primary key that is provided", async () => {
-    const adapter = freshAdapter();
     class Minimal extends Base {
       static {
         this.adapter = adapter;
@@ -2039,7 +2011,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns not equal attributes", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2054,7 +2025,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update for record with only primary key", async () => {
-    const adapter = freshAdapter();
     class Minimal extends Base {
       static {
         this.adapter = adapter;
@@ -2066,7 +2036,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute after update", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2080,7 +2049,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute does not run sql if attribute is not changed", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2094,7 +2062,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update raises record not found exception", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2105,7 +2072,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute with one updated", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2120,7 +2086,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute for updated at on", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2136,7 +2101,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2149,7 +2113,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update attribute for updated at on!", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2163,7 +2126,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update column for readonly attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2177,7 +2139,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update column with one changed and one updated", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2194,7 +2155,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update column with default scope", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2208,7 +2168,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns should not use setter method", async () => {
-    const adapter = freshAdapter();
     const log: string[] = [];
     class Topic extends Base {
       static {
@@ -2226,7 +2185,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns should not leave the object dirty", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2241,7 +2199,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns with one readonly attribute", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2256,7 +2213,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns with one changed and one updated", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2272,7 +2228,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns returns boolean", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2286,7 +2241,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level destroy", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2299,7 +2253,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level destroy is affected by scoping", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2312,7 +2265,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete with invalid ids", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2325,7 +2277,6 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete is affected by scoping", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2338,7 +2289,6 @@ describe("PersistenceTest", () => {
   });
 
   it("update uses query constraints config", async () => {
-    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -2353,7 +2303,6 @@ describe("PersistenceTest", () => {
 
   describe("QueryConstraintsTest", () => {
     it("primary key stays the same", async () => {
-      const adapter = freshAdapter();
       class Topic extends Base {
         static {
           this.attribute("title", "string");
@@ -3270,8 +3219,13 @@ describe("PersistenceTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string", body: "string" },
+      requireds: { name: "string" },
+      trackeds: { name: "string" },
+    });
     Post.adapter = adapter;
   });
 
