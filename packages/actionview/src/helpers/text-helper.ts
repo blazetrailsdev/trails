@@ -6,9 +6,21 @@ import {
   pluralize as inflectorPluralize,
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
+import { OutputBuffer } from "../buffers.js";
 import { contentTag } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";
+
+/**
+ * Host interface for helpers that write to or read per-render state from
+ * a view context. Rails stores `@output_buffer` and `@_cycles` on the
+ * view instance; the equivalents here are properties on the host.
+ */
+export interface TextHelperHost {
+  outputBuffer: OutputBuffer;
+  /** @internal */
+  _cycles?: Record<string, Cycle>;
+}
 
 /**
  * ActionView::Helpers::TextHelper
@@ -282,6 +294,147 @@ export function simpleFormat(
     contentTag(wrapperTag, raw(paragraph), htmlOptions).toString(),
   );
   return htmlSafe(wrapped.join("\n\n"));
+}
+
+/**
+ * concat — append +value+ to the host's output buffer. Use inside non-output
+ * code blocks where you cannot use `<%= %>`. Mirrors `ActionView::Helpers::TextHelper#concat`.
+ */
+export function concat(this: TextHelperHost, value: unknown): OutputBuffer {
+  this.outputBuffer.concat(value);
+  return this.outputBuffer;
+}
+
+/**
+ * safe_concat — like {@link concat}, but appends the value as HTML-safe.
+ * Mirrors `ActionView::Helpers::TextHelper#safe_concat`.
+ */
+export function safeConcat(this: TextHelperHost, value: unknown): OutputBuffer {
+  this.outputBuffer.safeConcat(value);
+  return this.outputBuffer;
+}
+
+/**
+ * Cycle — cycles through its values each time {@link Cycle.toString} is called.
+ * Mirrors `ActionView::Helpers::TextHelper::Cycle`.
+ */
+export class Cycle {
+  readonly values: unknown[];
+  private _index = 0;
+
+  constructor(firstValue: unknown, ...rest: unknown[]) {
+    if (arguments.length === 0) {
+      throw new TypeError("wrong number of arguments (given 0, expected 1+)");
+    }
+    this.values = [firstValue, ...rest];
+  }
+
+  reset(): void {
+    this._index = 0;
+  }
+
+  currentValue(): string {
+    return String(this.values[this._previousIndex()] ?? "");
+  }
+
+  toString(): string {
+    const value = String(this.values[this._index] ?? "");
+    this._index = this._nextIndex();
+    return value;
+  }
+
+  /** @internal */
+  private _nextIndex(): number {
+    return this._stepIndex(1);
+  }
+
+  /** @internal */
+  private _previousIndex(): number {
+    return this._stepIndex(-1);
+  }
+
+  /** @internal */
+  private _stepIndex(n: number): number {
+    const size = this.values.length;
+    return (((this._index + n) % size) + size) % size;
+  }
+}
+
+export interface CycleOptions {
+  name?: string;
+}
+
+function isCycleOptions(value: unknown): value is CycleOptions {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    !(value instanceof Cycle) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+/**
+ * cycle — returns a {@link Cycle} (stringifies to the next value each call).
+ * The first arg may be an array of values; trailing options may carry `name`
+ * to scope the cycle. Mirrors `ActionView::Helpers::TextHelper#cycle`.
+ */
+export function cycle(this: TextHelperHost, firstValue: unknown, ...rest: unknown[]): string {
+  if (arguments.length === 0) {
+    throw new TypeError("wrong number of arguments (given 0, expected 1+)");
+  }
+  let options: CycleOptions = {};
+  if (rest.length > 0 && isCycleOptions(rest[rest.length - 1])) {
+    options = rest.pop() as CycleOptions;
+  }
+  const name = options.name ?? "default";
+
+  const values = Array.isArray(firstValue) ? [...firstValue, ...rest] : [firstValue, ...rest];
+
+  let existing = getCycle(this, name);
+  if (!existing || !valuesEqual(existing.values, values)) {
+    existing = setCycle(this, name, new Cycle(values[0], ...values.slice(1)));
+  }
+  return existing.toString();
+}
+
+/**
+ * current_cycle — returns the current cycle string without advancing.
+ * Mirrors `ActionView::Helpers::TextHelper#current_cycle`.
+ */
+export function currentCycle(this: TextHelperHost, name = "default"): string | undefined {
+  const c = getCycle(this, name);
+  return c ? c.currentValue() : undefined;
+}
+
+/**
+ * reset_cycle — rewinds the named cycle to its first element.
+ * Mirrors `ActionView::Helpers::TextHelper#reset_cycle`.
+ */
+export function resetCycle(this: TextHelperHost, name = "default"): void {
+  const c = getCycle(this, name);
+  if (c) c.reset();
+}
+
+/** @internal */
+function getCycle(host: TextHelperHost, name: string): Cycle | undefined {
+  const cycles = host._cycles;
+  if (!cycles || !Object.hasOwn(cycles, name)) return undefined;
+  return cycles[name];
+}
+
+/** @internal */
+function setCycle(host: TextHelperHost, name: string, cycle: Cycle): Cycle {
+  host._cycles ??= Object.create(null) as Record<string, Cycle>;
+  host._cycles[name] = cycle;
+  return cycle;
+}
+
+/** @internal */
+function valuesEqual(a: unknown[], b: unknown[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 /** @internal */

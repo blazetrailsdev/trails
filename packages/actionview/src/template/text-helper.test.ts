@@ -1,17 +1,30 @@
 import { describe, expect, it } from "vitest";
 import type { SafeBuffer } from "@blazetrails/activesupport";
+import { OutputBuffer } from "../buffers.js";
 import {
+  Cycle,
+  concat,
+  currentCycle,
+  cycle,
   excerpt,
   highlight,
   pluralize,
+  resetCycle,
   simpleFormat,
   truncate,
   wordWrap,
+  type TextHelperHost,
 } from "../helpers/text-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 
-// Mirrors actionview/test/template/text_helper_test.rb. cycle/concat are
-// follow-ups.
+// Mirrors actionview/test/template/text_helper_test.rb. truncate / pluralize /
+// wordWrap / simpleFormat / highlight / excerpt / cycle / current_cycle /
+// reset_cycle / concat are covered. (Rails has no safe_concat test;
+// behavior is exercised in buffers.test.ts.)
+
+function newHost(initial = ""): TextHelperHost {
+  return { outputBuffer: new OutputBuffer(initial) };
+}
 
 const linkTo = (label: string, _href: string): SafeBuffer => raw(`<a href="#">${label}</a>`);
 
@@ -466,5 +479,142 @@ describe("TextHelperTest", () => {
     expect(excerpt("my very\nvery\nvery long\nstring", "long", opts3)).toBe(
       "...very\nvery long\nstring",
     );
+  });
+
+  it("concat", () => {
+    const host = newHost("foo");
+    concat.call(host, "bar");
+    expect(host.outputBuffer.toStr()).toBe("foobar");
+  });
+
+  it("cycle class", () => {
+    const value = new Cycle("one", 2, "3");
+    expect(value.toString()).toBe("one");
+    expect(value.toString()).toBe("2");
+    expect(value.toString()).toBe("3");
+    expect(value.toString()).toBe("one");
+    value.reset();
+    expect(value.toString()).toBe("one");
+    expect(value.toString()).toBe("2");
+    expect(value.toString()).toBe("3");
+  });
+
+  it("cycle class with no arguments", () => {
+    // @ts-expect-error testing runtime guard
+    expect(() => new Cycle()).toThrow();
+  });
+
+  it("cycle", () => {
+    const host = newHost();
+    expect(cycle.call(host, "one", 2, "3")).toBe("one");
+    expect(cycle.call(host, "one", 2, "3")).toBe("2");
+    expect(cycle.call(host, "one", 2, "3")).toBe("3");
+    expect(cycle.call(host, "one", 2, "3")).toBe("one");
+    expect(cycle.call(host, "one", 2, "3")).toBe("2");
+    expect(cycle.call(host, "one", 2, "3")).toBe("3");
+  });
+
+  it("cycle with array", () => {
+    const host = newHost();
+    const array = [1, 2, 3];
+    expect(cycle.call(host, array)).toBe("1");
+    expect(cycle.call(host, array)).toBe("2");
+    expect(cycle.call(host, array)).toBe("3");
+  });
+
+  it("cycle with no arguments", () => {
+    const host = newHost();
+    // @ts-expect-error testing runtime guard
+    expect(() => cycle.call(host)).toThrow();
+  });
+
+  it("cycle resets with new values", () => {
+    const host = newHost();
+    expect(cycle.call(host, "even", "odd")).toBe("even");
+    expect(cycle.call(host, "even", "odd")).toBe("odd");
+    expect(cycle.call(host, "even", "odd")).toBe("even");
+    expect(cycle.call(host, 1, 2, 3)).toBe("1");
+    expect(cycle.call(host, 1, 2, 3)).toBe("2");
+    expect(cycle.call(host, 1, 2, 3)).toBe("3");
+    expect(cycle.call(host, 1, 2, 3)).toBe("1");
+  });
+
+  it("named cycles", () => {
+    const host = newHost();
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("1");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("red");
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("2");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("blue");
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("3");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("red");
+  });
+
+  it("current cycle with default name", () => {
+    const host = newHost();
+    cycle.call(host, "even", "odd");
+    expect(currentCycle.call(host)).toBe("even");
+    cycle.call(host, "even", "odd");
+    expect(currentCycle.call(host)).toBe("odd");
+    cycle.call(host, "even", "odd");
+    expect(currentCycle.call(host)).toBe("even");
+  });
+
+  it("current cycle with named cycles", () => {
+    const host = newHost();
+    cycle.call(host, "red", "blue", { name: "colors" });
+    expect(currentCycle.call(host, "colors")).toBe("red");
+    cycle.call(host, "red", "blue", { name: "colors" });
+    expect(currentCycle.call(host, "colors")).toBe("blue");
+    cycle.call(host, "red", "blue", { name: "colors" });
+    expect(currentCycle.call(host, "colors")).toBe("red");
+  });
+
+  it("current cycle safe call", () => {
+    const host = newHost();
+    expect(() => currentCycle.call(host)).not.toThrow();
+    expect(() => currentCycle.call(host, "colors")).not.toThrow();
+  });
+
+  it("current cycle with more than two names", () => {
+    const host = newHost();
+    cycle.call(host, 1, 2, 3);
+    expect(currentCycle.call(host)).toBe("1");
+    cycle.call(host, 1, 2, 3);
+    expect(currentCycle.call(host)).toBe("2");
+    cycle.call(host, 1, 2, 3);
+    expect(currentCycle.call(host)).toBe("3");
+    cycle.call(host, 1, 2, 3);
+    expect(currentCycle.call(host)).toBe("1");
+  });
+
+  it("default named cycle", () => {
+    const host = newHost();
+    expect(cycle.call(host, 1, 2, 3)).toBe("1");
+    expect(cycle.call(host, 1, 2, 3, { name: "default" })).toBe("2");
+    expect(cycle.call(host, 1, 2, 3)).toBe("3");
+  });
+
+  it("reset cycle", () => {
+    const host = newHost();
+    expect(cycle.call(host, 1, 2, 3)).toBe("1");
+    expect(cycle.call(host, 1, 2, 3)).toBe("2");
+    resetCycle.call(host);
+    expect(cycle.call(host, 1, 2, 3)).toBe("1");
+  });
+
+  it("reset unknown cycle", () => {
+    const host = newHost();
+    expect(() => resetCycle.call(host, "colors")).not.toThrow();
+  });
+
+  it("reset named cycle", () => {
+    const host = newHost();
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("1");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("red");
+    resetCycle.call(host, "numbers");
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("1");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("blue");
+    expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("2");
+    expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("red");
   });
 });
