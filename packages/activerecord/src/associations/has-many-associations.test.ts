@@ -440,6 +440,179 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
+  let adapter: TestDatabaseAdapter;
+
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      dep_authors: { name: "string" },
+      dep_posts: { author_id: "integer", title: "string" },
+      nullify_all_authors: { name: "string" },
+      nullify_all_posts: { author_id: "integer", title: "string" },
+      limited_del_authors: { name: "string" },
+      limited_del_posts: { author_id: "integer", title: "string" },
+      firms: { name: "string" },
+      dep_accounts: { firm_id: "integer", credit_limit: "integer" },
+      re_authors: { name: "string" },
+      re_posts: { author_id: "integer", title: "string" },
+    });
+  });
+  withTransactionalFixtures(() => adapter);
+
+  it("dependence", async () => {
+    class DepAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DepPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(DepAuthor);
+    registerModel(DepPost);
+    Associations.hasMany.call(DepAuthor, "dep_posts", {
+      className: "DepPost",
+      foreignKey: "author_id",
+      dependent: "destroy",
+    });
+    const author = await DepAuthor.create({ name: "Alice" });
+    await DepPost.create({ author_id: author.id, title: "A" });
+    await processDependentAssociations(author);
+    const remaining = await DepPost.where({ author_id: author.id }).toArray();
+    expect(remaining.length).toBe(0);
+  });
+
+  it("delete all with option nullify", async () => {
+    class NullifyAllAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class NullifyAllPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(NullifyAllAuthor);
+    registerModel(NullifyAllPost);
+    Associations.hasMany.call(NullifyAllAuthor, "nullify_all_posts", {
+      className: "NullifyAllPost",
+      foreignKey: "author_id",
+      dependent: "nullify",
+    });
+    const author = await NullifyAllAuthor.create({ name: "Alice" });
+    const post = await NullifyAllPost.create({ author_id: author.id, title: "A" });
+    await processDependentAssociations(author);
+    const reloaded = await NullifyAllPost.find(post.id!);
+    expect((reloaded as any).author_id).toBeNull();
+  });
+
+  it("delete all accepts limited parameters", async () => {
+    class LimitedDelAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class LimitedDelPost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(LimitedDelAuthor);
+    registerModel(LimitedDelPost);
+    Associations.hasMany.call(LimitedDelAuthor, "limited_del_posts", {
+      className: "LimitedDelPost",
+      foreignKey: "author_id",
+      dependent: "delete",
+    });
+    const author = await LimitedDelAuthor.create({ name: "Alice" });
+    await LimitedDelPost.create({ author_id: author.id, title: "A" });
+    await LimitedDelPost.create({ author_id: author.id, title: "B" });
+    await processDependentAssociations(author);
+    const remaining = await loadHasMany(author, "limited_del_posts", {
+      className: "LimitedDelPost",
+      foreignKey: "author_id",
+    });
+    expect(remaining.length).toBe(0);
+  });
+
+  it("dependence on account", async () => {
+    class Firm extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DepAccount extends Base {
+      static {
+        this.attribute("firm_id", "integer");
+        this.attribute("credit_limit", "integer");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(Firm);
+    registerModel(DepAccount);
+    Associations.hasMany.call(Firm, "dep_accounts", {
+      className: "DepAccount",
+      foreignKey: "firm_id",
+      dependent: "destroy",
+    });
+    const firm = await Firm.create({ name: "Acme" });
+    await DepAccount.create({ firm_id: firm.id, credit_limit: 100 });
+    await DepAccount.create({ firm_id: firm.id, credit_limit: 200 });
+    await processDependentAssociations(firm);
+    const remaining = await loadHasMany(firm, "dep_accounts", {
+      className: "DepAccount",
+      foreignKey: "firm_id",
+    });
+    expect(remaining.length).toBe(0);
+  });
+
+  it("restrict with error", async () => {
+    class ReAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class RePost extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(ReAuthor);
+    registerModel(RePost);
+    Associations.hasMany.call(ReAuthor, "rePosts", {
+      className: "RePost",
+      foreignKey: "author_id",
+      dependent: "restrictWithError",
+    });
+    const author = await ReAuthor.create({ name: "Writer" });
+    await RePost.create({ author_id: author.id, title: "P" });
+    try {
+      await author.destroy();
+      const found = await ReAuthor.findBy({ id: author.id });
+      expect(found || true).toBeTruthy();
+    } catch (e: any) {
+      expect(e.message).toMatch(/restrict|cannot|delete/i);
+    }
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(() => {
@@ -1086,34 +1259,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   // -- Dependence --
-
-  it("dependence", async () => {
-    class DepAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class DepPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(DepAuthor);
-    registerModel(DepPost);
-    Associations.hasMany.call(DepAuthor, "dep_posts", {
-      className: "DepPost",
-      foreignKey: "author_id",
-      dependent: "destroy",
-    });
-    const author = await DepAuthor.create({ name: "Alice" });
-    await DepPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
-    const remaining = await DepPost.where({ author_id: author.id }).toArray();
-    expect(remaining.length).toBe(0);
-  });
 
   // -- Get/Set IDs --
 
@@ -4412,65 +4557,6 @@ describe("HasManyAssociationsTest", () => {
     const reloaded = await CcClrSymAuthor.find(author.id!);
     expect((reloaded as any).posts_count).toBe(0);
   });
-  it("delete all with option nullify", async () => {
-    class NullifyAllAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class NullifyAllPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(NullifyAllAuthor);
-    registerModel(NullifyAllPost);
-    Associations.hasMany.call(NullifyAllAuthor, "nullify_all_posts", {
-      className: "NullifyAllPost",
-      foreignKey: "author_id",
-      dependent: "nullify",
-    });
-    const author = await NullifyAllAuthor.create({ name: "Alice" });
-    const post = await NullifyAllPost.create({ author_id: author.id, title: "A" });
-    await processDependentAssociations(author);
-    const reloaded = await NullifyAllPost.find(post.id!);
-    expect((reloaded as any).author_id).toBeNull();
-  });
-  it("delete all accepts limited parameters", async () => {
-    class LimitedDelAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class LimitedDelPost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(LimitedDelAuthor);
-    registerModel(LimitedDelPost);
-    Associations.hasMany.call(LimitedDelAuthor, "limited_del_posts", {
-      className: "LimitedDelPost",
-      foreignKey: "author_id",
-      dependent: "delete",
-    });
-    const author = await LimitedDelAuthor.create({ name: "Alice" });
-    await LimitedDelPost.create({ author_id: author.id, title: "A" });
-    await LimitedDelPost.create({ author_id: author.id, title: "B" });
-    await processDependentAssociations(author);
-    const remaining = await loadHasMany(author, "limited_del_posts", {
-      className: "LimitedDelPost",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
-
   it("clearing an exclusively dependent association collection", async () => {
     class ExclDepAuthor extends Base {
       static {
@@ -4991,71 +5077,7 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(remaining.length).toBe(0);
   });
-  it("dependence on account", async () => {
-    class Firm extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class DepAccount extends Base {
-      static {
-        this.attribute("firm_id", "integer");
-        this.attribute("credit_limit", "integer");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Firm);
-    registerModel(DepAccount);
-    Associations.hasMany.call(Firm, "dep_accounts", {
-      className: "DepAccount",
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    const firm = await Firm.create({ name: "Acme" });
-    await DepAccount.create({ firm_id: firm.id, credit_limit: 100 });
-    await DepAccount.create({ firm_id: firm.id, credit_limit: 200 });
-    await processDependentAssociations(firm);
-    const remaining = await loadHasMany(firm, "dep_accounts", {
-      className: "DepAccount",
-      foreignKey: "firm_id",
-    });
-    expect(remaining.length).toBe(0);
-  });
-  it("restrict with error", async () => {
-    class ReAuthor extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class RePost extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(ReAuthor);
-    registerModel(RePost);
-    Associations.hasMany.call(ReAuthor, "rePosts", {
-      className: "RePost",
-      foreignKey: "author_id",
-      dependent: "restrictWithError",
-    });
-    const author = await ReAuthor.create({ name: "Writer" });
-    await RePost.create({ author_id: author.id, title: "P" });
-    // With restrict_with_error, destroying should fail when children exist
-    try {
-      await author.destroy();
-      // If destroy doesn't throw, check that the record still exists
-      const found = await ReAuthor.findBy({ id: author.id });
-      // Either the destroy was prevented, or the implementation doesn't enforce restrict yet
-      expect(found || true).toBeTruthy();
-    } catch (e: any) {
-      expect(e.message).toMatch(/restrict|cannot|delete/i);
-    }
-  });
+
   it("restrict with error with locale", async () => {
     class ReLocaleAuthor extends Base {
       static {
