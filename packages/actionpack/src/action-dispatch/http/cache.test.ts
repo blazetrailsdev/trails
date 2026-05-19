@@ -18,8 +18,9 @@ import {
 
 const req = (h: Record<string, string> = {}): RequestCacheHost => ({ getHeader: (n) => h[n] });
 // Real Response exercises the prototype-wired Cache::Response mixin
-// (see response.ts). The case-insensitive header lookup in Response#getHeader
-// means tests can assert via either casing.
+// (see ./response.ts; ../response.ts is a re-export shim). The
+// case-insensitive header lookup in Response#getHeader means tests can
+// assert via either casing.
 const res = (h: Record<string, string> = {}): Response => new Response(200, h);
 
 describe("Cache::Request", () => {
