@@ -313,7 +313,12 @@ export class Request {
   declare shouldApplyVaryHeader: () => boolean;
   declare setFormat: (extension: unknown) => void;
   declare setFormats: (extensions: unknown[]) => void;
-  declare variant: ArrayInquirer<string | symbol>;
+  get variant(): ArrayInquirer<string> {
+    return _variant.call(mimeHost(this));
+  }
+  set variant(value: string | string[] | null | undefined) {
+    _setVariant.call(mimeHost(this), value);
+  }
 
   // Class-level attribute mirroring Rails' `mattr_accessor :ignore_accept_header`.
   // Exposed as a static getter/setter so call sites read as `Request.ignoreAcceptHeader`
@@ -671,15 +676,6 @@ Request.prototype.setFormat = function (this: Request, extension: unknown) {
 Request.prototype.setFormats = function (this: Request, extensions: unknown[]) {
   _setFormats.call(mimeHost(this), extensions);
 };
-Object.defineProperty(Request.prototype, "variant", {
-  get(this: Request) {
-    return _variant.call(mimeHost(this));
-  },
-  set(this: Request, value: unknown) {
-    _setVariant.call(mimeHost(this), value);
-  },
-  configurable: true,
-});
 
 // Mix in ActionDispatch::Http::FilterParameters. The mixin reads the merged
 // param hash via the host's `params` getter (already defined on `Request`).
