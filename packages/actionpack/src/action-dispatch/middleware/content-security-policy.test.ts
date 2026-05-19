@@ -94,17 +94,22 @@ describe("ContentSecurityPolicyMiddleware", () => {
   });
 
   it("memoizes the nonce across reads (one per request)", async () => {
+    // Mirrors Rails' "one nonce per request" invariant
+    // (content_security_policy.rb:112-120): repeated reads of
+    // content_security_policy_nonce return the cached env value rather than
+    // re-invoking the generator. We assert this directly on the Request mixin
+    // since the middleware itself only reads the nonce once per request.
     let calls = 0;
     env["action_dispatch.content_security_policy_nonce_generator"] = () => {
       calls++;
       return "abc";
     };
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    policy.styleSrc("'self'");
-    env["action_dispatch.content_security_policy"] = policy;
-    const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    await new ContentSecurityPolicyMiddleware(app).call(env);
+    const { Request } = await import("../http/request.js");
+    const { contentSecurityPolicyNonce } = await import("../http/content-security-policy.js");
+    const request = new Request(env);
+    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
+    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
+    expect(contentSecurityPolicyNonce.call(request)).toBe("abc");
     expect(calls).toBe(1);
   });
 

@@ -241,8 +241,10 @@ export interface CspRequestHost {
 /** @internal Per-request nonce generator: `(request) => string`. */
 export type NonceGenerator = (request: unknown) => string;
 
-export function contentSecurityPolicy(this: CspRequestHost): ContentSecurityPolicy | undefined {
-  return this.getHeader(POLICY) as ContentSecurityPolicy | undefined;
+export function contentSecurityPolicy(
+  this: CspRequestHost,
+): ContentSecurityPolicy | null | undefined {
+  return this.getHeader(POLICY) as ContentSecurityPolicy | null | undefined;
 }
 
 export function setContentSecurityPolicy(
