@@ -93,20 +93,11 @@ export function urlFor(this: UrlForHost, options?: UrlForOptions): string {
   return fullUrlFor.call(this, options);
 }
 
-export type UrlForOptions =
-  | null
-  | undefined
-  | string
-  | symbol
-  | unknown[]
-  | Record<string, unknown>
-  // Rails dispatch matches `Class` and arbitrary models in addition to the
-  // explicit `Hash`/`Array`/`String`/`Symbol` cases; widening to `object`
-  // and any function lets callers pass model instances and class refs
-  // without casting (the unsupported branches throw at runtime).
-  | object
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  | Function;
+// Rails dispatch matches `Class` and arbitrary models in addition to the
+// explicit `Hash`/`Array`/`String`/`Symbol` cases. `object` covers
+// `Record`, arrays, class refs, and model instances (TS treats functions
+// as `object`), so callers pass them without casting.
+export type UrlForOptions = null | undefined | string | symbol | object;
 
 /** @internal */
 export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {

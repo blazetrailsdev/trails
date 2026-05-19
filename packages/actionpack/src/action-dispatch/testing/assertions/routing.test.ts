@@ -73,6 +73,17 @@ describe("assertGenerates", () => {
   it("throws on path mismatch", () => {
     bad(() => assertGenerates.call(h, "/wrong", { controller: "items", action: "index" }));
   });
+  it("accepts use_route: Symbol via Symbol#description (Rails parity)", () => {
+    const host: RoutingAssertionsHost = { routes: new RouteSet() };
+    host.routes!.draw((m) => m.get("/items", { to: "items#index", as: "items" }));
+    ok(() =>
+      assertGenerates.call(host, "/items", {
+        controller: "items",
+        action: "index",
+        use_route: Symbol("items"),
+      }),
+    );
+  });
 });
 
 describe("assertRouting", () => {

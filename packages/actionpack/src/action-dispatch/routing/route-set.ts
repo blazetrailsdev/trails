@@ -19,7 +19,7 @@ import {
   type JourneyMatch,
 } from "./journey-bridge.js";
 import type { Router as JourneyRouter, RackishResponse, RouterRequest } from "../journey/router.js";
-import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
+import { symbolToString, type PolymorphicMappingEntry } from "./polymorphic-routes.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
@@ -214,11 +214,15 @@ export class RouteSet {
   ): [string, string[]] {
     // Rails: `route_key = options.delete :use_route` — when present, look
     // the route up by its named-route key, mirroring `RouteSet#generate`.
+    // Rails route names are Symbols; we accept both strings and JS symbols
+    // (symbols carry their name in `.description` via `symbolToString`).
     let route: Route | undefined;
     const useRoute = options["use_route"];
-    if (typeof useRoute === "string") {
+    if (typeof useRoute === "string" || typeof useRoute === "symbol") {
       delete options["use_route"];
-      route = this.namedRoutes.get(useRoute);
+      route = this.namedRoutes.get(
+        typeof useRoute === "symbol" ? symbolToString(useRoute) : useRoute,
+      );
     }
     const { controller, action } = options;
     route ??= this.routes.find((r) => r.controller === controller && r.action === action);
