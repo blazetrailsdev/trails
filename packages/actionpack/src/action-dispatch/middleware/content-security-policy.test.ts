@@ -27,14 +27,16 @@ describe("ContentSecurityPolicyMiddleware", () => {
     env = buildEnv();
   });
 
-  it("writes CSP header from request policy", async () => {
+  // Rails: test_rack_lint — trails has no Rack::Lint, so we exercise the
+  // middleware end-to-end and assert it produces a CSP header without raising.
+  it("rack lint", async () => {
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
     const mw = new ContentSecurityPolicyMiddleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY]).toContain("default-src 'self'");
   });
 
-  it("does not override existing app CSP header", async () => {
+  it("does not override app content security policy", async () => {
     const app = async (): Promise<RackResponse> => [
       200,
       { [CONTENT_SECURITY_POLICY]: DEFAULT_CSP },
@@ -45,7 +47,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
     expect(headers[CONTENT_SECURITY_POLICY]).toBe(DEFAULT_CSP);
   });
 
-  it("does not override existing app CSP report-only header", async () => {
+  it("does not override app content security policy report only", async () => {
     env["action_dispatch.content_security_policy_report_only"] = true;
     const app = async (): Promise<RackResponse> => [
       200,
