@@ -54,8 +54,15 @@ type DirectiveName = string;
  */
 export class InvalidDirectiveError extends Error {}
 
+/**
+ * Shape of a stored directive. Rails uses `true` as a sentinel for bare
+ * directives that emit just the directive name (e.g. `upgrade-insecure-requests`)
+ * with no source list. Arrays are emitted as `name source1 source2 ...`.
+ */
+export type DirectiveValue = CSPSource[] | true;
+
 export class ContentSecurityPolicy {
-  private directives: Map<DirectiveName, CSPSource[]> = new Map();
+  private directives: Map<DirectiveName, DirectiveValue> = new Map();
 
   constructor(init?: (policy: ContentSecurityPolicy) => void) {
     if (init) init(this);
@@ -127,10 +134,11 @@ export class ContentSecurityPolicy {
     return this.setDirective("navigate-to", sources);
   }
   sandbox(...sources: [false] | CSPSource[]): this {
-    // Rails: empty `*values` → bare directive; `values.first` nil/false → delete.
-    // Ruby truthiness only treats nil/false as falsy — empty strings stay truthy.
+    // Rails: empty `*values` → bare directive (stored as `true`); `values.first`
+    // nil/false → delete. Ruby truthiness only treats nil/false as falsy —
+    // empty strings stay truthy.
     if (sources.length === 0) {
-      this.directives.set("sandbox", []);
+      this.directives.set("sandbox", true);
       return this;
     }
     const first = sources[0];
@@ -157,19 +165,22 @@ export class ContentSecurityPolicy {
     return this.setDirective("report-to", sources);
   }
   blockAllMixedContent(enabled: boolean | null = true): this {
-    // Rails `if enabled`: only nil/false delete; numeric/empty-string stay truthy.
+    // Rails `if enabled`: only nil/false delete; numeric/empty-string stay
+    // truthy. Bare directives store `true` (Rails parity, content_security_policy.rb:212-218).
     if (enabled === false || enabled == null) {
       this.directives.delete("block-all-mixed-content");
       return this;
     }
-    return this.setDirective("block-all-mixed-content", []);
+    this.directives.set("block-all-mixed-content", true);
+    return this;
   }
   upgradeInsecureRequests(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
       this.directives.delete("upgrade-insecure-requests");
       return this;
     }
-    return this.setDirective("upgrade-insecure-requests", []);
+    this.directives.set("upgrade-insecure-requests", true);
+    return this;
   }
   requireSriFor(...sources: CSPSource[]): this {
     return this.setDirective("require-sri-for", sources);
@@ -181,8 +192,18 @@ export class ContentSecurityPolicy {
     return this.setDirective("trusted-types", sources);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * Mirrors Rails' `DIRECTIVES.each { ... if sources.first ... else delete }`
+   * (content_security_policy.rb:189-197). A bare call like `policy.scriptSrc()`
+   * or `policy.scriptSrc(null)` removes the directive instead of setting an
+   * empty list.
+   */
   private setDirective(name: string, sources: CSPSource[]): this {
+    if (sources.length === 0 || !sources[0]) {
+      this.directives.delete(name);
+      return this;
+    }
     this.directives.set(name, this.applyMappings(sources));
     return this;
   }
@@ -241,14 +262,14 @@ export class ContentSecurityPolicy {
   ): (string | null)[] {
     const out: (string | null)[] = [];
     for (const [directive, sources] of this.directives) {
-      if (Array.isArray(sources) && sources.length > 0) {
+      if (Array.isArray(sources)) {
         const built = this.buildDirective(directive, sources, context).join(" ");
         if (nonce && this.isNonceDirective(directive, nonceDirectives)) {
           out.push(`${directive} ${built} 'nonce-${nonce}'`);
         } else {
           out.push(`${directive} ${built}`);
         }
-      } else if (sources) {
+      } else if (sources === true) {
         // Bare directive (no sources) — e.g. `block-all-mixed-content`.
         out.push(directive);
       } else {
@@ -329,14 +350,14 @@ export class ContentSecurityPolicy {
   dup(): ContentSecurityPolicy {
     const copy = new ContentSecurityPolicy();
     for (const [k, v] of this.directives) {
-      copy.directives.set(k, [...v]);
+      copy.directives.set(k, v === true ? true : [...v]);
     }
     return copy;
   }
 
   // --- Inspection ---
 
-  getDirectives(): Map<DirectiveName, CSPSource[]> {
+  getDirectives(): Map<DirectiveName, DirectiveValue> {
     return new Map(this.directives);
   }
 
