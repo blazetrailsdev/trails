@@ -1,10 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, RecordInvalid } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import {
   Associations,
   association,
@@ -536,18 +536,19 @@ const TEST_SCHEMA: Schema = {
   us_posts: { us_author_id: "integer" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("HasManyThroughAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it.skip("marshal dump", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal

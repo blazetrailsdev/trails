@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/inverse_associations_test.rb
  */
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, association, registerModel, InverseOfAssociationNotFoundError } from "../index.js";
 import {
   Associations,
@@ -13,19 +13,19 @@ import {
   setHasMany,
 } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
 describe("InverseBelongsToTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -41,6 +41,7 @@ describe("InverseBelongsToTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Man extends Base {
@@ -396,8 +397,8 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("InverseHasManyTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -423,6 +424,7 @@ describe("InverseHasManyTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Man extends Base {
@@ -769,8 +771,8 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -782,6 +784,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     class Man extends Base {
@@ -843,8 +846,8 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 });
 
 describe("AutomaticInverseFindingTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -859,6 +862,7 @@ describe("AutomaticInverseFindingTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
     // Automatic inverse finding is not yet implemented; inverseOf must be explicit
@@ -1279,8 +1283,8 @@ describe("AutomaticInverseFindingTests", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -1292,6 +1296,7 @@ describe("InversePolymorphicBelongsToTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Man extends Base {
@@ -1504,8 +1509,8 @@ describe("InversePolymorphicBelongsToTests", () => {
 
 describe("InverseCachedPathTests", () => {
   // Tests for the _cachedAssociations / _preloadedAssociations fast-paths in loadBelongsTo.
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       cached_men: { name: "string" },
@@ -1518,6 +1523,7 @@ describe("InverseCachedPathTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("wires inverseOf on the cached-associations fast-path", async () => {
     class CachedFace extends Base {
@@ -1591,8 +1597,8 @@ describe("InverseCachedPathTests", () => {
 });
 
 describe("InverseAssociationTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -1605,6 +1611,7 @@ describe("InverseAssociationTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should allow for inverse of options in associations", () => {
     class Man extends Base {
@@ -1710,8 +1717,8 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("inverse_of", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       authors: { name: "string" },
@@ -1724,6 +1731,7 @@ describe("inverse_of", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("sets inverse reference on loaded belongs_to", async () => {
     class Author extends Base {
@@ -1785,8 +1793,8 @@ describe("inverse_of", () => {
 });
 
 describe("InverseHasOneTests", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       men: { name: "string" },
@@ -1798,6 +1806,7 @@ describe("InverseHasOneTests", () => {
   afterAll(async () => {
     await dropAllTables(adapter);
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Man extends Base {
