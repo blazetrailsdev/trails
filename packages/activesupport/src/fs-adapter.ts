@@ -5,6 +5,8 @@
 export interface FsStatResult {
   isDirectory(): boolean;
   isFile(): boolean;
+  /** Only populated by lstat results (adapters may always return false from stat). */
+  isSymbolicLink?(): boolean;
   size: number;
   mtime: Date;
 }
@@ -46,6 +48,14 @@ export interface FsAdapter {
   cwd(): string;
   /** Async existence check — avoids requiring existsSync in async code paths. */
   exists(path: string): Promise<boolean>;
+  /**
+   * Async stat — async-only callers use this instead of statSync. Optional
+   * on the interface for backwards-compatibility, but async-only consumers
+   * (e.g. trailties) require it and will error if absent.
+   */
+  stat?(path: string): Promise<FsStatResult>;
+  /** Async lstat (no symlink follow). Optional; adapters without symlink support may omit. */
+  lstat?(path: string): Promise<FsStatResult>;
   /**
    * Create a unique temp directory (optional — not all filesystems support
    * atomic uniqueness). Only used by server-side database tasks; custom
@@ -111,8 +121,12 @@ function tryAutoRegisterNode(): boolean {
     const req = nodeModule.createRequire(
       typeof __filename !== "undefined" ? __filename : "file:///activesupport",
     );
-    const nodeFs = req("node:fs") as Omit<FsAdapter, "cwd" | "exists">;
-    const fsPromises = req("node:fs/promises") as { access(p: string): Promise<void> };
+    const nodeFs = req("node:fs") as Omit<FsAdapter, "cwd" | "exists" | "stat" | "lstat">;
+    const fsPromises = req("node:fs/promises") as {
+      access(p: string): Promise<void>;
+      stat(p: string): Promise<FsStatResult>;
+      lstat(p: string): Promise<FsStatResult>;
+    };
     const fs: FsAdapter = Object.assign({}, nodeFs, {
       cwd: () => globalThis.process.cwd(),
       exists: (p: string) =>
@@ -124,6 +138,8 @@ function tryAutoRegisterNode(): boolean {
             throw error;
           },
         ),
+      stat: (p: string) => fsPromises.stat(p),
+      lstat: (p: string) => fsPromises.lstat(p),
     }) as FsAdapter;
     const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;
     const nodeUrl = req("node:url") as { pathToFileURL(p: string): URL };
@@ -153,9 +169,14 @@ function tryAutoRegisterNodeAsync(): Promise<boolean> {
         if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
           return false;
         }
-        const nodeFs = (await import("node:fs")) as unknown as Omit<FsAdapter, "cwd" | "exists">;
+        const nodeFs = (await import("node:fs")) as unknown as Omit<
+          FsAdapter,
+          "cwd" | "exists" | "stat" | "lstat"
+        >;
         const fsPromises = (await import("node:fs/promises")) as unknown as {
           access(p: string): Promise<void>;
+          stat(p: string): Promise<FsStatResult>;
+          lstat(p: string): Promise<FsStatResult>;
         };
         const fs: FsAdapter = Object.assign({}, nodeFs, {
           cwd: () => globalThis.process.cwd(),
@@ -164,6 +185,8 @@ function tryAutoRegisterNodeAsync(): Promise<boolean> {
               () => true,
               () => false,
             ),
+          stat: (p: string) => fsPromises.stat(p),
+          lstat: (p: string) => fsPromises.lstat(p),
         }) as FsAdapter;
         const nodePath = (await import("node:path")) as unknown as Required<
           Omit<PathAdapter, "pathToFileURL">
