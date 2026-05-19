@@ -15,30 +15,37 @@ Mirrored upstream: <https://github.com/ruby/did_you_mean>.
 
 ## Package home
 
-Land it in **`@blazetrails/activesupport`** as `src/did-you-mean/`. Rationale:
+Land it as a **top-level package, `@blazetrails/did-you-mean`**, mirroring
+how `@blazetrails/globalid` is structured. Rationale:
 
-- DidYouMean is Ruby stdlib, not part of any single Rails package; Rails just
-  consumes it. activesupport is our analogue for "stdlib-ish utilities used
-  everywhere" (Inflector, StringInquirer, Concern, …).
-- All current call sites live in different packages (actionpack, activerecord,
-  actionview, railties). Putting it in activesupport avoids cross-package
-  dependencies that would otherwise climb the dep graph (e.g. actionpack →
-  activerecord) just to reach the helper.
+- DidYouMean is Ruby stdlib, not part of any Rails package — Rails just
+  consumes it. Modelling it as its own workspace package matches the
+  upstream boundary (separate gem / stdlib library), the same reasoning
+  that put globalid in its own package rather than folding it into
+  activerecord or activesupport.
+- All current call sites live in different packages (actionpack,
+  activerecord, actionview, railties). A standalone package with zero
+  trails deps is the cleanest thing for all of them to depend on; no
+  cross-package coupling sneaks in via activesupport.
 - It is not part of the Rails `api:compare` surface — `extract-ruby-api.rb`
-  doesn't scan `did_you_mean/*`. So the file layout is ours to design; no
+  doesn't scan `did_you_mean/*`. The file layout is ours to design; no
   Rails-mirror obligation. We just need to keep the public type signature
   close to Ruby's so caller ports are mechanical.
 
 Files:
 
-- `packages/activesupport/src/did-you-mean/levenshtein.ts`
-- `packages/activesupport/src/did-you-mean/jaro-winkler.ts`
-- `packages/activesupport/src/did-you-mean/spell-checker.ts`
-- `packages/activesupport/src/did-you-mean/index.ts` (re-exports)
+- `packages/did-you-mean/package.json` (`"name": "@blazetrails/did-you-mean"`,
+  no trails workspace deps, modelled on `packages/globalid/package.json`)
+- `packages/did-you-mean/src/levenshtein.ts`
+- `packages/did-you-mean/src/jaro-winkler.ts`
+- `packages/did-you-mean/src/spell-checker.ts`
+- `packages/did-you-mean/src/index.ts` (re-exports)
+- `packages/did-you-mean/tsconfig.json` (copy globalid's)
 - co-located `*.test.ts` files
 
-Re-export `SpellChecker`, `jaroDistance`, `jaroWinklerDistance`, and
-`levenshteinDistance` from the package barrel.
+The barrel exports `SpellChecker`, `jaroDistance`, `jaroWinklerDistance`,
+and `levenshteinDistance`. Consumer packages add
+`"@blazetrails/did-you-mean": "workspace:*"` to their `dependencies`.
 
 ## Survey of Rails usage
 
@@ -228,7 +235,7 @@ After PR 2 ships, `packages/actionpack/src/abstract-controller/base.ts`
 gets a ~10 LOC delta:
 
 ```ts
-import { SpellChecker } from "@blazetrails/activesupport";
+import { SpellChecker } from "@blazetrails/did-you-mean";
 
 export class ActionNotFound extends Error {
   readonly controller?: AbstractController;
