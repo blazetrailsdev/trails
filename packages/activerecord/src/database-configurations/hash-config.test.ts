@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashConfig } from "./hash-config.js";
 import { AdapterNotFound } from "../errors.js";
 import * as connectionAdapters from "../connection-adapters.js";
@@ -11,6 +11,10 @@ connectionAdapters.register("abstract", async () => AbstractAdapter as any);
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTest", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it("pool default when nil", () => {
       const config = new HashConfig("default_env", "primary", {
         pool: null as any,

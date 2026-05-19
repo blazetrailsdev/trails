@@ -54,10 +54,11 @@ export class HashConfig extends DatabaseConfig {
    * dumping is disabled (configured as either `false` or `null`).
    */
   schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
-    if ("schemaDump" in this.configuration) {
+    if ("schemaDump" in this.configuration && this.configuration.schemaDump !== undefined) {
       const val = this.configuration.schemaDump;
       // Rails: `if config = configuration_hash[:schema_dump]` — both `nil` and
-      // `false` short-circuit to a nil return.
+      // `false` short-circuit to a nil return. JS `undefined` is treated as
+      // "key absent" (fall through to the default).
       if (val === false || val === null) return null;
       return val as string;
     }
