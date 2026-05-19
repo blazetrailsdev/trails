@@ -2,14 +2,14 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations, association } from "./associations.js";
 import { Notifications } from "@blazetrails/activesupport";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   topics: {
@@ -110,7 +110,7 @@ const TEST_SCHEMA: Schema = {
 };
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
@@ -120,11 +120,12 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // CounterCacheTest — targets counter_cache_test.rb
 // ==========================================================================
 describe("CounterCacheTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test_counters_are_updated_both_in_memory_and_in_the_database_on_create
   it("counters are updated both in memory and in the database on create", async () => {
@@ -400,11 +401,12 @@ describe("CounterCacheTest", () => {
 });
 
 describe("CounterCacheTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -2387,11 +2389,12 @@ describe("CounterCacheTest", () => {
 });
 
 describe("counter_cache", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("increment counter", async () => {
     class Post extends Base {
@@ -2457,11 +2460,12 @@ describe("counter_cache", () => {
 });
 
 describe("Counter Cache (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "increment counter cache on create"
   it("increment counter", async () => {
