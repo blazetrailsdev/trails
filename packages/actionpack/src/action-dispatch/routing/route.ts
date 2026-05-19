@@ -73,8 +73,10 @@ export class Route {
   private _journeyRouter: JourneyRouter | null = null;
   /** @internal lazy Journey Format tree for pathFor() */
   private _pathFormatter: Format | null = null;
-  /** @internal required (non-optional) path captures, computed from Pattern */
+  /** @internal required (non-optional) path captures, computed by walking the AST for top-level symbols */
   private _requiredParamNames: readonly string[] | null = null;
+  /** @internal parsed AST for the path, cached for emitted-name computation in pathFor */
+  private _pathTree: unknown = null;
   /** @internal anchored requirement regexes for path captures, by capture name */
   private _pathRequirements: Record<string, RegExp> | null = null;
   /** @internal true once we've discovered the path can't be parsed */
@@ -239,7 +241,13 @@ export class Route {
         return;
       }
       if (n.isSymbol?.()) {
-        if (!nested) s += knowledge[n.toSym!()] ? 2 : 1;
+        // Preserve the original truthy-gate (`knowledge[name] ? 2 : 1`)
+        // while avoiding prototype-chain reads: own-property + truthy.
+        // Otherwise a capture named `constructor`/`toString` would inherit
+        // a truthy function from `Object.prototype` and boost the score.
+        const name = n.toSym!();
+        const known = Object.hasOwn(knowledge, name) && knowledge[name];
+        if (!nested) s += known ? 2 : 1;
         return;
       }
     };
@@ -282,6 +290,7 @@ export class Route {
   pathFor(params: Record<string, string | number> = {}): string {
     if (this._pathFormatter === null) {
       const tree = new Parser().parse(this.path);
+      this._pathTree = tree;
       const ast = new Ast(tree, true);
       // Pass path-capture constraints into the Pattern so requirement
       // checks (e.g. `id: /\d+/`) are honored at generation time. Use
@@ -310,7 +319,13 @@ export class Route {
       const safeReqs: Record<string, RegExp> = Object.create(null);
       for (const name of Object.keys(reqs)) {
         const re = reqs[name]!;
-        safeReqs[name] = new RegExp(`^(?:${re.source})$`, re.flags);
+        // Strip stateful flags that would break anchored single-shot use:
+        // `g`/`y` advance `lastIndex` across calls (nondeterministic across
+        // pathFor invocations); `m` rebinds `^`/`$` to line boundaries and
+        // weakens the `^…$` anchoring. Keep `i`/`s`/`u` (`v` is a `u`
+        // superset; preserved if present).
+        const safeFlags = re.flags.replace(/[gym]/g, "");
+        safeReqs[name] = new RegExp(`^(?:${re.source})$`, safeFlags);
       }
       this._pathRequirements = safeReqs;
     }
@@ -326,10 +341,16 @@ export class Route {
     }
     // Validate supplied path-capture values against the route's
     // requirement regexes (Rails Journey Formatter `missing_keys` check).
+    // Only validate captures that will actually be emitted: a capture inside
+    // an optional group whose group will be omitted (because some other
+    // member of the group isn't supplied) doesn't contribute to the output,
+    // so its supplied value shouldn't be constraint-checked.
+    const emitted = computeEmittedSymbols(this._pathTree, params);
     for (const [name, re] of Object.entries(this._pathRequirements!)) {
       // `Object.hasOwn` avoids inheriting prototype-chain values for
       // optional captures named like `constructor`/`toString`.
       if (!Object.hasOwn(params, name)) continue;
+      if (!emitted.has(name)) continue;
       const v = params[name];
       if (v != null && !re.test(String(v))) {
         throw new Error(
@@ -443,6 +464,96 @@ function emittedSlashInPathPreservingCapture(
     if (slashPrefix.includes("/") && out.includes(slashPrefix)) return true;
   }
   return false;
+}
+
+/**
+ * Names of `:symbol`/`*splat` captures that will actually be emitted into
+ * the path when `Format.evaluate(params)` runs. A symbol inside a Group is
+ * emitted iff every other Symbol directly under that Group is also supplied
+ * (the nested `Format` produced for that Group by `FormatBuilder` returns
+ * `""` from `Format.evaluate` when any of its parameters is missing — see
+ * `action-dispatch/journey/visitors.ts`) AND every ancestor Group also emits. Top-level symbols are always emitted
+ * once they are supplied.
+ *
+ * Used to skip requirement-regex validation for captures whose supplied
+ * value won't actually contribute to the output — mirrors Rails Journey
+ * Formatter, which only checks `missing_keys` against captures it's about
+ * to write.
+ */
+function computeEmittedSymbols(
+  tree: unknown,
+  params: Record<string, string | number>,
+): Set<string> {
+  const out = new Set<string>();
+  const isSupplied = (name: string): boolean => Object.hasOwn(params, name) && params[name] != null;
+
+  type N = {
+    isSymbol?: () => boolean;
+    isGroup?: () => boolean;
+    isStar?: () => boolean;
+    isCat?: () => boolean;
+    type?: string;
+    toSym?: () => string;
+    children?: () => unknown[];
+    left?: unknown;
+    right?: unknown;
+  };
+
+  // Collect Symbol names that sit directly inside this subtree without
+  // crossing into a nested Group — those are the parameters whose absence
+  // would make this group's `Format.evaluate` short-circuit and return "".
+  const directSymbols = (node: unknown): string[] => {
+    const names: string[] = [];
+    const walk = (nd: unknown): void => {
+      const n = nd as N;
+      if (n.isGroup?.()) return;
+      if (n.isStar?.()) {
+        walk(n.left);
+        return;
+      }
+      if (n.isCat?.()) {
+        walk(n.left);
+        walk(n.right);
+        return;
+      }
+      if (n.type === "OR") {
+        for (const c of n.children?.() ?? []) walk(c);
+        return;
+      }
+      if (n.isSymbol?.()) names.push(n.toSym!());
+    };
+    walk(node);
+    return names;
+  };
+
+  const walk = (node: unknown, parentFires: boolean): void => {
+    const n = node as N;
+    if (n.isGroup?.()) {
+      const direct = directSymbols(n.left);
+      const fires = parentFires && direct.every(isSupplied);
+      walk(n.left, fires);
+      return;
+    }
+    if (n.isStar?.()) {
+      walk(n.left, parentFires);
+      return;
+    }
+    if (n.isCat?.()) {
+      walk(n.left, parentFires);
+      walk(n.right, parentFires);
+      return;
+    }
+    if (n.type === "OR") {
+      for (const c of n.children?.() ?? []) walk(c, parentFires);
+      return;
+    }
+    if (n.isSymbol?.() && parentFires) {
+      const name = n.toSym!();
+      if (isSupplied(name)) out.add(name);
+    }
+  };
+  walk(tree, true);
+  return out;
 }
 
 function topLevelSymbolNames(tree: unknown): readonly string[] {

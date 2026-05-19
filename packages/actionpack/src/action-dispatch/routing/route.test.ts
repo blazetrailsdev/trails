@@ -85,6 +85,14 @@ describe("Route", () => {
       const r = new Route("GET", "/posts/:id", "posts", "show");
       expect(r.score({ id: true })).toBeGreaterThan(r.score());
     });
+
+    it("does not read inherited keys (Object.prototype) from the knowledge map", () => {
+      // `:toString` would read `Object.prototype.toString` (a function — truthy)
+      // and inflate the score without `Object.hasOwn`. After the fix, an empty
+      // knowledge map must score the same as having no `toString` entry.
+      const r = new Route("GET", "/:toString", "x", "y");
+      expect(r.score({})).toBeLessThan(r.score({ toString: true }));
+    });
   });
 
   describe("pathFor() — edge cases", () => {
@@ -190,6 +198,37 @@ describe("Route", () => {
       // top-level-symbol walk keeps it.
       const route = new Route("GET", "/:id(.:id)", "x", "y");
       expect(() => route.pathFor({})).toThrow(/Missing required parameter :id/);
+    });
+
+    it("strips stateful flags (g/y/m) from anchored requirement regexes", () => {
+      // The `/g` flag carries `lastIndex` across `.test()` calls — without
+      // stripping it, consecutive pathFor() calls with the same params
+      // would alternate pass/fail. `/m` weakens `^…$` anchoring to line
+      // boundaries (so `"42\nabc"` would pass).
+      const route = new Route("GET", "/posts/:id", "x", "y", {
+        constraints: { id: /\d+/gm },
+      });
+      expect(route.pathFor({ id: "42" })).toBe("/posts/42");
+      expect(route.pathFor({ id: "42" })).toBe("/posts/42");
+      expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
+      expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
+      // With `/m` not stripped, this would slip through.
+      expect(() => route.pathFor({ id: "42\nabc" })).toThrow(/Missing required parameter :id/);
+    });
+
+    it("skips requirement validation for captures in omitted optional groups", () => {
+      // `:id` and `:slug` share an optional group. If `slug` isn't supplied
+      // the group is omitted by Format.evaluate, so `id`'s value never lands
+      // in the output — the requirement regex shouldn't reject it either.
+      const route = new Route("GET", "/posts(/:id/:slug)", "x", "y", {
+        constraints: { id: /\d+/ },
+      });
+      expect(route.pathFor({ id: "bad" } as Record<string, string>)).toBe("/posts");
+      // When both are supplied the group fires and `id` IS validated.
+      expect(() => route.pathFor({ id: "bad", slug: "x" })).toThrow(
+        /Missing required parameter :id/,
+      );
+      expect(route.pathFor({ id: "42", slug: "x" })).toBe("/posts/42/x");
     });
 
     it("collapses double slashes from partially-supplied adjacent optional groups", () => {
