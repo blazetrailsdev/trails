@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Response } from "../response.js";
 import {
   etagMatches,
   fresh,
@@ -13,16 +14,14 @@ import {
   setEtag,
   setLastModified,
   type RequestCacheHost,
-  type ResponseCacheHost,
 } from "./cache.js";
 
 const req = (h: Record<string, string> = {}): RequestCacheHost => ({ getHeader: (n) => h[n] });
-const res = (h: Record<string, string> = {}): ResponseCacheHost => ({
-  getHeader: (k) => h[k],
-  setHeader: (k, v) => {
-    h[k] = v;
-  },
-});
+// Real Response exercises the prototype-wired Cache::Response mixin
+// (see ./response.ts; ../response.ts is a re-export shim). The
+// case-insensitive header lookup in Response#getHeader means tests can
+// assert via either casing.
+const res = (h: Record<string, string> = {}): Response => new Response(200, h);
 
 describe("Cache::Request", () => {
   it("not_modified? compares If-Modified-Since to modified_at", () => {
@@ -98,10 +97,10 @@ describe("Cache::Response", () => {
   });
 
   it("etag= sets weak validator", () => {
-    const h: Record<string, string> = {};
-    setEtag.call(res(h), "foo");
-    expect(h.ETag.startsWith('W/"')).toBe(true);
-    expect(isWeakEtag.call(res(h))).toBe(true);
+    const r = res();
+    setEtag.call(r, "foo");
+    expect(r.getHeader("ETag")?.startsWith('W/"')).toBe(true);
+    expect(isWeakEtag.call(r)).toBe(true);
   });
 
   it("generate_weak_etag wraps generate_strong_etag; arrays expand by '/'", () => {
@@ -110,35 +109,34 @@ describe("Cache::Response", () => {
   });
 
   it("handle_conditional_get! sets default only when validator present and header missing", () => {
-    const h: Record<string, string> = {};
-    const r = res(h);
+    const r = res();
     setEtag.call(r, "x");
     handleConditionalGetBang.call(r);
-    expect(h["Cache-Control"]).toBe("max-age=0, private, must-revalidate");
+    expect(r.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
 
-    const h2: Record<string, string> = { "Cache-Control": "public" };
-    setEtag.call(res(h2), "x");
-    handleConditionalGetBang.call(res(h2));
-    expect(h2["Cache-Control"]).toBe("public");
+    const r2 = res({ "Cache-Control": "public" });
+    setEtag.call(r2, "x");
+    handleConditionalGetBang.call(r2);
+    expect(r2.getHeader("Cache-Control")).toBe("public");
   });
 
   it("merge_and_normalize_cache_control! emits directives in Rails order", () => {
-    const h: Record<string, string> = {};
-    mergeAndNormalizeCacheControlBang.call(res(h), { max_age: 60, public: true });
-    expect(h["Cache-Control"]).toBe("max-age=60, public");
+    const r = res();
+    mergeAndNormalizeCacheControlBang.call(r, { max_age: 60, public: true });
+    expect(r.getHeader("Cache-Control")).toBe("max-age=60, public");
 
-    const h2: Record<string, string> = {};
-    mergeAndNormalizeCacheControlBang.call(res(h2), { no_store: true, private: true });
-    expect(h2["Cache-Control"]).toBe("private, no-store");
+    const r2 = res();
+    mergeAndNormalizeCacheControlBang.call(r2, { no_store: true, private: true });
+    expect(r2.getHeader("Cache-Control")).toBe("private, no-store");
 
-    const h3: Record<string, string> = { "Cache-Control": "no-cache, community=internal" };
-    mergeAndNormalizeCacheControlBang.call(res(h3), { max_age: 10, public: true });
-    expect(h3["Cache-Control"]).toBe("max-age=10, public, community=internal");
+    const r3 = res({ "Cache-Control": "no-cache, community=internal" });
+    mergeAndNormalizeCacheControlBang.call(r3, { max_age: 10, public: true });
+    expect(r3.getHeader("Cache-Control")).toBe("max-age=10, public, community=internal");
   });
 
   it("last_modified= writes httpdate", () => {
-    const h: Record<string, string> = {};
-    setLastModified.call(res(h), new Date(Date.UTC(1994, 10, 6, 8, 49, 37)));
-    expect(h["Last-Modified"]).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
+    const r = res();
+    setLastModified.call(r, new Date(Date.UTC(1994, 10, 6, 8, 49, 37)));
+    expect(r.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
   });
 });
