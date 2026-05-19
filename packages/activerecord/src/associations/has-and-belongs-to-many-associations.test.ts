@@ -46,9 +46,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     adapter = freshAdapter();
     // Schema covers the shared Developer/Project/DeveloperProject family
     // used by the majority of tests in this describe. Tests further down
-    // that declare their own inline classes reuse this per-test adapter
-    // and seed additional tables via `defineSchema` next to the class
-    // declarations.
+    // that declare their own inline classes reuse this per-test adapter;
+    // those that hit the database also seed additional tables via
+    // `defineSchema` next to the class declarations, while reflection-
+    // or validation-only tests skip the schema step.
     await defineSchema(adapter, {
       developers: { name: "string", salary: "integer" },
       projects: { name: "string", approved: "boolean", featured: "boolean" },
