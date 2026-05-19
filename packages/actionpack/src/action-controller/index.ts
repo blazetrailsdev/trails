@@ -59,7 +59,12 @@ export {
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
 } from "./metal/request-forgery-protection.js";
-export { SSE, ClientDisconnected } from "./metal/live.js";
+export {
+  SSE,
+  ClientDisconnected,
+  Buffer as LiveBuffer,
+  Response as LiveResponse,
+} from "./metal/live.js";
 export { BasicAuth, TokenAuth, DigestAuth } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
