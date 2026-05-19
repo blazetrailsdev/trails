@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import {
   Base,
@@ -15,8 +15,9 @@ import {
 } from "./index.js";
 import { Associations, setBelongsTo, association, loadHasManyThrough } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   markForDestruction,
@@ -165,7 +166,7 @@ const UNIVERSAL_AUTOSAVE_SCHEMA: Schema = {
   nauto_tags: { name: "string", nauto_article_id: "integer" },
 };
 
-async function setupAutosaveAdapter(): Promise<DatabaseAdapter> {
+async function setupAutosaveAdapter(): Promise<TestDatabaseAdapter> {
   const a = createTestAdapter();
   await defineSchema(a, UNIVERSAL_AUTOSAVE_SCHEMA);
   return a;
@@ -177,12 +178,12 @@ function cacheAssoc(record: Base, name: string, value: unknown) {
 }
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
     await defineSchema(adapter, {
       pirates: { catchphrase: "string" },
@@ -193,6 +194,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
       parrots_pirates: { pirate_id: "integer", parrot_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makePirateShip() {
     class Pirate extends Base {
@@ -642,12 +644,12 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
     await defineSchema(adapter, {
       companies: { name: "string" },
@@ -663,6 +665,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
       aid_developers: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Company extends Base {
@@ -999,14 +1002,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Firm extends Base {
@@ -1795,14 +1799,15 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Author extends Base {
@@ -2019,14 +2024,15 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Pirate extends Base {
@@ -2187,14 +2193,15 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Pirate extends Base {
@@ -3083,14 +3090,15 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Pirate extends Base {
@@ -3187,10 +3195,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should generate validation methods for has_many associations", async () => {
     class VmParent extends Base {
@@ -3373,14 +3382,15 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
     (record as any)._cachedAssociations.set(name, value);
   }
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Pirate extends Base {
@@ -3937,10 +3947,11 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Pirate extends Base {
@@ -4468,10 +4479,11 @@ describe("should update children when autosave is true and parent is new but chi
 });
 
 describe("ChangedForAutosaveTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await setupAutosaveAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("parent is changed_for_autosave when nested autosave child is changed", () => {
     class Child extends Base {
