@@ -2772,8 +2772,11 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { name: "string", status: "string" },
+    });
   });
 
   it("applies default attrs when creating via findOrCreateBy", async () => {
@@ -2794,8 +2797,11 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { name: "string" },
+    });
   });
 
   it("adds custom methods to a relation", async () => {
@@ -2823,8 +2829,11 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      items: { name: "string" },
+    });
   });
 
   it("isLoaded returns false before loading", () => {
@@ -2927,6 +2936,7 @@ describe("RelationTest", () => {
     Item.attribute("id", "integer");
     Item.attribute("name", "string");
     Item.adapter = freshAdapter();
+    await defineSchema(Item.adapter, { items: { name: "string" } });
 
     const item = await Item.create({ name: "Widget" });
     const str = item.inspect();
@@ -2938,8 +2948,9 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("eagerly loads records and returns the relation", async () => {
@@ -2964,8 +2975,9 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("returns the number of records after loading", async () => {
@@ -2993,6 +3005,9 @@ describe("RelationTest", () => {
     Item.attribute("name", "string");
     Item.attribute("status", "string");
     Item.adapter = freshAdapter();
+    await defineSchema(Item.adapter, {
+      items: { name: "string", status: "string" },
+    });
 
     const item = await Item.create({ name: "Widget", status: "active" });
     const sliced = item.slice("name", "status");
@@ -3010,6 +3025,9 @@ describe("RelationTest", () => {
     Item.attribute("name", "string");
     Item.attribute("status", "string");
     Item.adapter = freshAdapter();
+    await defineSchema(Item.adapter, {
+      items: { name: "string", status: "string" },
+    });
 
     const item = await Item.create({ name: "Widget", status: "active" });
     const values = item.valuesAt("name", "status");
@@ -3026,6 +3044,7 @@ describe("RelationTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: { name: "string" } });
 
     const user = await User.create({ name: "Alice" });
     // Update via raw SQL to simulate another process changing the data
@@ -3045,6 +3064,7 @@ describe("RelationTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
@@ -3066,6 +3086,9 @@ describe("RelationTest", () => {
     User.attribute("name", "string");
     User.attribute("email", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, {
+      users: { name: "string", email: "string" },
+    });
 
     await User.create({ name: "Alice", email: "alice@test.com" });
     await User.create({ name: "Bob" }); // email is null
@@ -3085,6 +3108,7 @@ describe("RelationTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     expect(await User.all().isOne()).toBe(true);
@@ -3102,6 +3126,7 @@ describe("RelationTest", () => {
     User.attribute("id", "integer");
     User.attribute("name", "string");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: { name: "string" } });
 
     await User.create({ name: "Alice" });
     const rel = User.all();
@@ -3181,6 +3206,9 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, {
+      invert_where_users: { name: "string", role: "string" },
+    });
     await InvertWhereUser.all().deleteAll();
     const alice = await InvertWhereUser.create({ name: "Alice", role: "admin" });
     const bob = await InvertWhereUser.create({ name: "Bob", role: "user" });
@@ -3275,6 +3303,9 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, {
+      users: { name: "string", role: "string" },
+    });
     const rel = User.where({ role: "admin" });
     const u = await rel.create({ name: "Bob" });
     expect(u.isPersisted()).toBe(true);
@@ -3388,6 +3419,9 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, {
+      users: { name: "string", role: "string" },
+    });
     await User.create({ name: "Alice", role: "admin" });
     await User.create({ name: "Bob", role: "user" });
     await User.create({ name: "Carol", role: "admin" });
@@ -3405,6 +3439,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Adam" });
     await User.create({ name: "Bob" });
@@ -3422,6 +3457,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const indexed = await User.where({}).indexBy("name");
@@ -3438,6 +3474,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const indexed = await User.where({}).indexBy((u: any) => String(u.name).toLowerCase());
@@ -3456,6 +3493,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const count = await User.where({}).asyncCount();
@@ -3471,6 +3509,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { age: "integer" } });
     await User.create({ age: 20 });
     await User.create({ age: 30 });
     const total = await User.where({}).asyncSum("age");
@@ -3486,6 +3525,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { age: "integer" } });
     await User.create({ age: 20 });
     await User.create({ age: 30 });
     const min = await User.where({}).asyncMinimum("age");
@@ -3501,6 +3541,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { age: "integer" } });
     await User.create({ age: 20 });
     await User.create({ age: 30 });
     const max = await User.where({}).asyncMaximum("age");
@@ -3516,6 +3557,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const names = await User.where({}).asyncPluck("name");
@@ -3533,6 +3575,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
     const rel = User.where({});
@@ -3548,6 +3591,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     expect(await User.where({}).length()).toBe(1);
   });
@@ -3591,6 +3635,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
 
     const rel = User.where({ name: "Alice" });
@@ -3607,6 +3652,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
 
     const rel = User.where({ name: "Nobody" });
     const result = await rel.presence();
@@ -3624,6 +3670,7 @@ describe("RelationTest", () => {
         this.adapter = adapter;
       }
     }
+    await defineSchema(adapter, { users: { name: "string" } });
     await User.create({ name: "Alice" });
     await User.create({ name: "Bob" });
 
@@ -3637,8 +3684,9 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { items: { name: "string" } });
   });
 
   it("isLoaded is false before loading", () => {
@@ -3797,8 +3845,9 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, { users: { name: "string" } });
   });
 
   it("where returns a new relation", async () => {
@@ -3867,6 +3916,16 @@ describe("RelationTest", () => {
   beforeEach(async () => {
     adapter = freshAdapter();
     Product.adapter = adapter;
+    await defineSchema(adapter, {
+      products: {
+        name: "string",
+        price: "integer",
+        category: "string",
+        active: "boolean",
+      },
+      items: { name: "string", category: "string" },
+      trackeds: { name: "string" },
+    });
     await Product.create({
       name: "Apple",
       price: 1,
@@ -4134,9 +4193,18 @@ describe("RelationTest", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Post.adapter = adapter;
+    await defineSchema(adapter, {
+      post2s: {
+        title: "string",
+        body: "string",
+        status: "string",
+        views: "integer",
+        created_at: "datetime",
+      },
+    });
   });
 
   // Rails: test_where_with_nil
@@ -4291,8 +4359,43 @@ describe("RelationTest", () => {
 
 describe("RelationTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    Post.adapter = adapter;
+    await defineSchema(adapter, {
+      posts: {
+        title: "string",
+        body: "string",
+        author: "string",
+        status: "string",
+        views: "integer",
+        category: "string",
+        published: "boolean",
+      },
+      post2s: {
+        title: "string",
+        body: "string",
+        author: "string",
+        status: "string",
+        views: "integer",
+        category: "string",
+        published: "boolean",
+      },
+      users: { name: "string", role: "string" },
+      products: {
+        name: "string",
+        category: "string",
+        featured: "boolean",
+        discontinued: "boolean",
+      },
+      topics: { title: "string", body: "string" },
+      block_accounts: { credit_limit: "integer" },
+      accounts: { credit_limit: "integer" },
+      birds: { name: "string", color: "string" },
+      custom_posts: { title: "string" },
+      custom: { title: "string" },
+      comments: { body: "string" },
+    });
   });
 
   function makePost() {
@@ -4488,6 +4591,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { json_posts: { title: "string" } });
     await JsonPost.create({ title: "hello" });
     const records = await JsonPost.all().toArray();
     expect(records.length).toBeGreaterThan(0);
@@ -5111,6 +5215,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { post2s: { title: "string" } });
     await Post.create({ title: "hello" });
     const result = await Post.findBy({ title: "hello" });
     expect(result).not.toBeNull();
@@ -5124,6 +5229,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { post2s: { title: "string" } });
     await Post.create({ title: "hello" });
     const result = await Post.findBy({ title: "hello" });
     expect(result).not.toBeNull();
@@ -5606,6 +5712,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     const result = await Post.all().firstOrCreate({ title: "unique" });
     expect(result).not.toBeNull();
     // calling again should find the existing record
@@ -5622,6 +5729,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { foc_posts: { title: "string" } });
     const p = await FocPost.where({ title: "first-or" }).firstOrCreate({ title: "first-or" });
     expect(p.isPersisted()).toBe(true);
   });
@@ -5634,6 +5742,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { focb_posts: { title: "string" } });
     const result = await FocbPost.all().firstOrCreateBang({ title: "bang-unique" });
     expect(result).not.toBeNull();
   });
@@ -5646,6 +5755,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { focba_posts: { title: "string" } });
     const p = await FocbaPost.where({ title: "valid-array" }).firstOrCreateBang({
       title: "valid-array",
     });
@@ -5752,6 +5862,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     const result = await Post.createOrFindBy({ title: "new post" });
     expect(result).not.toBeNull();
   });
@@ -5764,6 +5875,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     await Post.create({ title: "existing" });
     const result = await Post.createOrFindBy({ title: "existing" });
     expect(result).not.toBeNull();
@@ -5778,6 +5890,7 @@ describe("RelationTest", () => {
         this.validatesPresenceOf("title");
       }
     }
+    await defineSchema(StrictPost.adapter!, { strict_posts: { title: "string" } });
     await expect(
       StrictPost.where({ title: "" }).createOrFindByBang({ title: "" }),
     ).rejects.toThrow();
@@ -6038,6 +6151,10 @@ describe("RelationTest", () => {
         this.adapter = a;
       }
     }
+    await defineSchema(a, {
+      ref_authors: { name: "string" },
+      ref_posts: { title: "string", ref_author_id: "integer" },
+    });
     Associations.belongsTo.call(RefPost, "refAuthor", {
       className: "RefAuthor",
       foreignKey: "ref_author_id",
@@ -6071,6 +6188,7 @@ describe("RelationTest", () => {
         this.adapter = a;
       }
     }
+    await defineSchema(a, { ref_posts3: { title: "string" } });
 
     await RefPost3.create({ title: "First" });
 
@@ -6269,6 +6387,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     await Post.create({ title: "a" });
     const rel = Post.all();
     await rel.toArray();
@@ -6323,6 +6442,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     for (let i = 0; i < 15; i++) await Post.create({ title: `post ${i}` });
     const rel = Post.all();
     await rel.toArray(); // load it
@@ -6668,6 +6788,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     await Post.create({ title: "memo" });
     const result = await Post.where({ title: "memo" }).take();
     expect(result).not.toBeNull();
@@ -6681,6 +6802,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
     await Post.create({ title: "findmemo" });
     const result = await Post.findBy({ title: "findmemo" });
     expect(result).not.toBeNull();
@@ -6949,6 +7071,7 @@ describe("RelationTest", () => {
         this.adapter = adp;
       }
     }
+    await defineSchema(adp, { block_accounts: { credit_limit: "integer" } });
     await Account.create({ credit_limit: 50 });
     await Account.create({ credit_limit: 100 });
     const records = await Account.all().toArray();
@@ -7012,6 +7135,7 @@ describe("RelationTest", () => {
           this.adapter = adp;
         }
       }
+      await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
       const p = await Post.create({ title: "txn1" });
       expect((p as any).isPersisted()).toBe(true);
     });
@@ -7024,6 +7148,7 @@ describe("RelationTest", () => {
           this.adapter = adp;
         }
       }
+      await defineSchema(adp, { posts: { title: "string" }, post2s: { title: "string" } });
       const p = await Post.create({ title: "txn2" });
       expect((p as any).isPersisted()).toBe(true);
     });
