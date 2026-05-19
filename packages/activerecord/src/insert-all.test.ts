@@ -27,6 +27,23 @@ function freshAdapter(): DatabaseAdapter {
 // InsertAllTest — targets insert_all_test.rb
 // ==========================================================================
 describe("InsertAllTest", () => {
+  async function setupAdapter(): Promise<DatabaseAdapter> {
+    const a = freshAdapter();
+    await defineSchema(a, {
+      books: { title: "string", author: "string", status: "integer" },
+      posts: { title: "string", created_at: "datetime", updated_at: "datetime" },
+      items: {
+        columns: { code: "string", name: "string" },
+        primaryKey: ["code"],
+      },
+      cpk_orders: {
+        columns: { shop_id: "integer", id: "integer", name: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+    });
+    return a;
+  }
+
   function makeBook(adapter: DatabaseAdapter) {
     class Book extends Base {
       static {
@@ -41,14 +58,14 @@ describe("InsertAllTest", () => {
   }
 
   it("insert logs message including model name", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.insertAll([{ title: "First", author: "A" }]);
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
   it("insert all logs message including model name", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.insertAll([
       { title: "One", author: "A" },
@@ -58,7 +75,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert logs message including model name", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Existing", author: "Original" });
     const count = await Book.upsertAll([{ id: b.id, title: "Existing", author: "Updated" }]);
@@ -66,14 +83,14 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all logs message including model name", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.upsertAll([{ title: "X", author: "Y" }]);
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
   it("upsert all updates existing record by primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Original", author: "Smith" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Smith" }]);
@@ -82,7 +99,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all passing both on duplicate and update only will raise an error", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await expect(
       Book.upsertAll([{ title: "X" }], { onDuplicate: "skip", updateOnly: "title" } as any),
@@ -90,7 +107,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all only updates the column provided via update only", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Original", author: "Smith" });
     await Book.upsertAll([{ id: b.id, title: "Ignored", author: "Kept" }], {
@@ -102,7 +119,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all only updates the list of columns provided via update only", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Title", author: "Author", status: 0 });
     await Book.upsertAll([{ id: b.id, title: "New Title", author: "New Author", status: 1 }], {
@@ -114,7 +131,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all with enum values", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     defineEnum(Book, "status", { draft: 0, published: 1 });
     await Book.insertAll([
@@ -127,7 +144,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all on relation", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     // Scoped insert: where clause attributes merged into records
     await Book.where({ author: "Orwell" }).insertAll([{ title: "1984" }, { title: "Animal Farm" }]);
@@ -136,7 +153,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all on relation precedence", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     // Explicitly provided values take precedence over scope
     await Book.where({ author: "Default" }).insertAll([{ title: "Override", author: "Explicit" }]);
@@ -145,7 +162,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert all create with", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.all()
       .createWith({ author: "DefaultAuthor" })
@@ -155,7 +172,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all on relation", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.where({ author: "King" }).upsertAll([{ title: "The Shining" }]);
     const all = await Book.where({ author: "King" }).toArray();
@@ -163,7 +180,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all on relation precedence", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.where({ author: "Scope" }).upsertAll([{ title: "Book", author: "Explicit" }]);
     const found = await Book.where({ author: "Explicit" }).toArray();
@@ -171,7 +188,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all create with", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.all()
       .createWith({ author: "Default" })
@@ -181,7 +198,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all with unique by fails cleanly for adapters not supporting insert conflict target", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Existing", author: "Author" });
     // Read from adapterType, not adapter.supportsInsertConflictTarget(): PG's
@@ -212,7 +229,7 @@ describe("InsertAllTest", () => {
     // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
   });
   it.skipIf(!supportsConflictTarget)("insert all skip duplicates", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Existing", author: "Auth" });
     const existing = (await Book.first()) as any;
@@ -230,7 +247,7 @@ describe("InsertAllTest", () => {
     expect(all.some((b: any) => b.title === "New")).toBe(true);
   });
   it("upsert all updates records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const b = await Book.create({ title: "Original", author: "Auth" });
     await Book.upsertAll([{ id: b.id, title: "Updated", author: "Auth" }]);
@@ -238,7 +255,7 @@ describe("InsertAllTest", () => {
     expect(reloaded.title).toBe("Updated");
   });
   it.skipIf(!supportsConflictTarget)("upsert all with unique by", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Original", author: "Auth" });
     const existing = await Book.first();
@@ -250,7 +267,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert all does not update readonly attributes", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class Book extends Base {
       static {
         this.attribute("id", "integer");
@@ -282,7 +299,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert_all with enum values", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     defineEnum(Book, "status", { draft: 0, published: 1 });
     const count = await Book.insertAll([{ title: "EnumBook", author: "Auth", status: 0 }]);
@@ -299,7 +316,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert_all can insert records with timestamps", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -360,13 +377,13 @@ describe("InsertAllTest", () => {
     // SCOPE: ~30 LOC — re-raise adapter unique-violation as RecordNotUnique in execute() for bang variants and onDuplicate=undefined; affects ~5 duplicate-raise tests
   });
   it("insert_all with empty array", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.insertAll([]);
     expect(count).toBe(0);
   });
   it("upsert all with empty array", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.upsertAll([]);
     expect(count).toBe(0);
@@ -377,7 +394,7 @@ describe("InsertAllTest", () => {
     // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
   it("insert_all works without callbacks or validations", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     // insertAll bypasses callbacks and validations
     const count = await Book.insertAll([{ title: "NoCallback", author: "Test" }]);
@@ -386,7 +403,7 @@ describe("InsertAllTest", () => {
     expect(all.some((b: any) => b.title === "NoCallback")).toBe(true);
   });
   it("upsert_all works with custom primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class Item extends Base {
       static {
         this.attribute("code", "string");
@@ -403,7 +420,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert_all can skip callbacks", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const log: string[] = [];
     class Book extends Base {
       static {
@@ -420,7 +437,7 @@ describe("InsertAllTest", () => {
   });
 
   it("insert_all with record timestamps when model has no timestamp columns", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.insertAll([{ title: "NoTs", author: "Auth" }]);
     expect(count).toBeGreaterThanOrEqual(1);
@@ -432,7 +449,7 @@ describe("InsertAllTest", () => {
     // BLOCKED: relation — insert_all.rb: aliasAttribute support
   });
   it("insert_all does not modify given array", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const records = [{ title: "Test", author: "Auth" }];
     const original = JSON.parse(JSON.stringify(records));
@@ -440,7 +457,7 @@ describe("InsertAllTest", () => {
     expect(records).toEqual(original);
   });
   it("insert_all with composite primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class CpkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -458,7 +475,7 @@ describe("InsertAllTest", () => {
     expect(count).toBe(2);
   });
   it("upsert_all with composite primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class CpkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -519,7 +536,7 @@ describe("InsertAllTest", () => {
   });
 
   it("upsert_all noop when empty", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     const Book = makeBook(adapter);
     const count = await Book.upsertAll([]);
     expect(count).toBe(0);
@@ -566,7 +583,7 @@ describe("InsertAllTest", () => {
   it.skipIf(!supportsConflictTarget)(
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
-      const adapter = freshAdapter();
+      const adapter = await setupAdapter();
       class CpkOrder extends Base {
         static {
           this.attribute("shop_id", "integer");
@@ -587,7 +604,7 @@ describe("InsertAllTest", () => {
     },
   );
   it("insert all and upsert all works with composite primary keys when unique by is not provided", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupAdapter();
     class CpkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -738,8 +755,8 @@ describe("InsertAllTest", () => {
   });
 
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await setupAdapter();
   });
 
   function makeBookWithAdapter() {
@@ -897,8 +914,11 @@ describe("InsertAllTest", () => {
 
 describe("insertAll / upsertAll", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      products: { name: "string", price: "integer" },
+    });
   });
 
   it("insert all", async () => {
@@ -935,8 +955,11 @@ describe("insertAll / upsertAll", () => {
 describe("insertAll / upsertAll (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      books: { title: "string", author: "string" },
+    });
   });
 
   // Rails: test "insert_all inserts multiple records"
