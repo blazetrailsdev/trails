@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { beforeDestroy } from "../../callbacks.js";
 import * as Reflection from "../../reflection.js";
+import { joinHabtmTableNames } from "../../associations.js";
 import { CollectionAssociation as CollectionAssociationBuilder } from "./collection-association.js";
 
 /**
@@ -126,7 +127,7 @@ export class HasAndBelongsToMany {
       rhsTable = this._fallbackTableName(className);
     }
 
-    return [lhsTable, rhsTable].sort().join("_");
+    return joinHabtmTableNames(lhsTable, rhsTable);
   }
 
   static build(
@@ -134,7 +135,7 @@ export class HasAndBelongsToMany {
     name: string,
     options: Record<string, unknown>,
     deps: {
-      defaultJoinTableName: (model: any, name: string) => string;
+      defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
       singleFk: (fk: string | string[] | undefined, fallback: string) => string;
       createHabtmJoinModel: (...args: any[]) => any;
       modelRegistry: Map<string, any>;
@@ -144,7 +145,7 @@ export class HasAndBelongsToMany {
   }
 
   private _build(deps: {
-    defaultJoinTableName: (model: any, name: string) => string;
+    defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
     singleFk: (fk: string | string[] | undefined, fallback: string) => string;
     createHabtmJoinModel: (...args: any[]) => any;
     modelRegistry: Map<string, any>;
@@ -158,7 +159,11 @@ export class HasAndBelongsToMany {
     }
 
     const targetClassName = (options.className as string) ?? camelize(singularize(name));
-    const joinTableName = (options.joinTable as string) ?? deps.defaultJoinTableName(model, name);
+    const joinTableName =
+      (options.joinTable as string) ??
+      deps.defaultJoinTableName(model, name, {
+        className: options.className as string | undefined,
+      });
     const ownerFk = deps.singleFk(
       options.foreignKey as string | string[] | undefined,
       `${underscore(model.name)}_id`,

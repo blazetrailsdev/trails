@@ -16,7 +16,7 @@ import {
   columnNameMatcher as abstractColumnNameMatcher,
   defaultSqlTimezone,
 } from "./connection-adapters/abstract/sql-formatting.js";
-import { modelRegistry } from "./associations.js";
+import { joinHabtmTableNames, modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import {
@@ -1591,11 +1591,9 @@ export class Relation<T extends Base> {
     const targetPk = targetModel.primaryKey ?? "id";
     if (Array.isArray(targetPk)) return null;
 
-    // Match defaultJoinTableName from associations.ts:
-    // alphabetical sort of pluralize(underscore(ownerName)) and underscore(assocName)
-    const ownerKey = _pluralize(_toUnderscore(modelClass.name));
-    const assocKey = _toUnderscore(assocDef.name);
-    const defaultJoinTable = [ownerKey, assocKey].sort().join("_");
+    // Match Rails Builder::HasAndBelongsToMany#table_name: sort both side
+    // tableNames and collapse a shared `[._]`-terminated prefix.
+    const defaultJoinTable = joinHabtmTableNames(sourceTable, targetTable);
     const joinTable = assocDef.options.joinTable ?? defaultJoinTable;
 
     const ownerFk: string = fkOption ?? `${_toUnderscore(modelClass.name)}_id`;

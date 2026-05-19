@@ -1621,12 +1621,31 @@ function habtmOwnerPk(_options: AssociationOptions, ctor: typeof Base): string {
   return pk as string;
 }
 
-function defaultJoinTableName(model1: typeof Base, assocName: string): string {
-  const table1 = underscore(model1.name);
-  const table2 = underscore(assocName);
-  // Sort alphabetically
-  const sorted = [pluralize(table1), table2].sort();
-  return sorted.join("_");
+/**
+ * Compute the default HABTM join-table name.
+ *
+ * Mirrors ActiveRecord::Associations::Builder::HasAndBelongsToMany#table_name:
+ * sort both side table names, then collapse a shared `[._]`-terminated prefix
+ * so `b30_posts` + `b30_tags` → `b30_posts_tags` (not `b30_posts_b30_tags`).
+ */
+function defaultJoinTableName(
+  model1: typeof Base,
+  assocName: string,
+  options?: { className?: string },
+): string {
+  const lhsTable = (model1 as any).tableName ?? pluralize(underscore(model1.name));
+  const className = options?.className ?? camelize(singularize(assocName));
+  const targetModel = modelRegistry.get(className);
+  const rhsTable = (targetModel as any)?.tableName ?? pluralize(underscore(className));
+  return joinHabtmTableNames(lhsTable, rhsTable);
+}
+
+/** @internal */
+export function joinHabtmTableNames(a: string, b: string): string {
+  const sorted = [a, b].sort();
+  const joined = sorted.join("\0");
+  const collapsed = joined.replace(/^(.*[._])(.+)\0\1(.+)/, "$1$2_$3");
+  return collapsed.replace(/\0/g, "_");
 }
 
 /**
@@ -1645,7 +1664,7 @@ export async function loadHabtm(
   const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveAssocClass(record, assocName, className);
-  const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
+  const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName, options);
   const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
   const targetFk = `${underscore(singularize(assocName))}_id`;
   const ownerPkCol = habtmOwnerPk(options, ctor);

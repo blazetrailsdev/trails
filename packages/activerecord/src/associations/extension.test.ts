@@ -2,13 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   ext_posts: { title: "string" },
@@ -27,18 +27,19 @@ const TEST_SCHEMA: Schema = {
   nb_developers_nb_projects: { nb_developer_id: "integer", nb_project_id: "integer" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("AssociationsExtensionsTest", () => {
-  let extAdapter: DatabaseAdapter;
+  let extAdapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     extAdapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => extAdapter);
 
   function setupExtModels() {
     class ExtComment extends Base {
