@@ -50,8 +50,8 @@ export class HashConfig extends DatabaseConfig {
   /**
    * Mirrors: HashConfig#schema_dump
    *
-   * Returns the schema dump filename for this config, or false/null if
-   * schema dumping is disabled.
+   * Returns the schema dump filename for this config, or null if schema
+   * dumping is disabled (configured as either `false` or `null`).
    */
   schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
     if ("schemaDump" in this.configuration) {

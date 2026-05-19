@@ -3,6 +3,9 @@ import { HashConfig } from "./hash-config.js";
 import { AdapterNotFound } from "../errors.js";
 import * as connectionAdapters from "../connection-adapters.js";
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+// connection-handling registers the adapter class resolver that validateBang()
+// relies on; import it so this suite isn't order-dependent.
+import "../connection-handling.js";
 
 connectionAdapters.register("abstract", async () => AbstractAdapter as any);
 
