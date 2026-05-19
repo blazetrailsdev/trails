@@ -906,16 +906,26 @@ export class CallbackChain {
               // internally passes an onRejected, `.then(_, r)` does too.
               // `.then(onFulfilled)` alone doesn't rescue, so the rejection
               // must still propagate via pendingProceed.
-              if (onRejected) proceedObserved = true;
-              return observed.then(onFulfilled, onRejected);
+              if (onRejected) {
+                proceedObserved = true;
+                return observed.then(onFulfilled, onRejected);
+              }
+              const p = observed.then(onFulfilled);
+              // Suppress unhandled-rejection on the unobserved chain; the
+              // canonical propagation path is pendingProceed.
+              p.catch(() => {});
+              return p;
             },
             catch(onRejected?: any) {
               proceedObserved = true;
               return observed.catch(onRejected);
             },
             finally(onFinally?: any) {
-              proceedObserved = true;
-              return observed.finally(onFinally);
+              // .finally does not rescue rejections — the rejection still
+              // propagates through the returned promise. Don't mark observed.
+              const p = observed.finally(onFinally);
+              p.catch(() => {});
+              return p;
             },
           } as unknown as Promise<void>;
         };
