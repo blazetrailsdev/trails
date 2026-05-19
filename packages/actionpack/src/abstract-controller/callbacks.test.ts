@@ -430,23 +430,6 @@ describe("AbstractController::Base — trails-only", () => {
     await expect(c.processAction("missing")).rejects.toThrow(ActionNotFound);
   });
 
-  it("ActionNotFound.corrections suggests near-match action methods", async () => {
-    class SuggestController extends AbstractController {
-      async index() {}
-      async show() {}
-      async destroy() {}
-    }
-    const c = new SuggestController();
-    try {
-      await c.processAction("shw");
-    } catch (e) {
-      const err = e as ActionNotFound;
-      expect(err.controller).toBe(c);
-      expect(err.action).toBe("shw");
-      expect(err.corrections).toContain("show");
-    }
-  });
-
   it("available actions lists instance methods", () => {
     class MethodController extends AbstractController {
       async index() {}

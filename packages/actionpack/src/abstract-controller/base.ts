@@ -27,7 +27,6 @@ export type {
 export class ActionNotFound extends Error {
   readonly controller: AbstractController | null;
   readonly action: string | null;
-  private _corrections?: string[];
 
   constructor(
     message: string,
@@ -39,45 +38,6 @@ export class ActionNotFound extends Error {
     this.controller = controller;
     this.action = action;
   }
-
-  /**
-   * "Did you mean" suggestions — the controller's action methods ranked by
-   * edit distance to the missing action. Mirrors Rails' DidYouMean
-   * integration (`DidYouMean::SpellChecker.new(dictionary: controller.class.action_methods).correct(action)`)
-   * using Levenshtein distance with a `≤ floor(name.length / 3) + 1`
-   * threshold, capped at 3 suggestions. Memoized.
-   */
-  get corrections(): string[] {
-    if (this._corrections) return this._corrections;
-    if (!this.controller || !this.action) return (this._corrections = []);
-    const dictionary = (this.controller.constructor as typeof AbstractController).actionMethods();
-    const target = this.action;
-    const threshold = Math.floor(target.length / 3) + 1;
-    const scored = dictionary
-      .map((candidate) => ({ candidate, distance: _editDistance(target, candidate) }))
-      .filter(({ distance }) => distance <= threshold)
-      .sort((a, b) => a.distance - b.distance);
-    return (this._corrections = scored.slice(0, 3).map((s) => s.candidate));
-  }
-}
-
-/** Levenshtein distance — iterative two-row implementation. @internal */
-function _editDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  let prev = new Array<number>(b.length + 1);
-  let curr = new Array<number>(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      curr[j] = Math.min(curr[j - 1]! + 1, prev[j]! + 1, prev[j - 1]! + cost);
-    }
-    [prev, curr] = [curr, prev];
-  }
-  return prev[b.length]!;
 }
 
 export class AbstractController {
