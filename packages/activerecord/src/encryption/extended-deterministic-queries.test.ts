@@ -132,8 +132,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, { books: { name: "string" } });
     books = buildBooks(adapter);
-    // Warm the books table so the first create in each test doesn't race
-    // with the test-adapter's regex-recovery schema path on MariaDB.
+    // Warm the books table once before any test runs so the first create
+    // doesn't race with the test-adapter's regex-recovery schema path on
+    // MariaDB. Subsequent tests reuse the warmed schema cache.
     await books.EncryptedBook.where("1=1").toArray();
   });
 
