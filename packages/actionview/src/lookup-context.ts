@@ -540,7 +540,7 @@ export class LookupContext {
       // Fallback: look in "layouts" prefix
       const template = resolver.find(name, "layouts", format, extensions);
       if (template) {
-        return { ...template, isLayout: true };
+        return template.asLayout();
       }
     }
     return null;

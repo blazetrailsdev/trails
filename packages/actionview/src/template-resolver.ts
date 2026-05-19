@@ -14,13 +14,19 @@
  *     find(name, prefix, format, extensions) {
  *       const row = db.query("SELECT source, ext FROM templates WHERE ...");
  *       if (!row) return null;
- *       return { source: row.source, extension: row.ext, ... };
+ *       return new Template({
+ *         source: row.source,
+ *         extension: row.ext,
+ *         identifier: `${prefix}/${name}`,
+ *         virtualPath: `${prefix}/${name}`,
+ *         format,
+ *       });
  *     }
  *   }
  */
 
 import { getFs, getPath } from "@blazetrails/activesupport";
-import type { Template } from "./template.js";
+import { Template } from "./template.js";
 
 /**
  * A resolver knows how to find templates.
@@ -70,27 +76,29 @@ export class FileSystemResolver implements TemplateResolver {
       // Try format-specific first: index.html.ejs
       const formatPath = getPath().join(dir, `${name}.${format}.${ext}`);
       if (getFs().existsSync(formatPath)) {
-        return {
+        return new Template({
           source: getFs().readFileSync(formatPath, "utf-8"),
           extension: ext,
           identifier: `${prefix}/${name}`,
+          virtualPath: `${prefix}/${name}`,
           format,
           fullPath: formatPath,
           isPartial: name.startsWith("_"),
-        };
+        });
       }
 
       // Fallback: index.ejs
       const plainPath = getPath().join(dir, `${name}.${ext}`);
       if (getFs().existsSync(plainPath)) {
-        return {
+        return new Template({
           source: getFs().readFileSync(plainPath, "utf-8"),
           extension: ext,
           identifier: `${prefix}/${name}`,
+          virtualPath: `${prefix}/${name}`,
           format,
           fullPath: plainPath,
           isPartial: name.startsWith("_"),
-        };
+        });
       }
     }
 
@@ -101,7 +109,7 @@ export class FileSystemResolver implements TemplateResolver {
   findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {
-      return { ...template, isLayout: true };
+      return template.asLayout();
     }
     return null;
   }
@@ -127,23 +135,21 @@ export class InMemoryResolver implements TemplateResolver {
    */
   add(identifier: string, format: string, extension: string, source: string): void {
     const key = this.key(identifier, format);
-    this.templates.set(key, {
-      source,
-      extension,
-      identifier,
-      format,
-      isPartial: identifier.includes("/_") || identifier.startsWith("_"),
-    });
-    // Also store without format for fallback
-    const fallbackKey = `${identifier}:*`;
-    if (!this.templates.has(fallbackKey)) {
-      this.templates.set(fallbackKey, {
+    const isPartial = identifier.includes("/_") || identifier.startsWith("_");
+    const make = (): Template =>
+      new Template({
         source,
         extension,
         identifier,
+        virtualPath: identifier,
         format,
-        isPartial: identifier.includes("/_") || identifier.startsWith("_"),
+        isPartial,
       });
+    this.templates.set(key, make());
+    // Also store without format for fallback
+    const fallbackKey = `${identifier}:*`;
+    if (!this.templates.has(fallbackKey)) {
+      this.templates.set(fallbackKey, make());
     }
   }
 
@@ -200,7 +206,7 @@ export class InMemoryResolver implements TemplateResolver {
   findLayout(name: string, format: string, extensions: string[]): Template | null {
     const template = this.find(name, "layouts", format, extensions);
     if (template) {
-      return { ...template, isLayout: true };
+      return template.asLayout();
     }
     return null;
   }
