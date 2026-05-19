@@ -127,18 +127,20 @@ export class ContentSecurityPolicy {
     return this.setDirective("navigate-to", sources);
   }
   sandbox(...sources: [false] | CSPSource[]): this {
+    // Rails: empty `*values` → bare directive; falsy `values.first` → delete.
     if (sources.length === 0) {
       this.directives.set("sandbox", []);
       return this;
     }
-    if (sources[0] === false) {
+    if (!sources[0]) {
       this.directives.delete("sandbox");
       return this;
     }
     return this.setDirective("sandbox", sources as CSPSource[]);
   }
   pluginTypes(...sources: [false] | CSPSource[]): this {
-    if (sources[0] === false) {
+    // Rails: `if types.first` — empty or falsy first arg deletes the directive.
+    if (!sources[0]) {
       this.directives.delete("plugin-types");
       return this;
     }
