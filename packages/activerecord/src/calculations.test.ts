@@ -5,7 +5,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  */
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   association,
@@ -21,15 +21,14 @@ import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { runBeforeCallbacksOnProto, runAfterCallbacksOnProto } from "@blazetrails/activemodel";
 import { setApp, _resetApp } from "@blazetrails/globalid";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
@@ -37,9 +36,9 @@ function freshAdapter(): DatabaseAdapter {
 // CalculationsTest — targets calculations_test.rb
 // ==========================================================================
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       accounts: {
@@ -56,10 +55,7 @@ describe("CalculationsTest", () => {
       },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("should return nil as average", async () => {
     class Account extends Base {
@@ -1772,8 +1768,8 @@ describe("CalculationsTest", () => {
 // CalculationsTestExtra — additional targets for calculations_test.rb
 // ==========================================================================
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       accounts: {
@@ -1785,10 +1781,7 @@ describe("CalculationsTest", () => {
       posts: { title: "string" },
     });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("should resolve aliased attributes", async () => {
     class Account extends Base {
@@ -2439,16 +2432,14 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       orders: { status: "string", total: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("group().count() returns hash of counts", async () => {
     class Order extends Base {
@@ -2488,16 +2479,14 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       items: { price: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("delegates to the appropriate aggregate method", async () => {
     class Item extends Base {
@@ -2520,16 +2509,14 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       posts: { comments_count: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("increments a counter column by primary key", async () => {
     class Post extends Base {
@@ -2563,16 +2550,14 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       posts: { likes_count: "integer", comments_count: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("updates multiple counters for a record", async () => {
     class Post extends Base {
@@ -2593,7 +2578,7 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Order extends Base {
     static {
@@ -2610,7 +2595,7 @@ describe("CalculationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       orders: { amount: "integer", status: "string", customer_id: "integer" },
@@ -2629,6 +2614,7 @@ describe("CalculationsTest", () => {
     await Account.create({ firm_id: 1, credit_limit: 60 });
     await Account.create({ firm_id: 2, credit_limit: 100 });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should sum field", async () => {
     expect(await Order.all().sum("amount")).toBe(65);
@@ -2748,14 +2734,10 @@ describe("CalculationsTest", () => {
     }
     expect(await Empty.all().average("amount")).toBeNull();
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -2765,16 +2747,14 @@ describe("CalculationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       products: { name: "string", price: "integer", category: "string" },
     });
     Product.adapter = adapter;
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test_sum_on_empty_table
   it("sum on empty table returns 0", async () => {
@@ -2845,9 +2825,9 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       accounts: { balance: "integer" },
@@ -2911,6 +2891,7 @@ describe("CalculationsTest", () => {
       vehicles: { name: "string", type: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "group count"
   it("group().count() returns counts keyed by group value", async () => {
@@ -7080,16 +7061,14 @@ describe("CalculationsTest", () => {
 });
 
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       users: { name: "string", age: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("pick returns single column value from first record", async () => {
     class User extends Base {
@@ -7115,7 +7094,7 @@ describe("CalculationsTest", () => {
   });
 });
 describe("CalculationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Product extends Base {
     static {
@@ -7126,7 +7105,7 @@ describe("CalculationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       products: {
@@ -7145,9 +7124,7 @@ describe("CalculationsTest", () => {
     await Product.create({ name: "Carrot", price: 3, quantity: 30, category: "vegetable" });
     await Product.create({ name: "Donut", price: 5, quantity: 5, category: "pastry" });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   describe("count", () => {
     it("counts all records", async () => {
@@ -7451,17 +7428,15 @@ describe("CalculationsTest", () => {
 //   count  → always integer (not through type)
 // ==========================================================================
 describe("bigint aggregates (big_integer columns)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       scores: { value: "big_integer", category: "string" },
       items: { qty: "integer" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   function makeBigModel() {
     class Score extends Base {
