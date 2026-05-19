@@ -15,7 +15,16 @@
 import { Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
-import { cacheConfigured } from "./caching.js";
+// `cacheConfigured` is duplicated here (it also lives in `caching.ts`) so
+// the module graph stays acyclic: `caching.ts` now imports fragment wrappers
+// from this file to republish them on the `Caching` surface (per Rails'
+// `include AbstractController::Caching::Fragments`), and an import the other
+// direction would create a cycle. The predicate is a trivial two-property
+// check — the duplication is cheaper than threading it through a third file.
+function cacheConfigured(host: FragmentsHost): boolean {
+  const cls = host.constructor;
+  return Boolean(cls.performCaching && cls.cacheStore);
+}
 
 export type FragmentCacheKeyBlock = (this: FragmentsHost) => unknown;
 
