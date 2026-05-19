@@ -1662,102 +1662,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   // -- Counter cache --
-
-  it("has many without counter cache option", () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
-    const assoc = (Author as any)._associations.find((a: any) => a.name === "posts");
-    expect(assoc).toBeDefined();
-    expect(assoc.options.counterCache).toBeUndefined();
-  });
-
-  it("counter cache updates in memory after create", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(Post, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Post.create automatically triggers counter cache increment
-    await Post.create({ author_id: author.id, title: "A" });
-    const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-  });
-
-  it("pushing association updates counter cache", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    Associations.belongsTo.call(Post, "author", {
-      className: "Author",
-      foreignKey: "author_id",
-      counterCache: "posts_count",
-    });
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    // Post.create automatically triggers counter cache increment
-    await Post.create({ author_id: author.id, title: "A" });
-    const reloaded = await Author.find(author.id!);
-    expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
-  });
-
-  it("calling empty with counter cache", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice", posts_count: 0 });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(0);
-  });
+  // Migrated to dedicated `HasManyAssociationsTestCounterCacheHead` describe
+  // at end of file (B1966c — defineSchema + shared adapter +
+  // withTransactionalFixtures).
 
   // -- Replace --
 
@@ -8563,5 +8470,123 @@ describe("HasManyAssociationsTest", () => {
     await expect(container.destroy()).rejects.toThrow(DeleteRestrictionError);
     // Parent should still exist
     expect(await RContainer.count()).toBe(1);
+  });
+});
+
+// -- Counter cache (head describe migration — B1966c) --
+//
+// Extracted from the big `HasManyAssociationsTest` describe so the counter-
+// cache cluster can run under shared adapter + `defineSchema` upfront +
+// `withTransactionalFixtures` (mirrors #1938 / #1966 pilot pattern). Tests
+// re-declare local classes per `it()` (counter-cache options vary by test);
+// transactional fixtures roll rows back between tests while the schema
+// declared once in `beforeAll` survives.
+
+const COUNTER_CACHE_HEAD_SCHEMA: Schema = {
+  authors: { name: "string", posts_count: "integer" },
+  posts: { author_id: "integer", title: "string" },
+};
+
+describe("HasManyAssociationsTestCounterCacheHead", () => {
+  let cchAdapter: DatabaseAdapter;
+
+  beforeAll(async () => {
+    cchAdapter = createTestAdapter();
+    await defineSchema(cchAdapter, COUNTER_CACHE_HEAD_SCHEMA);
+  });
+  withTransactionalFixtures(() => cchAdapter as any);
+
+  it("has many without counter cache option", () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer");
+      }
+    }
+    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
+    const assoc = (Author as any)._associations.find((a: any) => a.name === "posts");
+    expect(assoc).toBeDefined();
+    expect(assoc.options.counterCache).toBeUndefined();
+  });
+
+  it("counter cache updates in memory after create", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer");
+        this.adapter = cchAdapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = cchAdapter;
+      }
+    }
+    Associations.belongsTo.call(Post, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+      counterCache: "posts_count",
+    });
+    registerModel(Author);
+    registerModel(Post);
+    const author = await Author.create({ name: "Alice", posts_count: 0 });
+    await Post.create({ author_id: author.id, title: "A" });
+    const reloaded = await Author.find(author.id!);
+    expect((reloaded as any).posts_count).toBe(1);
+  });
+
+  it("pushing association updates counter cache", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer");
+        this.adapter = cchAdapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = cchAdapter;
+      }
+    }
+    Associations.belongsTo.call(Post, "author", {
+      className: "Author",
+      foreignKey: "author_id",
+      counterCache: "posts_count",
+    });
+    registerModel(Author);
+    registerModel(Post);
+    const author = await Author.create({ name: "Alice", posts_count: 0 });
+    await Post.create({ author_id: author.id, title: "A" });
+    const reloaded = await Author.find(author.id!);
+    expect((reloaded as any).posts_count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calling empty with counter cache", async () => {
+    class Author extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("posts_count", "integer");
+        this.adapter = cchAdapter;
+      }
+    }
+    class Post extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+        this.adapter = cchAdapter;
+      }
+    }
+    registerModel(Author);
+    registerModel(Post);
+    const author = await Author.create({ name: "Alice", posts_count: 0 });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(0);
   });
 });
