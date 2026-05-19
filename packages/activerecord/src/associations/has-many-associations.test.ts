@@ -7731,9 +7731,11 @@ describe("HasManyAssociationsTest", () => {
   }
 
   it("collection proxy respects default scope", async () => {
-    // Rails: `assert_not_predicate author.first_posts, :exists?` —
-    // collection proxy's `exists?` filters by the default scope (no row
-    // matches), so `:exists?` returns false.
+    // Rails (has_many_associations_test.rb:2773-2776) asserts
+    // `assert_not_predicate author.first_posts, :exists?` on a scoped
+    // has_many. Mirrored here with `car.bulbs` (DsBulb's defaultScope
+    // is `name: "defaulty"`; the only seeded bulb is `name: "other"`,
+    // so the collection proxy's `exists()` returns false).
     const { DsCar, DsBulb } = setupCarBulb();
     const car = await DsCar.create({ name: "v1" });
     await DsBulb.create({ car_id: car.id, name: "other" }); // not "defaulty"
