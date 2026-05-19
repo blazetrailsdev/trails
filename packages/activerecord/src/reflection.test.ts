@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   columns,
@@ -27,11 +27,11 @@ import {
 import { Associations, resolveAssocClass } from "./associations.js";
 import { Table } from "@blazetrails/arel";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc model
 // classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must be
@@ -208,18 +208,19 @@ const TEST_SCHEMA: Schema = {
 };
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("ReflectionTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Author extends Base {
@@ -2884,11 +2885,12 @@ describe("ReflectionTest", () => {
 });
 
 describe("ReflectionTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "columns"
   it("columns", () => {

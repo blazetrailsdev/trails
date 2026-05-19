@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import {
   Base,
   RecordNotFound,
@@ -13,11 +13,11 @@ import {
 } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -140,7 +140,7 @@ const TEST_SCHEMA = {
 } as const;
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
@@ -150,11 +150,12 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // NestedAttributesTest — targets nested_attributes_test.rb
 // ==========================================================================
 describe("NestedAttributesTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should not build a new record if reject all blank does not return false", async () => {
     class NTag0 extends Base {
@@ -539,10 +540,11 @@ describe("NestedAttributesTest", () => {
 });
 
 describe("TestNestedAttributesOnAHasOneAssociation", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels(
     opts: {
@@ -822,10 +824,11 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 });
 
 describe("TestNestedAttributesOnABelongsToAssociation", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels(
     opts: {
@@ -1058,10 +1061,11 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 });
 
 describe("TestNestedAttributesInGeneral", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("base should have an empty nested attributes options", () => {
     class Plain extends Base {
@@ -2426,10 +2430,11 @@ describe("validate presence of parent works with inverse of", () => {
 });
 
 describe("acceptsNestedAttributesFor", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("creates child records through parent", async () => {
     class Comment extends Base {
@@ -2495,11 +2500,12 @@ describe("acceptsNestedAttributesFor", () => {
 });
 
 describe("Nested Attributes (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
@@ -2722,11 +2728,12 @@ describe("Nested Attributes (Rails-guided)", () => {
 });
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -2947,11 +2954,12 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     if (!(record as any)._cachedAssociations) (record as any)._cachedAssociations = new Map();
@@ -3201,10 +3209,11 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // Rails: NestedAttributesOnACollectionAssociationTests is mixed into
 // TestNestedAttributesOnAHasManyAssociation and TestNestedAttributesOnAHasAndBelongsToManyAssociation.
 describe("TestNestedAttributesOnAHasManyAssociation", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
   afterEach(() => {
     Notifications.unsubscribeAll();
   });
