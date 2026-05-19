@@ -900,20 +900,21 @@ export class CallbackChain {
           // calling it fire-and-forget. `await` and `.then(...)` both invoke
           // .then on the wrapper; bare `next();` does not.
           const observed = pendingProceed;
-          const markObserved = () => {
-            proceedObserved = true;
-          };
           return {
             then(onFulfilled?: any, onRejected?: any) {
-              markObserved();
+              // Only mark observed when a rejection path is wired — `await`
+              // internally passes an onRejected, `.then(_, r)` does too.
+              // `.then(onFulfilled)` alone doesn't rescue, so the rejection
+              // must still propagate via pendingProceed.
+              if (onRejected) proceedObserved = true;
               return observed.then(onFulfilled, onRejected);
             },
             catch(onRejected?: any) {
-              markObserved();
+              proceedObserved = true;
               return observed.catch(onRejected);
             },
             finally(onFinally?: any) {
-              markObserved();
+              proceedObserved = true;
               return observed.finally(onFinally);
             },
           } as unknown as Promise<void>;
