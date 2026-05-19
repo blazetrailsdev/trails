@@ -11,17 +11,17 @@ import {
   cacheControl as _cacheControl,
   getDate as _getDate,
   getLastModified as _getLastModified,
-  handleConditionalGet as _handleConditionalGet,
+  handleConditionalGetBang as _handleConditionalGetBang,
   hasDate as _hasDate,
   hasEtag as _hasEtag,
   hasLastModified as _hasLastModified,
   isStrongEtag as _isStrongEtag,
-  mergeAndNormalizeCacheControl as _mergeAndNormalizeCacheControl,
+  mergeAndNormalizeCacheControlBang as _mergeAndNormalizeCacheControlBang,
   isWeakEtag as _isWeakEtag,
   setDate as _setDate,
   setLastModified as _setLastModified,
-  setStrongEtag as _setStrongEtag,
-  setWeakEtag as _setWeakEtag,
+  strongEtag as _strongEtag,
+  weakEtag as _weakEtag,
 } from "./cache.js";
 import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
 
@@ -271,7 +271,7 @@ export class Response {
 
   /**
    * Mirrors Rails' `Cache::Response#etag=` — delegates to
-   * {@link setWeakEtag}, which hashes `validators` into a weak validator
+   * {@link weakEtag}, which hashes `validators` into a weak validator
    * (`W/"<md5>"`). Pass `undefined` to delete the header.
    */
   set etag(value: unknown) {
@@ -280,7 +280,7 @@ export class Response {
       delete this._headers["ETag"];
       return;
     }
-    this.setWeakEtag(value);
+    this.weakEtag(value);
   }
 
   // --- Cache::Response wiring (declared here for typing; bound below) ---
@@ -289,12 +289,12 @@ export class Response {
   declare readonly hasLastModified: boolean;
   declare readonly hasDate: boolean;
   declare readonly hasEtag: boolean;
-  declare setWeakEtag: (validators: unknown) => void;
-  declare setStrongEtag: (validators: unknown) => void;
+  declare weakEtag: (validators: unknown) => void;
+  declare strongEtag: (validators: unknown) => void;
   declare isWeakEtag: () => boolean;
   declare isStrongEtag: () => boolean;
-  declare handleConditionalGet: () => void;
-  declare mergeAndNormalizeCacheControl: (cacheControl: CacheControlHash) => void;
+  declare handleConditionalGetBang: () => void;
+  declare mergeAndNormalizeCacheControlBang: (cacheControl: CacheControlHash) => void;
   /**
    * Parsed `Cache-Control` directives as a hash, mirroring Rails'
    * `Cache::Response#cache_control` (an `attr_reader` set by
@@ -376,11 +376,11 @@ Object.defineProperty(Response.prototype, "cacheControl", {
   },
   configurable: true,
 });
-Response.prototype.setWeakEtag = function (this: Response, v: unknown) {
-  _setWeakEtag.call(this, v);
+Response.prototype.weakEtag = function (this: Response, v: unknown) {
+  _weakEtag.call(this, v);
 };
-Response.prototype.setStrongEtag = function (this: Response, v: unknown) {
-  _setStrongEtag.call(this, v);
+Response.prototype.strongEtag = function (this: Response, v: unknown) {
+  _strongEtag.call(this, v);
 };
 Response.prototype.isWeakEtag = function (this: Response) {
   return _isWeakEtag.call(this);
@@ -388,14 +388,14 @@ Response.prototype.isWeakEtag = function (this: Response) {
 Response.prototype.isStrongEtag = function (this: Response) {
   return _isStrongEtag.call(this);
 };
-Response.prototype.handleConditionalGet = function (this: Response) {
-  _handleConditionalGet.call(this);
+Response.prototype.handleConditionalGetBang = function (this: Response) {
+  _handleConditionalGetBang.call(this);
 };
-Response.prototype.mergeAndNormalizeCacheControl = function (
+Response.prototype.mergeAndNormalizeCacheControlBang = function (
   this: Response,
   cacheControl: CacheControlHash,
 ) {
-  _mergeAndNormalizeCacheControl.call(this, cacheControl);
+  _mergeAndNormalizeCacheControlBang.call(this, cacheControl);
 };
 export interface CookieOptions {
   value: string;
