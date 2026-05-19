@@ -6,13 +6,21 @@
  * @see https://api.rubyonrails.org/classes/AbstractController/Base.html
  */
 
-import type {
+import {
+  _insertCallbacks,
+  _normalizeCallbackOption,
+  _normalizeCallbackOptions,
+  type ActionCallback,
+  type AroundCallback,
+  type CallbackEntry,
+  type CallbackOptions,
+} from "./callbacks.js";
+export type {
   ActionCallback,
   AroundCallback,
   CallbackOptions,
-  CallbackEntry,
+  CallbackPredicateLike,
 } from "./callbacks.js";
-export type { ActionCallback, AroundCallback, CallbackOptions } from "./callbacks.js";
 
 /** Raised when an action cannot be found for the given controller. */
 export class ActionNotFound extends Error {
@@ -20,6 +28,11 @@ export class ActionNotFound extends Error {
     super(message);
     this.name = "ActionNotFound";
   }
+}
+
+/** Rails `Array(value)`: coerce scalar to single-element array. @internal */
+function _actionList(value: string | string[]): string[] {
+  return Array.isArray(value) ? value : [value];
 }
 
 export class AbstractController {
@@ -121,8 +134,16 @@ export class AbstractController {
     return this._actionMethodCache!.has(action);
   }
 
+  /** @internal Rails-private callback option normalizer. */
+  static _normalizeCallbackOptions = _normalizeCallbackOptions;
+  /** @internal Rails-private single-key callback option normalizer. */
+  static _normalizeCallbackOption = _normalizeCallbackOption;
+  /** @internal Rails-private callback insertion helper. */
+  static _insertCallbacks = _insertCallbacks;
+
   /** Register a before_action callback. */
   static beforeAction(callback: ActionCallback, options: CallbackOptions = {}): void {
+    _normalizeCallbackOptions(options);
     const entry: CallbackEntry = { callback, type: "before", options };
     if (options.prepend) {
       this._ensureOwnCallbacks().unshift(entry);
@@ -133,6 +154,7 @@ export class AbstractController {
 
   /** Register an after_action callback. */
   static afterAction(callback: ActionCallback, options: CallbackOptions = {}): void {
+    _normalizeCallbackOptions(options);
     const entry: CallbackEntry = { callback, type: "after", options };
     if (options.prepend) {
       this._ensureOwnCallbacks().unshift(entry);
@@ -143,6 +165,7 @@ export class AbstractController {
 
   /** Register an around_action callback. */
   static aroundAction(callback: AroundCallback, options: CallbackOptions = {}): void {
+    _normalizeCallbackOptions(options);
     const entry: CallbackEntry = { callback, type: "around", options };
     if (options.prepend) {
       this._ensureOwnCallbacks().unshift(entry);
@@ -201,8 +224,10 @@ export class AbstractController {
     const callbacks = allCallbacks.filter((entry) => {
       return !skipped.some((s) => {
         if (s.callback !== entry.callback) return false;
-        if (s.options.only && !s.options.only.includes(action)) return false;
-        if (s.options.except && s.options.except.includes(action)) return false;
+        if (s.options.only !== undefined && !_actionList(s.options.only).includes(action))
+          return false;
+        if (s.options.except !== undefined && _actionList(s.options.except).includes(action))
+          return false;
         return true;
       });
     });
@@ -277,11 +302,25 @@ export class AbstractController {
 
   private _shouldRun(entry: CallbackEntry, action: string): boolean {
     const opts = entry.options;
-    if (opts.only && !opts.only.includes(action)) return false;
-    if (opts.except && opts.except.includes(action)) return false;
-    if (opts.if && !opts.if(this)) return false;
-    if (opts.unless && opts.unless(this)) return false;
+    if (opts.only !== undefined && !_actionList(opts.only).includes(action)) return false;
+    if (opts.except !== undefined && _actionList(opts.except).includes(action)) return false;
+    if (opts.if !== undefined && !this._evalPredicate(opts.if, true)) return false;
+    if (opts.unless !== undefined && this._evalPredicate(opts.unless, false)) return false;
     return true;
+  }
+
+  private _evalPredicate(pred: NonNullable<CallbackOptions["if"]>, requireAll: boolean): boolean {
+    if (typeof pred === "function") return pred(this);
+    if (requireAll) {
+      for (const p of pred) {
+        if (!(typeof p === "function" ? p(this) : p.isMatch(this))) return false;
+      }
+      return true;
+    }
+    for (const p of pred) {
+      if (typeof p === "function" ? p(this) : p.isMatch(this)) return true;
+    }
+    return false;
   }
 
   private static _ensureOwnCallbacks(): CallbackEntry[] {

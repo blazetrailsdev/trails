@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { AbstractController, ActionNotFound } from "./base.js";
+import {
+  ActionFilter,
+  _insertCallbacks,
+  _normalizeCallbackOption,
+  _normalizeCallbackOptions,
+  type CallbackOptions,
+} from "./callbacks.js";
 
 // ==========================================================================
 // abstract/callbacks_test.rb
@@ -382,5 +389,103 @@ describe("AbstractController::Base — trails-only", () => {
   it("performed starts false", () => {
     const c = new (class extends AbstractController {})();
     expect(c.performed).toBe(false);
+  });
+});
+
+// ==========================================================================
+// trails-only coverage for ActionFilter + normalization helpers (Rails has
+// no public test for these; they're :nodoc: in callbacks.rb).
+// ==========================================================================
+describe("ActionFilter", () => {
+  it("matches when the controller's actionName is in the configured set", () => {
+    class C extends AbstractController {}
+    const c = new C();
+    c.actionName = "index";
+    const f = new ActionFilter([], "only", ["index", "show"]);
+    expect(f.isMatch(c)).toBe(true);
+    c.actionName = "destroy";
+    expect(f.isMatch(c)).toBe(false);
+  });
+
+  it("accepts a scalar action name", () => {
+    class C extends AbstractController {}
+    const c = new C();
+    c.actionName = "index";
+    expect(new ActionFilter([], "only", "index").isMatch(c)).toBe(true);
+  });
+});
+
+describe("_normalizeCallbackOption", () => {
+  it("converts :only into a prepended ActionFilter on :if", () => {
+    const opts: CallbackOptions = { only: ["index"] };
+    _normalizeCallbackOption(opts, "only", "if");
+    expect(opts.only).toBeUndefined();
+    expect(Array.isArray(opts.if)).toBe(true);
+    expect((opts.if as unknown[])[0]).toBeInstanceOf(ActionFilter);
+  });
+
+  it("converts :except into a prepended ActionFilter on :unless", () => {
+    const opts: CallbackOptions = { except: ["index"] };
+    _normalizeCallbackOption(opts, "except", "unless");
+    expect(opts.except).toBeUndefined();
+    expect((opts.unless as unknown[])[0]).toBeInstanceOf(ActionFilter);
+  });
+
+  it("is a no-op when the source key is absent", () => {
+    const opts: CallbackOptions = {};
+    _normalizeCallbackOption(opts, "only", "if");
+    expect(opts.if).toBeUndefined();
+  });
+
+  it("preserves an existing :if predicate by appending after the new filter", () => {
+    const existing = () => true;
+    const opts: CallbackOptions = { only: ["index"], if: existing };
+    _normalizeCallbackOption(opts, "only", "if");
+    const list = opts.if as unknown[];
+    expect(list).toHaveLength(2);
+    expect(list[0]).toBeInstanceOf(ActionFilter);
+    expect(list[1]).toBe(existing);
+  });
+});
+
+describe("_normalizeCallbackOptions", () => {
+  it("normalizes both :only and :except in a single pass", () => {
+    const opts: CallbackOptions = { only: ["a"], except: ["b"] };
+    _normalizeCallbackOptions(opts);
+    expect(opts.only).toBeUndefined();
+    expect(opts.except).toBeUndefined();
+    expect((opts.if as unknown[])[0]).toBeInstanceOf(ActionFilter);
+    expect((opts.unless as unknown[])[0]).toBeInstanceOf(ActionFilter);
+  });
+});
+
+describe("_insertCallbacks", () => {
+  it("yields each callback with the normalized options", () => {
+    const cb1 = () => {};
+    const cb2 = () => {};
+    const opts: CallbackOptions = { only: ["index"] };
+    const seen: Array<[unknown, CallbackOptions]> = [];
+    _insertCallbacks([cb1, cb2], opts, null, (cb, o) => seen.push([cb, o]));
+    expect(seen.map(([c]) => c)).toEqual([cb1, cb2]);
+    expect(opts.only).toBeUndefined();
+    expect((opts.if as unknown[])[0]).toBeInstanceOf(ActionFilter);
+    // `filters` is a transient bookkeeping key; should be removed post-yield.
+    expect((opts as Record<string, unknown>).filters).toBeUndefined();
+  });
+
+  it("appends the block to the callback list when provided", () => {
+    const block = () => {};
+    const opts: CallbackOptions = {};
+    const seen: unknown[] = [];
+    _insertCallbacks([], opts, block, (cb) => seen.push(cb));
+    expect(seen).toEqual([block]);
+  });
+});
+
+describe("AbstractController callback statics", () => {
+  it("exposes _normalizeCallbackOptions, _normalizeCallbackOption, _insertCallbacks", () => {
+    expect(AbstractController._normalizeCallbackOptions).toBe(_normalizeCallbackOptions);
+    expect(AbstractController._normalizeCallbackOption).toBe(_normalizeCallbackOption);
+    expect(AbstractController._insertCallbacks).toBe(_insertCallbacks);
   });
 });
