@@ -52,6 +52,13 @@ export {
 } from "./sanitize-helper.js";
 export type { Sanitizer, SanitizerClass, SanitizerVendor } from "./sanitize-helper.js";
 
+export {
+  distanceOfTimeInWords,
+  timeAgoInWords,
+  distanceOfTimeInWordsToNow,
+} from "./date-helper.js";
+export type { DistanceOfTimeInput, DistanceOfTimeOptions } from "./date-helper.js";
+
 export { truncate, pluralize, wordWrap, simpleFormat } from "./text-helper.js";
 export type {
   TruncateOptions,
