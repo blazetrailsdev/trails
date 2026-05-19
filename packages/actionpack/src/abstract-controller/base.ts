@@ -21,7 +21,6 @@ export type {
   CallbackOptions,
   CallbackPredicateLike,
 } from "./callbacks.js";
-export { ActionFilter } from "./callbacks.js";
 
 /** Raised when an action cannot be found for the given controller. */
 export class ActionNotFound extends Error {
