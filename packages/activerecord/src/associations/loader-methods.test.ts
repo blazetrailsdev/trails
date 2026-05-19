@@ -9,14 +9,14 @@
 // For collections (`hasMany` / `hasAndBelongsToMany`), the
 // AssociationProxy's thenable handles the load — `await record.<name>`.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, AssociationNotFoundError } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Base#loadBelongsTo / Base#loadHasOne", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class LoAuthor extends Base {
     declare name: string;
@@ -47,7 +47,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
   LoAuthor.hasOne("loProfile", { className: "LoProfile" });
   LoPost.belongsTo("loAuthor", { className: "LoAuthor" });
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       lo_authors: { name: "string" },
@@ -61,6 +61,7 @@ describe("Base#loadBelongsTo / Base#loadHasOne", () => {
     registerModel(LoPost);
     registerModel(LoProfile);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("loadBelongsTo returns the associated record", async () => {
     const author = new LoAuthor({ name: "dean" });

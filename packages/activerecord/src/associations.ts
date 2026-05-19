@@ -63,7 +63,15 @@ import { ForeignAssociation } from "./associations/foreign-association.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
-import { underscore, singularize, pluralize, camelize } from "@blazetrails/activesupport";
+import { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
+export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
+import {
+  underscore,
+  singularize,
+  pluralize,
+  camelize,
+  foreignKey as deriveForeignKey,
+} from "@blazetrails/activesupport";
 import { getInheritanceColumn, findStiClass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -111,6 +119,10 @@ export interface AssociationOptions {
    * Exists for Rails API parity — Rails uses this to switch between JOIN and
    * multi-query strategies. */
   disableJoins?: boolean;
+  /** HABTM-only: target-side FK column on the join table. Overrides the
+   * `class_name.foreign_key` default. Mirrors Rails'
+   * `has_and_belongs_to_many :tags, association_foreign_key: ...`. */
+  associationForeignKey?: string;
   /** When true, records loaded through this association are marked
    * strict-loading, causing further lazy loads on them to raise.
    *
@@ -1621,12 +1633,48 @@ function habtmOwnerPk(_options: AssociationOptions, ctor: typeof Base): string {
   return pk as string;
 }
 
-function defaultJoinTableName(model1: typeof Base, assocName: string): string {
-  const table1 = underscore(model1.name);
-  const table2 = underscore(assocName);
-  // Sort alphabetically
-  const sorted = [pluralize(table1), table2].sort();
-  return sorted.join("_");
+/**
+ * Compute the default HABTM join-table name.
+ *
+ * Mirrors ActiveRecord::Associations::Builder::HasAndBelongsToMany#table_name:
+ * sort both side table names, then collapse a shared `[._]`-terminated prefix
+ * so `b30_posts` + `b30_tags` → `b30_posts_tags` (not `b30_posts_b30_tags`).
+ */
+function defaultJoinTableName(
+  model1: typeof Base,
+  assocName: string,
+  options?: { className?: string },
+): string {
+  const lhsTable = (model1 as any).tableName ?? fallbackTableName(model1.name);
+  const className = options?.className ?? camelize(singularize(assocName));
+  const targetModel = modelRegistry.get(className);
+  const rhsTable = (targetModel as any)?.tableName ?? fallbackTableName(className);
+  return joinHabtmTableNames(lhsTable, rhsTable);
+}
+
+// Mirrors builder/has-and-belongs-to-many.ts#_fallbackTableName: namespaced
+// class names (`Admin::Tag`) underscore to `admin/tag`, which would leak a
+// `/` into the join-table name. Rails' `klass.table_name` normalizes to
+// underscores, so do the same when the target model isn't registered yet.
+function fallbackTableName(name: string): string {
+  return underscore(pluralize(name)).replace(/\//g, "_");
+}
+
+/**
+ * Compute the target-side FK for a HABTM. Mirrors Rails
+ * Builder::HasAndBelongsToMany#belongs_to_options:
+ *   1. explicit `associationForeignKey` override
+ *   2. `class_name.foreign_key` (demodulize+underscore+"_id")
+ *   3. default belongs_to: singularized association name + "_id"
+ * @internal
+ */
+export function habtmTargetFk(
+  assocName: string,
+  options: { className?: unknown; associationForeignKey?: unknown },
+): string {
+  if (options.associationForeignKey) return String(options.associationForeignKey);
+  if (options.className) return deriveForeignKey(String(options.className));
+  return `${underscore(singularize(assocName))}_id`;
 }
 
 /**
@@ -1645,9 +1693,9 @@ export async function loadHabtm(
   const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(singularize(assocName));
   const targetModel = resolveAssocClass(record, assocName, className);
-  const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName);
+  const joinTable = options.joinTable ?? defaultJoinTableName(ctor, assocName, options);
   const ownerFk = singleFk(options.foreignKey, `${underscore(ctor.name)}_id`);
-  const targetFk = `${underscore(singularize(assocName))}_id`;
+  const targetFk = habtmTargetFk(assocName, options as { className?: unknown });
   const ownerPkCol = habtmOwnerPk(options, ctor);
   const pkValue = record._readAttribute(ownerPkCol);
   if (pkValue === null || pkValue === undefined) return [];

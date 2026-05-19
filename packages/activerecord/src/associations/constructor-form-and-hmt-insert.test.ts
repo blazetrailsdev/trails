@@ -21,10 +21,12 @@ beforeAll(async () => {
     b30_profiles: { name: "string", owner_id: "integer" },
     b30_posts: { title: "string" },
     b30_tags: { name: "string" },
-    // HABTM defaults from associations/builder/has-and-belongs-to-many.ts:
-    //   ownerFk  = `${underscore(model.name)}_id`             = "b30_post_id"
-    //   sourceFk = `${underscore(demodulize(className))}_id`  = "b30_tag_id"
-    b30_posts_b30_tags: { b30_post_id: "integer", b30_tag_id: "integer" },
+    // HABTM defaults (mirrors Rails Builder::HasAndBelongsToMany#table_name):
+    //   joinTable = sort + `[._]`-prefix collapse of ["b30_posts","b30_tags"]
+    //             = "b30_posts_tags"
+    //   ownerFk   = `${underscore(model.name)}_id`            = "b30_post_id"
+    //   sourceFk  = `${underscore(demodulize(className))}_id` = "b30_tag_id"
+    b30_posts_tags: { b30_post_id: "integer", b30_tag_id: "integer" },
   });
 });
 withTransactionalFixtures(() => _adapter);

@@ -1654,7 +1654,9 @@ describe("ReflectionTest", () => {
       className: "CatalogCategory",
     });
     const ref = reflectOnAssociation(CatalogProduct, "catalogCategories");
-    expect(ref!.joinTable).toBe("catalog_categories_catalog_products");
+    // Rails Builder::HasAndBelongsToMany#table_name collapses a shared
+    // `[._]`-terminated prefix (see vendor reflection_test.rb:551).
+    expect(ref!.joinTable).toBe("catalog_categories_products");
   });
 
   it("join table with different prefix", () => {

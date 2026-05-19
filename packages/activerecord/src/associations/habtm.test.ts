@@ -2,31 +2,29 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, loadHabtm } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("has_and_belongs_to_many", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string" },
       tags: { name: "string" },
       developers: { name: "string" },
       projects: { name: "string" },
+      posts_tags: { post_id: "integer", tag_id: "integer" },
+      developers_projects: { developer_id: "integer", project_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("loads associated records through a join table", async () => {
     class Post extends Base {
@@ -45,11 +43,6 @@ describe("has_and_belongs_to_many", () => {
     Tag.adapter = adapter;
     registerModel(Tag);
     registerModel(Post);
-
-    // Create the join table
-    await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "posts_tags" ("post_id" INTEGER, "tag_id" INTEGER)`,
-    );
 
     const post = await Post.create({ title: "Hello" });
     const t1 = await Tag.create({ name: "ruby" });
@@ -87,11 +80,6 @@ describe("has_and_belongs_to_many", () => {
     Project.attribute("name", "string");
     Project.adapter = adapter;
     registerModel(Project);
-
-    // Create the join table
-    await adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "developers_projects" ("developer_id" INTEGER, "project_id" INTEGER)`,
-    );
 
     const dev = await Developer.create({ name: "Alice" });
     const proj = await Project.create({ name: "Rails" });
