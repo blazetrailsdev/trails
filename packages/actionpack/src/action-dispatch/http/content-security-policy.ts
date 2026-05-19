@@ -4,7 +4,7 @@
  * DSL for building Content-Security-Policy headers.
  */
 
-export type CSPSource = string | ((request?: unknown) => string);
+export type CSPSource = string | ((request?: unknown) => string | string[]);
 
 /**
  * Rails' default nonce-eligible directives. Mirrors
@@ -13,45 +13,40 @@ export type CSPSource = string | ((request?: unknown) => string);
  */
 export const DEFAULT_NONCE_DIRECTIVES = ["script-src", "style-src"] as const;
 
-const SCRIPT_DIRECTIVES = ["script_src", "script_src_attr", "script_src_elem"] as const;
-
-const STYLE_DIRECTIVES = ["style_src", "style_src_attr", "style_src_elem"] as const;
-
-const FETCH_DIRECTIVES = [
-  "child_src",
-  "connect_src",
-  "default_src",
-  "font_src",
-  "frame_src",
-  "img_src",
-  "manifest_src",
-  "media_src",
-  "object_src",
-  "prefetch_src",
-  "script_src",
-  "script_src_attr",
-  "script_src_elem",
-  "style_src",
-  "style_src_attr",
-  "style_src_elem",
-  "worker_src",
-] as const;
-
-const DOCUMENT_DIRECTIVES = ["base_uri", "plugin_types", "sandbox"] as const;
-
-const NAVIGATION_DIRECTIVES = ["form_action", "frame_ancestors", "navigate_to"] as const;
-
-const REPORTING_DIRECTIVES = ["report_to", "report_uri"] as const;
-
-const OTHER_DIRECTIVES = [
-  "block_all_mixed_content",
-  "require_sri_for",
-  "require_trusted_types_for",
-  "trusted_types",
-  "upgrade_insecure_requests",
-] as const;
+/**
+ * @internal
+ * Mirrors Rails' `MAPPINGS` constant — short-form keyword sources used by the
+ * DSL (Symbols in Ruby, prefixed-`:`-strings here) expand to their CSP source
+ * representation when passed to a directive setter.
+ */
+const MAPPINGS: Record<string, string> = {
+  self: "'self'",
+  unsafe_eval: "'unsafe-eval'",
+  wasm_unsafe_eval: "'wasm-unsafe-eval'",
+  unsafe_hashes: "'unsafe-hashes'",
+  unsafe_inline: "'unsafe-inline'",
+  none: "'none'",
+  http: "http:",
+  https: "https:",
+  data: "data:",
+  mediastream: "mediastream:",
+  allow_duplicates: "'allow-duplicates'",
+  blob: "blob:",
+  filesystem: "filesystem:",
+  report_sample: "'report-sample'",
+  script: "'script'",
+  strict_dynamic: "'strict-dynamic'",
+  ws: "ws:",
+  wss: "wss:",
+};
 
 type DirectiveName = string;
+
+/**
+ * Raised when a CSP directive source contains a semicolon or whitespace.
+ * Mirrors Rails' `ContentSecurityPolicy::InvalidDirectiveError`.
+ */
+export class InvalidDirectiveError extends Error {}
 
 export class ContentSecurityPolicy {
   private directives: Map<DirectiveName, CSPSource[]> = new Map();
@@ -153,47 +148,148 @@ export class ContentSecurityPolicy {
     return this.setDirective("trusted-types", sources);
   }
 
+  /** @internal */
   private setDirective(name: string, sources: CSPSource[]): this {
-    this.directives.set(name, sources);
+    this.directives.set(name, this.applyMappings(sources));
     return this;
   }
 
   // --- Build ---
 
   build(request?: unknown, nonce?: string, nonceDirectives?: readonly string[]): string {
-    const parts: string[] = [];
     const nonceDirs = nonceDirectives ?? DEFAULT_NONCE_DIRECTIVES;
+    return this.buildDirectives(request, nonce, nonceDirs)
+      .filter((p): p is string => p != null)
+      .join("; ");
+  }
 
+  // --- Rails-named privates (action_dispatch/http/content_security_policy.rb) ---
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#apply_mappings`. Translates short-form
+   * `:keyword` sources (string starting with `:`) to their CSP representation
+   * via [[MAPPINGS]]; strings and functions pass through unchanged.
+   */
+  private applyMappings(sources: CSPSource[]): CSPSource[] {
+    return sources.map((source) => {
+      if (typeof source === "string" && source.startsWith(":")) {
+        return this.applyMapping(source.slice(1));
+      }
+      if (typeof source === "string" || typeof source === "function") {
+        return source;
+      }
+      throw new TypeError(`Invalid content security policy source: ${String(source)}`);
+    });
+  }
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#apply_mapping`. Looks up a short-form
+   * keyword in [[MAPPINGS]] or throws.
+   */
+  private applyMapping(source: string): string {
+    const mapped = MAPPINGS[source];
+    if (mapped === undefined) {
+      throw new TypeError(`Unknown content security policy source mapping: ${source}`);
+    }
+    return mapped;
+  }
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#build_directives`. Iterates the directive
+   * map and produces one header part per directive, or `null` for omitted
+   * directives (matching Rails' `.compact` filter).
+   */
+  private buildDirectives(
+    context: unknown,
+    nonce: string | undefined,
+    nonceDirectives: readonly string[],
+  ): (string | null)[] {
+    const out: (string | null)[] = [];
     for (const [directive, sources] of this.directives) {
-      const resolved = sources.map((s) => {
-        if (typeof s === "function") {
-          if (request === undefined) {
-            throw new Error(`Missing context for dynamic source in ${directive}`);
-          }
-          return s(request);
+      if (Array.isArray(sources) && sources.length > 0) {
+        const built = this.buildDirective(directive, sources, context).join(" ");
+        if (nonce && this.isNonceDirective(directive, nonceDirectives)) {
+          out.push(`${directive} ${built} 'nonce-${nonce}'`);
+        } else {
+          out.push(`${directive} ${built}`);
+        }
+      } else if (sources) {
+        // Bare directive (no sources) — e.g. `block-all-mixed-content`.
+        out.push(directive);
+      } else {
+        out.push(null);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#validate`. Throws
+   * [[InvalidDirectiveError]] if any resolved source contains a semicolon or
+   * whitespace.
+   */
+  private validate(directive: string, sources: readonly string[]): void {
+    for (const source of sources) {
+      if (source.includes(";") || /\s/.test(source)) {
+        throw new InvalidDirectiveError(
+          `Invalid Content Security Policy ${directive}: "${source}". ` +
+            `Directive values must not contain whitespace or semicolons. ` +
+            `Please use multiple arguments or other directive methods instead.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#build_directive`. Resolves each source via
+   * [[resolveSource]] then validates the resolved list.
+   */
+  private buildDirective(directive: string, sources: CSPSource[], context: unknown): string[] {
+    const resolved = sources.flatMap((source) => this.resolveSource(source, context));
+    this.validate(directive, resolved);
+    return resolved;
+  }
+
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#resolve_source`. Strings pass through;
+   * functions (Rails' Procs) are invoked with `context` and their result is
+   * wrapped and re-run through [[applyMappings]].
+   */
+  private resolveSource(source: CSPSource, context: unknown): string[] {
+    if (typeof source === "string") {
+      return [source];
+    }
+    if (typeof source === "function") {
+      if (context === undefined) {
+        throw new Error(
+          `Missing context for the dynamic content security policy source: ${String(source)}`,
+        );
+      }
+      const result = source(context);
+      const wrapped = Array.isArray(result) ? result : [result];
+      return this.applyMappings(wrapped).map((s) => {
+        if (typeof s !== "string") {
+          throw new Error(`Unexpected content security policy source: ${String(s)}`);
         }
         return s;
       });
-
-      // Validate
-      for (const val of resolved) {
-        if (val.includes(";")) throw new Error(`Invalid CSP source: contains semicolon`);
-      }
-
-      // Add nonce to nonce-eligible directives (Rails default: script-src, style-src)
-      const allSources = [...resolved];
-      if (nonce && nonceDirs.includes(directive)) {
-        allSources.push(`'nonce-${nonce}'`);
-      }
-
-      if (allSources.length === 0) {
-        parts.push(directive);
-      } else {
-        parts.push(`${directive} ${allSources.join(" ")}`);
-      }
     }
+    throw new Error(`Unexpected content security policy source: ${String(source)}`);
+  }
 
-    return parts.join("; ");
+  /**
+   * @internal
+   * Mirrors `ContentSecurityPolicy#nonce_directive?`. Returns whether the
+   * directive is eligible to receive an auto-appended `'nonce-...'` source.
+   */
+  private isNonceDirective(directive: string, nonceDirectives: readonly string[]): boolean {
+    return nonceDirectives.includes(directive);
   }
 
   // --- Duplication ---
@@ -301,7 +397,21 @@ export function contentSecurityPolicyNonce(this: CspRequestHost): string | undef
   if (!generator) return undefined;
   const existing = this.getHeader(NONCE) as string | undefined;
   if (existing !== undefined) return existing;
-  const generated = generator(this);
+  const generated = generateContentSecurityPolicyNonce.call(this);
   this.setHeader(NONCE, generated);
   return generated;
+}
+
+/**
+ * @internal
+ * Mirrors Rails `Request#generate_content_security_policy_nonce` (private):
+ * invokes the configured nonce generator with the request as its argument.
+ * Throws if no generator is configured.
+ */
+export function generateContentSecurityPolicyNonce(this: CspRequestHost): string {
+  const generator = contentSecurityPolicyNonceGenerator.call(this);
+  if (!generator) {
+    throw new Error("No content_security_policy_nonce_generator configured for this request");
+  }
+  return generator(this);
 }
