@@ -421,8 +421,11 @@ export function maskedAuthenticityToken(
 ): string {
   const { action, method } = formOptions;
   const requestPath = c.request.path ?? "/";
+  // Rails: `per_form_csrf_tokens && action && method` — Ruby `&&` only treats
+  // nil/false as falsy, so an empty-string action ("submit to current path")
+  // still triggers per-form generation.
   const raw =
-    c.perFormCsrfTokens && action && method
+    c.perFormCsrfTokens && action != null && method != null
       ? perFormCsrfToken(c, null, normalizeActionPath(action, requestPath), method)
       : globalCsrfToken(c);
   return maskToken(raw);
