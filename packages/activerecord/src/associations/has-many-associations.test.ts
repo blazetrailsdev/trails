@@ -719,355 +719,6 @@ describe("HasManyAssociationsTest", () => {
     expect(titles).toContain("B");
   });
 
-  // -- Adding --
-
-  it("adding", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ title: "New" });
-    // Setting the FK manually simulates adding
-    post.author_id = author.id;
-    await post.save();
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === post.id)).toBe(true);
-  });
-
-  it("adding a collection", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const p1 = await Post.create({ title: "X" });
-    const p2 = await Post.create({ title: "Y" });
-    for (const p of [p1, p2]) {
-      p.author_id = author.id;
-      await p.save();
-    }
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(2);
-  });
-
-  it("adding using create", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "Created" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-    expect((posts[0] as any).title).toBe("Created");
-  });
-
-  // -- Build --
-
-  it("build", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = Post.new({ author_id: author.id, title: "Built" });
-    expect(post.isNewRecord()).toBe(true);
-    expect((post as any).author_id).toBe(author.id);
-  });
-
-  it("build many", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const posts = [
-      Post.new({ author_id: author.id, title: "A" }),
-      Post.new({ author_id: author.id, title: "B" }),
-    ];
-    expect(posts.length).toBe(2);
-    expect(posts.every((p) => p.isNewRecord())).toBe(true);
-  });
-
-  it("collection size after building", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "Saved" });
-    const newPost = Post.new({ author_id: author.id, title: "Built" });
-    expect(newPost.isNewRecord()).toBe(true);
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-  });
-
-  it("collection not empty after building", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length > 0).toBe(true);
-  });
-
-  it("build via block", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = Post.new({ author_id: author.id });
-    (post as any).title = "Via block";
-    expect((post as any).title).toBe("Via block");
-  });
-
-  it("new aliased to build", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = Post.new({ author_id: author.id, title: "Built" });
-    expect(post).toBeDefined();
-    expect(post.isNewRecord()).toBe(true);
-  });
-
-  // -- Create --
-
-  it("create", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ author_id: author.id, title: "Created" });
-    expect(post.isNewRecord()).toBe(false);
-    expect(post.id).toBeDefined();
-  });
-
-  it("create many", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    await Post.create({ author_id: author.id, title: "B" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(2);
-  });
-
-  it("create with bang on has many when parent is new raises", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = Author.new({ name: "Alice" });
-    expect(author.isNewRecord()).toBe(true);
-    // Creating a child before saving the parent should be handled carefully
-    // In our system, it doesn't auto-set FK from new parent's id
-    const post = Post.new({ title: "Test" });
-    expect(post.isNewRecord()).toBe(true);
-  });
-
-  it("create from association with nil values should work", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    // Creating with null title should still work
-    const post = await Post.create({ author_id: author.id });
-    expect(post.isNewRecord()).toBe(false);
-  });
-
-  it("has many build with options", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.attribute("published", "boolean");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = Post.new({ author_id: author.id, title: "Draft", published: false });
-    expect((post as any).title).toBe("Draft");
-  });
-
   // -- Deleting --
 
   it("deleting", async () => {
@@ -1665,122 +1316,6 @@ describe("HasManyAssociationsTest", () => {
   // Migrated to dedicated `HasManyAssociationsTestCounterCacheHead` describe
   // at end of file (B1966c — defineSchema + shared adapter +
   // withTransactionalFixtures).
-
-  // -- Replace --
-
-  it("replace", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "Old" });
-    // Replace: nullify old, assign new
-    await processDependentAssociations(author);
-    const newPost = await Post.create({ author_id: author.id, title: "New" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
-  });
-
-  it("replace with less", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A" });
-    await Post.create({ author_id: author.id, title: "B" });
-    // Remove one
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    await (posts[0] as any).destroy();
-    const remaining = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(remaining.length).toBe(1);
-  });
-
-  it("replace with new", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const oldPost = await Post.create({ author_id: author.id, title: "Old" });
-    await oldPost.destroy();
-    const newPost = await Post.create({ author_id: author.id, title: "New" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
-    expect(posts.some((p: any) => p.id === oldPost.id)).toBe(false);
-  });
-
-  it("replace with same content", async () => {
-    class Author extends Base {
-      static {
-        this.attribute("name", "string");
-        this.adapter = adapter;
-      }
-    }
-    class Post extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    const post = await Post.create({ author_id: author.id, title: "Same" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-    expect(posts[0].id).toBe(post.id);
-  });
 
   // -- Has many on new record --
 
@@ -7986,6 +7521,231 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(remaining.length).toBe(0);
+  });
+});
+
+// Building cluster (adding `<<`, build, create, replace `=`) migrated to a
+// shared describe-level adapter with explicit defineSchema +
+// withTransactionalFixtures (Batch B1966e). Tests previously defined Author
+// and Post inside each `it()` block against an inline `freshAdapter()` from
+// the parent describe's `beforeEach`. Hoisting the classes and adapter to
+// `beforeAll` means schema DDL runs once per file and each test runs inside
+// BEGIN/ROLLBACK rather than rebuilding tables.
+describe("HasManyAssociationsTest", () => {
+  let adapter: TestDatabaseAdapter;
+
+  class Author extends Base {
+    declare name: string;
+  }
+  class Post extends Base {
+    declare author_id: number;
+    declare title: string;
+    declare published: boolean;
+  }
+
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string", published: "boolean" },
+    });
+    Author.attribute("name", "string");
+    Author.adapter = adapter;
+    Post.attribute("author_id", "integer");
+    Post.attribute("title", "string");
+    Post.attribute("published", "boolean");
+    Post.adapter = adapter;
+    registerModel(Author);
+    registerModel(Post);
+  });
+  withTransactionalFixtures(() => adapter);
+
+  // -- Adding --
+
+  it("adding", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ title: "New" });
+    post.author_id = author.id as number;
+    await post.save();
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.some((p: any) => p.id === post.id)).toBe(true);
+  });
+
+  it("adding a collection", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const p1 = await Post.create({ title: "X" });
+    const p2 = await Post.create({ title: "Y" });
+    for (const p of [p1, p2]) {
+      p.author_id = author.id as number;
+      await p.save();
+    }
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(2);
+  });
+
+  it("adding using create", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "Created" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(1);
+    expect((posts[0] as any).title).toBe("Created");
+  });
+
+  // -- Build --
+
+  it("build", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = Post.new({ author_id: author.id, title: "Built" });
+    expect(post.isNewRecord()).toBe(true);
+    expect((post as any).author_id).toBe(author.id);
+  });
+
+  it("build many", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const posts = [
+      Post.new({ author_id: author.id, title: "A" }),
+      Post.new({ author_id: author.id, title: "B" }),
+    ];
+    expect(posts.length).toBe(2);
+    expect(posts.every((p) => p.isNewRecord())).toBe(true);
+  });
+
+  it("collection size after building", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "Saved" });
+    const newPost = Post.new({ author_id: author.id, title: "Built" });
+    expect(newPost.isNewRecord()).toBe(true);
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(1);
+  });
+
+  it("collection not empty after building", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "A" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length > 0).toBe(true);
+  });
+
+  it("build via block", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = Post.new({ author_id: author.id });
+    (post as any).title = "Via block";
+    expect((post as any).title).toBe("Via block");
+  });
+
+  it("new aliased to build", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = Post.new({ author_id: author.id, title: "Built" });
+    expect(post).toBeDefined();
+    expect(post.isNewRecord()).toBe(true);
+  });
+
+  // -- Create --
+
+  it("create", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ author_id: author.id, title: "Created" });
+    expect(post.isNewRecord()).toBe(false);
+    expect(post.id).toBeDefined();
+  });
+
+  it("create many", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "A" });
+    await Post.create({ author_id: author.id, title: "B" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(2);
+  });
+
+  it("create with bang on has many when parent is new raises", async () => {
+    const author = Author.new({ name: "Alice" });
+    expect(author.isNewRecord()).toBe(true);
+    const post = Post.new({ title: "Test" });
+    expect(post.isNewRecord()).toBe(true);
+  });
+
+  it("create from association with nil values should work", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ author_id: author.id });
+    expect(post.isNewRecord()).toBe(false);
+  });
+
+  it("has many build with options", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = Post.new({ author_id: author.id, title: "Draft", published: false });
+    expect((post as any).title).toBe("Draft");
+  });
+
+  // -- Replace --
+
+  it("replace", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "Old" });
+    await processDependentAssociations(author);
+    const newPost = await Post.create({ author_id: author.id, title: "New" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
+  });
+
+  it("replace with less", async () => {
+    const author = await Author.create({ name: "Alice" });
+    await Post.create({ author_id: author.id, title: "A" });
+    await Post.create({ author_id: author.id, title: "B" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    await (posts[0] as any).destroy();
+    const remaining = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(remaining.length).toBe(1);
+  });
+
+  it("replace with new", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const oldPost = await Post.create({ author_id: author.id, title: "Old" });
+    await oldPost.destroy();
+    const newPost = await Post.create({ author_id: author.id, title: "New" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
+    expect(posts.some((p: any) => p.id === oldPost.id)).toBe(false);
+  });
+
+  it("replace with same content", async () => {
+    const author = await Author.create({ name: "Alice" });
+    const post = await Post.create({ author_id: author.id, title: "Same" });
+    const posts = await loadHasMany(author, "posts", {
+      className: "Post",
+      foreignKey: "author_id",
+    });
+    expect(posts.length).toBe(1);
+    expect(posts[0].id).toBe(post.id);
   });
 });
 
