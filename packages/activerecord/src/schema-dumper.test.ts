@@ -78,11 +78,15 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("authors",\s*\{[^}]*force:\s*"cascade"[^}]*\}/);
   });
 
-  it.skip("schema dump excludes sqlite sequence", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs adapter-backed introspection to exercise sqlite_sequence filtering */
+  it.skipIf(adapterType !== "sqlite")("schema dump excludes sqlite sequence", async () => {
+    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const adapter = createTestAdapter();
+    const testCtx = new MigrationContext(adapter);
+    await testCtx.createTable("auto_inc", {}, (t) => {
+      t.string("name");
+    });
+    const output = await TopLevelDumper.dump(adapter);
+    expect(output).not.toMatch(/createTable\("sqlite_sequence"/);
   });
 
   it("schema dump includes camelcase table name", async () => {
@@ -500,11 +504,12 @@ describe("SchemaDumperTest", () => {
     // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
     /* needs PG enum support */
   });
-  it.skip("schema dump keeps large precision integer columns as decimal", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs decimal precision handling */
+  it("schema dump keeps large precision integer columns as decimal", async () => {
+    await ctx.createTable("numeric_data", {}, (t) => {
+      t.decimal("atoms_in_universe", { precision: 55 });
+    });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
   });
 
   it("schema dump keeps id column when id is false and id column added", async () => {
@@ -516,11 +521,13 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/string.*"id".*null: false/);
   });
 
-  it.skip("schema dump keeps id false when id is false and unique not null column added", () => {
-    // BLOCKED: schema — schema introspection / dumper gap in schema-dumper
-    // ROOT-CAUSE: schema-dumper.ts or abstract/schema-statements.ts missing Rails parity
-    // SCOPE: ~50–200 LOC fix in schema-dumper.ts or schema-statements.ts; affects ~7–43 tests in schema-dumper.test.ts
-    /* needs unique constraint + id: false */
+  it("schema dump keeps id false when id is false and unique not null column added", async () => {
+    await ctx.createTable("string_key_objects", { id: false }, (t) => {
+      t.string("key", { null: false });
+    });
+    await ctx.addIndex("string_key_objects", "key", { unique: true });
+    const output = SchemaDumper.dump(ctx);
+    expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
   it("foreign keys are dumped at the bottom to circumvent dependency issues", async () => {
