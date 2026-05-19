@@ -547,7 +547,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   beforeAll(async () => {
     adapter = await freshAdapter();
-  });
+  }, 30000);
   withTransactionalFixtures(() => adapter);
 
   it.skip("marshal dump", () => {
