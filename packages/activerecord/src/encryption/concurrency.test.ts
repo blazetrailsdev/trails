@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
@@ -6,9 +6,18 @@ import {
   restoreEncryptionConfig,
   makeEncryptedBook,
 } from "./test-helpers.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
+  let adapter: TestDatabaseAdapter;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+
+  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
@@ -22,7 +31,7 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   it("models can be encrypted and decrypted in different threads concurrently", async () => {
     // JS is single-threaded; this exercises concurrent async encrypt/decrypt operations
     // (multiple Promises in flight) to verify no shared-state corruption occurs.
-    const Book = makeEncryptedBook(await freshAdapter());
+    const Book = makeEncryptedBook(adapter);
     new Book();
 
     const names = Array.from({ length: 10 }, (_, i) => `Concurrent Book ${i}`);

@@ -6,7 +6,7 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { Base } from "../index.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -181,7 +181,34 @@ export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise
   await defineSchema(adapter, ENCRYPTION_SCHEMA);
 }
 
-export async function freshAdapter(): Promise<DatabaseAdapter> {
+/**
+ * Creates a `TestDatabaseAdapter` with the shared encryption schema installed.
+ *
+ * Two usage patterns:
+ *
+ * 1. **Per-test (legacy):** call `await freshAdapter()` inside each `it()`.
+ *    Spins up a brand-new adapter+schema for every test — slow but isolated.
+ *
+ * 2. **Transactional fixtures (preferred, B6.4):** call once in `beforeAll`
+ *    and wrap with `withTransactionalFixtures(() => adapter)` so each test
+ *    runs inside a BEGIN/ROLLBACK pair:
+ *
+ *    ```ts
+ *    let adapter: TestDatabaseAdapter;
+ *    beforeAll(async () => { adapter = await freshAdapter(); });
+ *    withTransactionalFixtures(() => adapter);
+ *    ```
+ *
+ *    The returned type is `TestDatabaseAdapter` so it satisfies
+ *    {@link TransactionalFixturesAdapter} without an extra cast.
+ *
+ * Caveat: tests that call {@link makeFreshModel} from inside `it()` bodies
+ * cannot use pattern (2) on MySQL/MariaDB. `makeFreshModel` runs DDL
+ * (`CREATE TABLE`) which auto-commits on MySQL and breaks the outer
+ * BEGIN/ROLLBACK wrap — the next `ROLLBACK TO SAVEPOINT` then errors with
+ * `SAVEPOINT active_record_1 does not exist`. Keep such tests on pattern (1).
+ */
+export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await installEncryptionSchema(adapter);
   return adapter;

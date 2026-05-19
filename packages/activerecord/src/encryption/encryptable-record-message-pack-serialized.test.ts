@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
@@ -8,10 +8,19 @@ import {
   makeMsgPackTextBook,
   assertEncryptedAttribute,
 } from "./test-helpers.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { Encoding as EncodingError } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
+  let adapter: TestDatabaseAdapter;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+
+  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
@@ -23,14 +32,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
   });
 
   it("binary data can be serialized with message pack", async () => {
-    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(await freshAdapter());
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(adapter);
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
     const book = await Book.create({ logo: allBytes });
     await assertEncryptedAttribute(book, "logo", allBytes);
   });
 
   it("binary data can be encrypted uncompressed and serialized with message pack", async () => {
-    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(await freshAdapter());
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized(adapter);
     // Rails: both ranges are 128 bytes (< 140 threshold) so neither is compressed.
     // TS note: highBytes (128–255) encoded as Latin-1 measures as 256 UTF-8 bytes so
     // it may be compressed; the round-trip is correct either way.
@@ -41,7 +50,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
   });
 
   it("text columns cannot be serialized with message pack", async () => {
-    const MsgPackTextBook = makeMsgPackTextBook(await freshAdapter());
+    const MsgPackTextBook = makeMsgPackTextBook(adapter);
     await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(EncodingError);
   });
 });

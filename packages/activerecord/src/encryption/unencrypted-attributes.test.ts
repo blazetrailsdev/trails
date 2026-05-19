@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
@@ -8,11 +8,20 @@ import {
   assertEncryptedAttribute,
   withoutEncryption,
 } from "./test-helpers.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { Configurable } from "./configurable.js";
 import { Decryption as DecryptionError } from "./errors.js";
 
 describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
+  let adapter: TestDatabaseAdapter;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+
+  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
@@ -30,7 +39,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
     // the system IS tolerant of plaintext). supportUnencryptedData = true
     // enables the plaintext-fallback path.
     Configurable.config.supportUnencryptedData = true;
-    const Post = makeEncryptedPost(await freshAdapter());
+    const Post = makeEncryptedPost(adapter);
     new Post();
     const post = await withoutEncryption(() =>
       Post.create({ title: "The Starfleet is here!", body: "take cover!" }),
@@ -50,7 +59,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
     // supportUnencryptedData = false disables the plaintext fallback, so reading
     // an unencrypted column raises DecryptionError.
     Configurable.config.supportUnencryptedData = false;
-    const Post = makeEncryptedPost(await freshAdapter());
+    const Post = makeEncryptedPost(adapter);
     new Post();
     const post = await withoutEncryption(() =>
       Post.create({ title: "The Starfleet is here!", body: "take cover!" }),
