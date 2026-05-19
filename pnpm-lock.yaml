@@ -298,6 +298,9 @@ importers:
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../../packages/globalid
+      '@blazetrails/html-sanitizer':
+        specifier: workspace:*
+        version: link:../../packages/html-sanitizer
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack

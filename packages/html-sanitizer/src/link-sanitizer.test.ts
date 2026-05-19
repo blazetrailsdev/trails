@@ -45,6 +45,16 @@ describe("LinkSanitizer", () => {
     expect(linkSanitize("")).toBe("");
   });
 
+  test("preserves_common_multimedia_tags", () => {
+    expect(linkSanitize('<p>see <img src="x" alt="y"></p>')).toBe(
+      '<p>see <img src="x" alt="y" /></p>',
+    );
+    expect(linkSanitize('<video src="v.mp4"></video>')).toBe('<video src="v.mp4"></video>');
+    expect(linkSanitize("<details><summary>more</summary>info</details>")).toBe(
+      "<details><summary>more</summary>info</details>",
+    );
+  });
+
   test("strip_href_from_non_anchor_elements", () => {
     // LinkSanitizer's TargetScrubber also strips bare 'href' attributes
     // from non-<a> elements (Loofah parity).

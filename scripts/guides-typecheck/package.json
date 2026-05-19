@@ -14,6 +14,7 @@
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
   }
 }
