@@ -890,21 +890,22 @@ export class CallbackChain {
       const prev = chain;
       chain = () => {
         let pendingProceed: Promise<void> | undefined;
-        let proceedSettled = false;
+        let proceedObserved = false;
         const next = (): void | Promise<void> => {
           const r = prev();
-          if (isThenable(r)) {
-            pendingProceed = Promise.resolve(r) as Promise<void>;
-            pendingProceed.then(
-              () => {
-                proceedSettled = true;
-              },
-              () => {
-                proceedSettled = true;
-              },
-            );
-          }
-          return r;
+          if (!isThenable(r)) return r;
+          pendingProceed = Promise.resolve(r) as Promise<void>;
+          // Return a thenable wrapper so we can detect whether the around
+          // actually awaited/chained on next() (real observation) versus
+          // calling it fire-and-forget. `await` and `.then(...)` both invoke
+          // .then on the wrapper; bare `next();` does not.
+          const observed = pendingProceed;
+          return {
+            then(onFulfilled?: any, onRejected?: any) {
+              proceedObserved = true;
+              return observed.then(onFulfilled, onRejected);
+            },
+          } as unknown as Promise<void>;
         };
         let cbResult: void | Promise<void>;
         try {
@@ -934,11 +935,10 @@ export class CallbackChain {
               throw err;
             }
             if (pendingProceed) {
-              // Swallow only when the around had observed next()'s outcome
-              // before resolving (proceedSettled set during its execution) —
-              // i.e., it awaited and may have rescued. Otherwise the around
-              // fired-and-forgot, so propagate the rejection.
-              if (proceedSettled) await pendingProceed.catch(() => {});
+              // Swallow only when the around actually observed next() (awaited
+              // or chained). Fire-and-forget arounds couldn't have rescued, so
+              // propagate the inner rejection.
+              if (proceedObserved) await pendingProceed.catch(() => {});
               else await pendingProceed;
             }
           })();

@@ -137,6 +137,37 @@ describe("Callbacks", () => {
       expect(result).toBe(false);
       expect(target.log).toEqual(["around"]);
     });
+
+    it("fire-and-forget around does not swallow inner rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (_t: any, next: any) => {
+        // intentionally not awaiting / returning next()
+        next();
+      });
+      await expect(
+        runCallbacks(target, "save", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("awaited around can rescue inner rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      let caught: Error | null = null;
+      setCallback(target, "save", "around", async (_t: any, next: any) => {
+        try {
+          await next();
+        } catch (e) {
+          caught = e as Error;
+        }
+      });
+      await runCallbacks(target, "save", async () => {
+        throw new Error("boom");
+      });
+      expect(caught!.message).toBe("boom");
+    });
   });
 
   describe("conditional callbacks", () => {
