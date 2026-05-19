@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/hstore_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   Hstore,
@@ -10,6 +10,7 @@ import {
 } from "../../connection-adapters/postgresql/oid/hstore.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -22,24 +23,14 @@ afterAll(() => {
 // The `hstores` table uses the PG-specific `hstore` type, which isn't
 // expressible via defineSchema. The table is created via raw DDL below;
 // defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await defineSchema(adapter, {});
-  return adapter;
-}
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let HstoreModel: any;
 
   beforeAll(async () => {
-    const setup = new PostgreSQLAdapter(PG_TEST_URL);
-    await setup.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
-    await setup.close();
-  });
-
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await defineSchema(adapter, {});
+    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
     await adapter.exec(`DROP TABLE IF EXISTS hstores`);
     await adapter.exec(`
       CREATE TABLE hstores (
@@ -60,10 +51,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     await HstoreModelCls.loadSchema();
     HstoreModel = HstoreModelCls;
   });
-  afterEach(async () => {
+
+  afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS hstores`);
     await adapter.close();
   });
+
+  withTransactionalFixtures(() => adapter);
 
   async function freshStoreAccessorModel(a: PostgreSQLAdapter): Promise<any> {
     const { Base } = await import("../../index.js");
