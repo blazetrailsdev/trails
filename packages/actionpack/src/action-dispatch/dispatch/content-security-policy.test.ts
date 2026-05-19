@@ -270,27 +270,6 @@ describe("ContentSecurityPolicyTest", () => {
     policy.trustedTypes("default");
     expect(policy.build()).toBe("trusted-types default");
   });
-});
-
-describe("ContentSecurityPolicyIntegrationTest", () => {
-  it("adds nonce to script src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.scriptSrc("'self'");
-    const header = policy.build(undefined, "abc123");
-    expect(header).toContain("'nonce-abc123'");
-  });
-
-  it("adds nonce to style src content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    policy.styleSrc("'self'");
-    const header = policy.build(undefined, "xyz789");
-    expect(header).toContain("'nonce-xyz789'");
-  });
-
-  it("generates no content security policy", () => {
-    const policy = new ContentSecurityPolicy();
-    expect(policy.build()).toBe("");
-  });
 
   // Rails: test_mappings — every MAPPINGS key resolves through a fetch
   // directive (content_security_policy_test.rb).
@@ -317,7 +296,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
 
   // Rails: test_raises_runtime_error_when_unexpected_source — Proc returns
   // an unexpected (non-string) value.
-  it("unexpected dynamic source raises", () => {
+  it("raises runtime error when unexpected source", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc(() => 42 as unknown as string);
     expect(() => policy.build({})).toThrow(/Unexpected|Invalid/);
@@ -359,7 +338,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
   });
 
   // Rails: test_whitespace_validation — embedded whitespace raises.
-  it("whitespace in source raises InvalidDirectiveError", () => {
+  it("whitespace validation", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("foo bar");
     expect(() => policy.build()).toThrow(/whitespace or semicolons/);
@@ -371,6 +350,27 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
     const copy = policy.dup();
     expect(copy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
     expect(copy.build()).toBe("upgrade-insecure-requests");
+  });
+});
+
+describe("ContentSecurityPolicyIntegrationTest", () => {
+  it("adds nonce to script src content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("'self'");
+    const header = policy.build(undefined, "abc123");
+    expect(header).toContain("'nonce-abc123'");
+  });
+
+  it("adds nonce to style src content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.styleSrc("'self'");
+    const header = policy.build(undefined, "xyz789");
+    expect(header).toContain("'nonce-xyz789'");
+  });
+
+  it("generates no content security policy", () => {
+    const policy = new ContentSecurityPolicy();
+    expect(policy.build()).toBe("");
   });
 });
 
