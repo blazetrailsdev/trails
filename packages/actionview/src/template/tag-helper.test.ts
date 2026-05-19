@@ -7,6 +7,10 @@ import {
   classNames,
   cdataSection,
   escapeOnce,
+  TagBuilder,
+  tagBuilder,
+  safeJoin,
+  toSentence,
 } from "../helpers/tag-helper.js";
 import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 import { raw } from "../helpers/output-safety-helper.js";
@@ -821,5 +825,56 @@ describe("TagHelperTest", () => {
   it("respond to", () => {
     const t = tag() as any;
     expect("any_tag" in t).toBe(true);
+  });
+
+  describe("TagBuilder", () => {
+    it("constructor stores view context", () => {
+      const ctx = { _outputBuffer: null };
+      const builder = new TagBuilder(ctx);
+      expect(builder.viewContext).toBe(ctx);
+    });
+
+    it("tagString builds a content tag", () => {
+      const builder = new TagBuilder();
+      expect(builder.tagString("p", "Hi").toString()).toBe("<p>Hi</p>");
+      expect(builder.tagString("p", null, { class: "x" }).toString()).toBe('<p class="x"></p>');
+      expect(builder.tagString("p", null, undefined, { block: () => "Yo" }).toString()).toBe(
+        "<p>Yo</p>",
+      );
+    });
+
+    it("defineVoidElement registers a void element", () => {
+      TagBuilder.defineVoidElement("custom-void");
+      const t = tag() as any;
+      expect(t["custom-void"]().toString()).toBe("<custom-void>");
+    });
+
+    it("defineSelfClosingElement registers a self-closing element", () => {
+      TagBuilder.defineSelfClosingElement("custom-selfclose");
+      const t = tag() as any;
+      expect(t["custom-selfclose"]().toString()).toBe("<custom-selfclose />");
+    });
+
+    it("defineElement with methodName aliases", () => {
+      TagBuilder.defineElement("my-elem", { methodName: "my_alias" });
+      const t = tag() as any;
+      expect(t.my_alias("x").toString()).toBe("<my-elem>x</my-elem>");
+    });
+  });
+
+  describe("tagBuilder()", () => {
+    it("returns the shared TagBuilder proxy", () => {
+      const b = tagBuilder() as any;
+      expect(b.span("hi").toString()).toBe("<span>hi</span>");
+    });
+  });
+
+  describe("OutputSafetyHelper re-exports", () => {
+    it("safeJoin", () => {
+      expect(safeJoin(["a", "b"], "-").toString()).toBe("a-b");
+    });
+    it("toSentence", () => {
+      expect(toSentence(["a", "b", "c"]).toString()).toBe("a, b, and c");
+    });
   });
 });

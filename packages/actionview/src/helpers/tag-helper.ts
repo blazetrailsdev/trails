@@ -5,7 +5,12 @@ import {
   htmlEscapeOnce,
   xmlNameEscape,
 } from "@blazetrails/activesupport";
-import { safeJoin } from "./output-safety-helper.js";
+import {
+  raw as _raw,
+  safeJoin as _safeJoin,
+  toSentence as _toSentence,
+  type ToSentenceOptions,
+} from "./output-safety-helper.js";
 
 /**
  * ActionView::Helpers::TagHelper
@@ -433,6 +438,13 @@ export function escapeOnce(html: string): SafeBuffer {
  * TagBuilder — modern HTML5 tag builder accessed via tag.div, tag.p, etc.
  */
 export class TagBuilder {
+  /** @internal */
+  viewContext: unknown;
+
+  constructor(viewContext?: unknown) {
+    this.viewContext = viewContext;
+  }
+
   /**
    * attributes() — transforms a hash into HTML attributes string.
    */
@@ -443,10 +455,89 @@ export class TagBuilder {
   }
 
   /**
+   * tagString() — low-level builder used by the dynamic dispatch methods.
+   * Mirrors `TagBuilder#tag_string`.
+   */
+  tagString(
+    name: string,
+    content: unknown,
+    options?: Record<string, unknown> | null,
+    opts?: { escape?: boolean; block?: (tagBuilder: TagBuilder) => unknown },
+  ): SafeBuffer {
+    const escape = opts?.escape !== false;
+    let actualContent: unknown = content;
+    if (opts?.block) {
+      const vc = this.viewContext as { capture?: (b: TagBuilder, fn: () => unknown) => unknown };
+      actualContent =
+        vc && typeof vc.capture === "function"
+          ? vc.capture(this, () => opts.block!(this))
+          : opts.block(this);
+    }
+    return contentTagString(name, actualContent, options ?? undefined, escape);
+  }
+
+  /**
+   * defineElement — registers a content-bearing element. Mirrors
+   * `TagBuilder.define_element`. The Proxy already dispatches arbitrary
+   * element names; calling this explicitly is only needed when a non-default
+   * tag name should be reachable through a different method name.
+   */
+  static defineElement(name: string, opts?: { methodName?: string }): void {
+    if (opts?.methodName && opts.methodName !== name) {
+      METHOD_TO_TAG_NAME[opts.methodName] = name;
+    }
+  }
+
+  /**
+   * defineVoidElement — registers a void element (no closing tag, no content).
+   */
+  static defineVoidElement(name: string, opts?: { methodName?: string }): void {
+    VOID_ELEMENTS.add(name);
+    if (opts?.methodName && opts.methodName !== name) {
+      METHOD_TO_TAG_NAME[opts.methodName] = name;
+    }
+  }
+
+  /**
+   * defineSelfClosingElement — registers a self-closing SVG-style element.
+   */
+  static defineSelfClosingElement(name: string, opts?: { methodName?: string }): void {
+    SELF_CLOSING_ELEMENTS.add(name);
+    if (opts?.methodName && opts.methodName !== name) {
+      METHOD_TO_TAG_NAME[opts.methodName] = name;
+    }
+  }
+
+  /**
    * Dynamic element methods are handled via Proxy
    */
 
   [key: string]: unknown;
+}
+
+/**
+ * tagBuilder() — returns the shared TagBuilder proxy. Mirrors the private
+ * `TagHelper#tag_builder` accessor.
+ *
+ * @internal
+ */
+export function tagBuilder(): TagBuilder {
+  return getTagBuilder();
+}
+
+/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
+export function raw(stringish: unknown): SafeBuffer {
+  return _raw(stringish);
+}
+
+/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
+export function safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer {
+  return _safeJoin(array, sep);
+}
+
+/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
+export function toSentence(array: unknown[], options?: ToSentenceOptions): SafeBuffer {
+  return _toSentence(array, options);
 }
 
 function createTagBuilderProxy(): TagBuilder {
@@ -466,6 +557,8 @@ function createTagBuilderProxy(): TagBuilder {
       // Known own properties
       if (
         prop === "attributes" ||
+        prop === "tagString" ||
+        prop === "viewContext" ||
         prop === "constructor" ||
         prop === "publicMethods" ||
         prop === "public_methods"
