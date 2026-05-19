@@ -46,9 +46,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     adapter = freshAdapter();
     // Schema covers the shared Developer/Project/DeveloperProject family
     // used by the majority of tests in this describe. Tests further down
-    // that build their own `createTestAdapter()` adapter and declare
-    // inline classes seed their own schema inline next to the adapter
-    // construction.
+    // that declare their own inline classes reuse this per-test adapter;
+    // those that hit the database also seed additional tables via
+    // `defineSchema` next to the class declarations, while reflection-
+    // or validation-only tests skip the schema step.
     await defineSchema(adapter, {
       developers: { name: "string", salary: "integer" },
       projects: { name: "string", approved: "boolean", featured: "boolean" },
@@ -629,7 +630,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     // signature (vendor/rails/activerecord/lib/active_record/associations.rb:1870-1871):
     // the macro-time scope flows positionally into the reflection, not
     // into the options bag. This is the exact wire the PR adds.
-    const a5 = createTestAdapter();
+    const a5 = adapter;
     class ScDev extends Base {
       static {
         this.attribute("name", "string");
@@ -1152,7 +1153,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("association with validate false does not run associated validation callbacks on create", async () => {
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     class RichPerson extends Base {
       static {
         this.attribute("first_name", "string");
@@ -1186,7 +1187,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("association with validate false does not run associated validation callbacks on update", async () => {
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     await defineSchema(a2, {
       rich_person2s: { first_name: "string" },
       treasure2s: { name: "string" },
@@ -1226,7 +1227,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("custom join table", async () => {
     // Use a differently-named join table model but with conventional FK columns
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     await defineSchema(a2, {
       cj_developers: { name: "string" },
       cj_projects: { name: "string" },
@@ -1334,7 +1335,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("association name is the same as join table name", async () => {
     // Use a join table model whose name matches the association name
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     await defineSchema(a2, {
       same_devs: { name: "string" },
       same_projs: { name: "string" },
@@ -1479,7 +1480,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   // ==========================================================================
 
   it("layers destroyAssociations chain for multiple HABTMs on one class", async () => {
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     await defineSchema(a2, {
       multi_owners: { name: "string" },
       tag_as: { name: "string" },
@@ -1540,7 +1541,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("subclass HABTM extends destroyAssociations chain via super", async () => {
-    const a2 = createTestAdapter();
+    const a2 = adapter;
     await defineSchema(a2, {
       parent_owners: { name: "string" },
       child_owners: { name: "string" },
