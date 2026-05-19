@@ -1,176 +1,275 @@
-import { describe, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { HashConfig } from "./hash-config.js";
+import { AdapterNotFound } from "../errors.js";
+import * as connectionAdapters from "../connection-adapters.js";
+import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+// connection-handling registers the adapter class resolver that validateBang()
+// relies on; import it so this suite isn't order-dependent.
+import "../connection-handling.js";
+
+connectionAdapters.register("abstract", async () => AbstractAdapter as any);
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTest", () => {
-    it.skip("pool default when nil", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
-    it.skip("pool overrides with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("pool default when nil", () => {
+      const config = new HashConfig("default_env", "primary", {
+        pool: null as any,
+        adapter: "abstract",
+      });
+      expect(config.pool).toBe(5);
     });
-    it.skip("when no pool uses default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("pool overrides with value", () => {
+      const config = new HashConfig("default_env", "primary", { pool: "0", adapter: "abstract" });
+      expect(config.pool).toBe(0);
     });
-    it.skip("min threads with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("when no pool uses default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.pool).toBe(5);
     });
-    it.skip("min threads default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("min threads with value", () => {
+      const config = new HashConfig("default_env", "primary", {
+        minThreads: "1",
+        adapter: "abstract",
+      });
+      expect(config.minThreads).toBe(1);
     });
-    it.skip("max threads with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("min threads default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.minThreads).toBe(0);
     });
-    it.skip("max threads default uses pool default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("max threads with value", () => {
+      const config = new HashConfig("default_env", "primary", {
+        maxThreads: "10",
+        adapter: "abstract",
+      });
+      expect(config.maxThreads).toBe(10);
     });
-    it.skip("max threads uses pool when set", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("max threads default uses pool default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.pool).toBe(5);
+      expect(config.maxThreads).toBe(5);
     });
-    it.skip("max queue is pool multiplied by 4", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("max threads uses pool when set", () => {
+      const config = new HashConfig("default_env", "primary", { pool: 1, adapter: "abstract" });
+      expect(config.pool).toBe(1);
+      expect(config.maxThreads).toBe(1);
     });
-    it.skip("checkout timeout default when nil", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("max queue is pool multiplied by 4", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.maxThreads).toBe(5);
+      expect(config.maxQueue).toBe(config.maxThreads * 4);
     });
-    it.skip("checkout timeout overrides with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("checkout timeout default when nil", () => {
+      const config = new HashConfig("default_env", "primary", {
+        checkoutTimeout: null as any,
+        adapter: "abstract",
+      });
+      expect(config.checkoutTimeout).toBe(5.0);
     });
-    it.skip("when no checkout timeout uses default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("checkout timeout overrides with value", () => {
+      const config = new HashConfig("default_env", "primary", {
+        checkoutTimeout: "0",
+        adapter: "abstract",
+      });
+      expect(config.checkoutTimeout).toBe(0.0);
     });
-    it.skip("reaping frequency default when nil", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("when no checkout timeout uses default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.checkoutTimeout).toBe(5.0);
     });
-    it.skip("reaping frequency overrides with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("reaping frequency default when nil", () => {
+      const config = new HashConfig("default_env", "primary", {
+        reapingFrequency: null,
+        adapter: "abstract",
+      });
+      expect(config.reapingFrequency).toBeNull();
     });
-    it.skip("when no reaping frequency uses default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("reaping frequency overrides with value", () => {
+      const config = new HashConfig("default_env", "primary", {
+        reapingFrequency: "0",
+        adapter: "abstract",
+      });
+      expect(config.reapingFrequency).toBe(0.0);
     });
-    it.skip("idle timeout default when nil", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("when no reaping frequency uses default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.reapingFrequency).toBe(60.0);
     });
-    it.skip("idle timeout overrides with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("idle timeout default when nil", () => {
+      const config = new HashConfig("default_env", "primary", {
+        idleTimeout: null,
+        adapter: "abstract",
+      });
+      expect(config.idleTimeout).toBeNull();
     });
-    it.skip("when no idle timeout uses default", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("idle timeout overrides with value", () => {
+      const config = new HashConfig("default_env", "primary", {
+        idleTimeout: "1",
+        adapter: "abstract",
+      });
+      expect(config.idleTimeout).toBe(1.0);
     });
-    it.skip("idle timeout nil when less than or equal to zero", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("when no idle timeout uses default", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.idleTimeout).toBe(300.0);
     });
-    it.skip("default schema dump value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("idle timeout nil when less than or equal to zero", () => {
+      const config = new HashConfig("default_env", "primary", {
+        idleTimeout: "0",
+        adapter: "abstract",
+      });
+      expect(config.idleTimeout).toBeNull();
     });
-    it.skip("schema dump value set to filename", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("default schema dump value", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      // trails default schema format is "ts" (Rails: "ruby" → "schema.rb").
+      expect(config.schemaDump()).toBe("schema.ts");
+      expect(config.schemaDump("ruby")).toBe("schema.rb");
     });
-    it.skip("schema dump value set to nil", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema dump value set to filename", () => {
+      const config = new HashConfig("default_env", "primary", {
+        schemaDump: "my_schema.rb",
+        adapter: "abstract",
+      });
+      expect(config.schemaDump()).toBe("my_schema.rb");
     });
-    it.skip("schema dump value set to false", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema dump value set to nil", () => {
+      const config = new HashConfig("default_env", "primary", {
+        schemaDump: null,
+        adapter: "abstract",
+      });
+      expect(config.schemaDump()).toBeNull();
     });
-    it.skip("database tasks defaults to true", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema dump value set to false", () => {
+      const config = new HashConfig("default_env", "primary", {
+        schemaDump: false,
+        adapter: "abstract",
+      });
+      expect(config.schemaDump()).toBeNull();
     });
-    it.skip("database tasks overrides with value", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("database tasks defaults to true", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.databaseTasks()).toBe(true);
     });
-    it.skip("schema cache path default for primary", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("database tasks overrides with value", () => {
+      let config = new HashConfig("default_env", "primary", {
+        databaseTasks: false,
+        adapter: "abstract",
+      });
+      expect(config.databaseTasks()).toBe(false);
+
+      config = new HashConfig("default_env", "primary", {
+        databaseTasks: "str" as any,
+        adapter: "abstract",
+      });
+      expect(config.databaseTasks()).toBe(true);
     });
-    it.skip("schema cache path default for custom name", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema cache path default for primary", () => {
+      const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      // trails writes JSON, not YAML (no Ruby Marshal/YAML in TS).
+      expect(config.defaultSchemaCachePath()).toBe("db/schema_cache.json");
     });
-    it.skip("schema cache path default for different db dir", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema cache path default for custom name", () => {
+      const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
+      expect(config.defaultSchemaCachePath()).toBe("db/alternate_schema_cache.json");
     });
-    it.skip("schema cache path configuration hash", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema cache path default for different db dir", () => {
+      const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
+      expect(config.defaultSchemaCachePath("my_db")).toBe("my_db/alternate_schema_cache.json");
     });
-    it.skip("lazy schema cache path", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("schema cache path configuration hash", () => {
+      const config = new HashConfig("default_env", "primary", {
+        schemaCachePath: "db/config_schema_cache.yml",
+        adapter: "abstract",
+      });
+      expect(config.schemaCachePath).toBe("db/config_schema_cache.yml");
     });
-    it.skip("lazy schema cache path uses default if config is not present", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("lazy schema cache path", () => {
+      const config = new HashConfig("default_env", "primary", {
+        schemaCachePath: "db/config_schema_cache.yml",
+        adapter: "abstract",
+      });
+      expect(config.lazySchemaCachePath()).toBe("db/config_schema_cache.yml");
     });
-    it.skip("validate checks the adapter exists", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("lazy schema cache path uses default if config is not present", () => {
+      const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
+      expect(config.lazySchemaCachePath()).toBe("db/alternate_schema_cache.json");
     });
-    it.skip("inspect does not show secrets", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("validate checks the adapter exists", async () => {
+      const ok = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      await expect(ok.validateBang()).resolves.toBe(true);
+
+      const bad = new HashConfig("default_env", "primary", { adapter: "potato" });
+      await expect(bad.validateBang()).rejects.toBeInstanceOf(AdapterNotFound);
     });
-    it.skip("seeds defaults to primary", () => {
-      // BLOCKED: connection-pool — database configuration parsing gap in hash-config
-      // ROOT-CAUSE: database-configurations.ts or connection-url-resolver.ts missing Rails parity for config resolution
-      // SCOPE: ~30–50 LOC fix in database-configurations.ts; affects ~5–34 tests in hash-config.test.ts
+
+    it("inspect does not show secrets", () => {
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "abstract",
+        password: "hunter2",
+      });
+      const out = config.inspect();
+      expect(out).not.toContain("hunter2");
+      expect(out).toContain("env_name=default_env");
+      expect(out).toContain("name=primary");
+    });
+
+    it("seeds defaults to primary", () => {
+      let config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.seeds).toBe(true);
+
+      config = new HashConfig("default_env", "primary", { adapter: "abstract", seeds: false });
+      expect(config.seeds).toBe(false);
+
+      config = new HashConfig("default_env", "primary", { adapter: "abstract", seeds: true });
+      expect(config.seeds).toBe(true);
+
+      config = new HashConfig("default_env", "secondary", { adapter: "abstract" });
+      vi.spyOn(config, "isPrimary").mockReturnValue(false);
+      expect(config.seeds).toBe(false);
+
+      config = new HashConfig("default_env", "secondary", { adapter: "abstract", seeds: false });
+      vi.spyOn(config, "isPrimary").mockReturnValue(false);
+      expect(config.seeds).toBe(false);
+
+      config = new HashConfig("default_env", "secondary", { adapter: "abstract", seeds: true });
+      vi.spyOn(config, "isPrimary").mockReturnValue(false);
+      expect(config.seeds).toBe(true);
     });
   });
 });
