@@ -482,11 +482,29 @@ export class DatabaseTasks {
   /** @internal */
   static eachLocalConfiguration(): DatabaseConfig[] {
     if (!this.databaseConfiguration) return [];
-    return this.databaseConfiguration.configurations.filter((c) => {
-      if (!c.database) return false;
-      const host = c.host;
-      return !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
-    });
+    const result: DatabaseConfig[] = [];
+    for (const c of this.databaseConfiguration.configsFor()) {
+      if (!c.database) continue;
+      if (this._localDatabase(c)) {
+        result.push(c);
+      } else {
+        const stderr = (globalThis as { process?: { stderr?: { write: (s: string) => unknown } } })
+          .process?.stderr;
+        stderr?.write?.(
+          `This task only modifies local databases. ${c.database} is on a remote host.\n`,
+        );
+      }
+    }
+    return result;
+  }
+
+  // Mirrors Rails: LOCAL_HOSTS = ["127.0.0.1", "localhost"] + host.blank?
+  // (blank? treats whitespace-only strings as blank, so we trim before
+  // comparing.)
+  /** @internal */
+  static _localDatabase(c: DatabaseConfig): boolean {
+    const host = c.host?.trim();
+    return !host || host === "localhost" || host === "127.0.0.1";
   }
 
   static cacheDumpFilename(
@@ -1146,8 +1164,7 @@ export function eachCurrentEnvironment(environment: string): string[] {
 
 /** @internal */
 export function isLocalDatabase(dbConfig: DatabaseConfig): boolean {
-  const host = dbConfig.host;
-  return !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
+  return DatabaseTasks._localDatabase(dbConfig);
 }
 
 /** @internal */

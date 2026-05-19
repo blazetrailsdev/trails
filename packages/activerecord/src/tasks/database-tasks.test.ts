@@ -162,6 +162,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
+    vi.restoreAllMocks();
   });
 
   it("ignores configurations without databases", async () => {
@@ -172,17 +173,27 @@ describe("DatabaseTasksCreateAllTest", () => {
     expect(created).toHaveLength(0);
   });
 
-  it.skip("ignores remote databases", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs remote host detection */
+  it("ignores remote databases", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+    });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await DatabaseTasks.createAll();
+    expect(created).toHaveLength(0);
   });
-  it.skip("warning for remote databases", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs remote host detection */
+  it("warning for remote databases", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+    });
+    const writes: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    await DatabaseTasks.createAll();
+    expect(writes.join("")).toMatch(
+      /This task only modifies local databases\. dev\.db is on a remote host\./,
+    );
   });
 
   it("creates configurations with local ip", async () => {
@@ -222,6 +233,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "sqlite3", database: "dev.db" },
       test: { adapter: "sqlite3", database: "test.db" },
+      production: { url: "sqlite3://prod-db-host/prod-db" },
     });
   });
   afterEach(() => {
@@ -236,11 +248,10 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     expect(created).toContain("test:test.db");
   });
 
-  it.skip("creates current environment database with url", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs URL config */
+  it("creates current environment database with url", async () => {
+    DatabaseTasks.env = "production";
+    await DatabaseTasks.createCurrent("production");
+    expect(created).toContain("production:/prod-db");
   });
 
   it("creates test and development databases when env was not specified", async () => {
@@ -256,11 +267,18 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     expect(created.length).toBe(2);
   });
 
-  it.skip("creates development database without test database when skip test database", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
-    /* needs skip_test_database config */
+  it("creates development database without test database when skip test database", async () => {
+    const prev = process.env.SKIP_TEST_DATABASE;
+    process.env.SKIP_TEST_DATABASE = "true";
+    try {
+      DatabaseTasks.env = "development";
+      await DatabaseTasks.createCurrent();
+      expect(created).toContain("development:dev.db");
+      expect(created.some((c) => c.startsWith("test:"))).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.SKIP_TEST_DATABASE;
+      else process.env.SKIP_TEST_DATABASE = prev;
+    }
   });
   it.skip("establishes connection for the given environments", () => {
     // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
@@ -287,6 +305,10 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
       test: {
         primary: { adapter: "sqlite3", database: "test_primary.db" },
       },
+      production: {
+        primary: { url: "sqlite3://prod-db-host/prod-db" },
+        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+      },
     });
   });
   afterEach(() => {
@@ -302,10 +324,11 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     expect(created[0]).toContain("test");
   });
 
-  it.skip("creates current environment database with url", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("creates current environment database with url", async () => {
+    DatabaseTasks.env = "production";
+    await DatabaseTasks.createCurrent("production");
+    expect(created).toContain("production:primary:/prod-db");
+    expect(created).toContain("production:secondary:/secondary-prod-db");
   });
 
   it("creates test and development databases when env was not specified", async () => {
@@ -341,6 +364,7 @@ describe("DatabaseTasksDropAllTest", () => {
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = null;
+    vi.restoreAllMocks();
   });
 
   it("ignores configurations without databases", async () => {
@@ -351,15 +375,27 @@ describe("DatabaseTasksDropAllTest", () => {
     expect(dropped).toHaveLength(0);
   });
 
-  it.skip("ignores remote databases", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("ignores remote databases", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+    });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await DatabaseTasks.dropAll();
+    expect(dropped).toHaveLength(0);
   });
-  it.skip("warning for remote databases", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("warning for remote databases", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: "dev.db", host: "my.server.tld" },
+    });
+    const writes: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      writes.push(String(chunk));
+      return true;
+    });
+    await DatabaseTasks.dropAll();
+    expect(writes.join("")).toMatch(
+      /This task only modifies local databases\. dev\.db is on a remote host\./,
+    );
   });
 
   it("drops configurations with local ip", async () => {
@@ -399,6 +435,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "sqlite3", database: "dev.db" },
       test: { adapter: "sqlite3", database: "test.db" },
+      production: { url: "sqlite3://prod-db-host/prod-db" },
     });
   });
   afterEach(() => {
@@ -413,10 +450,17 @@ describe("DatabaseTasksDropCurrentTest", () => {
     expect(dropped).toContain("test:test.db");
   });
 
-  it.skip("drops current environment database with url", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("drops current environment database with url", async () => {
+    const prev = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+    process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
+    try {
+      DatabaseTasks.env = "production";
+      await DatabaseTasks.dropCurrent("production");
+      expect(dropped).toContain("production:/prod-db");
+    } finally {
+      if (prev === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+      else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = prev;
+    }
   });
 
   it("drops test and development databases when env was not specified", async () => {
@@ -450,6 +494,10 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
       test: {
         primary: { adapter: "sqlite3", database: "test.db" },
       },
+      production: {
+        primary: { url: "sqlite3://prod-db-host/prod-db" },
+        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+      },
     });
   });
   afterEach(() => {
@@ -464,10 +512,18 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
     expect(dropped).toHaveLength(1);
   });
 
-  it.skip("drops current environment database with url", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("drops current environment database with url", async () => {
+    const prev = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+    process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
+    try {
+      DatabaseTasks.env = "production";
+      await DatabaseTasks.dropCurrent("production");
+      expect(dropped).toContain("production:primary");
+      expect(dropped).toContain("production:secondary");
+    } finally {
+      if (prev === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+      else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = prev;
+    }
   });
 
   it("drops test and development databases when env was not specified", async () => {
@@ -670,10 +726,23 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
     expect(truncated.length).toBe(2);
   });
 
-  it.skip("truncate all databases with url for environment", () => {
-    // BLOCKED: migration — DatabaseTasks feature gap in database-tasks
-    // ROOT-CAUSE: tasks/database-tasks.ts missing Rails parity for task lifecycle (create/drop/migrate/schema)
-    // SCOPE: ~50–100 LOC fix in tasks/database-tasks.ts; affects ~26 tests in database-tasks.test.ts
+  it("truncate all databases with url for environment", async () => {
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      production: {
+        primary: { url: "sqlite3://prod-db-host/prod-db" },
+        secondary: { url: "sqlite3://secondary-prod-db-host/secondary-prod-db" },
+      },
+    });
+    const prev = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+    process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
+    try {
+      await DatabaseTasks.truncateAll("production");
+      expect(truncated).toContain("production:/prod-db");
+      expect(truncated).toContain("production:/secondary-prod-db");
+    } finally {
+      if (prev === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
+      else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = prev;
+    }
   });
 
   it("truncate all development databases when env is not specified", async () => {
