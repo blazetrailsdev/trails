@@ -2,13 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, ReadOnlyRecord } from "./index.js";
 import { ReadonlyAttributeError } from "./readonly-attributes.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   posts: { title: "string" },
@@ -19,17 +19,18 @@ const TEST_SCHEMA = {
 } as const;
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
@@ -177,10 +178,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
@@ -221,11 +223,12 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("cant save readonly record", async () => {
     class Post extends Base {
@@ -258,10 +261,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("marks loaded records as readonly", async () => {
     class Item extends Base {
@@ -279,8 +283,13 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => adapter);
+
   it("allows setting readonly attributes on create", async () => {
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -299,7 +308,6 @@ describe("ReadonlyTest", () => {
     // on a persisted-record write to an attr_readonly column (readonly_attributes.rb
     // line 49). The Rails test by this name in newer Rails asserts that
     // behavior — the "ignores" wording pre-dates the raise being added.
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -323,7 +331,6 @@ describe("ReadonlyTest", () => {
   });
 
   it("exposes readonlyAttributes list", async () => {
-    const adapter = await freshAdapter();
     class Product extends Base {
       static _tableName = "products";
     }
@@ -337,10 +344,11 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("readonly records cannot be saved", async () => {
     class User extends Base {
@@ -358,11 +366,12 @@ describe("ReadonlyTest", () => {
 });
 
 describe("ReadonlyTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "readonly record cannot be saved"
   it("cant save readonly record", async () => {

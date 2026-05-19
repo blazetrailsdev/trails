@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { performance } from "node:perf_hooks";
 import { Base } from "./index.js";
 import { hasSecurePassword } from "./secure-password.js";
 import { setTokenForSecret } from "./generates-token-for.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
 
 // Union of every column referenced by tests in this file; per-test attribute
 // differences are immaterial (sqlite ignores unread columns).
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, {
     users: {
@@ -29,11 +29,12 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // -- Phase 2000: Core --
 
 describe("secure_password", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("hashes password on save and authenticates", async () => {
     class User extends Base {
@@ -98,11 +99,12 @@ describe("secure_password", () => {
 });
 
 describe("SecurePassword (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "authenticate with correct password"
   it("authenticate returns the user on success", async () => {
@@ -181,10 +183,14 @@ describe("SecurePassword (Rails-guided)", () => {
 });
 
 describe("password reset token", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => adapter);
+
+  beforeEach(() => {
     setTokenForSecret("test-reset-token-secret");
   });
 
@@ -307,11 +313,12 @@ describe("password reset token", () => {
 });
 
 describe("SecurePasswordTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   // Builds a User class with the union of attributes used across these tests.
   // Per-test attribute differences in Rails are immaterial for these tests
@@ -491,10 +498,11 @@ describe("SecurePasswordTest", () => {
 });
 
 describe("hasSecurePassword — per-attribute confirmation, challenge, and salt", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   const makeModel = () => {
     class User extends Base {

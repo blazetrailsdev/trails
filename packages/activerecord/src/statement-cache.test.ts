@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Attribute, ValueType } from "@blazetrails/activemodel";
 import {
   StatementCache,
@@ -9,26 +9,22 @@ import {
   Params,
   BindMap,
 } from "./statement-cache.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 describe("StatementCacheTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       books: { name: "string", title: "string" },
       authors: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
