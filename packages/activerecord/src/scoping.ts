@@ -1,6 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 
-const SCOPE_REGISTRY_KEY = "active_record_scoped_methods";
+const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
 /**
  * Scoping module — manages current scope and scope registry.
