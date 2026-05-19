@@ -1,23 +1,20 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 
-beforeAll(() => {
+beforeAll(async () => {
   adapter = createTestAdapter();
-});
-beforeEach(async () => {
-  I18n.reset();
   await defineSchema(adapter, { topics: { title: "string" } });
 });
-afterAll(async () => {
-  await dropAllTables(adapter);
+beforeEach(() => {
+  I18n.reset();
 });
+withTransactionalFixtures(() => adapter);
 
 describe("ActiveRecordI18nTests", () => {
   it("translated model attributes", () => {

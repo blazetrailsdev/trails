@@ -2,13 +2,13 @@
  * Tests for ActiveRecord::AttributeAssignment
  * Mirrors: activerecord/test/cases/attribute_assignment_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
 import { typeCastAttributeValue, findParameterPosition } from "./attribute-assignment.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: { title: "string", author: "string" },
@@ -16,21 +16,17 @@ const TEST_SCHEMA = {
   events: { title: "string", starts_at: "datetime", starts_on: "date" },
 } as const;
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 // ==========================================================================
 // AttributeAssignmentTest — targets attribute_assignment_test.rb
 // ==========================================================================
 describe("AttributeAssignmentTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("bulk assign attributes", () => {
     class Topic extends Base {

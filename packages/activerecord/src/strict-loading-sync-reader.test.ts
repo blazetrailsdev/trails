@@ -6,12 +6,11 @@
 //
 // Preserves Rails default (off) — strict loading is opt-in.
 
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, registerModel, StrictLoadingViolationError } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -22,7 +21,7 @@ afterAll(() => {
 });
 
 describe("strict loading — sync singular reader (Phase R.3)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class SrAuthor extends Base {
     declare name: string;
@@ -52,7 +51,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   SrAuthor.hasOne("srProfile", { className: "SrProfile" });
   SrPost.belongsTo("srAuthor", { className: "SrAuthor" });
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       sr_authors: { name: "string" },
@@ -67,6 +66,7 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     registerModel(SrPost);
     registerModel(SrProfile);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("sync belongsTo access throws when strict loading is enabled and not loaded", async () => {
     const author = new SrAuthor({ name: "dean" });
@@ -208,9 +208,5 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect(((post as any).srAuthor as SrAuthor).name).toBe("dean");
     // Reader should have marked it loaded as a side effect.
     expect(assoc.loaded).toBe(true);
-  });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
   });
 });

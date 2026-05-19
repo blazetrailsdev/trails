@@ -2,24 +2,20 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 describe("DupTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { topics: { title: "string", body: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Topic extends Base {
@@ -168,11 +164,12 @@ describe("DupTest", () => {
 });
 
 describe("DupTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { items: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("creates an unsaved copy without primary key", async () => {
     class Item extends Base {
@@ -191,11 +188,12 @@ describe("DupTest", () => {
 });
 
 describe("DupTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { animals: { name: "string" }, users: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("transforms a record to another class", async () => {
     class Animal extends Base {

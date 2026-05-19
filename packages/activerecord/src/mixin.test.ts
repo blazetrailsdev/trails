@@ -1,22 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 describe("TouchTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       mixins: { lft: "integer", updated_at: "datetime", created_at: "datetime" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterEach(() => {
     vi.useRealTimers();

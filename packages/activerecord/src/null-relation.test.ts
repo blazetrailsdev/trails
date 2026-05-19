@@ -2,18 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -27,16 +21,13 @@ afterAll(() => {
 // NullRelationTest — targets null_relation_test.rb
 // ==========================================================================
 describe("NullRelationTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { posts: { title: "string" } });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("none chainable", async () => {
     class Post extends Base {
@@ -76,15 +67,12 @@ describe("NullRelationTest", () => {
 });
 
 describe("NullRelationTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { posts: { title: "string" } });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
@@ -139,15 +127,12 @@ describe("NullRelationTest", () => {
 });
 
 describe("NullRelationTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { items: { name: "string" }, devs: { name: "string" } });
   });
-
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("none returns empty for all terminal methods", async () => {
     class Item extends Base {

@@ -1,16 +1,20 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base, Relation } from "./index.js";
 import { registerModel } from "./associations.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 
-beforeAll(() => {
+beforeAll(async () => {
   adapter = createTestAdapter();
+  await defineSchema(adapter, {
+    post_classes: { title: "string", status: "string" },
+  });
 });
+withTransactionalFixtures(() => adapter);
 
 describe("QueryingTest — static forwarders on Base", () => {
   let Post: typeof Base;
@@ -24,12 +28,6 @@ describe("QueryingTest — static forwarders on Base", () => {
       }
     }
     Post = PostClass;
-  });
-
-  beforeEach(async () => {
-    await defineSchema(adapter, {
-      post_classes: { title: "string", status: "string" },
-    });
   });
 
   it("includes() returns a Relation without throwing", () => {

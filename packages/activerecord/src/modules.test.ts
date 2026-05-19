@@ -2,16 +2,16 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 describe("ModulesTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       accounts: { name: "string" },
@@ -23,6 +23,7 @@ describe("ModulesTest", () => {
       posts: { title: "string", author_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it.skip("module spanning associations", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
