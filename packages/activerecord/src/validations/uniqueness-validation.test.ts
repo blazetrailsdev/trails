@@ -10,14 +10,6 @@ import { createTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
-// Cluster A schema — covers `UniquenessValidationTest` (first describe).
-// Remaining describes still use sync `freshAdapter()` and will be migrated
-// in cluster B/C/D follow-up PRs.
 const CLUSTER_A_SCHEMA = {
   posts: {
     title: "string",
