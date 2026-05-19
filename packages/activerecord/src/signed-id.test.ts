@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base, RecordNotFound, registerSubclass } from "./index.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -10,9 +10,9 @@ import { setSignedIdVerifierSecret, setSignedIdVerifier, signedIdVerifier } from
 import { UnknownPrimaryKey } from "./errors.js";
 import { SignedGlobalID, setApp, _resetApp } from "@blazetrails/globalid";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // Tables referenced by ad-hoc model classes declared per-test in this
 // file. Each `class X extends Base` derives its table via Rails-style
@@ -30,16 +30,19 @@ const TEST_SCHEMA: Schema = {
   mateys: { columns: { name: "string" }, primaryKey: false },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("SignedIdTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
+  });
+  withTransactionalFixtures(() => adapter);
+  beforeEach(() => {
     setSignedIdVerifierSecret("blazetrails-test-secret");
   });
 

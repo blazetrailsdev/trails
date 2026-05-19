@@ -2,11 +2,11 @@
  * Autosave association tests.
  * Mirrors: activerecord/test/cases/autosave_association_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import {
   markForDestruction,
   isMarkedForDestruction,
@@ -28,7 +28,7 @@ const TEST_SCHEMA = {
   pirate_ships: { name: "string", pirate_id: "integer" },
 } as const;
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
@@ -39,11 +39,12 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("markForDestruction and isMarkedForDestruction", () => {
     class Post extends Base {
@@ -154,7 +155,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Company extends Base {
     static {
@@ -169,7 +170,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Company.adapter = adapter;
     Account.adapter = adapter;
@@ -178,6 +179,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
     Associations.hasOne.call(Company, "account", { autosave: true });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("test_should_save_parent_but_not_invalid_child", async () => {
     const company = new Company({ name: "Acme" });
@@ -247,7 +249,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Post extends Base {
     static {
@@ -262,7 +264,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Post.adapter = adapter;
     Author.adapter = adapter;
@@ -271,6 +273,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
     Associations.belongsTo.call(Post, "author", { autosave: true });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("test_should_save_parent_but_not_invalid_child", async () => {
     const author = new Author({ name: "Dean" });
@@ -319,7 +322,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 // ==========================================================================
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Company extends Base {
     static {
@@ -335,7 +338,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Company.adapter = adapter;
     Employee.adapter = adapter;
@@ -344,6 +347,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
     Associations.hasMany.call(Company, "employees", { autosave: true });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("test_invalid_adding — parent fails to save when child is invalid", async () => {
     const company = new Company({ name: "Acme" });
@@ -403,7 +407,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 // ==========================================================================
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Ship extends Base {
     static {
@@ -418,7 +422,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Ship.adapter = adapter;
     Part.adapter = adapter;
@@ -427,6 +431,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
     Associations.hasMany.call(Ship, "parts", { autosave: true });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should destroy the associated models when marked for destruction", async () => {
     const ship = await Ship.create({ name: "HMS Victory" });

@@ -7,10 +7,10 @@ import { Base } from "./index.js";
 import { generatesTokenFor, setTokenForSecret } from "./generates-token-for.js";
 import { setSignedIdVerifierSecret } from "./signed-id.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -19,15 +19,10 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("TokenForTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string", password_digest: "string" },
       user_short_expiries: { name: "string", password_digest: "string" },
@@ -39,6 +34,9 @@ describe("TokenForTest", () => {
       cpk_items: { shop_id: "integer", name: "string" },
       no_pk_items: { name: "string" },
     });
+  });
+  withTransactionalFixtures(() => adapter);
+  beforeEach(() => {
     setSignedIdVerifierSecret("blazetrails-test-secret");
     setTokenForSecret("blazetrails-test-token-secret");
   });
@@ -259,12 +257,15 @@ describe("TokenForTest", () => {
 });
 
 describe("TokenForTest", () => {
-  let adapter2: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter2 = freshAdapter();
+  let adapter2: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter2 = createTestAdapter();
     await defineSchema(adapter2, {
       users: { name: "string", password_digest: "string" },
     });
+  });
+  withTransactionalFixtures(() => adapter2);
+  beforeEach(() => {
     setTokenForSecret("blazetrails-test-token-secret");
   });
 
