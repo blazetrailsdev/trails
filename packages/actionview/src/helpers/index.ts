@@ -4,6 +4,8 @@ export type { FormBuilderOptions } from "./form-builder.js";
 export { raw, safeJoin, toSentence } from "./output-safety-helper.js";
 export type { ToSentenceOptions } from "./output-safety-helper.js";
 
+export { debug } from "./debug-helper.js";
+
 export {
   tag,
   contentTag,
