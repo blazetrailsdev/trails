@@ -401,6 +401,9 @@ const TEST_SCHEMA: Schema = {
   lj_authors: { name: "string" },
   lj_comments: { lj_post_id: "integer", body: "string" },
   lj_posts: { lj_author_id: "integer", title: "string" },
+  ltjm_posts: { title: "string" },
+  ltjm_taggings: { post_id: "integer", tag_id: "integer" },
+  ltjm_tags: { name: "string" },
   mhr_authors: { name: "string" },
   mhr_comments: { body: "string", mhr_post_id: "integer" },
   mhr_posts: { title: "string", mhr_author_id: "integer" },
@@ -8667,5 +8670,55 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(result).toBe(true);
     const joins = await IrpvJoin.all().where({ irpv_owner_id: owner.id }).toArray();
     expect(joins.length).toBe(1);
+  });
+
+  it("loads through a join model", async () => {
+    class LtjmTag extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = adapter;
+      }
+    }
+    class LtjmTagging extends Base {
+      static {
+        this.attribute("post_id", "integer");
+        this.attribute("tag_id", "integer");
+        this.adapter = adapter;
+      }
+    }
+    class LtjmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    Associations.hasMany.call(LtjmPost, "ltjmTaggings", {
+      className: "LtjmTagging",
+      foreignKey: "post_id",
+    });
+    Associations.hasMany.call(LtjmPost, "ltjmTags", {
+      through: "ltjmTaggings",
+      className: "LtjmTag",
+      source: "tag",
+    });
+    registerModel("LtjmTag", LtjmTag);
+    registerModel("LtjmTagging", LtjmTagging);
+    registerModel("LtjmPost", LtjmPost);
+
+    const post = await LtjmPost.create({ title: "Hello" });
+    const tag1 = await LtjmTag.create({ name: "ruby" });
+    const tag2 = await LtjmTag.create({ name: "rails" });
+    await LtjmTagging.create({ post_id: post.id, tag_id: tag1.id });
+    await LtjmTagging.create({ post_id: post.id, tag_id: tag2.id });
+
+    const tags = await loadHasManyThrough(post, "ltjmTags", {
+      through: "ltjmTaggings",
+      className: "LtjmTag",
+      source: "tag",
+    });
+    expect(tags).toHaveLength(2);
+    const names = tags.map((t) => t.name);
+    expect(names).toContain("ruby");
+    expect(names).toContain("rails");
   });
 });
