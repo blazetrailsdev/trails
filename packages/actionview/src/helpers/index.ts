@@ -49,3 +49,11 @@ export {
   sanitizedAllowedAttributes,
 } from "./sanitize-helper.js";
 export type { Sanitizer, SanitizerClass, SanitizerVendor } from "./sanitize-helper.js";
+
+export { truncate, pluralize, wordWrap, simpleFormat } from "./text-helper.js";
+export type {
+  TruncateOptions,
+  PluralizeOptions,
+  WordWrapOptions,
+  SimpleFormatOptions,
+} from "./text-helper.js";
