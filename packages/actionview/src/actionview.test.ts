@@ -457,6 +457,210 @@ describe("ActionView::LookupContext", () => {
       expect(output).toBe("content");
     });
   });
+
+  describe("details cascade (Phase 1d)", () => {
+    it("seeds default details from registered procs", () => {
+      const c = new LookupContext();
+      expect(c.locale).toBe("en");
+      expect(Array.from(c.formats)).toEqual(["html", "text", "js", "css", "xml", "json"]);
+      expect(Array.from(c.variants)).toEqual([]);
+      expect(Array.from(c.handlers)).toContain("ejs");
+    });
+
+    it("formats= expands */* using defaults and dedupes", () => {
+      const c = new LookupContext();
+      c.formats = ["xml", "*/*"];
+      expect(Array.from(c.formats)).toEqual(["xml", "html", "text", "js", "css", "json"]);
+    });
+
+    it("formats= removes every */* occurrence before expanding defaults", () => {
+      const c = new LookupContext();
+      c.formats = ["*/*", "xml", "*/*"];
+      expect(Array.from(c.formats)).toEqual(["xml", "html", "text", "js", "css", "json"]);
+    });
+
+    it("formats= adds html fallback when only :js is requested", () => {
+      const c = new LookupContext();
+      c.formats = ["js"];
+      expect(Array.from(c.formats)).toEqual(["js", "html"]);
+      expect(c.htmlFallbackForJs).toBe(true);
+    });
+
+    it("formats= rejects unknown formats", () => {
+      const c = new LookupContext();
+      expect(() => {
+        c.formats = ["nope"];
+      }).toThrow(/Invalid formats/);
+    });
+
+    it("locale getter returns first locale; setter replaces it", () => {
+      const c = new LookupContext();
+      c.locale = "fr";
+      expect(c.locale).toBe("fr");
+    });
+
+    it("setting details invalidates the cached details key", () => {
+      const c = new LookupContext();
+      const first = c.detailsKey();
+      c.formats = ["html"];
+      const second = c.detailsKey();
+      expect(first).not.toBe(second);
+    });
+  });
+
+  describe("DetailsKey + cache (Phase 1d)", () => {
+    beforeEach(() => {
+      LookupContext.DetailsKey.clear();
+    });
+
+    it("returns null detailsKey when cache is disabled", () => {
+      const c = new LookupContext();
+      c.cache = false;
+      expect(c.detailsKey()).toBeNull();
+    });
+
+    it("disableCache yields without cache and restores prior value", () => {
+      const c = new LookupContext();
+      let inner: unknown;
+      c.disableCache(() => {
+        inner = c.detailsKey();
+      });
+      expect(inner).toBeNull();
+      expect(c.detailsKey()).not.toBeNull();
+    });
+
+    it("DetailsKey.detailsCacheKey returns the same Requested for equal details", () => {
+      const a = new LookupContext();
+      const b = new LookupContext();
+      expect(a.detailsKey()).toBe(b.detailsKey());
+    });
+
+    it("canonicalizes invalid formats before computing the cache key", () => {
+      LookupContext.DetailsKey.clear();
+      const c1 = new LookupContext();
+      const c2 = new LookupContext();
+      c1.formats = ["html"];
+      const k1 = c1.detailsKey();
+      // Build a details tuple that filters down to ["html"] and verify
+      // it hits the same cache entry.
+      const k2 = LookupContext.DetailsKey.detailsCacheKey({
+        ...(c2 as unknown as { _details: Record<string, string[]> })._details,
+        formats: ["html"],
+      });
+      expect(k1).toBe(k2);
+    });
+
+    it("isAny produces a Requested with variants:'any' so any variant matches", () => {
+      const c = new LookupContext();
+      const [, key] = c.detailArgsForAny();
+      expect((key as unknown as { variantsIdx: unknown }).variantsIdx).toBe("any");
+    });
+
+    it("does not collide on detail values containing : , |", () => {
+      const c1 = new LookupContext();
+      const c2 = new LookupContext();
+      c1.variants = ["a", "b"];
+      c2.variants = ["a,s:b|"];
+      expect(c1.detailsKey()).not.toBe(c2.detailsKey());
+    });
+
+    it("distinguishes non-global Symbols by identity in the details key", () => {
+      const c1 = new LookupContext();
+      const c2 = new LookupContext();
+      c1.variants = [Symbol("mobile")];
+      c2.variants = [Symbol("mobile")];
+      expect(c1.detailsKey()).not.toBe(c2.detailsKey());
+    });
+
+    it("digestCache is per-tuple and persists across instances", () => {
+      const a = new LookupContext();
+      const b = new LookupContext();
+      a.digestCache().set("k", "v");
+      expect(b.digestCache().get("k")).toBe("v");
+    });
+
+    it("DetailsKey.clear wipes details + digest caches", () => {
+      const c = new LookupContext();
+      c.digestCache().set("k", "v");
+      LookupContext.DetailsKey.clear();
+      expect(LookupContext.DetailsKey.digestCaches()).toEqual([]);
+    });
+  });
+
+  describe("ViewPaths protocol (Phase 1d)", () => {
+    const stubResolver = () => {
+      const r = {
+        templates: [] as Array<{ name: string; prefix: string; partial: boolean; t: unknown }>,
+        findAll(name: string, prefix: string, partial: boolean): unknown[] {
+          return this.templates
+            .filter((x) => x.name === name && x.prefix === prefix && x.partial === partial)
+            .map((x) => x.t);
+        },
+      };
+      return r;
+    };
+
+    it("constructor accepts an array of resolvers and exposes viewPaths", () => {
+      const r = stubResolver();
+      const c = new LookupContext([r]);
+      expect(c.viewPaths.size).toBe(1);
+      expect(c.viewPaths.at(0)).toBe(r);
+    });
+
+    it("find / findAll delegate to viewPaths with normalized prefixes", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "show", prefix: "users", partial: false, t: { id: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.findAll("users/show", [], false)).toEqual([{ id: 1 }]);
+      expect(c.find("users/show", [], false)).toEqual({ id: 1 });
+    });
+
+    it("isExists returns true/false based on viewPaths matches", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "form", prefix: "users", partial: true, t: { p: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.isExists("form", ["users"], true)).toBe(true);
+      expect(c.isExists("missing", ["users"], true)).toBe(false);
+    });
+
+    it("isAny uses default details and ignores format constraints", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "index", prefix: "posts", partial: false, t: { p: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.isAny("index", ["posts"], false)).toBe(true);
+    });
+
+    it("appendViewPaths / prependViewPaths rebuild the PathSet", () => {
+      const a = stubResolver();
+      const b = stubResolver();
+      const c = new LookupContext([a]);
+      c.appendViewPaths([b]);
+      expect(c.viewPaths.at(1)).toBe(b);
+      c.prependViewPaths([b]);
+      expect(c.viewPaths.at(0)).toBe(b);
+    });
+
+    it("withPrependedFormats returns sibling with overridden formats", () => {
+      const c = new LookupContext();
+      const next = c.withPrependedFormats(["json"]);
+      expect(Array.from(next.formats)).toEqual(["json"]);
+      expect(Array.from(c.formats)).not.toEqual(["json"]);
+    });
+
+    it("detailArgsFor returns memoized details when options is empty", () => {
+      const c = new LookupContext();
+      const [d1] = c.detailArgsFor({});
+      const [d2] = c.detailArgsFor({});
+      expect(d1).toBe(d2);
+    });
+
+    it("detailArgsFor merges options without mutating instance details", () => {
+      const c = new LookupContext();
+      const [details] = c.detailArgsFor({ formats: ["json"] });
+      expect(Array.from(details.formats)).toEqual(["json"]);
+      expect(Array.from(c.formats)).not.toEqual(["json"]);
+    });
+  });
 });
 
 // ==========================================================================

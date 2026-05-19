@@ -14,12 +14,23 @@
 import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
 
+/**
+ * Argument shape for the `details` parameter of resolver lookups. Rails
+ * passes the raw details hash here (see `view_paths.rb#find`); the
+ * `TemplateDetails`/`Requested` cases are accepted for resolvers that
+ * already work in canonical-key form.
+ */
+export type LookupDetails =
+  | TemplateDetails
+  | Requested
+  | Readonly<Record<string, ReadonlyArray<string | symbol>>>;
+
 export interface PathSetResolver {
   findAll(
     path: TemplatePath | string,
     prefix: string,
     partial: boolean,
-    details: TemplateDetails | Requested,
+    details: LookupDetails,
     detailsKey: unknown,
     locals: ReadonlyArray<string>,
   ): unknown[];
@@ -83,7 +94,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     path: TemplatePath | string,
     prefixes: string | ReadonlyArray<string>,
     partial: boolean,
-    details: TemplateDetails | Requested,
+    details: LookupDetails,
     detailsKey: unknown,
     locals: ReadonlyArray<string>,
   ): unknown {
@@ -97,7 +108,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     path: TemplatePath | string,
     prefixes: string | ReadonlyArray<string>,
     partial: boolean,
-    details: TemplateDetails | Requested,
+    details: LookupDetails,
     detailsKey: unknown,
     locals: ReadonlyArray<string>,
   ): unknown[] {
@@ -149,7 +160,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     path: TemplatePath | string,
     prefixes: string | ReadonlyArray<string>,
     partial: boolean,
-    details: TemplateDetails | Requested,
+    details: LookupDetails,
     detailsKey: unknown,
     locals: ReadonlyArray<string>,
   ): boolean {
