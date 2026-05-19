@@ -44,7 +44,7 @@ export interface CallbackOptions {
  *
  * @internal
  */
-export type CallbackOptionsWithFilters = CallbackOptions & {
+type CallbackOptionsWithFilters = CallbackOptions & {
   filters?: Array<ActionCallback | AroundCallback>;
 };
 
@@ -165,12 +165,16 @@ export function _insertCallbacks(
   block: ActionCallback | AroundCallback | null,
   yieldFn: (callback: ActionCallback | AroundCallback, options: CallbackOptions) => void,
 ): void {
-  if (block) callbacks.push(block);
+  // Rails splats `*names` into a fresh array, so its in-place push is
+  // invisible to callers. JS callers own the array they pass in — copy
+  // to preserve that effective immutability.
+  const list = callbacks.slice();
+  if (block) list.push(block);
   const opts = options as CallbackOptionsWithFilters;
-  opts.filters = callbacks;
+  opts.filters = list;
   _normalizeCallbackOptions(options);
   delete opts.filters;
-  for (const callback of callbacks) {
+  for (const callback of list) {
     yieldFn(callback, options);
   }
 }
