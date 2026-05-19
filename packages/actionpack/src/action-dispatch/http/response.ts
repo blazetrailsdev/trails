@@ -36,6 +36,8 @@ export class Response {
   private _charset: string | undefined;
   private _cookies: Map<string, CookieValue> = new Map();
   private _sending = false;
+  /** Rails: `response.sending_file = true` flag set by `send_file_headers!`. */
+  sendingFile = false;
   request: Request | null = null;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {

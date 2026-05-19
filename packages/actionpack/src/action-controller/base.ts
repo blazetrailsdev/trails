@@ -40,6 +40,7 @@ import {
   httpBasicAuthenticateWith,
   requestHttpBasicAuthentication,
 } from "./metal/http-authentication.js";
+import { sendFileHeadersBang } from "./metal/data-streaming.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -573,6 +574,9 @@ export class Base extends Metal {
 
   // --- Send File / Send Data ---
 
+  /** Mirrors Rails `send_file_headers!`; wired below via `Base.prototype`. */
+  declare sendFileHeadersBang: typeof sendFileHeadersBang;
+
   /** Send file content. */
   sendFile(
     filePath: string,
@@ -704,6 +708,10 @@ export class Base extends Metal {
     return false;
   }
 }
+
+// Rails: `ActionController::DataStreaming#send_file_headers!` mixed in via
+// `include DataStreaming`. Trails wires it onto Base.prototype explicitly.
+Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 
 // Rails: `included do helper_method :content_security_policy?,
 // :content_security_policy_nonce end` (content_security_policy.rb:13).

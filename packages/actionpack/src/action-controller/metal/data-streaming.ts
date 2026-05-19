@@ -23,13 +23,14 @@ export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
 /**
  * Minimal controller-like host that `sendFileHeadersBang` mutates.
  * Mirrors the surface Rails relies on (`self.content_type=`,
- * `response.sending_file=`, `headers[]=`).
+ * `response.sending_file=`, `headers["..."]=` — surfaced here as
+ * `setHeader` to match `ActionController::Base`'s public API).
  * @internal
  */
 export interface SendFileHeadersHost {
   contentType: string | null;
   response: { sendingFile: boolean };
-  headers: Record<string, string>;
+  setHeader(name: string, value: string): void;
 }
 
 /** Options accepted by `sendFileHeadersBang`. */
@@ -92,11 +93,14 @@ export function sendFileHeadersBang(
     : DEFAULT_SEND_FILE_DISPOSITION;
 
   if (disposition) {
-    this.headers["Content-Disposition"] = ContentDisposition.format({
-      disposition,
-      filename: options.filename ?? null,
-    });
+    this.setHeader(
+      "Content-Disposition",
+      ContentDisposition.format({
+        disposition,
+        filename: options.filename ?? null,
+      }),
+    );
   }
 
-  this.headers["Content-Transfer-Encoding"] = "binary";
+  this.setHeader("Content-Transfer-Encoding", "binary");
 }

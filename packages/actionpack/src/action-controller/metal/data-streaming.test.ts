@@ -5,16 +5,24 @@ import {
   type SendFileHeadersHost,
 } from "./data-streaming.js";
 
-function makeHost(): SendFileHeadersHost {
+interface TestHost extends SendFileHeadersHost {
+  headers: Record<string, string>;
+}
+
+function makeHost(): TestHost {
+  const headers: Record<string, string> = {};
   return {
     contentType: null,
     response: { sendingFile: false },
-    headers: {},
+    headers,
+    setHeader(name: string, value: string) {
+      headers[name] = value;
+    },
   };
 }
 
 describe("sendFileHeadersBang", () => {
-  let host: SendFileHeadersHost;
+  let host: TestHost;
 
   beforeEach(() => {
     host = makeHost();

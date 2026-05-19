@@ -344,4 +344,20 @@ describe("SendFileController", () => {
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
   });
+
+  // Guards the Base.prototype.sendFileHeadersBang wiring so a refactor
+  // that drops the prototype assignment trips this test.
+  it("sendFileHeadersBang is reachable on controllers and mutates response", async () => {
+    class C extends Base {
+      async action() {
+        this.sendFileHeadersBang({ type: "image/png", filename: "x.png" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("action", makeRequest(), makeResponse());
+    expect(c.contentType).toBe("image/png");
+    expect(c.response.sendingFile).toBe(true);
+    expect(c.getHeader("Content-Disposition")).toMatch(/attachment;.*filename="x\.png"/);
+    expect(c.getHeader("Content-Transfer-Encoding")).toBe("binary");
+  });
 });
