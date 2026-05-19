@@ -302,7 +302,7 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("cookie persistence", () => {
     it("cookies persist across requests", async () => {
       await app.get("/posts/set-cookie");
-      expect(app.cookieJar.token).toBe("abc123");
+      expect(app.cookies.get("token")).toBe("abc123");
 
       await app.get("/posts/read-cookie");
       expect(app.responseBody).toContain("token=abc123");

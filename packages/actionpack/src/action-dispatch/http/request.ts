@@ -43,6 +43,7 @@ import {
 } from "./filter-parameters.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
+import { COOKIES_APP_OPTIONS_KEY, type CookieJarOptions } from "../middleware/cookies.js";
 import {
   parameters as _parameters,
   parameterParsers as _parameterParsers,
@@ -56,6 +57,7 @@ import {
   type ParametersHost,
 } from "./parameters.js";
 
+const FLASH_HASH_KEY = "action_dispatch.request.flash_hash";
 const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
 const CGI_VARIABLES: ReadonlySet<string> = new Set([
   "AUTH_TYPE",
@@ -588,6 +590,60 @@ export class Request {
 
   get session(): Record<string, unknown> {
     return (this.env["rack.session"] as Record<string, unknown>) || {};
+  }
+
+  // --- Flash ---
+  //
+  // Backed by an env header so the value survives the request lifecycle the
+  // same way Rails' flash middleware stores it (`action_dispatch.request.flash_hash`).
+
+  get flash(): unknown {
+    return this.env[FLASH_HASH_KEY];
+  }
+
+  set flash(value: unknown) {
+    this.env[FLASH_HASH_KEY] = value;
+  }
+
+  // --- Cookies ---
+  //
+  // Parses the `HTTP_COOKIE` header into a `name → value` map. Trails layers
+  // a richer `CookieJar` on top via `ActionDispatch::Cookies`; this getter
+  // returns the raw seed used to build it.
+
+  get cookies(): Record<string, string> {
+    const header = (this.env.HTTP_COOKIE as string | undefined) ?? "";
+    const out: Record<string, string> = {};
+    if (!header) return out;
+    for (const pair of header.split(";")) {
+      const eq = pair.indexOf("=");
+      if (eq < 0) continue;
+      const k = pair.slice(0, eq).trim();
+      const v = pair.slice(eq + 1).trim();
+      if (k) out[k] = v;
+    }
+    return out;
+  }
+
+  // --- Cookies (app-wide options) ---
+  //
+  // `cookiesAppOptions` is the bridge the `ActionDispatch::Cookies` middleware
+  // uses to pass the app-wide secret/serializer/etc. configuration into the
+  // signed/encrypted cookie jars. Rails stores each option in its own env
+  // header (`action_dispatch.signed_cookie_salt` and friends); trails
+  // collapses them into a single `CookieJarOptions` object stored under
+  // `COOKIES_APP_OPTIONS_KEY` until the full middleware lands.
+
+  get cookiesAppOptions(): CookieJarOptions | undefined {
+    return this.env[COOKIES_APP_OPTIONS_KEY] as CookieJarOptions | undefined;
+  }
+
+  set cookiesAppOptions(options: CookieJarOptions | undefined) {
+    if (options === undefined) {
+      delete this.env[COOKIES_APP_OPTIONS_KEY];
+    } else {
+      this.env[COOKIES_APP_OPTIONS_KEY] = options;
+    }
   }
 
   // --- Static factory ---

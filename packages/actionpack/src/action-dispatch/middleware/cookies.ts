@@ -22,6 +22,15 @@ function toUTCString(expires: CookieExpires): string {
     : expires.toUTCString();
 }
 
+/**
+ * Rack env key under which {@link CookieJar.build} reads the app-wide
+ * {@link CookieJarOptions}. The `ActionDispatch::Cookies` middleware sets
+ * this so signed/encrypted cookie accessors can find their secrets.
+ *
+ * @internal
+ */
+export const COOKIES_APP_OPTIONS_KEY = "action_dispatch.cookies_app_options";
+
 export interface CookieJarOptions {
   secret?: string;
   signedSecret?: string;

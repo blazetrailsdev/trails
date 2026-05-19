@@ -101,12 +101,24 @@ export function fileFixtureUpload(
 export const fixtureFileUpload = fileFixtureUpload;
 
 /**
+ * Mirror of Ruby's `NoMethodError`. Rails tests pattern-match on the error
+ * class (e.g. `assert_raises(NoMethodError)`), so use this rather than a
+ * bare `Error` when porting methods that raise it.
+ */
+export class NoMethodError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
  * `assigns` has been extracted to a gem in Rails. Mirror the error so tests
  * relying on the legacy helper get the same message.
  */
 export function assigns(this: TestProcessHost, _key?: string | symbol): never {
-  throw new Error(
-    'NoMethodError: assigns has been extracted to a gem. To continue using it, add `gem "rails-controller-testing"` to your Gemfile.',
+  throw new NoMethodError(
+    'assigns has been extracted to a gem. To continue using it, add `gem "rails-controller-testing"` to your Gemfile.',
   );
 }
 

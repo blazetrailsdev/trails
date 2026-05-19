@@ -34,9 +34,16 @@
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
+import { CookieJar } from "../middleware/cookies.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
+import {
+  cookies as testProcessCookies,
+  flash as testProcessFlash,
+  redirectToUrl as testProcessRedirectToUrl,
+  type TestProcessHost,
+} from "./test-process.js";
 
 type ControllerClass = new () => Metal;
 
@@ -67,8 +74,17 @@ export class IntegrationTest {
   /** Session data persisted across requests. */
   session: Record<string, unknown> = {};
 
-  /** Accumulated cookies across requests (simple key/value). */
-  cookieJar: Record<string, string> = {};
+  /** Accumulated cookies across requests (simple key/value), seeds the jar. */
+  private _persistentCookies: Record<string, string> = {};
+
+  /**
+   * Memoized CookieJar slot consumed by `ActionDispatch::TestProcess#cookies`.
+   * Cleared at the start of each request so the jar reflects the current
+   * request's `HTTP_COOKIE` header.
+   *
+   * @internal
+   */
+  _cookieJar?: CookieJar;
 
   /** The controller instance from the last request. */
   controller!: Metal;
@@ -99,10 +115,40 @@ export class IntegrationTest {
     return this.response?.getHeader("location") ?? this.controller?.getHeader("location");
   }
 
-  /** Flash from the last request. */
+  /**
+   * Flash from the last request. Delegates to
+   * `ActionDispatch::TestProcess#flash`, which reads off
+   * `this.request.flash` — wired up by `_processPath` after each dispatch so
+   * the value survives between requests like the real flash middleware.
+   */
   get flash(): FlashHash {
-    return (this.controller as any)?.flash ?? new FlashHash();
+    if (!this.request) return new FlashHash();
+    return testProcessFlash.call(this as unknown as TestProcessHost) as FlashHash;
   }
+
+  /**
+   * Cookies from the last request as a Rails-shaped `CookieJar`. Delegates
+   * to `ActionDispatch::TestProcess#cookies`, which builds the jar from
+   * `this.request.cookies` (parsed from `HTTP_COOKIE`) and memoizes it on
+   * `_cookieJar`. The slot is cleared on every new request and on `reset()`.
+   */
+  get cookies(): CookieJar {
+    if (!this.request) {
+      this._cookieJar ??= CookieJar.build(undefined, this._persistentCookies);
+      return this._cookieJar;
+    }
+    return testProcessCookies.call(this as unknown as TestProcessHost);
+  }
+
+  /** Mirror of `ActionDispatch::TestProcess#redirectToUrl`. */
+  get redirectToUrl(): string | undefined {
+    return testProcessRedirectToUrl.call(this as unknown as TestProcessHost);
+  }
+
+  /** Mirror of `ActionDispatch::TestProcess#session` (no-op delegation). */
+  // `session` is kept as an instance field above so multi-request tests can
+  // observe accumulated state directly. TestProcess#session reads the same
+  // value off the Request via `rack.session`, which `_processPath` syncs.
 
   /**
    * Register a controller class for a given name.
@@ -260,7 +306,8 @@ export class IntegrationTest {
    */
   reset(): void {
     this.session = {};
-    this.cookieJar = {};
+    this._persistentCookies = {};
+    this._cookieJar = undefined;
     this.controller = undefined!;
     this.request = undefined!;
     this.response = undefined!;
@@ -314,12 +361,16 @@ export class IntegrationTest {
       ...(options.env ?? {}),
     };
 
-    // Cookies from jar
-    if (Object.keys(this.cookieJar).length > 0) {
-      env.HTTP_COOKIE = Object.entries(this.cookieJar)
+    // Cookies from persistent jar
+    if (Object.keys(this._persistentCookies).length > 0) {
+      env.HTTP_COOKIE = Object.entries(this._persistentCookies)
         .map(([k, v]) => `${k}=${v}`)
         .join("; ");
     }
+
+    // Reset the TestProcess#cookies memoization slot — the jar must reflect
+    // the cookies parsed off this request, not the previous one.
+    this._cookieJar = undefined;
 
     // Format / content type
     if (options.format || options.as) {
@@ -379,6 +430,10 @@ export class IntegrationTest {
       Object.assign(this.session, (this.controller as any).session);
     }
 
+    // Surface the controller's flash on the request so `TestProcess#flash`
+    // (and the `flash` getter above) can find it.
+    this.request.flash = (this.controller as any).flash ?? new FlashHash();
+
     // Collect cookies from response
     const setCookies = this.response.getHeader("set-cookie");
     if (setCookies) {
@@ -388,10 +443,21 @@ export class IntegrationTest {
         if (eqIdx > 0) {
           const name = parts.slice(0, eqIdx).trim();
           const value = parts.slice(eqIdx + 1).trim();
-          this.cookieJar[name] = value;
+          this._persistentCookies[name] = value;
         }
       }
     }
+
+    // Reflect the up-to-date persistent jar on the request so subsequent
+    // reads of `app.cookies` (which delegates to `TestProcess#cookies`)
+    // see Set-Cookies from the just-finished response, not just the
+    // cookies that were sent in.
+    if (Object.keys(this._persistentCookies).length > 0) {
+      this.request.env.HTTP_COOKIE = Object.entries(this._persistentCookies)
+        .map(([k, v]) => `${k}=${v}`)
+        .join("; ");
+    }
+    this._cookieJar = undefined;
   }
 }
 
