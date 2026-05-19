@@ -247,19 +247,20 @@ export class Request {
   // --- Domain / subdomains ---
 
   // Rails: `Request#{domain,subdomains,subdomain}` delegate to
-  // `ActionDispatch::Http::URL.extract_*` (`url.rb:320-340`). Keeping these
-  // as thin pass-throughs means the negative-`slice` clamp added in
-  // url.ts#extractSubdomainsFrom applies here too.
+  // `ActionDispatch::Http::URL.extract_*` (`url.rb:320-340`) and default the
+  // `tld_length` arg to the class-level `@@tld_length` so railtie config
+  // (`URL.tldLength = N`) flows through. `domain` returns `nil` for IP /
+  // unnamed hosts; we mirror that with `string | null`.
 
-  domain(tldLength = 1): string {
-    return HttpURL.extractDomain(this.host, tldLength) ?? "";
+  domain(tldLength: number = HttpURL.tldLength): string | null {
+    return HttpURL.extractDomain(this.host, tldLength);
   }
 
-  subdomains(tldLength = 1): string[] {
+  subdomains(tldLength: number = HttpURL.tldLength): string[] {
     return HttpURL.extractSubdomains(this.host, tldLength);
   }
 
-  subdomain(tldLength = 1): string {
+  subdomain(tldLength: number = HttpURL.tldLength): string {
     return HttpURL.extractSubdomain(this.host, tldLength);
   }
 
