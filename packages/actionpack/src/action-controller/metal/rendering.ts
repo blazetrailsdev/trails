@@ -7,8 +7,8 @@
  */
 
 import { htmlEscape, isPresent } from "@blazetrails/activesupport";
-import { Metal } from "../metal.js";
 import { Renderer } from "../renderer.js";
+import { resolveStatus } from "./status-codes.js";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
 
@@ -48,11 +48,13 @@ export function _normalizeText(options: Record<string, unknown>): void {
  */
 export function _normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
   _normalizeText(options);
-  if (options.html) {
+  // Ruby `if options[:key]` — only `nil`/`false` skip; `""` and `0` are
+  // truthy and must still be processed.
+  if (options.html != null && options.html !== false) {
     options.html = htmlEscape(options.html);
   }
-  if (options.status) {
-    options.status = Metal.resolveStatus(options.status as number | string);
+  if (options.status != null && options.status !== false) {
+    options.status = resolveStatus(options.status as number | string);
   }
   return options;
 }
@@ -127,20 +129,25 @@ export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">
 
 /**
  * Mirrors Rails `_process_options(options)` — applies controller-level
- * options (`:status`, `:content_type`, `:location`) to the response.
+ * options (`:status`, `:content_type`, `:location` in Rails) to the
+ * response. Trails reads camelCase keys (`contentType`) per CLAUDE.md;
+ * the snake_case Ruby symbols are documented here only for cross-
+ * reference to the Rails source.
  * @internal
  */
 export function _processOptions(
   this: Pick<RenderingHost, "status" | "contentType" | "setHeader" | "urlFor">,
   options: Record<string, unknown>,
 ): void {
-  if (options.status) {
-    this.status = Metal.resolveStatus(options.status as number | string);
+  // Ruby `if options[:key]` — only `nil`/`false` skip; `""` and `0` are
+  // truthy and must still be applied.
+  if (options.status != null && options.status !== false) {
+    this.status = resolveStatus(options.status as number | string);
   }
-  if (options.contentType) {
+  if (options.contentType != null && options.contentType !== false) {
     this.contentType = String(options.contentType);
   }
-  if (options.location) {
+  if (options.location != null && options.location !== false) {
     this.setHeader("Location", this.urlFor(String(options.location)));
   }
 }

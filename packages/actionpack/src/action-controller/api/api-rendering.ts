@@ -7,11 +7,7 @@
  */
 
 function resolveContentType(options: Record<string, unknown>, fallback: string): string {
-  return (
-    (options.contentType as string | undefined) ??
-    (options.content_type as string | undefined) ??
-    fallback
-  );
+  return typeof options.contentType === "string" ? options.contentType : fallback;
 }
 
 export function renderForApi(options: Record<string, unknown>): {

@@ -17,31 +17,18 @@ import {
   type MiddlewareEntry,
 } from "../action-dispatch/middleware/stack.js";
 import { includeContent } from "./metal/head.js";
-
-const STATUS_CODES: Record<string, number> = {
-  ok: 200,
-  created: 201,
-  accepted: 202,
-  no_content: 204,
-  moved_permanently: 301,
-  found: 302,
-  see_other: 303,
-  not_modified: 304,
-  bad_request: 400,
-  unauthorized: 401,
-  forbidden: 403,
-  not_found: 404,
-  method_not_allowed: 405,
-  not_acceptable: 406,
-  conflict: 409,
-  gone: 410,
-  unprocessable_entity: 422,
-  too_many_requests: 429,
-  internal_server_error: 500,
-  not_implemented: 501,
-  bad_gateway: 502,
-  service_unavailable: 503,
-};
+import { Renderers } from "./metal/renderers.js";
+import { STATUS_CODES, resolveStatus } from "./metal/status-codes.js";
+import {
+  _normalizeOptions as _normalizeOptionsFn,
+  _normalizeText as _normalizeTextFn,
+  _processOptions as _processOptionsFn,
+  _processVariant as _processVariantFn,
+  _renderInPriorities as _renderInPrioritiesFn,
+  _setHtmlContentType as _setHtmlContentTypeFn,
+  _setRenderedContentType as _setRenderedContentTypeFn,
+  _setVaryHeader as _setVaryHeaderFn,
+} from "./metal/rendering.js";
 
 export class MiddlewareStack extends DispatchMiddlewareStack {}
 
@@ -319,8 +306,50 @@ export class Metal extends AbstractController {
   }
 
   /** Resolve a status symbol to a number. */
-  static resolveStatus(status: number | string): number {
-    if (typeof status === "number") return status;
-    return STATUS_CODES[status] ?? 500;
+  static resolveStatus = resolveStatus;
+
+  /**
+   * Composes the Rails `render_to_body` chain. With `ActionController::Base`'s
+   * include order, the effective chain is:
+   *
+   *   Rendering#render_to_body   → super || _render_in_priorities(options) || " "
+   *   Renderers#render_to_body   → _render_to_body_with_renderer(options) || super
+   *   AbstractController         → (nil — no-op base)
+   *
+   * Flattened: try the registered renderers first, then the
+   * `:body`/`:plain`/`:html` priority resolver, finally the
+   * single-space fallback. Subclasses that template-render override
+   * this and delegate back via `super`.
+   * @internal
+   */
+  renderToBody(options: Record<string, unknown> = {}): unknown {
+    // Match Ruby `||` short-circuit semantics: skip on `nil`/`false`,
+    // keep `""` and `0` (truthy in Ruby).
+    const truthy = (v: unknown): boolean => v != null && v !== false;
+    const renderer = Renderers._renderToBodyWithRenderer(options);
+    if (truthy(renderer)) return renderer;
+    const priority = _renderInPrioritiesFn(options);
+    if (truthy(priority)) return priority;
+    return " ";
   }
+
+  // Rails-private rendering helpers — wired onto the class so the
+  // `metal/rendering.rb` privates resolve as `Metal._foo` (api:compare
+  // surface) while keeping the implementation in `metal/rendering.ts`.
+  /** @internal */
+  static _normalizeOptions = _normalizeOptionsFn;
+  /** @internal */
+  static _normalizeText = _normalizeTextFn;
+  /** @internal */
+  static _processOptions = _processOptionsFn;
+  /** @internal */
+  static _processVariant = _processVariantFn;
+  /** @internal */
+  static _renderInPriorities = _renderInPrioritiesFn;
+  /** @internal */
+  static _setHtmlContentType = _setHtmlContentTypeFn;
+  /** @internal */
+  static _setRenderedContentType = _setRenderedContentTypeFn;
+  /** @internal */
+  static _setVaryHeader = _setVaryHeaderFn;
 }

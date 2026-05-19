@@ -45,6 +45,17 @@ describe("_normalizeOptions", () => {
     expect(out.status).toBe(404);
     expect(out.plain).toBe("<plain>");
   });
+
+  test("Ruby-truthy gate: '' and 0 are processed, null/false skip", () => {
+    // `html: ""` is Ruby-truthy → html-escape runs and returns a SafeBuffer
+    // wrapping "" (still truthy / present, just escaped).
+    expect(String(_normalizeOptions({ html: "" }).html)).toBe("");
+    // `status: 0` is Ruby-truthy → resolveStatus passes the number through.
+    expect(_normalizeOptions({ status: 0 }).status).toBe(0);
+    // `null`/`false` skip → fields untouched.
+    expect(_normalizeOptions({ html: null }).html).toBeNull();
+    expect(_normalizeOptions({ status: false }).status).toBe(false);
+  });
 });
 
 describe("_processVariant", () => {
@@ -141,5 +152,72 @@ describe("_processOptions", () => {
 
     _processOptions.call(host, {});
     expect(host.status).toBe(201);
+  });
+
+  test("Ruby-truthy gate: '' / 0 are applied, null/false skip", () => {
+    const host = {
+      status: 200,
+      contentType: null as string | null,
+      setHeader: () => undefined,
+      urlFor: (s: string) => s,
+    };
+    _processOptions.call(host, { status: 0, contentType: "" });
+    expect(host.status).toBe(0);
+    expect(host.contentType).toBe("");
+
+    host.status = 200;
+    host.contentType = null;
+    _processOptions.call(host, { status: null, contentType: false });
+    expect(host.status).toBe(200);
+    expect(host.contentType).toBeNull();
+  });
+});
+
+describe("Metal wiring", () => {
+  test("exposes the rendering privates as static members", async () => {
+    const { Metal } = await import("../metal.js");
+    expect(Metal._renderInPriorities).toBe(_renderInPriorities);
+    expect(Metal._normalizeText).toBe(_normalizeText);
+    expect(Metal._normalizeOptions).toBe(_normalizeOptions);
+    expect(Metal._processVariant).toBe(_processVariant);
+    expect(Metal._setHtmlContentType).toBe(_setHtmlContentType);
+    expect(Metal._setRenderedContentType).toBe(_setRenderedContentType);
+    expect(Metal._setVaryHeader).toBe(_setVaryHeader);
+    expect(Metal._processOptions).toBe(_processOptions);
+  });
+
+  test("renderToBody routes through _renderInPriorities and falls back to ' '", async () => {
+    const { Metal } = await import("../metal.js");
+    const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
+    expect(instance.renderToBody({ body: "hi" })).toBe("hi");
+    expect(instance.renderToBody({ plain: "p", html: "h" })).toBe("p");
+    expect(instance.renderToBody({ html: "h" })).toBe("h");
+    expect(instance.renderToBody({})).toBe(" ");
+    expect(instance.renderToBody({ json: "{}" })).toBe(" ");
+  });
+
+  test("renderToBody preserves '' / 0 (Ruby-truthy) and falls through on false/null", async () => {
+    const { Metal } = await import("../metal.js");
+    const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
+    // Ruby `""` and `0` are truthy; Rails `super || _render_in_priorities || " "`
+    // returns them as-is rather than falling through.
+    expect(instance.renderToBody({ body: "" })).toBe("");
+    expect(instance.renderToBody({ plain: 0 })).toBe(0);
+    // Ruby `false`/`nil` fall through; `_renderInPriorities` returns null
+    // when no key matches, so the " " fallback wins.
+    expect(instance.renderToBody({ body: false })).toBe(" ");
+    expect(instance.renderToBody({ body: null })).toBe(" ");
+  });
+
+  test("renderToBody dispatches to a registered renderer before the priority resolver", async () => {
+    const { Metal } = await import("../metal.js");
+    const { Renderers } = await import("../metal/renderers.js");
+    Renderers.add("csvBody", (v) => `csv:${String(v)}`);
+    try {
+      const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
+      expect(instance.renderToBody({ csvBody: "a,b" })).toBe("csv:a,b");
+    } finally {
+      Renderers.remove("csvBody");
+    }
   });
 });
