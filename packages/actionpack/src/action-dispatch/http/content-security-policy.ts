@@ -4,22 +4,17 @@
  * DSL for building Content-Security-Policy headers.
  */
 
-export type CSPSource = string | ((request?: unknown) => string | string[]);
-
 /**
- * Rails' default nonce-eligible directives. Mirrors
- * `DEFAULT_NONCE_DIRECTIVES = %w[script-src style-src]`
- * (actionpack/lib/action_dispatch/http/content_security_policy.rb:174).
+ * Symbol-source shorthands. Mirrors Rails' `MAPPINGS` constant
+ * (actionpack/lib/action_dispatch/http/content_security_policy.rb:128-147).
+ *
+ * Ruby's `policy.script_src :self, :https` becomes
+ * `policy.scriptSrc(":self", ":https")` in trails — a leading `:` marks the
+ * string as a symbol shorthand and resolves through this table. Strings
+ * without the `:` prefix pass through unchanged so literal sources like
+ * `"script"` (for `require-sri-for`) keep their plain-string meaning.
  */
-export const DEFAULT_NONCE_DIRECTIVES = ["script-src", "style-src"] as const;
-
-/**
- * @internal
- * Mirrors Rails' `MAPPINGS` constant — short-form keyword sources used by the
- * DSL (Symbols in Ruby, prefixed-`:`-strings here) expand to their CSP source
- * representation when passed to a directive setter.
- */
-const MAPPINGS: Record<string, string> = {
+export const MAPPINGS = {
   self: "'self'",
   unsafe_eval: "'unsafe-eval'",
   wasm_unsafe_eval: "'wasm-unsafe-eval'",
@@ -38,7 +33,18 @@ const MAPPINGS: Record<string, string> = {
   strict_dynamic: "'strict-dynamic'",
   ws: "ws:",
   wss: "wss:",
-};
+} as const;
+
+export type CspSymbol = `:${keyof typeof MAPPINGS}`;
+
+export type CSPSource = CspSymbol | (string & {}) | ((request?: unknown) => string | string[]);
+
+/**
+ * Rails' default nonce-eligible directives. Mirrors
+ * `DEFAULT_NONCE_DIRECTIVES = %w[script-src style-src]`
+ * (actionpack/lib/action_dispatch/http/content_security_policy.rb:174).
+ */
+export const DEFAULT_NONCE_DIRECTIVES = ["script-src", "style-src"] as const;
 
 type DirectiveName = string;
 
@@ -189,11 +195,10 @@ export class ContentSecurityPolicy {
    * keyword in [[MAPPINGS]] or throws.
    */
   private applyMapping(source: string): string {
-    const mapped = MAPPINGS[source];
-    if (mapped === undefined) {
+    if (!Object.hasOwn(MAPPINGS, source)) {
       throw new TypeError(`Unknown content security policy source mapping: ${source}`);
     }
-    return mapped;
+    return MAPPINGS[source as keyof typeof MAPPINGS];
   }
 
   /**
