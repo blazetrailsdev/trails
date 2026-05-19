@@ -1,10 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/nested_through_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import {
   Associations,
   loadBelongsTo,
@@ -74,14 +74,14 @@ const TEST_SCHEMA: Schema = {
   phmt_drink_designer2s: { name: "string" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("NestedThroughAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Author extends Base {
     static {
@@ -111,21 +111,25 @@ describe("NestedThroughAssociationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Author.adapter = adapter;
     Post.adapter = adapter;
     Tag.adapter = adapter;
     Tagging.adapter = adapter;
+    registerModel(Author);
+    registerModel(Post);
+    registerModel(Tag);
+    registerModel(Tagging);
+  });
+  withTransactionalFixtures(() => adapter);
+
+  beforeEach(() => {
     // Reset associations to avoid cross-test coupling
     (Author as any)._associations = [];
     (Post as any)._associations = [];
     (Tag as any)._associations = [];
     (Tagging as any)._associations = [];
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Tag);
-    registerModel(Tagging);
   });
 
   it("has many through has many with has many source reflection", async () => {

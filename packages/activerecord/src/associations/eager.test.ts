@@ -1,12 +1,12 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/eager_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Associations, association, loadHasMany, loadHasManyThrough } from "../associations.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 // All tables referenced by tests in this file. Tests declare ad-hoc
 // model classes per-test, so under AR_NO_AUTO_SCHEMA=1 the schema must
@@ -364,7 +364,7 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
@@ -374,11 +374,12 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // EagerAssociationTest — targets associations/eager_test.rb
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("should work inverse of with eager load", async () => {
     class EagerInvParent extends Base {

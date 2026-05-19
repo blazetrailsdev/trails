@@ -29,19 +29,15 @@
  * resolves to null, the chain walker has no type filter, ids mix
  * across polymorphic targets).
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
-
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("ThroughReflection — checkValidityBang at first use", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class StvAuthor extends Base {
     static {
@@ -70,8 +66,8 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       stv_authors: { name: "string" },
       stv_comments: {
@@ -90,6 +86,10 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
     registerModel("StvComment", StvComment);
     registerModel("StvPost", StvPost);
     registerModel("StvMember", StvMember);
+  });
+  withTransactionalFixtures(() => adapter);
+
+  beforeEach(() => {
     (StvAuthor as any)._associations = [];
     (StvAuthor as any)._reflections = {};
     (StvComment as any)._associations = [];

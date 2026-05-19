@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { SubclassNotFound, Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import {
   Associations,
@@ -13,8 +13,9 @@ import {
   touchBelongsToParents,
 } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -23,14 +24,15 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("destroy linked models", async () => {
     class Post extends Base {
@@ -47,15 +49,16 @@ describe("BelongsToWithForeignKeyTest", () => {
 });
 
 describe("touch on belongs_to", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string", updated_at: "datetime" },
       comments: { body: "string", post_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("touches parent updated_at when child is saved", async () => {
     class Post extends Base {
@@ -92,10 +95,10 @@ describe("touch on belongs_to", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     // Schema covers the base Company/Account, counter-cache
     // (Btc/Btcas/Cc/CustomCc/Btcau), polymorphic Post/Comment + Tag
     // (incl. wp_cpk_tags), and Record/Entry table families. Later tests
@@ -274,6 +277,7 @@ describe("BelongsToAssociationsTest", () => {
       pk_clients: { firm_name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("natural assignment", async () => {
     class Company extends Base {
@@ -3929,14 +3933,15 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       albt_companies: { name: "string" },
       albt_accounts: { company_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("async load belongs to", async () => {
     class AlbtCompany extends Base {
@@ -3965,9 +3970,9 @@ describe("AsyncBelongsToAssociationsTest", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       bt_companies: { name: "string" },
       bt_accounts: { company_id: "integer", credit_limit: "integer" },
@@ -3975,6 +3980,7 @@ describe("BelongsToAssociationsTest", () => {
       pk_clients: { firm_name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("belongs to", async () => {
     // Rails: test_belongs_to

@@ -13,7 +13,7 @@ function isTemporalDatetime(v: unknown): boolean {
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   Base,
   registerModel,
@@ -22,8 +22,9 @@ import {
   registerSubclass,
   SubclassNotFound,
 } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import {
   Associations,
   loadBelongsTo,
@@ -95,7 +96,7 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 
 describe("HasOneAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Firm extends Base {
     static {
@@ -110,13 +111,15 @@ describe("HasOneAssociationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     Firm.adapter = adapter;
     Account.adapter = adapter;
     registerModel(Firm);
     registerModel(Account);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("has one", async () => {
     const firm = await Firm.create({ name: "First Firm" });
