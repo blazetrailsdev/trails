@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ContentSecurityPolicy } from "../content-security-policy.js";
+import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -204,6 +204,37 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.requireSriFor("script", "style");
     expect(policy.build()).toBe("require-sri-for script style");
+  });
+
+  it("symbol-source mappings", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.defaultSrc(":self", ":https");
+    policy.scriptSrc(":self", ":unsafe_eval", ":strict_dynamic");
+    policy.imgSrc(":self", ":data", ":blob");
+    policy.objectSrc(":none");
+    const header = policy.build();
+    expect(header).toContain("default-src 'self' https:");
+    expect(header).toContain("script-src 'self' 'unsafe-eval' 'strict-dynamic'");
+    expect(header).toContain("img-src 'self' data: blob:");
+    expect(header).toContain("object-src 'none'");
+  });
+
+  it("symbol-source mappings table", () => {
+    expect(MAPPINGS.self).toBe("'self'");
+    expect(MAPPINGS.https).toBe("https:");
+    expect(MAPPINGS.none).toBe("'none'");
+    expect(MAPPINGS.unsafe_inline).toBe("'unsafe-inline'");
+  });
+
+  it("unknown symbol-source raises", () => {
+    const policy = new ContentSecurityPolicy();
+    expect(() => policy.defaultSrc(":bogus")).toThrow(/Unknown content security policy source/);
+  });
+
+  it("non-symbol strings pass through unchanged", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("https://cdn.example.com", "'sha256-abc123'");
+    expect(policy.build()).toBe("script-src https://cdn.example.com 'sha256-abc123'");
   });
 
   it("trusted types directive", () => {
