@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
-  freshAdapter,
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
@@ -8,6 +7,8 @@ import {
   makeKeyProvider,
   makeEncryptedBook,
 } from "./test-helpers.js";
+import { createTestAdapter } from "../test-adapter.js";
+import { defineSchema } from "../test-helpers/define-schema.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
@@ -49,7 +50,11 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   } = {};
 
   beforeAll(async () => {
-    adapter = await freshAdapter();
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
+      encrypted_book_with_downcase_names: { name: { type: "string", limit: 1024 } },
+    });
   });
 
   withTransactionalFixtures(() => adapter);
