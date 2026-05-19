@@ -49,7 +49,7 @@ class Callback2 extends AbstractController {
     this.responseBody = (this.text ?? "") as string;
   }
 }
-Callback2.beforeAction((c) => (c as Callback2).first());
+Callback2.beforeAction((c) => (c as Callback2).first(), { name: "first" });
 Callback2.afterAction((c) => (c as Callback2)._second());
 Callback2.aroundAction(async (c, next) => {
   const self = c as Callback2;
@@ -59,7 +59,10 @@ Callback2.aroundAction(async (c, next) => {
 });
 
 class Callback2Overwrite extends Callback2 {}
-Callback2Overwrite.beforeAction((c) => (c as Callback2).first(), { except: ["index"] });
+Callback2Overwrite.beforeAction((c) => (c as Callback2).first(), {
+  name: "first",
+  except: ["index"],
+});
 
 describe("TestCallbacks2", () => {
   let controller: Callback2;
@@ -82,14 +85,11 @@ describe("TestCallbacks2", () => {
     expect(controller.aroundz).toBe("FIRSTSECOND");
   });
 
-  // BLOCKED: Rails identifies callbacks by name (`:first` symbol), so
-  // `before_action :first, except: :index` in a subclass *replaces* the
-  // parent's unconditional `:first`. trails identifies callbacks by
-  // function reference — no named replacement — so the parent's
-  // unconditional callback still fires on :index. ~60 LOC follow-up to
-  // add a `name?: string` slot on CallbackOptions and dedup-by-name in
-  // the registry.
-  it.skip("before_action with overwritten condition", () => {});
+  it("before_action with overwritten condition", async () => {
+    const overwriteController = new Callback2Overwrite();
+    await overwriteController.processAction("index");
+    expect(overwriteController.responseBody).toBe("");
+  });
 });
 
 class Callback3 extends AbstractController {
@@ -267,7 +267,10 @@ class ChangedConditions extends Callback2 {
     this.responseBody = (this.text ?? "") as string;
   }
 }
-ChangedConditions.beforeAction((c) => (c as Callback2).first(), { only: ["index"] });
+ChangedConditions.beforeAction((c) => (c as Callback2).first(), {
+  name: "first",
+  only: ["index"],
+});
 
 describe("TestCallbacksWithChangedConditions", () => {
   let controller: ChangedConditions;
@@ -280,11 +283,10 @@ describe("TestCallbacksWithChangedConditions", () => {
     expect(controller.responseBody).toBe("Hello world");
   });
 
-  // BLOCKED: same named-callback-replacement gap as TestCallbacks2's
-  // "before_action with overwritten condition" — Rails dedups :first by
-  // symbol, trails doesn't dedup by function reference, so the parent's
-  // unconditional :first still fires on :not_index.
-  it.skip("when a callback is modified in a child with :only, it does not work for other actions", () => {});
+  it("when a callback is modified in a child with :only, it does not work for other actions", async () => {
+    await controller.processAction("not_index");
+    expect(controller.responseBody).toBe("");
+  });
 });
 
 class SetsResponseBody extends AbstractController {
@@ -325,18 +327,79 @@ describe("TestCallbacksWithArgs", () => {
 });
 
 describe("TestCallbacksWithMissingConditions", () => {
-  // BLOCKED: raise_on_missing_callback_actions class flag is not ported.
-  // The whole "callbacks reference an action that doesn't exist on the
-  // controller" diagnostic path is unimplemented (~80 LOC follow-up:
-  // validate :only / :except against availableActions at processAction
-  // time when the flag is set).
-  it.skip("callbacks raise exception when their 'only' condition is a missing action", () => {});
-  it.skip("callbacks raise exception when their 'only' array condition contains a missing action", () => {});
-  it.skip("callbacks raise exception when their 'except' condition is a missing action", () => {});
-  it.skip("callbacks raise exception when their 'except' array condition contains a missing action", () => {});
-  it.skip("raised exception message includes the names of callback actions and missing conditional action", () => {});
-  it.skip("raised exception message includes a block callback", () => {});
-  it.skip("callbacks with both :only and :except options raise an exception with the correct message", () => {});
+  function makeController(
+    register: (k: typeof AbstractController) => void,
+  ): typeof AbstractController {
+    class C extends AbstractController {
+      async index() {}
+      async show() {}
+    }
+    C.raiseOnMissingCallbackActions = true;
+    register(C);
+    return C;
+  }
+
+  async function runAndCatch(C: typeof AbstractController): Promise<Error> {
+    const c = new C();
+    try {
+      await c.processAction("index");
+    } catch (e) {
+      return e as Error;
+    }
+    throw new Error("expected processAction to throw");
+  }
+
+  it("callbacks raise exception when their 'only' condition is a missing action", async () => {
+    const C = makeController((k) => k.beforeAction(function callback() {}, { only: "showw" }));
+    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+  });
+
+  it("callbacks raise exception when their 'only' array condition contains a missing action", async () => {
+    const C = makeController((k) =>
+      k.beforeAction(function callback() {}, { only: ["index", "showw"] }),
+    );
+    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+  });
+
+  it("callbacks raise exception when their 'except' condition is a missing action", async () => {
+    const C = makeController((k) => k.beforeAction(function callback() {}, { except: "showw" }));
+    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+  });
+
+  it("callbacks raise exception when their 'except' array condition contains a missing action", async () => {
+    const C = makeController((k) =>
+      k.beforeAction(function callback() {}, { except: ["index", "showw"] }),
+    );
+    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+  });
+
+  it("raised exception message includes the names of callback actions and missing conditional action", async () => {
+    const C = makeController((k) => {
+      k.beforeAction(function callback1() {}, { only: "showw" });
+      k.beforeAction(function callback2() {}, { only: "showw" });
+      k.beforeAction(() => {}, { only: "showw" });
+    });
+    // trails' beforeAction takes one callback at a time, so each
+    // registration gets its own ActionFilter and the first one to fail
+    // surfaces in the message. We assert on that one + the shared bits
+    // (`only`, `showw`) — Rails groups all callbacks into one filter
+    // because `before_action :a, :b, :c, only: :showw` shares a list.
+    const err = await runAndCatch(C);
+    for (const s of [":callback1", "only", "showw"]) expect(err.message).toContain(s);
+  });
+
+  it("raised exception message includes a block callback", async () => {
+    const C = makeController((k) => k.beforeAction(() => {}, { only: "showw" }));
+    expect((await runAndCatch(C)).message).toContain("#<Proc:");
+  });
+
+  it("callbacks with both :only and :except options raise an exception with the correct message", async () => {
+    const C = makeController((k) =>
+      k.beforeAction(function callback() {}, { only: ["index", "show"], except: "showw" }),
+    );
+    const err = await runAndCatch(C);
+    for (const s of [":callback", "except", "showw"]) expect(err.message).toContain(s);
+  });
 });
 
 // ==========================================================================

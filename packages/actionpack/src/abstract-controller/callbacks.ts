@@ -6,7 +6,7 @@
  * @see https://api.rubyonrails.org/classes/AbstractController/Callbacks.html
  */
 
-import type { AbstractController } from "./base.js";
+import { ActionNotFound, type AbstractController } from "./base.js";
 
 export type ActionCallback = (
   controller: AbstractController,
@@ -26,6 +26,14 @@ export interface CallbackPredicateLike {
 }
 
 export interface CallbackOptions {
+  /**
+   * Symbolic name for the callback. When a subclass registers a callback
+   * with the same `name`, it replaces the inherited entry (Rails
+   * identifies callbacks by symbol in AS::Callbacks). Without `name`,
+   * callbacks are identified by function reference and don't dedup
+   * across the inheritance chain.
+   */
+  name?: string;
   only?: string | string[];
   except?: string | string[];
   if?:
@@ -78,6 +86,25 @@ export class ActionFilter implements CallbackPredicateLike {
 
   /** True iff the controller's current action is in the configured set. */
   isMatch(controller: AbstractController): boolean {
+    const Constructor = controller.constructor as { raiseOnMissingCallbackActions?: boolean };
+    if (Constructor.raiseOnMissingCallbackActions) {
+      const missing = [...this._actions].find((a) => !controller.isAvailableAction(a));
+      if (missing !== undefined) {
+        const names =
+          this._filters.length === 1
+            ? _inspectFilter(this._filters[0]!)
+            : `[${this._filters.map(_inspectFilter).join(", ")}]`;
+        // Ruby `:key.inspect` renders as `:key`; preserve that for parity
+        // with Rails' error message format (the literal `:only` / `:except`).
+        const message =
+          `The ${missing} action could not be found for the ${names} ` +
+          `callback on ${controller.constructor.name}, but it is listed in the controller's ` +
+          `:${this._conditionalKey} option.\n\n` +
+          `Raising for missing callback actions is a new default in Rails 7.1; ` +
+          `set \`raiseOnMissingCallbackActions = false\` on the controller class to opt out.`;
+        throw new ActionNotFound(message, controller, missing);
+      }
+    }
     return this._actions.has(controller.actionName);
   }
 
@@ -177,4 +204,102 @@ export function _insertCallbacks(
   for (const callback of list) {
     yieldFn(callback, options);
   }
+}
+
+function _actionList(value: string | string[]): string[] {
+  return Array.isArray(value) ? value : [value];
+}
+
+/** Named fn → `:name`; anon → `#<Proc:…>` (Rails Proc#inspect parity). @internal */
+function _inspectFilter(filter: ActionCallback | AroundCallback): string {
+  const fn = filter as { name?: string };
+  return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
+}
+
+function _shouldRun(controller: AbstractController, entry: CallbackEntry, action: string): boolean {
+  const opts = entry.options;
+  if (opts.only !== undefined && !_actionList(opts.only).includes(action)) return false;
+  if (opts.except !== undefined && _actionList(opts.except).includes(action)) return false;
+  if (opts.if !== undefined && !_evalPredicate(controller, opts.if, true)) return false;
+  if (opts.unless !== undefined && _evalPredicate(controller, opts.unless, false)) return false;
+  return true;
+}
+
+function _evalPredicate(
+  controller: AbstractController,
+  pred: NonNullable<CallbackOptions["if"]>,
+  requireAll: boolean,
+): boolean {
+  if (typeof pred === "function") return pred(controller);
+  if (requireAll) {
+    for (const p of pred) {
+      if (!(typeof p === "function" ? p(controller) : p.isMatch(controller))) return false;
+    }
+    return true;
+  }
+  for (const p of pred) {
+    if (typeof p === "function" ? p(controller) : p.isMatch(controller)) return true;
+  }
+  return false;
+}
+
+/**
+ * Rails `AC::Callbacks#process_action` — wraps the dispatch with the
+ * registered `:process_action` callbacks. Ruby uses a `run_callbacks { super }`
+ * override; here the wrapping lives in callbacks.ts and `Base#processAction`
+ * delegates to it so the file layout matches Rails.
+ * @internal
+ */
+export async function processAction(
+  controller: AbstractController,
+  action: string,
+  dispatch: () => Promise<void>,
+): Promise<void> {
+  const Constructor = controller.constructor as unknown as {
+    getCallbacks: () => CallbackEntry[];
+    getSkipped: () => Array<{
+      callback: ActionCallback | AroundCallback;
+      options: CallbackOptions;
+    }>;
+  };
+  const allCallbacks = Constructor.getCallbacks();
+  const skipped = Constructor.getSkipped();
+
+  const callbacks = allCallbacks.filter((entry) => {
+    return !skipped.some((s) => {
+      if (s.callback !== entry.callback) return false;
+      if (s.options.only !== undefined && !_actionList(s.options.only).includes(action))
+        return false;
+      if (s.options.except !== undefined && _actionList(s.options.except).includes(action))
+        return false;
+      return true;
+    });
+  });
+
+  const befores = callbacks.filter((c) => c.type === "before" && _shouldRun(controller, c, action));
+  const afters = callbacks.filter((c) => c.type === "after" && _shouldRun(controller, c, action));
+  const arounds = callbacks.filter((c) => c.type === "around" && _shouldRun(controller, c, action));
+
+  const executeAction = async (): Promise<void> => {
+    for (const entry of befores) {
+      if (controller.performed) return;
+      const result = await (entry.callback as ActionCallback)(controller);
+      if (result === false) return;
+    }
+    if (controller.performed) return;
+    await dispatch();
+    for (const entry of afters.reverse()) {
+      await (entry.callback as ActionCallback)(controller);
+    }
+  };
+
+  let chain = executeAction;
+  for (const around of arounds.reverse()) {
+    const inner = chain;
+    chain = async () => {
+      await (around.callback as AroundCallback)(controller, inner);
+    };
+  }
+
+  await chain();
 }

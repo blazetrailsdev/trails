@@ -10,6 +10,7 @@ import {
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
+  processAction as _runProcessActionCallbacks,
   type ActionCallback,
   type AroundCallback,
   type CallbackEntry,
@@ -24,20 +25,28 @@ export type {
 
 /** Raised when an action cannot be found for the given controller. */
 export class ActionNotFound extends Error {
-  constructor(message: string) {
+  readonly controller: AbstractController | null;
+  readonly action: string | null;
+
+  constructor(
+    message: string,
+    controller: AbstractController | null = null,
+    action: string | null = null,
+  ) {
     super(message);
     this.name = "ActionNotFound";
+    this.controller = controller;
+    this.action = action;
   }
-}
-
-/** Rails `Array(value)`: coerce scalar to single-element array. @internal */
-function _actionList(value: string | string[]): string[] {
-  return Array.isArray(value) ? value : [value];
 }
 
 export class AbstractController {
   /** The action currently being processed. */
   actionName: string = "";
+
+  /** When true, ActionFilter#isMatch raises if `:only`/`:except` references
+   * an action that doesn't exist on the controller. Rails 7.1 mattr_accessor. */
+  static raiseOnMissingCallbackActions: boolean = false;
 
   /** Internal storage for response body. Subclasses may override the
    * `responseBody` accessor (e.g. Metal writes through to the response). */
@@ -143,30 +152,33 @@ export class AbstractController {
 
   /** Register a before_action callback. */
   static beforeAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    _normalizeCallbackOptions(options);
-    const entry: CallbackEntry = { callback, type: "before", options };
-    if (options.prepend) {
-      this._ensureOwnCallbacks().unshift(entry);
-    } else {
-      this._ensureOwnCallbacks().push(entry);
-    }
+    this._registerActionCallback("before", callback, options);
   }
 
   /** Register an after_action callback. */
   static afterAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    _normalizeCallbackOptions(options);
-    const entry: CallbackEntry = { callback, type: "after", options };
-    if (options.prepend) {
-      this._ensureOwnCallbacks().unshift(entry);
-    } else {
-      this._ensureOwnCallbacks().push(entry);
-    }
+    this._registerActionCallback("after", callback, options);
   }
 
   /** Register an around_action callback. */
   static aroundAction(callback: AroundCallback, options: CallbackOptions = {}): void {
+    this._registerActionCallback("around", callback, options);
+  }
+
+  /** Pre-populates `options.filters` so ActionFilter retains the callback
+   * for diagnostic rendering. Mirrors `_insert_callbacks` filters wiring. @internal */
+  private static _registerActionCallback(
+    type: "before" | "after" | "around",
+    callback: ActionCallback | AroundCallback,
+    options: CallbackOptions,
+  ): void {
+    const opts = options as CallbackOptions & {
+      filters?: Array<ActionCallback | AroundCallback>;
+    };
+    opts.filters = [callback];
     _normalizeCallbackOptions(options);
-    const entry: CallbackEntry = { callback, type: "around", options };
+    delete opts.filters;
+    const entry: CallbackEntry = { callback, type, options };
     if (options.prepend) {
       this._ensureOwnCallbacks().unshift(entry);
     } else {
@@ -186,6 +198,24 @@ export class AbstractController {
     for (const klass of hierarchy) {
       if (Object.prototype.hasOwnProperty.call(klass, "_callbacks")) {
         chain.push(...(klass as any)._callbacks);
+      }
+    }
+    // Dedup by (`options.name`, `type`): when a subclass registers a
+    // callback with the same name and kind, drop the inherited entry.
+    // Mirrors AS::Callbacks CallbackChain#remove_duplicates, which
+    // matches on Callback#duplicates? (same filter + same kind) — so
+    // `before_action :first` and `after_action :first` coexist, but a
+    // child's `before_action :first, except: :index` replaces the
+    // parent's `before_action :first`.
+    const seen = new Set<string>();
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const entry = chain[i]!;
+      if (entry.options.name === undefined) continue;
+      const key = `${entry.type}\0${entry.options.name}`;
+      if (seen.has(key)) {
+        chain.splice(i, 1);
+      } else {
+        seen.add(key);
       }
     }
     return chain;
@@ -208,75 +238,94 @@ export class AbstractController {
   }
 
   /**
-   * Process an action by name. Runs callbacks around the action. Extra
-   * `args` are forwarded to the action method (mirrors Rails'
-   * `Controller#process(action, *args)`).
+   * Process an action by name. Delegates to the callbacks-wrapping
+   * dispatcher in `callbacks.ts`, which then invokes `_dispatchAction` as
+   * the inner step (mirrors Rails AC::Callbacks#process_action overriding
+   * Base#process_action with a `run_callbacks { super }` wrapper).
    */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
     this.actionName = action;
     this._performed = false;
+    await _runProcessActionCallbacks(this, action, () => this._dispatchAction(action, ...args));
+  }
 
+  /** Rails `Base#send_action` — raw method dispatch with actionMissing
+   * fallback and ActionNotFound on no match. @internal */
+  async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
     const Constructor = this.constructor as typeof AbstractController;
-    const allCallbacks = Constructor.getCallbacks();
-    const skipped = Constructor.getSkipped();
-
-    // Filter out skipped callbacks
-    const callbacks = allCallbacks.filter((entry) => {
-      return !skipped.some((s) => {
-        if (s.callback !== entry.callback) return false;
-        if (s.options.only !== undefined && !_actionList(s.options.only).includes(action))
-          return false;
-        if (s.options.except !== undefined && _actionList(s.options.except).includes(action))
-          return false;
-        return true;
-      });
-    });
-
-    const befores = callbacks.filter((c) => c.type === "before" && this._shouldRun(c, action));
-    const afters = callbacks.filter((c) => c.type === "after" && this._shouldRun(c, action));
-    const arounds = callbacks.filter((c) => c.type === "around" && this._shouldRun(c, action));
-
-    // Build the around chain
-    const executeAction = async (): Promise<void> => {
-      // Run before callbacks
-      for (const entry of befores) {
-        if (this.performed) return;
-        const result = await (entry.callback as ActionCallback)(this);
-        if (result === false) return; // Halt chain
+    if (Constructor.hasAction(action)) {
+      const method = (this as any)[action];
+      if (typeof method === "function") {
+        await method.apply(this, args);
       }
-
-      if (this.performed) return;
-
-      // Execute the action (only if it's a recognized action method)
-      if (Constructor.hasAction(action)) {
-        const method = (this as any)[action];
-        if (typeof method === "function") {
-          await method.apply(this, args);
-        }
-      } else if (typeof (this as any).actionMissing === "function") {
-        await (this as any).actionMissing(action, ...args);
-      } else {
-        throw new ActionNotFound(
-          `The action '${action}' could not be found for ${this.constructor.name}`,
-        );
-      }
-
-      // Run after callbacks (in reverse order)
-      for (const entry of afters.reverse()) {
-        await (entry.callback as ActionCallback)(this);
-      }
-    };
-
-    // Wrap with around callbacks
-    let chain = executeAction;
-    for (const around of arounds.reverse()) {
-      const inner = chain;
-      chain = async () => {
-        await (around.callback as AroundCallback)(this, inner);
-      };
+    } else if (typeof (this as any).actionMissing === "function") {
+      await (this as any).actionMissing(action, ...args);
+    } else {
+      throw new ActionNotFound(
+        `The action '${action}' could not be found for ${this.constructor.name}`,
+        this,
+        action,
+      );
     }
+  }
 
-    await chain();
+  /**
+   * Rails `Base#process` — public entry. Validates the action via
+   * `_findActionName`, resets the response body, then delegates to
+   * `processAction` which handles the per-request `actionName` /
+   * `_performed` setup. Splitting state ownership this way (Rails-style
+   * single-setter is the goal, but trails has long-standing direct
+   * `processAction` callers in Metal and tests that need their state
+   * primed) avoids the double-assign that earlier iterations had.
+   */
+  async process(action: string, ...args: unknown[]): Promise<void> {
+    if (!this._findActionName(action)) {
+      throw new ActionNotFound(
+        `The action '${action}' could not be found for ${this.constructor.name}`,
+        this,
+        action,
+      );
+    }
+    this._responseBody = null;
+    await this.processAction(action, ...args);
+  }
+
+  /** Rails `available_action?` — `action` is a real method or covered by
+   * `actionMissing`. */
+  isAvailableAction(action: string): boolean {
+    return this._findActionName(action) !== undefined;
+  }
+
+  /** @internal */
+  isActionMethod(name: string): boolean {
+    return (this.constructor as typeof AbstractController).hasAction(name);
+  }
+
+  /** @internal */
+  _handleActionMissing(...args: unknown[]): unknown {
+    return (this as any).actionMissing?.(this.actionName, ...args);
+  }
+
+  /** @internal */
+  _findActionName(name: string): string | undefined {
+    return this._validActionName(name) ? this.methodForAction(name) : undefined;
+  }
+
+  /** @internal */
+  methodForAction(name: string): string | undefined {
+    if (this.isActionMethod(name)) return name;
+    if (typeof (this as any).actionMissing === "function") return "_handleActionMissing";
+    return undefined;
+  }
+
+  /** @internal Rails `_valid_action_name?` — reject path-separator names. */
+  _validActionName(name: string): boolean {
+    return !name.includes("/");
+  }
+
+  /** Rails `Base.supports_path?` — whether this controller renders URL paths. */
+  static supportsPath(): boolean {
+    return true;
   }
 
   /**
@@ -298,29 +347,6 @@ export class AbstractController {
   /** Get available action names. */
   availableActions(): string[] {
     return (this.constructor as typeof AbstractController).actionMethods();
-  }
-
-  private _shouldRun(entry: CallbackEntry, action: string): boolean {
-    const opts = entry.options;
-    if (opts.only !== undefined && !_actionList(opts.only).includes(action)) return false;
-    if (opts.except !== undefined && _actionList(opts.except).includes(action)) return false;
-    if (opts.if !== undefined && !this._evalPredicate(opts.if, true)) return false;
-    if (opts.unless !== undefined && this._evalPredicate(opts.unless, false)) return false;
-    return true;
-  }
-
-  private _evalPredicate(pred: NonNullable<CallbackOptions["if"]>, requireAll: boolean): boolean {
-    if (typeof pred === "function") return pred(this);
-    if (requireAll) {
-      for (const p of pred) {
-        if (!(typeof p === "function" ? p(this) : p.isMatch(this))) return false;
-      }
-      return true;
-    }
-    for (const p of pred) {
-      if (typeof p === "function" ? p(this) : p.isMatch(this)) return true;
-    }
-    return false;
   }
 
   private static _ensureOwnCallbacks(): CallbackEntry[] {
