@@ -16,8 +16,10 @@
  * scope has been opened so existing unit-level tests keep working.
  */
 
-import { getAsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
+
+const REGISTRY_KEY = "active_record_explain_registry";
 
 interface Slot {
   collect: boolean;
@@ -119,5 +121,5 @@ export class ExplainRegistry {
  * @internal
  */
 export function instance(): ExplainRegistry {
-  return new ExplainRegistry();
+  return IsolatedExecutionState.fetch(REGISTRY_KEY, () => new ExplainRegistry());
 }

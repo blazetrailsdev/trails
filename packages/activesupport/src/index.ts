@@ -34,6 +34,8 @@ export {
 } from "./async-context-adapter.js";
 export type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
 
+export { IsolatedExecutionState } from "./isolated-execution-state.js";
+
 export {
   registerChildProcessAdapter,
   getChildProcess,

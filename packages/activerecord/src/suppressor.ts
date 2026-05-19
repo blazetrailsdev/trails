@@ -5,41 +5,31 @@
  * Mirrors: ActiveRecord::Suppressor
  */
 
-import { getAsyncContext } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, getAsyncContext } from "@blazetrails/activesupport";
 import type { AsyncContext } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
+const SUPPRESSOR_REGISTRY_KEY = "active_record_suppressor_registry";
+
 /**
- * The suppressor registry: a map from class name → `true` when that
- * class is currently suppressed. Mirrors Rails'
- * `Suppressor.registry[klass.name] = true` contract.
- *
- * Storage is async-context-scoped (matching `explain-registry.ts` and
- * Rails' `IsolatedExecutionState`/per-fiber semantics) so two
- * concurrent `suppress` blocks running under the same Promise.all
- * don't leak state into each other. Outside any active scope
- * (sequential code paths) we fall back to a process-global registry,
- * so existing direct mutations (`Base.registry[name] = true`)
- * still work.
+ * Per-async-scope override layer used by `suppress()` so concurrent
+ * `Promise.all` branches don't leak suppression state into each other.
+ * `registry()` returns the override if a scope is active, otherwise the
+ * per-context bag from `IsolatedExecutionState` (mirroring Rails'
+ * `Suppressor.registry`).
  *
  * `Object.create(null)` avoids `__proto__`/`constructor` foot-guns.
  */
-const _fallback: Record<string, true | undefined> = Object.create(null);
+let _scopeOverride: AsyncContext<Record<string, true | undefined>> | null = null;
+let _scopeAdapter: ReturnType<typeof getAsyncContext> | null = null;
 
-let _context: AsyncContext<Record<string, true | undefined>> | null = null;
-let _contextAdapter: ReturnType<typeof getAsyncContext> | null = null;
-
-function ctx(): AsyncContext<Record<string, true | undefined>> {
+function scopeOverride(): AsyncContext<Record<string, true | undefined>> {
   const adapter = getAsyncContext();
-  if (!_context || _contextAdapter !== adapter) {
-    _contextAdapter = adapter;
-    _context = adapter.create<Record<string, true | undefined>>();
+  if (!_scopeOverride || _scopeAdapter !== adapter) {
+    _scopeAdapter = adapter;
+    _scopeOverride = adapter.create<Record<string, true | undefined>>();
   }
-  return _context;
-}
-
-function currentRegistry(): Record<string, true | undefined> {
-  return ctx().getStore() ?? _fallback;
+  return _scopeOverride;
 }
 
 /**
@@ -51,7 +41,13 @@ function currentRegistry(): Record<string, true | undefined> {
  * Mirrors: ActiveRecord::Suppressor.registry
  */
 export function registry(): Record<string, true | undefined> {
-  return currentRegistry();
+  return (
+    scopeOverride().getStore() ??
+    IsolatedExecutionState.fetch(
+      SUPPRESSOR_REGISTRY_KEY,
+      () => Object.create(null) as Record<string, true | undefined>,
+    )
+  );
 }
 
 /**
@@ -69,13 +65,13 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
     // (Rails has the same constraint); just run the block.
     return await fn();
   }
-  const parent = currentRegistry();
+  const parent = registry();
   // Null-prototype copy: keeps `Object.prototype` keys (toString,
   // constructor, …) from masquerading as suppressed class names.
   const child: Record<string, true | undefined> = Object.create(null);
   Object.assign(child, parent);
   child[name] = true;
-  return await ctx().run(child, fn);
+  return await scopeOverride().run(child, fn);
 }
 
 /**
@@ -83,7 +79,7 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
  * suppressed in the active scope.
  */
 export function isSuppressed(modelClass: typeof Base): boolean {
-  const reg = currentRegistry();
+  const reg = registry();
   let current: typeof Base | null = modelClass;
   while (current && typeof current === "function") {
     const klassName = current.name;
