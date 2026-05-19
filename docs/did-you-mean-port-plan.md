@@ -57,7 +57,7 @@ From `grep -rn DidYouMean vendor/rails`:
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `actionpack/lib/abstract_controller/base.rb` — `ActionNotFound#corrections`                                                                                                                             | controller action names   | `packages/actionpack/src/abstract-controller/base.ts:26` — `ActionNotFound` has no `corrections`                                                                      |
 | `actionpack/lib/action_controller/metal/exceptions.rb` — `UrlGenerationError#corrections`                                                                                                               | route name dictionary     | not yet ported                                                                                                                                                        |
-| `actionpack/lib/action_controller/metal/strong_parameters.rb` — `UnpermittedParameters#corrections`                                                                                                     | permitted-keys dictionary | `strong-parameters.ts:29` ships an inline Levenshtein ≤2 helper — should be replaced by `SpellChecker`                                                                |
+| `actionpack/lib/action_controller/metal/strong_parameters.rb` — `ParameterMissing#corrections`                                                                                                          | permitted-keys dictionary | `strong-parameters.ts:23-31` ships an inline Levenshtein ≤2 helper on `ParameterMissing` — should be replaced by `SpellChecker`                                       |
 | `activerecord/lib/active_record/associations/errors.rb` — `AssociationNotFoundError#corrections`, `InverseOfAssociationNotFoundError#corrections`, `HasManyThroughAssociationNotFoundError#corrections` | reflection names          | `packages/activerecord/src/associations.ts` + `reflection.ts` use an ad-hoc `levenshtein()` with `≤3` threshold (only covers two of the three error types faithfully) |
 | `actionview/lib/action_view/template/error.rb` — `Template::Error#corrections` (uses raw `DidYouMean::Jaro.distance`)                                                                                   | template virtual paths    | not yet ported — needs `Jaro.distance` exported, not just `SpellChecker`                                                                                              |
 | `railties/lib/rails/command.rb` — command suggestion                                                                                                                                                    | registered command names  | `@blazetrails/trailties` exists but command-suggestion behaviour not yet ported                                                                                       |
@@ -67,7 +67,7 @@ From `grep -rn DidYouMean vendor/rails`:
 So the consumers we actually need to wire up after the port lands:
 
 1. **AbstractController::ActionNotFound#corrections** (this prompt's motivating case)
-2. **UnpermittedParameters#corrections** (replaces existing inline Levenshtein)
+2. **ParameterMissing#corrections** (replaces existing inline Levenshtein)
 3. **AssociationNotFoundError / InverseOfAssociationNotFoundError / HasManyThroughAssociationNotFoundError `#corrections`** (replaces existing `levenshtein()` ad-hoc helpers in `associations.ts` and `reflection.ts`)
 4. **Template::Error#corrections** (needs `jaroDistance` exported)
 5. **UrlGenerationError#corrections** (new, when route exceptions are ported)
@@ -90,8 +90,8 @@ observable behaviour that downstream tests will pin.
 6. Sort `words` by `jaroWinklerDistance(String(word), normalizedInput)` **descending**. Ruby does `sort_by` ascending then `reverse!`; that ordering is stable in Ruby, and we have to mimic it. `Array.prototype.sort` is stable per ECMAScript 2019 (Node ≥12), so a descending comparator that returns 0 for ties is sufficient in practice — but to make the determinism explicit and engine-independent in the test record, decorate-sort-undecorate: map each word to `{word, index, score}`, sort by `score` descending with `index` ascending as an explicit tiebreaker, then unmap. That makes the dictionary-order guarantee load-bearing in the code, not in a footnote about V8 internals.
 7. `mistypeThreshold = Math.ceil(normalizedInput.length * 0.25)`.
 8. `corrections` = `words` where `levenshteinDistance(normalize(word), normalizedInput) <= mistypeThreshold`.
-9. If `corrections` is empty, take the misspell fallback:
-   `words.filter(word => { const w = normalize(word); const len = Math.min(normalizedInput.length, w.length); return levenshteinDistance(w, normalizedInput) < len; }).slice(0, 1)`.
+9. If `corrections` is empty, reassign it to the misspell fallback:
+   `corrections = words.filter(word => { const w = normalize(word); const len = Math.min(normalizedInput.length, w.length); return levenshteinDistance(w, normalizedInput) < len; }).slice(0, 1);`.
 10. Return `corrections`.
 
 Notes:
