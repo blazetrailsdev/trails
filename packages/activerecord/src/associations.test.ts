@@ -1592,8 +1592,20 @@ describe("HasAndBelongsToManyAssociations", () => {
 describe("CounterCache", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      topics: {
+        title: "string",
+        replies_count: { type: "integer", default: 0 },
+      },
+      replies: { content: "string", topic_id: "integer" },
+      categories: {
+        name: "string",
+        num_products: { type: "integer", default: 0 },
+      },
+      products: { name: "string", category_id: "integer" },
+    });
   });
 
   // Rails: test_update_counter_cache_on_create
