@@ -122,7 +122,7 @@ describe("Callbacks", () => {
       expect(target.log).toEqual(["halted"]);
     });
 
-    it("after callbacks still run when around does not yield", () => {
+    it("after callbacks are skipped when around does not yield", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "around", (t: any) => {
@@ -135,7 +135,64 @@ describe("Callbacks", () => {
         target.log.push("block");
       });
       expect(result).toBe(false);
-      expect(target.log).toEqual(["around", "after"]);
+      expect(target.log).toEqual(["around"]);
+    });
+
+    it("fire-and-forget around does not swallow inner rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (_t: any, next: any) => {
+        // intentionally not awaiting / returning next()
+        next();
+      });
+      await expect(
+        runCallbacks(target, "save", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("fire-and-forget next().finally(...) does not swallow inner rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (_t: any, next: any) => {
+        next().finally(() => {});
+      });
+      await expect(
+        runCallbacks(target, "save", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("fire-and-forget next().catch() with no handler does not swallow rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (_t: any, next: any) => {
+        next().catch();
+      });
+      await expect(
+        runCallbacks(target, "save", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+    });
+
+    it("awaited around can rescue inner rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      let caught: Error | null = null;
+      setCallback(target, "save", "around", async (_t: any, next: any) => {
+        try {
+          await next();
+        } catch (e) {
+          caught = e as Error;
+        }
+      });
+      await runCallbacks(target, "save", async () => {
+        throw new Error("boom");
+      });
+      expect(caught!.message).toBe("boom");
     });
   });
 

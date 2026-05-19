@@ -875,13 +875,12 @@ export class CallbackChain {
   ): boolean | Promise<boolean> {
     let blockExecuted = false;
     const trackedBlock = (): void | Promise<void> => {
-      const r = block?.();
-      if (isThenable(r)) {
-        return Promise.resolve(r).then(() => {
-          blockExecuted = true;
-        });
-      }
+      // Track invocation, not successful completion: in Rails an around that
+      // rescues an exception raised by yield still runs the outer invoke_after
+      // (callbacks.rb#run_callbacks). Setting the flag here means a block
+      // rejection caught by an around no longer looks like "around did not yield".
       blockExecuted = true;
+      return block?.() as void | Promise<void>;
     };
 
     let chain: () => void | Promise<void> = trackedBlock;
@@ -891,10 +890,49 @@ export class CallbackChain {
       const prev = chain;
       chain = () => {
         let pendingProceed: Promise<void> | undefined;
+        let proceedObserved = false;
         const next = (): void | Promise<void> => {
           const r = prev();
-          if (isThenable(r)) pendingProceed = Promise.resolve(r) as Promise<void>;
-          return r;
+          if (!isThenable(r)) return r;
+          pendingProceed = Promise.resolve(r) as Promise<void>;
+          // Return a thenable wrapper so we can detect whether the around
+          // actually awaited/chained on next() (real observation) versus
+          // calling it fire-and-forget. `await` and `.then(...)` both invoke
+          // .then on the wrapper; bare `next();` does not.
+          const observed = pendingProceed;
+          return {
+            then(onFulfilled?: any, onRejected?: any) {
+              // Only mark observed when a rejection path is wired — `await`
+              // internally passes an onRejected, `.then(_, r)` does too.
+              // `.then(onFulfilled)` alone doesn't rescue, so the rejection
+              // must still propagate via pendingProceed.
+              if (typeof onRejected === "function") {
+                proceedObserved = true;
+                return observed.then(onFulfilled, onRejected);
+              }
+              const p = observed.then(onFulfilled);
+              // Suppress unhandled-rejection on the unobserved chain; the
+              // canonical propagation path is pendingProceed.
+              p.catch(() => {});
+              return p;
+            },
+            catch(onRejected?: any) {
+              if (typeof onRejected === "function") {
+                proceedObserved = true;
+                return observed.catch(onRejected);
+              }
+              const p = observed.catch(onRejected);
+              p.catch(() => {});
+              return p;
+            },
+            finally(onFinally?: any) {
+              // .finally does not rescue rejections — the rejection still
+              // propagates through the returned promise. Don't mark observed.
+              const p = observed.finally(onFinally);
+              p.catch(() => {});
+              return p;
+            },
+          } as unknown as Promise<void>;
         };
         let cbResult: void | Promise<void>;
         try {
@@ -919,10 +957,16 @@ export class CallbackChain {
           return (async () => {
             try {
               await cbResult;
-              if (pendingProceed) await pendingProceed;
             } catch (err) {
               if (pendingProceed) await pendingProceed.catch(() => {});
               throw err;
+            }
+            if (pendingProceed) {
+              // Swallow only when the around actually observed next() (awaited
+              // or chained). Fire-and-forget arounds couldn't have rescued, so
+              // propagate the inner rejection.
+              if (proceedObserved) await pendingProceed.catch(() => {});
+              else await pendingProceed;
             }
           })();
         }
@@ -932,9 +976,9 @@ export class CallbackChain {
     const chainResult = chain();
 
     const finish = (): boolean | Promise<boolean> => {
-      // After callbacks run even when around halts (didn't yield) — mirrors the
-      // original _invoke which ran afters after core() regardless of whether
-      // the block executed. Return blockExecuted so callers can detect around-halt.
+      // Rails AS::Callbacks compiles arounds wrapping (befores + block + afters)
+      // as a single continuation: a non-yielding around skips the afters too.
+      if (!blockExecuted) return false;
       const afterResult = this._runAfters(afters, false, skipAfterIfTerminated, target, opts);
       if (isThenable(afterResult)) return Promise.resolve(afterResult).then(() => blockExecuted);
       return blockExecuted;
