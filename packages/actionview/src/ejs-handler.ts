@@ -16,7 +16,7 @@
  *   TemplateHandlerRegistry.register(new EjsHandler());
  */
 
-import type { TemplateHandler, RenderContext } from "./template-handler.js";
+import type { TemplateHandler, RenderContext } from "./template/handlers.js";
 
 export class EjsHandler implements TemplateHandler {
   readonly extensions = ["ejs"];

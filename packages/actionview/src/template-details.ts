@@ -5,8 +5,8 @@
  * to match concrete templates against a `Requested` set.
  */
 
-import type { TemplateHandler } from "./template-handler.js";
-import { TemplateHandlerRegistry } from "./template-handler.js";
+import type { TemplateHandler } from "./template/handlers.js";
+import { TemplateHandlerRegistry } from "./template/handlers.js";
 
 export type DetailKey = string | symbol | null;
 

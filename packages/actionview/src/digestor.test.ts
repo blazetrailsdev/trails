@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { Digestor } from "./digestor.js";
 import { LookupContext } from "./lookup-context.js";
-import { TemplateHandlerRegistry } from "./template-handler.js";
+import { TemplateHandlerRegistry } from "./template/handlers.js";
 import { InMemoryResolver } from "./template-resolver.js";
 
 function withFinder(source: string): LookupContext {

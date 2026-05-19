@@ -7,7 +7,7 @@ import {
   EjsHandler,
   Renderer,
 } from "./index.js";
-import type { TemplateHandler, RenderContext } from "./template-handler.js";
+import type { TemplateHandler, RenderContext } from "./template/handlers.js";
 
 // ==========================================================================
 // Register EJS handler for all tests

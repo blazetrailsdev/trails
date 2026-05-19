@@ -12,8 +12,8 @@
  *   const output = await ctx.render("posts", "index", "html", { posts: [...] });
  */
 
-import type { RenderContext } from "./template-handler.js";
-import { TemplateHandlerRegistry } from "./template-handler.js";
+import type { RenderContext } from "./template/handlers.js";
+import { TemplateHandlerRegistry } from "./template/handlers.js";
 import type { TemplateResolver } from "./template-resolver.js";
 import type { Template } from "./template.js";
 
