@@ -2,12 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA = {
   topics: { title: "string", score: "integer" },
@@ -18,17 +18,18 @@ const TEST_SCHEMA = {
 } as const;
 
 // -- Helpers --
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("ValidationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Topic extends Base {
@@ -264,10 +265,11 @@ describe("ValidationsTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("validates before save", async () => {
     class User extends Base {
@@ -361,10 +363,11 @@ describe("ValidationsTest", () => {
 });
 
 describe("ValidationsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("validate uniqueness", async () => {
     class Email extends Base {
