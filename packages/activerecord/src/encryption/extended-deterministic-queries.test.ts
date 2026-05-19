@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -30,14 +32,11 @@ const TEST_KEY = Buffer.alloc(32, "x").toString("base64");
  * Mirrors Rails' `models/book_encrypted.rb`: one `books` table, five model
  * classes pointing at it with different encryption configurations.
  *
- * Config mutation and prototype patching are handled in the describe
- * block's beforeAll/afterAll; setupBooks() only builds fresh classes
- * and an adapter per test.
+ * Schema and classes are built once in beforeAll so transactional fixtures
+ * can wrap each test in BEGIN/ROLLBACK — DDL inside beforeEach would
+ * auto-commit on MariaDB and break the outer wrap.
  */
-async function setupBooks() {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, { books: { name: "string" } });
-
+function buildBooks(adapter: TestDatabaseAdapter) {
   class UnencryptedBook extends Base {
     static {
       this._tableName = "books";
@@ -84,7 +83,6 @@ async function setupBooks() {
   }
 
   return {
-    adapter,
     UnencryptedBook,
     EncryptedBook,
     EncryptedBookWithDowncaseName,
@@ -94,7 +92,8 @@ async function setupBooks() {
 }
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
-  let books: Awaited<ReturnType<typeof setupBooks>>;
+  let adapter: TestDatabaseAdapter;
+  let books: ReturnType<typeof buildBooks>;
 
   // Snapshot global state up front and restore it after the whole
   // block. Configurable.config and Relation/Base/EncryptedAttributeType
@@ -115,7 +114,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     serialize?: (...args: any[]) => unknown;
   } = {};
 
-  beforeAll(() => {
+  beforeAll(async () => {
     Configurable.config.extendQueries = true;
     Configurable.config.supportUnencryptedData = true;
     Configurable.config.keyDerivationSalt = "test-salt";
@@ -129,7 +128,17 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
     installExtendedQueriesIfConfigured();
+
+    adapter = createTestAdapter();
+    await defineSchema(adapter, { books: { name: "string" } });
+    books = buildBooks(adapter);
+    // Warm the books table once before any test runs so the first create
+    // doesn't race with the test-adapter's regex-recovery schema path on
+    // MariaDB. Subsequent tests reuse the warmed schema cache.
+    await books.EncryptedBook.where("1=1").toArray();
   });
+
+  withTransactionalFixtures(() => adapter);
 
   afterAll(() => {
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
@@ -146,15 +155,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     Configurable.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
     Configurable.config.primaryKey = savedConfig.primaryKey;
     Configurable.config.deterministicKey = savedConfig.deterministicKey;
-  });
-
-  beforeEach(async () => {
-    books = await setupBooks();
-    // Warm the books table so the first create in each test doesn't race
-    // with the test-adapter's regex-recovery schema path on MariaDB,
-    // which can otherwise leave the create's INSERT torn from the
-    // subsequent SELECT (different pool connections, uncommitted state).
-    await books.EncryptedBook.where("1=1").toArray();
   });
 
   it("Finds records when data is unencrypted", async () => {

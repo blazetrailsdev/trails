@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import {
   freshAdapter,
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   makeEncryptedBookWithDowncaseName,
-  makeFreshModel,
   makeKeyProvider,
   makeEncryptedBook,
 } from "./test-helpers.js";
@@ -17,7 +16,28 @@ import { UniquenessValidator } from "../validations.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import type { DatabaseAdapter } from "../adapter.js";
+
+// Builds a fresh Base subclass bound to the shared `encrypted_books` table.
+// Each test gets its own class so `encrypts(...)` is called exactly once
+// (encrypts() is idempotent and would no-op on a reused class). DDL was
+// already executed in beforeAll, so no in-test ALTER TABLE — compatible
+// with transactional fixtures on MariaDB.
+function freshBook(adapter: DatabaseAdapter): any {
+  return class extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+      this.adapter = adapter;
+    }
+  } as any;
+}
+
 describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
+  let adapter: TestDatabaseAdapter;
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
   let savedExtendQueries: boolean;
   const savedMethods: {
@@ -27,6 +47,12 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     findBy?: (...args: any[]) => unknown;
     serialize?: (...args: any[]) => unknown;
   } = {};
+
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+
+  withTransactionalFixtures(() => adapter);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
@@ -61,7 +87,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work", async () => {
-    const Book = makeEncryptedBookWithDowncaseName(await freshAdapter());
+    const Book = makeEncryptedBookWithDowncaseName(adapter);
     Book.validatesUniqueness("name");
     new Book();
 
@@ -75,15 +101,13 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // previousTypes, so the uniqueness query also searches for the unencrypted value.
     Configurable.config.supportUnencryptedData = true;
 
-    const adp = await freshAdapter();
-    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const Book = freshBook(adapter);
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true });
     new Book();
 
     // Insert unencrypted "dune" directly (simulates a row that leaked plain text).
-    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
-    RawBook._tableName = Book._tableName;
+    const RawBook = freshBook(adapter);
     new RawBook();
     await RawBook.create({ name: "dune" });
 
@@ -98,14 +122,12 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // supportUnencryptedData: false — so no plain-text fallback in previousTypes.
     Configurable.config.supportUnencryptedData = true;
 
-    const adp = await freshAdapter();
-    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const Book = freshBook(adapter);
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: false });
     new Book();
 
-    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
-    RawBook._tableName = Book._tableName;
+    const RawBook = freshBook(adapter);
     new RawBook();
     await RawBook.create({ name: "dune" });
 
@@ -120,14 +142,12 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     // supportUnencryptedData: true — so the plain-text fallback IS included.
     Configurable.config.supportUnencryptedData = false;
 
-    const adp = await freshAdapter();
-    const Book = await makeFreshModel(adp, { id: "integer", name: "string" });
+    const Book = freshBook(adapter);
     Book.validatesUniqueness("name");
     Book.encrypts("name", { deterministic: true, downcase: true, supportUnencryptedData: true });
     new Book();
 
-    const RawBook = await makeFreshModel(adp, { id: "integer", name: "string" });
-    RawBook._tableName = Book._tableName;
+    const RawBook = freshBook(adapter);
     new RawBook();
     await RawBook.create({ name: "dune" });
 
@@ -141,7 +161,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     Configurable.config.supportUnencryptedData = false;
     Configurable.config.previous = [{ downcase: true, deterministic: true }];
 
-    const OldBook = await makeFreshModel(await freshAdapter(), { id: "integer", name: "string" });
+    const OldBook = freshBook(adapter);
     OldBook.validatesUniqueness("name");
     OldBook.encrypts("name", { deterministic: true, downcase: false });
     new OldBook();
@@ -159,7 +179,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     const prevKeyProvider = makeKeyProvider("prev-key-for-uniqueness-test-32b!!");
     Configurable.config.previous = [{ keyProvider: prevKeyProvider, deterministic: true }];
 
-    const Book = makeEncryptedBook(await freshAdapter()); // deterministic encrypted name
+    const Book = makeEncryptedBook(adapter); // deterministic encrypted name
     Book.validatesUniqueness("name");
     new Book();
 
