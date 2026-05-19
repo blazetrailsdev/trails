@@ -1520,11 +1520,24 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string" },
+      size_un_authors: { name: "string" },
+      size_un_posts: { author_id: "integer", title: "string" },
+      size_ld_authors: { name: "string" },
+      size_ld_posts: { author_id: "integer", title: "string" },
+      empty_un_authors: { name: "string" },
+      empty_un_posts: { author_id: "integer", title: "string" },
+      empty_ld_authors: { name: "string" },
+      empty_ld_posts: { author_id: "integer", title: "string" },
+    });
   });
+  withTransactionalFixtures(() => adapter);
 
   // -- Calling size/empty --
 
