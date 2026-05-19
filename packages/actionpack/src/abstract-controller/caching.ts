@@ -11,6 +11,16 @@
 
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
+import {
+  combinedFragmentCacheKey as _combinedFragmentCacheKey,
+  expireFragment as _expireFragment,
+  fragmentExist as _fragmentExist,
+  instrumentFragmentCache as _instrumentFragmentCache,
+  readFragment as _readFragment,
+  writeFragment as _writeFragment,
+  type FragmentsHost,
+} from "./fragments.js";
+
 const SLOTS = ["defaultStaticExtension", "performCaching", "enableFragmentCacheLogging"] as const;
 
 export type CachingSlot = (typeof SLOTS)[number];
@@ -145,6 +155,50 @@ export function cache<T>(
 function expandControllerCacheKey(key: unknown): string {
   const flat = Array.isArray(key) ? key.map(stringify).join("/") : stringify(key);
   return `controller/${flat}`;
+}
+
+// Rails `include AbstractController::Caching::Fragments` exposes the fragment
+// API on the `Caching` module itself. The implementations live in `fragments.ts`;
+// these thin wrappers republish them on `caching.ts` so `api:compare` sees the
+// surface where Rails exposes it. Re-export statements wouldn't suffice — the
+// extractor counts only direct `export function` declarations.
+
+export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
+  return _combinedFragmentCacheKey.call(this, key);
+}
+
+export function writeFragment(
+  this: FragmentsHost,
+  key: unknown,
+  content: string,
+  options?: CacheOptions,
+): string {
+  return _writeFragment.call(this, key, content, options);
+}
+
+export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
+  return _readFragment.call(this, key, options);
+}
+
+export function fragmentExist(
+  this: FragmentsHost,
+  key: unknown,
+  options?: CacheOptions,
+): boolean | undefined {
+  return _fragmentExist.call(this, key, options);
+}
+
+export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
+  return _expireFragment.call(this, key, options);
+}
+
+export function instrumentFragmentCache<T>(
+  host: FragmentsHost,
+  name: string,
+  key: unknown,
+  block: () => T,
+): T {
+  return _instrumentFragmentCache(host, name, key, block);
 }
 
 function stringify(part: unknown): string {
