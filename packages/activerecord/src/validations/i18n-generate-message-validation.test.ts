@@ -1,28 +1,25 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { Base } from "../index.js";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("I18nGenerateMessageValidationTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
-  });
-  beforeEach(async () => {
     await defineSchema(adapter, { topics: { title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
   afterEach(() => {
     I18n.reset();
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  afterAll(() => {
     vi.unstubAllEnvs();
   });
 

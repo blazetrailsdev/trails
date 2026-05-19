@@ -2,15 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
-let _adapter: DatabaseAdapter;
-beforeEach(async () => {
+let _adapter: TestDatabaseAdapter;
+beforeAll(async () => {
   _adapter = createTestAdapter();
   await defineSchema(_adapter, {
     posts: { title: "string", tags_count: "integer" },
@@ -21,7 +21,8 @@ beforeEach(async () => {
     ws_posts: { title: "string", tags_count: "integer" },
   });
 });
-function freshAdapter(): DatabaseAdapter {
+withTransactionalFixtures(() => _adapter);
+function freshAdapter(): TestDatabaseAdapter {
   return _adapter;
 }
 

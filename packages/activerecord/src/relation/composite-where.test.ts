@@ -10,14 +10,14 @@
  *
  * Mirrors: ActiveRecord predicate-builder composite-key handling.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Relation#where — composite-key form", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class CompOrder extends Base {
     static {
@@ -29,7 +29,7 @@ describe("Relation#where — composite-key form", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       comp_orders: {
@@ -48,6 +48,7 @@ describe("Relation#where — composite-key form", () => {
     // registration also avoids the stale-entry leak across the
     // suite that registerModel would otherwise create.
   });
+  withTransactionalFixtures(() => adapter);
 
   it("compiles `where(['c1','c2'], [[v1a,v1b], [v2a,v2b]])` to OR-of-AND of column equalities", async () => {
     await CompOrder.create({ shop_id: 1, order_number: 100, name: "match-1" });

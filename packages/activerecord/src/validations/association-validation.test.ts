@@ -2,21 +2,18 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("AssociationValidationTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeAll(() => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = createTestAdapter();
-  });
-  beforeEach(async () => {
     await defineSchema(adapter, {
       posts: { title: "string" },
       comments: { body: "string", post_id: "integer" },
@@ -32,9 +29,7 @@ describe("AssociationValidationTest", () => {
       reply_ctxs: { title: "string" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("validates associated many", async () => {
     let cidx = 0;

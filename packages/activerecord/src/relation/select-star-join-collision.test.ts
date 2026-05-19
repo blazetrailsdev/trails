@@ -17,15 +17,15 @@
  * behavior); callers who want bare `*` there override with
  * `.select("*")`.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("SELECT * column collision in joined relations", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class SsjUser extends Base {
     static {
@@ -41,7 +41,7 @@ describe("SELECT * column collision in joined relations", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       ssj_users: { name: "string" },
@@ -70,6 +70,7 @@ describe("SELECT * column collision in joined relations", () => {
       source: "friend",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("hydrates the target's columns, not the join table's, when ids collide", async () => {
     const a = await SsjUser.create({ name: "a" });

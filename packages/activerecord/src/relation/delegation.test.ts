@@ -1,18 +1,19 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 
-beforeEach(async () => {
+beforeAll(async () => {
   adapter = createTestAdapter();
   await defineSchema(adapter, {
     arel_posts: { title: "string" },
     posts: { title: "string" },
   });
 });
+withTransactionalFixtures(() => adapter);
 
 describe("DelegationTest", () => {
   it("not respond to arel method", () => {

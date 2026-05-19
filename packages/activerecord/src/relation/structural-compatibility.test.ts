@@ -2,22 +2,23 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 
-beforeEach(async () => {
+beforeAll(async () => {
   adapter = createTestAdapter();
   await defineSchema(adapter, {
     posts: { title: "string", score: "integer" },
     users: { name: "string" },
   });
 });
+withTransactionalFixtures(() => adapter);
 
 // ==========================================================================
 // StructuralCompatibilityTest — targets relation/structural_compatibility_test.rb
