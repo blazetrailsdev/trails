@@ -67,13 +67,17 @@ Sized in LOC; all unblocked. Bundle to PR-ceiling (~250 LOC) per
 - **http/url** (#1818) — clamp `extractSubdomainsFrom` end at `Math.max(0, parts.length - (tldLength+1))` (~5).
 - **http/mime-type** (#1848) — register `MimeType.ALL` (intern `parse("*/*")`) + identity compare in `negotiateMime` (~10); allow null symbol for ad-hoc types so `formats` filter isn't a no-op (~10); re-parent `InvalidType` onto `MimeType.InvalidMimeType` when base lands (~10); raise `InvalidType` on media ranges missing `/` (#1861).
 - **http/mime_negotiation** (#1848) — tighten `paramsReadable` catch to `[BadRequest, ParseError]` (~5).
-- **routing/url_for** (#1825) — fix stale "HelperMethodBuilder (not yet ported)" wording in 3 stub branches (~30); throw on `use_route: Symbol()` with no `.description` (~5).
+- ~~**routing/url_for** (#1825)~~ — wording fixed; `use_route: Symbol()` with no `.description` throws via `symbolToString`. `UrlForOptions` tightened to `string|symbol|object|null|undefined` (eslint pragma + dead `Function` arm dropped).
 - **routing/endpoint** (#1836) — `engine()` returns false; ~5 LOC once `Rails::Engine` lands.
 - **middleware/actionable_exceptions** (#1853) — prototype-chain walk in `ActionableError.action` (~15); warn on `_registry` collision (~10); switch endpoint to `cattrAccessor` (~5).
 - **middleware/remote-ip** (#1820) — relax `customProxies` check to `Symbol.iterator in Object(...)` (~10).
 - **middleware/public_exceptions** (#1861) — replace hardcoded `"utf-8"` with `Response.defaultCharset` (~10).
 - **middleware/session/abstract_store** (#1863) — `privateId` + comparison helpers on `SessionId` (~10); add `cookieJar` accessor to `Request` (~20).
-- **testing/assertions/routing** (#1866) — accept JS Symbol for `use_route` via `Symbol#description` (~5); URL-form path support in `assertRecognizes`/`assertGenerates` (~20).
+- **testing/assertions/routing** (#1866) — ~~accept JS Symbol for `use_route` via `Symbol#description`~~ (done — normalized via `symbolToString` in `assertGenerates`); URL-form path support in `assertRecognizes`/`assertGenerates` (~20).
+- **controller/allow_browser** (#1947) — known divergences from Rails (`useragent` gem):
+  - `isBot` uses a regex (`bot|crawl|spider|slurp`) rather than `useragent`'s curated bot list — may miss exotic crawler UAs.
+  - Mobile UAs fold into desktop families (`mobile chrome`/`mobile safari`/`mobile firefox` → `chrome`/`safari`/`firefox`); Rails distinguishes them and requires explicit `mobile_safari:` keys.
+  - `compareVersions` is a dot-segment numeric compare; semver prerelease tags (`120.0.0-beta`) parse to `NaN` and compare as `0` (Rails delegates to `useragent`'s `OperatingSystem::Version` which is also non-strict but handles tags).
 - **testing/test-response** (#1845) — port `successful`/`notFound`/`redirection`/`serverError`/`clientError` status predicates; unblocks skipped "helpers" test.
 - **http/param_error** (#1879) — extend `ExceptionWrapper.STATUS_MAP` for ParseError/ParamError family → 400, or switch to prototype-chain walk (~30); wire `ParamError` into `request.ts` parse rescue once that lands (~10).
 - **http/param_builder** (#1877) — relocate ParamBuilder + QueryParser test files from `http/` to `dispatch/` for Rails layout parity (~20).
