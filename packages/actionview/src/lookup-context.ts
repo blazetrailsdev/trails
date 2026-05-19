@@ -388,7 +388,7 @@ export class LookupContext {
   ): unknown {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsFor(options);
-    return this._viewPaths.find(base, pfxs, partial, details as never, key, keys);
+    return this._viewPaths.find(base, pfxs, partial, details, key, keys);
   }
 
   /** Rails-shape `find_all`. */
@@ -401,7 +401,7 @@ export class LookupContext {
   ): unknown[] {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsFor(options);
-    return this._viewPaths.findAll(base, pfxs, partial, details as never, key, keys);
+    return this._viewPaths.findAll(base, pfxs, partial, details, key, keys);
   }
 
   /** Rails-shape `exists?` / `template_exists?`. */
@@ -414,7 +414,7 @@ export class LookupContext {
   ): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsFor(options);
-    return this._viewPaths.exists(base, pfxs, partial, details as never, key, keys);
+    return this._viewPaths.exists(base, pfxs, partial, details, key, keys);
   }
 
   /**
@@ -424,7 +424,7 @@ export class LookupContext {
   isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsForAny();
-    return this._viewPaths.exists(base, pfxs, partial, details as never, key, []);
+    return this._viewPaths.exists(base, pfxs, partial, details, key, []);
   }
 
   /**
