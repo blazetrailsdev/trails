@@ -11,7 +11,15 @@
 
 import { NO_ROUTES_MESSAGE } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
-import type { PolymorphicMappingEntry } from "./polymorphic-routes.js";
+import {
+  HelperMethodBuilder,
+  isModelClass,
+  symbolToString,
+  type ModelClass,
+  type PolymorphicHost,
+  type PolymorphicMappingEntry,
+  type ToModel,
+} from "./polymorphic-routes.js";
 
 // Re-export the PolymorphicRoutes mixin functions. Rails: `module UrlFor;
 // include PolymorphicRoutes`. The functions are `this`-typed and hosts attach
@@ -128,16 +136,23 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
       rawRouteName == null
         ? null
         : typeof rawRouteName === "symbol"
-          ? (rawRouteName.description ?? null)
+          ? symbolToString(rawRouteName)
           : String(rawRouteName);
     return requireRoutes(this).urlFor(merged, routeName);
   }
-  // Symbol / Function / model — Rails delegates to HelperMethodBuilder.url
-  // (in route_set.rb), which is not yet ported. Mirror the dispatch shape
-  // so callers see the right surface area.
-  throw new Error(
-    `urlFor(${typeof options}) requires HelperMethodBuilder (not yet ported from route_set.rb)`,
-  );
+  // Rails: `case options when Symbol ... when Class ... else` delegates to
+  // `HelperMethodBuilder.url.{handle_string,_class,_model}_call`. The PolymorphicHost
+  // contract is what HelperMethodBuilder dispatches against; UrlForHost satisfies
+  // it (both expose `_routes` and host-side dynamic helper methods).
+  const builder = HelperMethodBuilder.url();
+  const target = this as unknown as PolymorphicHost;
+  if (typeof options === "symbol") {
+    return builder.handleStringCall(target, symbolToString(options));
+  }
+  if (isModelClass(options)) {
+    return builder.handleClassCall(target, options as ModelClass);
+  }
+  return builder.handleModelCall(target, options as ToModel);
 }
 
 /**
