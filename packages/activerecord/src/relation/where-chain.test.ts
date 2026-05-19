@@ -2,16 +2,17 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-let _adapter: DatabaseAdapter = createTestAdapter();
-beforeEach(async () => {
+let _adapter: TestDatabaseAdapter = createTestAdapter();
+beforeAll(async () => {
   _adapter = createTestAdapter();
   const authorCols = { name: "string" as const };
   const postCols = {
@@ -36,8 +37,11 @@ beforeEach(async () => {
     ma_authors: authorCols,
     ma_categories: { name: "string" },
     rr_posts: postCols,
+    cpk_shops: { name: "string" },
+    cpk_orders: { shop_id: "integer", order_id: "integer", cpk_shop_id: "integer" },
   });
 });
+withTransactionalFixtures(() => _adapter);
 function freshAdapter(): DatabaseAdapter {
   return _adapter;
 }
@@ -261,10 +265,6 @@ describe("WhereChainTest", () => {
 
   it("associated with composite primary key", async () => {
     const a = freshAdapter();
-    await defineSchema(a, {
-      cpk_shops: { name: "string" },
-      cpk_orders: { shop_id: "integer", order_id: "integer", cpk_shop_id: "integer" },
-    });
     class CpkShop extends Base {
       static {
         this.attribute("name", "string");

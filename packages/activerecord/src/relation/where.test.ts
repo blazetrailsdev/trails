@@ -2,12 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -115,10 +116,15 @@ const SCHEMA: Schema = {
   },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, SCHEMA);
-  return adapter;
+let _adapter: TestDatabaseAdapter;
+beforeAll(async () => {
+  _adapter = createTestAdapter();
+  await defineSchema(_adapter, SCHEMA);
+});
+withTransactionalFixtures(() => _adapter);
+
+function freshAdapter(): DatabaseAdapter {
+  return _adapter;
 }
 
 // ==========================================================================
@@ -128,7 +134,7 @@ describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   it("where with string generates sql", () => {
@@ -225,7 +231,7 @@ describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   it("where copies bind params", () => {
@@ -1363,7 +1369,7 @@ describe("where with Range", () => {
   });
 
   it("filters records with BETWEEN", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
 
     class User extends Base {
       static {
@@ -1383,7 +1389,7 @@ describe("where with Range", () => {
   });
 
   it("BETWEEN is inclusive on both ends", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
 
     class User extends Base {
       static {
@@ -1403,7 +1409,7 @@ describe("where with Range", () => {
 
 describe("Range edge cases", () => {
   it("count with Range condition", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
 
     class User extends Base {
       static {
@@ -1420,7 +1426,7 @@ describe("Range edge cases", () => {
   });
 
   it("Range combined with IN array in same where", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
 
     class User extends Base {
       static {
@@ -1444,7 +1450,7 @@ describe("Range edge cases", () => {
 describe("where with raw SQL", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   it("supports raw SQL string with bind params", async () => {
@@ -1487,7 +1493,7 @@ describe("where with raw SQL", () => {
 describe("where with subquery", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   it("supports Relation as value for IN subquery", async () => {
@@ -1521,7 +1527,7 @@ describe("where with subquery", () => {
 
 describe("rewhere clears NOT clauses", () => {
   it("replaces whereNot clauses for the same key", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1543,7 +1549,7 @@ describe("rewhere clears NOT clauses", () => {
 
 describe("where with named binds", () => {
   it("replaces :name placeholders with values", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1564,7 +1570,7 @@ describe("where with named binds", () => {
   });
 
   it("handles string named binds with quoting", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
     }
@@ -1583,7 +1589,7 @@ describe("where with named binds", () => {
 
 describe("whereAny", () => {
   it("matches records where ANY condition is true (OR)", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1602,7 +1608,7 @@ describe("whereAny", () => {
   });
 
   it("filters correctly with strict conditions", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1625,7 +1631,7 @@ describe("whereAny", () => {
 
 describe("whereAll", () => {
   it("matches records where ALL conditions are true (AND)", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1659,7 +1665,7 @@ describe("Relation Where (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
     User.adapter = adapter;
     await User.create({ name: "Alice", email: "alice@test.com", age: 25, active: true });
     await User.create({ name: "Bob", email: "bob@test.com", age: 30, active: false });
@@ -1757,7 +1763,7 @@ describe("where with Range (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
     Person.adapter = adapter;
     await Person.create({ name: "Child", age: 10 });
     await Person.create({ name: "Teen", age: 16 });
@@ -1805,7 +1811,7 @@ describe("Range / BETWEEN (Rails-guided)", () => {
   }
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
     Product.adapter = adapter;
   });
 
@@ -1846,7 +1852,7 @@ describe("Raw SQL Where (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   // Rails: test "where with SQL string and bind values"
@@ -1936,7 +1942,7 @@ describe("Raw SQL Where (Rails-guided)", () => {
 describe("WhereTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   function makeAuthor() {
@@ -2095,7 +2101,7 @@ describe("WhereTest", () => {
 describe("WhereTest Arel nodes", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
-    adapter = await freshAdapter();
+    adapter = freshAdapter();
   });
 
   it("where accepts an Arel node", async () => {
@@ -2153,7 +2159,7 @@ describe("WhereTest Arel nodes", () => {
 // ==========================================================================
 describe("WhereTest", () => {
   it("aliased attribute", async () => {
-    const adapter = await freshAdapter();
+    const adapter = freshAdapter();
     class Topic extends Base {
       static {
         this.attribute("title", "string");
