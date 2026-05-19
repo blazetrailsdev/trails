@@ -445,8 +445,54 @@ describe("StrictLoadingTest", () => {
 describe("StrictLoadingTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      slvr_authors: { name: "string" },
+      sl_bt_publishers: { name: "string" },
+      sl_bt_books: { title: "string", publisher_id: "integer" },
+      sl_hm_authors: { name: "string" },
+      sl_hm_books: { title: "string", author_id: "integer" },
+      sl_ho_authors: { name: "string" },
+      sl_ho_profiles: { bio: "string", author_id: "integer" },
+      sl_thr_authors: { name: "string" },
+      sl_thr_posts: { title: "string", sl_thr_author_id: "integer" },
+      sl_thr_tags: { name: "string" },
+      sl_thr_taggings: { sl_thr_post_id: "integer", sl_thr_tag_id: "integer" },
+      sl_hot_authors: { name: "string" },
+      sl_hot_accounts: { sl_hot_author_id: "integer" },
+      sl_hot_profiles: { sl_hot_account_id: "integer", bio: "string" },
+      slrm_authors: { name: "string" },
+      sl_all_authors: { name: "string" },
+      sl_all_books: { title: "string", author_id: "integer" },
+      slc_authors: { name: "string" },
+      slp_authors: { name: "string" },
+      sls_authors: { name: "string", age: "integer" },
+      slsz_authors: { name: "string" },
+      sle_authors: { name: "string" },
+      sla_authors: { name: "string" },
+      sln_authors: { name: "string" },
+      slex_authors: { name: "string" },
+      sli_authors: { name: "string" },
+      sll_authors: { name: "string" },
+      slld_authors: { name: "string" },
+      slpr_authors: { name: "string" },
+      sl_bang_authors: { name: "string" },
+      gm_authors: { name: "string" },
+      gm_books: { title: "string", author_id: "integer" },
+      rsl_authors: { name: "string" },
+      rsl_books: { title: "string", author_id: "integer" },
+      slcn_authors: { name: "string" },
+      slcn_books: { title: "string", sl_cn_author_id: "integer" },
+      slbd_authors: { name: "string" },
+      slbd_books: { title: "string", sl_bd_author_id: "integer" },
+      slwr_authors: { name: "string" },
+      slwr_books: { title: "string", sl_wr_author_id: "integer" },
+      slnr_authors: { name: "string" },
+      slnr_books: { title: "string", sl_nr_author_id: "integer" },
+    });
   });
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
@@ -1309,8 +1355,14 @@ describe("StrictLoadingFixturesTest", () => {
 
 describe("strict_loading", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { author_id: "integer" },
+      authors2: { name: "string" },
+      posts: { author2_id: "integer" },
+    });
   });
 
   it("raises StrictLoadingViolationError on lazy association load", async () => {
@@ -1370,6 +1422,12 @@ describe("strict_loading", () => {
 });
 
 describe("strictLoadingByDefault", () => {
+  async function setupUsersAdapter(): Promise<DatabaseAdapter> {
+    const a = freshAdapter();
+    await defineSchema(a, { users: { name: "string" } });
+    return a;
+  }
+
   it("defaults to false", () => {
     class User extends Base {
       static {
@@ -1381,7 +1439,7 @@ describe("strictLoadingByDefault", () => {
   });
 
   it("sets strict loading on instantiated records when enabled", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupUsersAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
@@ -1398,7 +1456,7 @@ describe("strictLoadingByDefault", () => {
   });
 
   it("does not affect records when disabled", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupUsersAdapter();
     class User extends Base {
       static {
         this.attribute("id", "integer");
