@@ -19,6 +19,7 @@
  */
 
 import { Parameters } from "./metal/strong-parameters.js";
+import { EXCLUDE_PARAMETERS as RAILS_EXCLUDE_PARAMETERS } from "./metal/params-wrapper.js";
 
 export interface WrapParametersOptions {
   /** Keys to include in the wrapped hash. If omitted, all non-framework keys are included. */
@@ -31,14 +32,18 @@ export interface WrapParametersOptions {
   name?: string;
 }
 
-/** Framework parameter keys that are never wrapped. */
+/**
+ * Framework parameter keys that are never wrapped. Composed of the
+ * Rails-faithful `EXCLUDE_PARAMETERS` (`authenticity_token`, `_method`,
+ * `utf8`) from `metal/params-wrapper.ts` plus the routing/form keys that
+ * this higher-level helper additionally strips (`controller`, `action`,
+ * `format`, `commit`).
+ */
 const EXCLUDE_PARAMETERS = new Set([
+  ...RAILS_EXCLUDE_PARAMETERS,
   "controller",
   "action",
   "format",
-  "_method",
-  "authenticity_token",
-  "utf8",
   "commit",
 ]);
 

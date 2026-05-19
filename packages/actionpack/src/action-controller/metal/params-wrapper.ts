@@ -21,6 +21,13 @@ export class Options {
   exclude: string[] | null;
   klass: unknown;
   model: unknown;
+  /**
+   * Tracks whether `name` was explicitly provided (mirrors Rails'
+   * `@name_set` mutex flag in `Options#initialize` — `@name_set = name`
+   * is truthy only when a name was passed in). Used by the `inherited`
+   * hook to decide whether to re-derive the default on subclass dup.
+   */
+  nameSet: boolean;
 
   constructor(
     name: string | null = null,
@@ -36,6 +43,7 @@ export class Options {
     this.exclude = exclude;
     this.klass = klass;
     this.model = model;
+    this.nameSet = name != null;
   }
 
   static fromHash(hash: Record<string, unknown>): Options {
