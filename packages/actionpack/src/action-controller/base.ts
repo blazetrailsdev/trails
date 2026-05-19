@@ -33,6 +33,13 @@ import {
 import { helperMethod, type HelpersClassMethods } from "../abstract-controller/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
+import {
+  authenticateOrRequestWithHttpBasic,
+  authenticateWithHttpBasic,
+  httpBasicAuthenticateOrRequestWith,
+  httpBasicAuthenticateWith,
+  requestHttpBasicAuthentication,
+} from "./metal/http-authentication.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -463,6 +470,15 @@ export class Base extends Metal {
   instrumentName(): string {
     return instrumentName.call(this);
   }
+
+  // --- HTTP Basic authentication (Rails parity, P17a) ---
+
+  /** Class DSL: `http_basic_authenticate_with name:, password:, realm:, **options`. */
+  static httpBasicAuthenticateWith = httpBasicAuthenticateWith;
+  httpBasicAuthenticateOrRequestWith = httpBasicAuthenticateOrRequestWith;
+  authenticateOrRequestWithHttpBasic = authenticateOrRequestWithHttpBasic;
+  authenticateWithHttpBasic = authenticateWithHttpBasic;
+  requestHttpBasicAuthentication = requestHttpBasicAuthentication;
 
   // --- Rescue ---
 
