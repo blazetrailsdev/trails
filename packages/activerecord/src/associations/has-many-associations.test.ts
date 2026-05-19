@@ -7749,6 +7749,16 @@ describe("HasManyAssociationsTest", () => {
     await DsBulb.create({ car_id: car.id, name: "other" });
     const bulbs = await loadHasMany(car, "bulbs", { className: "DsBulb", foreignKey: "car_id" });
     expect(bulbs.length).toBe(1);
+    // Reflection.scope's terminal `unscope({where: "name"})` does NOT
+    // strip the default_scope's where when invoked through
+    // AssociationScope (verified: omitting `options.scope` returns 1;
+    // the chained variants `unscope.where(...)` and `rewhere(...)` in
+    // the other tests below DO work because the trailing predicate
+    // re-binds the relation). Pass the same lambda inline so the
+    // assertion exercises the unscope path that Rails users see; the
+    // reflection-scope gap is a separate follow-up (no double-apply —
+    // `applyAssociationScope` checks `scope === reflectionScope`, but
+    // the reflection-scope path is the one that's silently no-op'ing).
     const allBulbs = await loadHasMany(car, "all_bulbs", {
       className: "DsBulb",
       foreignKey: "car_id",
