@@ -311,10 +311,12 @@ export function unverifiedRequestWarningMessage(controller: CsrfController): str
 export function isVerifiedRequest(controller: CsrfController): boolean {
   if (!isProtectAgainstForgery(controller)) return true;
   if (isGetOrHead(controller.request.method)) return true;
-  const valid = controller.isAnyAuthenticityTokenValid
+  // Rails: valid_request_origin? && any_authenticity_token_valid? — origin
+  // check short-circuits so a bad origin never reaches token storage.
+  if (!isValidRequestOrigin(controller)) return false;
+  return controller.isAnyAuthenticityTokenValid
     ? controller.isAnyAuthenticityTokenValid()
     : isAnyAuthenticityTokenValid(controller);
-  return isValidRequestOrigin(controller) && valid;
 }
 
 // ---------------------------------------------------------------------------
