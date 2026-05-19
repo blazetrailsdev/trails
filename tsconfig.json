@@ -27,7 +27,8 @@
     { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
     { "path": "packages/trailties" },
-    { "path": "packages/globalid" }
+    { "path": "packages/globalid" },
+    { "path": "packages/html-sanitizer" }
   ],
   "exclude": ["node_modules", "dist"]
 }
