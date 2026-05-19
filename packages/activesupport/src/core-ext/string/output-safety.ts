@@ -21,7 +21,7 @@ const HTML_ESCAPE_PATTERN = /[&<>"']/g;
  * Mirrors ERB::Util.html_escape.
  */
 export function htmlEscape(value: unknown): SafeBuffer {
-  if (value instanceof SafeBuffer) return value;
+  if (value instanceof SafeBuffer && value.htmlSafe) return value;
   const str = String(value ?? "");
   const escaped = str.replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
   return new SafeBuffer(escaped, true);

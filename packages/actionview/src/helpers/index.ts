@@ -59,10 +59,12 @@ export {
 } from "./date-helper.js";
 export type { DistanceOfTimeInput, DistanceOfTimeOptions } from "./date-helper.js";
 
-export { truncate, pluralize, wordWrap, simpleFormat } from "./text-helper.js";
+export { truncate, pluralize, wordWrap, simpleFormat, highlight, excerpt } from "./text-helper.js";
 export type {
   TruncateOptions,
   PluralizeOptions,
   WordWrapOptions,
   SimpleFormatOptions,
+  HighlightOptions,
+  ExcerptOptions,
 } from "./text-helper.js";
