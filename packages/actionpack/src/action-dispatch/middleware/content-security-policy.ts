@@ -39,12 +39,8 @@ export class ContentSecurityPolicyMiddleware {
     const nonce = contentSecurityPolicyNonce.call(request);
     const nonceDirectives = contentSecurityPolicyNonceDirectives.call(request);
     // Rails: `context = request.controller_instance || request`
-    // (content_security_policy.rb:51). `controller_instance` reads the
-    // `action_controller.instance` env slot (http/request.rb:190-192). Until
-    // the trails metal sets that env slot consistently, the fallback to
-    // `request` is what gets exercised — but we keep the env lookup so that
-    // wiring lands without revisiting this file.
-    const context = env["action_controller.instance"] ?? request;
+    // (content_security_policy.rb:51).
+    const context = request.controllerInstance ?? request;
 
     headers[this.headerName(request)] = policy.build(context, nonce, nonceDirectives);
     return response;
