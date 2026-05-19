@@ -470,8 +470,9 @@ function emittedSlashInPathPreservingCapture(
  * Names of `:symbol`/`*splat` captures that will actually be emitted into
  * the path when `Format.evaluate(params)` runs. A symbol inside a Group is
  * emitted iff every other Symbol directly under that Group is also supplied
- * (Group#evaluate returns `""` if any of its parameters is missing) AND
- * every ancestor Group also emits. Top-level symbols are always emitted
+ * (the nested `Format` produced for that Group by `FormatBuilder` returns
+ * `""` from `Format.evaluate` when any of its parameters is missing — see
+ * `action-dispatch/journey/visitors.ts`) AND every ancestor Group also emits. Top-level symbols are always emitted
  * once they are supplied.
  *
  * Used to skip requirement-regex validation for captures whose supplied
@@ -500,7 +501,7 @@ function computeEmittedSymbols(
 
   // Collect Symbol names that sit directly inside this subtree without
   // crossing into a nested Group — those are the parameters whose absence
-  // would make `Format.evaluate` short-circuit and return "" for the group.
+  // would make this group's `Format.evaluate` short-circuit and return "".
   const directSymbols = (node: unknown): string[] => {
     const names: string[] = [];
     const walk = (nd: unknown): void => {
