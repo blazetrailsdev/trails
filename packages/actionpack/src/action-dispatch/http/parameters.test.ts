@@ -248,4 +248,47 @@ describe("parseFormattedParameters", () => {
       ParseError,
     );
   });
+
+  it("rethrows Rack ParamError-family failures without wrapping", async () => {
+    const { ParameterTypeError, InvalidParameterError, ParamsTooDeepError } =
+      await import("@blazetrails/rack");
+    const { ParamError } = await import("./param-error.js");
+    const host = makeHost({
+      contentLength: 1,
+      contentMimeType: MimeType.JSON,
+      rawPost: "{}",
+    });
+    for (const Err of [ParameterTypeError, InvalidParameterError, ParamsTooDeepError]) {
+      const parsers = {
+        [MimeType.JSON.symbol]: () => {
+          throw new Err("boom");
+        },
+      };
+      let caught: unknown;
+      try {
+        parseFormattedParameters.call(host, parsers, () => ({}));
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(Err);
+      expect(caught).toBeInstanceOf(ParamError);
+    }
+  });
+
+  it("rethrows ActionDispatch ParseError subclasses without re-wrapping", async () => {
+    const { ParameterTypeError: AdParameterTypeError } = await import("./param-error.js");
+    const host = makeHost({
+      contentLength: 1,
+      contentMimeType: MimeType.JSON,
+      rawPost: "{}",
+    });
+    const parsers = {
+      [MimeType.JSON.symbol]: () => {
+        throw new AdParameterTypeError("nope");
+      },
+    };
+    expect(() => parseFormattedParameters.call(host, parsers, () => ({}))).toThrow(
+      AdParameterTypeError,
+    );
+  });
 });

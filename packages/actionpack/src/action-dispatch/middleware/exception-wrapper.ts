@@ -16,7 +16,17 @@ const STATUS_MAP: Record<string, number> = {
   InvalidAuthenticityToken: 422,
   ParameterMissing: 400,
   ParameterTypeError: 400,
+  InvalidParameterError: 400,
+  ParamsTooDeepError: 400,
   UnpermittedParameters: 400,
+  // ActionDispatch ParseError/ParamError family — Rails' rescue_responses uses
+  // the fully-qualified class names that `param-error.ts` and `parameters.ts`
+  // assign via `this.name`. All map to 400 Bad Request, matching Rails.
+  "ActionDispatch::Http::Parameters::ParseError": 400,
+  "ActionDispatch::ParamError": 400,
+  "ActionDispatch::ParameterTypeError": 400,
+  "ActionDispatch::InvalidParameterError": 400,
+  "ActionDispatch::ParamsTooDeepError": 400,
 };
 
 export class ExceptionWrapper {
@@ -130,8 +140,10 @@ export class ExceptionWrapper {
   }
 
   private computeStatusCode(): number {
-    const name = this.exceptionName;
-    return STATUS_MAP[name] ?? 500;
+    // Direct lookup by exception name, mirroring Rails'
+    // `@@rescue_responses[class_name]` (no ancestor walk — Rails subclasses
+    // must register their own name to opt in).
+    return STATUS_MAP[this.exceptionName] ?? 500;
   }
 }
 

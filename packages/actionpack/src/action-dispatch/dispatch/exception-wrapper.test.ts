@@ -64,6 +64,18 @@ describe("ExceptionWrapperTest", () => {
     expect(ExceptionWrapper.statusCodeFor("ParameterTypeError")).toBe(400);
   });
 
+  it("#status_code returns 400 for the ActionDispatch ParseError/ParamError family", () => {
+    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::Http::Parameters::ParseError")).toBe(
+      400,
+    );
+    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParamError")).toBe(400);
+    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParameterTypeError")).toBe(400);
+    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::InvalidParameterError")).toBe(400);
+    expect(ExceptionWrapper.statusCodeFor("ActionDispatch::ParamsTooDeepError")).toBe(400);
+    expect(ExceptionWrapper.statusCodeFor("InvalidParameterError")).toBe(400);
+    expect(ExceptionWrapper.statusCodeFor("ParamsTooDeepError")).toBe(400);
+  });
+
   it("#rescue_response? returns false for an exception that's not in rescue_responses", () => {
     expect(ExceptionWrapper.rescueResponse("SomeRandomError")).toBe(false);
   });
