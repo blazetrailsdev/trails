@@ -26,8 +26,8 @@ export interface CallbackPredicateLike {
 }
 
 export interface CallbackOptions {
-  only?: string[];
-  except?: string[];
+  only?: string | string[];
+  except?: string | string[];
   if?:
     | ((controller: AbstractController) => boolean)
     | Array<((controller: AbstractController) => boolean) | CallbackPredicateLike>;

@@ -31,6 +31,11 @@ export class ActionNotFound extends Error {
   }
 }
 
+/** Rails `Array(value)`: coerce scalar to single-element array. @internal */
+function _actionList(value: string | string[]): string[] {
+  return Array.isArray(value) ? value : [value];
+}
+
 export class AbstractController {
   /** The action currently being processed. */
   actionName: string = "";
@@ -220,8 +225,8 @@ export class AbstractController {
     const callbacks = allCallbacks.filter((entry) => {
       return !skipped.some((s) => {
         if (s.callback !== entry.callback) return false;
-        if (s.options.only && !s.options.only.includes(action)) return false;
-        if (s.options.except && s.options.except.includes(action)) return false;
+        if (s.options.only && !_actionList(s.options.only).includes(action)) return false;
+        if (s.options.except && _actionList(s.options.except).includes(action)) return false;
         return true;
       });
     });
@@ -296,8 +301,8 @@ export class AbstractController {
 
   private _shouldRun(entry: CallbackEntry, action: string): boolean {
     const opts = entry.options;
-    if (opts.only && !opts.only.includes(action)) return false;
-    if (opts.except && opts.except.includes(action)) return false;
+    if (opts.only && !_actionList(opts.only).includes(action)) return false;
+    if (opts.except && _actionList(opts.except).includes(action)) return false;
     if (opts.if !== undefined && !this._evalPredicate(opts.if, true)) return false;
     if (opts.unless !== undefined && this._evalPredicate(opts.unless, false)) return false;
     return true;
