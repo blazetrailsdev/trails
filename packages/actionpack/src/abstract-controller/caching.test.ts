@@ -8,9 +8,11 @@ import {
   cacheStore,
   CACHING_DEFAULTS,
   CACHING_SLOTS,
+  readFragment,
   setCacheStore,
   viewCacheDependencies,
   viewCacheDependency,
+  writeFragment,
   type CachingHost,
 } from "./caching.js";
 
@@ -131,6 +133,15 @@ describe("AbstractController::Caching", () => {
       const host = makeHost(store);
       cache.call(host, ["posts", 5, "edit"], () => "x");
       expect(store.read("controller/posts/5/edit")).toBe("x");
+    });
+  });
+
+  describe("fragment wrappers (Caching::Fragments republish)", () => {
+    it("writeFragment/readFragment round-trip via ./caching", () => {
+      const store = new MemoryStore();
+      const host = makeHost(store);
+      writeFragment.call(host, "post/1", "rendered body");
+      expect(readFragment.call(host, "post/1")).toBe("rendered body");
     });
   });
 });

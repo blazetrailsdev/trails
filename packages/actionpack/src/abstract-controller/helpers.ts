@@ -79,6 +79,70 @@ export function _helpersInstance(this: HelpersHost): HelperMethodsModule {
 }
 
 /**
+ * Rails exposes `_helpers` as both an instance reader (`def _helpers`) and a
+ * class-level reader/writer (`redefine_singleton_method(:_helpers)` plus
+ * `attr_writer :_helpers`). This overload mirrors both:
+ *   - bound to an instance, returns `this.class._helpers`
+ *   - called with a class + value, writes the slot (Rails `_helpers=`)
+ *   - called with a class only, reads from the class with superclass fallback
+ *     via JS prototype lookup
+ */
+export function _helpers(this: HelpersHost): HelperMethodsModule;
+export function _helpers(cls: HelpersClassMethods): HelperMethodsModule;
+export function _helpers(cls: HelpersClassMethods, value: HelperMethodsModule | null): void;
+export function _helpers(
+  this: HelpersHost | void,
+  clsOrValue?: HelpersClassMethods,
+  value?: HelperMethodsModule | null,
+): HelperMethodsModule | void {
+  if (clsOrValue && arguments.length >= 2) {
+    // `_helpers=` writer. Rails' redefined reader treats a nil slot as
+    // "fall through to superclass" (`@_helpers ||= nil; superclass._helpers`),
+    // and `Helpers.inherited` calls `klass._helpers = nil` to re-enable
+    // that fallback on subclasses. Assigning `undefined` would create an
+    // own property that shadows the prototype chain; instead delete the
+    // own slot so JS prototype lookup walks to the parent class.
+    if (value == null) {
+      delete (clsOrValue as { _helpers?: HelperMethodsModule })._helpers;
+    } else {
+      clsOrValue._helpers = value;
+    }
+    return;
+  }
+  if (clsOrValue) {
+    return clsOrValue._helpers ?? (Object.create(null) as HelperMethodsModule);
+  }
+  return _helpersInstance.call(this as HelpersHost);
+}
+
+/**
+ * `ClassMethods#define_helpers_module(klass, helpers = nil)` — Rails' private
+ * helper that builds (and caches on the class) the `HelperMethods` module
+ * that backs `_helpers`. Idempotent under explicit `inherited` calls in
+ * tests: Rails reuses the existing `:HelperMethods` constant if one is
+ * already attached to the class. Trails has no constant namespace per class,
+ * so we cache by class identity in a WeakMap. Optionally splices a parent
+ * helpers module into the prototype chain so methods added to the parent
+ * after this call remain visible from the child.
+ *
+ * Does NOT assign to `cls._helpers` — that's the caller's responsibility
+ * (Rails likewise does the assignment in the `included` block and in
+ * `_helpers_for_modification`, not here).
+ */
+const helperMethodsByClass = new WeakMap<HelpersClassMethods, HelperMethodsModule>();
+
+export function defineHelpersModule(
+  cls: HelpersClassMethods,
+  helpers?: HelperMethodsModule | null,
+): HelperMethodsModule {
+  const existing = helperMethodsByClass.get(cls);
+  if (existing) return existing;
+  const mod = Object.create(helpers ?? null) as HelperMethodsModule;
+  helperMethodsByClass.set(cls, mod);
+  return mod;
+}
+
+/**
  * `ClassMethods#helper_method(*methods)` — register controller method
  * names as view helpers. Each name gets a proxy on the helpers module
  * that does `this.controller[name](...args)`. Nested-array inputs are
@@ -351,6 +415,19 @@ export function defaultHelperModule(cls: HelpersClassMethods, options: Resolutio
     if (err instanceof Error && err.message === `uninitialized constant ${expectedName}`) return;
     throw err;
   }
+}
+
+/**
+ * Bang-suffix alias for {@link defaultHelperModule} so the Rails name
+ * (`default_helper_module!`) is reachable by api:compare. Same behavior —
+ * Rails' bang here signals "swallows NameError for the specific helper name",
+ * not a destructive mutation, so a thin alias is the right shape.
+ */
+export function defaultHelperModuleBang(
+  cls: HelpersClassMethods,
+  options: ResolutionOptions,
+): void {
+  defaultHelperModule(cls, options);
 }
 
 function camelizeHelperPrefix(raw: string): string {

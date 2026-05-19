@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  _helpers,
   _helpersForModification,
   _helpersInstance,
   applyHelpers,
   clearHelpers,
+  defineHelpersModule,
   helper,
   helperMethod,
   type HelperMethodsModule,
@@ -257,5 +259,72 @@ describe("_helpersForModification", () => {
     const cls = makeBase();
     helperMethod(cls, ["a", ["b", ["c"]]]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("_helpers (class-level reader/writer)", () => {
+  it("reads from the class, falling through to the parent via prototype", () => {
+    const parent = makeBase();
+    helperMethod(parent, "fromParent");
+    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+
+    // No own slot — JS prototype lookup walks to parent (Rails' superclass fallback).
+    expect(_helpers(child)).toBe(parent._helpers);
+  });
+
+  it("writer assigns the slot; subsequent reads return that value", () => {
+    const cls = makeBase();
+    const mod = { hello: () => "world" } as unknown as HelperMethodsModule;
+    _helpers(cls, mod);
+    expect(cls._helpers).toBe(mod);
+    expect(_helpers(cls)).toBe(mod);
+  });
+
+  it("writer with null deletes the own slot to restore parent fallback", () => {
+    const parent = makeBase();
+    helperMethod(parent, "fromParent");
+    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const ownMod = {} as HelperMethodsModule;
+    _helpers(child, ownMod);
+    expect(child._helpers).toBe(ownMod);
+
+    _helpers(child, null);
+    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    // After clearing, the inherited slot is visible again via prototype.
+    expect(child._helpers).toBe(parent._helpers);
+  });
+
+  it("instance form delegates to _helpersInstance (class._helpers)", () => {
+    const cls = makeBase();
+    helperMethod(cls, "shown");
+    const host = { constructor: cls } as HelpersHost;
+    const instanceReader = _helpers as (this: HelpersHost) => HelperMethodsModule;
+    expect(instanceReader.call(host)).toBe(cls._helpers);
+  });
+});
+
+describe("defineHelpersModule", () => {
+  it("is idempotent per class — same class returns the same module", () => {
+    const cls = makeBase();
+    const first = defineHelpersModule(cls);
+    const second = defineHelpersModule(cls);
+    expect(second).toBe(first);
+  });
+
+  it("does NOT write cls._helpers (caller is responsible, per Rails)", () => {
+    const cls = makeBase();
+    defineHelpersModule(cls);
+    expect(Object.prototype.hasOwnProperty.call(cls, "_helpers")).toBe(false);
+  });
+
+  it("splices the parent helpers module into the prototype chain", () => {
+    const parent = makeBase();
+    helperMethod(parent, "fromParent");
+    const child = makeBase();
+    const mod = defineHelpersModule(child, parent._helpers);
+    expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
+    // Live: methods added to parent after definition remain visible.
+    helperMethod(parent, "addedLater");
+    expect(typeof (mod as HelperMethodsModule).addedLater).toBe("function");
   });
 });
