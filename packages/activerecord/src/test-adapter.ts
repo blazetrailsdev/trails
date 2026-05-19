@@ -659,10 +659,33 @@ export interface TestDatabaseAdapter extends DatabaseAdapter {
   readonly tables: Set<string>;
 }
 
+let _createTestAdapterWarned = false;
+
 /**
  * Create a fresh adapter for testing.
+ *
+ * SHARP EDGE — calling this **inside** a `withTransactionalFixtures` scope
+ * (i.e. mid-test, after `beforeAll` set up the shared adapter) sets the
+ * module-level `_needsCleanup` flag. The next `SchemaAdapter.setup()` call
+ * sees that flag and triggers `resetTestAdapterState()`, which **drops every
+ * table** — silently destroying the schema the surrounding describe just
+ * built. The symptom is "table not found" on subsequent tests in the same
+ * file. See follow-up notes on #1960 (`has-and-belongs-to-many-associations`
+ * still trips this). Migrations to transactional fixtures must rewrite any
+ * inline `createTestAdapter()` calls to reuse the describe-level adapter.
+ *
+ * Warn (once) when this happens so future migrations don't fail silently.
  */
 export function createTestAdapter(): TestDatabaseAdapter {
+  if (_skipGlobalResetDepth > 0 && !_createTestAdapterWarned) {
+    _createTestAdapterWarned = true;
+
+    console.warn(
+      "[trails] createTestAdapter() called inside withTransactionalFixtures — " +
+        "this sets _needsCleanup and will drop the shared describe's tables on " +
+        "the next setup(). Reuse the describe-level adapter instead.",
+    );
+  }
   _needsCleanup = true;
   return _factory();
 }
