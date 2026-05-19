@@ -6,6 +6,23 @@
 
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
+import {
+  type CacheControlHash,
+  cacheControl as _cacheControl,
+  getDate as _getDate,
+  getEtag as _getEtag,
+  getLastModified as _getLastModified,
+  handleConditionalGet as _handleConditionalGet,
+  hasDate as _hasDate,
+  hasEtag as _hasEtag,
+  hasLastModified as _hasLastModified,
+  isStrongEtag as _isStrongEtag,
+  isWeakEtag as _isWeakEtag,
+  setDate as _setDate,
+  setLastModified as _setLastModified,
+  setStrongEtag as _setStrongEtag,
+  setWeakEtag as _setWeakEtag,
+} from "./cache.js";
 import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
 
 export class Response {
@@ -246,6 +263,24 @@ export class Response {
     return e !== undefined && e.startsWith('"') && !e.startsWith('W/"');
   }
 
+  // --- Cache::Response wiring (declared here for typing; bound below) ---
+  declare lastModified: Date | undefined;
+  declare date: Date | undefined;
+  declare readonly hasLastModified: boolean;
+  declare readonly hasDate: boolean;
+  declare readonly hasEtag: boolean;
+  declare setWeakEtag: (validators: unknown) => void;
+  declare setStrongEtag: (validators: unknown) => void;
+  declare isWeakEtag: () => boolean;
+  declare isStrongEtag: () => boolean;
+  declare handleConditionalGet: () => void;
+  /**
+   * Parsed `Cache-Control` directives as a hash, mirroring Rails'
+   * `Cache::Response#cache_control`. The raw header string remains available
+   * via the existing {@link cacheControl} string accessor.
+   */
+  declare readonly cacheControlHash: CacheControlHash;
+
   // --- Rack response ---
 
   toRack(): [number, Record<string, string>, string[]] {
@@ -269,6 +304,74 @@ export class Response {
     return new this(status, headers, body ? [body] : []) as InstanceType<T>;
   }
 }
+
+// Mix in ActionDispatch::Http::Cache::Response. Property-style helpers
+// (Rails no-arg accessors) are wired as getters/setters; methods that take
+// arguments are wired as prototype methods. The existing `etag`/`cacheControl`
+// string accessors are intentionally retained — Rails-parity replacements
+// (etag= → weakEtag=, cacheControl as parsed hash) are tracked as a separate
+// follow-up since they break existing test expectations.
+Object.defineProperty(Response.prototype, "lastModified", {
+  get(this: Response) {
+    return _getLastModified.call(this);
+  },
+  set(this: Response, t: Date) {
+    _setLastModified.call(this, t);
+  },
+  configurable: true,
+});
+Object.defineProperty(Response.prototype, "hasLastModified", {
+  get(this: Response) {
+    return _hasLastModified.call(this);
+  },
+  configurable: true,
+});
+Object.defineProperty(Response.prototype, "date", {
+  get(this: Response) {
+    return _getDate.call(this);
+  },
+  set(this: Response, t: Date) {
+    _setDate.call(this, t);
+  },
+  configurable: true,
+});
+Object.defineProperty(Response.prototype, "hasDate", {
+  get(this: Response) {
+    return _hasDate.call(this);
+  },
+  configurable: true,
+});
+Object.defineProperty(Response.prototype, "hasEtag", {
+  get(this: Response) {
+    return _hasEtag.call(this);
+  },
+  configurable: true,
+});
+Object.defineProperty(Response.prototype, "cacheControlHash", {
+  get(this: Response) {
+    return _cacheControl.call(this);
+  },
+  configurable: true,
+});
+Response.prototype.setWeakEtag = function (this: Response, v: unknown) {
+  _setWeakEtag.call(this, v);
+};
+Response.prototype.setStrongEtag = function (this: Response, v: unknown) {
+  _setStrongEtag.call(this, v);
+};
+Response.prototype.isWeakEtag = function (this: Response) {
+  return _isWeakEtag.call(this);
+};
+Response.prototype.isStrongEtag = function (this: Response) {
+  return _isStrongEtag.call(this);
+};
+Response.prototype.handleConditionalGet = function (this: Response) {
+  _handleConditionalGet.call(this);
+};
+// `_getEtag` mirrors Rails' `Cache::Response#etag` reader. The existing
+// `Response.etag` getter already returns the header value (case-insensitive),
+// so we don't re-wire it here. Reference the import to satisfy TS unused-import.
+void _getEtag;
 
 export interface CookieOptions {
   value: string;
