@@ -7,8 +7,8 @@
  */
 
 import { htmlEscape, isPresent } from "@blazetrails/activesupport";
-import { Metal } from "../metal.js";
 import { Renderer } from "../renderer.js";
+import { resolveStatus } from "./status-codes.js";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
 
@@ -52,7 +52,7 @@ export function _normalizeOptions(options: Record<string, unknown>): Record<stri
     options.html = htmlEscape(options.html);
   }
   if (options.status) {
-    options.status = Metal.resolveStatus(options.status as number | string);
+    options.status = resolveStatus(options.status as number | string);
   }
   return options;
 }
@@ -135,7 +135,7 @@ export function _processOptions(
   options: Record<string, unknown>,
 ): void {
   if (options.status) {
-    this.status = Metal.resolveStatus(options.status as number | string);
+    this.status = resolveStatus(options.status as number | string);
   }
   if (options.contentType) {
     this.contentType = String(options.contentType);

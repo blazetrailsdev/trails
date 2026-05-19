@@ -167,6 +167,19 @@ describe("Metal wiring", () => {
     expect(instance.renderToBody({ json: "{}" })).toBe(" ");
   });
 
+  test("renderToBody preserves '' / 0 (Ruby-truthy) and falls through on false/null", async () => {
+    const { Metal } = await import("../metal.js");
+    const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
+    // Ruby `""` and `0` are truthy; Rails `super || _render_in_priorities || " "`
+    // returns them as-is rather than falling through.
+    expect(instance.renderToBody({ body: "" })).toBe("");
+    expect(instance.renderToBody({ plain: 0 })).toBe(0);
+    // Ruby `false`/`nil` fall through; `_renderInPriorities` returns null
+    // when no key matches, so the " " fallback wins.
+    expect(instance.renderToBody({ body: false })).toBe(" ");
+    expect(instance.renderToBody({ body: null })).toBe(" ");
+  });
+
   test("renderToBody dispatches to a registered renderer before the priority resolver", async () => {
     const { Metal } = await import("../metal.js");
     const { Renderers } = await import("../metal/renderers.js");
