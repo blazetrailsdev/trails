@@ -165,6 +165,19 @@ describe("Callbacks", () => {
       ).rejects.toThrow("boom");
     });
 
+    it("fire-and-forget next().catch() with no handler does not swallow rejection", async () => {
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (_t: any, next: any) => {
+        next().catch();
+      });
+      await expect(
+        runCallbacks(target, "save", async () => {
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+    });
+
     it("awaited around can rescue inner rejection", async () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
