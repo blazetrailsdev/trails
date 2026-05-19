@@ -81,6 +81,7 @@ export class AbstractController {
     "isContentSecurityPolicy",
     "contentSecurityPolicyNonce",
     "currentContentSecurityPolicy",
+    "rateLimiting",
   ]);
 
   private static _actionMethodCache?: Set<string>;

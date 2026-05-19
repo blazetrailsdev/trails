@@ -23,8 +23,10 @@ export class API extends Metal {
    */
   static rateLimit = rateLimit;
 
-  /** @internal Private in Rails; instance slot enables subclass overrides. */
-  rateLimiting = rateLimiting;
+  /** @internal Private in Rails; prototype slot enables subclass overrides. */
+  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
+    return rateLimiting.call(this, args);
+  }
 
   render(options: RenderOptions = {}): void {
     if (this.performed) {

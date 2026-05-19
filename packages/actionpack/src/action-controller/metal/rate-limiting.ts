@@ -89,9 +89,13 @@ export class MemoryRateLimitStore implements RateLimitStore {
   private _entries = new Map<string, { count: number; expiresAt: number }>();
   private _pruneThreshold = MemoryRateLimitStore._PRUNE_BASELINE;
   /**
-   * Inserts to skip before re-sweeping after a sterile sweep (nothing
-   * expired). Without this, sustained all-live traffic at the cap would turn
-   * every insert into an O(N) walk — see review #8 comment 2.
+   * Inserts to defer before re-sweeping after a sterile sweep at the cap
+   * (every entry still live; no space was reclaimed). Without this, once
+   * `_pruneThreshold` saturates at `_PRUNE_MAX` under sustained all-live
+   * traffic, every subsequent insert would re-trigger the O(N) walk because
+   * `size >= threshold` stays true. Counting down a baseline of inserts
+   * amortizes the next walk against another `_PRUNE_BASELINE` requests so
+   * the steady-state cost stays O(1) per increment.
    */
   private _skipSweepInserts = 0;
 

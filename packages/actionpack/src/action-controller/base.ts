@@ -443,12 +443,15 @@ export class Base extends Metal {
   static rateLimit = rateLimit;
 
   /**
-   * Per-request enforcement. Private in Rails; exposed as an instance
+   * Per-request enforcement. Private in Rails; exposed as a prototype
    * method so subclass overrides win (the DSL dispatches through
-   * `this.rateLimiting`).
+   * `this.rateLimiting`). Listed in AbstractController._internalMethods
+   * so it isn't picked up as an action.
    * @internal
    */
-  rateLimiting = rateLimiting;
+  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
+    return rateLimiting.call(this, args);
+  }
 
   /**
    * Class DSL: override the default form builder for all views rendered by
