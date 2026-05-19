@@ -622,7 +622,7 @@ describe("HasManyThroughAssociations", () => {
     const orphan = await Orphan.create({ name: "Lost" });
     await expect(
       loadHasManyThrough(orphan, "things", { through: "nonexistent", className: "Patient" }),
-    ).rejects.toThrow('Through association "nonexistent" not found');
+    ).rejects.toThrow(/Could not find the association :nonexistent/);
   });
 
   // Rails: test_has_many_through_only_returns_matching

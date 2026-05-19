@@ -978,11 +978,34 @@ describe("AssociationsJoinModelTest", () => {
     ).rejects.toThrow(/Could not find the association :nonexistent/);
   });
 
-  it.skip("exceptions have suggestions for fix", () => {
-    // BLOCKED: associations — join-model feature gap
-    // ROOT-CAUSE: associations/join-model.ts or preloader.ts missing join-model semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in join-model.test.ts
-    // Requires error message suggestions
+  it("exceptions have suggestions for fix", async () => {
+    const ad = freshAdapter();
+    class EhsAuthor extends Base {
+      static {
+        this.attribute("name", "string");
+        this.adapter = ad;
+      }
+    }
+    class EhsTagging extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.adapter = ad;
+      }
+    }
+    await registerSchemaFor(ad, EhsAuthor, EhsTagging);
+    // Real reflection: taggings. Misspelled :through → "taggng" (lev 2).
+    Associations.hasMany.call(EhsAuthor, "taggings", {
+      className: "EhsTagging",
+      foreignKey: "author_id",
+    });
+    Associations.hasMany.call(EhsAuthor, "tags", {
+      through: "taggng",
+      className: "EhsTagging",
+    });
+    const author = await EhsAuthor.create({ name: "Spell" });
+    await expect(
+      loadHasManyThrough(author, "tags", { through: "taggng", className: "EhsTagging" }),
+    ).rejects.toThrow(/Did you mean\? taggings/);
   });
 
   it("has many through join model with conditions", async () => {

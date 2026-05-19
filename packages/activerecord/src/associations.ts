@@ -52,6 +52,7 @@ export async function initializeAssociations(): Promise<void> {
   ]);
 }
 import { StrictLoadingViolationError, ConfigurationError, Rollback } from "./errors.js";
+import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
   AssociationNotFoundError,
   DeleteRestrictionError,
@@ -311,7 +312,26 @@ function _wireInverseAssociation(owner: Base, child: Base, inverseName: string):
   child._cachedAssociations.set(inverseName, owner);
 }
 
-function levenshtein(a: string, b: string): number {
+/**
+ * @internal
+ * Builds a HasManyThroughAssociationNotFoundError with DidYouMean-style
+ * `corrections` derived from the owner's existing association names —
+ * mirrors `ActiveRecord::HasManyThroughAssociationNotFoundError#corrections`.
+ */
+export function _hmtNotFound(
+  ctor: typeof Base,
+  assocName: string,
+  through: string,
+): HasManyThroughAssociationNotFoundError {
+  const assocs: AssociationDefinition[] = ctor._associations ?? [];
+  const corrections = assocs
+    .map((a) => a.name)
+    .filter((n) => n !== assocName && levenshtein(n, through) <= 3);
+  return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
+}
+
+/** @internal */
+export function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
@@ -1369,9 +1389,7 @@ export async function loadHasManyThrough(
   const associations: AssociationDefinition[] = ctor._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
-    throw new ConfigurationError(
-      `Through association "${options.through}" not found on ${ctor.name}`,
-    );
+    throw _hmtNotFound(ctor, assocName, options.through!);
   }
 
   // Resolve the target model
@@ -1471,9 +1489,7 @@ export async function loadHasOneThrough(
   const associations: AssociationDefinition[] = ctor._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
   if (!throughAssoc) {
-    throw new ConfigurationError(
-      `Through association "${options.through}" not found on ${ctor.name}`,
-    );
+    throw _hmtNotFound(ctor, assocName, options.through!);
   }
 
   // Load the through record (could be has_one or belongs_to)

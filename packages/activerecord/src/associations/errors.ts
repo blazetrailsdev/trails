@@ -65,12 +65,20 @@ export class InverseOfAssociationRecursiveError extends ActiveRecordError {
 export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
   readonly ownerClass: string;
   readonly reflection: string;
+  readonly corrections: string[];
 
-  constructor(owner: string, through: string, reflection: string = through) {
-    super(`Could not find the association :${through} in model ${owner}`);
+  constructor(
+    owner: string,
+    through: string,
+    reflection: string = through,
+    corrections: string[] = [],
+  ) {
+    const suggestion = corrections.length > 0 ? `\nDid you mean? ${corrections.join(", ")}` : "";
+    super(`Could not find the association :${through} in model ${owner}${suggestion}`);
     this.name = "HasManyThroughAssociationNotFoundError";
     this.ownerClass = owner;
     this.reflection = reflection;
+    this.corrections = corrections;
   }
 }
 

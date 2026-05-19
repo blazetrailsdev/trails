@@ -10,7 +10,7 @@ import {
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
-import { modelRegistry } from "./associations.js";
+import { modelRegistry, levenshtein } from "./associations.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -1442,6 +1442,7 @@ export class ThroughReflection extends AbstractReflection {
         this.activeRecord.name,
         this.through,
         this.name,
+        this._throughCorrections(),
       );
     }
 
@@ -1535,6 +1536,21 @@ export class ThroughReflection extends AbstractReflection {
   /** @internal */
   protected deriveClassName(): string {
     return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
+  }
+
+  /**
+   * @internal
+   * Mirrors ActiveRecord's DidYouMean-powered suggestions for
+   * HasManyThroughAssociationNotFoundError. Returns reflection names on
+   * the active_record that are within Levenshtein distance 3 of the
+   * misspelled `:through` name, excluding the failing reflection.
+   */
+  private _throughCorrections(): string[] {
+    const rawReflections: Record<string, unknown> =
+      (this.activeRecord as { _reflections?: Record<string, unknown> })._reflections ?? {};
+    const candidates = Object.keys(rawReflections).filter((k) => k !== this.name);
+    const target = this.through;
+    return candidates.filter((k) => levenshtein(k, target) <= 3);
   }
 
   /**
