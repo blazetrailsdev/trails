@@ -7,8 +7,8 @@
  * @see https://api.rubyonrails.org/classes/ActionController/Renderer.html
  */
 
-import { Metal } from "./metal.js";
 import type { RouteSetLike } from "../abstract-controller/url-for.js";
+import { resolveStatus } from "./metal/status-codes.js";
 
 export class Renderer {
   private _controller: unknown;
@@ -45,10 +45,10 @@ export class Renderer {
     const merged = { ...this._defaults, ...options };
     this._lastStatus =
       merged.status !== undefined && merged.status !== null
-        ? Metal.resolveStatus(merged.status as number | string)
+        ? resolveStatus(merged.status as number | string)
         : 200;
     const explicitContentType =
-      (merged.contentType as string | undefined) ?? (merged.content_type as string | undefined);
+      typeof merged.contentType === "string" ? merged.contentType : undefined;
 
     if (merged.json !== undefined) {
       this._lastContentType = explicitContentType ?? "application/json; charset=utf-8";

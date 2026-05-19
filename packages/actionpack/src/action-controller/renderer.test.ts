@@ -85,4 +85,18 @@ describe("Renderer", () => {
       ).toBe("http");
     });
   });
+
+  describe("render — contentType", () => {
+    it("honors camelCase `contentType` over the default for the rendered format", () => {
+      const r = new Renderer({}, null);
+      r.render({ plain: "hi", contentType: "text/markdown" });
+      expect(r.contentType).toBe("text/markdown");
+    });
+
+    it("ignores snake_case `content_type` (camelCase-only contract)", () => {
+      const r = new Renderer({}, null);
+      r.render({ plain: "hi", content_type: "text/markdown" });
+      expect(r.contentType).toBe("text/plain; charset=utf-8");
+    });
+  });
 });
