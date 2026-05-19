@@ -47,7 +47,8 @@ export class Renderer {
       merged.status !== undefined && merged.status !== null
         ? resolveStatus(merged.status as number | string)
         : 200;
-    const explicitContentType = merged.contentType as string | undefined;
+    const explicitContentType =
+      typeof merged.contentType === "string" ? merged.contentType : undefined;
 
     if (merged.json !== undefined) {
       this._lastContentType = explicitContentType ?? "application/json; charset=utf-8";

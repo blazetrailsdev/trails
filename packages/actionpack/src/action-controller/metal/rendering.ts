@@ -129,7 +129,10 @@ export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">
 
 /**
  * Mirrors Rails `_process_options(options)` — applies controller-level
- * options (`:status`, `:content_type`, `:location`) to the response.
+ * options (`:status`, `:content_type`, `:location` in Rails) to the
+ * response. Trails reads camelCase keys (`contentType`) per CLAUDE.md;
+ * the snake_case Ruby symbols are documented here only for cross-
+ * reference to the Rails source.
  * @internal
  */
 export function _processOptions(

@@ -45,6 +45,17 @@ describe("_normalizeOptions", () => {
     expect(out.status).toBe(404);
     expect(out.plain).toBe("<plain>");
   });
+
+  test("Ruby-truthy gate: '' and 0 are processed, null/false skip", () => {
+    // `html: ""` is Ruby-truthy → html-escape runs and returns a SafeBuffer
+    // wrapping "" (still truthy / present, just escaped).
+    expect(String(_normalizeOptions({ html: "" }).html)).toBe("");
+    // `status: 0` is Ruby-truthy → resolveStatus passes the number through.
+    expect(_normalizeOptions({ status: 0 }).status).toBe(0);
+    // `null`/`false` skip → fields untouched.
+    expect(_normalizeOptions({ html: null }).html).toBeNull();
+    expect(_normalizeOptions({ status: false }).status).toBe(false);
+  });
 });
 
 describe("_processVariant", () => {
@@ -141,6 +152,24 @@ describe("_processOptions", () => {
 
     _processOptions.call(host, {});
     expect(host.status).toBe(201);
+  });
+
+  test("Ruby-truthy gate: '' / 0 are applied, null/false skip", () => {
+    const host = {
+      status: 200,
+      contentType: null as string | null,
+      setHeader: () => undefined,
+      urlFor: (s: string) => s,
+    };
+    _processOptions.call(host, { status: 0, contentType: "" });
+    expect(host.status).toBe(0);
+    expect(host.contentType).toBe("");
+
+    host.status = 200;
+    host.contentType = null;
+    _processOptions.call(host, { status: null, contentType: false });
+    expect(host.status).toBe(200);
+    expect(host.contentType).toBeNull();
   });
 });
 
