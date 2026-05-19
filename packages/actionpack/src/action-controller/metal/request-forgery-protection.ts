@@ -189,3 +189,140 @@ export function skipForgeryProtection(
   const merged = { raise: false, ...options };
   _controller.skipBeforeAction?.("verifyAuthenticityToken", merged);
 }
+
+// ---------------------------------------------------------------------------
+// Verification predicates (Rails: metal/request_forgery_protection.rb privates)
+// ---------------------------------------------------------------------------
+
+/** @internal */
+export interface CsrfRequest {
+  method: string;
+  origin?: string | null;
+  baseUrl: string;
+  path?: string;
+  mediaType?: string | null;
+  xhr?: boolean;
+  xCsrfToken?: string | null;
+}
+
+/** @internal */
+export interface CsrfController {
+  request: CsrfRequest;
+  session?: { enabled?: () => boolean } | Record<string, unknown> | null;
+  allowForgeryProtection?: boolean;
+  forgeryProtectionOriginCheck?: boolean;
+  _markedForSameOriginVerification?: boolean;
+  logger?: { warn(msg: string): void } | null;
+  logWarningOnCsrfFailure?: boolean;
+  /** Supplied by P20c (token validation). */
+  isAnyAuthenticityTokenValid?: () => boolean;
+}
+
+const CROSS_ORIGIN_JAVASCRIPT_WARNING =
+  "Security warning: an embedded <script> tag on another site requested " +
+  "protected JavaScript. If you know what you're doing, go ahead and disable " +
+  "forgery protection on this action to permit cross-origin JavaScript embedding.";
+
+const NULL_ORIGIN_MESSAGE =
+  "The browser returned a 'null' origin for a request with origin-based " +
+  "forgery protection turned on. This usually means you have the 'no-referrer' " +
+  "Referrer-Policy header enabled, or that the request came from a site that " +
+  "refused to give its origin. This makes it impossible for Rails to verify " +
+  "the source of the requests. Likely the best solution is to change your " +
+  "referrer policy to something less strict like same-origin or strict-origin. " +
+  "If you cannot change the referrer policy, you can disable origin checking " +
+  "with the Rails.application.config.action_controller.forgery_protection_origin_check setting.";
+
+function isGetOrHead(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === "GET" || m === "HEAD";
+}
+
+/** @internal */
+export function isProtectAgainstForgery(controller: CsrfController): boolean {
+  if (controller.allowForgeryProtection === false) return false;
+  const session = controller.session;
+  if (session && typeof (session as { enabled?: unknown }).enabled === "function") {
+    return (session as { enabled: () => boolean }).enabled();
+  }
+  return true;
+}
+
+/** @internal */
+export function isValidRequestOrigin(controller: CsrfController): boolean {
+  if (controller.forgeryProtectionOriginCheck === false) return true;
+  const origin = controller.request.origin;
+  if (origin === "null") throw new InvalidAuthenticityToken(NULL_ORIGIN_MESSAGE);
+  return origin == null || origin === controller.request.baseUrl;
+}
+
+/** @internal */
+export function markForSameOriginVerificationBang(controller: CsrfController): boolean {
+  const value = controller.request.method.toUpperCase() === "GET";
+  controller._markedForSameOriginVerification = value;
+  return value;
+}
+
+/** @internal */
+export function isMarkedForSameOriginVerification(controller: CsrfController): boolean {
+  return controller._markedForSameOriginVerification ?? false;
+}
+
+/** @internal */
+export function isNonXhrJavascriptResponse(controller: CsrfController): boolean {
+  const mediaType = controller.request.mediaType ?? "";
+  return /^(?:text|application)\/javascript/.test(mediaType) && !controller.request.xhr;
+}
+
+/** @internal */
+export function verifySameOriginRequest(controller: CsrfController): void {
+  if (isMarkedForSameOriginVerification(controller) && isNonXhrJavascriptResponse(controller)) {
+    if (controller.logger && controller.logWarningOnCsrfFailure !== false) {
+      controller.logger.warn(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+    }
+    throw new InvalidCrossOriginRequest(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+  }
+}
+
+/** @internal */
+export function unverifiedRequestWarningMessage(controller: CsrfController): string {
+  if (isValidRequestOrigin(controller)) {
+    return "Can't verify CSRF token authenticity.";
+  }
+  return `HTTP Origin header (${controller.request.origin}) didn't match request.base_url (${controller.request.baseUrl})`;
+}
+
+/** @internal */
+export function isVerifiedRequest(controller: CsrfController): boolean {
+  if (!isProtectAgainstForgery(controller)) return true;
+  if (isGetOrHead(controller.request.method)) return true;
+  return isValidRequestOrigin(controller) && (controller.isAnyAuthenticityTokenValid?.() ?? false);
+}
+
+/** @internal */
+export function normalizeRelativeActionPath(relActionPath: string, requestPath: string): string {
+  let path = requestPath + "/" + relActionPath;
+  path = path.replace(/\/\.\//g, "/");
+  return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+}
+
+/** @internal */
+export function normalizeActionPath(actionPath: string, requestPath: string): string {
+  // Mirrors Ruby's URI.parse: relative inputs without a leading "/" pass
+  // through unparsed; absolute paths, protocol-relative ("//host/x"), and
+  // absolute URLs all have their `.pathname` extracted (using a dummy base
+  // so the URL constructor accepts the schemeless cases).
+  if (actionPath === "" || !actionPath.startsWith("/")) {
+    const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+    if (!SCHEME_RE.test(actionPath)) {
+      return normalizeRelativeActionPath(actionPath, requestPath);
+    }
+  }
+  let parsedPath: string;
+  try {
+    parsedPath = new URL(actionPath, "http://_placeholder_").pathname;
+  } catch {
+    parsedPath = actionPath;
+  }
+  return parsedPath.endsWith("/") && parsedPath.length > 1 ? parsedPath.slice(0, -1) : parsedPath;
+}
