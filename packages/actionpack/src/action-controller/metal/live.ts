@@ -204,7 +204,9 @@ export class SSE {
 
     for (const name of SSE.PERMITTED_OPTIONS) {
       const value = current[name];
-      if (value !== undefined && value !== null && value !== "") {
+      // Match Ruby truthiness: `if option_value` is true for "" — an empty
+      // `id:` line resets the browser's Last-Event-ID, which is valid SSE.
+      if (value !== undefined && value !== null) {
         this._stream.write(`${name}: ${value}\n`);
       }
     }
@@ -221,8 +223,8 @@ export class SSE {
 export class Response extends DispatchResponse {
   stream: Buffer;
 
-  constructor() {
-    super();
+  constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
+    super(status, headers, body);
     this.stream = new Buffer(this);
   }
 

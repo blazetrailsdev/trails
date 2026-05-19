@@ -140,6 +140,12 @@ describe("ActionController::Live::SSE", () => {
     expect(joined).toContain("event: override\n");
   });
 
+  it("emits an empty id: line when id is the empty string (Last-Event-ID reset)", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write("hi", { id: "" });
+    expect(cap.writes.join("")).toContain("id: \n");
+  });
+
   it("splits embedded newlines into multiple data: lines", () => {
     const cap = captureStream();
     new SSE(cap.stream).write("line1\nline2");
@@ -165,6 +171,14 @@ describe("ActionController::Live::Response", () => {
     res.stream.write("b");
     res.stream.close();
     expect([...res.stream.eachChunk()]).toEqual(["a", "b"]);
+  });
+
+  it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
+    const res = new Response(201, { "x-test": "1" }, ["seed"]);
+    expect(res.status).toBe(201);
+    expect(res.headers["x-test"]).toBe("1");
+    expect(res.body).toBe("seed");
+    expect(res.stream).toBeInstanceOf(Buffer);
   });
 
   it("beforeCommitted (via close) flushes accumulated cookies into a set-cookie header", () => {
