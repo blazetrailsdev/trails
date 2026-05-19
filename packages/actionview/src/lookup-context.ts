@@ -139,7 +139,12 @@ export class DetailsKey {
     return Array.from(DetailsKey._digestCache.values());
   }
 
-  /** Clear every resolver cache, plus the details and digest caches. */
+  /**
+   * Clear the details and digest caches, plus any resolver caches
+   * advertised by `PathRegistry`. Until the resolver port (Phase 1c)
+   * wires real entries into `PathRegistry`, the resolver loop is a
+   * no-op.
+   */
   static clear(): void {
     for (const resolver of PathRegistry.allResolvers()) {
       const r = resolver as TemplateResolver & { clearCache?: () => void };
@@ -149,10 +154,30 @@ export class DetailsKey {
     DetailsKey._digestCache.clear();
   }
 
-  /** @internal Stable JSON-ish key for a details tuple. */
+  /** @internal Per-symbol identity tag, so two non-global Symbols with
+   * the same description don't collide in `_stableKey`. Mirrors Ruby's
+   * symbol interning (where `:foo == :foo` is always true) by giving
+   * each non-interned Symbol a stable per-process numeric id. */
+  private static _symbolIds = new Map<symbol, number>();
+  private static _nextSymbolId = 0;
+  private static _tagSymbol(s: symbol): string {
+    const keyed = Symbol.keyFor(s);
+    if (keyed !== undefined) return `S@${keyed}`;
+    let id = DetailsKey._symbolIds.get(s);
+    if (id === undefined) {
+      id = ++DetailsKey._nextSymbolId;
+      DetailsKey._symbolIds.set(s, id);
+    }
+    return `s#${id}`;
+  }
+
+  /** @internal Stable key for a details tuple. */
   private static _stableKey(details: DetailsMap): string {
     return REGISTERED_DETAILS.map(
-      (k) => `${k}:${(details[k] ?? []).map((v) => String(v)).join(",")}`,
+      (k) =>
+        `${k}:${(details[k] ?? [])
+          .map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : `s:${String(v)}`))
+          .join(",")}`,
     ).join("|");
   }
 }
@@ -236,10 +261,9 @@ export class LookupContext {
       return;
     }
     let arr = [...values];
-    const wildIdx = arr.indexOf("*/*");
-    if (wildIdx >= 0) {
-      arr.splice(wildIdx, 1);
-      arr = arr.concat(DEFAULT_PROCS.formats());
+    const hadWildcard = arr.includes("*/*");
+    if (hadWildcard) {
+      arr = arr.filter((v) => v !== "*/*").concat(DEFAULT_PROCS.formats());
     }
     arr = Array.from(new Set(arr));
     const invalid = arr.filter((f) => typeof f !== "string" || !VALID_FORMAT_SYMBOLS.has(f));

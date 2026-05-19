@@ -473,6 +473,12 @@ describe("ActionView::LookupContext", () => {
       expect(Array.from(c.formats)).toEqual(["xml", "html", "text", "js", "css", "json"]);
     });
 
+    it("formats= removes every */* occurrence before expanding defaults", () => {
+      const c = new LookupContext();
+      c.formats = ["*/*", "xml", "*/*"];
+      expect(Array.from(c.formats)).toEqual(["xml", "html", "text", "js", "css", "json"]);
+    });
+
     it("formats= adds html fallback when only :js is requested", () => {
       const c = new LookupContext();
       c.formats = ["js"];
@@ -527,6 +533,14 @@ describe("ActionView::LookupContext", () => {
       const a = new LookupContext();
       const b = new LookupContext();
       expect(a.detailsKey()).toBe(b.detailsKey());
+    });
+
+    it("distinguishes non-global Symbols by identity in the details key", () => {
+      const c1 = new LookupContext();
+      const c2 = new LookupContext();
+      c1.variants = [Symbol("mobile")];
+      c2.variants = [Symbol("mobile")];
+      expect(c1.detailsKey()).not.toBe(c2.detailsKey());
     });
 
     it("digestCache is per-tuple and persists across instances", () => {
