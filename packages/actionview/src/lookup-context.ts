@@ -10,12 +10,55 @@
  *   ctx.addResolver(new InMemoryResolver()); // fallback
  *
  *   const output = await ctx.render("posts", "index", "html", { posts: [...] });
+ *
+ * Phase 1d fleshes out the registered-details cascade (locale, formats,
+ * variants, handlers) and a real `DetailsKey` cache mirroring
+ * `action_view/lookup_context.rb`.
  */
 
 import type { RenderContext } from "./template/handlers.js";
 import { TemplateHandlerRegistry } from "./template/handlers.js";
 import type { TemplateResolver } from "./template-resolver.js";
 import type { Template } from "./template.js";
+import { PathRegistry } from "./path-registry.js";
+import { Requested } from "./template-details.js";
+
+type DetailValue = ReadonlyArray<string | symbol>;
+type DetailsMap = Record<string, DetailValue>;
+type DefaultProc = () => DetailValue;
+
+const DEFAULT_PROCS: Record<string, DefaultProc> = {};
+const REGISTERED_DETAILS: string[] = [];
+
+function registerDetail(name: string, proc: DefaultProc): void {
+  if (!REGISTERED_DETAILS.includes(name)) REGISTERED_DETAILS.push(name);
+  DEFAULT_PROCS[name] = proc;
+}
+
+// I18n is not yet ported; fall back to a single "en" locale.
+registerDetail("locale", () => ["en"]);
+registerDetail("formats", () => ["html", "text", "js", "css", "xml", "json"]);
+registerDetail("variants", () => []);
+registerDetail("handlers", () => TemplateHandlerRegistry.extensions as DetailValue);
+
+/** Whitelist of format symbols recognized by `formats=`. */
+const VALID_FORMAT_SYMBOLS: ReadonlySet<string> = new Set([
+  "html",
+  "text",
+  "js",
+  "css",
+  "xml",
+  "json",
+  "rss",
+  "atom",
+  "yaml",
+  "multipart_form",
+  "url_encoded_form",
+  "ics",
+  "csv",
+  "vcf",
+  "tsx",
+]);
 
 export class MissingTemplate extends Error {
   /** Rails-shape accessors — refined in Phase 1d. @internal stub - real impl in Phase 1d */
@@ -48,17 +91,210 @@ export class MissingTemplate extends Error {
   }
 }
 
+/**
+ * Per-process cache of `{locale, formats, variants, handlers}` detail
+ * tuples + their associated digest caches. Mirrors
+ * `ActionView::LookupContext::DetailsKey`.
+ */
+export class DetailsKey {
+  /** @internal */
+  static _detailsKeys = new Map<string, Requested>();
+  /** @internal */
+  static _digestCache = new Map<Requested, Map<string, string>>();
+
+  /** Canonical Requested object for a given detail tuple. */
+  static detailsCacheKey(details: DetailsMap): Requested {
+    const key = DetailsKey._stableKey(details);
+    let req = DetailsKey._detailsKeys.get(key);
+    if (req) return req;
+    let formats = details.formats;
+    if (formats && !formats.every((f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f))) {
+      formats = formats.filter(
+        (f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f),
+      ) as DetailValue;
+    }
+    req = new Requested({
+      locale: details.locale ?? [],
+      handlers: details.handlers ?? [],
+      formats: formats ?? [],
+      variants: details.variants ?? [],
+    });
+    DetailsKey._detailsKeys.set(key, req);
+    return req;
+  }
+
+  /** Digest cache scoped to a given detail tuple. */
+  static digestCache(details: DetailsMap): Map<string, string> {
+    const req = DetailsKey.detailsCacheKey(details);
+    let cache = DetailsKey._digestCache.get(req);
+    if (!cache) {
+      cache = new Map();
+      DetailsKey._digestCache.set(req, cache);
+    }
+    return cache;
+  }
+
+  static digestCaches(): Array<Map<string, string>> {
+    return Array.from(DetailsKey._digestCache.values());
+  }
+
+  /** Clear every resolver cache, plus the details and digest caches. */
+  static clear(): void {
+    for (const resolver of PathRegistry.allResolvers()) {
+      const r = resolver as TemplateResolver & { clearCache?: () => void };
+      r.clearCache?.();
+    }
+    DetailsKey._detailsKeys.clear();
+    DetailsKey._digestCache.clear();
+  }
+
+  /** @internal Stable JSON-ish key for a details tuple. */
+  private static _stableKey(details: DetailsMap): string {
+    return REGISTERED_DETAILS.map(
+      (k) => `${k}:${(details[k] ?? []).map((v) => String(v)).join(",")}`,
+    ).join("|");
+  }
+}
+
 export class LookupContext {
-  /**
-   * Nested cache-key class, exposed at the value level by the runtime
-   * assignment near the bottom of this file and at the type level here.
-   * @internal stub - real impl in Phase 1d
-   */
   static DetailsKey: typeof DetailsKey;
 
+  /** Names of detail facets registered process-wide. */
+  static get registeredDetails(): ReadonlyArray<string> {
+    return REGISTERED_DETAILS;
+  }
+
+  /** @internal Register a new detail facet (used by extensions). */
+  static registerDetail(name: string, proc: DefaultProc): void {
+    registerDetail(name, proc);
+  }
+
+  /** @internal */
+  static _defaultProcs(): Record<string, DefaultProc> {
+    return DEFAULT_PROCS;
+  }
+
+  // --- Existing high-level renderer state (kept for AC integration) ---
   private resolvers: TemplateResolver[] = [];
   private layoutName: string | false | null = "application";
-  private _prefixes: string[] = [];
+
+  // --- Rails-faithful state ---
+  private _details: DetailsMap;
+  private _prefixes: string[];
+  private _detailsKey: Requested | null = null;
+  private _detailsCache = true;
+  private _htmlFallbackForJs = false;
+
+  constructor(details: DetailsMap = {}, prefixes: string[] = []) {
+    this._prefixes = prefixes;
+    this._details = {};
+    for (const k of REGISTERED_DETAILS) {
+      this._details[k] = details[k] ?? DEFAULT_PROCS[k]();
+    }
+  }
+
+  // --- prefixes ---
+  get prefixes(): string[] {
+    return this._prefixes;
+  }
+  set prefixes(value: string[]) {
+    this._prefixes = value;
+  }
+
+  // --- details accessors ---
+  get locale(): string | symbol | null {
+    return this._details.locale[0] ?? null;
+  }
+  set locale(value: string | symbol | null) {
+    this._setDetail("locale", value == null ? DEFAULT_PROCS.locale() : [value]);
+  }
+
+  get formats(): DetailValue {
+    return this._details.formats;
+  }
+  set formats(values: DetailValue | null | undefined) {
+    if (!values) {
+      this._setDetail("formats", DEFAULT_PROCS.formats());
+      return;
+    }
+    let arr = [...values];
+    const wildIdx = arr.indexOf("*/*");
+    if (wildIdx >= 0) {
+      arr.splice(wildIdx, 1);
+      arr = arr.concat(DEFAULT_PROCS.formats());
+    }
+    arr = Array.from(new Set(arr));
+    const invalid = arr.filter((f) => typeof f !== "string" || !VALID_FORMAT_SYMBOLS.has(f));
+    if (invalid.length > 0) {
+      throw new Error(`Invalid formats: ${invalid.map((v) => String(v)).join(", ")}`);
+    }
+    if (arr.length === 1 && arr[0] === "js") {
+      arr.push("html");
+      this._htmlFallbackForJs = true;
+    }
+    this._setDetail("formats", arr);
+  }
+  get htmlFallbackForJs(): boolean {
+    return this._htmlFallbackForJs;
+  }
+
+  get variants(): DetailValue {
+    return this._details.variants;
+  }
+  set variants(values: DetailValue | null | undefined) {
+    this._setDetail(
+      "variants",
+      values && values.length > 0 ? [...values] : DEFAULT_PROCS.variants(),
+    );
+  }
+
+  get handlers(): DetailValue {
+    return this._details.handlers;
+  }
+  set handlers(values: DetailValue | null | undefined) {
+    this._setDetail(
+      "handlers",
+      values && values.length > 0 ? [...values] : DEFAULT_PROCS.handlers(),
+    );
+  }
+
+  /** @internal */
+  private _setDetail(key: string, value: DetailValue): void {
+    if (this._details[key] === value) return;
+    this._detailsKey = null;
+    this._details = { ...this._details, [key]: value };
+  }
+
+  // --- cache controls (DetailsCache module) ---
+  get cache(): boolean {
+    return this._detailsCache;
+  }
+  set cache(value: boolean) {
+    this._detailsCache = value;
+  }
+
+  /** Cache key for the current details tuple (null when cache is off). */
+  detailsKey(): Requested | null {
+    if (!this._detailsCache) return null;
+    if (!this._detailsKey) this._detailsKey = DetailsKey.detailsCacheKey(this._details);
+    return this._detailsKey;
+  }
+
+  /** Run `block` with the details cache disabled. */
+  disableCache<T>(block: () => T): T {
+    const prev = this._detailsCache;
+    this._detailsCache = false;
+    try {
+      return block();
+    } finally {
+      this._detailsCache = prev;
+    }
+  }
+
+  /** Digest cache scoped to the current details tuple. */
+  digestCache(): Map<string, string> {
+    return DetailsKey.digestCache(this._details);
+  }
 
   /** Add a resolver to the lookup chain. First added = highest priority. */
   addResolver(resolver: TemplateResolver): void {
@@ -73,15 +309,6 @@ export class LookupContext {
   /** Get the current layout name. */
   getLayout(): string | false | null {
     return this.layoutName;
-  }
-
-  /** Set view prefixes (for controller inheritance lookup). */
-  set prefixes(value: string[]) {
-    this._prefixes = value;
-  }
-
-  get prefixes(): string[] {
-    return this._prefixes;
   }
 
   /**
@@ -265,25 +492,4 @@ export class LookupContext {
   }
 }
 
-/**
- * Cache key for `{locale, formats, variants, handlers}` detail tuples.
- * Hooked by the `action_view` load callback to clear the cache between
- * request cycles. Real cache wiring lands in Phase 1d.
- *
- * Also exported as `LookupContext.DetailsKey` via namespace merging so
- * downstream code can mirror Rails' `ActionView::LookupContext::DetailsKey`
- * spelling without `as any` casts.
- *
- * @internal stub - real impl in Phase 1d
- */
-export class DetailsKey {
-  /** @internal stub - real impl in Phase 1d */
-  static clear(): void {}
-}
-
-// Install DetailsKey as a static on LookupContext so consumers can write
-// `LookupContext.DetailsKey.clear()` — matching the Rails
-// `ActionView::LookupContext::DetailsKey` nesting both at the value and
-// the type level (see the corresponding `static DetailsKey: typeof
-// DetailsKey` field declared inside LookupContext above).
 (LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;

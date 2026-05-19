@@ -457,6 +457,92 @@ describe("ActionView::LookupContext", () => {
       expect(output).toBe("content");
     });
   });
+
+  describe("details cascade (Phase 1d)", () => {
+    it("seeds default details from registered procs", () => {
+      const c = new LookupContext();
+      expect(c.locale).toBe("en");
+      expect(Array.from(c.formats)).toEqual(["html", "text", "js", "css", "xml", "json"]);
+      expect(Array.from(c.variants)).toEqual([]);
+      expect(Array.from(c.handlers)).toContain("ejs");
+    });
+
+    it("formats= expands */* using defaults and dedupes", () => {
+      const c = new LookupContext();
+      c.formats = ["xml", "*/*"];
+      expect(Array.from(c.formats)).toEqual(["xml", "html", "text", "js", "css", "json"]);
+    });
+
+    it("formats= adds html fallback when only :js is requested", () => {
+      const c = new LookupContext();
+      c.formats = ["js"];
+      expect(Array.from(c.formats)).toEqual(["js", "html"]);
+      expect(c.htmlFallbackForJs).toBe(true);
+    });
+
+    it("formats= rejects unknown formats", () => {
+      const c = new LookupContext();
+      expect(() => {
+        c.formats = ["nope"];
+      }).toThrow(/Invalid formats/);
+    });
+
+    it("locale getter returns first locale; setter replaces it", () => {
+      const c = new LookupContext();
+      c.locale = "fr";
+      expect(c.locale).toBe("fr");
+    });
+
+    it("setting details invalidates the cached details key", () => {
+      const c = new LookupContext();
+      const first = c.detailsKey();
+      c.formats = ["html"];
+      const second = c.detailsKey();
+      expect(first).not.toBe(second);
+    });
+  });
+
+  describe("DetailsKey + cache (Phase 1d)", () => {
+    beforeEach(() => {
+      LookupContext.DetailsKey.clear();
+    });
+
+    it("returns null detailsKey when cache is disabled", () => {
+      const c = new LookupContext();
+      c.cache = false;
+      expect(c.detailsKey()).toBeNull();
+    });
+
+    it("disableCache yields without cache and restores prior value", () => {
+      const c = new LookupContext();
+      let inner: unknown;
+      c.disableCache(() => {
+        inner = c.detailsKey();
+      });
+      expect(inner).toBeNull();
+      expect(c.detailsKey()).not.toBeNull();
+    });
+
+    it("DetailsKey.detailsCacheKey returns the same Requested for equal details", () => {
+      const a = new LookupContext();
+      const b = new LookupContext();
+      expect(a.detailsKey()).toBe(b.detailsKey());
+    });
+
+    it("digestCache is per-tuple and persists across instances", () => {
+      const a = new LookupContext();
+      const b = new LookupContext();
+      a.digestCache().set("k", "v");
+      expect(b.digestCache().get("k")).toBe("v");
+    });
+
+    it("DetailsKey.clear wipes details + digest caches", () => {
+      const c = new LookupContext();
+      c.digestCache().set("k", "v");
+      LookupContext.DetailsKey.clear();
+      expect(LookupContext.DetailsKey.digestCaches()).toEqual([]);
+    });
+  });
 });
 
 // ==========================================================================
