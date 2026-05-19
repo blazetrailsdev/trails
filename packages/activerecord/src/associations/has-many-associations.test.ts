@@ -1740,6 +1740,19 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(posts.length === 0).toBe(false);
   });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: TestDatabaseAdapter;
+
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string" },
+    });
+  });
+  withTransactionalFixtures(() => adapter);
 
   // -- Association definition --
 
@@ -1828,6 +1841,14 @@ describe("HasManyAssociationsTest", () => {
     });
     const found = posts.find((p: any) => p.id === post.id);
     expect(found).toBeDefined();
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
   });
 
   // -- Scoped queries --
