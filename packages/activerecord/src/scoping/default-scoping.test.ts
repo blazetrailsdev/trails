@@ -27,7 +27,7 @@ beforeEach(async () => {
       mentor_id: "integer",
       active: "boolean",
     },
-    animals: { name: "string", type: "string" },
+    animals: { name: "string", type: "string", active: "boolean" },
     dogs: { name: "string", type: "string", active: "boolean" },
     articles: {
       title: "string",
