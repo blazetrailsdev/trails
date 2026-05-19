@@ -1015,11 +1015,30 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string" },
+      destroy_all_authors: { name: "string" },
+      destroy_all_posts: { author_id: "integer", title: "string" },
+      delete_all_unloaded_authors: { name: "string" },
+      delete_all_unloaded_posts: { author_id: "integer", title: "string" },
+      nullify_authors: { name: "string" },
+      nullify_posts: { author_id: "integer", title: "string" },
+      cpk_authors: { name: "string" },
+      cpk_posts: { tenant_id: "integer", author_id: "integer", title: "string" },
+      cache_authors: { name: "string" },
+      cache_posts: { cache_author_id: "integer" },
+      clear_authors: { name: "string" },
+      clear_posts: { author_id: "integer", title: "string" },
+      clear_dep_authors: { name: "string" },
+      clear_dep_posts: { author_id: "integer", title: "string" },
+    });
   });
+  withTransactionalFixtures(() => adapter);
 
   // -- Destroying --
 
@@ -1497,6 +1516,14 @@ describe("HasManyAssociationsTest", () => {
     expect(author.isNewRecord()).toBe(true);
     // New records have no id; any query would return 0 results
     expect(author.id == null).toBe(true);
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
   });
 
   // -- Calling size/empty --
