@@ -5,6 +5,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { Configurable } from "./configurable.js";
 
 export class KeyGenerator {
@@ -20,7 +21,8 @@ export class KeyGenerator {
 
   deriveKeyFrom(password: string, length?: number): string {
     const salt = this.keyDerivationSalt();
-    return this.deriveKey(password, length ?? this.keyLength(), salt);
+    const generator = new AsKeyGenerator(password, { hashDigestClass: this._hashDigestClass });
+    return generator.generateKey(salt, length ?? this.keyLength()).toString("base64");
   }
 
   generateRandomKey(length?: number): string {
