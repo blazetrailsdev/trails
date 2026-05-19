@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import {
   SubclassNotFound,
@@ -24,9 +24,10 @@ import {
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -256,6 +257,185 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
     }
     const sql = Post.order("title").reorder("title DESC").toSql();
     expect(sql).toContain("ORDER BY");
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: TestDatabaseAdapter;
+
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      dnp_comments: {
+        author_id: "integer",
+        author_type: "string",
+        body: "string",
+      },
+      dnp_people: { first_name: "string" },
+      jp_comments: {
+        body: "string",
+        commentable_id: "integer",
+        commentable_type: "string",
+      },
+      jp_posts: { title: "string" },
+      bphm_comments: {
+        body: "string",
+        commentable_id: "integer",
+        commentable_type: "string",
+      },
+      bphm_posts: { title: "string" },
+      bp_inv_comments: {
+        body: "string",
+        commentable_id: "integer",
+        commentable_type: "string",
+      },
+      bp_inv_posts: { title: "string" },
+      null_poly_comments: {
+        commentable_id: "integer",
+        commentable_type: "string",
+        body: "string",
+      },
+    });
+  });
+  withTransactionalFixtures(() => adapter);
+
+  it("depends and nullify on polymorphic assoc", async () => {
+    class DnpComment extends Base {
+      static {
+        this.attribute("author_id", "integer");
+        this.attribute("author_type", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    class DnpPerson extends Base {
+      static {
+        this.attribute("first_name", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(DnpComment);
+    registerModel(DnpPerson);
+    Associations.hasMany.call(DnpPerson, "comments", {
+      className: "DnpComment",
+      as: "author",
+      dependent: "nullify",
+    });
+    const author = await DnpPerson.create({ first_name: "Laertis" });
+    const comment = await DnpComment.create({
+      author_id: author.id,
+      author_type: "DnpPerson",
+      body: "Hello",
+    });
+    expect(comment.author_id).toBe(author.id);
+    expect(comment.author_type).toBe("DnpPerson");
+    await processDependentAssociations(author);
+    const reloaded = await DnpComment.find(comment.id as number);
+    expect(reloaded.author_id).toBeNull();
+    expect(reloaded.author_type).toBeNull();
+  });
+
+  it("joining through a polymorphic association with a where clause", async () => {
+    class JpComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class JpPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(JpComment);
+    registerModel(JpPost);
+    const post = await JpPost.create({ title: "Hello" });
+    await JpComment.create({ body: "Great", commentable_id: post.id, commentable_type: "JpPost" });
+    await JpComment.create({ body: "Nice", commentable_id: post.id, commentable_type: "JpPost" });
+    const comments = await JpComment.where({
+      commentable_id: post.id,
+      commentable_type: "JpPost",
+    }).toArray();
+    expect(comments.length).toBe(2);
+  });
+
+  it("build with polymorphic has many does not allow to override type and id", async () => {
+    class BphmComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BphmPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(BphmComment);
+    registerModel(BphmPost);
+    Associations.hasMany.call(BphmPost, "bphmComments", {
+      as: "commentable",
+      className: "BphmComment",
+    });
+    const post = await BphmPost.create({ title: "Hello" });
+    const proxy = association(post, "bphmComments");
+    const comment = proxy.build({ body: "nice", commentable_id: 999, commentable_type: "Evil" });
+    expect(comment.commentable_id).toBe(post.id);
+    expect(comment.commentable_type).toBe("BphmPost");
+  });
+
+  it("build from polymorphic association sets inverse instance", async () => {
+    class BpInvComment extends Base {
+      static {
+        this.attribute("body", "string");
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.adapter = adapter;
+      }
+    }
+    class BpInvPost extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(BpInvComment);
+    registerModel(BpInvPost);
+    Associations.hasMany.call(BpInvPost, "bpInvComments", {
+      as: "commentable",
+      className: "BpInvComment",
+    });
+    const post = await BpInvPost.create({ title: "Hello" });
+    const proxy = association(post, "bpInvComments");
+    const comment = proxy.build({ body: "nice" });
+    expect(comment.commentable_id).toBe(post.id);
+    expect(comment.commentable_type).toBe("BpInvPost");
+  });
+
+  it("attributes are set when initialized from polymorphic has many null relationship", async () => {
+    class NullPolyComment extends Base {
+      static {
+        this.attribute("commentable_id", "integer");
+        this.attribute("commentable_type", "string");
+        this.attribute("body", "string");
+        this.adapter = adapter;
+      }
+    }
+    registerModel(NullPolyComment);
+    const comment = NullPolyComment.new({
+      commentable_id: null as any,
+      commentable_type: null as any,
+      body: "Orphan",
+    });
+    expect((comment as any).commentable_id).toBeNull();
+    expect((comment as any).commentable_type).toBeNull();
+    expect((comment as any).body).toBe("Orphan");
   });
 });
 
@@ -5400,41 +5580,6 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(remaining.length).toBe(0);
   });
-  it("depends and nullify on polymorphic assoc", async () => {
-    class DnpComment extends Base {
-      static {
-        this.attribute("author_id", "integer");
-        this.attribute("author_type", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    class DnpPerson extends Base {
-      static {
-        this.attribute("first_name", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(DnpComment);
-    registerModel(DnpPerson);
-    Associations.hasMany.call(DnpPerson, "comments", {
-      className: "DnpComment",
-      as: "author",
-      dependent: "nullify",
-    });
-    const author = await DnpPerson.create({ first_name: "Laertis" });
-    const comment = await DnpComment.create({
-      author_id: author.id,
-      author_type: "DnpPerson",
-      body: "Hello",
-    });
-    expect(comment.author_id).toBe(author.id);
-    expect(comment.author_type).toBe("DnpPerson");
-    await processDependentAssociations(author);
-    const reloaded = await DnpComment.find(comment.id as number);
-    expect(reloaded.author_id).toBeNull();
-    expect(reloaded.author_type).toBeNull();
-  });
   it("restrict with error", async () => {
     class ReAuthor extends Base {
       static {
@@ -6844,87 +6989,6 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).title).toBe("Merged");
     expect((post as any).author_id).toBe(author.id);
   });
-  it("joining through a polymorphic association with a where clause", async () => {
-    class JpComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-        this.adapter = adapter;
-      }
-    }
-    class JpPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(JpComment);
-    registerModel(JpPost);
-    const post = await JpPost.create({ title: "Hello" });
-    await JpComment.create({ body: "Great", commentable_id: post.id, commentable_type: "JpPost" });
-    await JpComment.create({ body: "Nice", commentable_id: post.id, commentable_type: "JpPost" });
-    const comments = await JpComment.where({
-      commentable_id: post.id,
-      commentable_type: "JpPost",
-    }).toArray();
-    expect(comments.length).toBe(2);
-  });
-  it("build with polymorphic has many does not allow to override type and id", async () => {
-    class BphmComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-        this.adapter = adapter;
-      }
-    }
-    class BphmPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(BphmComment);
-    registerModel(BphmPost);
-    Associations.hasMany.call(BphmPost, "bphmComments", {
-      as: "commentable",
-      className: "BphmComment",
-    });
-    const post = await BphmPost.create({ title: "Hello" });
-    const proxy = association(post, "bphmComments");
-    // Attempt to override type and id — they should be set by the association
-    const comment = proxy.build({ body: "nice", commentable_id: 999, commentable_type: "Evil" });
-    expect(comment.commentable_id).toBe(post.id);
-    expect(comment.commentable_type).toBe("BphmPost");
-  });
-  it("build from polymorphic association sets inverse instance", async () => {
-    class BpInvComment extends Base {
-      static {
-        this.attribute("body", "string");
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-        this.adapter = adapter;
-      }
-    }
-    class BpInvPost extends Base {
-      static {
-        this.attribute("title", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(BpInvComment);
-    registerModel(BpInvPost);
-    Associations.hasMany.call(BpInvPost, "bpInvComments", {
-      as: "commentable",
-      className: "BpInvComment",
-    });
-    const post = await BpInvPost.create({ title: "Hello" });
-    const proxy = association(post, "bpInvComments");
-    const comment = proxy.build({ body: "nice" });
-    expect(comment.commentable_id).toBe(post.id);
-    expect(comment.commentable_type).toBe("BpInvPost");
-  });
   it("dont call save callbacks twice on has many", async () => {
     class NoDblAuthor extends Base {
       static {
@@ -6990,25 +7054,6 @@ describe("HasManyAssociationsTest", () => {
     const post = NullRelPost.new({ author_id: null as any, title: "Orphan" });
     expect((post as any).author_id).toBeNull();
     expect((post as any).title).toBe("Orphan");
-  });
-  it("attributes are set when initialized from polymorphic has many null relationship", async () => {
-    class NullPolyComment extends Base {
-      static {
-        this.attribute("commentable_id", "integer");
-        this.attribute("commentable_type", "string");
-        this.attribute("body", "string");
-        this.adapter = adapter;
-      }
-    }
-    registerModel(NullPolyComment);
-    const comment = NullPolyComment.new({
-      commentable_id: null as any,
-      commentable_type: null as any,
-      body: "Orphan",
-    });
-    expect((comment as any).commentable_id).toBeNull();
-    expect((comment as any).commentable_type).toBeNull();
-    expect((comment as any).body).toBe("Orphan");
   });
   it("replace returns target", async () => {
     class Author extends Base {
