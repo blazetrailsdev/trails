@@ -11,9 +11,9 @@ import { adapterType, createTestAdapter } from "./test-adapter.js";
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
 // `skip unless supports_insert_conflict_target?`. MySQL's ON DUPLICATE KEY
 // UPDATE has no conflict-target syntax, so InsertAll raises when uniqueBy
-// is given — mirror Rails by skipping those tests on MySQL here.
+// is given. Use `it.skipIf(...)` inline (not a variable alias) so that
+// scripts/test-compare/extract-ts-tests.ts can match the tests by name.
 const supportsConflictTarget = adapterType !== "mysql";
-const itIfConflictTarget = supportsConflictTarget ? it : it.skip;
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
@@ -211,7 +211,7 @@ describe("InsertAllTest", () => {
     // ROOT-CAUSE: returning clause currently passes through to executeMutation which returns affected-row counts; PG-only RETURNING extraction (Result rows + type-cast) is not wired through Builder.toSql + execute path.
     // SCOPE: ~50 LOC across insert-all.ts (Builder.returningClause select_values + execute branch) and pg adapter (executeInsertAll → Result); affects ~4 RETURNING tests
   });
-  itIfConflictTarget("insert all skip duplicates", async () => {
+  it.skipIf(!supportsConflictTarget)("insert all skip duplicates", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Existing", author: "Auth" });
@@ -237,7 +237,7 @@ describe("InsertAllTest", () => {
     const reloaded = await Book.find(b.id);
     expect(reloaded.title).toBe("Updated");
   });
-  itIfConflictTarget("upsert all with unique by", async () => {
+  it.skipIf(!supportsConflictTarget)("upsert all with unique by", async () => {
     const adapter = freshAdapter();
     const Book = makeBook(adapter);
     await Book.create({ title: "Original", author: "Auth" });
@@ -249,10 +249,31 @@ describe("InsertAllTest", () => {
     expect(reloaded.title).toBe("Upserted");
   });
 
-  it.skip("upsert all does not update readonly attributes", () => {
-    // BLOCKED: relation
-    // ROOT-CAUSE: insert-all.ts does not consult model.readonlyAttributes() when building keysIncludingTimestamps or _updatableColumns, so readonly columns flow into both INSERT column list and ON CONFLICT update set.
-    // SCOPE: ~15 LOC — filter this.keys against readonlyAttributes() in resolveAttributeAliases path and exclude from _updatableColumns; affects ~3 readonly tests
+  it("upsert all does not update readonly attributes", async () => {
+    const adapter = freshAdapter();
+    class Book extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("author", "string");
+        this.adapter = adapter;
+      }
+    }
+    // Subclass with readonly title — mirrors Rails' ReadonlyNameBook.
+    class ReadonlyTitleBook extends Book {
+      static {
+        this.attrReadonly("title");
+      }
+    }
+    const b = await Book.create({ title: "Original", author: "A" });
+    const newTitle = "Should Not Update";
+    // Update a non-readonly column alongside the readonly one so the test
+    // distinguishes "readonly filtered out of update set" from "update set
+    // collapsed to empty / upsert silently no-op'd".
+    await ReadonlyTitleBook.upsertAll([{ id: b.id, title: newTitle, author: "B" }]);
+    const found = await Book.find(b.id);
+    expect(found.title).not.toBe(newTitle);
+    expect(found.author).toBe("B");
   });
 
   it.skip("upsert all updates changed columns only", () => {
@@ -364,8 +385,7 @@ describe("InsertAllTest", () => {
     const all = await Book.all().toArray();
     expect(all.some((b: any) => b.title === "NoCallback")).toBe(true);
   });
-  it.skip("upsert_all works with custom primary key", async () => {
-    // BLOCKED: relation — insert_all.rb: custom primary key in upsert
+  it("upsert_all works with custom primary key", async () => {
     const adapter = freshAdapter();
     class Item extends Base {
       static {
@@ -543,7 +563,7 @@ describe("InsertAllTest", () => {
     // ROOT-CAUSE: schema-cache.indexes() returns IndexDefinition without partial-index where clause, expression-index sql, or inverted column-order match; findUniqueIndexFor falls back to first match and Builder.conflictTarget emits raw columns only.
     // SCOPE: ~60–80 LOC across schema-cache index extraction (pg/mysql/sqlite index introspection) and findUniqueIndexFor matching; affects ~7 index/partial-index tests
   });
-  itIfConflictTarget(
+  it.skipIf(!supportsConflictTarget)(
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
       const adapter = freshAdapter();
@@ -1054,7 +1074,7 @@ describe("insertAll / upsertAll (Rails-guided)", () => {
 // Regression: upsertAll on returning DBs (cache miss path)
 // ==========================================================================
 describe("InsertAll async uniqueIndexes regression", () => {
-  itIfConflictTarget(
+  it.skipIf(!supportsConflictTarget)(
     "upsertAll with uniqueBy succeeds when schema cache is cold (returning DB scenario)",
     async () => {
       const adapter = createTestAdapter();
@@ -1082,7 +1102,7 @@ describe("InsertAll async uniqueIndexes regression", () => {
     },
   );
 
-  itIfConflictTarget(
+  it.skipIf(!supportsConflictTarget)(
     "upsertAll with partial unique index emits WHERE in conflict target",
     async () => {
       const adapter = createTestAdapter();
