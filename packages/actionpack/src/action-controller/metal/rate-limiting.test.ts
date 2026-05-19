@@ -103,10 +103,13 @@ describe("MemoryRateLimitStore", () => {
 
     it("saturates the threshold at _PRUNE_MAX and arms _skipSweepInserts", () => {
       const store = new MemoryRateLimitStore();
-      // Enough inserts to double the threshold past the cap: each sterile
-      // sweep doubles 1024 → 2048 → 4096 → 8192 → 16384 (= _PRUNE_MAX).
-      // 8193 entries triggers the fourth sweep and saturates the cap.
-      for (let i = 0; i < BASELINE * 8 + 1; i += 1) {
+      // Each sterile (all-live) sweep doubles the threshold:
+      // BASELINE → 2·BASELINE → 4·BASELINE → … → PRUNE_MAX.
+      // The Nth all-live insert (where N == current threshold) trips the
+      // sweep, so the run that saturates at PRUNE_MAX happens once size
+      // reaches PRUNE_MAX/2 == BASELINE * 8 (when PRUNE_MAX = 16·BASELINE).
+      const saturatingInsertCount = PRUNE_MAX / 2;
+      for (let i = 0; i < saturatingInsertCount; i += 1) {
         store.increment(`live:${i}`, 1, { expiresIn: 3600 });
       }
       expect(peek(store)._pruneThreshold).toBe(PRUNE_MAX);
