@@ -166,7 +166,7 @@ function analyzeTsDepUsage(
     for (const stmt of sourceFile.statements) {
       if (!ts.isImportDeclaration(stmt)) continue;
       const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
-      if (specifier !== tsImport) continue;
+      if (!isImportFromPackage(specifier, tsImport)) continue;
       const clause = stmt.importClause;
       if (!clause) continue;
       if (clause.name) importedNames.add(clause.name.text);
@@ -253,6 +253,16 @@ function visitMethodDeclarations(
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(sourceFile, visit);
+}
+
+/**
+ * Match an import specifier against a package root, including subpath
+ * imports (e.g. "@blazetrails/activesupport/message-verifier" matches
+ * tsImport "@blazetrails/activesupport"). Requires a "/" boundary so
+ * "@blazetrails/activesupporting" does not match "@blazetrails/activesupport".
+ */
+export function isImportFromPackage(specifier: string, tsImport: string): boolean {
+  return specifier === tsImport || specifier.startsWith(tsImport + "/");
 }
 
 export function isWithinTypeNode(node: ts.Node): boolean {

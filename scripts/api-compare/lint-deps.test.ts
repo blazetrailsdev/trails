@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as ts from "typescript";
-import { methodUsesDepImport } from "./lint-deps.js";
+import { methodUsesDepImport, isImportFromPackage } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
   return ts.createSourceFile("virtual.ts", source, ts.ScriptTarget.Latest, true);
@@ -161,5 +161,24 @@ describe("methodUsesDepImport — lint-deps-ignore annotation", () => {
     expect(methodUsesDepImport(node, new Set(["Nodes"]), new Set(), "arel", sf, anchor)).toBe(
       false,
     );
+  });
+});
+
+describe("isImportFromPackage", () => {
+  const pkg = "@blazetrails/activesupport";
+  it("matches the package root exactly", () => {
+    expect(isImportFromPackage(pkg, pkg)).toBe(true);
+  });
+  it("matches subpath imports", () => {
+    expect(isImportFromPackage(`${pkg}/message-verifier`, pkg)).toBe(true);
+    expect(isImportFromPackage(`${pkg}/temporal`, pkg)).toBe(true);
+  });
+  it("does not match a different package with a shared prefix", () => {
+    expect(isImportFromPackage("@blazetrails/activesupporting", pkg)).toBe(false);
+    expect(isImportFromPackage("@blazetrails/activerecord", pkg)).toBe(false);
+  });
+  it("does not match unrelated specifiers", () => {
+    expect(isImportFromPackage("typescript", pkg)).toBe(false);
+    expect(isImportFromPackage("./local", pkg)).toBe(false);
   });
 });
