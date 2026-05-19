@@ -212,7 +212,7 @@ export class RemoteIp {
     } else if (
       typeof customProxies !== "string" &&
       !(customProxies instanceof String) &&
-      typeof (customProxies as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+      Symbol.iterator in Object(customProxies)
     ) {
       const isEmptyCollection =
         (Array.isArray(customProxies) && customProxies.length === 0) ||

@@ -7,7 +7,7 @@
  * and not part of the public contract.
  */
 
-import { bodyFromString } from "@blazetrails/rack";
+import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
@@ -154,8 +154,8 @@ export class DebugLocks {
     return [
       200,
       {
-        "content-type": `text/plain; charset=${DebugLocks.defaultCharset}`,
-        "content-length": str.length.toString(),
+        [CONTENT_TYPE]: `text/plain; charset=${DebugLocks.defaultCharset}`,
+        [CONTENT_LENGTH]: Buffer.byteLength(str, "utf-8").toString(),
       },
       bodyFromString(str),
     ];

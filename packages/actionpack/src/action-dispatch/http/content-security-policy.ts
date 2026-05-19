@@ -126,11 +126,29 @@ export class ContentSecurityPolicy {
   navigateTo(...sources: CSPSource[]): this {
     return this.setDirective("navigate-to", sources);
   }
-  sandbox(...sources: CSPSource[]): this {
-    return this.setDirective("sandbox", sources);
+  sandbox(...sources: [false] | CSPSource[]): this {
+    // Rails: empty `*values` → bare directive; `values.first` nil/false → delete.
+    // Ruby truthiness only treats nil/false as falsy — empty strings stay truthy.
+    if (sources.length === 0) {
+      this.directives.set("sandbox", []);
+      return this;
+    }
+    const first = sources[0];
+    if (first === false || first == null) {
+      this.directives.delete("sandbox");
+      return this;
+    }
+    return this.setDirective("sandbox", sources as CSPSource[]);
   }
-  pluginTypes(...sources: CSPSource[]): this {
-    return this.setDirective("plugin-types", sources);
+  pluginTypes(...sources: [false] | CSPSource[]): this {
+    // Rails: `if types.first` — only nil/false delete (Ruby truthiness, so
+    // empty string stays truthy and is passed through to the directive).
+    const first = sources[0];
+    if (first === false || first == null) {
+      this.directives.delete("plugin-types");
+      return this;
+    }
+    return this.setDirective("plugin-types", sources as CSPSource[]);
   }
   reportUri(...sources: CSPSource[]): this {
     return this.setDirective("report-uri", sources);
@@ -138,10 +156,19 @@ export class ContentSecurityPolicy {
   reportTo(...sources: CSPSource[]): this {
     return this.setDirective("report-to", sources);
   }
-  blockAllMixedContent(): this {
+  blockAllMixedContent(enabled: boolean | null = true): this {
+    // Rails `if enabled`: only nil/false delete; numeric/empty-string stay truthy.
+    if (enabled === false || enabled == null) {
+      this.directives.delete("block-all-mixed-content");
+      return this;
+    }
     return this.setDirective("block-all-mixed-content", []);
   }
-  upgradeInsecureRequests(): this {
+  upgradeInsecureRequests(enabled: boolean | null = true): this {
+    if (enabled === false || enabled == null) {
+      this.directives.delete("upgrade-insecure-requests");
+      return this;
+    }
     return this.setDirective("upgrade-insecure-requests", []);
   }
   requireSriFor(...sources: CSPSource[]): this {

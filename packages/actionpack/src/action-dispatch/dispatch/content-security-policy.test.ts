@@ -79,6 +79,34 @@ describe("ContentSecurityPolicyTest", () => {
     expect(header).toContain("upgrade-insecure-requests");
   });
 
+  it("block_all_mixed_content false removes the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.blockAllMixedContent();
+    policy.blockAllMixedContent(false);
+    expect(policy.build()).not.toContain("block-all-mixed-content");
+  });
+
+  it("upgrade_insecure_requests false removes the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.upgradeInsecureRequests();
+    policy.upgradeInsecureRequests(false);
+    expect(policy.build()).not.toContain("upgrade-insecure-requests");
+  });
+
+  it("sandbox false removes the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.sandbox("allow-scripts");
+    policy.sandbox(false);
+    expect(policy.build()).not.toContain("sandbox");
+  });
+
+  it("plugin_types false removes the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.pluginTypes("application/x-shockwave-flash");
+    policy.pluginTypes(false);
+    expect(policy.build()).not.toContain("plugin-types");
+  });
+
   it("multiple sources", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'", "https://cdn.example.com", "https://api.example.com");

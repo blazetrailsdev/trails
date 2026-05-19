@@ -53,3 +53,4 @@ export {
   ParamsTooDeepError,
 } from "./utils.js";
 export { BodyProxy } from "./body-proxy.js";
+export { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
