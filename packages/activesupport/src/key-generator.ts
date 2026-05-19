@@ -8,10 +8,12 @@ import { getCrypto } from "./crypto-adapter.js";
 export class KeyGenerator {
   private readonly secret: string;
   private readonly iterations: number;
+  private readonly hashDigestClass: string;
 
-  constructor(secret: string, options: { iterations?: number } = {}) {
+  constructor(secret: string, options: { iterations?: number; hashDigestClass?: string } = {}) {
     this.secret = secret;
     this.iterations = options.iterations ?? 65536;
+    this.hashDigestClass = options.hashDigestClass ?? "sha1";
   }
 
   /**
@@ -19,7 +21,18 @@ export class KeyGenerator {
    * Returns the key as a Buffer.
    */
   generateKey(salt: string, keySize: number = 64): Buffer {
-    return getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, "sha1");
+    return getCrypto().pbkdf2Sync(
+      this.secret,
+      salt,
+      this.iterations,
+      keySize,
+      this.normalizedDigest(),
+    );
+  }
+
+  /** @internal */
+  private normalizedDigest(): string {
+    return this.hashDigestClass.toLowerCase().replace(/-/g, "");
   }
 
   inspect(): string {

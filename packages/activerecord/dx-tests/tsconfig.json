@@ -12,6 +12,7 @@
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/src/message-verifier.ts"
       ],
+      "@blazetrails/activesupport/key-generator": ["../../activesupport/src/key-generator.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/sqlite-adapter": ["../../activesupport/src/sqlite-adapter.ts"],
