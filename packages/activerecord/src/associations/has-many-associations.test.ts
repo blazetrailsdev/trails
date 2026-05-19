@@ -8037,10 +8037,17 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
+const TAIL_PRIMARY_KEYS_SCHEMA: Schema = {
+  cpk_authors: { name: "string" },
+  cpk_posts: { author_id: "integer", title: "string" },
+  cpk_asg_authors: { name: "string" },
+  cpk_asg_posts: { author_id: "integer", title: "string" },
+};
+
 describe("HasManyAssociationsTestPrimaryKeys", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapterWithSchema(TAIL_PRIMARY_KEYS_SCHEMA);
   });
 
   it("has many custom primary key", async () => {
@@ -8089,10 +8096,33 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   });
 });
 
+const TAIL_HMT_SCHEMA: Schema = {
+  no_cb_authors: { name: "string" },
+  no_cb_posts: { author_id: "integer", title: "string" },
+  reset_authors: { name: "string" },
+  reset_posts: { author_id: "integer", title: "string" },
+  del_cc_authors: { name: "string", posts_count: "integer" },
+  del_cc_posts: { author_id: "integer", title: "string" },
+  dep_del_authors: { name: "string" },
+  dep_del_posts: { author_id: "integer", title: "string" },
+  null_authors: { name: "string" },
+  null_posts: { author_id: "integer", title: "string" },
+  one_authors: { name: "string" },
+  one_posts: { author_id: "integer", title: "string" },
+  abs_poly_comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
+  abs_poly_posts: { title: "string" },
+  cust_poly_comments: { body: "string", taggable_id: "integer", taggable_type: "string" },
+  cust_poly_posts: { title: "string" },
+  no_raise_authors: { name: "string" },
+  no_raise_posts: { author_id: "integer", title: "string" },
+  preload_authors: { name: "string" },
+  preload_posts: { author_id: "integer", title: "string" },
+};
+
 describe("HasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapterWithSchema(TAIL_HMT_SCHEMA);
   });
 
   it("do not call callbacks for delete all", async () => {
@@ -8378,10 +8408,15 @@ describe("HasManyAssociationsTest", () => {
   });
 });
 
+const TAIL_ASYNC_SCHEMA: Schema = {
+  async_authors: { name: "string" },
+  async_posts: { author_id: "integer", title: "string" },
+};
+
 describe("AsyncHasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapterWithSchema(TAIL_ASYNC_SCHEMA);
   });
 
   it("async load has many", async () => {
@@ -8411,10 +8446,17 @@ describe("AsyncHasManyAssociationsTest", () => {
   });
 });
 
+const TAIL_HMT2_SCHEMA: Schema = {
+  cn_posts: { title: "string", my_comment_count: "integer" },
+  cn_comments: { body: "string", post_id: "integer" },
+  r_widgets: { name: "string", container_id: "integer" },
+  r_containers: { name: "string" },
+};
+
 describe("HasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeEach(async () => {
+    adapter = await freshAdapterWithSchema(TAIL_HMT2_SCHEMA);
   });
 
   it("custom named counter cache", async () => {
