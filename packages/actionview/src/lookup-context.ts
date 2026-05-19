@@ -21,6 +21,7 @@ import { TemplateHandlerRegistry } from "./template/handlers.js";
 import type { TemplateResolver } from "./template-resolver.js";
 import type { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
+import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
@@ -184,13 +185,30 @@ export class LookupContext {
   private _detailsKey: Requested | null = null;
   private _detailsCache = true;
   private _htmlFallbackForJs = false;
+  private _viewPaths: PathSet;
+  private _detailArgsForAny: [DetailsMap, Requested | null] | null = null;
 
-  constructor(details: DetailsMap = {}, prefixes: string[] = []) {
+  constructor(
+    viewPaths: PathSet | ReadonlyArray<PathSetResolver> | null = null,
+    details: DetailsMap = {},
+    prefixes: string[] = [],
+  ) {
     this._prefixes = prefixes;
-    this._details = {};
+    this._details = this.initializeDetails({}, details);
+    this._viewPaths = this.buildViewPaths(viewPaths);
+  }
+
+  /**
+   * @internal
+   * Populate `target` with the registered detail facets, falling back to
+   * each facet's default proc when `details` doesn't supply a value.
+   * Mirrors `LookupContext#initialize_details`.
+   */
+  initializeDetails(target: DetailsMap, details: DetailsMap): DetailsMap {
     for (const k of REGISTERED_DETAILS) {
-      this._details[k] = details[k] ?? DEFAULT_PROCS[k]();
+      target[k] = details[k] ?? DEFAULT_PROCS[k]();
     }
+    return target;
   }
 
   // --- prefixes ---
@@ -294,6 +312,138 @@ export class LookupContext {
   /** Digest cache scoped to the current details tuple. */
   digestCache(): Map<string, string> {
     return DetailsKey.digestCache(this._details);
+  }
+
+  /**
+   * Return a sibling `LookupContext` whose `formats` detail is replaced
+   * with the given list. Mirrors `LookupContext#with_prepended_formats`.
+   */
+  withPrependedFormats(formats: DetailValue): LookupContext {
+    const details = { ...this._details, formats };
+    return new LookupContext(this._viewPaths, details, this._prefixes);
+  }
+
+  // --- ViewPaths module ---
+  /** Frozen `PathSet` of resolvers used for Rails-shape lookups. */
+  get viewPaths(): PathSet {
+    return this._viewPaths;
+  }
+
+  /**
+   * @internal
+   * Whenever setting view paths, make a copy so we can manipulate them
+   * per-instance without aliasing. Mirrors
+   * `ViewPaths#build_view_paths` (the `String`/`Pathname` wrapping there
+   * is deferred to the resolver port).
+   */
+  buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver> | null): PathSet {
+    if (paths instanceof PathSet) return paths;
+    return new PathSet(paths ?? []);
+  }
+
+  /** Append `paths` to the current view-path set. */
+  appendViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
+    this._viewPaths = this.buildViewPaths([...this._viewPaths.toArray(), ...paths]);
+  }
+
+  /** Prepend `paths` to the current view-path set. */
+  prependViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
+    this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toArray()]);
+  }
+
+  /**
+   * Find one matching template (Rails-shape signature). Aliased as
+   * `findTemplate` for the existing 3-arg call sites.
+   */
+  find(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    partial = false,
+    keys: ReadonlyArray<string> = [],
+    options: Record<string, DetailValue> = {},
+  ): unknown {
+    const [base, pfxs] = this.normalizeName(name, prefixes);
+    const [details, key] = this.detailArgsFor(options);
+    return this._viewPaths.find(base, pfxs, partial, details as never, key, keys);
+  }
+
+  /** Rails-shape `find_all`. */
+  findAll(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    partial = false,
+    keys: ReadonlyArray<string> = [],
+    options: Record<string, DetailValue> = {},
+  ): unknown[] {
+    const [base, pfxs] = this.normalizeName(name, prefixes);
+    const [details, key] = this.detailArgsFor(options);
+    return this._viewPaths.findAll(base, pfxs, partial, details as never, key, keys);
+  }
+
+  /** Rails-shape `exists?` / `template_exists?`. */
+  isExists(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    partial = false,
+    keys: ReadonlyArray<string> = [],
+    options: Record<string, DetailValue> = {},
+  ): boolean {
+    const [base, pfxs] = this.normalizeName(name, prefixes);
+    const [details, key] = this.detailArgsFor(options);
+    return this._viewPaths.exists(base, pfxs, partial, details as never, key, keys);
+  }
+
+  /**
+   * Rails-shape `any?` / `any_templates?` — ignores format/locale/variant
+   * constraints by using `detail_args_for_any`.
+   */
+  isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
+    const [base, pfxs] = this.normalizeName(name, prefixes);
+    const [details, key] = this.detailArgsForAny();
+    return this._viewPaths.exists(base, pfxs, partial, details as never, key, []);
+  }
+
+  /**
+   * @internal
+   * Compute the (details, detailsKey) pair for a lookup. Returns the
+   * memoized request details when `options` is empty (the hot path).
+   */
+  detailArgsFor(options: Record<string, DetailValue>): [DetailsMap, Requested | null] {
+    if (Object.keys(options).length === 0) return [this._details, this.detailsKey()];
+    const userDetails = { ...this._details, ...options };
+    const key = this._detailsCache ? DetailsKey.detailsCacheKey(userDetails) : null;
+    return [userDetails, key];
+  }
+
+  /**
+   * @internal
+   * Details tuple for `any?` lookups — every facet at its default except
+   * `variants`, which is wildcarded.
+   */
+  detailArgsForAny(): [DetailsMap, Requested | null] {
+    if (this._detailArgsForAny) return this._detailArgsForAny;
+    const details: DetailsMap = {};
+    for (const k of REGISTERED_DETAILS) {
+      details[k] = k === "variants" ? ["*"] : DEFAULT_PROCS[k]();
+    }
+    const key = this._detailsCache ? DetailsKey.detailsCacheKey(details) : null;
+    this._detailArgsForAny = [details, key];
+    return this._detailArgsForAny;
+  }
+
+  /**
+   * @internal
+   * Splits a possibly-namespaced template name (`"admin/users/show"`)
+   * into `(name, prefixes)`. Mirrors `ViewPaths#normalize_name`.
+   */
+  normalizeName(name: string, prefixes: ReadonlyArray<string>): [string, ReadonlyArray<string>] {
+    const idx = name.lastIndexOf("/");
+    if (idx < 0) return [name, prefixes.length > 0 ? prefixes : [""]];
+    let pathPrefix = name.slice(0, idx);
+    if (pathPrefix.startsWith("/")) pathPrefix = pathPrefix.slice(1);
+    const base = name.slice(idx + 1);
+    const pfxs = prefixes.length === 0 ? [pathPrefix] : prefixes.map((p) => `${p}/${pathPrefix}`);
+    return [base, pfxs];
   }
 
   /** Add a resolver to the lookup chain. First added = highest priority. */

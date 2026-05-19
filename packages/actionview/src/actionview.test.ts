@@ -543,6 +543,81 @@ describe("ActionView::LookupContext", () => {
       expect(LookupContext.DetailsKey.digestCaches()).toEqual([]);
     });
   });
+
+  describe("ViewPaths protocol (Phase 1d)", () => {
+    const stubResolver = () => {
+      const r = {
+        templates: [] as Array<{ name: string; prefix: string; partial: boolean; t: unknown }>,
+        findAll(name: string, prefix: string, partial: boolean): unknown[] {
+          return this.templates
+            .filter((x) => x.name === name && x.prefix === prefix && x.partial === partial)
+            .map((x) => x.t);
+        },
+      };
+      return r;
+    };
+
+    it("constructor accepts an array of resolvers and exposes viewPaths", () => {
+      const r = stubResolver();
+      const c = new LookupContext([r]);
+      expect(c.viewPaths.size).toBe(1);
+      expect(c.viewPaths.at(0)).toBe(r);
+    });
+
+    it("find / findAll delegate to viewPaths with normalized prefixes", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "show", prefix: "users", partial: false, t: { id: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.findAll("users/show", [], false)).toEqual([{ id: 1 }]);
+      expect(c.find("users/show", [], false)).toEqual({ id: 1 });
+    });
+
+    it("isExists returns true/false based on viewPaths matches", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "form", prefix: "users", partial: true, t: { p: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.isExists("form", ["users"], true)).toBe(true);
+      expect(c.isExists("missing", ["users"], true)).toBe(false);
+    });
+
+    it("isAny uses default details and ignores format constraints", () => {
+      const r = stubResolver();
+      r.templates.push({ name: "index", prefix: "posts", partial: false, t: { p: 1 } });
+      const c = new LookupContext([r]);
+      expect(c.isAny("index", ["posts"], false)).toBe(true);
+    });
+
+    it("appendViewPaths / prependViewPaths rebuild the PathSet", () => {
+      const a = stubResolver();
+      const b = stubResolver();
+      const c = new LookupContext([a]);
+      c.appendViewPaths([b]);
+      expect(c.viewPaths.at(1)).toBe(b);
+      c.prependViewPaths([b]);
+      expect(c.viewPaths.at(0)).toBe(b);
+    });
+
+    it("withPrependedFormats returns sibling with overridden formats", () => {
+      const c = new LookupContext();
+      const next = c.withPrependedFormats(["json"]);
+      expect(Array.from(next.formats)).toEqual(["json"]);
+      expect(Array.from(c.formats)).not.toEqual(["json"]);
+    });
+
+    it("detailArgsFor returns memoized details when options is empty", () => {
+      const c = new LookupContext();
+      const [d1] = c.detailArgsFor({});
+      const [d2] = c.detailArgsFor({});
+      expect(d1).toBe(d2);
+    });
+
+    it("detailArgsFor merges options without mutating instance details", () => {
+      const c = new LookupContext();
+      const [details] = c.detailArgsFor({ formats: ["json"] });
+      expect(Array.from(details.formats)).toEqual(["json"]);
+      expect(Array.from(c.formats)).not.toEqual(["json"]);
+    });
+  });
 });
 
 // ==========================================================================
