@@ -81,7 +81,12 @@ jobs:
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
-          elif ! files=$(git diff --name-only "$base" "$head" 2>/dev/null); then
+          # Triple-dot: diff against the merge-base of $base and $head, not
+          # against the current tip of the base branch. Using `$base $head`
+          # would also include every commit merged to main since this branch
+          # diverged, inflating the changed-files list with unrelated paths
+          # and triggering gates that shouldn't fire.
+          elif ! files=$(git diff --name-only "$base"..."$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
