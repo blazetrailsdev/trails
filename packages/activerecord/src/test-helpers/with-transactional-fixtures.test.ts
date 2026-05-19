@@ -171,6 +171,43 @@ describe("withTransactionalFixtures (defineSchema signature cache invalidation)"
   });
 });
 
+// The signature-cache invalidation must NOT discard entries created
+// outside the rolled-back test transaction (e.g. tables registered in
+// `beforeAll`). For raw adapters, defineSchema treats a missing
+// signature as "table doesn't exist" — wiping the whole map would cause
+// a follow-up `defineSchema(adapter, sameSpec)` to CREATE TABLE over
+// the still-existing beforeAll table and fail.
+describe("withTransactionalFixtures (preserves beforeAll signatures across rollback)", () => {
+  let adapter: SQLite3Adapter;
+
+  beforeAll(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+    // Outer-transaction table — must survive rollback in afterEach.
+    await defineSchema(adapter, { outer_table: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("test adds an inner table via defineSchema", async () => {
+    await defineSchema(adapter, {
+      outer_table: { name: "string" },
+      inner_table: { label: "string" },
+    });
+  });
+
+  it("next test re-calls defineSchema with the same beforeAll spec — must be a no-op", async () => {
+    // If the signature cache were fully wiped, this call would treat
+    // outer_table as new and try to CREATE TABLE over the live table.
+    await defineSchema(adapter, { outer_table: { name: "string" } });
+    const cols = await adapter.columns("outer_table");
+    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
+  });
+});
+
 // Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
 // raw DatabaseAdapter directly instead of going through createTestAdapter().
 // The helper must accept that shape — `transactionManager` lives on the

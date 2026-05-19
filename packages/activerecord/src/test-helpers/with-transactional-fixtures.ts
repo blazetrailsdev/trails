@@ -7,7 +7,10 @@ import {
   resetTestAdapterState,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
-import { _clearAppliedSchemaSignaturesForAdapter } from "./define-schema.js";
+import {
+  _restoreAppliedSchemaSignaturesForAdapter,
+  _snapshotAppliedSchemaSignaturesForAdapter,
+} from "./define-schema.js";
 
 interface TxnHost {
   transactionManager: {
@@ -62,13 +65,13 @@ function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
   const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
   const host = (wrapped ?? adapter) as { schemaCache?: { clear?: () => void } };
   host.schemaCache?.clear?.();
-  // Also drop the parallel per-adapter signature cache maintained by
-  // `defineSchema`. If a test calls `defineSchema(...)` inside an `it()`
-  // body, the rollback reverts the table at the DB but the signature cache
-  // would otherwise still claim "we created this table" — causing the next
-  // test's `defineSchema` call to skip recreating it.
-  _clearAppliedSchemaSignaturesForAdapter(adapter);
-  if (wrapped) _clearAppliedSchemaSignaturesForAdapter(wrapped);
+}
+
+function adapterAndInner(
+  adapter: TransactionalFixturesAdapter,
+): readonly [DatabaseAdapter, DatabaseAdapter | null] {
+  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter ?? null;
+  return [adapter as DatabaseAdapter, wrapped];
 }
 
 /**
@@ -134,6 +137,13 @@ function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
  */
 export function withTransactionalFixtures(getAdapter: () => TransactionalFixturesAdapter): void {
   let active = true;
+  // Snapshots of defineSchema's per-adapter signature cache taken at the
+  // start of each test. On rollback we restore — preserving signatures for
+  // tables created outside the test transaction (e.g. in `beforeAll`) while
+  // discarding signatures for any `defineSchema(...)` that ran inside the
+  // `it()` body (whose DDL was rolled back at the DB).
+  let outerSig: Map<string, string> | null = null;
+  let innerSig: Map<string, string> | null = null;
 
   beforeAll(() => {
     active = getUseTransactionalTests(getAdapter());
@@ -151,6 +161,9 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
 
   beforeEach(async () => {
     if (!active) return;
+    const [outer, inner] = adapterAndInner(getAdapter());
+    outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
+    innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
     // Mirrors Rails ConnectionPool#pin_connection!:
     //   @pinned_connection.begin_transaction joinable: false, _lazy: false
     await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
@@ -161,5 +174,10 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
     const t = tm(getAdapter());
     while (t.openTransactions > 0) await t.rollbackTransaction();
     clearSchemaCache(getAdapter());
+    const [outer, inner] = adapterAndInner(getAdapter());
+    if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
+    if (inner && innerSig) _restoreAppliedSchemaSignaturesForAdapter(inner, innerSig);
+    outerSig = null;
+    innerSig = null;
   });
 }
