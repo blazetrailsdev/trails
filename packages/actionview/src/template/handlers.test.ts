@@ -12,6 +12,22 @@ function makeHandler(extensions: string[]): TemplateHandler {
 describe("Template::Handlers", () => {
   afterEach(() => TemplateHandlers.clear());
 
+  it("registers a handler for multiple extensions variadically", () => {
+    const h = makeHandler(["tsx", "jsx"]);
+    TemplateHandlers.registerTemplateHandler("tsx", "jsx", h);
+
+    expect(TemplateHandlers.registeredTemplateHandler("tsx")).toBe(h);
+    expect(TemplateHandlers.registeredTemplateHandler("jsx")).toBe(h);
+  });
+
+  it("registerTemplateHandler throws when no extension is supplied", () => {
+    expect(() =>
+      (TemplateHandlers.registerTemplateHandler as unknown as (h: TemplateHandler) => void)(
+        makeHandler([]),
+      ),
+    ).toThrow(/Extension is required/);
+  });
+
   it("registers and looks up handlers by extension", () => {
     const h = makeHandler(["ejs"]);
     TemplateHandlers.registerTemplateHandler("ejs", h);

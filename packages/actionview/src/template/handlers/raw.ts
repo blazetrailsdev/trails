@@ -13,7 +13,21 @@ import type { RenderContext, TemplateHandler } from "../handlers.js";
 export class Raw implements TemplateHandler {
   readonly extensions = ["raw", "txt", "html", "ruby"];
 
-  render(source: string, _locals: Record<string, unknown>, _context: RenderContext): string {
+  /**
+   * Rails-named entry point mirroring `Raw#call(template, source)`. The
+   * Rails implementation returns `"#{source.inspect}.html_safe;"` — a code
+   * fragment evaluated against the compiled template's binding. The TS
+   * port short-circuits the codegen step and returns the source directly,
+   * since downstream rendering already treats handler output as html-safe.
+   *
+   * @param _template Unused; mirrors Rails' positional `template` argument.
+   * @param source The raw template source.
+   */
+  call(_template: unknown, source: string): string {
     return source;
+  }
+
+  render(source: string, _locals: Record<string, unknown>, _context: RenderContext): string {
+    return this.call(undefined, source);
   }
 }

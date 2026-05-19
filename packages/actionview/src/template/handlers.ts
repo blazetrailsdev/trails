@@ -63,13 +63,17 @@ let cachedExtensions: string[] | null = null;
  */
 export const TemplateHandlers = {
   /**
-   * Register an object that knows how to handle template files with the
-   * given extension. The handler must implement {@link TemplateHandler}.
-   *
-   * Rails: `register_template_handler(*extensions, handler)`.
+   * Register an object that knows how to handle template files with one or
+   * more extensions. The handler must implement {@link TemplateHandler}.
+   * Rails: `register_template_handler(*extensions, handler)` — variadic
+   * extensions with the handler as the trailing argument. Raises
+   * `ArgumentError` (here, a plain `Error`) when no extension is supplied.
    */
-  registerTemplateHandler(extension: string, handler: TemplateHandler): void {
-    handlers.set(extension, handler);
+  registerTemplateHandler(...extensionsAndHandler: [...string[], TemplateHandler]): void {
+    const handler = extensionsAndHandler[extensionsAndHandler.length - 1] as TemplateHandler;
+    const extensions = extensionsAndHandler.slice(0, -1) as string[];
+    if (extensions.length === 0) throw new Error("Extension is required");
+    for (const extension of extensions) handlers.set(extension, handler);
     cachedExtensions = null;
   },
 
