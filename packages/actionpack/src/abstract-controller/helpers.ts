@@ -96,8 +96,17 @@ export function _helpers(
   value?: HelperMethodsModule | null,
 ): HelperMethodsModule | void {
   if (clsOrValue && arguments.length >= 2) {
-    // `_helpers=` writer
-    clsOrValue._helpers = value ?? undefined;
+    // `_helpers=` writer. Rails' redefined reader treats a nil slot as
+    // "fall through to superclass" (`@_helpers ||= nil; superclass._helpers`),
+    // and `Helpers.inherited` calls `klass._helpers = nil` to re-enable
+    // that fallback on subclasses. Assigning `undefined` would create an
+    // own property that shadows the prototype chain; instead delete the
+    // own slot so JS prototype lookup walks to the parent class.
+    if (value == null) {
+      delete (clsOrValue as { _helpers?: HelperMethodsModule })._helpers;
+    } else {
+      clsOrValue._helpers = value;
+    }
     return;
   }
   if (clsOrValue) {
