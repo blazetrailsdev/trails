@@ -6,12 +6,12 @@
  * autosave-skip guarantee. Mirrors selected scenarios from
  * vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasManyThrough } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   nta_authors: { name: "string" },
@@ -32,14 +32,14 @@ const TEST_SCHEMA: Schema = {
   nse_drink_designers: { name: "string" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("HMT Slot E — nested-through advanced", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class NtaAuthor extends Base {
     static {
@@ -69,7 +69,7 @@ describe("HMT Slot E — nested-through advanced", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     NtaAuthor.adapter = adapter;
     NtaPost.adapter = adapter;
@@ -118,6 +118,7 @@ describe("HMT Slot E — nested-through advanced", () => {
       scope: (rel: any) => rel.distinct(),
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   async function seedSharedTag() {
     const author = await NtaAuthor.create({ name: "David" });

@@ -26,15 +26,15 @@
  * Mirrors selected scenarios from
  * vendor/rails/activerecord/test/cases/associations/nested_through_associations_test.rb.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, registerSubclass, enableSti } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("HMT Slot D — nested-through preloader / STI / joins+includes", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class NtdAuthor extends Base {
     static {
@@ -70,7 +70,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
   enableSti(NtdRating);
   registerSubclass(NtdHighRating);
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       ntd_authors: { name: "string" },
@@ -120,6 +120,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
       source: "ntdRatings",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   async function seed() {
     const a = await NtdAuthor.create({ name: "a" });

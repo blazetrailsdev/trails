@@ -1,10 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_one_through_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import {
   Associations,
   loadHasOne,
@@ -71,14 +71,14 @@ const TEST_SCHEMA: Schema = {
   },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("HasOneThroughAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Club extends Base {
     static {
@@ -100,7 +100,7 @@ describe("HasOneThroughAssociationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     Club.adapter = adapter;
     Membership.adapter = adapter;
@@ -129,6 +129,7 @@ describe("HasOneThroughAssociationsTest", () => {
 
     Associations.belongsTo.call(Membership, "club", { className: "Club", foreignKey: "club_id" });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("has one through with has one", async () => {
     // member -> membership -> club

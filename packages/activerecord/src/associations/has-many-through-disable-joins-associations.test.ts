@@ -1,10 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_many_through_disable_joins_associations_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { Associations, association, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
@@ -52,14 +52,14 @@ function djasScope(owner: Base, assocName: string): any {
   });
 }
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class DjAuthor extends Base {
     static {
@@ -110,7 +110,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     }
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
     DjAuthor.adapter = adapter;
     DjPost.adapter = adapter;
@@ -286,6 +286,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       foreignKey: "dj_member_type_id",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   async function setupData() {
     const author = await DjAuthor.create({ name: "Mary" });

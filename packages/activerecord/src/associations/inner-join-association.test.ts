@@ -2,13 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   authors: { name: "string" },
@@ -23,17 +23,18 @@ const TEST_SCHEMA: Schema = {
   habtm_posts_habtm_tags: { habtm_post_id: "integer", habtm_tag_id: "integer" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
+async function freshAdapter(): Promise<TestDatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("InnerJoinAssociationTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModels() {
     class Author extends Base {
@@ -225,7 +226,7 @@ describe("InnerJoinAssociationTest", () => {
   });
 
   it("find with sti join", async () => {
-    const a = await freshAdapter();
+    const a = adapter;
     class Comment extends Base {
       static {
         this.attribute("body", "string");
