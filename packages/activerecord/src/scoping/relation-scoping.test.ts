@@ -269,17 +269,13 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoped find select", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs scoping + select interaction */
+    // BLOCKED: select narrowing of loaded attributes — hasAttribute() does not
+    // reflect the projected column set; depends on attribute-set materialization
+    // from result rows rather than from the schema declaration.
   });
 
   it.skip("scope select concatenates", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* select overwrites instead of concatenating */
+    // BLOCKED: select narrowing of loaded attributes — see "scoped find select".
   });
 
   it("scoped count", async () => {
@@ -328,11 +324,20 @@ describe("RelationScopingTest", () => {
     expect(unscopedSql).toContain("SELECT");
   });
 
-  it.skip("find with annotation unscope", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs unscope(:annotate) */
+  it("find with annotation unscope", async () => {
+    class AnnUnscopePost extends Base {
+      static {
+        this._tableName = "ann_posts";
+        this.attribute("title", "string");
+        this.adapter = adapter;
+      }
+    }
+    await AnnUnscopePost.create({ title: "David" });
+    const rel = AnnUnscopePost.annotate("unscope").where({ title: "David" }).unscope("annotate");
+    expect(rel.toSql()).not.toContain("/* unscope */");
+    const post = (await rel.first()) as Base | null;
+    expect(post).not.toBeNull();
+    expect(post!.title).toBe("David");
   });
 
   it.skip("scoped find include", () => {
@@ -486,10 +491,9 @@ describe("RelationScopingTest", () => {
   });
 
   it.skip("scoping respects sti constraint", () => {
-    // BLOCKED: relation — relation scoping feature gap
-    // ROOT-CAUSE: relation/scoping.ts#scopeFor or Relation#scoped missing Rails parity
-    // SCOPE: ~50 LOC in relation/scoping.ts; affects ~28 tests in relation-scoping.test.ts
-    /* needs STI + scoping interaction */
+    // BLOCKED: STI find — subclass `find(id)` does not enforce the type
+    // constraint at query time, so `SpecialComment.find(id_of_plain)` returns
+    // a record instead of raising RecordNotFound.
   });
 
   it("scoping with klass method works in the scope block", async () => {
