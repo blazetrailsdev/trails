@@ -364,7 +364,12 @@ export function realCsrfToken(controller: CsrfController, _session?: unknown): B
   const env = (controller.request.env ??= {});
   let encoded = env[CSRF_TOKEN_ENV_KEY] as string | undefined;
   if (encoded == null) {
-    encoded = controller.csrfTokenStorageStrategy?.fetch(controller) ?? generateCsrfToken();
+    // Rails: csrf_token_storage_strategy defaults to SessionStore.new at the
+    // class level (line 100 of request_forgery_protection.rb); mirror that
+    // here so a session-backed controller without explicit config still
+    // verifies tokens against its session-stored real token.
+    const strategy = (controller.csrfTokenStorageStrategy ??= storageStrategy("session"));
+    encoded = strategy.fetch(controller) ?? generateCsrfToken();
     env[CSRF_TOKEN_ENV_KEY] = encoded;
   }
   return decodeCsrfToken(encoded);
@@ -457,9 +462,8 @@ export function isValidPerFormCsrfToken(
   session?: unknown,
 ): boolean {
   if (!c.perFormCsrfTokens) return false;
-  const rawPath = c.request.path ?? "/";
-  // Rails: request.path.chomp("/") — strips a single trailing slash only.
-  const path = rawPath.length > 1 && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
+  // Rails: request.path.chomp("/") — strips a single trailing slash, so "/" → "".
+  const path = (c.request.path ?? "").replace(/\/$/, "");
   const method = c.request.requestMethod ?? c.request.method;
   return compareBuffers(token, perFormCsrfToken(c, session, path, method));
 }
@@ -552,7 +556,8 @@ export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): 
 export function normalizeRelativeActionPath(relActionPath: string, requestPath: string): string {
   let path = requestPath + "/" + relActionPath;
   path = path.replace(/\/\.\//g, "/");
-  return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
+  // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
+  return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 /** @internal */
@@ -573,5 +578,6 @@ export function normalizeActionPath(actionPath: string, requestPath: string): st
   } catch {
     parsedPath = actionPath;
   }
-  return parsedPath.endsWith("/") && parsedPath.length > 1 ? parsedPath.slice(0, -1) : parsedPath;
+  // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
+  return parsedPath.endsWith("/") ? parsedPath.slice(0, -1) : parsedPath;
 }
