@@ -2,13 +2,13 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } from "./index.js";
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
 const TEST_SCHEMA: Schema = {
   vehicles: {
@@ -48,18 +48,17 @@ const TEST_SCHEMA: Schema = {
 };
 
 // -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
+async function freshAdapter(): Promise<DatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
 }
 
 describe("InheritanceTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeHierarchy() {
     class Vehicle extends Base {
@@ -1535,11 +1534,10 @@ describe("InheritanceTest", () => {
 });
 
 describe("InheritanceComputeTypeTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   function makeHierarchy() {
     class Vehicle extends Base {
@@ -1619,12 +1617,11 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("STI", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("subclasses share the parent table", () => {
     class Vehicle extends Base {
@@ -1718,12 +1715,11 @@ describe("STI", () => {
 });
 
 describe("STI (Rails-guided)", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   // Rails: test "subclass uses parent table"
   it("subclass inherits the base table name", () => {

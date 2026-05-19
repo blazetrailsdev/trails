@@ -2,12 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound, SoleRecordExceeded } from "./index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import type { DatabaseAdapter } from "./adapter.js";
 
 const TEST_SCHEMA = {
   topics: {
@@ -39,7 +39,7 @@ const TEST_SCHEMA = {
 } as const;
 
 // -- Helpers --
-async function freshAdapter(): Promise<TestDatabaseAdapter> {
+async function freshAdapter(): Promise<DatabaseAdapter> {
   const adapter = createTestAdapter();
   await defineSchema(adapter, TEST_SCHEMA);
   return adapter;
@@ -49,12 +49,11 @@ async function freshAdapter(): Promise<TestDatabaseAdapter> {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("exists", async () => {
     class Topic extends Base {
@@ -2465,21 +2464,19 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
   let Post: typeof Base;
-  beforeAll(async () => {
-    adapter = await freshAdapter();
+  beforeEach(async () => {
+    const adp = await freshAdapter();
     class PostClass extends Base {
       static {
         this.tableName = "posts";
-        this.adapter = adapter;
+        this.adapter = adp;
         this.attribute("title", "string");
         this.attribute("body", "string");
       }
     }
     Post = PostClass;
   });
-  withTransactionalFixtures(() => adapter);
 
   it("find by empty in condition", async () => {
     await Post.create({ title: "a" });
@@ -2739,11 +2736,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("sole() returns the only matching record", async () => {
     class Item extends Base {
@@ -2823,11 +2819,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("returns the sole matching record", async () => {
     class Item extends Base {
@@ -2857,11 +2852,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("accepts conditions hash", async () => {
     class Item extends Base {
@@ -2891,11 +2885,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("second() returns the second record", async () => {
     class Item extends Base {
@@ -3154,7 +3147,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -3164,14 +3157,13 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
     User.adapter = adapter;
     await User.create({ name: "Alice", email: "alice@test.com", age: 25 });
     await User.create({ name: "Bob", email: "bob@test.com", age: 30 });
     await User.create({ name: "Charlie", email: "charlie@test.com", age: 35 });
   });
-  withTransactionalFixtures(() => adapter);
 
   it("find by primary key", async () => {
     const found = await User.find(1);
@@ -3378,7 +3370,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
   class Bird extends Base {
     static {
@@ -3387,11 +3379,10 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
     Bird.adapter = adapter;
   });
-  withTransactionalFixtures(() => adapter);
 
   it("find_or_create_by finds existing", async () => {
     await Bird.create({ name: "Parrot", color: "green" });
@@ -3430,7 +3421,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -3440,11 +3431,10 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
     User.adapter = adapter;
   });
-  withTransactionalFixtures(() => adapter);
 
   // Rails: test_find_with_array_of_ids
   it("find with single id returns instance", async () => {
@@ -3499,11 +3489,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("finds a record by a single attribute", async () => {
     class User extends Base {
@@ -3534,11 +3523,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("returns true for valid dynamic finders", () => {
     class User extends Base {
@@ -3567,11 +3555,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("first(n) returns array of n records", async () => {
     class User extends Base {
@@ -3605,11 +3592,10 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
     adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("find with multiple IDs", async () => {
     class User extends Base {
@@ -3650,7 +3636,7 @@ describe("FinderTest", () => {
   });
 });
 describe("FinderTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: DatabaseAdapter;
 
   class User extends Base {
     static {
@@ -3660,14 +3646,13 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     adapter = await freshAdapter();
     User.adapter = adapter;
     await User.create({ name: "Alice", email: "alice@test.com", age: 30 });
     await User.create({ name: "Bob", email: "bob@test.com", age: 25 });
     await User.create({ name: "Charlie", email: "charlie@test.com", age: 35 });
   });
-  withTransactionalFixtures(() => adapter);
 
   describe("find", () => {
     it("finds by single id", async () => {
