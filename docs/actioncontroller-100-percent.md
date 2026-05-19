@@ -200,29 +200,27 @@ Sequencing rules:
 
 ### Wave 0 — single-file peripherals
 
-| PR  | Rails file                | Missing | TS file (api:compare row) | Methods                                                                                                                                                                             |
-| --- | ------------------------- | ------: | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P3  | `form_builder.rb`         |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                                      |
-| P4  | `metal/data_streaming.rb` |       1 | `metal/data-streaming.ts` | `sendFileHeadersBang` (`send_file_headers!`). Refactor existing `send_file`/`send_data` to delegate. RFC 6266 with both `filename="..."` ASCII fallback and `filename*=UTF-8''...`. |
-| P7  | `metal/renderers.rb`      |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve.          |
-| P9  | `deprecator.rb`           |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                          |
+| PR  | Rails file | Missing | TS file (api:compare row) | Methods |
+| --- | ---------- | ------: | ------------------------- | ------- |
+
+All Wave 0 rows shipped: P3 (#1944), P4 (#1945 + #2013), P7 (#1946), P9 (#1944).
 
 ### Wave 1 — small bundle peripherals
 
 Ship after Wave 0 lands. One PR per row.
 
-| PR  | Rails file                           | Missing | Notes                                                                                                                                             |
-| --- | ------------------------------------ | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P10 | `metal/content_security_policy.rb`   |       4 | `isContentSecurityPolicy?`, `currentContentSecurityPolicy`, `contentSecurityPolicy`, `contentSecurityPolicyReportOnly` — class DSL.               |
-| P11 | `metal/etag_with_template_digest.rb` |       3 | `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate`. Depends on actionview digestor — stub if not yet ported, document gap. |
-| P12 | `metal/helpers.rb`                   |       5 | `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers`. Requires actionview helper integration.                     |
+| PR      | Rails file                             | Missing | Notes                                                                                                                                             |
+| ------- | -------------------------------------- | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~P10~~ | ~~`metal/content_security_policy.rb`~~ |   ~~4~~ | Shipped #1948 + #1952.                                                                                                                            |
+| P11     | `metal/etag_with_template_digest.rb`   |       3 | `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate`. Depends on actionview digestor — stub if not yet ported, document gap. |
+| P12     | `metal/helpers.rb`                     |       5 | `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers`. Requires actionview helper integration.                     |
 
 ### Wave 2 — medium peripherals
 
-| PR  | Rails file                           | Missing | Notes                                                                                                                                                                   |
-| --- | ------------------------------------ | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P14 | `metal/redirecting.rb` (privates)    |       6 | `_computeRedirectToLocation`, `_allowOtherHost`, `_extractRedirectToStatus`, `_enforceOpenRedirectProtection`, `_isUrlHostAllowed`, `_ensureUrlIsHttpHeaderSafe`.       |
-| P15 | `metal/params_wrapper.rb` (privates) |       8 | `_defaultWrapModel`, `_wrapperKey`, `_wrapperFormats`, `_wrapParameters`, `_extractParameters`, `_isWrapperEnabled`, `_performParameterWrapping`, `_setWrapperOptions`. |
+| PR  | Rails file | Missing | Notes |
+| --- | ---------- | ------: | ----- |
+
+Wave 2 rows shipped: P14 (#1949), P15 (#1950 + #2033).
 
 ### Wave 3 — split-file PRs
 
@@ -231,26 +229,26 @@ the same TS file, so ship them in alphabetical order (a → b → c).
 
 #### `metal/http_authentication.rb` (33 missing) — `metal/http-authentication.ts`
 
-| PR   | Module   | Missing | Methods                                                                                                                                                                                                                 |
-| ---- | -------- | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P17a | `Basic`  |      13 | `authenticate`, `hasBasicCredentials`, `userNameAndPassword`, `decodeCredentials`, `authScheme`, `authParam`, `encodeCredentials`, `authenticationRequest` + 5 controller-side helpers (`httpBasicAuthenticate*` etc.). |
-| P17b | `Digest` |      12 | `validateDigestResponse`, `expectedResponse`, `ha1`, `decodeCredentialsHeader`, `authenticationHeader`, `secretToken`, `nonce`, `validateNonce`, `opaque` + 3 controller-side helpers.                                  |
-| P17c | `Token`  |       8 | `tokenAndOptions`, `tokenParamsFrom`, `paramsArrayFrom`, `rewriteParamValues`, `rawParams` + 3 controller-side helpers.                                                                                                 |
+| PR       | Module      | Missing | Methods                                                                                                                                                                                |
+| -------- | ----------- | ------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~P17a~~ | ~~`Basic`~~ |  ~~13~~ | Shipped #1970.                                                                                                                                                                         |
+| P17b     | `Digest`    |      12 | `validateDigestResponse`, `expectedResponse`, `ha1`, `decodeCredentialsHeader`, `authenticationHeader`, `secretToken`, `nonce`, `validateNonce`, `opaque` + 3 controller-side helpers. |
+| P17c     | `Token`     |       8 | `tokenAndOptions`, `tokenParamsFrom`, `paramsArrayFrom`, `rewriteParamValues`, `rawParams` + 3 controller-side helpers.                                                                |
 
 #### `metal/live.rb` (22 missing) — `metal/live.ts`
 
-| PR   | Subject              | Missing | Methods                                                                                                                                                                                                         |
-| ---- | -------------------- | ------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P18a | `Live::Buffer` class |      12 | `performWrite`, `queueSize`, `ignoreDisconnect`, `writeln`, `abort`, `isConnected`, `onError`, `callOnError`, `eachChunk`, `buildQueue`, `beforeCommitted`, `buildBuffer`.                                      |
-| P18b | `Live` mixin         |      10 | `process`, `responseBody=`, `sendStream`, `newControllerThread`, `cleanUpThreadLocals`, `logError`, `originalNewControllerThread`, `originalCleanUpThreadLocals`, `liveThreadPoolExecutor`, `makeResponseBang`. |
+| PR  | Subject | Missing | Methods |
+| --- | ------- | ------: | ------- |
+
+`metal/live.rb` shipped: P18a (#1985), P18b (#2004).
 
 #### `metal/request_forgery_protection.rb` (31 missing) — `metal/request-forgery-protection.ts`
 
-| PR   | Subject                              | Missing | Methods                                                                                                                                                                                                                                                                                             |
-| ---- | ------------------------------------ | ------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P20a | Verification predicates              |      10 | `isVerifiedRequest`, `verifySameOriginRequest`, `markForSameOriginVerificationBang`, `isMarkedForSameOriginVerification`, `isNonXhrJavascriptResponse`, `isValidRequestOrigin`, `isProtectAgainstForgery`, `unverifiedRequestWarningMessage`, `normalizeActionPath`, `normalizeRelativeActionPath`. |
-| P20b | Token generation/encoding            |      11 | `generateCsrfToken`, `encodeCsrfToken`, `decodeCsrfToken`, `maskToken`, `unmaskToken`, `maskedAuthenticityToken`, `realCsrfToken`, `perFormCsrfToken`, `globalCsrfToken`, `csrfTokenHmac`, `xorByteStrings`.                                                                                        |
-| P20c | Token validation + strategy plumbing |      10 | `isAnyAuthenticityTokenValid`, `requestAuthenticityTokens`, `isValidAuthenticityToken`, `isValidPerFormCsrfToken`, `compareWithRealToken`, `compareWithGlobalToken`, `formAuthenticityParam`, `protectionMethodClass`, `storageStrategy`, `isIsStorageStrategy`.                                    |
+| PR       | Subject                              | Missing | Methods        |
+| -------- | ------------------------------------ | ------: | -------------- |
+| ~~P20a~~ | Verification predicates              |      10 | Shipped #1988. |
+| ~~P20b~~ | Token generation/encoding            |      11 | Shipped #2003. |
+| ~~P20c~~ | Token validation + strategy plumbing |      10 | Shipped #2003. |
 
 #### `test_case.rb` (36 missing) — `test-case.ts`
 
