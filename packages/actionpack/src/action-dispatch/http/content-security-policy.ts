@@ -46,7 +46,6 @@ export type CSPSource = CspSymbol | (string & {}) | ((request?: unknown) => stri
  */
 export const DEFAULT_NONCE_DIRECTIVES = ["script-src", "style-src"] as const;
 
-
 type DirectiveName = string;
 
 /**
