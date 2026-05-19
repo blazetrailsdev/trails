@@ -613,11 +613,16 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      posts: { author_id: "integer", title: "string" },
+    });
   });
+  withTransactionalFixtures(() => adapter);
 
   // -- Counting --
 
@@ -1006,6 +1011,14 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(posts.length).toBe(1);
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  let adapter: DatabaseAdapter;
+
+  beforeEach(() => {
+    adapter = freshAdapter();
   });
 
   // -- Destroying --
