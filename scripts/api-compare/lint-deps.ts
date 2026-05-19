@@ -128,6 +128,120 @@ function collectRubyDepMethods(ruby: ApiManifest, pkg: string, dep: string): Rub
 
 type TsDepMap = Map<string, Map<string, boolean>>; // file -> method -> usesDep
 
+function isPkgSourceFile(sf: ts.SourceFile, pkgSrcDir: string): boolean {
+  return (
+    sf.fileName.startsWith(pkgSrcDir) &&
+    !sf.fileName.endsWith(".test.ts") &&
+    !sf.fileName.endsWith(".d.ts")
+  );
+}
+
+export function collectDirectImports(sf: ts.SourceFile, tsImport: string): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
+    if (!isImportFromPackage(specifier, tsImport)) continue;
+    const clause = stmt.importClause;
+    if (!clause) continue;
+    if (clause.name) names.add(clause.name.text);
+    if (clause.namedBindings) {
+      if (ts.isNamedImports(clause.namedBindings)) {
+        for (const el of clause.namedBindings.elements) names.add(el.name.text);
+      } else if (ts.isNamespaceImport(clause.namedBindings)) {
+        names.add(clause.namedBindings.name.text);
+      }
+    }
+  }
+  return names;
+}
+
+// Visits every top-level "taint candidate" — a binding whose body or
+// initializer could (transitively) use the dep, making the binding
+// itself a wrapper that callers should inherit credit from.
+//
+// Includes non-exported helpers because a same-file caller can still
+// reach them, and value-initialized constants (e.g. `const booleanType =
+// new BooleanType()`) so that methods referencing the constant by name
+// get credited too.
+function visitTopLevelTaintCandidates(
+  sf: ts.SourceFile,
+  callback: (name: ts.Identifier, body: ts.Node, anchor: ts.Node) => void,
+) {
+  for (const stmt of sf.statements) {
+    if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) {
+      callback(stmt.name, stmt, stmt);
+    } else if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name) && decl.initializer) {
+          callback(decl.name, decl.initializer, stmt);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Find top-level functions in the package whose bodies (transitively)
+ * reference tsImport. These act as "wrappers" — a method that calls
+ * `executionContextId()` should get credit for using activesupport because
+ * `executionContextId`'s body calls `getAsyncContext()`.
+ *
+ * Runs to a fixed point so multi-level wrappers propagate.
+ */
+export function collectTaintedSymbols(
+  program: ts.Program,
+  pkgSrcDir: string,
+  tsImport: string,
+  tsIdentifiers: string[],
+  dep: string,
+): Set<ts.Symbol> {
+  const checker = program.getTypeChecker();
+  const knownIds = new Set(tsIdentifiers);
+  const tainted = new Set<ts.Symbol>();
+  const directCache = new Map<ts.SourceFile, Set<string>>();
+  const getDirect = (sf: ts.SourceFile): Set<string> => {
+    let s = directCache.get(sf);
+    if (!s) {
+      s = collectDirectImports(sf, tsImport);
+      directCache.set(sf, s);
+    }
+    return s;
+  };
+
+  type Candidate = { sf: ts.SourceFile; name: ts.Identifier; body: ts.Node; anchor: ts.Node };
+  const candidates: Candidate[] = [];
+  for (const sf of program.getSourceFiles()) {
+    if (!isPkgSourceFile(sf, pkgSrcDir)) continue;
+    visitTopLevelTaintCandidates(sf, (name, body, anchor) => {
+      candidates.push({ sf, name, body, anchor });
+    });
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const { sf, name, body, anchor } of candidates) {
+      const sym = checker.getSymbolAtLocation(name);
+      if (!sym || tainted.has(sym)) continue;
+      if (
+        methodUsesDepImport(body, getDirect(sf), knownIds, dep, sf, anchor, {
+          checker,
+          taintedSymbols: tainted,
+          // A lint-deps-ignore opt-out should not taint the wrapper —
+          // otherwise an "uses raw SQL; no Arel needed" helper would
+          // grant credit to every caller and hide real violations.
+          skipIgnoreAnnotation: true,
+        })
+      ) {
+        tainted.add(sym);
+        changed = true;
+      }
+    }
+  }
+  return tainted;
+}
+
 function analyzeTsDepUsage(
   pkgSrcDir: string,
   tsImport: string,
@@ -148,40 +262,20 @@ function analyzeTsDepUsage(
     noEmit: true,
   });
 
+  const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
+  const taintedSymbols = collectTaintedSymbols(program, pkgSrcDir, tsImport, tsIdentifiers, dep);
 
   for (const sourceFile of program.getSourceFiles()) {
-    if (!sourceFile.fileName.startsWith(pkgSrcDir)) continue;
-    if (sourceFile.fileName.endsWith(".test.ts")) continue;
-    if (sourceFile.fileName.endsWith(".d.ts")) continue;
+    if (!isPkgSourceFile(sourceFile, pkgSrcDir)) continue;
 
     // Normalize separators to POSIX so the keys match rubyFileToTs
     // output (which uses path.posix.* for cross-platform stability).
     // Without this, Windows path.relative emits backslashes and the
     // tsDepMap.get(rubyFileToTs(...)) lookup misses.
     const relPath = path.relative(pkgSrcDir, sourceFile.fileName).split(path.sep).join("/");
+    const importedNames = collectDirectImports(sourceFile, tsImport);
 
-    // Collect import bindings from the target package
-    const importedNames = new Set<string>();
-    for (const stmt of sourceFile.statements) {
-      if (!ts.isImportDeclaration(stmt)) continue;
-      const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
-      if (!isImportFromPackage(specifier, tsImport)) continue;
-      const clause = stmt.importClause;
-      if (!clause) continue;
-      if (clause.name) importedNames.add(clause.name.text);
-      if (clause.namedBindings) {
-        if (ts.isNamedImports(clause.namedBindings)) {
-          for (const el of clause.namedBindings.elements) {
-            importedNames.add(el.name.text);
-          }
-        } else if (ts.isNamespaceImport(clause.namedBindings)) {
-          importedNames.add(clause.namedBindings.name.text);
-        }
-      }
-    }
-
-    // Check each method's signature and body for dependency references.
     const methodMap = new Map<string, boolean>();
     visitMethodDeclarations(sourceFile, (name, methodNode, anchor) => {
       const uses = methodUsesDepImport(
@@ -191,6 +285,10 @@ function analyzeTsDepUsage(
         dep,
         sourceFile,
         anchor,
+        {
+          checker,
+          taintedSymbols,
+        },
       );
       const existing = methodMap.get(name);
       if (existing === undefined || uses) methodMap.set(name, uses);
@@ -286,6 +384,14 @@ export function hasLintDepsIgnore(node: ts.Node, dep: string, sourceFile: ts.Sou
   return false;
 }
 
+export interface TransitiveContext {
+  checker: ts.TypeChecker;
+  taintedSymbols: Set<ts.Symbol>;
+  // Suppresses lint-deps-ignore detection. Used during taint
+  // computation so an opt-out helper doesn't spuriously taint callers.
+  skipIgnoreAnnotation?: boolean;
+}
+
 export function methodUsesDepImport(
   node: ts.Node,
   importedNames: Set<string>,
@@ -293,22 +399,52 @@ export function methodUsesDepImport(
   dep: string,
   sourceFile: ts.SourceFile,
   anchor: ts.Node = node,
+  transitive?: TransitiveContext,
 ): boolean {
-  if (hasLintDepsIgnore(anchor, dep, sourceFile)) return true;
+  if (!transitive?.skipIgnoreAnnotation && hasLintDepsIgnore(anchor, dep, sourceFile)) return true;
   let found = false;
-  const check = (n: ts.Node) => {
+  // Walk top-down so we can distinguish:
+  //   - signature type positions (param/return/typeParam of the function
+  //     itself) — these COUNT because the method's API surface is
+  //     bound to the dep;
+  //   - body type positions (casts, satisfies, local-var annotations) —
+  //     these DON'T count because they have no runtime effect;
+  //   - runtime references — always count.
+  const check = (n: ts.Node, inSignatureType: boolean) => {
     if (found) return;
     if (ts.isIdentifier(n)) {
-      if (isDeclarationName(n)) return;
-      if (isWithinTypeNode(n)) return;
-      if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
-        found = true;
-        return;
+      if (!isDeclarationName(n)) {
+        const inType = isWithinTypeNode(n);
+        if (!inType || inSignatureType) {
+          if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
+            found = true;
+            return;
+          }
+          if (transitive && transitive.taintedSymbols.size > 0) {
+            const sym = transitive.checker.getSymbolAtLocation(n);
+            if (sym) {
+              const resolved =
+                sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
+              if (transitive.taintedSymbols.has(resolved)) {
+                found = true;
+                return;
+              }
+            }
+          }
+        }
       }
     }
-    ts.forEachChild(n, check);
+    ts.forEachChild(n, (c) => {
+      // Descending from a function-like into any non-body child means
+      // we're entering signature territory (typeParameters, parameters,
+      // return type). Once we're in signature territory we stay there
+      // for the whole subtree.
+      const childInSig =
+        inSignatureType || (ts.isFunctionLike(n) && c !== (n as ts.FunctionLikeDeclaration).body);
+      check(c, childInSig);
+    });
   };
-  check(node);
+  check(node, false);
   return found;
 }
 
