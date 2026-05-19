@@ -43,8 +43,6 @@ export {
   type RenderOptions as RendererOptions,
 } from "./renderer.js";
 
-export { EjsHandler } from "./ejs-handler.js";
-
 export { OutputBuffer, RawOutputBuffer } from "./buffers.js";
 
 export { PathSet, type PathSetResolver } from "./path-set.js";

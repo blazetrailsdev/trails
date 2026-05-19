@@ -8,7 +8,7 @@
  * To add a new template engine:
  *
  *   import { TemplateHandlers } from "@blazetrails/actionview";
- *   TemplateHandlers.registerTemplateHandler("ejs", new EjsHandler());
+ *   TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
  */
 
 /**
@@ -34,7 +34,7 @@ export interface RenderContext {
  * through the `render` method's arguments.
  */
 export interface TemplateHandler {
-  /** File extensions this handler supports (e.g., ["ejs"], ["tsx", "jsx"]) */
+  /** File extensions this handler supports (e.g., ["tse"], ["tsx", "jsx"]) */
   readonly extensions: string[];
 
   /**

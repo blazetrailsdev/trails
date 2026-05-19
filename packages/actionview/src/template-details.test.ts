@@ -33,7 +33,7 @@ describe("TemplateDetails#matches", () => {
 
   test("fails when handler absent from requested", () => {
     const r = req();
-    const d = new TemplateDetails("en", "ejs", "html", null);
+    const d = new TemplateDetails("en", "builder", "html", null);
     expect(d.matches(r)).toBe(false);
   });
 });

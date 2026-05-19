@@ -38,7 +38,7 @@ export interface TemplateResolver {
    * @param name       Template name (e.g., "index", "_form")
    * @param prefix     Controller prefix (e.g., "posts", "admin/posts")
    * @param format     Response format (e.g., "html", "json")
-   * @param extensions Handler extensions to search for (e.g., ["ejs", "tsx"])
+   * @param extensions Handler extensions to search for (e.g., ["tse", "tsx"])
    * @returns The resolved template, or null if not found
    */
   find(name: string, prefix: string, format: string, extensions: string[]): Template | null;
@@ -62,9 +62,9 @@ export interface TemplateResolver {
  *   {basePath}/{prefix}/{name}.{extension}
  *
  * Examples:
- *   app/views/posts/index.html.ejs
- *   app/views/posts/index.ejs
- *   app/views/layouts/application.html.ejs
+ *   app/views/posts/index.html.tse
+ *   app/views/posts/index.tse
+ *   app/views/layouts/application.html.tse
  */
 export class FileSystemResolver implements TemplateResolver {
   constructor(private basePath: string) {}
@@ -73,7 +73,7 @@ export class FileSystemResolver implements TemplateResolver {
     const dir = getPath().join(this.basePath, prefix);
 
     for (const ext of extensions) {
-      // Try format-specific first: index.html.ejs
+      // Try format-specific first: index.html.tse
       const formatPath = getPath().join(dir, `${name}.${format}.${ext}`);
       if (getFs().existsSync(formatPath)) {
         return new Template({
@@ -87,7 +87,7 @@ export class FileSystemResolver implements TemplateResolver {
         });
       }
 
-      // Fallback: index.ejs
+      // Fallback: index.tse
       const plainPath = getPath().join(dir, `${name}.${ext}`);
       if (getFs().existsSync(plainPath)) {
         return new Template({
@@ -119,8 +119,8 @@ export class FileSystemResolver implements TemplateResolver {
  * Stores templates in memory. Perfect for testing or embedded templates.
  *
  *   const resolver = new InMemoryResolver();
- *   resolver.add("posts/index", "html", "ejs", "<h1>Posts</h1>");
- *   resolver.addLayout("application", "html", "ejs", "<html><%= yield %></html>");
+ *   resolver.add("posts/index", "html", "tse", "<h1>Posts</h1>");
+ *   resolver.addLayout("application", "html", "tse", "<html><%= yield %></html>");
  */
 export class InMemoryResolver implements TemplateResolver {
   private templates = new Map<string, Template>();
@@ -130,7 +130,7 @@ export class InMemoryResolver implements TemplateResolver {
    *
    * @param identifier Logical path (e.g., "posts/index")
    * @param format     Response format (e.g., "html")
-   * @param extension  Handler extension (e.g., "ejs")
+   * @param extension  Handler extension (e.g., "tse")
    * @param source     Template source code
    */
   add(identifier: string, format: string, extension: string, source: string): void {

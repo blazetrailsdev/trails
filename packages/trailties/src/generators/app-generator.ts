@@ -538,7 +538,7 @@ export class ApplicationRecord extends ActiveRecord.Base {
 
     // Views — layouts
     this.createFile(
-      "src/app/views/layouts/application.html.ejs",
+      "src/app/views/layouts/application.html.tse",
       `<!DOCTYPE html>
 <html>
 <head>
@@ -555,7 +555,7 @@ export class ApplicationRecord extends ActiveRecord.Base {
     );
 
     this.createFile(
-      "src/app/views/layouts/mailer.html.ejs",
+      "src/app/views/layouts/mailer.html.tse",
       `<!DOCTYPE html>
 <html>
 <head>
@@ -572,7 +572,7 @@ export class ApplicationRecord extends ActiveRecord.Base {
     );
 
     this.createFile(
-      "src/app/views/layouts/mailer.text.ejs",
+      "src/app/views/layouts/mailer.text.tse",
       `<%- yield %>
 `,
     );

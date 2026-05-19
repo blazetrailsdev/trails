@@ -71,11 +71,11 @@ export function rubyFileToTs(rubyFile: string, pkg?: string): string {
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
   const kebab = base.replace(/_/g, "-");
-  const tsFile = kebab.replace(/\berb\b/g, "ejs") + ".ts";
+  const tsFile = kebab.replace(/\berb\b/g, "tse") + ".ts";
   if (dir === ".") return tsFile;
   const tsDir = dir
     .split("/")
-    .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "ejs"))
+    .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "tse"))
     .join("/");
   return path.posix.join(tsDir, tsFile);
 }

@@ -26,7 +26,7 @@
       case "js": return "javascript";
       case "json": return "json";
       case "css": return "css";
-      case "html": case "ejs": return "html";
+      case "html": case "tse": return "html";
       case "sql": return "sql";
       case "md": return "markdown";
       default: return "plaintext";

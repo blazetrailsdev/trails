@@ -78,8 +78,8 @@ describe("ControllerGeneratorTest", () => {
   it("invokes default template engine", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/foo.html.ejs"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/bar.html.ejs"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/foo.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/bar.html.tse"))).toBe(true);
   });
 
   it("add routes", () => {

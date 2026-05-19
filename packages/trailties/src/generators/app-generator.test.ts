@@ -76,9 +76,9 @@ describe("AppGenerator", () => {
     expect(exists("src/app/mailers/application-mailer.ts")).toBe(true);
     expect(exists("src/app/channels/application-cable/connection.ts")).toBe(true);
     expect(exists("src/app/channels/application-cable/channel.ts")).toBe(true);
-    expect(exists("src/app/views/layouts/application.html.ejs")).toBe(true);
-    expect(exists("src/app/views/layouts/mailer.html.ejs")).toBe(true);
-    expect(exists("src/app/views/layouts/mailer.text.ejs")).toBe(true);
+    expect(exists("src/app/views/layouts/application.html.tse")).toBe(true);
+    expect(exists("src/app/views/layouts/mailer.html.tse")).toBe(true);
+    expect(exists("src/app/views/layouts/mailer.text.tse")).toBe(true);
     expect(exists("src/app/assets/stylesheets/application.css")).toBe(true);
     expect(exists("src/app/assets/images/.gitkeep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
@@ -172,7 +172,7 @@ describe("AppGenerator", () => {
     const appConfig = fs.readFileSync(appPath("src/config/application.ts"), "utf-8");
     expect(appConfig).toContain("my-app");
 
-    const layout = fs.readFileSync(appPath("src/app/views/layouts/application.html.ejs"), "utf-8");
+    const layout = fs.readFileSync(appPath("src/app/views/layouts/application.html.tse"), "utf-8");
     expect(layout).toContain("my-app");
   });
 });

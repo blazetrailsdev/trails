@@ -58,9 +58,9 @@ function rubyToConventionTs(rubyFile: string, pkg: string): string {
 
   let tsDir = dir === "." ? "" : dir.replace(/_/g, "-");
 
-  // Rails uses ERB; we use EJS — map erb paths to ejs
-  tsDir = tsDir.replace(/\berb\b/g, "ejs");
-  const mappedTsFile = tsFile.replace(/\berb\b/g, "ejs");
+  // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
+  tsDir = tsDir.replace(/\berb\b/g, "tse");
+  const mappedTsFile = tsFile.replace(/\berb\b/g, "tse");
 
   if (!tsDir) return mappedTsFile;
   return path.join(tsDir, mappedTsFile);
@@ -70,9 +70,9 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-// Rails uses ERB; we use EJS — normalize class/test names to match
+// Rails uses ERB; we use TSE — normalize class/test names to match
 function normalizeErb(s: string): string {
-  return normalize(s).replace(/erb/g, "ejs");
+  return normalize(s).replace(/erb/g, "tse");
 }
 
 function normPath(ancestors: string[], description: string): string {

@@ -96,7 +96,7 @@ ${actions.map((a) => `  it("${a}", () => {\n    // TODO: test ${a} action\n  });
         ? namespaceParts.map((p) => dasherize(underscore(p))).join("/")
         : viewDir;
     for (const action of actions) {
-      this.createFile(`src/app/views/${viewBase}/${action}.html.ejs`, "");
+      this.createFile(`src/app/views/${viewBase}/${action}.html.tse`, "");
     }
     // Ensure view directory exists even with no actions
     if (actions.length === 0) {

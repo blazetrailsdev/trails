@@ -45,11 +45,13 @@ export class Application {
   }
 
   /**
-   * Set up the ActionView pipeline: register EJS handler and file system resolver.
+   * Set up the ActionView pipeline: register the Raw passthrough handler and
+   * file system resolver. Template rendering (`render :action`) returns
+   * "no handler" until Phase 2a TSE lands; `render json:` / `render plain:`
+   * keep working.
    */
   private setupViews(): void {
-    // Register EJS handler
-    ActionView.TemplateHandlerRegistry.register(new ActionView.EjsHandler());
+    ActionView.TemplateHandlerRegistry.register(new ActionView.RawHandler());
 
     // Add file system resolver pointing to the app's views directory
     const viewsPath = path.join(this.cwd, "src", "app", "views");

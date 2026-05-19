@@ -42,32 +42,32 @@ export class ScaffoldGenerator extends GeneratorBase {
       this.controllerTestSource(controllerClassName, controllerFileName),
     );
 
-    // EJS view templates — use resourceName (underscored plural) to match
+    // TSE view templates — use resourceName (underscored plural) to match
     // ActionController's template lookup (controller class name lowercased)
     this.createFile(
-      `src/app/views/${resourceName}/index.html.ejs`,
+      `src/app/views/${resourceName}/index.html.tse`,
       this.indexView(resourceName, singular, columns),
     );
     this.createFile(
-      `src/app/views/${resourceName}/show.html.ejs`,
+      `src/app/views/${resourceName}/show.html.tse`,
       this.showView(singular, columns),
     );
     this.createFile(
-      `src/app/views/${resourceName}/new.html.ejs`,
+      `src/app/views/${resourceName}/new.html.tse`,
       this.newView(singular, resourceName, columns),
     );
     this.createFile(
-      `src/app/views/${resourceName}/edit.html.ejs`,
+      `src/app/views/${resourceName}/edit.html.tse`,
       this.editView(singular, resourceName, columns),
     );
     this.createFile(
-      `src/app/views/${resourceName}/_form.html.ejs`,
+      `src/app/views/${resourceName}/_form.html.tse`,
       this.formPartial(singular, columns),
     );
 
     // Create layout if it doesn't exist
-    if (!this.fileExists("src/app/views/layouts/application.html.ejs")) {
-      this.createFile("src/app/views/layouts/application.html.ejs", this.layoutTemplate());
+    if (!this.fileExists("src/app/views/layouts/application.html.tse")) {
+      this.createFile("src/app/views/layouts/application.html.tse", this.layoutTemplate());
     }
 
     // Add RESTful routes

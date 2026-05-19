@@ -156,7 +156,7 @@
       case "css":
         return "🎨";
       case "html":
-      case "ejs":
+      case "tse":
         return "🌐";
       case "md":
         return "📝";

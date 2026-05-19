@@ -15,10 +15,10 @@ describe("ActionView::Template (smoke)", () => {
     const t = new Template({
       source: "hi",
       identifier: "posts/_form",
-      virtualPath: "posts/_form.html.ejs",
+      virtualPath: "posts/_form.html.tse",
       format: "html",
       variant: "phone",
-      extension: "ejs",
+      extension: "tse",
       locals: ["a"],
     });
     expect(t.identifier).toBe("posts/_form");
@@ -65,7 +65,7 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("asLayout returns a copy with isLayout flipped on", () => {
-    const t = new Template({ source: "<html/>", identifier: "layouts/app", extension: "ejs" });
+    const t = new Template({ source: "<html/>", identifier: "layouts/app", extension: "tse" });
     const wrapped = t.asLayout();
     expect(wrapped.isLayout).toBe(true);
     expect(t.isLayout).toBe(false);
