@@ -371,7 +371,7 @@ export function contentSecurityPolicyNonceGenerator(
 
 export function setContentSecurityPolicyNonceGenerator(
   this: CspRequestHost,
-  generator: NonceGenerator,
+  generator: NonceGenerator | null,
 ): void {
   this.setHeader(NONCE_GENERATOR, generator);
 }
@@ -384,7 +384,7 @@ export function contentSecurityPolicyNonceDirectives(
 
 export function setContentSecurityPolicyNonceDirectives(
   this: CspRequestHost,
-  directives: readonly string[],
+  directives: readonly string[] | null,
 ): void {
   this.setHeader(NONCE_DIRECTIVES, directives);
 }
