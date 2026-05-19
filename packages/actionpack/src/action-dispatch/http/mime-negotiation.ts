@@ -167,19 +167,49 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
   return v;
 }
 
-/** Sets the variant for template. Accepts a Symbol/string or an Array of them. */
-export function setVariant(this: MimeNegotiationHost, variant: unknown): void {
+/**
+ * Sets the variant for template. Mirrors Rails' `variant=`:
+ *
+ *     def variant=(variant)
+ *       variant = Array(variant)
+ *       if variant.all?(Symbol)
+ *         @variant = ActiveSupport::ArrayInquirer.new(variant)
+ *       else
+ *         raise ArgumentError, "request.variant must be set to a Symbol or an Array of Symbols."
+ *       end
+ *     end
+ *
+ * Ruby Symbols are represented as plain strings in this codebase (the same
+ * convention used elsewhere for symbol-keyed Rails APIs). `ArrayInquirer`'s
+ * predicate access (`variant.phone?`) is keyed by string property names, so
+ * narrowing to strings keeps `variant.phone()` and `variant.any("phone")`
+ * consistent — accepting raw JS `symbol` values here would store an entry
+ * that the proxy cannot match by property name.
+ */
+export function setVariant(
+  this: MimeNegotiationHost,
+  variant: string | string[] | null | undefined,
+): void {
   const arr = Array.isArray(variant) ? variant : variant == null ? [] : [variant];
-  if (!arr.every((v) => typeof v === "string" || typeof v === "symbol")) {
+  if (!arr.every((v) => typeof v === "string")) {
     throw new Error("request.variant must be set to a Symbol or an Array of Symbols.");
   }
-  (this as MimeNegotiationHost & { _variant?: ArrayInquirer<string | symbol> })._variant =
-    new ArrayInquirer<string | symbol>(...(arr as Array<string | symbol>));
+  (
+    this as MimeNegotiationHost & {
+      _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
+    }
+  )._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
+    Record<string, () => boolean>;
 }
 
-export function variant(this: MimeNegotiationHost): ArrayInquirer<string | symbol> {
-  const host = this as MimeNegotiationHost & { _variant?: ArrayInquirer<string | symbol> };
-  return (host._variant ??= new ArrayInquirer<string | symbol>());
+export function variant(
+  this: MimeNegotiationHost,
+): ArrayInquirer<string> & Record<string, () => boolean> {
+  const host = this as MimeNegotiationHost & {
+    _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
+  };
+  return (host._variant ??= new ArrayInquirer<string>() as ArrayInquirer<string> &
+    Record<string, () => boolean>);
 }
 
 /** Sets the format by string extension (`request.format = :iphone`). */
