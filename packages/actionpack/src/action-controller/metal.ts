@@ -169,7 +169,7 @@ export class Metal extends AbstractController {
 
   setRequestBang(request: Request): void {
     this.request = request;
-    (request as any).controllerInstance = this;
+    request.setHeader("action_controller.instance", this);
   }
 
   setResponseBang(response: Response): void {
