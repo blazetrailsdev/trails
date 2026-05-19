@@ -323,6 +323,9 @@ export class Cycle {
   private _index = 0;
 
   constructor(firstValue: unknown, ...rest: unknown[]) {
+    if (arguments.length === 0) {
+      throw new TypeError("wrong number of arguments (given 0, expected 1+)");
+    }
     this.values = [firstValue, ...rest];
   }
 
@@ -377,6 +380,9 @@ function isCycleOptions(value: unknown): value is CycleOptions {
  * to scope the cycle. Mirrors `ActionView::Helpers::TextHelper#cycle`.
  */
 export function cycle(this: TextHelperHost, firstValue: unknown, ...rest: unknown[]): string {
+  if (arguments.length === 0) {
+    throw new TypeError("wrong number of arguments (given 0, expected 1+)");
+  }
   let options: CycleOptions = {};
   if (rest.length > 0 && isCycleOptions(rest[rest.length - 1])) {
     options = rest.pop() as CycleOptions;
