@@ -35,7 +35,6 @@ export function truncate(
 ): SafeBuffer | null {
   if (text === null || text === undefined) return null;
 
-  const wasSafe = text instanceof SafeBuffer && text.htmlSafe;
   const textStr = text instanceof SafeBuffer ? text.toString() : text;
   const length = options.length ?? 30;
   const truncated = stringTruncate(textStr, length, {
@@ -43,10 +42,7 @@ export function truncate(
     separator: options.separator,
   });
 
-  // Rails: ERB::Util.html_escape returns html_safe strings unchanged, so an
-  // already-safe input passes through untouched when escape != false.
-  let content: SafeBuffer =
-    options.escape === false || wasSafe ? htmlSafe(truncated) : htmlEscape(truncated);
+  let content: SafeBuffer = options.escape === false ? htmlSafe(truncated) : htmlEscape(truncated);
 
   if (block && textStr.length > length) {
     const extra = block();
@@ -86,6 +82,142 @@ export function pluralize(
 
   const word = isOne ? singular : (plural ?? inflectorPluralize(singular));
   return `${count ?? 0} ${word}`;
+}
+
+export interface HighlightOptions {
+  highlighter?: string;
+  sanitize?: boolean;
+}
+
+/**
+ * highlight — highlights occurrences of +phrases+ in +text+ by wrapping
+ * matches in `<mark>` (or a custom highlighter / block-supplied) HTML.
+ * Sanitizes input by default; preserves HTML tag structure by only
+ * substituting within text segments.
+ */
+export function highlight(
+  text: string | SafeBuffer | null | undefined,
+  phrases: string | RegExp | Array<string | RegExp> | null | undefined,
+  options: HighlightOptions = {},
+  block?: (match: string) => string,
+): SafeBuffer {
+  const doSanitize = options.sanitize !== false;
+  let working: string;
+  if (text == null) {
+    working = "";
+  } else {
+    working = doSanitize ? sanitize(String(text)).toString() : String(text);
+  }
+
+  const phrasesBlank =
+    phrases == null ||
+    (typeof phrases === "string" && phrases.length === 0) ||
+    (Array.isArray(phrases) && phrases.length === 0);
+  const phraseList: Array<string | RegExp> = Array.isArray(phrases)
+    ? phrases
+    : phrases == null
+      ? []
+      : [phrases];
+
+  if (isBlank(working) || phrasesBlank) {
+    return htmlSafe(working);
+  }
+
+  const sources = phraseList.map((p) => (p instanceof RegExp ? p.source : escapeRegExp(String(p))));
+  const pattern = new RegExp(`(${sources.join("|")})`, "gi");
+  const highlighter = options.highlighter ?? "<mark>\\1</mark>";
+
+  const segments = working.match(/<[^>]*|[^<]+/g) ?? [];
+  const replaced = segments
+    .map((segment) => {
+      if (segment.startsWith("<")) return segment;
+      if (block) {
+        return segment.replace(pattern, (match) => block(match));
+      }
+      return segment.replace(pattern, (_match, p1: string) => highlighter.replace(/\\1/g, p1));
+    })
+    .join("");
+
+  return htmlSafe(replaced);
+}
+
+export interface ExcerptOptions {
+  radius?: number;
+  omission?: string;
+  separator?: string;
+}
+
+/**
+ * excerpt — extracts the first occurrence of +phrase+ plus surrounding text,
+ * prepending / appending an omission marker when the excerpt is truncated.
+ * Returns null if +phrase+ is not found.
+ */
+export function excerpt(
+  text: string | null | undefined,
+  phrase: string | RegExp | null | undefined,
+  options: ExcerptOptions = {},
+): string | null {
+  if (text == null || phrase == null) return null;
+
+  const separator = options.separator ?? "";
+  const regex = phrase instanceof RegExp ? phrase : new RegExp(escapeRegExp(String(phrase)), "i");
+
+  const match = text.match(regex);
+  if (!match) return null;
+  let matchedPhrase: string = match[0];
+
+  if (separator !== "") {
+    for (const value of text.split(separator)) {
+      if (regex.test(value)) {
+        matchedPhrase = value;
+        break;
+      }
+    }
+  }
+
+  const idx = text.indexOf(matchedPhrase);
+  const firstPart = text.slice(0, idx);
+  const secondPart = text.slice(idx + matchedPhrase.length);
+
+  const [prefix, first] = cutExcerptPart("first", firstPart, separator, options);
+  const [postfix, second] = cutExcerptPart("second", secondPart, separator, options);
+
+  const affix = [first, separator, matchedPhrase, separator, second].join("").trim();
+  return [prefix, affix, postfix].join("");
+}
+
+/** @internal */
+function cutExcerptPart(
+  position: "first" | "second",
+  part: string | null,
+  separator: string,
+  options: ExcerptOptions,
+): [string, string] {
+  if (part == null) return ["", ""];
+
+  const radius = options.radius ?? 100;
+  const omission = options.omission ?? "...";
+
+  let tokens: string[];
+  if (separator !== "") {
+    tokens = part.split(separator).filter((t) => t !== "");
+  } else {
+    tokens = Array.from(part);
+  }
+
+  const affix = tokens.length > radius ? omission : "";
+  const sliced =
+    position === "first"
+      ? tokens.slice(Math.max(0, tokens.length - radius))
+      : tokens.slice(0, radius);
+
+  const joined = separator !== "" ? sliced.join(separator) : sliced.join("");
+  return [affix, joined];
+}
+
+/** @internal */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export interface WordWrapOptions {
