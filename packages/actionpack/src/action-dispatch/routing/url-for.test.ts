@@ -78,6 +78,12 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(routes.calls[0]![1]).toBe("post");
   });
 
+  it("use_route Symbol() without description throws ArgumentError", () => {
+    expect(() => fullUrlFor.call(makeHost(), { use_route: Symbol() })).toThrow(
+      /description-less Symbol/,
+    );
+  });
+
   it("explicit option wins over urlOptions default", () => {
     const host = makeHost({ defaultUrlOptions: { host: "default.test" } });
     const routes = host._routes as ReturnType<typeof makeRoutes>;
@@ -85,8 +91,45 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(routes.calls[0]![0]).toEqual({ host: "override.test" });
   });
 
-  it("symbol options throw with HelperMethodBuilder reference", () => {
-    expect(() => fullUrlFor.call(makeHost(), Symbol("user"))).toThrow(/HelperMethodBuilder/);
+  it("symbol options delegate to HelperMethodBuilder.url().handleStringCall", () => {
+    const user_url = vi.fn(() => "/users");
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["user_url"] = user_url;
+    const result = fullUrlFor.call(host, Symbol("user"));
+    expect(result).toBe("/users");
+    expect(user_url).toHaveBeenCalledOnce();
+  });
+
+  it("class options delegate to HelperMethodBuilder.url().handleClassCall", () => {
+    const users_url = vi.fn(() => "/users");
+    class User {
+      static modelName = {
+        name: "User",
+        singularRouteKey: "user",
+        routeKey: "users",
+      };
+    }
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["users_url"] = users_url;
+    const result = fullUrlFor.call(host, User);
+    expect(result).toBe("/users");
+    expect(users_url).toHaveBeenCalledOnce();
+  });
+
+  it("model instance options delegate to HelperMethodBuilder.url().handleModelCall", () => {
+    const user_url = vi.fn(() => "/users/1");
+    const modelName = { name: "User", singularRouteKey: "user", routeKey: "users" };
+    class UserRecord {
+      toModel() {
+        return { modelName, persisted: () => true };
+      }
+    }
+    const user = new UserRecord();
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["user_url"] = user_url;
+    const result = fullUrlFor.call(host, user);
+    expect(result).toBe("/users/1");
+    expect(user_url).toHaveBeenCalledOnce();
   });
 
   it("array options delegate to host.polymorphicUrl when present", () => {
@@ -140,14 +183,15 @@ describe("ActionDispatch::Routing::UrlFor", () => {
         return { id: 1 };
       }
     }
-    expect(() => fullUrlFor.call(makeHost(), new FakeParams())).toThrow(/HelperMethodBuilder/);
+    // No toModel() → handleModelCall TypeErrors on record.toModel().
+    expect(() => fullUrlFor.call(makeHost(), new FakeParams())).toThrow(TypeError);
   });
 
   it("class-instance options fall through to HelperMethodBuilder dispatch", () => {
     class Post {
       id = 1;
     }
-    expect(() => fullUrlFor.call(makeHost(), new Post())).toThrow(/HelperMethodBuilder/);
+    expect(() => fullUrlFor.call(makeHost(), new Post())).toThrow(TypeError);
   });
 
   it("optimizeRoutesGeneration requires empty defaultUrlOptions", () => {

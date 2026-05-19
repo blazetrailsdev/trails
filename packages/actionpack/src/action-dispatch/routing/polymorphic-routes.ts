@@ -83,7 +83,8 @@ export interface PolymorphicOptions {
   [key: string]: unknown;
 }
 
-function isModelClass(x: unknown): x is ModelClass {
+/** @internal */
+export function isModelClass(x: unknown): x is ModelClass {
   return typeof x === "function" && "modelName" in (x as object);
 }
 
@@ -103,7 +104,8 @@ function isHash(x: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-function symbolToString(s: symbol): string {
+/** @internal */
+export function symbolToString(s: symbol): string {
   const name = s.description;
   if (!name) {
     throw new ArgumentError(
