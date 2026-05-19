@@ -20,7 +20,7 @@ import {
   touchBelongsToParents,
 } from "./index.js";
 import { createTestAdapter } from "./test-adapter.js";
-import { defineSchema } from "./test-helpers/define-schema.js";
+import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import {
   Associations,
@@ -220,7 +220,7 @@ describe("BelongsToAssociations", () => {
   });
 
   // Rails: test_belongs_to_required_validates_foreign_key
-  it("test_belongs_to_required_validates_foreign_key", () => {
+  it("test_belongs_to_required_validates_foreign_key", async () => {
     class Subscriber extends Base {
       static {
         this.attribute("company_id", "integer");
@@ -232,7 +232,7 @@ describe("BelongsToAssociations", () => {
   });
 
   // Rails: test_optional_false_is_same_as_required
-  it("test_optional_false_is_same_as_required", () => {
+  it("test_optional_false_is_same_as_required", async () => {
     class Subscriber extends Base {
       static {
         this.attribute("company_id", "integer");
@@ -1445,7 +1445,7 @@ describe("AssociationReflection", () => {
   });
 
   // Rails: test_reflection_custom_class_name
-  it("test_reflection_uses_custom_class_name", () => {
+  it("test_reflection_uses_custom_class_name", async () => {
     class Author extends Base {
       static {
         this.adapter = adapter;
@@ -1457,7 +1457,7 @@ describe("AssociationReflection", () => {
   });
 
   // Rails: test_reflection_is_belongs_to / is_has_many etc.
-  it("test_reflection_type_predicates", () => {
+  it("test_reflection_type_predicates", async () => {
     class Author extends Base {
       static {
         this.adapter = adapter;
@@ -1724,8 +1724,12 @@ describe("CounterCache", () => {
 describe("TouchBelongsToParents", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      owners: { name: "string", updated_at: "datetime" },
+      pets: { name: "string", owner_id: "integer" },
+    });
   });
 
   // Rails: test_belongs_to_touch_parent
@@ -1789,8 +1793,27 @@ describe("TouchBelongsToParents", () => {
 
 describe("Rails-guided: association features", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      articles: { title: "string" },
+      comments: { body: "string", article_id: "integer" },
+      categories: { name: "string" },
+      tags: { name: "string", category_id: "integer" },
+      students: { name: "string" },
+      enrollments: { student_id: "integer", skill_id: "integer" },
+      skills: { name: "string" },
+      machines: { name: "string" },
+      parts: { name: "string", machine_id: "integer" },
+      journals: { title: "string" },
+      entries: { content: "string", journal_id: "integer" },
+      boxes: { name: "string" },
+      widgets: { label: "string", box_id: "integer" },
+      events: { name: "string" },
+      tickets: { subject: "string", event_id: "integer" },
+      albums: { name: "string" },
+      songs: { title: "string", album_id: "integer" },
+    });
   });
 
   it("dependent: destroy on has_many destroys all children", async () => {
@@ -2039,8 +2062,208 @@ describe("Rails-guided: association features", () => {
 });
 
 describe("AssociationsTest", () => {
+  async function setupATAdapter(): Promise<DatabaseAdapter> {
+    const a = freshAdapter();
+    await defineSchema(a, {
+      ships: {
+        name: "string",
+        pirate_id: "integer",
+        treasures_count: { type: "integer", default: 0 },
+      },
+      ship_parts: { name: "string", ship_id: "integer" },
+      as_cpk_children: { parent_region_id: "integer", parent_id: "integer", label: "string" },
+      cpk_children: {
+        parent_region_id: "integer",
+        parent_id: "integer",
+        label: "string",
+        cpk_parent_id: "integer",
+        cpk_parent_region_id: "integer",
+      },
+      cpk_poly_owners_a: {
+        columns: { region_id: "integer", id: "integer", name: "string" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_poly_owners_b: {
+        columns: { region_id: "integer", id: "integer", name: "string" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_poly_owners_c: {
+        columns: { region_id: "integer", id: "integer", name: "string" },
+        primaryKey: ["region_id", "id"],
+      },
+      a_comments: { a_post_id: "integer", body: "string" },
+      a_posts: { title: "string" },
+      as_cpk_childs: { label: "string", parent_id: "integer", parent_region_id: "integer" },
+      as_cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
+      as_cpk_owners: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      as_cpk_parents: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      b_comments: { b_post_id: "integer", body: "string" },
+      b_posts: { title: "string" },
+      bt_nqc_blog_posts: { blog_id: "integer", title: "string" },
+      bt_nqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
+      c_comments: { body: "string", c_post_id: "integer" },
+      c_posts: { title: "string" },
+      cfk_line_items: { name: "string", order_id: "integer", order_shop_id: "integer" },
+      cfk_orders: {
+        columns: { id: "integer", shop_id: "integer", status: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_books: {
+        columns: { id: "integer", shop_id: "integer", title: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_chapters: { cpk_book_id: "integer", cpk_book_shop_id: "integer", number: "integer" },
+      cpk_child2s: { label: "string", parent_id: "integer", parent_region_id: "integer" },
+      cpk_child3s: { label: "string", parent_id: "integer", parent_region_id: "integer" },
+      cpk_childs: { label: "string", parent_id: "integer", parent_region_id: "integer" },
+      cpk_item2s: { label: "string", owner_id: "integer", owner_region_id: "integer" },
+      cpk_items: { label: "string", owner_id: "integer", owner_region_id: "integer" },
+      cpk_order_items: {
+        cpk_order_id: "integer",
+        cpk_order_shop_id: "integer",
+        name: "string",
+        order_id: "integer",
+        order_shop_id: "integer",
+      },
+      cpk_orders: {
+        columns: { id: "integer", shop_id: "integer", status: "string" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_owner2s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_owners: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_parent2s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_parent3s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_parents: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_posts: {
+        author_id: "integer",
+        author_region_id: "integer",
+        cpk_author_id: "integer",
+        cpk_author_region_id: "integer",
+        title: "string",
+      },
+      cpk_refs: { cpk_target_id: "integer", cpk_target_shop_id: "integer" },
+      cpk_targets: {
+        columns: { id: "integer", name: "string", shop_id: "integer" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_thru_appt1s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
+      cpk_thru_appt2s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
+      cpk_thru_appt3s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
+      cpk_thru_appt4s: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
+      cpk_thru_doc1s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_thru_doc2s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_thru_doc3s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_thru_doc4s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cpk_thru_pat1s: { name: "string" },
+      cpk_thru_pat2s: { name: "string" },
+      cpk_thru_pat3s: { name: "string" },
+      cpk_thru_pat4s: { name: "string" },
+      cpk_thru_tgt_appts: { doctor_id: "integer", patient_id: "integer" },
+      cpk_thru_tgt_docs: { name: "string" },
+      cpk_thru_tgt_pats: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cqc_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cqc_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
+      d_comments: { body: "string", d_post_id: "integer" },
+      d_posts: { title: "string" },
+      dqc_blog_posts: { blog_id: "integer", revision: "integer", title: "string" },
+      dqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
+      el_children: { el_parent_id: "integer", value: "string" },
+      el_parents: { name: "string" },
+      inf_child2s: { inf_parent2_id: "integer", inf_parent2_region_id: "integer", label: "string" },
+      inf_childs: { inf_parent_id: "integer", inf_parent_region_id: "integer", label: "string" },
+      inf_parent2s: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      inf_parents: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      io_comments: { body: "string", io_post_id: "integer" },
+      io_posts: { score: "integer", title: "string" },
+      pbt_blog_posts: {
+        blog_id: "integer",
+        parent_id: "integer",
+        parent_type: "string",
+        title: "string",
+      },
+      pmqc_blog_posts: { blog_id: "integer", title: "string" },
+      pmqc_comments: { blog_id: "integer", blog_post_id: "integer", body: "string" },
+      qc_multi_blog_posts: { revision: "integer", title: "string" },
+      qc_multi_comments: { blog_post_id: "integer" },
+      qc_single_blog_posts: { title: "string" },
+      qc_single_comments: { blog_post_id: "integer" },
+      qc_three_blog_posts: { blog_id: "integer", revision: "integer" },
+      qc_three_comments: { blog_post_id: "integer" },
+      qrk_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      qsar_blog_posts: {
+        columns: { blog_id: "integer", id: "integer", title: "string" },
+        primaryKey: ["blog_id", "id"],
+      },
+      qsar_comments: {
+        columns: { blog_id: "integer", blog_post_id: "integer", body: "string", id: "integer" },
+        primaryKey: ["blog_id", "id"],
+      },
+      qwar_blog_posts: {
+        columns: { blog_id: "integer", id: "integer", title: "string" },
+        primaryKey: ["blog_id", "id"],
+      },
+      qwar_comments: {
+        columns: { blog_id: "integer", blog_post_id: "integer", body: "string", id: "integer" },
+        primaryKey: ["blog_id", "id"],
+      },
+    });
+    return a;
+  }
+
   it("eager loading should not change count of children", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class ELParent extends Base {
       static {
         this._tableName = "el_parents";
@@ -2080,7 +2303,7 @@ describe("AssociationsTest", () => {
     /* needs author_favorites association */
   });
   it("loading the association target should keep child records marked for destruction", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class DPost extends Base {
       static {
         this._tableName = "d_posts";
@@ -2114,7 +2337,8 @@ describe("AssociationsTest", () => {
     expect(isMarkedForDestruction(comment)).toBe(true);
   });
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
-    const f = createFixtures();
+    const fxAdapter = await setupATAdapter();
+    const f = createFixtures(fxAdapter);
     const ship = await f.Ship.create({ name: "The good ship Dollypop" });
     const proxy = association(ship, "parts");
     const part = await proxy.create({ name: "Mast" });
@@ -2126,7 +2350,7 @@ describe("AssociationsTest", () => {
     expect(parts[0].name).toBe("Deck");
   });
   it("loading cpk association when persisted and in memory differ", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkOrder extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -2164,7 +2388,7 @@ describe("AssociationsTest", () => {
     expect(items.length).toBe(1);
   });
   it("include with order works", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class IOPost extends Base {
       static {
         this._tableName = "io_posts";
@@ -2195,7 +2419,7 @@ describe("AssociationsTest", () => {
     expect(posts[1].title).toBe("B");
   });
   it("bad collection keys", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class APost extends Base {
       static {
         this._tableName = "a_posts";
@@ -2226,7 +2450,7 @@ describe("AssociationsTest", () => {
   });
 
   it("should construct new finder sql after create", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class BPost extends Base {
       static {
         this._tableName = "b_posts";
@@ -2260,7 +2484,7 @@ describe("AssociationsTest", () => {
   });
 
   it("force reload", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CPost extends Base {
       static {
         this._tableName = "c_posts";
@@ -2305,7 +2529,7 @@ describe("AssociationsTest", () => {
     /* needs references/includes support */
   });
   it("belongs to a model with composite foreign key finds associated record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkOrder extends Base {
       static {
         this._tableName = "cpk_orders";
@@ -2341,7 +2565,7 @@ describe("AssociationsTest", () => {
     expect(loaded!.status).toBe("pending");
   });
   it("belongs to a cpk model by id attribute", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkBook extends Base {
       static {
         this._tableName = "cpk_books";
@@ -2378,7 +2602,7 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 10]);
   });
   it("belongs to a model with composite primary key uses composite pk in sql", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkAuthor extends Base {
       static {
         this._tableName = "cpk_authors";
@@ -2418,7 +2642,7 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([1, 5]);
   });
   it("querying by whole associated records using query constraints", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class QwarBlogPost extends Base {
       static {
         this._tableName = "qwar_blog_posts";
@@ -2456,7 +2680,7 @@ describe("AssociationsTest", () => {
     expect(posts.map((p: any) => p.title).sort()).toEqual(["Post 1", "Post 2"]);
   });
   it("querying by single associated record works using query constraints", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class QsarBlogPost extends Base {
       static {
         this._tableName = "qsar_blog_posts";
@@ -2492,7 +2716,7 @@ describe("AssociationsTest", () => {
     expect(posts.map((p: any) => p.title)).toEqual(["Post 2"]);
   });
   it("querying by relation with composite key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class QrkAuthor extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2512,7 +2736,7 @@ describe("AssociationsTest", () => {
     expect(results.map((r: any) => r.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("has many association with composite foreign key loads records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkAuthor extends Base {
       static {
         this._tableName = "cpk_authors";
@@ -2550,7 +2774,7 @@ describe("AssociationsTest", () => {
     expect(posts.map((p) => p.title).sort()).toEqual(["Post1", "Post2"]);
   });
   it("has many association from a model with query constraints different from the association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class DqcBlogPost extends Base {
       static {
         this._tableName = "dqc_blog_posts";
@@ -2591,8 +2815,8 @@ describe("AssociationsTest", () => {
     expect(comments).toHaveLength(2);
     expect(comments.map((c) => c.body).sort()).toEqual(["A", "B"]);
   });
-  it("query constraints over three without defining explicit foreign key query constraints raises", () => {
-    const adapter = freshAdapter();
+  it("query constraints over three without defining explicit foreign key query constraints raises", async () => {
+    const adapter = await setupATAdapter();
     class QcThreeBlogPost extends Base {
       static {
         this.attribute("blog_id", "integer");
@@ -2616,7 +2840,7 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow("more than 2 attributes");
   });
   it("model with composite query constraints has many association sql", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CqcAuthor extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2651,7 +2875,7 @@ describe("AssociationsTest", () => {
   it("belongs to association does not use parent query constraints if not configured to", async () => {
     // Rails: test_belongs_to_association_does_not_use_parent_query_constraints_if_not_configured_to
     // When belongs_to has explicit single FK/PK, it bypasses query_constraints derivation.
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class BtNqcBlogPost extends Base {
       static {
         this.attribute("blog_id", "integer");
@@ -2700,7 +2924,7 @@ describe("AssociationsTest", () => {
     // Owner has query_constraints :blog_id, :id. Polymorphic belongs_to :parent must derive
     // the composite FK [blog_id, parent_id] and resolve against the target's
     // [blog_id, id] query-constraints key — not just scalar parent_id.
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class PbtBlogPost extends Base {
       static {
         this._tableName = "pbt_blog_posts";
@@ -2747,7 +2971,7 @@ describe("AssociationsTest", () => {
     expect(wrong).toBeNull();
   });
   it("preloads model with query constraints by explicitly configured fk and pk", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class PmqcBlogPost extends Base {
       static {
         this._tableName = "pmqc_blog_posts";
@@ -2786,7 +3010,7 @@ describe("AssociationsTest", () => {
     expect((cached as any).title).toBe("Great post");
   });
   it("append composite foreign key has many association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkOwner extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2819,7 +3043,7 @@ describe("AssociationsTest", () => {
   });
 
   it("nullify composite foreign key has many association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkOwner2 extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2851,7 +3075,7 @@ describe("AssociationsTest", () => {
     expect(item.owner_id).toBeNull();
   });
   it("assign persisted composite foreign key belongs to association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkParent extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2886,7 +3110,7 @@ describe("AssociationsTest", () => {
   });
 
   it("nullify composite foreign key belongs to association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkParent2 extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2920,7 +3144,7 @@ describe("AssociationsTest", () => {
   });
 
   it("assign composite foreign key belongs to association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkParent3 extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2954,7 +3178,7 @@ describe("AssociationsTest", () => {
     expect(child.parent_id).toBe(30);
   });
   it("setBelongsTo infers composite foreign key from target primary key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class InfParent extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -2983,7 +3207,7 @@ describe("AssociationsTest", () => {
   });
 
   it("setBelongsTo nullifies inferred composite foreign key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class InfParent2 extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -3014,8 +3238,8 @@ describe("AssociationsTest", () => {
     expect(child.inf_parent2_id).toBeNull();
   });
 
-  it("query constraints that dont include the primary key raise with a single column", () => {
-    const adapter = freshAdapter();
+  it("query constraints that dont include the primary key raise with a single column", async () => {
+    const adapter = await setupATAdapter();
     class QcSingleBlogPost extends Base {
       static {
         this.attribute("title", "string");
@@ -3040,8 +3264,8 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow(ConfigurationError);
     expect(() => refl.foreignKey).toThrow("does not include the primary key");
   });
-  it("query constraints that dont include the primary key raise with multiple columns", () => {
-    const adapter = freshAdapter();
+  it("query constraints that dont include the primary key raise with multiple columns", async () => {
+    const adapter = await setupATAdapter();
     class QcMultiBlogPost extends Base {
       static {
         this.attribute("title", "string");
@@ -3068,7 +3292,7 @@ describe("AssociationsTest", () => {
     expect(() => refl.foreignKey).toThrow("does not include the primary key");
   });
   it("assign belongs to cpk model by id attribute", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkTarget extends Base {
       static {
         this._tableName = "cpk_targets";
@@ -3103,7 +3327,7 @@ describe("AssociationsTest", () => {
     expect(loaded!.id).toEqual([2, 7]);
   });
   it("append composite foreign key has many association with autosave", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class AsCpkOwner extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -3137,7 +3361,7 @@ describe("AssociationsTest", () => {
     expect(item.owner_id).toBe(10);
   });
   it("assign composite foreign key belongs to association with autosave", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class AsCpkParent extends Base {
       static {
         this.attribute("region_id", "integer");
@@ -3175,7 +3399,7 @@ describe("AssociationsTest", () => {
     expect(child.parent_id).toBe(30);
   });
   it("append composite has many through association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkThruDoc1 extends Base {
       static {
         this._tableName = "cpk_thru_doc1s";
@@ -3247,7 +3471,7 @@ describe("AssociationsTest", () => {
     expect(otherLoaded.map((p: any) => p.name)).toEqual(["Noise"]);
   });
   it("append composite has many through association with autosave", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkThruDoc2 extends Base {
       static {
         this._tableName = "cpk_thru_doc2s";
@@ -3306,7 +3530,7 @@ describe("AssociationsTest", () => {
     expect(joins[0].patient_id).toBe(bob.id);
   });
   it("nullify composite has many through association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkThruDoc3 extends Base {
       static {
         this._tableName = "cpk_thru_doc3s";
@@ -3366,7 +3590,7 @@ describe("AssociationsTest", () => {
   it("delete single composite has many through join row", async () => {
     // Covers _deleteThrough composite-aware findBy. Another owner shares one
     // PK component to verify the join lookup ANDs across both columns.
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkThruDoc4 extends Base {
       static {
         this._tableName = "cpk_thru_doc4s";
@@ -3437,7 +3661,7 @@ describe("AssociationsTest", () => {
     // unrepresentable. Promoted from plain Error to ConfigurationError so
     // misconfiguration surfaces with the same error class as the rest of the
     // through-association validations (reflection.ts:556-588).
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkThruTgtDoc extends Base {
       static {
         this._tableName = "cpk_thru_tgt_docs";
@@ -3492,7 +3716,7 @@ describe("AssociationsTest", () => {
     // the two polymorphic columns. `_throughOwnerPolymorphic` now requires an
     // explicit single-column `primaryKey:` option on the polymorphic-through
     // when the owner has a composite PK, and rejects an array `primaryKey:`.
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     const makeOwner = (
       suffix: string,
     ): {
@@ -3591,7 +3815,7 @@ describe("AssociationsTest", () => {
     }
   });
   it("belongs to with explicit composite foreign key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CfkOrder extends Base {
       static {
         this.attribute("shop_id", "integer");
@@ -3627,7 +3851,7 @@ describe("AssociationsTest", () => {
   });
 
   it("cpk model has many records by id attribute", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupATAdapter();
     class CpkParent extends Base {
       static {
         this._tableName = "cpk_parents";
@@ -3689,7 +3913,7 @@ describe("Associations", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Author.adapter = adapter;
     Book.adapter = adapter;
@@ -3697,6 +3921,12 @@ describe("Associations", () => {
     registerModel(Author);
     registerModel(Book);
     registerModel(Profile);
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      profiles: { bio: "string", author_id: "integer" },
+      articles: { title: "string", writer_id: "integer" },
+    });
   });
 
   it("loadBelongsTo loads the parent record", async () => {
@@ -3778,6 +4008,10 @@ describe("Associations: dependent", () => {
 
     registerModel(Post);
     registerModel(Comment);
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      comments: { body: "string", post_id: "integer" },
+    });
 
     const post = await Post.create({ title: "Hello" });
     await Comment.create({ body: "Nice", post_id: post.id });
@@ -3813,6 +4047,10 @@ describe("Associations: dependent", () => {
 
     registerModel(Thread);
     registerModel(Reply);
+    await defineSchema(adapter, {
+      threads: { subject: "string" },
+      replies: { content: "string", thread_id: "integer" },
+    });
 
     const thread = await Thread.create({ subject: "Test" });
     await Reply.create({ content: "Reply 1", thread_id: thread.id });
@@ -3826,8 +4064,23 @@ describe("Associations: dependent", () => {
 });
 
 describe("CollectionProxy", () => {
+  let cpAdapter: DatabaseAdapter;
+  beforeEach(async () => {
+    cpAdapter = freshAdapter();
+    await defineSchema(cpAdapter, {
+      orders: { number: "string" },
+      items: { name: "string", order_id: "integer" },
+      invoices: { number: "string" },
+      line_items: { name: "string", invoice_id: "integer" },
+      docs: { title: "string" },
+      notes: { text: "string", doc_id: "integer" },
+      projects: { name: "string" },
+      tasks: { title: "string", project_id: "integer" },
+    });
+  });
+
   it("toArray loads associated records", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpAdapter;
 
     class Item extends Base {
       static {
@@ -3858,7 +4111,7 @@ describe("CollectionProxy", () => {
   });
 
   it("build creates unsaved record with FK", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpAdapter;
 
     class LineItem extends Base {
       static {
@@ -3890,7 +4143,7 @@ describe("CollectionProxy", () => {
   });
 
   it("create saves a new associated record", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpAdapter;
 
     class Note extends Base {
       static {
@@ -3919,7 +4172,7 @@ describe("CollectionProxy", () => {
   });
 
   it("count returns number of associated records", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpAdapter;
 
     class Task extends Base {
       static {
@@ -3952,8 +4205,13 @@ describe("CollectionProxy", () => {
 describe("Polymorphic Associations", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      articles: { title: "string" },
+      photos: { url: "string" },
+      comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
+    });
   });
 
   it("belongsTo polymorphic loads correct parent type", async () => {
@@ -4046,8 +4304,16 @@ describe("Polymorphic Associations", () => {
 
 describe("association scopes", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      comments: {
+        body: "string",
+        approved: "boolean",
+        post_id: "integer",
+      },
+    });
   });
 
   it("applies scope to has_many association", async () => {
@@ -4088,8 +4354,14 @@ describe("association scopes", () => {
 
 describe("whereAssociated / whereMissing", () => {
   let adapter: DatabaseAdapter;
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      wa_authors: {},
+      wa_books: { wa_author_id: "integer" },
+      wm_authors: {},
+      wm_books: { wm_author_id: "integer" },
+    });
   });
 
   it("whereAssociated filters records WITH non-null FK", async () => {
@@ -4142,7 +4414,7 @@ describe("whereAssociated / whereMissing", () => {
 });
 
 describe("destroyedByAssociation", () => {
-  it("is null by default", () => {
+  it("is null by default", async () => {
     const adapter = freshAdapter();
     class User extends Base {
       static _tableName = "users";
@@ -4161,6 +4433,7 @@ describe("destroyedByAssociation", () => {
     }
     User.attribute("id", "integer");
     User.adapter = adapter;
+    await defineSchema(adapter, { users: {} });
 
     const user = await User.create({});
     user.destroyedByAssociation = { name: "posts", type: "hasMany" };
@@ -4193,6 +4466,10 @@ describe("dependent: restrictWithException", () => {
       dependent: "restrictWithException",
       className: "DComment",
       foreignKey: "d_post_id",
+    });
+    await defineSchema(adapter, {
+      d_posts: { title: "string" },
+      d_comments: { d_post_id: "integer", body: "string" },
     });
 
     const post = await DPost.create({ title: "Hello" });
@@ -4227,6 +4504,10 @@ describe("dependent: restrictWithException", () => {
       className: "DReview",
       foreignKey: "d_article_id",
     });
+    await defineSchema(adapter, {
+      d_articles: { title: "string" },
+      d_reviews: { d_article_id: "integer" },
+    });
 
     const article = await DArticle.create({ title: "Hello" });
     await article.destroy();
@@ -4235,8 +4516,17 @@ describe("dependent: restrictWithException", () => {
 });
 
 describe("CollectionProxy enhancements", () => {
+  let cpeAdapter: DatabaseAdapter;
+  beforeEach(async () => {
+    cpeAdapter = freshAdapter();
+    await defineSchema(cpeAdapter, {
+      authors: { name: "string" },
+      posts: { title: "string", author_id: "integer" },
+    });
+  });
+
   it("push adds records to the collection", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
@@ -4264,7 +4554,7 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("size returns count", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
@@ -4291,7 +4581,7 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("isEmpty returns true/false", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
@@ -4319,7 +4609,7 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("first and last return correct records", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
@@ -4351,7 +4641,7 @@ describe("CollectionProxy enhancements", () => {
   });
 
   it("includes checks for record membership", async () => {
-    const adapter = freshAdapter();
+    const adapter = cpeAdapter;
     class Author extends Base {
       static {
         this.attribute("id", "integer");
@@ -4401,7 +4691,7 @@ describe("Associations (Rails-guided)", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Author.adapter = adapter;
     Book.adapter = adapter;
@@ -4409,6 +4699,12 @@ describe("Associations (Rails-guided)", () => {
     registerModel(Author);
     registerModel(Book);
     registerModel(Profile);
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      profiles: { bio: "string", author_id: "integer" },
+      articles: { title: "string", writer_id: "integer", author_id: "integer" },
+    });
   });
 
   it("belongs_to loads parent", async () => {
@@ -4487,7 +4783,7 @@ describe("Associations (Rails-guided)", () => {
     }
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
     Author.adapter = adapter;
     Book.adapter = adapter;
@@ -4495,6 +4791,12 @@ describe("Associations (Rails-guided)", () => {
     registerModel(Author);
     registerModel(Book);
     registerModel(Profile);
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { title: "string", author_id: "integer" },
+      profiles: { bio: "string", author_id: "integer" },
+      articles: { title: "string", writer_id: "integer", author_id: "integer" },
+    });
   });
 
   // -- belongsTo --
@@ -4599,8 +4901,13 @@ describe("Associations (Rails-guided)", () => {
 describe("Polymorphic Associations (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      images: { url: "string" },
+      comments: { body: "string", commentable_id: "integer", commentable_type: "string" },
+    });
   });
 
   // Rails: test "belongs_to polymorphic"
@@ -4696,8 +5003,12 @@ describe("Polymorphic Associations (Rails-guided)", () => {
 describe("HABTM (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      developers: { name: "string" },
+      projects: { name: "string" },
+    });
   });
 
   // Rails: test "has_and_belongs_to_many basic"
@@ -4750,8 +5061,14 @@ describe("HABTM (Rails-guided)", () => {
 describe("inverse_of (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      authors: { name: "string" },
+      books: { author_id: "integer" },
+      posts: { title: "string" },
+      comments: { body: "string", post_id: "integer" },
+    });
   });
 
   // Rails: test "inverse_of on belongs_to sets parent reference"
@@ -4823,8 +5140,12 @@ describe("inverse_of (Rails-guided)", () => {
 describe("Association Scopes (Rails-guided)", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      posts: { title: "string" },
+      comments: { body: "string", approved: "boolean", position: "integer", post_id: "integer" },
+    });
   });
 
   // Rails: test "has_many with scope"
@@ -4905,8 +5226,80 @@ describe("Association Scopes (Rails-guided)", () => {
 describe("BelongsToAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, {
+      abs_clients: { firm_id: "integer", name: "string" },
+      abs_firms: { name: "string" },
+      bc_accounts: { firm_id: "integer", name: "string" },
+      bc_firms: { name: "string" },
+      build_accounts: { credit_limit: "integer", firm_id: "integer" },
+      build_firms: { name: "string" },
+      cc_accounts: { firm_id: "integer", name: "string" },
+      cc_comments: { body: "string", post_id: "integer" },
+      cc_firms: { name: "string" },
+      cc_posts: { cc_comments_count: { type: "integer", default: 0 }, title: "string" },
+      clients: { firm_id: "integer", name: "string" },
+      comments: { body: "string", post_id: "integer" },
+      cr_nr_accounts: { firm_id: "integer" },
+      cr_nr_firms: { name: "string" },
+      create_accounts: { credit_limit: "integer", firm_id: "integer" },
+      create_firms: { name: "string" },
+      firms: { name: "string" },
+      fk_cr_accounts: { firm_id: "integer" },
+      fk_cr_firms: { name: "string" },
+      fk_nil_accounts: { firm_id: "integer" },
+      fk_nil_firms: { name: "string" },
+      fk_sv_accounts: { firm_id: "integer" },
+      fk_sv_firms: { name: "string" },
+      id_accounts: { firm_id: "integer" },
+      id_firms: { name: "string" },
+      inv_comments: { body: "string", post_id: "integer" },
+      inv_posts: { title: "string" },
+      missing_accounts: { company_id: "integer" },
+      missing_companies: { name: "string" },
+      nat_accounts: { credit_limit: "integer", firm_id: "integer" },
+      nat_firms: { name: "string" },
+      nil_accounts: { credit_limit: "integer", firm_id: "integer" },
+      nil_firms: { name: "string" },
+      nil_inv_comments: { body: "string", post_id: "integer" },
+      nil_inv_posts: { title: "string" },
+      no_fk_clients: { firm_id: "integer", name: "string" },
+      no_fk_firms: { name: "string" },
+      nr_clients: { firm_id: "integer", name: "string" },
+      nr_firms: { name: "string" },
+      null_fk_accounts: { company_id: "integer" },
+      null_fk_companies: { name: "string" },
+      opt_accounts: { company_id: "integer" },
+      opt_companies: { name: "string" },
+      poly_images: { imageable_id: "integer", imageable_type: "string", url: "string" },
+      poly_items: { owner_id: "integer", owner_type: "string" },
+      poly_nil_items: { owner_id: "integer", owner_type: "string" },
+      poly_nil_owners: { name: "string" },
+      poly_owners: { name: "string" },
+      poly_posts: { title: "string" },
+      posts: { title: "string" },
+      reload_accounts: { firm_id: "integer" },
+      reload_firms: { name: "string" },
+      req_accounts: { company_id: "integer" },
+      req_companies: { name: "string" },
+      sl_accounts: { firm_id: "integer" },
+      sl_firms: { name: "string" },
+      st_clients: { firm_id: "integer", name: "string" },
+      st_firms: { name: "string" },
+      stk_accounts: { firm_id: "integer" },
+      stk_firms: { name: "string" },
+      tc2_accounts: { firm_id: "integer" },
+      tc2_firms: { name: "string" },
+      tc3_accounts: { firm_id: "integer" },
+      tc3_firms: { name: "string" },
+      tc_accounts: { firm_id: "integer" },
+      tc_firms: { name: "string" },
+      touch_comments: { body: "string", post_id: "integer" },
+      touch_posts: { title: "string", updated_at: "string" },
+      wc_accounts: { firm_id: "integer" },
+      wc_firms: { active: "boolean", name: "string" },
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -6058,9 +6451,38 @@ function makeFirmClients(adapter: DatabaseAdapter) {
 describe("HasManyAssociationsTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  const HM_SCHEMA: Schema = {
+    articles: { title: "string" },
+    child2s: { name: "string", root_id: "integer" },
+    children: { name: "string", parent_id: "integer" },
+    clients: { firm_id: "integer", name: "string" },
+    comments: { body: "string", post_id: "integer" },
+    entries: { log_id: "integer", name: "string" },
+    firms: { name: "string" },
+    grandchildren: { child_id: "integer", name: "string" },
+    logs: { name: "string" },
+    parents: { name: "string" },
+    people: { name: "string" },
+    posts: { title: "string" },
+    products: { buyer_id: "integer", name: "string", seller_id: "integer" },
+    roots: { name: "string" },
+    scoped_comments: { approved: "boolean", body: "string", post_id: "integer" },
+    scoped_posts: { title: "string" },
+    shelves: { name: "string" },
+    tags: { name: "string", post_id: "integer" },
+    widgets: { name: "string", shelf_id: "integer" },
+  };
+
+  beforeEach(async () => {
     adapter = createTestAdapter();
+    await defineSchema(adapter, HM_SCHEMA);
   });
+
+  async function setupHMAdapter2(): Promise<DatabaseAdapter> {
+    const a = createTestAdapter();
+    await defineSchema(a, HM_SCHEMA);
+    return a;
+  }
 
   // -------------------------------------------------------------------------
   // Basic has_many loading
@@ -6306,7 +6728,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("dependence", async () => {
     // Rails: test_dependence
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Tag extends Base {
       static {
         this.attribute("name", "string");
@@ -6348,7 +6770,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("depends and nullify", async () => {
     // Rails: test_depends_and_nullify
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Child extends Base {
       static {
         this.attribute("name", "string");
@@ -6389,7 +6811,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with exception when empty allows destroy", async () => {
     // Rails: test_restrict_with_exception (empty case)
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Widget extends Base {
       static {
         this.attribute("name", "string");
@@ -6422,7 +6844,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with error", async () => {
     // Rails: test_restrict_with_error
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Entry extends Base {
       static {
         this.attribute("name", "string");
@@ -6556,7 +6978,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("association with scope applies conditions", async () => {
     // Rails: scoped association variant
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class ScopedComment extends Base {
       static {
         this.attribute("body", "string");
@@ -6611,7 +7033,7 @@ describe("HasManyAssociationsTest", () => {
   // -------------------------------------------------------------------------
 
   it("has many with different foreign keys", async () => {
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Product extends Base {
       static {
         this.attribute("name", "string");
@@ -7198,7 +7620,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("three levels of dependence", async () => {
     // Rails: test_three_levels_of_dependence
-    const adapter2 = createTestAdapter();
+    const adapter2 = await setupHMAdapter2();
     class Grandchild extends Base {
       static {
         this.attribute("name", "string");
@@ -7250,8 +7672,17 @@ describe("HasManyAssociationsTest", () => {
 describe("AssociationProxyTest", () => {
   let apAdapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     apAdapter = freshAdapter();
+    await defineSchema(apAdapter, {
+      ap_categories: { name: "string" },
+      ap_comments: { ap_post_id: "integer", body: "string" },
+      ap_posts: { title: "string" },
+      ap_tagged_posts: { title: "string" },
+      ap_taggings: { ap_category_id: "integer", ap_tagged_post_id: "integer" },
+      is_humans: { name: "string" },
+      is_interests: { is_human_id: "integer", topic: "string" },
+    });
   });
 
   function setupProxyModels() {
@@ -7305,7 +7736,7 @@ describe("AssociationProxyTest", () => {
     expect(comments[0].body).toBe("c1");
   });
 
-  it("prepend is not defined", () => {
+  it("prepend is not defined", async () => {
     const { APPost, APComment } = setupProxyModels();
     const post = new APPost({ title: "no prepend" });
     const proxy = association(post, "apComments");
@@ -7620,10 +8051,141 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
+  async function setupPLAdapter(): Promise<DatabaseAdapter> {
+    const a = freshAdapter();
+    await defineSchema(a, {
+      cfk_bt_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cfk_bt_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
+      cfk_hm_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cfk_hm_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
+      cfk_lbt_authors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cfk_lbt_posts: { author_id: "integer", author_region_id: "integer", title: "string" },
+      cfk_thru_appts: { doctor_id: "integer", doctor_region_id: "integer", patient_id: "integer" },
+      cfk_thru_doctors: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      cfk_thru_patients: { name: "string" },
+      cpk_pl_children: {
+        cpk_pl_owner_id: "integer",
+        cpk_pl_owner_shop_id: "integer",
+        label: "string",
+      },
+      cpk_pl_owners: {
+        columns: { id: "integer", name: "string", shop_id: "integer" },
+        primaryKey: ["shop_id", "id"],
+      },
+      cpk_pl_refs: { cpk_pl_target_id: "integer", cpk_pl_target_region_id: "integer" },
+      cpk_pl_targets: {
+        columns: { id: "integer", name: "string", region_id: "integer" },
+        primaryKey: ["region_id", "id"],
+      },
+      dc_authors: { name: "string" },
+      dc_posts: { dc_author_id: "integer", title: "string" },
+      dkn_authors: { name: "string" },
+      dkn_postesques: { dkn_author_name: "string" },
+      dkn_posts: { dkn_author_id: "integer", title: "string" },
+      gat_posts: { title: "string" },
+      gat_taggings: { gat_post_id: "integer", gat_tag_id: "integer" },
+      gat_tags: { name: "string" },
+      ggt_posts: { title: "string" },
+      ggt_taggings: { ggt_post_id: "integer", ggt_tag_id: "integer" },
+      ggt_tags: { name: "string" },
+      gmm_posts: { title: "string" },
+      gmm_taggings: { gmm_post_id: "integer", gmm_tag_id: "integer" },
+      gmm_tags: { name: "string" },
+      gql_authors: { name: "string" },
+      gql_posts: { gql_author_id: "integer", title: "string" },
+      gqs_authors: { name: "string" },
+      gqs_posts: { gqs_author_id: "integer", title: "string" },
+      gsl_authors: { name: "string" },
+      gsl_comments: { body: "string", gsl_post_id: "integer" },
+      gsl_posts: { gsl_author_id: "integer", title: "string" },
+      hmtc_categories: { name: "string", special: "boolean" },
+      hmtc_categorizations: { hmtc_category_id: "integer", hmtc_post_id: "integer" },
+      hmtc_posts: { title: "string" },
+      ia_authors: { name: "string" },
+      ia_favs: { ia_author_id: "integer", ia_favorite_author_id: "integer" },
+      md_comments: { body: "string", origin_id: "integer", origin_type: "string" },
+      mdd_dogs: { name: "string", md_owner_id: "integer", md_owner_type: "string" },
+      mdd_other_dogs: { name: "string", md_owner_id: "integer", md_owner_type: "string" },
+      mdd_comments: { mdd_commentable_id: "integer", mdd_commentable_type: "string" },
+      p_authors: { name: "string" },
+      p_posts: { p_author_id: "integer", title: "string" },
+      pa_authors: { name: "string" },
+      pa_posts: { pa_author_id: "integer", title: "string" },
+      pd_authors: { name: "string" },
+      pd_posts: { pd_author_id: "integer", title: "string" },
+      pids_authors: { name: "string" },
+      pids_posts: { mention: "string", pids_author_id: "integer" },
+      pk_authors: { name: "string" },
+      pk_posts: { pk_author_id: "integer", title: "string" },
+      pkb_authors: { name: "string" },
+      pkb_posts: { pkb_author_id: "integer", title: "string" },
+      pkba_authors: { name: "string" },
+      pkba_posts: { pkba_author_id: "integer", title: "string" },
+      pkq_authors: { name: "string" },
+      pkq_posts: { pkq_author_id: "integer", title: "string" },
+      pl_authors: { name: "string" },
+      pl_posts: { pl_author_id: "integer", title: "string" },
+      pm_authors: { name: "string" },
+      pm_comments: { body: "string", pm_post_id: "integer" },
+      pm_posts: { pm_author_id: "integer", title: "string" },
+      pr_authors: { name: "string" },
+      pr_posts: { pr_author_id: "integer", title: "string" },
+      ps_authors: { name: "string" },
+      ps_posts: { ps_author_id: "integer", title: "string" },
+      pt_posts: { title: "string" },
+      pt_taggings: { pt_post_id: "integer", pt_tag_id: "integer" },
+      pt_tags: { name: "string" },
+      pu_authors: { name: "string" },
+      pu_posts: { pu_author_id: "integer", title: "string" },
+      pw_authors: { name: "string" },
+      pw_posts: { pw_author_id: "integer", title: "string" },
+      pwits_authors: { name: "string" },
+      pwits_comments: { mention: "string", pwits_post_id: "integer" },
+      pwits_posts: { pwits_author_id: "integer" },
+      pws_comments: { body: "string", pws_post_id: "integer" },
+      pws_posts: { title: "string" },
+      pwtiss_authors: { name: "string" },
+      pwtiss_comments: { pwtiss_post_id: "integer" },
+      pwtiss_posts: { mention: "string", pwtiss_author_id: "integer" },
+      qc_comments: { body: "string", qc_post_id: "integer" },
+      qc_posts: { title: "string" },
+      qi_authors: { name: "string" },
+      qi_posts: { qi_author_id: "integer", title: "string" },
+      qs_authors: { name: "string" },
+      qs_posts: { qs_author_id: "integer", title: "string" },
+      sa_authors: { name: "string" },
+      sa_posts: { sa_author_id: "integer", title: "string" },
+      sl_author_favorites: { sl_author_id: "integer", sl_favorite_author_id: "integer" },
+      sl_authors: { name: "string" },
+      sl_posts: { sl_author_id: "integer", title: "string" },
+      sti_books: { title: "string" },
+      sti_essays: { body: "string", sti_book_id: "integer", type: "string" },
+      ta_authors: { name: "string" },
+      ta_categories: { name: "string" },
+      ta_essays: { ta_author_id: "integer", ta_category_id: "integer" },
+      tb_authors: { name: "string" },
+      tb_categories: { name: "string" },
+      tb_essays: { tb_author_id: "integer", tb_category_id: "integer" },
+    });
+    return a;
+  }
+
   afterEach(() => vi.restoreAllMocks());
 
   it("preload with scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PwsPost extends Base {
       static {
         this.attribute("title", "string");
@@ -7654,7 +8216,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload makes correct number of queries on array", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -7687,7 +8249,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload makes correct number of queries on relation", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PRAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -7719,7 +8281,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload does not concatenate duplicate records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PDAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -7751,7 +8313,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload for hmt with conditions", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class HmtcPost extends Base {
       static {
         this.attribute("title", "string");
@@ -7801,7 +8363,7 @@ describe("PreloaderTest", () => {
     expect(cats[0].name).toBe("Special");
   });
   it("preload groups queries with same scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GQSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -7835,7 +8397,7 @@ describe("PreloaderTest", () => {
     expect((a2 as any)._preloadedAssociations.get("gqsPosts")[0].title).toBe("P2");
   });
   it("preload grouped queries with already loaded records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GQLAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -7872,7 +8434,7 @@ describe("PreloaderTest", () => {
     expect((p2Fresh as any)._preloadedAssociations.get("gqlAuthor").name).toBe("Auth2");
   });
   it("preload grouped queries of middle records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GMMPost extends Base {
       static {
         this.attribute("title", "string");
@@ -7930,7 +8492,7 @@ describe("PreloaderTest", () => {
     ]);
   });
   it("preload grouped queries of through records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GGTPost extends Base {
       static {
         this.attribute("title", "string");
@@ -7987,7 +8549,7 @@ describe("PreloaderTest", () => {
     expect(p2tags[0].name).toBe("rails");
   });
   it("preload through records with already loaded middle record", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GATPost extends Base {
       static {
         this.attribute("title", "string");
@@ -8047,7 +8609,7 @@ describe("PreloaderTest", () => {
     ]);
   });
   it("preload with instance dependent scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PIDSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8089,7 +8651,7 @@ describe("PreloaderTest", () => {
     expect(bobPosts).toEqual([]);
   });
   it("preload with instance dependent through scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PWITSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8153,7 +8715,7 @@ describe("PreloaderTest", () => {
     expect(bobComments).toEqual([]);
   });
   it("preload with through instance dependent scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PWTISSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8225,7 +8787,7 @@ describe("PreloaderTest", () => {
   });
 
   it("some already loaded associations", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class SAAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8259,7 +8821,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload through", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PTTag extends Base {
       static {
         this.attribute("name", "string");
@@ -8310,7 +8872,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload groups queries with same scope at second level", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class GSLAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8365,7 +8927,7 @@ describe("PreloaderTest", () => {
     /* BLOCKED: needs `extending` association option to differentiate vs `same scope`. */
   });
   it("preload with grouping sets inverse association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class IAAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8417,7 +8979,7 @@ describe("PreloaderTest", () => {
     expect(loadedMary._cachedAssociations?.get("iaFavs")).toBe(fav);
   });
   it("preload can group separate levels", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class SLAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8474,7 +9036,7 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(3);
   });
   it("preload does not group same class different scope", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class DCAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8512,7 +9074,7 @@ describe("PreloaderTest", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
   it("preload does not group same scope different key name", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class DKNAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8559,6 +9121,14 @@ describe("PreloaderTest", () => {
   it("multi database polymorphic preload with same table name", async () => {
     const adapterA = freshAdapter();
     const adapterB = freshAdapter();
+    await defineSchema(adapterA, {
+      mdd_dogs: { name: "string" },
+      md_comments: { body: "string", origin_id: "integer", origin_type: "string" },
+    });
+    await defineSchema(adapterB, {
+      mdd_dogs: { name: "string" },
+      md_comments: { body: "string", origin_id: "integer", origin_type: "string" },
+    });
     class MDDog extends Base {
       static {
         this._tableName = "mdd_dogs";
@@ -8597,7 +9167,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PAAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8629,7 +9199,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records sti", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class StiBook extends Base {
       static {
         this.attribute("title", "string");
@@ -8671,7 +9241,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8706,7 +9276,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with some records already loaded", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PLAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8741,7 +9311,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with through association", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class TAAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8797,7 +9367,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with only some records available with through associations", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class TBAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8857,7 +9427,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records with multiple classes", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PMAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8902,7 +9472,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when scoped", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class QSAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -8939,7 +9509,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when collection", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class QCPost extends Base {
       static {
         this.attribute("title", "string");
@@ -8976,7 +9546,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with available records queries when incomplete", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class QIAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9015,7 +9585,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload with unpersisted records no ops", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PUAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9048,7 +9618,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload wont set the wrong target", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PWAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9081,7 +9651,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many association with composite foreign key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CfkHmAuthor extends Base {
       static {
         this._tableName = "cfk_hm_authors";
@@ -9125,7 +9695,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload belongs to association with composite foreign key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CfkBtAuthor extends Base {
       static {
         this._tableName = "cfk_bt_authors";
@@ -9165,7 +9735,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload loaded belongs to association with composite foreign key", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CfkLBtAuthor extends Base {
       static {
         this._tableName = "cfk_lbt_authors";
@@ -9211,7 +9781,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload has many through association with composite query constraints", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CfkThruDoctor extends Base {
       static {
         this._tableName = "cfk_thru_doctors";
@@ -9267,7 +9837,7 @@ describe("PreloaderTest", () => {
     expect(preloaded.map((p: any) => p.name).sort()).toEqual(["Alice", "Bob"]);
   });
   it("preloads has many on model with a composite primary key through id attribute", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CpkPLOwner extends Base {
       static {
         this._tableName = "cpk_pl_owners";
@@ -9303,7 +9873,7 @@ describe("PreloaderTest", () => {
     expect(children.length).toBe(2);
   });
   it("preloads belongs to a composite primary key model through id attribute", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class CpkPLTarget extends Base {
       static {
         this._tableName = "cpk_pl_targets";
@@ -9339,7 +9909,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records no ops", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PKAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9371,7 +9941,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built has many records after query", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PKQAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9403,7 +9973,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records no ops", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PKBAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9435,7 +10005,7 @@ describe("PreloaderTest", () => {
   });
 
   it("preload keeps built belongs to records after query", async () => {
-    const adapter = freshAdapter();
+    const adapter = await setupPLAdapter();
     class PKBAAuthor extends Base {
       static {
         this.attribute("name", "string");
@@ -9657,7 +10227,7 @@ describe("OverridingAssociationsTest", () => {
     expect(hoAssoc.type).toBe("hasOne");
   });
 
-  it("requires symbol argument", () => {
+  it("requires symbol argument", async () => {
     // In TypeScript, association names are strings (Ruby uses symbols).
     // This test verifies that passing a non-string would be caught at compile time.
     // Since TypeScript's type system handles this, we just verify string args work.
@@ -9686,6 +10256,9 @@ describe("OverridingAssociationsTest", () => {
     }
     Associations.belongsTo.call(OABroken, "nonexistent", { foreignKey: "nonexistent_id" });
     registerModel("OABroken", OABroken);
+    await defineSchema(oaAdapter, {
+      oa_brokens: { name: "string", nonexistent_id: "integer" },
+    });
     const record = await OABroken.create({ name: "test", nonexistent_id: 1 });
     await expect(
       loadBelongsTo(record, "nonexistent", { foreignKey: "nonexistent_id" }),
@@ -9775,7 +10348,7 @@ describe("WithAnnotationsTest", () => {
     expect(sql).toContain("has-one-hint");
   });
 
-  it("has many with annotation includes a query comment", () => {
+  it("has many with annotation includes a query comment", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
       static {
@@ -9787,7 +10360,7 @@ describe("WithAnnotationsTest", () => {
     expect(sql).toContain("has-many-hint");
   });
 
-  it("has many through with annotation includes a query comment", () => {
+  it("has many through with annotation includes a query comment", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
       static {
@@ -9799,7 +10372,7 @@ describe("WithAnnotationsTest", () => {
     expect(sql).toContain("hmt-hint");
   });
 
-  it("has many through with annotation includes a query comment when eager loading", () => {
+  it("has many through with annotation includes a query comment when eager loading", async () => {
     const adapter = freshAdapter();
     class Post extends Base {
       static {
@@ -9819,8 +10392,15 @@ describe("WithAnnotationsTest", () => {
 describe("CollectionProxyDelegation", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = freshAdapter();
+    await defineSchema(adapter, {
+      dlg_posts: { title: "string" },
+      dlg_comments: { body: "string", active: "boolean", dlg_post_id: "integer" },
+      bt_blogs: { title: "string" },
+      bt_posts: { title: "string", bt_blog_id: "integer" },
+      bt_authors: { name: "string" },
+    });
   });
 
   function setupDelegationModels() {
@@ -9990,7 +10570,7 @@ describe("CollectionProxyDelegation", () => {
     expect(typeof rel.toSql).toBe("function");
   });
 
-  it("associations mixed onto Base: this.belongsTo / hasOne / hasMany / hasAndBelongsToMany work", () => {
+  it("associations mixed onto Base: this.belongsTo / hasOne / hasMany / hasAndBelongsToMany work", async () => {
     const adapter = createTestAdapter();
     class BtBlog extends Base {
       static {
