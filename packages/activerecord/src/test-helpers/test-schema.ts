@@ -1,9 +1,11 @@
 // Mirror of vendor/rails/activerecord/test/schema/schema.rb.
 //
 // Single canonical schema declaration for the AR fixture port (see
-// docs/fixtures-port-plan.md). Tables are added in alphabetical order
-// matching the Rails source. Built incrementally across PRs 0.5a..0.5h;
-// the wire-up into setup-adapter-suite happens in the final split.
+// docs/fixtures-port-plan.md). Tables appear in the same order as the
+// Rails source (which is broadly — but not strictly — alphabetical;
+// e.g. `paragraphs` sits inside the `cpk_*` block). Built incrementally
+// across PRs 0.5a..0.5h; the wire-up into setup-adapter-suite happens
+// in the final split.
 //
 // Features Rails' schema.rb expresses that defineSchema cannot yet
 // express (deliberately dropped during the port — fixture-row tests
@@ -203,5 +205,287 @@ export const TEST_SCHEMA: Schema = {
       color: "string",
     },
     primaryKey: ["ID"],
+  },
+
+  CamelCase: {
+    name: "string",
+  },
+
+  cars: {
+    person_id: "integer",
+    name: "string",
+    engines_count: "integer",
+    wheels_count: { type: "integer", default: 0, null: false },
+    wheels_owned_at: "datetime",
+    bulbs_count: "integer",
+    custom_tyres_count: "integer",
+    lock_version: { type: "integer", null: false, default: 0 },
+    created_at: { type: "datetime", null: false },
+    updated_at: { type: "datetime", null: false },
+  },
+
+  // Rails declares `id: :integer`; defineSchema's default bigint PK is
+  // wider but accepts the same integer values fixtures emit.
+  old_cars: {},
+
+  carriers: {},
+
+  carts: {
+    columns: {
+      shop_id: "big_integer",
+      id: { type: "big_integer", null: false },
+      title: "string",
+    },
+    primaryKey: ["shop_id", "id"],
+  },
+
+  categories: {
+    name: { type: "string", null: false },
+    type: "string",
+    categorizations_count: "integer",
+  },
+
+  categories_posts: {
+    category_id: { type: "integer", null: false },
+    post_id: { type: "integer", null: false },
+  },
+
+  categorizations: {
+    category_id: "integer",
+    named_category_name: "string",
+    post_id: "integer",
+    author_id: "integer",
+    special: "boolean",
+  },
+
+  citations: {
+    book1_id: "integer",
+    book2_id: "integer",
+    citation_id: "integer",
+  },
+
+  cpk_books: {
+    columns: {
+      author_id: "integer",
+      id: "integer",
+      title: "string",
+      revision: "integer",
+      order_id: "integer",
+      shop_id: "integer",
+    },
+    primaryKey: ["author_id", "id"],
+  },
+
+  cpk_chapters: {
+    columns: {
+      author_id: "integer",
+      id: "integer",
+      book_id: "integer",
+      title: "string",
+    },
+    primaryKey: ["author_id", "id"],
+  },
+
+  cpk_authors: {
+    name: "string",
+  },
+
+  cpk_posts: {
+    columns: {
+      title: "string",
+      author: "string",
+    },
+    primaryKey: ["title", "author"],
+  },
+
+  cpk_comments: {
+    commentable_title: "string",
+    commentable_author: "string",
+    commentable_type: "string",
+    text: "text",
+  },
+
+  cpk_reviews: {
+    author_id: "integer",
+    number: "integer",
+    rating: "integer",
+    comment: "string",
+  },
+
+  // Composite PK is configured on the model level; the DB table keeps the
+  // default autoincrement `id` so order rows still get one.
+  cpk_orders: {
+    shop_id: "integer",
+    status: "string",
+    books_count: { type: "integer", default: 0 },
+  },
+
+  cpk_order_tags: {
+    columns: {
+      order_id: "integer",
+      tag_id: "integer",
+      attached_by: "string",
+      attached_reason: "string",
+    },
+    primaryKey: ["order_id", "tag_id"],
+  },
+
+  cpk_tags: {
+    name: { type: "string", null: false },
+  },
+
+  cpk_order_agreements: {
+    order_id: "integer",
+    signature: "string",
+  },
+
+  cpk_cars: {
+    columns: {
+      make: { type: "string", null: false },
+      model: { type: "string", null: false },
+    },
+    primaryKey: ["make", "model"],
+  },
+
+  cpk_car_reviews: {
+    car_make: { type: "string", null: false },
+    car_model: { type: "string", null: false },
+    comment: "text",
+    rating: "integer",
+  },
+
+  paragraphs: {
+    book_id: "integer",
+  },
+
+  clothing_items: {
+    clothing_type: "string",
+    color: "string",
+    type: "string",
+    size: "string",
+    description: "text",
+  },
+
+  sharded_blogs: {
+    name: "string",
+  },
+
+  sharded_blog_posts: {
+    title: "string",
+    parent_id: "integer",
+    parent_type: "string",
+    blog_id: "integer",
+    revision: "integer",
+  },
+
+  sharded_comments: {
+    body: "string",
+    blog_post_id: "integer",
+    blog_id: "integer",
+  },
+
+  sharded_tags: {
+    name: "string",
+    blog_id: "integer",
+  },
+
+  sharded_blog_posts_tags: {
+    blog_id: "integer",
+    blog_post_id: "integer",
+    tag_id: "integer",
+  },
+
+  clubs: {
+    name: "string",
+    category_id: "integer",
+  },
+
+  collections: {
+    name: "string",
+  },
+
+  colnametests: {
+    references: { type: "integer", null: false },
+  },
+
+  columns: {
+    record_id: "integer",
+  },
+
+  comments: {
+    post_id: { type: "integer", null: false },
+    body: { type: "text", null: false },
+    type: "string",
+    label: { type: "integer", default: 0 },
+    tags_count: { type: "integer", default: 0 },
+    children_count: { type: "integer", default: 0 },
+    parent_id: "integer",
+    author_id: "integer",
+    author_type: "string",
+    // Rails comment: kept as string so preload works when types don't match.
+    resource_id: "string",
+    resource_type: "string",
+    origin_id: "integer",
+    origin_type: "string",
+    developer_id: "integer",
+    updated_at: "datetime",
+    deleted_at: "datetime",
+    comments: "integer",
+    company: "integer",
+  },
+
+  comment_overlapping_counter_caches: {
+    user_comments_count_id: "integer",
+    post_comments_count_id: "integer",
+    commentable_id: "integer",
+    commentable_type: "string",
+  },
+
+  companies: {
+    type: "string",
+    firm_id: "integer",
+    firm_name: "string",
+    name: "string",
+    client_of: "big_integer",
+    rating: { type: "big_integer", default: 1 },
+    account_id: "integer",
+    description: { type: "string", default: "" },
+    status: { type: "integer", default: 0 },
+  },
+
+  content: {
+    title: "string",
+    book_id: "integer",
+    book_destroy_async_id: "integer",
+  },
+
+  content_positions: {
+    content_id: "integer",
+  },
+
+  vegetables: {
+    name: "string",
+    seller_id: "integer",
+    custom_type: "string",
+  },
+
+  computers: {
+    system: "string",
+    developer: { type: "integer", null: false },
+    extendedWarranty: { type: "integer", null: false },
+    timezone: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  // Rails declares `id: false` — pure join table, no synthetic PK.
+  computers_developers: {
+    columns: {
+      computer_id: "integer",
+      developer_id: "integer",
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    primaryKey: false,
   },
 };
