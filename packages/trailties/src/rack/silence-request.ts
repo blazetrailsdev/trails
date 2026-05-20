@@ -9,7 +9,7 @@ import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Logger as ASLogger } from "@blazetrails/activesupport";
 
 export interface Silencer {
-  silence<T>(level: number | string, fn: () => T): T;
+  silence(level: number | string, fn: () => void): void;
   silenceAsync?<T>(level: number | string, fn: () => Promise<T>): Promise<T>;
 }
 
@@ -39,7 +39,16 @@ export class SilenceRequest {
       if (logger.silenceAsync) {
         return logger.silenceAsync(ERROR_LEVEL, () => this.app(env));
       }
-      return logger.silence(ERROR_LEVEL, () => this.app(env));
+      let pending: Promise<RackResponse> | undefined;
+      logger.silence(ERROR_LEVEL, () => {
+        pending = this.app(env);
+      });
+      if (!pending) {
+        throw new Error(
+          "Silencer.silence did not invoke callback synchronously; provide silenceAsync for async-aware silencing.",
+        );
+      }
+      return pending;
     }
     return this.app(env);
   }

@@ -43,14 +43,14 @@ export class Logger {
       : 0;
     env["rails.rackLoggerTagCount"] = tagCount;
 
-    const startedAt = Date.now();
+    const startedAt = performance.now();
     let finished = false;
     const finish = (): void => {
       if (finished) return;
       finished = true;
       Notifications.publish("request.action_dispatch", {
         request: env,
-        elapsed: Date.now() - startedAt,
+        elapsed: performance.now() - startedAt,
       });
       if (this.logger.popTags && tagCount > 0) this.logger.popTags(tagCount);
     };

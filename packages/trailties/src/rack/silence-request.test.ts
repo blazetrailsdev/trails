@@ -12,9 +12,9 @@ describe("Rack::SilenceRequest", () => {
   it("silence request only to specific path", async () => {
     const calls: string[] = [];
     const logger = {
-      silence<T>(_level: number | string, fn: () => T): T {
+      silence(_level: number | string, fn: () => void) {
         calls.push("silence");
-        return fn();
+        fn();
       },
     };
 
@@ -31,9 +31,9 @@ describe("Rack::SilenceRequest", () => {
   it("prefers silenceAsync when available", async () => {
     const calls: string[] = [];
     const logger = {
-      silence<T>(_level: number | string, fn: () => T): T {
+      silence(_level: number | string, fn: () => void) {
         calls.push("silence");
-        return fn();
+        fn();
       },
       async silenceAsync<T>(_level: number | string, fn: () => Promise<T>): Promise<T> {
         calls.push("silenceAsync:start");
