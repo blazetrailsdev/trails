@@ -87,24 +87,40 @@ function parseIpv4(addr: string): bigint {
   return out;
 }
 
+const HEXTET_RE = /^[0-9a-f]{1,4}$/i;
+
 function parseIpv6(addr: string): bigint {
-  let head = addr;
-  let tail = "";
-  if (addr.includes("::")) {
+  const doubleColonCount = addr.split("::").length - 1;
+  if (doubleColonCount > 1) throw new Error(`invalid IPv6: ${addr}`);
+  let head: string;
+  let tail: string;
+  let collapsed: boolean;
+  if (doubleColonCount === 1) {
     const [h, t] = addr.split("::");
     head = h;
     tail = t ?? "";
+    collapsed = true;
+  } else {
+    head = addr;
+    tail = "";
+    collapsed = false;
   }
   const headParts = head ? head.split(":") : [];
   const tailParts = tail ? tail.split(":") : [];
-  const missing = 8 - headParts.length - tailParts.length;
-  if (missing < 0) throw new Error(`invalid IPv6: ${addr}`);
-  const all = [...headParts, ...Array(missing).fill("0"), ...tailParts];
+  const groupCount = headParts.length + tailParts.length;
+  let all: string[];
+  if (collapsed) {
+    const missing = 8 - groupCount;
+    if (missing < 1) throw new Error(`invalid IPv6: ${addr}`);
+    all = [...headParts, ...Array(missing).fill("0"), ...tailParts];
+  } else {
+    if (groupCount !== 8) throw new Error(`invalid IPv6: ${addr}`);
+    all = headParts;
+  }
   let out = 0n;
   for (const p of all) {
-    const n = Number.parseInt(p || "0", 16);
-    if (!Number.isInteger(n) || n < 0 || n > 0xffff) throw new Error(`invalid IPv6: ${addr}`);
-    out = (out << 16n) | BigInt(n);
+    if (!HEXTET_RE.test(p)) throw new Error(`invalid IPv6: ${addr}`);
+    out = (out << 16n) | BigInt(Number.parseInt(p, 16));
   }
   return out;
 }
@@ -247,7 +263,7 @@ export class HostAuthorization {
 
   /** @internal */
   private markAsAuthorized(env: RackEnv, host: string): void {
-    env["action_dispatch.authorized_host"] = host.replace(/:\d+$/, "").toLowerCase();
+    env["action_dispatch.authorized_host"] = host.replace(/:\d+$/, "");
   }
 
   private blockedResponse(host: string): RackResponse {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HostAuthorization } from "../middleware/host-authorization.js";
+import { HostAuthorization, IPAddr } from "../middleware/host-authorization.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 
@@ -192,5 +192,27 @@ describe("HostAuthorizationTest", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(200);
+  });
+
+  it("authorized_host preserves IPv6 brackets and strips port", async () => {
+    const env: Record<string, unknown> = {
+      HTTP_HOST: "[::1]:3000",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    };
+    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const [status] = await mw.call(env);
+    expect(status).toBe(200);
+    expect(env["action_dispatch.authorized_host"]).toBe("[::1]");
+  });
+
+  it("non-IP hostname does not match IPv6 CIDR allowlist", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const [status] = await mw.call({
+      HTTP_HOST: "example.com:3000",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(403);
   });
 });
