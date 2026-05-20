@@ -42,11 +42,11 @@ export class Router {
   }
 
   eagerLoadBang(): void {
-    void this._simulator();
+    void this.simulator();
   }
 
   serve(req: RouterRequest): RackishResponse {
-    for (const { match, parameters, route } of this._findRoutes(req)) {
+    for (const { match, parameters, route } of this.findRoutes(req)) {
       const setParams = req.pathParameters;
       const pathInfo = req.pathInfo;
       const scriptName = req.scriptName;
@@ -92,7 +92,7 @@ export class Router {
     // explicit `=== true` signals short-circuit.
     block: (route: Route, parameters: Record<string, unknown>) => unknown,
   ): void {
-    for (const { match, parameters, route } of this._findRoutes(req)) {
+    for (const { match, parameters, route } of this.findRoutes(req)) {
       if (!route.path.anchored) {
         req.scriptName = match.toString();
         let post = match.postMatch();
@@ -107,7 +107,7 @@ export class Router {
   }
 
   /** @internal */
-  private _partitionedRoutes(): [Route[], Route[]] {
+  private partitionedRoutes(): [Route[], Route[]] {
     const anchored: Route[] = [];
     const custom: Route[] = [];
     for (const r of this.routes) {
@@ -118,38 +118,38 @@ export class Router {
   }
 
   /** @internal */
-  private _ast() {
+  private ast() {
     return this.routes.ast;
   }
 
   /** @internal */
-  private _simulator() {
+  private simulator() {
     return this.routes.simulator;
   }
 
   /** @internal */
-  private _customRoutes(): readonly Route[] {
+  private customRoutes(): readonly Route[] {
     return this.routes.customRoutes;
   }
 
   /** @internal */
-  private _filterRoutes(path: string): Route[] {
-    if (!this._ast()) return [];
-    return this._simulator().memos(path, () => []) as Route[];
+  private filterRoutes(path: string): Route[] {
+    if (!this.ast()) return [];
+    return this.simulator().memos(path, () => []) as Route[];
   }
 
   /** @internal */
-  private *_findRoutes(
+  private *findRoutes(
     req: RouterRequest,
   ): Generator<{ match: PatternMatch; parameters: Record<string, unknown>; route: Route }> {
     const pathInfo = req.pathInfo;
     let routes = [
-      ...this._filterRoutes(pathInfo),
-      ...this._customRoutes().filter((r) => r.path.isMatch(pathInfo)),
+      ...this.filterRoutes(pathInfo),
+      ...this.customRoutes().filter((r) => r.path.isMatch(pathInfo)),
     ];
 
     if (req.isHead || req.requestMethod === "HEAD") {
-      routes = this._matchHeadRoutes(routes, req);
+      routes = this.matchHeadRoutes(routes, req);
     } else {
       routes = routes.filter((r) =>
         r.matches(req as unknown as { requestMethod: string } & Record<string, unknown>),
@@ -171,7 +171,7 @@ export class Router {
   }
 
   /** @internal */
-  private _matchHeadRoutes(routes: Route[], req: RouterRequest): Route[] {
+  private matchHeadRoutes(routes: Route[], req: RouterRequest): Route[] {
     const head = routes.filter(
       (r) =>
         r.isRequiresMatchingVerb() &&

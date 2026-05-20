@@ -116,6 +116,11 @@ export class Route {
   /** @internal */
   private _requiredDefaultsCache: Record<string, unknown> | null = null;
 
+  /** Rails `Route.verb_matcher(verb)` — `:all` / "GET" / etc. */
+  static verbMatcher(verb: string | symbol): VerbMatcher {
+    return VerbMatchers.for(verb);
+  }
+
   constructor(opts: RouteOptions) {
     this.name = opts.name;
     this.app = opts.app;
@@ -218,7 +223,7 @@ export class Route {
   }
 
   matches(request: VerbRequest & Record<string, unknown>): boolean {
-    if (!this._matchVerb(request)) return false;
+    if (!this.matchVerb(request)) return false;
     for (const [method, value] of Object.entries(this.constraints)) {
       const actual = request[method];
       if (value instanceof RegExp) {
@@ -254,11 +259,16 @@ export class Route {
   }
 
   get verb(): string {
-    return this._requestMethodMatch.map((m) => m.verb).join("|");
+    return this.verbs().join("|");
   }
 
   /** @internal */
-  private _matchVerb(request: VerbRequest): boolean {
+  private verbs(): string[] {
+    return this._requestMethodMatch.map((m) => m.verb);
+  }
+
+  /** @internal */
+  private matchVerb(request: VerbRequest): boolean {
     return this._requestMethodMatch.some((m) => m.call(request));
   }
 }

@@ -51,11 +51,16 @@ export class Routes implements Iterable<Route> {
     return this.routes[Symbol.iterator]();
   }
 
+  /** Rails `routes.each(&block)`. */
+  each(block: (route: Route) => void): void {
+    for (const r of this.routes) block(r);
+  }
+
   clear(): void {
     this.routes.length = 0;
     this.anchoredRoutes.length = 0;
     this.customRoutes.length = 0;
-    this._clearCache();
+    this.clearCacheBang();
   }
 
   partitionRoute(route: Route): void {
@@ -84,12 +89,12 @@ export class Routes implements Iterable<Route> {
     const route = mapping.makeRoute(name, this.routes.length);
     this.routes.push(route);
     this.partitionRoute(route);
-    this._clearCache();
+    this.clearCacheBang();
     return route;
   }
 
   /** @internal */
-  private _clearCache(): void {
+  private clearCacheBang(): void {
     this._ast = null;
     this._simulator = null;
   }

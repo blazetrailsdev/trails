@@ -29,7 +29,7 @@ export class Scanner {
   nextToken(): Token | null {
     if (this._pos >= this._str.length) return null;
     let token: Token | null = null;
-    while (this._pos < this._str.length && (token = this._scan()) === null) {
+    while (this._pos < this._str.length && (token = this.scan()) === null) {
       // continue scanning
     }
     return token;
@@ -44,11 +44,11 @@ export class Scanner {
   }
 
   /** @internal */
-  private _scan(): Token | null {
+  private scan(): Token | null {
     const ch = this._str[this._pos];
     const staticTok = STATIC_TOKENS[ch];
 
-    if (staticTok !== undefined && (staticTok !== "SYMBOL" || this._nextByteIsNotAToken())) {
+    if (staticTok !== undefined && (staticTok !== "SYMBOL" || this.isNextByteIsNotAToken())) {
       this._pos += 1;
       if (staticTok === "SYMBOL" || staticTok === "STAR") {
         WORD.lastIndex = this._pos;
@@ -75,7 +75,7 @@ export class Scanner {
   }
 
   /** @internal */
-  private _nextByteIsNotAToken(): boolean {
+  private isNextByteIsNotAToken(): boolean {
     const next = this._str[this._pos + 1];
     return next === undefined || STATIC_TOKENS[next] === undefined;
   }
