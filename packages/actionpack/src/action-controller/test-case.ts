@@ -36,6 +36,7 @@
 import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
+import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -420,6 +421,13 @@ export class TestCase {
     }
   }
 }
+
+/**
+ * ActionController::TestRequest — a controller-test-flavored TestRequest
+ * that mirrors `ActionDispatch::TestRequest`. Subclass kept thin: behavior
+ * is inherited from the dispatch layer.
+ */
+export class TestRequest extends AbstractTestRequest {}
 
 export class LiveTestResponse extends Response {}
 
