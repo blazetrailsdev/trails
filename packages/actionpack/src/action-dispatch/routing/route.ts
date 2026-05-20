@@ -18,6 +18,15 @@ export interface RouteConstraints {
   [key: string]: string | RegExp;
 }
 
+/**
+ * A Rack-style application: anything that responds to `call(env)`. Functions
+ * (Rails' lambda apps) and class-like objects with a `call` method are both
+ * accepted, matching `app.respond_to?(:call)` in Rails' `mount`.
+ */
+export type MountableApp =
+  | ((env: Record<string, unknown>) => unknown)
+  | { call: (env: Record<string, unknown>) => unknown };
+
 export interface RouteOptions {
   name?: string;
   constraints?: RouteConstraints;
@@ -35,6 +44,11 @@ export interface RouteOptions {
   anchor?: boolean;
   shallow?: boolean;
   internal?: boolean;
+  /**
+   * Mounted Rack-compatible app (set by `Mapper#mount`). When present the
+   * route forwards requests to this app rather than to a controller action.
+   */
+  app?: MountableApp;
 }
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
@@ -70,6 +84,8 @@ export class Route {
   readonly anchor: boolean;
   /** Marks routes that should be hidden from `bin/rails routes` (info routes etc). */
   readonly internal: boolean;
+  /** Mounted Rack app, set by `Mapper#mount`. */
+  readonly app: MountableApp | undefined;
 
   private readonly paramNames: string[];
   /** @internal lazy single-route Journey router for match() */
@@ -103,6 +119,7 @@ export class Route {
     this.redirectTarget = options.redirect;
     this.anchor = options.anchor !== false;
     this.internal = options.internal === true;
+    this.app = options.app;
 
     // Derive capture names from the Journey parser/AST — the same source
     // the Journey bridge uses. Keeps the path-vs-request constraint split

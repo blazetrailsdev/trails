@@ -1076,6 +1076,24 @@ export class RouteSet {
       return [status, lowerHeaders, bodyFromString((bodyArr as string[]).join(""))];
     }
 
+    // Mounted Rack app: forward the request after stripping the mount prefix
+    // from PATH_INFO and appending it to SCRIPT_NAME. Mirrors Rails' Journey
+    // anchor: false dispatch into the engine's app.
+    const mountedApp = route.app;
+    if (mountedApp) {
+      const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
+      const mountPath = route.path.replace(/\/$/, "");
+      const remaining = path.startsWith(mountPath) ? path.slice(mountPath.length) : path;
+      const forwarded: Record<string, unknown> = {
+        ...env,
+        SCRIPT_NAME: scriptName + mountPath,
+        PATH_INFO: remaining.length === 0 ? "/" : remaining,
+      };
+      const call =
+        typeof mountedApp === "function" ? mountedApp.bind(null) : mountedApp.call.bind(mountedApp);
+      return (await call(forwarded)) as RackResponse;
+    }
+
     // Merge route params into the env (like Rails does with request.params)
     env["action_dispatch.request.path_parameters"] = {
       controller: route.controller,
