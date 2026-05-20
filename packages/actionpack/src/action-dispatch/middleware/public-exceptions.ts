@@ -18,12 +18,16 @@
 
 import { I18n, getFs, getPath } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
+import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { MimeType } from "../http/mime-type.js";
 import { Response } from "../http/response.js";
 
 async function* emptyBody(): RackBody {}
+
+async function* bodyFromBytes(bytes: Uint8Array): RackBody {
+  yield bytes;
+}
 
 const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -74,14 +78,21 @@ export class PublicExceptions {
   }
 
   private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
-    const bytes = Buffer.byteLength(body, "utf-8");
+    const charset = Response.defaultCharset;
+    // Encode the body into bytes that match the negotiated charset so the
+    // `content-type` header, `content-length`, and wire bytes all agree.
+    // Unknown tokens fall back to utf-8 with the header rewritten to match.
+    const enc = normalizeCharset(charset);
+    const effectiveCharset =
+      enc === "utf-8" && charset.toLowerCase() !== "utf-8" ? "utf-8" : charset;
+    const encoded = Buffer.from(body, enc);
     return [
       status,
       {
-        "content-type": `${contentType}; charset=${Response.defaultCharset}`,
-        "content-length": String(bytes),
+        "content-type": `${contentType}; charset=${effectiveCharset}`,
+        "content-length": String(encoded.byteLength),
       },
-      bodyFromString(body),
+      bodyFromBytes(encoded),
     ];
   }
 
@@ -104,6 +115,29 @@ export class PublicExceptions {
       return this.renderFormat(status, htmlType, html);
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];
+  }
+}
+
+function normalizeCharset(charset: string): BufferEncoding {
+  switch (charset.toLowerCase()) {
+    case "utf-8":
+    case "utf8":
+      return "utf-8";
+    case "utf-16le":
+    case "utf16le":
+    case "ucs-2":
+    case "ucs2":
+      return "utf16le";
+    case "iso-8859-1":
+    case "iso8859-1":
+    case "latin1":
+    case "latin-1":
+      return "latin1";
+    case "us-ascii":
+    case "ascii":
+      return "ascii";
+    default:
+      return "utf-8";
   }
 }
 

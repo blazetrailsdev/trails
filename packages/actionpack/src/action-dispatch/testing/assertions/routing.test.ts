@@ -53,6 +53,23 @@ describe("assertRecognizes", () => {
     bad(() => assertRecognizes.call(h, { controller: "wrong", action: "x" }, "/items"));
     bad(() => assertRecognizes.call(h, { controller: "items", action: "index" }, "/nope"));
   });
+
+  it("accepts a full URL and recognizes its path segment", () => {
+    ok(() =>
+      assertRecognizes.call(
+        h,
+        { controller: "items", action: "index" },
+        "http://example.com/items",
+      ),
+    );
+    ok(() =>
+      assertRecognizes.call(
+        h,
+        { controller: "items", action: "create" },
+        { path: "https://example.com:8080/items", method: "post" },
+      ),
+    );
+  });
 });
 
 describe("assertGenerates", () => {
@@ -73,6 +90,16 @@ describe("assertGenerates", () => {
   it("throws on path mismatch", () => {
     bad(() => assertGenerates.call(h, "/wrong", { controller: "items", action: "index" }));
   });
+  it("accepts a full URL and uses its path segment for comparison", () => {
+    const h = buildHost();
+    ok(() =>
+      assertGenerates.call(h, "http://example.com/items", {
+        controller: "items",
+        action: "index",
+      }),
+    );
+  });
+
   it("accepts use_route: Symbol via Symbol#description (Rails parity)", () => {
     const host: RoutingAssertionsHost = { routes: new RouteSet() };
     host.routes!.draw((m) => m.get("/items", { to: "items#index", as: "items" }));

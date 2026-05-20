@@ -114,4 +114,38 @@ describe("PublicExceptions", () => {
       Response.defaultCharset = prior;
     }
   });
+
+  it("computes content-length from bytes of the negotiated charset", async () => {
+    const prior = Response.defaultCharset;
+    const priorBody = "<h1>500</h1>";
+    try {
+      // Non-ASCII payload makes the utf-8 vs latin1 byte-count divergence
+      // observable: "résumé" is 8 bytes UTF-8, 6 bytes Latin-1.
+      writeFileSync(path.join(publicPath, "500.html"), "résumé");
+
+      Response.defaultCharset = "utf-8";
+      const utf8 = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "text/html" });
+      expect(utf8[1]["content-length"]).toBe(String(Buffer.byteLength("résumé", "utf-8")));
+
+      Response.defaultCharset = "iso-8859-1";
+      const latin = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "text/html" });
+      expect(latin[1]["content-length"]).toBe(String(Buffer.byteLength("résumé", "latin1")));
+    } finally {
+      Response.defaultCharset = prior;
+      writeFileSync(path.join(publicPath, "500.html"), priorBody);
+    }
+  });
+
+  it("falls back to utf-8 header + bytes when defaultCharset is unknown", async () => {
+    const prior = Response.defaultCharset;
+    try {
+      Response.defaultCharset = "x-bogus-charset";
+      const res = await app.call({ PATH_INFO: "/500", HTTP_ACCEPT: "application/json" });
+      expect(res[1]["content-type"]).toBe("application/json; charset=utf-8");
+      const body = await bodyToString(res[2]);
+      expect(res[1]["content-length"]).toBe(String(Buffer.byteLength(body, "utf-8")));
+    } finally {
+      Response.defaultCharset = prior;
+    }
+  });
 });

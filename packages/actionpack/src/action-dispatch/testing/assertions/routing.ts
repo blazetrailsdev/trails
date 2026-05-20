@@ -22,6 +22,9 @@ export interface PathWithMethod {
 
 type Options = Record<string, unknown>;
 
+/** Mirrors Rails' `%r{://}` test for "is this a full URL, not a path?" */
+const URL_FORM_RE = /:\/\//;
+
 /** Initialises `@routes`. Mirrors Rails' `setup`. Call from your own setup. */
 export function setup(this: RoutingAssertionsHost): void {
   if (this.routes == null) this.routes = undefined;
@@ -129,7 +132,23 @@ export function assertGenerates(
   extras: Options = {},
   message?: string,
 ): void {
-  const path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+  let path: string;
+  if (URL_FORM_RE.test(expectedPath)) {
+    // Rails: `URI.parse(expected_path).path` (falls back to "/" when empty).
+    // Ruby's URI accepts relative inputs that contain `://` (e.g. inside a
+    // query string), so use a base URL when WHATWG's absolute parse fails.
+    path = failOn(TypeError, message, () => {
+      let parsed: URL;
+      try {
+        parsed = new URL(expectedPath);
+      } catch {
+        parsed = new URL(expectedPath, "http://localhost");
+      }
+      return parsed.pathname === "" ? "/" : parsed.pathname;
+    });
+  } else {
+    path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+  }
   const routes = requireRoutes(this);
   const opts = { ...options };
   const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
@@ -184,9 +203,43 @@ export function recognizedRequestFor(
 ): TestRequest {
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
   let pathStr = typeof path === "string" ? path : path.path;
-  if (!pathStr.startsWith("/")) pathStr = `/${pathStr}`;
 
   const request = new TestRequest();
+  if (URL_FORM_RE.test(pathStr)) {
+    // Rails uses Ruby's `URI.parse`, which is more permissive than
+    // WHATWG `URL`: a relative path that happens to contain `://` (e.g.
+    // `/items?next=http://example.com`) parses to a `URI::Generic` with
+    // no scheme/host/port. Mirror that by attempting an absolute parse
+    // first and falling back to a base URL when WHATWG rejects the input.
+    let parsed: URL;
+    let isAbsolute = true;
+    try {
+      parsed = new URL(pathStr);
+    } catch {
+      isAbsolute = false;
+      parsed = failOn(TypeError, msg, () => new URL(pathStr, "http://localhost"));
+    }
+    if (isAbsolute) {
+      const scheme = parsed.protocol.replace(/:$/, "");
+      request.env["rack.url_scheme"] = scheme;
+      if (parsed.host) request.env["HTTP_HOST"] = parsed.host;
+      if (parsed.hostname) request.env["SERVER_NAME"] = parsed.hostname;
+      // Rails: `request.port = uri.port if uri.port`. Ruby's URI yields
+      // the default port for known schemes (80/443) and nil otherwise.
+      // WHATWG URL returns "" for default ports, so reapply defaults for
+      // http/https only and leave SERVER_PORT alone for other schemes.
+      if (parsed.port) {
+        request.env["SERVER_PORT"] = parsed.port;
+      } else if (scheme === "https") {
+        request.env["SERVER_PORT"] = "443";
+      } else if (scheme === "http") {
+        request.env["SERVER_PORT"] = "80";
+      }
+    }
+    pathStr = parsed.pathname || "/";
+  } else if (!pathStr.startsWith("/")) {
+    pathStr = `/${pathStr}`;
+  }
   request.env["PATH_INFO"] = pathStr;
   request.env["REQUEST_METHOD"] = method.toUpperCase();
 
