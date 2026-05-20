@@ -5,24 +5,24 @@
 //
 // In Rails this extends `Rails::ApplicationController`. That class is
 // deferred to PR 1.7 (InfoController), so PWAController extends
-// ActionController.Base directly and applies `skipForgeryProtection`
-// inline. Switch to ApplicationController once PR 1.7 lands.
+// ActionController.Base directly and applies `skipBeforeAction` for the
+// CSRF check inline (mirrors `skip_forgery_protection`).
+//
+// NOTE: Base.render() doesn't yet honor the `template:` option — the
+// option is forwarded for Rails-faithful intent, but actual template
+// lookup needs `lookupContext` wiring (Phase 2.x).
 
 import { ActionController } from "@blazetrails/actionpack";
 
+type PWARenderOptions = ActionController.RenderOptions & { template?: string };
+
 export class PWAController extends ActionController.Base {
   serviceWorker(): void {
-    (this.render as (o: Record<string, unknown>) => void)({
-      template: "pwa/service-worker",
-      layout: false,
-    });
+    this.render({ template: "pwa/service-worker", layout: false } as PWARenderOptions);
   }
 
   manifest(): void {
-    (this.render as (o: Record<string, unknown>) => void)({
-      template: "pwa/manifest",
-      layout: false,
-    });
+    this.render({ template: "pwa/manifest", layout: false } as PWARenderOptions);
   }
 }
 

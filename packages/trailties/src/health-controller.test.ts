@@ -8,7 +8,7 @@ describe("HealthController", () => {
     HealthControllerTest.tests(HealthController);
     const t = new HealthControllerTest(HealthController);
     await t.get("show");
-    expect(t.response.statusCode ?? (t.controller as { status: number }).status).toBe(200);
+    expect(t.controller.status).toBe(200);
     expect(t.responseBody).toMatch(/background-color: green/);
   });
 
@@ -22,7 +22,7 @@ describe("HealthController", () => {
     HealthControllerTest.tests(FailingController);
     const t = new HealthControllerTest(FailingController);
     await t.get("show");
-    expect((t.controller as { status: number }).status).toBe(500);
+    expect(t.controller.status).toBe(500);
     expect(t.responseBody).toMatch(/background-color: red/);
   });
 });
