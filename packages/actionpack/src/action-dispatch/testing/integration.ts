@@ -64,6 +64,13 @@ const STATUS_RANGES: Record<string, [number, number]> = {
   error: [500, 599],
 };
 
+const DEFAULT_HOST = "www.example.com";
+const DEFAULT_REMOTE_ADDR = "127.0.0.1";
+const DEFAULT_ACCEPT =
+  "text/xml,application/xml,application/xhtml+xml," +
+  "text/html;q=0.9,text/plain;q=0.8,image/png," +
+  "*/*;q=0.5";
+
 export class IntegrationTest {
   /** The route set for this test. */
   routes: RouteSet = new RouteSet();
@@ -73,6 +80,152 @@ export class IntegrationTest {
 
   /** Session data persisted across requests. */
   session: Record<string, unknown> = {};
+
+  /** The hostname used in the last request. */
+  host: string = DEFAULT_HOST;
+
+  /** The remote address used in the last request. */
+  remoteAddr: string = DEFAULT_REMOTE_ADDR;
+
+  /** The Accept header to send. */
+  accept: string = DEFAULT_ACCEPT;
+
+  /** A running counter of the number of requests processed. */
+  requestCount: number = 0;
+
+  /** @internal */
+  _https: boolean = false;
+
+  /**
+   * Memoized mock-session slot. Rails uses `Rack::MockSession`; we have no
+   * equivalent, so it just holds the persistent cookie/session bag.
+   *
+   * @internal
+   */
+  _mockSessionMemo?: { cookies: Record<string, string>; session: Record<string, unknown> };
+
+  /** @internal */
+  _urlOptions?: Record<string, unknown>;
+
+  constructor() {
+    this.resetBang();
+  }
+
+  /**
+   * Reset the instance. Mirrors `Integration::Session#reset!`. Existing
+   * `reset()` is kept as a friendly alias.
+   */
+  resetBang(): void {
+    this.session = {};
+    this._persistentCookies = {};
+    this._cookieJar = undefined;
+    this.controller = undefined!;
+    this.request = undefined!;
+    this.response = undefined!;
+    this._https = false;
+    this._mockSessionMemo = undefined;
+    this._urlOptions = undefined;
+    this.requestCount = 0;
+    this.host = DEFAULT_HOST;
+    this.remoteAddr = DEFAULT_REMOTE_ADDR;
+    this.accept = DEFAULT_ACCEPT;
+  }
+
+  /** Mirror of Rails `Integration::Session#https!`. */
+  httpsBang(flag: boolean = true): void {
+    this._https = flag;
+  }
+
+  /** Returns true if the session is mimicking a secure HTTPS request. */
+  isHttps(): boolean {
+    return this._https;
+  }
+
+  /**
+   * Default URL options for this session, derived from host/scheme.
+   * Mirrors `Integration::Session#url_options`, memoized per-request like
+   * Rails (cleared inside `_processPath`).
+   */
+  urlOptions(): Record<string, unknown> {
+    this._urlOptions ??= {
+      host: this.host,
+      protocol: this._https ? "https" : "http",
+    };
+    return this._urlOptions;
+  }
+
+  /**
+   * Default URL options getter that Runner clients (e.g. `urlFor`) call.
+   * Returns the same object as `urlOptions()`.
+   */
+  defaultUrlOptions(): Record<string, unknown> {
+    return this.urlOptions();
+  }
+
+  /**
+   * Lazily-built mock-session bag. No `Rack::MockSession` to wrap, so we
+   * surface the persistent state used by the request loop.
+   *
+   * @internal
+   */
+  _mockSession(): { cookies: Record<string, string>; session: Record<string, unknown> } {
+    this._mockSessionMemo ??= { cookies: this._persistentCookies, session: this.session };
+    return this._mockSessionMemo;
+  }
+
+  /**
+   * Build the absolute URI used by `process` when a relative path is given.
+   *
+   * @internal
+   */
+  _buildFullUri(path: string): string {
+    const scheme = this._https ? "https" : "http";
+    const port = this._https ? "443" : "80";
+    const hostPart = this.host.includes(":") ? this.host : `${this.host}:${port}`;
+    return `${scheme}://${hostPart}${path}`;
+  }
+
+  /**
+   * Expand a path that may itself contain a scheme/host, optionally letting
+   * the caller observe the parsed location to update `host`/`https`. Mirrors
+   * `Integration::Session#build_expanded_path`.
+   *
+   * @internal
+   */
+  _buildExpandedPath(path: string, onLocation?: (url: URL) => void): string {
+    if (!path.includes("://")) return path;
+    const location = new URL(path);
+    onLocation?.(location);
+    return location.search ? `${location.pathname}${location.search}` : location.pathname;
+  }
+
+  /**
+   * Rails-shaped `Integration::Session#process`. Verb helpers delegate here.
+   */
+  async process(
+    method: string,
+    path: string,
+    options: IntegrationRequestOptions = {},
+  ): Promise<number> {
+    let expanded = path;
+    if (path.includes("://")) {
+      expanded = this._buildExpandedPath(path, (loc) => {
+        this.httpsBang(loc.protocol === "https:");
+        if (loc.host) this.host = loc.host;
+      });
+    }
+    await this._processPath(method.toUpperCase(), expanded, options);
+    this.requestCount += 1;
+    return this.status;
+  }
+
+  /** Rails-shaped `RequestHelpers#follow_redirect!`. */
+  async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
+    const location = this.redirectUrl;
+    if (!location) throw new Error("not a redirect!");
+    await this.get(location, options);
+    return this.status;
+  }
 
   /** Accumulated cookies across requests (simple key/value), seeds the jar. */
   private _persistentCookies: Record<string, string> = {};
@@ -302,15 +455,10 @@ export class IntegrationTest {
   }
 
   /**
-   * Reset all session state (cookies, session, flash).
+   * Reset all session state (cookies, session, flash). Alias of {@link resetBang}.
    */
   reset(): void {
-    this.session = {};
-    this._persistentCookies = {};
-    this._cookieJar = undefined;
-    this.controller = undefined!;
-    this.request = undefined!;
-    this.response = undefined!;
+    this.resetBang();
   }
 
   // --- Internal ---
@@ -349,9 +497,13 @@ export class IntegrationTest {
     const env: Record<string, unknown> = {
       REQUEST_METHOD: method,
       PATH_INFO: path,
-      HTTP_HOST: "www.example.com",
-      SERVER_NAME: "www.example.com",
-      SERVER_PORT: "80",
+      HTTP_HOST: this.host,
+      SERVER_NAME: this.host.split(":")[0],
+      SERVER_PORT: this.host.split(":")[1] ?? (this._https ? "443" : "80"),
+      HTTPS: this._https ? "on" : "off",
+      "rack.url_scheme": this._https ? "https" : "http",
+      REMOTE_ADDR: this.remoteAddr,
+      HTTP_ACCEPT: this.accept,
       "rack.session": { ...this.session },
       "action_dispatch.request.path_parameters": {
         controller: controllerName,
@@ -371,6 +523,8 @@ export class IntegrationTest {
     // Reset the TestProcess#cookies memoization slot — the jar must reflect
     // the cookies parsed off this request, not the previous one.
     this._cookieJar = undefined;
+    // Clear url-options memo so the next call sees the up-to-date host/scheme.
+    this._urlOptions = undefined;
 
     // Format / content type
     if (options.format || options.as) {
