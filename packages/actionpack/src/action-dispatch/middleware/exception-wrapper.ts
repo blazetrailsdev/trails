@@ -375,7 +375,9 @@ export class ExceptionWrapper {
   }
 
   private computeStatusCode(): number {
-    return STATUS_MAP[this.unwrappedException.name] ?? STATUS_MAP[this.exceptionName] ?? 500;
+    return (
+      STATUS_MAP[classNameOf(this.unwrappedException)] ?? STATUS_MAP[this.exceptionName] ?? 500
+    );
   }
 }
 
