@@ -11,13 +11,8 @@ export interface GemOptions {
 
 export interface ActionsHost {
   output: (msg: string) => void;
-  insertIntoFile(
-    relativePath: string,
-    marker: string,
-    content: string,
-    options?: { after?: boolean },
-  ): void;
-  appendWithNewline(relativePath: string, content: string): void;
+  insertIntoFile(rel: string, marker: string, content: string, opts?: { after?: boolean }): void;
+  appendWithNewline(rel: string, content: string): void;
 }
 
 export interface GeneratorActionsState {

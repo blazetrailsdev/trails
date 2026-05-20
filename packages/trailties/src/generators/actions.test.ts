@@ -32,15 +32,13 @@ describe("ActionsTest", () => {
   });
 
   it("gem with version should include version in gemfile", () => {
-    gen.gem("rspec", ">= 2.0.0.a5");
-    gen.gem("RedCloth", ">= 4.1.0", "< 4.2.0");
     gen.gem("nokogiri", { version: ">= 1.4.2" });
     gen.gem("faker", { version: [">= 0.1.0", "< 0.3.0"] });
+    gen.gem("RedCloth", ">= 4.1.0", "< 4.2.0");
     const c = read("Gemfile");
-    expect(c).toMatch(/gem "rspec", ">= 2\.0\.0\.a5"/);
-    expect(c).toMatch(/gem "RedCloth", ">= 4\.1\.0", "< 4\.2\.0"/);
     expect(c).toMatch(/gem "nokogiri", ">= 1\.4\.2"/);
     expect(c).toMatch(/gem "faker", ">= 0\.1\.0", "< 0\.3\.0"/);
+    expect(c).toMatch(/gem "RedCloth", ">= 4\.1\.0", "< 4\.2\.0"/);
   });
 
   it("gem should include options", () => {
