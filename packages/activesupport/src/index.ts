@@ -37,6 +37,14 @@ export type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.
 export { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 export {
+  EncryptedFile,
+  MissingContentError,
+  MissingKeyError,
+  InvalidKeyLengthError,
+} from "./encrypted-file.js";
+export type { EncryptedFileOptions } from "./encrypted-file.js";
+
+export {
   registerChildProcessAdapter,
   getChildProcess,
   getChildProcessAsync,

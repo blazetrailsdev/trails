@@ -7,21 +7,23 @@ and answers the design decisions you would otherwise have to ask about.
 Open the PR whose dependencies are met; do not deviate from the answers
 below without proposing a plan-doc change first.
 
-## Repo state at plan start
+## Repo state
 
-- Existing trailties: CLI shell only — `commands/`, `generators/`,
-  `server/`, `database.ts`, `migration-loader.ts`, `schema-source.ts`.
-- `pnpm tsx scripts/api-compare/compare.ts --package trailties` baseline:
-  **2/1076 methods (0.2%)** public-only (2/1560 with privates), **1/134 files**.
-  (`pnpm api:compare` is a chained script — args don't reach `compare.ts`.)
-- Existing matches: one method in `generators/actions.ts`, one in
-  `generators/base.ts`. Everything else is greenfield.
+- Existing trailties: CLI shell + Paths + Initializable. `commands/`,
+  `generators/`, `server/`, `database.ts`, `migration-loader.ts`,
+  `schema-source.ts`, `paths.ts`, `initializable.ts`.
+- PRs merged from this plan: **PR 1.1** (Paths, #2020), **PR 1.2**
+  (Initializable, #2024). All other PRs below are open.
 - Actionpack: `MiddlewareStack` exists and is solid. `mount` for engines
   is **missing** (Phase 1.5 prerequisite).
 - Activesupport: `Concern`, `Configurable`, `Callbacks`, `Notifications`,
-  `BacktraceCleaner`, `EventedFileUpdateChecker`, `EncryptedConfiguration`,
-  `EncryptedFile`, `EnvironmentInquirer`, `fsAdapter`, `osAdapter`,
-  `childProcessAdapter`, `cryptoAdapter` all exist.
+  `BacktraceCleaner`, `EventedFileUpdateChecker`,
+  `EnvironmentInquirer`, `fsAdapter`, `osAdapter`,
+  `childProcessAdapter`, `cryptoAdapter`, `MessageEncryptor` all exist.
+- **NOT yet built (despite earlier plan claims):**
+  `EncryptedFile`, `EncryptedConfiguration`. Only `it.skip` test stubs
+  exist at `packages/activesupport/src/encrypted-{file,configuration}.test.ts`.
+  PR 1.6 depends on these — see PR 1.6-pre-a / 1.6-pre-b below.
 
 ## Hard rules
 
@@ -111,55 +113,8 @@ These are the only open items. Each is scoped to a specific PR.
 
 ## Phase 1 — Leaves
 
-PR 1.1 and 1.2 land first; the rest can land in parallel.
-
-### PR 1.1 — `Paths` (~250 LOC)
-
-**Blocks:** PR 2.2, generators that walk paths.
-**Blocked by:** PR 0.2.
-
-**New files:**
-
-- `packages/trailties/src/paths.ts`
-- `packages/trailties/src/paths.test.ts`
-
-**Rails source:** `railties/lib/rails/paths.rb` — `Paths::Root`, `Paths::Path`, `add`, `load_paths`, `existent`, `existent_directories`, `glob:`, `with:`, `expanded`. **Skip** `eager_load!`, `autoload_paths`, `autoload_once`.
-
-**Surface:**
-
-```ts
-export class Root {
-  add(path: string, options?: PathOptions): Path;
-  get(path: string): Path | undefined;
-  all_paths(): Path[];
-  load_paths(): Promise<string[]>;
-}
-export class Path {
-  to(path: string, options?: PathOptions): Path;
-  existent(): Promise<string[]>;
-  existent_directories(): Promise<string[]>;
-  expanded(): Promise<string[]>;
-  // flags: load_path?, glob
-}
-```
-
-### PR 1.2 — `Initializable` (~200 LOC)
-
-**Blocks:** PR 2.1.
-**Blocked by:** none (independent of PR 1.1).
-
-**New files:**
-
-- `packages/trailties/src/initializable.ts`
-- `packages/trailties/src/initializable.test.ts`
-
-**Rails source:** `railties/lib/rails/initializable.rb` — `Initializer`, `Collection`, `tsort_each_node`, `tsort_each_child`, `run_initializers`, class-level `initializer` macro, `initializers`, inheritance merging.
-
-In-tree topo sort (Kahn's). Inheritance merge uses activesupport's `Concern`.
-
-**First commit:** spike — verify `Concern` supports class-side property
-assignment via `Object.defineProperty` on the subclass. If not, factor a
-static-state helper before main work. Resolves open question #1.
+PR 1.1 (Paths, #2020) and PR 1.2 (Initializable, #2024) are merged.
+The remaining Phase 1 PRs can land in parallel.
 
 ### PR 1.3 — Rails `BacktraceCleaner` silencer set (~80 LOC)
 
@@ -205,9 +160,76 @@ static-state helper before main work. Resolves open question #1.
 
 TS regex equivalents for the Ruby method/class patterns: `function` decls, arrow assignments, `class X { method() {} }`, `get`/`set` accessors.
 
+### PR 1.6-pre-a — `EncryptedFile` in activesupport (~250 LOC)
+
+**Blocks:** PR 1.6-pre-b, PR 1.6.
+**Blocked by:** none. Existing `MessageEncryptor` + `cryptoAdapter` +
+async `fsAdapter` are sufficient.
+
+**New files:**
+
+- `packages/activesupport/src/encrypted-file.ts`
+
+**Files changed:**
+
+- `packages/activesupport/src/encrypted-file.test.ts` — flesh out the
+  15 `it.skip` stubs (test names already match Rails verbatim) with real
+  assertions ported from Rails.
+- `packages/activesupport/src/index.ts` — export `EncryptedFile`,
+  `MissingKeyError`, `MissingContentError`, `InvalidKeyLengthError`.
+
+**Rails source:** `activesupport/lib/active_support/encrypted_file.rb`,
+`activesupport/test/encrypted_file_test.rb`.
+
+**Notes / divergences from Rails (as shipped in PR #2148):**
+
+- `read` / `write` / `change` are **async** (use `fsAdapter.exists`,
+  `readFile`, `writeFile`, `rename`, `mkdtemp`, `rmdir`, `unlink`,
+  `realpath`). Rails is sync via `Pathname#binread` + `FileUtils.mv` +
+  `Tempfile.create`. Required for the "async fs only" rule and browser
+  hosts without sync fs.
+- Default serializer is **`NullSerializer`** (raw string in / raw string
+  out). Rails uses `Marshal`; we have no Marshal port. The higher-level
+  `EncryptedConfiguration` (PR 1.6-pre-b) parses contents itself.
+- Default cipher is **`aes-256-cbc`**, with `expectedKeyLength() = 64`
+  hex chars. Rails uses `aes-128-gcm` (key length 32 hex chars); our
+  `MessageEncryptor` does not yet handle GCM auth tags, so the cipher
+  flip is deferred until that lands. Greenfield port with no on-disk
+  Rails compat needed.
+- `env_key` lookup goes through `processAdapter.env`, not `process.env`.
+- `content_path` symlink resolution (Rails' `Pathname#realpath` in
+  `initialize`) is lazy + memoized on first I/O — constructors can't
+  `await`. Behavior equivalent.
+
+### PR 1.6-pre-b — `EncryptedConfiguration` in activesupport (~150 LOC)
+
+**Blocks:** PR 1.6.
+**Blocked by:** PR 1.6-pre-a.
+
+**New files:**
+
+- `packages/activesupport/src/encrypted-configuration.ts`
+
+**Files changed:**
+
+- `packages/activesupport/src/encrypted-configuration.test.ts` — port Rails
+  tests verbatim.
+- `packages/activesupport/src/index.ts` — export
+  `EncryptedConfiguration`, `InvalidContentError`.
+
+**Rails source:** `activesupport/lib/active_support/encrypted_configuration.rb`,
+`activesupport/test/encrypted_configuration_test.rb`.
+
+**Notes:**
+
+- Underlying serializer: JSON (Rails uses YAML). Document divergence.
+- `config` / `[]` accessors return a plain object indexable by string keys
+  (Rails uses `OrderedOptions` / `InheritableOptions`).
+- `validate!` raises `InvalidContentError` if JSON parse fails.
+
 ### PR 1.6 — `Credentials` + `Encrypted` commands (~250 LOC)
 
-**Blocked by:** none.
+**Blocked by:** PR 1.6-pre-a, PR 1.6-pre-b.
 
 **New files:**
 
@@ -220,7 +242,16 @@ TS regex equivalents for the Ruby method/class patterns: `function` decls, arrow
 
 **Rails source:** `railties/lib/rails/application.rb#credentials`, `#encrypted`; `railties/lib/rails/commands/credentials/credentials_command.rb`; `railties/lib/rails/commands/encrypted/encrypted_command.rb`. **Skip** `Rails::Secrets`.
 
-Wraps activesupport's `EncryptedFile` and `EncryptedConfiguration`. `credentials:edit` shells out to `$EDITOR` via `childProcessAdapter`; in browser hosts the no-op spawn rejects with a clear message.
+Wraps activesupport's `EncryptedFile` and `EncryptedConfiguration`.
+`credentials:edit` shells out to `$EDITOR` via `childProcessAdapter`;
+in browser hosts the no-op spawn rejects with a clear message.
+
+**Application dependency:** Rails' commands call
+`Rails.application.encrypted(content_path, key_path:)`. `Application`
+doesn't land until PR 2.5, so PR 1.6 constructs `EncryptedConfiguration`
+directly from CLI flags (`--key`, content path positional arg) and the
+default Rails paths (`config/credentials.yml.enc`, `config/master.key`).
+When PR 2.5 lands, wire `Rails.application.encrypted` and delegate.
 
 ### PR 1.7 — `Info` and `InfoController` (~200 LOC)
 
