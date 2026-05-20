@@ -4,6 +4,157 @@
 
 import { registerDefaultMimeTypes } from "./mime-types.js";
 
+/**
+ * Ordered set of registered MIME types. Mirrors `Mime::Mimes` — Rails uses
+ * this as `Mime::SET`. Iteration order follows registration order; symbol
+ * membership is tracked separately for `validSymbols` checks.
+ */
+export class Mimes {
+  /** @internal */
+  private _mimes: MimeType[] = [];
+  /** @internal */
+  private _symbols: string[] = [];
+  /** @internal */
+  private _symbolsSet: Set<string> = new Set();
+
+  get symbols(): string[] {
+    return this._symbols;
+  }
+
+  each(callback: (type: MimeType) => void): void {
+    for (const m of this._mimes) callback(m);
+  }
+
+  /** @internal Mirrors Ruby `<<`. */
+  push(type: MimeType): void {
+    this._mimes.push(type);
+    const sym = type.toSym();
+    this._symbols.push(sym);
+    this._symbolsSet.add(sym);
+  }
+
+  deleteIf(predicate: (type: MimeType) => boolean): void {
+    const kept: MimeType[] = [];
+    const removed = new Set<string>();
+    for (const m of this._mimes) {
+      if (predicate(m)) {
+        removed.add(m.toSym());
+      } else {
+        kept.push(m);
+      }
+    }
+    this._mimes = kept;
+    this._symbols = this._symbols.filter((s) => !removed.has(s));
+    for (const sym of removed) this._symbolsSet.delete(sym);
+  }
+
+  /** @internal */
+  validSymbols(symbols: string[]): boolean {
+    return symbols.every((s) => this._symbolsSet.has(s));
+  }
+
+  /** @internal */
+  select(predicate: (type: MimeType) => boolean): MimeType[] {
+    return this._mimes.filter(predicate);
+  }
+}
+
+/**
+ * A simple helper used in parsing the Accept header. Mirrors
+ * `Mime::Type::AcceptItem`.
+ *
+ * @internal
+ */
+export class AcceptItem {
+  index: number;
+  name: string;
+  q: number;
+
+  constructor(index: number, name: string, q?: number | string | null) {
+    this.index = index;
+    this.name = name;
+    let qNum: number;
+    if (q === null || q === undefined) {
+      qNum = name === "*/*" ? 0.0 : 1.0;
+    } else {
+      qNum = typeof q === "string" ? parseFloat(q) : q;
+      if (Number.isNaN(qNum)) qNum = 1.0;
+    }
+    this.q = Math.trunc(qNum * 100);
+  }
+
+  /** @internal Three-way comparator used by `AcceptList.sortBang`. */
+  compare(other: AcceptItem): number {
+    const result = other.q - this.q;
+    if (result !== 0) return result;
+    return this.index - other.index;
+  }
+}
+
+/**
+ * Sort helpers for the parsed Accept-header list. Mirrors
+ * `Mime::Type::AcceptList`.
+ *
+ * @internal
+ */
+export class AcceptList {
+  static sortBang(list: AcceptItem[]): MimeType[] {
+    list.sort((a, b) => a.compare(b));
+
+    let textXmlIdx = AcceptList.findItemByName(list, "text/xml");
+    const xml = MimeType.lookup("xml");
+    let appXmlIdx = xml ? AcceptList.findItemByName(list, xml.toString()) : null;
+
+    if (textXmlIdx !== null && appXmlIdx !== null) {
+      const appXml = list[appXmlIdx];
+      const textXml = list[textXmlIdx];
+      appXml.q = Math.max(textXml.q, appXml.q);
+      if (appXmlIdx > textXmlIdx) {
+        list[appXmlIdx] = textXml;
+        list[textXmlIdx] = appXml;
+        [appXmlIdx, textXmlIdx] = [textXmlIdx, appXmlIdx];
+      }
+      list.splice(textXmlIdx, 1);
+      if (appXmlIdx > textXmlIdx) appXmlIdx--;
+    } else if (textXmlIdx !== null && xml) {
+      list[textXmlIdx].name = xml.toString();
+    }
+
+    if (appXmlIdx !== null) {
+      const appXml = list[appXmlIdx];
+      let idx = appXmlIdx;
+      while (idx < list.length) {
+        const type = list[idx];
+        if (type.q < appXml.q) break;
+        if (type.name.endsWith("+xml")) {
+          list[appXmlIdx] = list[idx];
+          list[idx] = appXml;
+          appXmlIdx = idx;
+        }
+        idx++;
+      }
+    }
+
+    const seen = new Set<string>();
+    const out: MimeType[] = [];
+    for (const item of list) {
+      const looked = MimeType.lookup(item.name) ?? new MimeType(item.name, item.name);
+      if (!seen.has(looked.toString())) {
+        seen.add(looked.toString());
+        out.push(looked);
+      }
+    }
+    return out;
+  }
+
+  static findItemByName(list: AcceptItem[], name: string): number | null {
+    const idx = list.findIndex((item) => item.name === name);
+    return idx === -1 ? null : idx;
+  }
+}
+
+const TRAILING_STAR_REGEXP = /^(text|application)\/\*/;
+
 export class MimeType {
   /** @internal */
   readonly string: string;
@@ -14,6 +165,9 @@ export class MimeType {
   private static registry: Map<string, MimeType> = new Map();
   private static extensionMap: Map<string, MimeType> = new Map();
   private static callbacks: Array<(type: MimeType) => void> = [];
+
+  /** Ordered set of all registered MIME types. Mirrors `Mime::SET`. */
+  static readonly SET: Mimes = new Mimes();
 
   constructor(string: string, symbol: string, synonyms: string[] = []) {
     this.string = string;
@@ -39,6 +193,14 @@ export class MimeType {
     return this.symbol;
   }
 
+  toSym(): string {
+    return this.symbol;
+  }
+
+  isHtml(): boolean {
+    return this.symbol === "html" || this.string.includes("html");
+  }
+
   equals(other: MimeType | string | symbol): boolean {
     if (other instanceof MimeType) return this.string === other.string;
     if (typeof other === "symbol") return this.symbol === other.toString();
@@ -54,6 +216,7 @@ export class MimeType {
     extensions: string[] = [],
   ): MimeType {
     const type = new MimeType(string, symbol, synonyms);
+    MimeType.SET.push(type);
     MimeType.registry.set(symbol, type);
     MimeType.registry.set(string, type);
     for (const syn of synonyms) {
@@ -80,6 +243,7 @@ export class MimeType {
   static unregister(symbol: string): void {
     const type = MimeType.registry.get(symbol);
     if (!type) return;
+    MimeType.SET.deleteIf((v) => v === type);
     // Sweep every registry entry whose value is this type — captures
     // the symbol, string, synonyms, AND any aliases added later via
     // registerAlias(). Avoids partial removals where lookup() still
@@ -121,6 +285,32 @@ export class MimeType {
 
   static onRegister(callback: (type: MimeType) => void): void {
     MimeType.callbacks.push(callback);
+  }
+
+  /** Rails-named alias of {@link onRegister}. */
+  static registerCallback(callback: (type: MimeType) => void): void {
+    MimeType.onRegister(callback);
+  }
+
+  /** @internal */
+  static parseTrailingStar(acceptHeader: string): MimeType[] | null {
+    const m = acceptHeader.match(TRAILING_STAR_REGEXP);
+    if (!m) return null;
+    return MimeType.parseDataWithTrailingStar(m[1]);
+  }
+
+  /**
+   * For an input of `'text'`, returns all registered MIME types whose
+   * string or any synonym contains `'text'` as a substring (Rails uses
+   * `Regexp.new(Regexp.quote(type))` against each, so the match is
+   * substring, not prefix). Mirrors `Mime::Type.parse_data_with_trailing_star`.
+   *
+   * @internal
+   */
+  static parseDataWithTrailingStar(type: string): MimeType[] {
+    return MimeType.SET.select(
+      (m) => m.string.includes(type) || m.synonyms.some((s) => s.includes(type)),
+    );
   }
 
   // --- Parsing ---
@@ -244,3 +434,25 @@ export class MimeType {
 }
 
 registerDefaultMimeTypes(MimeType);
+
+/**
+ * Module-level helpers from Ruby's `Mime` module. Rails exposes these as
+ * `Mime.fetch(:html)` etc.; in TS they hang off this object so callers can
+ * write `Mime.fetch("html")`.
+ */
+export const Mime = {
+  /**
+   * Look up a MIME type by extension. Returns the result of `fallback` if
+   * the extension is not registered (Rails raises `KeyError`; the callback
+   * lets callers mirror that or supply a default).
+   */
+  fetch(type: MimeType | string, fallback?: (key: string) => MimeType): MimeType {
+    if (type instanceof MimeType) return type;
+    const found = MimeType.lookupByExtension(type);
+    if (found) return found;
+    if (fallback) return fallback(type);
+    const err = new Error(`key not found: "${type}"`);
+    err.name = "KeyError";
+    throw err;
+  },
+};
