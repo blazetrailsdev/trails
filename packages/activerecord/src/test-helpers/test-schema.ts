@@ -995,11 +995,15 @@ export const TEST_SCHEMA: Schema = {
     tenant_id: "integer",
   },
 
-  // PR 0.5f group: S-W range. Covers the second
+  // PR 0.5f group: S-W range in Rails source order. Covers the second
   // `disable_referential_integrity` block (seminars..sections), the
   // shape_/shipping_/ship/* run, S-strays, T-tables, U-V, and
-  // "warehouse-things". The remaining tail (circles..long-table-name
-  // plus fk_test_* and overloaded_types) lands in sibling PR 0.5g.
+  // "warehouse-things". Rails sandwiches `prisoners` (P-prefix) between
+  // `squeaks` and `sinks` at schema.rb:1137; we keep Rails' declaration
+  // order rather than alphabetizing (same convention as `having` in
+  // the G block and `cold_jokes` in the F block). The remaining tail
+  // (circles..long-table-name plus fk_test_* and overloaded_types)
+  // lands in sibling PR 0.5g.
 
   seminars: { name: "string" },
 
