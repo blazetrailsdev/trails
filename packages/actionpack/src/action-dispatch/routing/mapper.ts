@@ -485,7 +485,7 @@ export class Mapper {
     delete matchOpts.at;
     this.match(path, matchOpts);
     if (asName) this._mountedApps.set(asName, { app, path });
-    if (railsApp && asName) this.defineGeneratePrefix(app, asName);
+    if (railsApp && asName) this.defineGeneratePrefix(app, asName, path);
   }
 
   /** @internal */
@@ -513,20 +513,20 @@ export class Mapper {
   }
 
   /**
-   * Records a `script_namer` for a mounted Rails engine so the engine's URL
+   * Records a `scriptNamer` for a mounted Rails engine so the engine's URL
    * helpers can prefix generated paths with the mount point. Mirrors Rails'
-   * `define_generate_prefix(app, name)` registration step; the Rails impl
-   * additionally extends `app.routes` with `find_script_name` /
-   * `optimize_routes_generation?`, which trails wires via the
-   * {@link _mountedScriptNamers} map when the engine helper layer lands.
+   * `define_generate_prefix(app, name)` registration step. Option keys
+   * (`scriptName`, `originalScriptName`) follow the project-wide camelCase
+   * convention (see CLAUDE.md); Rails' `:script_name` / `:original_script_name`
+   * are the same value under their Ruby-side names.
    *
    * @internal
    */
-  defineGeneratePrefix(app: MountableApp, name: string): void {
+  defineGeneratePrefix(app: MountableApp, name: string, mountPath: string): void {
     const scriptNamer = (options: Record<string, unknown>): string => {
-      const prefixOptions: Record<string, unknown> = { ...options };
-      if (options.originalScriptName) prefixOptions.scriptName = "";
-      return `/${name}${prefixOptions.scriptName ? `${prefixOptions.scriptName}` : ""}`;
+      if (options.originalScriptName) return mountPath;
+      const sn = options.scriptName;
+      return typeof sn === "string" && sn.length > 0 ? sn : mountPath;
     };
     this._mountedScriptNamers.set(name, { app, scriptNamer });
   }
@@ -743,11 +743,19 @@ export class Mapper {
     const namePrefix = this.currentNamePrefix();
     const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
 
+    // Merge scope defaults (set via the `defaults(...)` DSL) under per-call defaults.
+    const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
+    const mergedDefaults =
+      scopeDefaults || options.defaults
+        ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
+        : undefined;
+
     this.routes.push(
       new Route(verb, fullPath, controller, action, {
         ...options,
         name: fullName,
         redirect: redirectTarget,
+        defaults: mergedDefaults,
       }),
     );
   }
