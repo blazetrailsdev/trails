@@ -3731,6 +3731,20 @@ export class Relation<T extends Base> {
     return Array.isArray(pk) ? pk.includes(col) : pk === col;
   }
 
+  /**
+   * Quote a bare column identifier using the active adapter. Mirrors Rails'
+   * `arel_column` fallback (`yield field` → `connection.quote_table_name(name)`):
+   * an unknown column under a `from(subquery)` context must emit as bare
+   * `"col"` / `` `col` ``, not `table.col`. We can't use
+   * `Nodes.UnqualifiedColumn(table.get(col))` here because the MySQL visitor
+   * overrides that to delegate to the inner Attribute (needed for `UPDATE
+   * SET t.x = t.x + 1`), which re-qualifies the name.
+   * @internal
+   */
+  private _quoteBareColumn(name: string): string {
+    return this._modelClass.adapter.quoteColumnName(name);
+  }
+
   private _applyOrderToManager(manager: SelectManager, table: Table): void {
     // Raw order clauses (from inOrderOf)
     for (const rawClause of this._rawOrderClauses) {
@@ -3755,11 +3769,11 @@ export class Relation<T extends Base> {
             // Any dotted identifier (one or more dots) passes through as raw SQL.
             if (rawCol.includes(".")) {
               manager.order(new Nodes.SqlLiteral(trimmed));
+            } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
+              const lit = new Nodes.SqlLiteral(this._quoteBareColumn(rawCol));
+              manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
             } else {
-              const node =
-                !this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)
-                  ? new Nodes.UnqualifiedColumn(table.get(rawCol))
-                  : table.get(rawCol);
+              const node = table.get(rawCol);
               manager.order(
                 dir === "DESC" ? new Nodes.Descending(node) : new Nodes.Ascending(node),
               );
@@ -3768,11 +3782,13 @@ export class Relation<T extends Base> {
             // Not "col DIR" form. Only wrap plain letter-start identifiers;
             // everything else (positional "1", NULLS FIRST, commas, etc.) is raw SQL.
             if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
-              const node =
-                !this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)
-                  ? new Nodes.UnqualifiedColumn(table.get(trimmed))
-                  : table.get(trimmed);
-              manager.order(new Nodes.Ascending(node));
+              if (!this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)) {
+                manager.order(
+                  new Nodes.Ascending(new Nodes.SqlLiteral(this._quoteBareColumn(trimmed))),
+                );
+              } else {
+                manager.order(new Nodes.Ascending(table.get(trimmed)));
+              }
             } else {
               manager.order(new Nodes.SqlLiteral(trimmed));
             }
@@ -3786,10 +3802,8 @@ export class Relation<T extends Base> {
           const lit = new Nodes.SqlLiteral(col);
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {
-          const unqual = new Nodes.UnqualifiedColumn(table.get(col));
-          manager.order(
-            dir === "desc" ? new Nodes.Descending(unqual) : new Nodes.Ascending(unqual),
-          );
+          const lit = new Nodes.SqlLiteral(this._quoteBareColumn(col));
+          manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else {
           manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
         }
