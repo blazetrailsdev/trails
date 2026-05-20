@@ -157,6 +157,8 @@ export function quote(value: unknown): string {
     return String(value);
   }
   if (value instanceof Uint8Array) return quotedBinary(value);
+  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
+  if (value instanceof BinaryData) return quotedBinary(value.bytes);
   if (typeof value === "string") return quoteString(value);
   return abstractQuote(value);
 }

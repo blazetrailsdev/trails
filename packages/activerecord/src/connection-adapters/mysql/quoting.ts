@@ -19,6 +19,7 @@ import {
   formatPlainTimeForSqlMysql as formatPlainTimeForSql,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -187,6 +188,8 @@ export function quote(value: unknown): string {
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
   if (value instanceof Buffer || value instanceof Uint8Array) return quotedBinary(value);
+  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
+  if (value instanceof BinaryData) return quotedBinary(value.bytes);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");

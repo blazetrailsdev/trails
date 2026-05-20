@@ -15,6 +15,7 @@ import {
   formatPlainTimeForSql,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -93,6 +94,9 @@ export function quote(value: unknown): string {
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
     return quotedBinary(value);
   }
+  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
+  // BinaryData wraps raw bytes from serialize() (e.g. encryption ciphertext for binary columns).
+  if (value instanceof BinaryData) return quotedBinary(value.bytes);
   if (typeof value === "function" && value.name) {
     return quoteString(value.name);
   }

@@ -585,21 +585,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const overridingInstance = found!.becomes(OverridingBook);
     expect(overridingInstance.name).toBe("Dune-overridden");
   });
-  // BLOCKED on TM Phase 9a follow-up (Category B): encryption binary writes
-  // bypass type.serialize so the EncryptedMessage object reaches
-  // adapter.quote() and throws. Pre-existed; the prior fixSqliteCompat regex
-  // wrap masked it because the dormant-visitor fallback used Arel's lenient
-  // defaultQuoter (String-coerced unknown objects → silent garbage insert).
-  // Fix at the encryption type/serialize layer, not the visitor.
-  it.skip("binary data can be encrypted", async () => {
+  it("binary data can be encrypted", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
     expect((await Book.create({ logo: allBytes })).logo).toEqual(allBytes);
     expect((await Book.create({ logo: null })).logo).toBeNull();
     expect((await Book.create({ logo: new Uint8Array(0) })).logo).toEqual(new Uint8Array(0));
   });
-  // BLOCKED on TM Phase 9a follow-up (Category B): see preceding skip.
-  it.skip("binary data can be encrypted uncompressed", async () => {
+  it("binary data can be encrypted uncompressed", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
