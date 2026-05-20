@@ -19,7 +19,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await defineSchema(adapter, { bind_test: { name: "string" } });
+    // `dropExisting: true` makes this file repeatable against a
+    // non-empty PG test DB — a prior aborted run could leave `bind_test`
+    // behind, and the per-adapter signature cache starts empty in a
+    // fresh process, so defineSchema would otherwise try CREATE TABLE
+    // over an existing table.
+    await defineSchema(adapter, { bind_test: { name: "string" } }, { dropExisting: true });
     await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
   });
 
