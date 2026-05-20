@@ -1,8 +1,10 @@
 export {
   CookieStore,
-  CookieOverflow,
-  type CookieStoreOptions,
-  type SessionData,
+  SessionId as CookieStoreSessionId,
+  DEFAULT_SAME_SITE,
+  type CookieStoreSessionOptions,
+  type CookieStoreRequest,
+  type CookieJarLike,
 } from "./cookie-store.js";
 
 export {
