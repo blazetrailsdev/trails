@@ -1,35 +1,24 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { appCommand } from "./app.js";
 
-let tmpDir: string;
-let origCwd: string;
-
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-app-cmd-"));
-  origCwd = process.cwd();
-  process.chdir(tmpDir);
-});
-
-afterEach(() => {
-  process.chdir(origCwd);
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
 describe("AppCommandTest", () => {
   it("app:template applies a template that calls the gem DSL", async () => {
-    const templatePath = path.join(tmpDir, "template.mjs");
-    fs.writeFileSync(
-      templatePath,
-      'export default function (gen) { gen.gem("rspec-rails", { group: "test" }); }\n',
-    );
-
-    const program = appCommand();
-    await program.parseAsync(["node", "app", "template", templatePath]);
-
-    const gemfile = fs.readFileSync(path.join(tmpDir, "Gemfile"), "utf-8");
-    expect(gemfile).toContain('gem "rspec-rails", group: "test"');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-app-cmd-"));
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const tmpl = path.join(tmpDir, "template.mjs");
+      fs.writeFileSync(tmpl, 'export default (g) => g.gem("rspec-rails", { group: "test" });\n');
+      await appCommand().parseAsync(["node", "app", "template", tmpl]);
+      expect(fs.readFileSync(path.join(tmpDir, "Gemfile"), "utf-8")).toContain(
+        'gem "rspec-rails", group: "test"',
+      );
+    } finally {
+      process.chdir(origCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

@@ -66,16 +66,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output(`      append  ${relativePath}`);
   }
 
-  appendWithNewline(relativePath: string, content: string): void {
-    const fullPath = this.path.join(this.cwd, relativePath);
-    if (!this.fs.existsSync(fullPath)) {
-      this.createFile(relativePath, content + "\n");
-      return;
-    }
+  appendWithNewline(rel: string, content: string): void {
+    const fullPath = this.path.join(this.cwd, rel);
+    if (!this.fs.existsSync(fullPath)) return this.createFile(rel, content + "\n");
     const existing = this.fs.readFileSync(fullPath, "utf-8");
-    const prefix = existing.endsWith("\n") ? "" : "\n";
-    this.fs.appendFileSync(fullPath, prefix + content + "\n");
-    this.output(`      append  ${relativePath}`);
+    this.fs.appendFileSync(fullPath, (existing.endsWith("\n") ? "" : "\n") + content + "\n");
+    this.output(`      append  ${rel}`);
   }
 
   insertIntoFile(
