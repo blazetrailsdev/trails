@@ -25,6 +25,7 @@ const aliases = {
   "@blazetrails/rack": path.resolve(__dirname, "../rack/src/index.ts"),
   "@blazetrails/actionview": path.resolve(__dirname, "../actionview/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "../actionpack/src/index.ts"),
+  "@blazetrails/did-you-mean": path.resolve(__dirname, "../did-you-mean/src/index.ts"),
   "@blazetrails/trailties/generators": path.resolve(
     __dirname,
     "../trailties/src/generators/index.ts",

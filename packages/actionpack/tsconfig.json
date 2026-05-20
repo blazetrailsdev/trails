@@ -10,6 +10,7 @@
     { "path": "../actionview" },
     { "path": "../activemodel" },
     { "path": "../activesupport" },
+    { "path": "../did-you-mean" },
     { "path": "../rack" }
   ]
 }
