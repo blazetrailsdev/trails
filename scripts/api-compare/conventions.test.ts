@@ -35,6 +35,33 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("name")).toBe("name");
     expect(snakeToCamel("expr")).toBe("expr");
   });
+
+  it("renames `erb` token to `tse` (trails uses .tse in place of .erb)", () => {
+    expect(snakeToCamel("erb")).toBe("tse");
+    expect(snakeToCamel("erb_handler")).toBe("tseHandler");
+    expect(snakeToCamel("compile_erb")).toBe("compileTse");
+    expect(snakeToCamel("compile_erb_template")).toBe("compileTseTemplate");
+    expect(snakeToCamel("_erb_source")).toBe("_tseSource");
+  });
+
+  it("renames `ERB` and `Erb` constant-token casings (dot-notation names)", () => {
+    // Mirrors the `visit_Arel_Nodes_X` dot-notation pattern: Ruby methods that
+    // walk constants embed module names verbatim as snake segments. ERB-token
+    // constants (both ALL-CAPS like `ERB` and PascalCase like `Erb`) must
+    // rename the same way for api:compare to match the TS counterpart.
+    expect(snakeToCamel("visit_ERB")).toBe("visitTSE");
+    expect(snakeToCamel("visit_ERB_Template")).toBe("visitTSETemplate");
+    expect(snakeToCamel("visit_Erb_Node")).toBe("visitTseNode");
+  });
+
+  it("does NOT rename `erb` when it appears as a substring of another token", () => {
+    // Guard: only standalone snake-case segments should be substituted,
+    // not embedded substrings like `verb`, `verbatim`, `superb`, `reverb`.
+    expect(snakeToCamel("verb")).toBe("verb");
+    expect(snakeToCamel("verbatim_copy")).toBe("verbatimCopy");
+    expect(snakeToCamel("http_verb")).toBe("httpVerb");
+    expect(snakeToCamel("superb_thing")).toBe("superbThing");
+  });
 });
 
 describe("rubyMethodToTs", () => {
