@@ -1,9 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/explain_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -15,26 +16,18 @@ afterAll(() => {
 
 // EXPLAIN tests build their own ad-hoc `ex_*` tables; nothing is
 // expressible as a static defineSchema spec. defineSchema(adapter, {})
-// marks the file as TM-Phase-5 compliant.
+// marks the file as TM-Phase-5 compliant. The outer transaction wrapping
+// each test rolls back those tables (PG DDL is transactional).
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await defineSchema(adapter, {});
   });
-  afterEach(async () => {
-    try {
-      const tables = await adapter.execute(
-        `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'ex_%'`,
-      );
-      for (const t of tables) {
-        await adapter.exec(`DROP TABLE IF EXISTS "${t.tablename}" CASCADE`);
-      }
-    } catch {
-      // ignore cleanup errors
-    }
+  afterAll(async () => {
     await adapter.close();
   });
+  withTransactionalFixtures(() => adapter);
 
   describe("PostgresqlExplainTest", () => {
     it("explain for one query", async () => {

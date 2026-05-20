@@ -1,9 +1,10 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/datatype_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,24 +18,17 @@ afterAll(() => {
 // types (interval, oid, name, char) that aren't expressible via defineSchema.
 // They're created via raw DDL inside each test; defineSchema(adapter, {}) marks
 // the file as TM-Phase-5 compliant (auto-schema path disabled, no model relies
-// on it).
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await defineSchema(adapter, {});
-  return adapter;
-}
-
+// on it). The outer per-test transaction rolls back DDL between tests.
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await defineSchema(adapter, {});
   });
-  afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS ex CASCADE`);
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_times CASCADE`);
-    await adapter.exec(`DROP TABLE IF EXISTS postgresql_oids CASCADE`);
+  afterAll(async () => {
     await adapter.close();
   });
+  withTransactionalFixtures(() => adapter);
 
   async function setupTimesTable() {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_times`);

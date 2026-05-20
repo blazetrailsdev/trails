@@ -1,10 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/json_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,25 +18,21 @@ afterAll(() => {
 // The `json_test` table uses the PG-specific `JSON` and `JSONB` types,
 // which aren't expressible via defineSchema. The table is created via raw
 // DDL below; defineSchema(adapter, {}) marks the file as TM-Phase-5 compliant.
-async function freshAdapter(): Promise<PostgreSQLAdapter> {
-  const adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  await defineSchema(adapter, {});
-  return adapter;
-}
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await defineSchema(adapter, {});
     await adapter.exec(`DROP TABLE IF EXISTS "json_test"`);
     await adapter.exec(
       `CREATE TABLE "json_test" ("id" SERIAL PRIMARY KEY, "settings" JSON, "prefs" JSONB, "name" VARCHAR(255))`,
     );
   });
-  afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS "json_test"`);
+  afterAll(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS "json_test"`).catch(() => {});
     await adapter.close();
   });
+  withTransactionalFixtures(() => adapter);
 
   describe("PostgresqlJsonTest", () => {
     it("json column", async () => {

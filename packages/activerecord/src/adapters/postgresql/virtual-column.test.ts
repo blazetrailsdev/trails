@@ -1,10 +1,11 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/virtual_column_test.rb
  */
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -21,7 +22,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let VirtualColumn: any;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
     await defineSchema(adapter, {});
     await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
@@ -45,10 +46,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     await VirtualColumn.create({ name: "Rails" });
   });
 
-  afterEach(async () => {
-    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`);
+  afterAll(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS virtual_columns`).catch(() => {});
     await adapter.close();
   });
+  withTransactionalFixtures(() => adapter);
 
   describe("PostgresqlVirtualColumnTest", () => {
     it("virtual column with full inserts", async () => {
