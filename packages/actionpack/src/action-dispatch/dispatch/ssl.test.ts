@@ -92,7 +92,7 @@ describe("RedirectSSLTest", () => {
       PATH_INFO: "/",
       REQUEST_METHOD: "GET",
     });
-    expect(headers["strict-transport-security"]).toBe("max-age=31536000");
+    expect(headers["strict-transport-security"]).toBe("max-age=63072000; includeSubDomains");
   });
 
   it("HSTS with subdomains", async () => {
@@ -125,7 +125,7 @@ describe("RedirectSSLTest", () => {
       PATH_INFO: "/",
       REQUEST_METHOD: "GET",
     });
-    expect(headers["strict-transport-security"]).toBe("max-age=3600");
+    expect(headers["strict-transport-security"]).toBe("max-age=3600; includeSubDomains");
   });
 
   it("HSTS disabled", async () => {
@@ -136,7 +136,7 @@ describe("RedirectSSLTest", () => {
       PATH_INFO: "/",
       REQUEST_METHOD: "GET",
     });
-    expect(headers["strict-transport-security"]).toBeUndefined();
+    expect(headers["strict-transport-security"]).toBe("max-age=0; includeSubDomains");
   });
 
   it("no HSTS on HTTP", async () => {

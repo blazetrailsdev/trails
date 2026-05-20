@@ -36,10 +36,14 @@ export class RequestId {
     const headerKey = `HTTP_${this.header.toUpperCase().replace(/-/g, "_")}`;
     const existing = env[headerKey] as string | undefined;
     if (existing) {
-      // Sanitize: only allow alphanumeric, dashes, and underscores
-      const sanitized = existing.replace(/[^\w-]/g, "").slice(0, 255);
+      const sanitized = existing.replace(/[^\w-@]/g, "").slice(0, 255);
       if (sanitized.length > 0) return sanitized;
     }
+    return this.internalRequestId();
+  }
+
+  /** @internal */
+  private internalRequestId(): string {
     return getCrypto().randomUUID();
   }
 }
