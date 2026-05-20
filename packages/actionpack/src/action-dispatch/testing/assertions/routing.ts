@@ -22,6 +22,9 @@ export interface PathWithMethod {
 
 type Options = Record<string, unknown>;
 
+/** Mirrors Rails' `%r{://}` test for "is this a full URL, not a path?" */
+const URL_FORM_RE = /:\/\//;
+
 /** Initialises `@routes`. Mirrors Rails' `setup`. Call from your own setup. */
 export function setup(this: RoutingAssertionsHost): void {
   if (this.routes == null) this.routes = undefined;
@@ -129,7 +132,16 @@ export function assertGenerates(
   extras: Options = {},
   message?: string,
 ): void {
-  const path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+  let path: string;
+  if (URL_FORM_RE.test(expectedPath)) {
+    // Rails: `URI.parse(expected_path).path` (falls back to "/" when empty).
+    path = failOn(TypeError, message, () => {
+      const parsed = new URL(expectedPath);
+      return parsed.pathname === "" ? "/" : parsed.pathname;
+    });
+  } else {
+    path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+  }
   const routes = requireRoutes(this);
   const opts = { ...options };
   const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
@@ -184,9 +196,20 @@ export function recognizedRequestFor(
 ): TestRequest {
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
   let pathStr = typeof path === "string" ? path : path.path;
-  if (!pathStr.startsWith("/")) pathStr = `/${pathStr}`;
 
   const request = new TestRequest();
+  if (URL_FORM_RE.test(pathStr)) {
+    // Rails: when path is a full URL, populate rack.url_scheme + host/port from
+    // the parsed URI and use only its path segment for recognition.
+    const parsed = failOn(TypeError, msg, () => new URL(pathStr));
+    request.env["rack.url_scheme"] = parsed.protocol.replace(/:$/, "");
+    request.env["HTTP_HOST"] = parsed.host;
+    request.env["SERVER_NAME"] = parsed.hostname;
+    if (parsed.port) request.env["SERVER_PORT"] = parsed.port;
+    pathStr = parsed.pathname || "/";
+  } else if (!pathStr.startsWith("/")) {
+    pathStr = `/${pathStr}`;
+  }
   request.env["PATH_INFO"] = pathStr;
   request.env["REQUEST_METHOD"] = method.toUpperCase();
 

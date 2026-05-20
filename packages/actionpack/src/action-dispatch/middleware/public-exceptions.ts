@@ -74,11 +74,19 @@ export class PublicExceptions {
   }
 
   private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
-    const bytes = Buffer.byteLength(body, "utf-8");
+    const charset = Response.defaultCharset;
+    // Buffer.byteLength accepts the same encoding tokens Rails ships
+    // (`Response.default_charset` defaults to "utf-8"); narrow to known
+    // values so a misconfigured charset can't crash the error middleware.
+    const enc: BufferEncoding =
+      charset === "utf-8" || charset === "utf8" || charset === "latin1" || charset === "ascii"
+        ? (charset as BufferEncoding)
+        : "utf-8";
+    const bytes = Buffer.byteLength(body, enc);
     return [
       status,
       {
-        "content-type": `${contentType}; charset=${Response.defaultCharset}`,
+        "content-type": `${contentType}; charset=${charset}`,
         "content-length": String(bytes),
       },
       bodyFromString(body),
