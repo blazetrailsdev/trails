@@ -48,7 +48,7 @@ export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHa
   }
   const existing = flashHash.call(this);
   if (existing) return existing;
-  const built = FlashHash.fromSessionValue(this.session.get("flash") as never);
+  const built = FlashHash.fromSessionValue(this.session.get("flash"));
   this.env[FLASH_KEY] = built;
   return built;
 }
@@ -290,18 +290,23 @@ export class FlashHash {
     return copy;
   }
 
-  static fromSessionValue(
-    value: FlashHash | Record<string, unknown> | null | undefined,
-  ): FlashHash {
+  static fromSessionValue(value: unknown): FlashHash {
     if (value === null || value === undefined) return new FlashHash();
     if (value instanceof FlashHash) return value.dup();
+    if (typeof value !== "object") return new FlashHash();
     // Rails 4.0+ session shape: `{ "flashes" => Hash, "discard" => Array }`.
     // Rails' `flashes.except!(*discard)` removes the keys the prior request
     // marked for discard, then `new(flashes, flashes.keys)` marks every
     // remaining key for sweep — they live through this request and are
     // dropped on the next one.
-    const flashes = (value["flashes"] ?? value) as Record<string, unknown>;
-    const discard = (value["discard"] as string[]) ?? [];
+    const obj = value as Record<string, unknown>;
+    const flashesRaw = obj["flashes"];
+    const flashes = (flashesRaw && typeof flashesRaw === "object" ? flashesRaw : obj) as Record<
+      string,
+      unknown
+    >;
+    const discardRaw = obj["discard"];
+    const discard = Array.isArray(discardRaw) ? (discardRaw as string[]) : [];
     const discardSet = new Set(discard);
     const out = new FlashHash();
     for (const [k, v] of Object.entries(flashes)) {
