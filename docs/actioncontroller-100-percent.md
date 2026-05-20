@@ -1,8 +1,8 @@
 # ActionController: Road to 100%
 
-`pnpm tsx scripts/api-compare/compare.ts --package actioncontroller`
-→ **236/414 methods (57%)** public-only (252/581, 43.4% with privates);
-**28 of 41 files at 100%**.
+Current (2026-05-20):
+`pnpm tsx scripts/api-compare/compare.ts --package actioncontroller --privates`
+→ **429/581 methods (73.8%)**; **34 of 43 files at 100%**.
 
 > `pnpm api:compare` is a chained `&&` script and won't forward
 > `--package` to `compare.ts`; invoke `compare.ts` directly for the
@@ -20,13 +20,12 @@ instead, and why.
 `YAML.safe_load` round-trips.
 **Us:** No-op. TypeScript has no built-in YAML deserialization that needs hooking.
 
-### DidYouMean corrections (`ParameterMissing.corrections`, `UrlGenerationError.corrections`)
+### DidYouMean corrections — closed (no longer a divergence)
 
-**Rails:** Uses `DidYouMean::SpellChecker` (Jaro-Winkler distance) integrated
-into Ruby's error reporting.
-**Us:** `ParameterMissing` uses Levenshtein distance ≤ 2.
-`UrlGenerationError` uses case-insensitive substring matching. Both produce
-useful suggestions but may differ from Rails in edge cases.
+Both `ParameterMissing#corrections` (#2097) and `UrlGenerationError#corrections`
+(#2100) now delegate to `@blazetrails/did-you-mean`'s `SpellChecker`, matching
+Rails. Remaining: `Template::Error#corrections` in actionview uses raw
+`Jaro.distance` (already exported from the barrel) — ~80 LOC follow-up.
 
 ### CSRF token stores (`SessionStore`, `CookieStore`)
 
@@ -198,79 +197,66 @@ Sequencing rules:
 - One agent per source file at a time; methods in the same file collide.
 - Wave 4 (core) is **serial** — each PR depends on the prior one shipping.
 
-### Wave 0 — single-file peripherals
+### Wave 0 — single-file peripherals — all closed
 
-| PR  | Rails file                | Missing | TS file (api:compare row) | Methods                                                                                                                                                                             |
-| --- | ------------------------- | ------: | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P3  | `form_builder.rb`         |       1 | `form-builder.ts`         | `defaultFormBuilder` — class DSL accepting builder class or string name (resolve via existing `@blazetrails/activesupport` constant resolver).                                      |
-| P4  | `metal/data_streaming.rb` |       1 | `metal/data-streaming.ts` | `sendFileHeadersBang` (`send_file_headers!`). Refactor existing `send_file`/`send_data` to delegate. RFC 6266 with both `filename="..."` ASCII fallback and `filename*=UTF-8''...`. |
-| P7  | `metal/renderers.rb`      |       2 | `metal/renderers.ts`      | `_renderToBodyWithRenderer`, `_renderWithRendererMethodName`. Refactor existing inline dispatch logic into named methods; `Renderers.add` registration must still resolve.          |
-| P9  | `deprecator.rb`           |       3 | `deprecator.ts`           | `deprecator` (Deprecation instance), `addRenderer`, `removeRenderer` (deprecation shims delegating to Renderers registry).                                                          |
+- Slot P3 closed (form_builder.rb at 100%)
+- Slot P4 closed (metal/data_streaming.rb at 100%)
+- Slot P7 closed (metal/renderers.rb at 100%)
+- Slot P9 closed (#2099/#2114 — deprecator.rb at 100%)
 
 ### Wave 1 — small bundle peripherals
 
-Ship after Wave 0 lands. One PR per row.
+- Slot P10 closed (metal/content_security_policy.rb at 100%)
+- **P11 still open** — `metal/etag_with_template_digest.rb` 5/12 (42%). 7 missing methods include `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate` + 4 privates. Depends on actionview digestor.
+- **P12 still open** — `metal/helpers.rb` 0/6 (0%). Requires actionview helper integration; methods: `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers` + 1 private.
 
-| PR  | Rails file                           | Missing | Notes                                                                                                                                             |
-| --- | ------------------------------------ | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P10 | `metal/content_security_policy.rb`   |       4 | `isContentSecurityPolicy?`, `currentContentSecurityPolicy`, `contentSecurityPolicy`, `contentSecurityPolicyReportOnly` — class DSL.               |
-| P11 | `metal/etag_with_template_digest.rb` |       3 | `determineTemplateEtag`, `pickTemplateForEtag`, `lookupAndDigestTemplate`. Depends on actionview digestor — stub if not yet ported, document gap. |
-| P12 | `metal/helpers.rb`                   |       5 | `helpersPath`, `helpers`, `helperAttr`, `modulesForHelpers`, `allApplicationHelpers`. Requires actionview helper integration.                     |
+### Wave 2 — medium peripherals — all closed
 
-### Wave 2 — medium peripherals
-
-| PR  | Rails file                           | Missing | Notes                                                                                                                                                                   |
-| --- | ------------------------------------ | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P14 | `metal/redirecting.rb` (privates)    |       6 | `_computeRedirectToLocation`, `_allowOtherHost`, `_extractRedirectToStatus`, `_enforceOpenRedirectProtection`, `_isUrlHostAllowed`, `_ensureUrlIsHttpHeaderSafe`.       |
-| P15 | `metal/params_wrapper.rb` (privates) |       8 | `_defaultWrapModel`, `_wrapperKey`, `_wrapperFormats`, `_wrapParameters`, `_extractParameters`, `_isWrapperEnabled`, `_performParameterWrapping`, `_setWrapperOptions`. |
+- Slot P14 closed (metal/redirecting.rb at 100%)
+- Slot P15 closed (metal/params_wrapper.rb at 100%)
 
 ### Wave 3 — split-file PRs
 
-Each Rails file below is too large for one ≤300-LOC PR. Sub-PRs serialize on
-the same TS file, so ship them in alphabetical order (a → b → c).
+#### `metal/http_authentication.rb` — `metal/http-authentication.ts` — 13/33 (39%)
 
-#### `metal/http_authentication.rb` (33 missing) — `metal/http-authentication.ts`
+20 missing across Basic/Digest/Token. Slots P17a/P17b/P17c still **open**; bundle by module per the original split.
 
-| PR   | Module   | Missing | Methods                                                                                                                                                                                                                 |
-| ---- | -------- | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P17a | `Basic`  |      13 | `authenticate`, `hasBasicCredentials`, `userNameAndPassword`, `decodeCredentials`, `authScheme`, `authParam`, `encodeCredentials`, `authenticationRequest` + 5 controller-side helpers (`httpBasicAuthenticate*` etc.). |
-| P17b | `Digest` |      12 | `validateDigestResponse`, `expectedResponse`, `ha1`, `decodeCredentialsHeader`, `authenticationHeader`, `secretToken`, `nonce`, `validateNonce`, `opaque` + 3 controller-side helpers.                                  |
-| P17c | `Token`  |       8 | `tokenAndOptions`, `tokenParamsFrom`, `paramsArrayFrom`, `rewriteParamValues`, `rawParams` + 3 controller-side helpers.                                                                                                 |
+#### `metal/live.rb` — at 100%
 
-#### `metal/live.rb` (22 missing) — `metal/live.ts`
+- Slot P18a closed (Live::Buffer)
+- Slot P18b closed (Live mixin)
 
-| PR   | Subject              | Missing | Methods                                                                                                                                                                                                         |
-| ---- | -------------------- | ------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P18a | `Live::Buffer` class |      12 | `performWrite`, `queueSize`, `ignoreDisconnect`, `writeln`, `abort`, `isConnected`, `onError`, `callOnError`, `eachChunk`, `buildQueue`, `beforeCommitted`, `buildBuffer`.                                      |
-| P18b | `Live` mixin         |      10 | `process`, `responseBody=`, `sendStream`, `newControllerThread`, `cleanUpThreadLocals`, `logError`, `originalNewControllerThread`, `originalCleanUpThreadLocals`, `liveThreadPoolExecutor`, `makeResponseBang`. |
+#### `metal/request_forgery_protection.rb` — at 100%
 
-#### `metal/request_forgery_protection.rb` (31 missing) — `metal/request-forgery-protection.ts`
+- Slot P20a closed (verification predicates)
+- Slot P20b closed (token generation/encoding)
+- Slot P20c closed (token validation + strategy plumbing)
 
-| PR   | Subject                              | Missing | Methods                                                                                                                                                                                                                                                                                             |
-| ---- | ------------------------------------ | ------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P20a | Verification predicates              |      10 | `isVerifiedRequest`, `verifySameOriginRequest`, `markForSameOriginVerificationBang`, `isMarkedForSameOriginVerification`, `isNonXhrJavascriptResponse`, `isValidRequestOrigin`, `isProtectAgainstForgery`, `unverifiedRequestWarningMessage`, `normalizeActionPath`, `normalizeRelativeActionPath`. |
-| P20b | Token generation/encoding            |      11 | `generateCsrfToken`, `encodeCsrfToken`, `decodeCsrfToken`, `maskToken`, `unmaskToken`, `maskedAuthenticityToken`, `realCsrfToken`, `perFormCsrfToken`, `globalCsrfToken`, `csrfTokenHmac`, `xorByteStrings`.                                                                                        |
-| P20c | Token validation + strategy plumbing |      10 | `isAnyAuthenticityTokenValid`, `requestAuthenticityTokens`, `isValidAuthenticityToken`, `isValidPerFormCsrfToken`, `compareWithRealToken`, `compareWithGlobalToken`, `formAuthenticityParam`, `protectionMethodClass`, `storageStrategy`, `isIsStorageStrategy`.                                    |
+#### `test_case.rb` — `test-case.ts` — 23/49 (47%)
 
-#### `test_case.rb` (36 missing) — `test-case.ts`
+- Slot P21a closed (TestSession family — `isEnabled`, `idWas`, `loadBang`, `keys`, `values`, `destroy`, `dig`, `fetch`, `isExists`, `isSuccess`, `isMissing`, `isError`).
+- **P21b/P21c still open**, split per #2094 post-merge:
+  - **`<base>b`** (~250 LOC) — TestRequest helpers: `queryString=`, `contentType=`, `assignParameters`, `shouldMultipart`, `paramsParsers`, `newSession`, `create`, `defaultEnv` + TestResponse status predicates (`isSuccess`, `isMissing`, `isError`).
+  - **`<base>c`** (~250 LOC) — `process`, `setupRequest`, `buildResponse`, `wrapExecution`, `processControllerResponse`, `setupControllerRequestAndResponse`, `scrubEnvBang`, `documentRootElement`, `checkRequiredIvars`, `assertTemplate`, `executorAroundEachRequest`, `generatedPath`, `queryParameterNames`.
 
-| PR   | Collaborator         | Missing | Methods                                                                                                                                                                                                                                                        |
-| ---- | -------------------- | ------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P21a | `TestSession`        |      12 | `isEnabled`, `idWas`, `loadBang`, `keys`, `values`, `destroy`, `dig`, `fetch`, `isExists`, `isSuccess`, `isMissing`, `isError`.                                                                                                                                |
-| P21b | `TestRequest`/params |      12 | `assignParameters`, `queryString=`, `contentType=`, `shouldMultipart`, `paramsParsers`, `queryParameterNames`, `defaultEnv`, `newSession`, `create`, `controllerClass`, `generatedPath`, `executorAroundEachRequest`.                                          |
-| P21c | Behavior mixin       |      12 | `process`, `controllerClassName`, `setupControllerRequestAndResponse`, `buildResponse`, `setupRequest`, `wrapExecution`, `processControllerResponse`, `scrubEnvBang`, `documentRootElement`, `checkRequiredIvars`, `tests`, `determineDefaultControllerClass`. |
+### Wave 4 — core — all closed
 
-### Wave 4 — core (strict serial order: P22 → P23 → P24 → P26)
+- Slot P22 closed (metal/instrumentation.rb at 100%)
+- Slot P23 closed (api/api_rendering.rb at 100% via #2094/#2098)
+- Slot P24 closed (metal/implicit_render.rb at 100% via #2098)
+- Slot P26 closed (#2121 — `_protectedIvars`, `withoutModules`, `MODULES`)
 
-These touch the controller backbone and depend on prior peripherals. Do not
-fan out.
+### Fresh sized followups (post-#2067 findings)
 
-| PR  | Rails file                 | Missing | Methods                                                                                           |
-| --- | -------------------------- | ------: | ------------------------------------------------------------------------------------------------- |
-| P22 | `metal/instrumentation.rb` |       3 | `haltedCallbackHook`, `cleanupViewRuntime`, `appendInfoToPayload`. Hooks render + callback chain. |
-| P23 | `api/api_rendering.rb`     |       1 | `renderToBody` API override. Depends on `metal/rendering.rb` privates (P16).                      |
-| P24 | `metal/implicit_render.rb` |       3 | `defaultRender`, `methodForAction`, `isInteractiveBrowserRequest`. Uses rendering stack.          |
-| P26 | `base.rb` (privates)       |       2 | `_protectedIvars`, `withoutModules`. Final composition.                                           |
+- **base.rb still 38%** — 64 remaining misses are in mixin/included-from files (`redirecting.rb`, `etag_with_*.rb`, `helpers.rb`, `request_forgery_protection.rb`, `implicit_render.rb`, `instrumentation.rb`, `params_wrapper.rb` privates). Most are upstream-blocked on rendering / dispatcher pipeline; tracked under their separate P-slots.
+- **metal/etag_with_flash.rb** 5/9 (56%) — ~5 LOC + decision: switch to `toHash()` vs `toSessionValue()` for ETag inputs (verify Rails' own ETagger usage first; current TS may already match Rails).
+- **metal/flash.rb** 2/3 (67%) — close out remaining mixin export.
+- **metal/strong_parameters.rb** 65/89 (73%) — ~250 LOC PR ready in `actioncontroller-leaves-b` (closed at user request for CI capacity; reopen when capacity permits). Captures +24 methods.
+- **metal/implicit-render** (#2098) — ~30 LOC: wire real `templateExists`/`anyTemplates` on host once ActionView lookup arrives (currently returns 204 unless host stubs them).
+- **metal/instrumentation.haltedCallbackHook** (#2098) — ~50 LOC: wire from AS::Callbacks `_runCallbacks` halt path (currently takes a Notifier argument but the chain doesn't call it yet).
+- **metal.buildMiddleware** (#2098) — ~10 LOC: promote inline `valid` augmentation onto the `Middleware` class.
+- **Two DoubleRenderError classes** (#2094) — consolidate abstract-controller vs action-controller versions (both extend `AbstractControllerError`; `instanceof` against parent works, identity-equality between layers doesn't).
+- **DidYouMean consumer left** — Template::Error#corrections (actionview) calls Rails' raw `DidYouMean::Jaro.distance`; maps to the existing `Jaro.distance` export from `@blazetrails/did-you-mean` (no new barrel symbol needed). ~80 LOC.
 
 ### Tracking
 
