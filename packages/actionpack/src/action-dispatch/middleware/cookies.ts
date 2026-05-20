@@ -621,7 +621,17 @@ export interface SerializedCookieJarsHost {
 }
 
 const JSON_SERIALIZER: CookieSerializer = {
-  dump: (v) => JSON.stringify(v),
+  dump: (v) => {
+    // JSON.stringify returns `undefined` for `undefined`/functions/symbols.
+    // Rails' JSON serializer raises on those; do the same so
+    // unserializable values aren't silently dropped by CookieJar#set's
+    // `value === undefined` guard.
+    const out = JSON.stringify(v);
+    if (out === undefined) {
+      throw new TypeError(`cannot serialize ${typeof v} as a cookie value`);
+    }
+    return out;
+  },
   load: (s) => JSON.parse(s),
   dumped: (s) => {
     try {
