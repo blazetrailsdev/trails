@@ -146,10 +146,10 @@ describe("StreamingBuffer", () => {
     expect(chunks).toEqual(["<x>"]);
   });
 
-  it("skips nil on concat", () => {
+  it("concat passes nil through as empty string (Rails parity)", () => {
     const chunks: string[] = [];
     new StreamingBuffer((v) => chunks.push(v)).concat(null);
-    expect(chunks).toEqual([]);
+    expect(chunks).toEqual([""]);
   });
 
   it("capture swaps the sink and restores it", () => {

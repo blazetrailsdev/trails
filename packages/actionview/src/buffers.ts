@@ -146,10 +146,13 @@ export class StreamingBuffer {
     return this._block;
   }
 
-  /** Append a value, escaping if not html-safe. */
+  /**
+   * Append a value, escaping if not html-safe. Mirrors Rails `<<` — unlike
+   * `OutputBuffer`/`RawStreamingBuffer`, nil is NOT skipped: `nil.to_s`
+   * produces `""`, which is still passed through to the block.
+   */
   concat(value: unknown): this {
-    if (value === null || value === undefined) return this;
-    const str = value instanceof SafeBuffer ? value.toString() : String(value);
+    const str = value instanceof SafeBuffer ? value.toString() : value == null ? "" : String(value);
     this._block(isHtmlSafe(value) ? str : htmlEscape(str).toString());
     return this;
   }
