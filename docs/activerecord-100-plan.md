@@ -531,6 +531,22 @@ Followup from #1878. ~30–60 LOC delegate `CollectionProxy#clear` and `#destroy
 
 Followup from #1873. File passes audit but fails `AR_NO_AUTO_SCHEMA=1` — large BelongsToAssociationsTest describe (line 81, ~146 tests, ~3660 LOC) needs `defineSchema` migration. Split into 5–8 cluster PRs at ~250 LOC each.
 
+### Batch Audit-V1 — Validations root file (~285 LOC, risk: low)
+
+Surfaced by 2026-05-19 audit. Port 19 missing tests from `validations/validations.test.ts` mirroring Rails' top-level `validations_test.rb`. Gaps: `validate`/`validate!`, `save_without_validation`, acceptance-without-DB edge cases, numericality mutation/raw/custom-getter, `validators` introspection. No known blockers. Bundle with adjacent validations files to hit 250-LOC target. The existing Validations batch (#1131) only covered `validations/*.rb` sub-files; `validations_test.rb` itself was missed.
+
+### Batch Audit-M1 — MySQL adapter-prevent-writes (~200 LOC, risk: low)
+
+Surfaced by 2026-05-19 audit. Port 11 missing tests for `adapter_prevent_writes_test.rb` into `adapters/abstract-mysql-adapter/adapter-prevent-writes.test.ts`. All scenarios (INSERT/UPDATE/DELETE/SELECT/SHOW/SET/DESCRIBE/DESC/KILL/USE/REPLACE) are basic SQL-string pattern matching — no complex impl gaps expected. Bundle with other small MySQL adapter items (Batch B49 or B110).
+
+### Batch Audit-DB1 — DB-Config Resolver (~250 LOC, risk: medium)
+
+Surfaced by 2026-05-19 audit. Dedicated slot for `database-configurations/resolver.test.ts`: 16 tests covering URL→hash resolution, environment lookup, primary/replica roles, multi-DB config. The existing Architectural note ("~4 db_config un-skips") materially understates the gap (18 missing across all db-config files, 16 in resolver alone). Promote from vague "Phases 2–4" to an explicit batch.
+
+### Batch Audit-PG1 — PG serial sequences (~200 LOC, risk: low)
+
+Surfaced by 2026-05-19 audit. Port 12 missing tests from `adapters/postgresql/serial.test.ts` covering sequence, bigserial, and serial column types. Can be bundled as a sub-item of Batch 53 or opened as a standalone ~200-LOC PG serial batch.
+
 ---
 
 ## Doc-hygiene + infra followups
@@ -544,7 +560,7 @@ Followup from #1873. File passes audit but fails `AR_NO_AUTO_SCHEMA=1` — large
 
 ## Architectural (deferred; too big for single ~250-LOC slot)
 
-- **Connection-pool / per-thread query-cache architecture, Phases 2–4** (~120 LOC remaining). ~10 actionable test unskips (4 db_config + 6 pool-attachment); other 4 are permanent (GVL/fork/thread skips).
+- **Connection-pool / per-thread query-cache architecture, Phases 2–4** (~120 LOC remaining). ~10 actionable test unskips (6 pool-attachment); other 4 are permanent (GVL/fork/thread skips). db_config resolver gap promoted to Batch Audit-DB1 (18 missing tests across 4 db-config files; resolver alone: 16).
 - `_aliasTracker` real semantics on `JoinDependency#joinConstraints`.
 - Multirange OID direct lookup via `LEFT JOIN pg_range` — blocked on PG12/13 compat decision.
 - `encodeRangeLiteral` ↔ `RangeType.encodeLiteral` consolidation into `range.ts` helper.
