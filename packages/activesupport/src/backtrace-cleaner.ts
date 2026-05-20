@@ -1,13 +1,15 @@
 type LineFilter = (line: string) => string;
 type LineSilencer = (line: string) => boolean;
 
+export type CleanKind = "silent" | "noise" | "all";
+
 /**
  * BacktraceCleaner — filters and silences backtrace lines.
  * Mirrors Rails ActiveSupport::BacktraceCleaner.
  */
 export class BacktraceCleaner {
-  private _filters: LineFilter[] = [];
-  private _silencers: LineSilencer[] = [];
+  protected _filters: LineFilter[] = [];
+  protected _silencers: LineSilencer[] = [];
 
   /** addFilter — adds a filter that transforms backtrace lines. */
   addFilter(filter: LineFilter): this {
@@ -33,23 +35,34 @@ export class BacktraceCleaner {
     return this;
   }
 
-  /** clean — applies all filters and silencers to a backtrace array. */
-  clean(backtrace: string[]): string[] {
-    return backtrace
-      .map((line) => this._applyFilters(line))
-      .filter((line) => !this._isSilenced(line));
+  /** clean — applies filters then silencer selection per `kind`. */
+  clean(backtrace: string[], kind: CleanKind = "silent"): string[] {
+    const filtered = backtrace.map((line) => this._applyFilters(line));
+    if (kind === "all") return filtered;
+    if (kind === "noise") return filtered.filter((line) => this._isSilenced(line));
+    return filtered.filter((line) => !this._isSilenced(line));
   }
 
-  private _applyFilters(line: string): string {
+  /** cleanFrame — clean a single frame; returns undefined when excluded by the selected kind. */
+  cleanFrame(frame: string, kind: CleanKind = "silent"): string | undefined {
+    const filtered = this._applyFilters(frame);
+    if (kind === "all") return filtered;
+    const silenced = this._isSilenced(filtered);
+    if (kind === "noise") return silenced ? filtered : undefined;
+    return silenced ? undefined : filtered;
+  }
+
+  protected _applyFilters(line: string): string {
     return this._filters.reduce((l, filter) => filter(l), line);
   }
 
-  private _isSilenced(line: string): boolean {
+  protected _isSilenced(line: string): boolean {
     return this._silencers.some((s) => s(line));
   }
 
-  dup(): BacktraceCleaner {
-    const copy = new BacktraceCleaner();
+  dup(): this {
+    const Ctor = this.constructor as new () => this;
+    const copy = new Ctor();
     copy._filters = [...this._filters];
     copy._silencers = [...this._silencers];
     return copy;
