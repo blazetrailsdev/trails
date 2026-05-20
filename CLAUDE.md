@@ -80,6 +80,15 @@ When NOT to use this:
 - Do NOT use subagents unless explicitly requested.
 - Do use worktrees for any changes; leave the default worktree for the user.
   Always use `scripts/start-worktree.sh` to start a worktree.
+- **Do NOT stack PRs.** Each PR branches from `main` and stands alone.
+  We don't have spare CI runners or review bandwidth — stacked branches
+  (`<base>b` off `<base>`, `<base>c` off `<base>b`, etc.) re-run CI on
+  every parent rebase and force Copilot/the human to re-review the same
+  diff multiple times. They also produce file-overlap conflicts with
+  sibling agents working in parallel. If a feature needs splitting,
+  open each split PR from `main` with **non-overlapping files**; if
+  true ordering is required, ship the first PR, wait for merge, then
+  open the next from updated `main`.
 - Open new PRs in **draft** status.
 - After opening a PR, run the `/link` skill with the PR number so webhook
   notifications (Copilot reviews, CI failures) are delivered to this pane.
