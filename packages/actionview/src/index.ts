@@ -43,7 +43,7 @@ export {
   type RenderOptions as RendererOptions,
 } from "./renderer.js";
 
-export { OutputBuffer, RawOutputBuffer } from "./buffers.js";
+export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
 export { PathSet, type PathSetResolver } from "./path-set.js";
 export { TemplatePath } from "./template-path.js";

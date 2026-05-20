@@ -276,3 +276,41 @@ export function stripTags(html: string | null | undefined): SafeBuffer {
 export function stripLinks(html: string | null | undefined): string {
   return getLinkSanitizer().sanitize(html ?? "");
 }
+
+/**
+ * ActionView::Helpers::SanitizeHelper class-method surface.
+ *
+ * Rails mirrors a `ClassMethods` sub-module included via Concern that
+ * exposes `full_sanitizer`, `link_sanitizer`, `safe_list_sanitizer` (with
+ * matching writers) plus `sanitizer_vendor`. Exposed here as static
+ * getter/setter accessors using the camelCase equivalents of those
+ * Rails snake_case names (`fullSanitizer`, `linkSanitizer`,
+ * `safeListSanitizer`, `sanitizerVendor`) per the trails camelCase
+ * convention.
+ */
+export class SanitizeHelper {
+  static get fullSanitizer(): Sanitizer {
+    return getFullSanitizer();
+  }
+  static set fullSanitizer(value: Sanitizer) {
+    setFullSanitizer(value);
+  }
+
+  static get linkSanitizer(): Sanitizer {
+    return getLinkSanitizer();
+  }
+  static set linkSanitizer(value: Sanitizer) {
+    setLinkSanitizer(value);
+  }
+
+  static get safeListSanitizer(): Sanitizer {
+    return getSafeListSanitizer();
+  }
+  static set safeListSanitizer(value: Sanitizer) {
+    setSafeListSanitizer(value);
+  }
+
+  static get sanitizerVendor(): SanitizerVendor {
+    return getSanitizerVendor();
+  }
+}

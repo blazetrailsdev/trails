@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
-import { OutputBuffer, RawOutputBuffer } from "./buffers.js";
+import { OutputBuffer, RawOutputBuffer, RawStreamingBuffer, StreamingBuffer } from "./buffers.js";
 
 describe("OutputBuffer", () => {
   it("initializes from a string", () => {
@@ -127,6 +127,89 @@ describe("RawOutputBuffer", () => {
 
   it("raw() returns self", () => {
     const raw = new OutputBuffer().raw();
+    expect(raw.raw()).toBe(raw);
+  });
+});
+
+describe("StreamingBuffer", () => {
+  it("streams concat through the block, escaping unsafe values", () => {
+    const chunks: string[] = [];
+    const buf = new StreamingBuffer((v) => chunks.push(v));
+    buf.concat("<unsafe>");
+    buf.concat(htmlSafe("<safe>"));
+    expect(chunks).toEqual(["&lt;unsafe&gt;", "<safe>"]);
+  });
+
+  it("safeConcat bypasses escaping", () => {
+    const chunks: string[] = [];
+    new StreamingBuffer((v) => chunks.push(v)).safeConcat("<x>");
+    expect(chunks).toEqual(["<x>"]);
+  });
+
+  it("concat passes nil through as empty string (Rails parity)", () => {
+    const chunks: string[] = [];
+    new StreamingBuffer((v) => chunks.push(v)).concat(null);
+    expect(chunks).toEqual([""]);
+  });
+
+  it("safeConcat passes nil through as empty string (Rails parity)", () => {
+    const chunks: string[] = [];
+    const buf = new StreamingBuffer((v) => chunks.push(v));
+    buf.safeConcat(null);
+    buf.safeConcat(undefined);
+    expect(chunks).toEqual(["", ""]);
+  });
+
+  it("concat/safeConcat accept an OutputBuffer without throwing", () => {
+    const chunks: string[] = [];
+    const buf = new StreamingBuffer((v) => chunks.push(v));
+    const ob = new OutputBuffer("<x>");
+    buf.concat(ob);
+    buf.safeConcat(ob);
+    expect(chunks).toEqual(["<x>", "<x>"]);
+  });
+
+  it("capture swaps the sink and restores it", () => {
+    const chunks: string[] = [];
+    const buf = new StreamingBuffer((v) => chunks.push(v));
+    const captured = buf.capture(() => buf.safeConcat("inside"));
+    expect(captured).toBeInstanceOf(SafeBuffer);
+    expect(captured.toString()).toBe("inside");
+    expect(chunks).toEqual([]);
+    buf.safeConcat("after");
+    expect(chunks).toEqual(["after"]);
+  });
+
+  it("htmlSafe()/isHtmlSafe() report safe", () => {
+    const buf = new StreamingBuffer(() => {});
+    expect(buf.isHtmlSafe()).toBe(true);
+    expect(buf.htmlSafe()).toBe(buf);
+  });
+
+  it("exposes block via reader", () => {
+    const block = () => {};
+    expect(new StreamingBuffer(block).block).toBe(block);
+  });
+});
+
+describe("RawStreamingBuffer", () => {
+  it("writes through without escaping", () => {
+    const chunks: string[] = [];
+    const buf = new StreamingBuffer((v) => chunks.push(v));
+    const raw = buf.raw();
+    expect(raw).toBeInstanceOf(RawStreamingBuffer);
+    raw.concat("<unsafe>");
+    expect(chunks).toEqual(["<unsafe>"]);
+  });
+
+  it("skips nil values", () => {
+    const chunks: string[] = [];
+    new StreamingBuffer((v) => chunks.push(v)).raw().concat(null);
+    expect(chunks).toEqual([]);
+  });
+
+  it("raw() returns self", () => {
+    const raw = new StreamingBuffer(() => {}).raw();
     expect(raw.raw()).toBe(raw);
   });
 });

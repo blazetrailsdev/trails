@@ -49,6 +49,7 @@ export {
   setSafeListSanitizer,
   sanitizedAllowedTags,
   sanitizedAllowedAttributes,
+  SanitizeHelper,
 } from "./sanitize-helper.js";
 export type { Sanitizer, SanitizerClass, SanitizerVendor } from "./sanitize-helper.js";
 
