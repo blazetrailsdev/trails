@@ -21,6 +21,7 @@ import {
 import type { Router as JourneyRouter, RackishResponse, RouterRequest } from "../journey/router.js";
 import {
   polymorphicUrl as polymorphicUrlFn,
+  polymorphicMapping as polymorphicMappingFn,
   symbolToString,
   type PolymorphicArg,
   type PolymorphicHost,
@@ -41,8 +42,23 @@ import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
+import { Request as AdRequest } from "../http/request.js";
+import { Routes as JourneyRoutes } from "../journey/routes.js";
+import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 
 const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
+
+/** @internal Mirrors Ruby `Hash#==` for shallow string-keyed hashes. */
+function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  // Check key presence *and* value equality — bare value compare would
+  // accept `{a: undefined}` vs `{b: undefined}` as equal (both lookups
+  // yield `undefined`), incorrectly reusing a stale defaultEnv cache.
+  for (const k of ka) if (!Object.hasOwn(b, k) || a[k] !== b[k]) return false;
+  return true;
+}
 
 /** @internal Rails: `RouteSet::CustomUrlHelper` — captured `direct(...)` block. */
 export class CustomUrlHelper implements PolymorphicMappingEntry {
@@ -177,20 +193,196 @@ export class StaticDispatcher extends Dispatcher {
   }
 }
 
+/** Rails: `RouteSet::Config = Struct.new(:relative_url_root, :api_only, :default_scope)`. */
+export interface RouteSetConfig {
+  relativeUrlRoot: string | null;
+  apiOnly: boolean;
+  defaultScope: Record<string, unknown> | null;
+}
+
+/** @internal Rails: `RouteSet::DEFAULT_CONFIG`. */
+export const DEFAULT_CONFIG: RouteSetConfig = {
+  relativeUrlRoot: null,
+  apiOnly: false,
+  defaultScope: null,
+};
+
+/**
+ * Rails: `RouteSet::MountedHelpers` — bare module that engines extend, so
+ * apps can `include MountedHelpers` to access engine route helpers. In
+ * trails it's a plain class; {@link RouteSet.defineMountedHelper} attaches
+ * named getters to its prototype.
+ */
+export class MountedHelpers {}
+
+/**
+ * @internal Rails: anonymous Module returned by `generate_url_helpers`.
+ * Wraps a {@link RoutesProxy} so the singleton-level `url_for` /
+ * `polymorphic_url` / etc. calls in the Rails source map onto methods on
+ * an exported class — making them visible to `api:compare`.
+ */
+export class UrlHelpersModule {
+  /** @internal Rails: `@_proxy = proxy_class.new(routes)`. */
+  private readonly _proxy: RoutesProxy;
+  /** @internal Whether `path` helpers are mixed in. */
+  readonly _supportsPath: boolean;
+
+  constructor(routes: RouteSet, supportsPath: boolean) {
+    this._supportsPath = supportsPath;
+    // Rails' proxy_class does `include UrlFor`; `_routes` on the proxy
+    // points at the RouteSet's own `_routes` adapter (the one whose
+    // `urlFor` has the Rails-shape `(options, routeName?)` signature).
+    // Passing the bare RouteSet here would route through its legacy
+    // positional `urlFor(routeName, params, options)` and break at runtime.
+    const target = routes._routes;
+    // Rails' proxy_class includes UrlFor; its `url_options` therefore
+    // returns `default_url_options.dup` — so the proxy reads the
+    // RouteSet's current defaults (host/protocol/port). Mirror that by
+    // reading `routes.defaultUrlOptions` *dynamically* (later
+    // `setDefaultUrlOptions()` calls must flow through). The singleton
+    // `url_options; {}; end` (route_set.rb:591) is separate — that's
+    // the singleton on the *module*, not the proxy.
+    const scope: UrlForHost = {
+      _routes: target,
+      get defaultUrlOptions(): Record<string, unknown> {
+        return routes.defaultUrlOptions;
+      },
+      urlOptions: () => ({ ...routes.defaultUrlOptions }),
+    };
+    this._proxy = new RoutesProxy(target, scope, {});
+    // `withRoutesHelpers` (abstract-controller/trailties/routes-helpers.ts)
+    // copies helper methods onto a controller's prototype via `for...in`,
+    // which only sees *own enumerable* properties. Class methods live on
+    // the prototype and are non-enumerable, so re-publish each as a bound
+    // own property here. The prototype methods remain (so `api:compare`
+    // extracts them); the own copies make them mountable.
+    for (const name of [
+      "urlFor",
+      "fullUrlFor",
+      "routeFor",
+      "polymorphicUrl",
+      "polymorphicPath",
+      "polymorphicUrlForAction",
+      "polymorphicPathForAction",
+      "polymorphicMapping",
+      "urlOptions",
+    ] as const) {
+      Object.defineProperty(this, name, {
+        value: (this[name] as (...a: unknown[]) => unknown).bind(this),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+
+  /** Rails singleton: `def url_for(options)`. */
+  urlFor(options: UrlForOptions): string {
+    return this._proxy.urlFor(options);
+  }
+  /** Rails singleton: `def full_url_for(options)`. */
+  fullUrlFor(options: UrlForOptions): string {
+    return this._proxy.fullUrlFor(options);
+  }
+  /** Rails singleton: `def route_for(name, *args)`. */
+  routeFor(name: string, ...args: unknown[]): string {
+    return this._proxy.routeFor(name, ...args);
+  }
+  /** Rails singleton: `def polymorphic_url(record_or_hash_or_array, options = {})`. */
+  polymorphicUrl(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, record, options);
+  }
+  /** Rails singleton: `def polymorphic_path(record_or_hash_or_array, options = {})`. */
+  polymorphicPath(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, record, {
+      ...options,
+      onlyPath: true,
+    });
+  }
+  /** @internal Rails-private polymorphic helper exposed through the proxy. */
+  polymorphicUrlForAction(
+    record: PolymorphicArg,
+    action: string,
+    options: PolymorphicOptions = {},
+  ): string {
+    return this.polymorphicUrl(record, { ...options, action });
+  }
+  /** @internal Rails-private polymorphic helper exposed through the proxy. */
+  polymorphicPathForAction(
+    record: PolymorphicArg,
+    action: string,
+    options: PolymorphicOptions = {},
+  ): string {
+    return this.polymorphicPath(record, { ...options, action });
+  }
+  /**
+   * @internal Rails-private polymorphic helper — delegates to the shared
+   * `polymorphic-routes.ts` lookup so semantics stay aligned with the
+   * `toModel()` / `modelName` resolution used by `polymorphicUrl` itself.
+   */
+  polymorphicMapping(record: unknown): PolymorphicMappingEntry | undefined {
+    return polymorphicMappingFn(this._proxy as unknown as PolymorphicHost, record);
+  }
+  get _routes(): UrlForRoutes {
+    return this._proxy._routes;
+  }
+  /** Rails singleton: `def url_options; {}; end`. */
+  urlOptions(): Record<string, unknown> {
+    return {};
+  }
+}
+
 export class RouteSet {
   private routes: Route[] = [];
   private namedRoutes: Map<string, Route> = new Map();
   private dispatcher: DispatcherCallback | undefined;
+  /** @internal Rails: `@config`. */
+  private _config: RouteSetConfig;
+  /** Rails: `attr_accessor :disable_clear_and_finalize`. */
+  disableClearAndFinalize = false;
+  /** Rails: `attr_accessor :resources_path_names`. */
+  resourcesPathNames: Record<string, string> = { new: "new", edit: "edit" };
+  /** Rails: `attr_accessor :draw_paths`. */
+  drawPaths: string[] = [];
+  /** Rails: `attr_reader :env_key`. Unique per RouteSet (Rails uses object_id). */
+  readonly envKey: string = `ROUTES_${(RouteSet._envSeq = (RouteSet._envSeq ?? 0) + 1)}_SCRIPT_NAME`;
+  private static _envSeq?: number;
+  /**
+   * Rails: `attr_accessor :set` — `Journey::Routes` container. Holds the
+   * Journey-level route table; the higher-level routing Route objects
+   * (`this.routes`) are bridged into it by Mapper. `clearBang` drops
+   * both. Rails: `@set = Journey::Routes.new` (route_set.rb:402).
+   */
+  set: JourneyRoutes = new JourneyRoutes();
+  /**
+   * Rails: `attr_accessor :formatter` — `Journey::Formatter.new(self)`
+   * (route_set.rb:404). Owns the generation-path cache. Wiring a real
+   * {@link JourneyFormatter} requires bridging the higher-level routing
+   * `Route` into `Journey::Route` (NamedRoutes-shape FormatterHost expects
+   * the Journey type). That bridge is PR-c work; until then this exposes
+   * just the `clear()` / `eagerLoadBang()` hooks the rest of RouteSet
+   * actually invokes, satisfying the attr_accessor surface.
+   */
+  formatter: Pick<JourneyFormatter, "clear" | "eagerLoadBang"> = {
+    clear() {},
+    eagerLoadBang() {},
+  };
+  /** @internal Rails: `@url_helpers_with_paths`. */
+  private _urlHelpersWithPaths?: UrlHelpersModule;
+  /** @internal Rails: `@url_helpers_without_paths`. */
+  private _urlHelpersWithoutPaths?: UrlHelpersModule;
   /** Public for parity with Rails `RouteSet#default_url_options`. */
   defaultUrlOptions: Record<string, unknown> = {};
   private readonly _append: Array<(mapper: Mapper) => void> = [];
   private readonly _prepend: Array<(mapper: Mapper) => void> = [];
   private _finalized = false;
   /**
-   * Helpers registered via {@link addUrlHelper}. Rails dispatches these
-   * through NamedRouteCollection, which isn't ported yet.
+   * @internal Helpers registered via {@link addUrlHelper}. Rails dispatches
+   * these through NamedRouteCollection, which isn't ported yet. Renamed
+   * from `urlHelpers` so the Rails-shape `urlHelpers(supportsPath)` method
+   * can take that name.
    */
-  readonly urlHelpers: Map<string, CustomUrlHelper> = new Map();
+  readonly _customUrlHelpers: Map<string, CustomUrlHelper> = new Map();
   /**
    * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
    * back to the standard RESTful helper. In Rails this is populated by the
@@ -223,15 +415,211 @@ export class RouteSet {
   /** @internal */
   private readonly _routeDispatcher: Dispatcher = new Dispatcher(false, this.dispatcherRegistry);
 
+  constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
+    // Rails: `def initialize(config = DEFAULT_CONFIG.dup)` — DEFAULT_CONFIG
+    // is dup'd at the call site. Clone here too so a caller passing
+    // `DEFAULT_CONFIG` (or any shared config struct) can't have later
+    // `defaultScope=` mutations leak across instances.
+    this._config = { ...config };
+  }
+
+  /** Rails: `def self.default_resources_path_names`. */
+  static defaultResourcesPathNames(): Record<string, string> {
+    return { new: "new", edit: "edit" };
+  }
+
   /**
-   * Draw routes using the Mapper DSL. Can be called multiple times;
-   * each call appends routes (like Rails).
+   * Rails: `def self.new_with_config(config)` — duplicates `DEFAULT_CONFIG`
+   * then copies over `relative_url_root` / `api_only` / `default_scope` from
+   * any source object that responds to them. Engines may omit
+   * `relativeUrlRoot`, so we only copy keys that are present.
+   */
+  static newWithConfig(config: Partial<RouteSetConfig>): RouteSet {
+    const merged: RouteSetConfig = { ...DEFAULT_CONFIG };
+    if ("relativeUrlRoot" in config) merged.relativeUrlRoot = config.relativeUrlRoot ?? null;
+    if ("apiOnly" in config) merged.apiOnly = config.apiOnly ?? false;
+    if ("defaultScope" in config) merged.defaultScope = config.defaultScope ?? null;
+    return new RouteSet(merged);
+  }
+
+  /** Rails: `attr_accessor :router`. Trails uses {@link journeyRouter} as the underlying lazy router. */
+  get router(): JourneyRouter {
+    return this.journeyRouter;
+  }
+  set router(value: JourneyRouter) {
+    this._journeyRouter = value;
+  }
+
+  /** Rails: `def relative_url_root`. */
+  get relativeUrlRoot(): string | null {
+    return this._config.relativeUrlRoot;
+  }
+  /** Rails: `def api_only?`. */
+  isApiOnly(): boolean {
+    return this._config.apiOnly;
+  }
+  /** Rails: `def default_scope`. */
+  get defaultScope(): Record<string, unknown> | null {
+    return this._config.defaultScope;
+  }
+  /** Rails: `def default_scope=(new_default_scope)`. */
+  set defaultScope(value: Record<string, unknown> | null) {
+    this._config.defaultScope = value;
+  }
+
+  /** Rails: `def request_class` — returns `ActionDispatch::Request`. */
+  requestClass(): typeof AdRequest {
+    return AdRequest;
+  }
+
+  /** @internal Rails: `private def make_request(env)`. */
+  makeRequest(env: RackEnv): AdRequest {
+    return new (this.requestClass())(env);
+  }
+
+  /**
+   * Rails: `def default_env` — synthesizes a Rack env from
+   * {@link defaultUrlOptions} (host, port, scheme, script_name). Cached
+   * until `defaultUrlOptions` changes. The Rails implementation routes
+   * through `ActionDispatch::Http::URL.full_url_for` to validate options;
+   * trails does the assembly inline pending the URL port.
+   */
+  defaultEnv(): RackEnv {
+    // Rails caches by *value comparison* against the previously-stored
+    // options snapshot: `if default_url_options != @default_env&.[](...)`.
+    const cachedOpts = this._defaultEnv?.["action_dispatch.routes.default_url_options"] as
+      | Record<string, unknown>
+      | undefined;
+    if (this._defaultEnv && cachedOpts && shallowEqual(cachedOpts, this.defaultUrlOptions)) {
+      return this._defaultEnv;
+    }
+    const urlOptions = Object.freeze({ ...this.defaultUrlOptions });
+    const host = typeof urlOptions["host"] === "string" ? urlOptions["host"] : "example.org";
+    const protocol = typeof urlOptions["protocol"] === "string" ? urlOptions["protocol"] : "http";
+    const scheme = protocol.replace(/:?\/*$/, "");
+    const port = typeof urlOptions["port"] === "number" ? urlOptions["port"] : undefined;
+    const defaultPort = scheme === "https" ? 443 : 80;
+    const httpHost = port == null || port === defaultPort ? host : `${host}:${port}`;
+    const scriptName =
+      typeof urlOptions["script_name"] === "string" ? urlOptions["script_name"] : "";
+    this._defaultEnv = Object.freeze({
+      "action_dispatch.routes": this,
+      "action_dispatch.routes.default_url_options": urlOptions,
+      HTTPS: scheme === "https" ? "on" : "off",
+      "rack.url_scheme": scheme,
+      HTTP_HOST: httpHost,
+      SCRIPT_NAME: scriptName.replace(/\/$/, ""),
+      "rack.input": "",
+    });
+    return this._defaultEnv;
+  }
+
+  /**
+   * Rails: `def from_requirements(requirements)` — lookup intended for
+   * Language Server tooling. Matches the first route whose `defaults`
+   * (Trails's analog of Rails's `route.requirements`) is shallow-equal
+   * to the supplied hash — same shape Rails compares via `Hash#==`.
+   */
+  fromRequirements(requirements: Record<string, unknown>): Route | undefined {
+    // Rails: `routes.find { |route| route.requirements == requirements }`.
+    // Trails Route stores requirements as `defaults` (merged controller +
+    // action + path constraints); the field name diverges but the semantic
+    // is the same — the matching shape for `{ controller, action }` lookups.
+    return this.routes.find((r) =>
+      shallowEqual(r.defaults, requirements as Record<string, string>),
+    );
+  }
+
+  /** Rails: `def url_helpers(supports_path = true)` — memoized per `supportsPath`. */
+  urlHelpers(supportsPath = true): UrlHelpersModule {
+    if (supportsPath) {
+      return (this._urlHelpersWithPaths ??= this.generateUrlHelpers(true));
+    }
+    return (this._urlHelpersWithoutPaths ??= this.generateUrlHelpers(false));
+  }
+
+  /**
+   * Rails: `def generate_url_helpers(supports_path)` — builds the anonymous
+   * Module whose singleton dispatches `url_for` / `full_url_for` / etc.
+   * through a `_proxy` over `_routes`. Trails returns an
+   * {@link UrlHelpersModule} instance.
+   */
+  generateUrlHelpers(supportsPath: boolean): UrlHelpersModule {
+    return new UrlHelpersModule(this, supportsPath);
+  }
+
+  /** Rails: `def mounted_helpers` — module engines extend. */
+  mountedHelpers(): typeof MountedHelpers {
+    return MountedHelpers;
+  }
+
+  /**
+   * Rails: `def define_mounted_helper(name, script_namer = nil)` — defines
+   * `name` and `_#{name}` methods on {@link MountedHelpers} that lazily
+   * build a {@link RoutesProxy} into this RouteSet.
+   */
+  defineMountedHelper(name: string, scriptNamer: ScriptNamer | null = null): void {
+    const proto = MountedHelpers.prototype as Record<string, unknown>;
+    // Rails: `return if MountedHelpers.method_defined?(name)` — Rails
+    // mutates the shared MountedHelpers module (one per app); the early
+    // return is intentional, callers must clear the module to redefine.
+    if (Object.hasOwn(proto, name)) return;
+    const cacheKey = `_${name}` as const;
+    const buildProxy = (ctx: Record<string, unknown>): RoutesProxy => {
+      const scope =
+        (ctx as unknown as UrlForHost & { _routesContext?: () => UrlForHost })._routesContext?.() ??
+        (ctx as unknown as UrlForHost);
+      // Resolve `helpers` *lazily* so `clearBang()` (which drops the
+      // memoized url-helpers module) doesn't leave mounted proxies bound
+      // to a stale helpers reference. Pass the `_routes` adapter, not
+      // the RouteSet itself — RoutesProxy dispatches `urlFor` against
+      // the Rails-shape signature exposed by the adapter.
+      return new RoutesProxy(
+        this._routes,
+        scope,
+        this.urlHelpers() as unknown as Record<string, unknown>,
+        scriptNamer,
+      );
+    };
+    proto[cacheKey] = function (this: Record<string, unknown>): RoutesProxy {
+      return buildProxy(this);
+    };
+    Object.defineProperty(proto, name, {
+      configurable: true,
+      get(this: Record<string, unknown>): RoutesProxy {
+        const memo = `@_${name}` as const;
+        const existing = this[memo] as RoutesProxy | undefined;
+        if (existing) return existing;
+        const built = (this[cacheKey] as () => RoutesProxy).call(this);
+        this[memo] = built;
+        return built;
+      },
+    });
+  }
+
+  /** @internal Cached {@link defaultEnv} value. */
+  private _defaultEnv?: Readonly<RackEnv>;
+
+  /**
+   * Draw routes using the Mapper DSL. Rails' `draw` clears + finalizes
+   * around `eval_block` unless `disableClearAndFinalize` is set; trails
+   * adopts that gating only when {@link prepend}/{@link append} blocks
+   * are registered, otherwise it stays append-only (legacy back-compat).
+   * Callers wanting strict Rails semantics in every case should use
+   * {@link clearBang} + {@link evalBlock} + {@link finalizeBang} directly.
    */
   draw(callback: DrawCallback): void {
-    // Rails' `draw` calls `clear!` first; trails keeps it append-only for
-    // back-compat until callers opt into the Rails semantics via
-    // {@link clearBang} + {@link evalBlock} + {@link finalizeBang}.
+    // Rails: `clear! unless @disable_clear_and_finalize; eval_block(block); finalize! unless @disable_clear_and_finalize`.
+    // Trails has historically kept `draw` append-only for back-compat; we
+    // only adopt the Rails clear+finalize semantics when the caller has
+    // *not* set `disableClearAndFinalize` AND has registered at least one
+    // `prepend`/`append` block (otherwise old call sites that rely on
+    // append-only would silently lose routes). The flag controls the
+    // clear/finalize gate exactly as in Rails when those blocks are wired.
+    const railsSemantics = this._prepend.length > 0 || this._append.length > 0;
+    if (railsSemantics && !this.disableClearAndFinalize) this.clearBang();
     this.evalBlock(callback);
+    if (railsSemantics && !this.disableClearAndFinalize) this.finalizeBang();
   }
 
   /** @internal Rails: `private def eval_block(block)`. */
@@ -261,21 +649,43 @@ export class RouteSet {
     this._finalized = true;
   }
 
-  /** Rails: `clear!` — drop routes and replay {@link prepend} blocks. */
+  /**
+   * Rails: `def clear!` (route_set.rb:490):
+   * `@finalized = false; named_routes.clear; set.clear; formatter.clear;
+   *  @polymorphic_mappings.clear; @prepend.each { |blk| eval_block(blk) }`.
+   * Trails additionally resets the memoized url_helpers and default_env
+   * (Rails relies on `@url_helpers_with_paths` etc. being reset via fresh
+   * Module construction in `generate_url_helpers`; clearing them here is
+   * the equivalent invalidation step).
+   */
   clearBang(): void {
     this._finalized = false;
     this.routes = [];
     this.namedRoutes.clear();
+    this.set.clear();
+    this.formatter.clear();
     this.polymorphicMappings.clear();
     this.dispatcherRegistry.clear();
-    this.urlHelpers.clear();
+    this._customUrlHelpers.clear();
+    this._urlHelpersWithPaths = undefined;
+    this._urlHelpersWithoutPaths = undefined;
+    this._defaultEnv = undefined;
     this._journeyRouter = null;
     for (const blk of this._prepend) this.evalBlock(blk);
   }
 
-  /** Rails: `eager_load!`. Forces the Journey router build. */
+  /**
+   * Rails: `def eager_load!` — `router.eager_load!; routes.each(&:eager_load!); formatter.eager_load!; nil`.
+   * Trails warms the router and the formatter; the per-route warmup is
+   * skipped because the higher-level `routing::Route` has no Journey
+   * Path/AST cache to populate (Rails warms `route.path.ast` via
+   * `Journey::Route#eager_load!`, which is a no-op for trails Routes
+   * until the routing→Journey bridge lands in PR-c).
+   */
   eagerLoadBang(): void {
-    void this.journeyRouter;
+    const router = this.journeyRouter as JourneyRouter & { eagerLoadBang?(): void };
+    router.eagerLoadBang?.();
+    this.formatter.eagerLoadBang();
   }
 
   /** Rails: `empty?`. */
@@ -311,15 +721,18 @@ export class RouteSet {
   }
 
   /**
-   * Rails: `add_url_helper(name, options, &block)`. Stored in
-   * {@link urlHelpers} until NamedRouteCollection lands.
+   * Rails: `NamedRouteCollection#add_url_helper(name, defaults, &block)`.
+   * Stored in {@link _customUrlHelpers} (a private map) until
+   * NamedRouteCollection lands; once ported, these will be folded into
+   * the generated url-helpers module so `${name}Path` / `${name}Url`
+   * become callable on `urlHelpers()`.
    */
   addUrlHelper(
     name: string,
     options: Record<string, unknown>,
     block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
   ): void {
-    this.urlHelpers.set(name, new CustomUrlHelper(name, options, block));
+    this._customUrlHelpers.set(name, new CustomUrlHelper(name, options, block));
   }
 
   /** Rails: `extra_keys(options, recall = {})`. */
@@ -603,9 +1016,14 @@ export class RouteSet {
     this._finalized = false;
     this.routes = [];
     this.namedRoutes.clear();
+    this.set.clear();
+    this.formatter.clear();
     this.polymorphicMappings.clear();
     this.dispatcherRegistry.clear();
-    this.urlHelpers.clear();
+    this._customUrlHelpers.clear();
+    this._urlHelpersWithPaths = undefined;
+    this._urlHelpersWithoutPaths = undefined;
+    this._defaultEnv = undefined;
     this._journeyRouter = null;
   }
 
