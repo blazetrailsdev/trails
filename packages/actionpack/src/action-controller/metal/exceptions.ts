@@ -5,6 +5,8 @@
  * @see https://api.rubyonrails.org/classes/ActionController.html
  */
 
+import { SpellChecker } from "@blazetrails/did-you-mean";
+
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
 export class ActionControllerError extends Error {
@@ -42,6 +44,7 @@ export class UrlGenerationError extends ActionControllerError {
   readonly routes: unknown;
   readonly routeName: string | null;
   readonly methodName: string | null;
+  #cachedCorrections: string[] | null = null;
 
   constructor(
     message: string,
@@ -56,17 +59,24 @@ export class UrlGenerationError extends ActionControllerError {
     this.methodName = methodName;
   }
 
+  /**
+   * Rails parity: grep `helper_names` for substrings of `route_name`,
+   * drop the exact `method_name`, then run `SpellChecker` against the
+   * filtered dictionary.
+   * @see vendor/rails/actionpack/lib/action_controller/metal/exceptions.rb
+   */
   get corrections(): string[] {
-    if (!this.routeName || !this.routes) return [];
-    // `this.routes` may be a full `RouteSetLike` OR a Journey
-    // `FormatterHost` (which has `namedRoutes.has/get`, not
-    // `namedRoutes.helperNames`). Treat both shapes as optional.
+    if (this.#cachedCorrections !== null) return this.#cachedCorrections;
+    if (!this.routeName || !this.routes) {
+      this.#cachedCorrections = [];
+      return this.#cachedCorrections;
+    }
     const routes = this.routes as Partial<RouteSetLike> | undefined;
     const helpers = routes?.namedRoutes?.helperNames ?? [];
-    const target = this.routeName.toLowerCase();
-    return helpers
-      .filter((name) => name !== this.methodName && name.toLowerCase().includes(target))
-      .slice(0, 5);
+    const pattern = new RegExp(this.routeName);
+    const maybeThese = helpers.filter((name) => pattern.test(name) && name !== this.methodName);
+    this.#cachedCorrections = new SpellChecker({ dictionary: maybeThese }).correct(this.routeName);
+    return this.#cachedCorrections;
   }
 }
 
