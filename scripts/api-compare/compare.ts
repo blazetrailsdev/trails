@@ -156,6 +156,7 @@ const RUBY_ERROR_BUILTINS = new Set([
   "KeyError",
   "RangeError",
   "IOError",
+  "LoadError",
 ]);
 
 function shortName(fqn: string | undefined | null): string | null {
@@ -231,6 +232,11 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // `ActiveRecord::Base` has no Ruby super; TS `Base` extends `Model`
   // so the ActiveModel mixin surface is type-visible on subclasses.
   ["Base", "Model"],
+  // `ActionController::MimeResponds::Collector` is a plain class in Rails
+  // that `include AbstractController::Collector`; TS extends the
+  // ActionDispatch `Collector` (re-aliased as `DispatchCollector`) to share
+  // the negotiation pipeline.
+  ["Collector", "DispatchCollector"],
 ]);
 
 // Per-class TS renames that don't fit the systematic alias patterns

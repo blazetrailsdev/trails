@@ -1,27 +1,22 @@
 /**
- * ActionController::Railtie
+ * Trailtie — initialization hooks for ActionController.
  *
- * Railtie for ActionController. Hooks into app initialization to
- * configure controllers, set up middlewares, and register log subscribers.
+ * Mirrors: ActionController::Railtie < Rails::Railtie (railtie.rb)
+ *
+ * Extends the base Railtie from `@blazetrails/activesupport` and registers
+ * itself in the global initialization pipeline.
+ *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
+import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { deprecator } from "./deprecator.js";
 
-export class Railtie {
-  static railtieName = "action_controller";
+export class Trailtie extends BaseRailtie {
+  static {
+    registerRailtie(this);
 
-  private _initializers: Array<{ name: string; fn: () => void }> = [];
-
-  initializer(name: string, fn: () => void): void {
-    this._initializers.push({ name, fn });
-  }
-
-  runInitializers(): void {
-    for (const init of this._initializers) {
-      init.fn();
-    }
-  }
-
-  get initializers(): ReadonlyArray<{ name: string; fn: () => void }> {
-    return [...this._initializers];
+    this.initializer("action_controller.deprecator", () => {
+      BaseRailtie.deprecators["actionController"] = deprecator();
+    });
   }
 }

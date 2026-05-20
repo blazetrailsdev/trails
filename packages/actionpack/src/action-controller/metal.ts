@@ -13,7 +13,7 @@ import type { RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { underscore } from "@blazetrails/activesupport";
 import {
-  MiddlewareStack as DispatchMiddlewareStack,
+  MiddlewareStack as AbstractMiddlewareStack,
   type MiddlewareEntry,
 } from "../action-dispatch/middleware/stack.js";
 import { includeContent } from "./metal/head.js";
@@ -30,7 +30,7 @@ import {
   _setVaryHeader as _setVaryHeaderFn,
 } from "./metal/rendering.js";
 
-export class MiddlewareStack extends DispatchMiddlewareStack {}
+export class MiddlewareStack extends AbstractMiddlewareStack {}
 
 export class Middleware {
   readonly klass: MiddlewareEntry["klass"];

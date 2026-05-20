@@ -36,6 +36,7 @@
 import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
+import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -418,6 +419,20 @@ export class TestCase {
     if ("session" in this.controller) {
       Object.assign(this.session, (this.controller as any).session);
     }
+  }
+}
+
+/**
+ * ActionController::TestRequest — a controller-test-flavored TestRequest
+ * that mirrors `ActionDispatch::TestRequest`. Most behavior is inherited
+ * from the dispatch layer; controller-specific helpers (`newSession`) live
+ * here so test harnesses can synthesize a request without reaching across
+ * packages.
+ */
+export class TestRequest extends AbstractTestRequest {
+  /** Mirrors Rails `ActionController::TestRequest.new_session`. */
+  static newSession(): TestSession {
+    return new TestSession();
   }
 }
 

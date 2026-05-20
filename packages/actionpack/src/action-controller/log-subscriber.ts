@@ -6,61 +6,54 @@
  * @see https://api.rubyonrails.org/classes/ActionController/LogSubscriber.html
  */
 
-export interface Event {
-  name: string;
-  payload: Record<string, unknown>;
-  duration: number;
-}
+import {
+  LogSubscriber as BaseLogSubscriber,
+  NotificationEvent as Event,
+} from "@blazetrails/activesupport";
 
-export class LogSubscriber {
-  private _logger: { info(msg: string): void; debug?(msg: string): void } | null;
-
-  constructor(logger?: { info(msg: string): void; debug?(msg: string): void }) {
-    this._logger = logger ?? null;
-  }
-
+export class LogSubscriber extends BaseLogSubscriber {
   startProcessing(event: Event): void {
     const { controller, action, format } = event.payload as {
       controller: string;
       action: string;
       format?: string;
     };
-    this._logger?.info(`Processing by ${controller}#${action} as ${format ?? "*/*"}`);
+    this._info(`Processing by ${controller}#${action} as ${format ?? "*/*"}`);
   }
 
   processAction(event: Event): void {
     const { status } = event.payload as { status: number | string };
-    this._logger?.info(`Completed ${status} in ${event.duration.toFixed(1)}ms`);
+    this._info(`Completed ${status} in ${event.duration.toFixed(1)}ms`);
   }
 
   halted(event: Event): void {
     const { filter } = event.payload as { filter: string };
-    this._logger?.info(`Filter chain halted as ${filter} rendered or redirected`);
+    this._info(`Filter chain halted as ${filter} rendered or redirected`);
   }
 
   sendFile(event: Event): void {
     const { path } = event.payload as { path: string };
-    this._logger?.info(`Sent file ${path}`);
+    this._info(`Sent file ${path}`);
   }
 
   sendData(event: Event): void {
     const { filename } = event.payload as { filename?: string };
-    this._logger?.info(`Sent data ${filename ?? "(inline)"}`);
+    this._info(`Sent data ${filename ?? "(inline)"}`);
   }
 
   redirect(event: Event): void {
     const { status, location } = event.payload as { status: number | string; location: string };
-    this._logger?.info(`Redirected to ${location} (${status})`);
+    this._info(`Redirected to ${location} (${status})`);
   }
 
   haltedCallback(event: Event): void {
     const { filter } = event.payload as { filter: string };
-    this._logger?.info(`Filter chain halted as "${filter}" rendered or redirected`);
+    this._info(`Filter chain halted as "${filter}" rendered or redirected`);
   }
 
   redirectTo(event: Event): void {
     const { location } = event.payload as { location: string };
-    this._logger?.info(`Redirected to ${location}`);
+    this._info(`Redirected to ${location}`);
   }
 
   unpermittedParameters(event: Event): void {
@@ -74,12 +67,6 @@ export class LogSubscriber {
           .map(([k, v]) => `${k}: ${v}`)
           .join(", ")} }`
       : "";
-    this._logger?.debug?.(
-      `Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`,
-    );
-  }
-
-  get logger(): { info(msg: string): void; debug?(msg: string): void } | null {
-    return this._logger;
+    this._debug(`Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`);
   }
 }

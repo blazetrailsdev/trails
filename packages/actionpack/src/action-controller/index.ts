@@ -68,11 +68,10 @@ export {
 export { BasicAuth, TokenAuth, DigestAuth } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
-export { TestRequest } from "../action-dispatch/testing/test-request.js";
-export { LiveTestResponse, TestSession } from "./test-case.js";
+export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export { defaultFormBuilder } from "./form-builder.js";
-export { Railtie } from "./trailtie.js";
+export { Trailtie } from "./trailtie.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { renderForApi } from "./api/api-rendering.js";
