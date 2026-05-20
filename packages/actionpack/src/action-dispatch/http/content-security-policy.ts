@@ -40,6 +40,14 @@ export type CspSymbol = `:${keyof typeof MAPPINGS}`;
 export type CSPSource = CspSymbol | (string & {}) | ((request?: unknown) => string | string[]);
 
 /**
+ * What a directive setter accepts in its rest list. Rails treats only
+ * `nil`/`false` as falsy (content_security_policy.rb:189-197), so callers
+ * may pass `null`/`false` as the first arg to clear a directive without
+ * an unsafe cast.
+ */
+export type CSPSourceOrClear = CSPSource | null | false;
+
+/**
  * Rails' default nonce-eligible directives. Mirrors
  * `DEFAULT_NONCE_DIRECTIVES = %w[script-src style-src]`
  * (actionpack/lib/action_dispatch/http/content_security_policy.rb:174).
@@ -54,8 +62,15 @@ type DirectiveName = string;
  */
 export class InvalidDirectiveError extends Error {}
 
+/**
+ * Shape of a stored directive. Rails uses `true` as a sentinel for bare
+ * directives that emit just the directive name (e.g. `upgrade-insecure-requests`)
+ * with no source list. Arrays are emitted as `name source1 source2 ...`.
+ */
+export type DirectiveValue = CSPSource[] | true;
+
 export class ContentSecurityPolicy {
-  private directives: Map<DirectiveName, CSPSource[]> = new Map();
+  private directives: Map<DirectiveName, DirectiveValue> = new Map();
 
   constructor(init?: (policy: ContentSecurityPolicy) => void) {
     if (init) init(this);
@@ -63,74 +78,75 @@ export class ContentSecurityPolicy {
 
   // --- Directive setters ---
 
-  defaultSrc(...sources: CSPSource[]): this {
+  defaultSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("default-src", sources);
   }
-  scriptSrc(...sources: CSPSource[]): this {
+  scriptSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("script-src", sources);
   }
-  scriptSrcAttr(...sources: CSPSource[]): this {
+  scriptSrcAttr(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("script-src-attr", sources);
   }
-  scriptSrcElem(...sources: CSPSource[]): this {
+  scriptSrcElem(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("script-src-elem", sources);
   }
-  styleSrc(...sources: CSPSource[]): this {
+  styleSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("style-src", sources);
   }
-  styleSrcAttr(...sources: CSPSource[]): this {
+  styleSrcAttr(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("style-src-attr", sources);
   }
-  styleSrcElem(...sources: CSPSource[]): this {
+  styleSrcElem(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("style-src-elem", sources);
   }
-  imgSrc(...sources: CSPSource[]): this {
+  imgSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("img-src", sources);
   }
-  fontSrc(...sources: CSPSource[]): this {
+  fontSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("font-src", sources);
   }
-  connectSrc(...sources: CSPSource[]): this {
+  connectSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("connect-src", sources);
   }
-  mediaSrc(...sources: CSPSource[]): this {
+  mediaSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("media-src", sources);
   }
-  objectSrc(...sources: CSPSource[]): this {
+  objectSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("object-src", sources);
   }
-  frameSrc(...sources: CSPSource[]): this {
+  frameSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("frame-src", sources);
   }
-  childSrc(...sources: CSPSource[]): this {
+  childSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("child-src", sources);
   }
-  workerSrc(...sources: CSPSource[]): this {
+  workerSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("worker-src", sources);
   }
-  frameAncestors(...sources: CSPSource[]): this {
+  frameAncestors(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("frame-ancestors", sources);
   }
-  formAction(...sources: CSPSource[]): this {
+  formAction(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("form-action", sources);
   }
-  baseUri(...sources: CSPSource[]): this {
+  baseUri(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("base-uri", sources);
   }
-  manifestSrc(...sources: CSPSource[]): this {
+  manifestSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("manifest-src", sources);
   }
-  prefetchSrc(...sources: CSPSource[]): this {
+  prefetchSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("prefetch-src", sources);
   }
-  navigateTo(...sources: CSPSource[]): this {
+  navigateTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("navigate-to", sources);
   }
-  sandbox(...sources: [false] | CSPSource[]): this {
-    // Rails: empty `*values` → bare directive; `values.first` nil/false → delete.
-    // Ruby truthiness only treats nil/false as falsy — empty strings stay truthy.
+  sandbox(...sources: CSPSourceOrClear[]): this {
+    // Rails: empty `*values` → bare directive (stored as `true`); `values.first`
+    // nil/false → delete. Ruby truthiness only treats nil/false as falsy —
+    // empty strings stay truthy.
     if (sources.length === 0) {
-      this.directives.set("sandbox", []);
+      this.directives.set("sandbox", true);
       return this;
     }
     const first = sources[0];
@@ -140,7 +156,7 @@ export class ContentSecurityPolicy {
     }
     return this.setDirective("sandbox", sources as CSPSource[]);
   }
-  pluginTypes(...sources: [false] | CSPSource[]): this {
+  pluginTypes(...sources: CSPSourceOrClear[]): this {
     // Rails: `if types.first` — only nil/false delete (Ruby truthiness, so
     // empty string stays truthy and is passed through to the directive).
     const first = sources[0];
@@ -150,40 +166,57 @@ export class ContentSecurityPolicy {
     }
     return this.setDirective("plugin-types", sources as CSPSource[]);
   }
-  reportUri(...sources: CSPSource[]): this {
+  reportUri(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("report-uri", sources);
   }
-  reportTo(...sources: CSPSource[]): this {
+  reportTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("report-to", sources);
   }
   blockAllMixedContent(enabled: boolean | null = true): this {
-    // Rails `if enabled`: only nil/false delete; numeric/empty-string stay truthy.
+    // Rails `if enabled`: only nil/false delete; numeric/empty-string stay
+    // truthy. Bare directives store `true` (Rails parity, content_security_policy.rb:212-218).
     if (enabled === false || enabled == null) {
       this.directives.delete("block-all-mixed-content");
       return this;
     }
-    return this.setDirective("block-all-mixed-content", []);
+    this.directives.set("block-all-mixed-content", true);
+    return this;
   }
   upgradeInsecureRequests(enabled: boolean | null = true): this {
     if (enabled === false || enabled == null) {
       this.directives.delete("upgrade-insecure-requests");
       return this;
     }
-    return this.setDirective("upgrade-insecure-requests", []);
+    this.directives.set("upgrade-insecure-requests", true);
+    return this;
   }
-  requireSriFor(...sources: CSPSource[]): this {
+  requireSriFor(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("require-sri-for", sources);
   }
-  requireTrustedTypesFor(...sources: CSPSource[]): this {
+  requireTrustedTypesFor(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("require-trusted-types-for", sources);
   }
-  trustedTypes(...sources: CSPSource[]): this {
+  trustedTypes(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("trusted-types", sources);
   }
 
-  /** @internal */
-  private setDirective(name: string, sources: CSPSource[]): this {
-    this.directives.set(name, this.applyMappings(sources));
+  /**
+   * @internal
+   * Mirrors Rails' `DIRECTIVES.each { ... if sources.first ... else delete }`
+   * (content_security_policy.rb:189-197). A bare call like `policy.scriptSrc()`
+   * or `policy.scriptSrc(null)` removes the directive instead of setting an
+   * empty list.
+   */
+  private setDirective(name: string, sources: CSPSourceOrClear[]): this {
+    // Rails `if sources.first` uses Ruby truthiness: only nil/false are falsy.
+    // Empty strings stay truthy, so `policy.scriptSrc("")` must set the
+    // directive (matching content_security_policy.rb:189-197).
+    const first = sources[0];
+    if (sources.length === 0 || first == null || first === false) {
+      this.directives.delete(name);
+      return this;
+    }
+    this.directives.set(name, this.applyMappings(sources as CSPSource[]));
     return this;
   }
 
@@ -241,14 +274,14 @@ export class ContentSecurityPolicy {
   ): (string | null)[] {
     const out: (string | null)[] = [];
     for (const [directive, sources] of this.directives) {
-      if (Array.isArray(sources) && sources.length > 0) {
+      if (Array.isArray(sources)) {
         const built = this.buildDirective(directive, sources, context).join(" ");
         if (nonce && this.isNonceDirective(directive, nonceDirectives)) {
           out.push(`${directive} ${built} 'nonce-${nonce}'`);
         } else {
           out.push(`${directive} ${built}`);
         }
-      } else if (sources) {
+      } else if (sources === true) {
         // Bare directive (no sources) — e.g. `block-all-mixed-content`.
         out.push(directive);
       } else {
@@ -329,14 +362,14 @@ export class ContentSecurityPolicy {
   dup(): ContentSecurityPolicy {
     const copy = new ContentSecurityPolicy();
     for (const [k, v] of this.directives) {
-      copy.directives.set(k, [...v]);
+      copy.directives.set(k, v === true ? true : [...v]);
     }
     return copy;
   }
 
   // --- Inspection ---
 
-  getDirectives(): Map<DirectiveName, CSPSource[]> {
+  getDirectives(): Map<DirectiveName, DirectiveValue> {
     return new Map(this.directives);
   }
 

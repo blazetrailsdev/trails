@@ -270,6 +270,95 @@ describe("ContentSecurityPolicyTest", () => {
     policy.trustedTypes("default");
     expect(policy.build()).toBe("trusted-types default");
   });
+
+  // Rails: test_mappings — every MAPPINGS key resolves through a fetch
+  // directive (content_security_policy_test.rb).
+  it("mappings table is exhaustive", () => {
+    for (const [key, expected] of Object.entries(MAPPINGS)) {
+      const policy = new ContentSecurityPolicy();
+      policy.defaultSrc(`:${key}`);
+      expect(policy.build()).toBe(`default-src ${expected}`);
+    }
+  });
+
+  // Rails: test_dynamic_directives — Proc returning Array<String> flattens.
+  it("dynamic directive returning array of sources", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.defaultSrc(() => ["https://a.example", "https://b.example"]);
+    expect(policy.build({})).toBe("default-src https://a.example https://b.example");
+  });
+
+  // Rails: test_invalid_directive_source — non-string/non-proc raises.
+  it("invalid directive source raises", () => {
+    const policy = new ContentSecurityPolicy();
+    expect(() => policy.defaultSrc(123 as unknown as string)).toThrow(/Invalid/);
+  });
+
+  // Rails: test_raises_runtime_error_when_unexpected_source — Proc returns
+  // an unexpected (non-string) value.
+  it("raises runtime error when unexpected source", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.defaultSrc(() => 42 as unknown as string);
+    expect(() => policy.build({})).toThrow(/Unexpected|Invalid/);
+  });
+
+  // Rails: DSL with no args deletes the directive (content_security_policy.rb:189).
+  it("DSL with no args clears the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("'self'");
+    policy.scriptSrc();
+    expect(policy.hasDirective("script-src")).toBe(false);
+  });
+
+  it("DSL with falsy first arg clears the directive", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("'self'");
+    policy.scriptSrc(null);
+    expect(policy.hasDirective("script-src")).toBe(false);
+  });
+
+  // Ruby truthiness: empty string stays truthy, so DSL with "" preserves the
+  // directive (content_security_policy.rb:189-197).
+  it("DSL with empty-string first arg keeps the directive (Ruby truthiness)", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.scriptSrc("");
+    expect(policy.hasDirective("script-src")).toBe(true);
+  });
+
+  // Bare directives store the `true` sentinel (Rails parity).
+  it("block_all_mixed_content stores true sentinel", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.blockAllMixedContent();
+    expect(policy.getDirectives().get("block-all-mixed-content")).toBe(true);
+  });
+
+  it("upgrade_insecure_requests stores true sentinel", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.upgradeInsecureRequests();
+    expect(policy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
+  });
+
+  it("sandbox with no args stores true sentinel", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.sandbox();
+    expect(policy.getDirectives().get("sandbox")).toBe(true);
+    expect(policy.build()).toBe("sandbox");
+  });
+
+  // Rails: test_whitespace_validation — embedded whitespace raises.
+  it("whitespace validation", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.defaultSrc("foo bar");
+    expect(() => policy.build()).toThrow(/whitespace or semicolons/);
+  });
+
+  it("dup preserves bare-directive sentinel", () => {
+    const policy = new ContentSecurityPolicy();
+    policy.upgradeInsecureRequests();
+    const copy = policy.dup();
+    expect(copy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
+    expect(copy.build()).toBe("upgrade-insecure-requests");
+  });
 });
 
 describe("ContentSecurityPolicyIntegrationTest", () => {
