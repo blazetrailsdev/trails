@@ -57,13 +57,19 @@ describe("Mapper#mount dispatch", () => {
   it("dynamic mount points get SCRIPT_NAME from Journey's matched prefix", async () => {
     const seen: Array<Record<string, unknown>> = [];
     const engine = (env: Record<string, unknown>) => {
-      seen.push({ SCRIPT_NAME: env["SCRIPT_NAME"], PATH_INFO: env["PATH_INFO"] });
+      seen.push({
+        SCRIPT_NAME: env["SCRIPT_NAME"],
+        PATH_INFO: env["PATH_INFO"],
+        path_parameters: env["action_dispatch.request.path_parameters"],
+      });
       return [200, {}, [""]];
     };
     const routes = new RouteSet();
     routes.draw((r) => r.mount(engine, { at: "/:tenant" }));
 
     await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/acme/widgets" });
-    expect(seen).toEqual([{ SCRIPT_NAME: "/acme", PATH_INFO: "/widgets" }]);
+    expect(seen).toEqual([
+      { SCRIPT_NAME: "/acme", PATH_INFO: "/widgets", path_parameters: { tenant: "acme" } },
+    ]);
   });
 });

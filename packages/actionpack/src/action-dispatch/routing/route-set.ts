@@ -1081,19 +1081,22 @@ export class RouteSet {
     // anchor: false dispatch into the engine's app.
     const mountedApp = route.app;
     if (mountedApp) {
-      // Use Journey's actual unanchored match data (matchedPrefix /
-      // postMatch) — same as Rails' Journey router: `req.script_name +
-      // match.to_s` and `match.post_match`. This handles dynamic mount
-      // points (`/:tenant`) and segment-boundary cases that a literal
-      // `route.path.startsWith(...)` would get wrong.
-      const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
-      const matchedPrefix = matched.matchedPrefix ?? route.path.replace(/\/$/, "");
-      const remaining = matched.postMatch ?? "/";
-      const forwarded: RackEnv = {
-        ...env,
-        SCRIPT_NAME: scriptName + matchedPrefix,
-        PATH_INFO: remaining,
-      };
+      // Mirrors Rails' `action_dispatch/journey/router.rb#serve`:
+      // - SCRIPT_NAME/PATH_INFO are rewritten ONLY for unanchored routes
+      //   (`unless route.path.anchored`). Anchored mounts forward env
+      //   unchanged. matchedPrefix / postMatch on `matched` are populated
+      //   by `journeyRecognize` from `match.to_s` / `match.post_match`,
+      //   so dynamic mount points (`/:tenant` → `/acme`) work without
+      //   relying on literal `route.path` slicing.
+      // - `path_parameters` is set on the forwarded request unconditionally
+      //   (Rails: `req.path_parameters = tmp_params` before `route.app.serve`).
+      const forwarded: RackEnv = { ...env };
+      if (matched.matchedPrefix !== undefined) {
+        const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
+        forwarded["SCRIPT_NAME"] = scriptName + matched.matchedPrefix;
+        forwarded["PATH_INFO"] = matched.postMatch ?? "/";
+      }
+      forwarded["action_dispatch.request.path_parameters"] = { ...route.defaults, ...params };
       return typeof mountedApp === "function"
         ? await mountedApp(forwarded)
         : await mountedApp.call(forwarded);
