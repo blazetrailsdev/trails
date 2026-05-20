@@ -360,12 +360,11 @@ describe("RequestFormat", () => {
   });
 
   it("format is not nil with unknown format", () => {
-    const req = new Request({ HTTP_ACCEPT: "application/octet-stream" });
-    // Rails: returns Mime::NullType because the ad-hoc MimeType has nil symbol
-    // and is filtered out of `formats`. Pending MimeType.symbol nullability
-    // followup (#1848); for now ad-hoc types keep a string symbol and slip
-    // through the filter.
-    expect(req.format.symbol).toBe("application/octet-stream");
+    // Rails: stub_request("QUERY_STRING" => "format=hello") + assert_nil request.format.
+    // Unknown format extension yields an empty `formats` array → NullType.instance,
+    // whose `.symbol` is null and `.nil?` is true.
+    const req = new Request({ QUERY_STRING: "format=hello" });
+    expect(req.format.symbol).toBeNull();
   });
 
   it("can override format with parameter positive", () => {
@@ -520,11 +519,15 @@ describe("RequestEtag", () => {
   });
 
   it("always matches *", () => {
-    const req = new Request({ HTTP_ACCEPT: "*/*" });
-    // Rails: Mime::ALL (symbol :all). Pending MimeType.ALL registry interning
-    // followup (#1848) — for now `parse("*/*")` returns an ad-hoc instance
-    // whose symbol is the media range itself.
-    expect(req.format.symbol).toBe("*/*");
+    // Rails: stub_request("HTTP_IF_NONE_MATCH" => "*") then etag_matches?("\"strong\"") etc.
+    // The previous body tested `req.format` with HTTP_ACCEPT="*/*" — unrelated to
+    // the Rails test of the same name (request_test.rb:1297-1306).
+    const req = new Request({ HTTP_IF_NONE_MATCH: "*" });
+    expect(req.ifNoneMatch).toBe("*");
+    expect(req.ifNoneMatchEtags).toEqual(["*"]);
+    expect(req.etagMatches('"strong"')).toBe(true);
+    expect(req.etagMatches('W/"weak"')).toBe(true);
+    expect(req.etagMatches(undefined)).toBe(false);
   });
 });
 
