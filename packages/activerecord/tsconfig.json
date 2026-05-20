@@ -10,6 +10,7 @@
   "references": [
     { "path": "../arel" },
     { "path": "../activemodel" },
+    { "path": "../did-you-mean" },
     { "path": "../globalid" },
     { "path": "../trails-tsc" }
   ]

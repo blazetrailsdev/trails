@@ -10,7 +10,9 @@ import {
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
-import { modelRegistry, levenshtein } from "./associations.js";
+import { SpellChecker } from "@blazetrails/did-you-mean";
+
+import { modelRegistry } from "./associations.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -1540,17 +1542,16 @@ export class ThroughReflection extends AbstractReflection {
 
   /**
    * @internal
-   * Mirrors ActiveRecord's DidYouMean-powered suggestions for
-   * HasManyThroughAssociationNotFoundError. Returns reflection names on
-   * the active_record that are within Levenshtein distance 3 of the
-   * misspelled `:through` name, excluding the failing reflection.
+   * Mirrors `HasManyThroughAssociationNotFoundError#corrections`: feeds the
+   * owner's reflection names (minus the failing one) into `SpellChecker`,
+   * which applies the Jaro-Winkler + Levenshtein thresholds from Ruby's
+   * `did_you_mean`.
    */
   private _throughCorrections(): string[] {
     const rawReflections: Record<string, unknown> =
       (this.activeRecord as { _reflections?: Record<string, unknown> })._reflections ?? {};
-    const candidates = Object.keys(rawReflections).filter((k) => k !== this.name);
-    const target = this.through;
-    return candidates.filter((k) => levenshtein(k, target) <= 3);
+    const dictionary = Object.keys(rawReflections).filter((k) => k !== this.name);
+    return new SpellChecker({ dictionary }).correct(this.through);
   }
 
   /**

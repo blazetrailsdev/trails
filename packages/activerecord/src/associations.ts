@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { Table as ArelTable } from "@blazetrails/arel";
+import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 // Re-export the slot's setter so the package entry and other internal
@@ -231,12 +232,8 @@ function validateInverseOf(targetModel: typeof Base, assocName: string, inverseO
   if (targetAssocs.length === 0) return;
   if (targetAssocs.some((a) => a.name === inverseOf)) return;
 
-  const corrections: string[] = [];
-  for (const a of targetAssocs) {
-    if (levenshtein(a.name, inverseOf) <= 3) {
-      corrections.push(a.name);
-    }
-  }
+  const dictionary = targetAssocs.map((a) => a.name);
+  const corrections = new SpellChecker({ dictionary }).correct(inverseOf);
   throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections, targetModel.name);
 }
 
@@ -323,28 +320,9 @@ export function _hmtNotFound(
   through: string,
 ): HasManyThroughAssociationNotFoundError {
   const assocs: AssociationDefinition[] = ctor._associations ?? [];
-  const corrections = assocs
-    .map((a) => a.name)
-    .filter((n) => n !== assocName && levenshtein(n, through) <= 3);
+  const dictionary = assocs.map((a) => a.name).filter((n) => n !== assocName);
+  const corrections = new SpellChecker({ dictionary }).correct(through);
   return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
-}
-
-/** @internal */
-export function levenshtein(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
-  return dp[m][n];
 }
 
 /**
