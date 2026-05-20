@@ -19,11 +19,73 @@ import {
   type JourneyMatch,
 } from "./journey-bridge.js";
 import type { Router as JourneyRouter, RackishResponse, RouterRequest } from "../journey/router.js";
-import { symbolToString, type PolymorphicMappingEntry } from "./polymorphic-routes.js";
+import {
+  polymorphicUrl as polymorphicUrlFn,
+  symbolToString,
+  type PolymorphicArg,
+  type PolymorphicHost,
+  type PolymorphicMappingEntry,
+  type PolymorphicOptions,
+} from "./polymorphic-routes.js";
+import {
+  fullUrlFor as fullUrlForFn,
+  routeFor as routeForFn,
+  urlOptions as urlOptionsFn,
+  _routesContext as routesContextFn,
+  _withRoutes as withRoutesFn,
+  type UrlForHost,
+  type UrlForOptions,
+  type UrlForRoutes,
+} from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+
+const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
+
+/** @internal Rails: `RouteSet::CustomUrlHelper` — captured `direct(...)` block. */
+export class CustomUrlHelper implements PolymorphicMappingEntry {
+  readonly name: string;
+  readonly defaults: Record<string, unknown>;
+  readonly block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string;
+
+  constructor(
+    name: string,
+    defaults: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+  ) {
+    this.name = name;
+    this.defaults = defaults;
+    this.block = block;
+  }
+
+  call(t: PolymorphicHost, args: unknown[], onlyPath = false): string {
+    // Rails: `options = args.extract_options!` — only strip a trailing
+    // *plain* Hash. Model instances, Dates, class instances all stay in
+    // the positional args. Work on a copy so the caller's array is
+    // unchanged.
+    const rest = args.slice();
+    const last = rest[rest.length - 1];
+    const isPlainHash =
+      last != null &&
+      typeof last === "object" &&
+      !Array.isArray(last) &&
+      (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null);
+    const options = isPlainHash ? (rest.pop() as Record<string, unknown>) : {};
+    const merged = { ...this.defaults, ...options };
+    const result = this.block.apply(t, [...rest, merged]);
+    const url =
+      typeof result === "string"
+        ? result
+        : ((t as unknown as { fullUrlFor: (o: unknown) => string }).fullUrlFor?.(result) ??
+          String(result));
+    if (!onlyPath) return url;
+    // Rails: strip scheme+host, keep from first single-slash on.
+    const m = url.match(/(?<!\/)\/(?!\/)(.*)$/);
+    return m ? "/" + m[1] : url;
+  }
+}
 
 export type DrawCallback = (mapper: Mapper) => void;
 
@@ -119,7 +181,16 @@ export class RouteSet {
   private routes: Route[] = [];
   private namedRoutes: Map<string, Route> = new Map();
   private dispatcher: DispatcherCallback | undefined;
-  private defaultUrlOptions: { host?: string } = {};
+  /** Public for parity with Rails `RouteSet#default_url_options`. */
+  defaultUrlOptions: Record<string, unknown> = {};
+  private readonly _append: Array<(mapper: Mapper) => void> = [];
+  private readonly _prepend: Array<(mapper: Mapper) => void> = [];
+  private _finalized = false;
+  /**
+   * Helpers registered via {@link addUrlHelper}. Rails dispatches these
+   * through NamedRouteCollection, which isn't ported yet.
+   */
+  readonly urlHelpers: Map<string, CustomUrlHelper> = new Map();
   /**
    * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
    * back to the standard RESTful helper. In Rails this is populated by the
@@ -129,6 +200,22 @@ export class RouteSet {
    * `RouteSet#polymorphic_mappings`.
    */
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
+  /**
+   * @internal Rails-private `_routes`. Points at an adapter that exposes
+   * {@link polymorphicMappings} so {@link polymorphicUrl} works, but whose
+   * `urlFor` raises until trails' legacy `urlFor(routeName, params,
+   * options)` is replaced by the Rails-shape `urlFor(options, routeName?)`
+   * (PR b). Wiring `this` directly would route {@link fullUrlFor} into
+   * the wrong-shape `urlFor` at runtime.
+   */
+  _routes: UrlForRoutes = {
+    urlFor: () => {
+      throw new Error(
+        "RouteSet#urlFor needs the Rails-shape (options, routeName?) signature before fullUrlFor can be wired through _routes — see PR b.",
+      );
+    },
+    polymorphicMappings: this.polymorphicMappings,
+  };
   /** Controller name → handler registry consulted by {@link Dispatcher}. */
   readonly dispatcherRegistry: DispatcherRegistry = new DispatcherRegistry();
   /** @internal */
@@ -141,16 +228,206 @@ export class RouteSet {
    * each call appends routes (like Rails).
    */
   draw(callback: DrawCallback): void {
-    const mapper = new Mapper();
-    callback(mapper);
+    // Rails' `draw` calls `clear!` first; trails keeps it append-only for
+    // back-compat until callers opt into the Rails semantics via
+    // {@link clearBang} + {@link evalBlock} + {@link finalizeBang}.
+    this.evalBlock(callback);
+  }
 
+  /** @internal Rails: `private def eval_block(block)`. */
+  evalBlock(block: DrawCallback): void {
+    const mapper = new Mapper();
+    block(mapper);
     for (const route of mapper.routes) {
-      this.routes.push(route);
-      if (route.name) {
-        this.namedRoutes.set(route.name, route);
-      }
+      this.addRoute(route, route.name);
     }
     this._journeyRouter = null;
+  }
+
+  /** Rails: `append(&block)`. */
+  append(block: DrawCallback): void {
+    this._append.push(block);
+  }
+
+  /** Rails: `prepend(&block)`. */
+  prepend(block: DrawCallback): void {
+    this._prepend.push(block);
+  }
+
+  /** Rails: `finalize!` — flush queued {@link append} blocks. */
+  finalizeBang(): void {
+    if (this._finalized) return;
+    for (const blk of this._append) this.evalBlock(blk);
+    this._finalized = true;
+  }
+
+  /** Rails: `clear!` — drop routes and replay {@link prepend} blocks. */
+  clearBang(): void {
+    this._finalized = false;
+    this.routes = [];
+    this.namedRoutes.clear();
+    this.polymorphicMappings.clear();
+    this.dispatcherRegistry.clear();
+    this.urlHelpers.clear();
+    this._journeyRouter = null;
+    for (const blk of this._prepend) this.evalBlock(blk);
+  }
+
+  /** Rails: `eager_load!`. Forces the Journey router build. */
+  eagerLoadBang(): void {
+    void this.journeyRouter;
+  }
+
+  /** Rails: `empty?`. */
+  isEmpty(): boolean {
+    return this.routes.length === 0;
+  }
+
+  /**
+   * Rails: `add_route(mapping, name)`. Trails' Mapper builds {@link Route}
+   * instances directly, so the first argument here is a Route.
+   */
+  addRoute(route: Route, name?: string | null): Route {
+    if (name && !ROUTE_NAME_RE.test(name)) {
+      throw new Error(`Invalid route name: '${name}'`);
+    }
+    // Rails raises on duplicate names; trails' Mapper currently emits the
+    // singular form for both `index` and `show` on `resources`, so we
+    // tolerate the collision until Mapper catches up.
+    this.routes.push(route);
+    if (name) this.namedRoutes.set(name, route);
+    this._journeyRouter = null;
+    return route;
+  }
+
+  /** Rails: `add_polymorphic_mapping(klass, options, &block)`. */
+  addPolymorphicMapping(
+    klass: string | { name: string },
+    options: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+  ): void {
+    const key = typeof klass === "string" ? klass : klass.name;
+    this.polymorphicMappings.set(key, new CustomUrlHelper(key, options, block));
+  }
+
+  /**
+   * Rails: `add_url_helper(name, options, &block)`. Stored in
+   * {@link urlHelpers} until NamedRouteCollection lands.
+   */
+  addUrlHelper(
+    name: string,
+    options: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+  ): void {
+    this.urlHelpers.set(name, new CustomUrlHelper(name, options, block));
+  }
+
+  /** Rails: `extra_keys(options, recall = {})`. */
+  extraKeys(options: Record<string, unknown>, recall: Record<string, unknown> = {}): string[] {
+    return this.generateExtras(options, recall)[1];
+  }
+
+  /** @internal Rails: `private def generate(...)` — returns the path string. */
+  generate(
+    routeName: string | null | undefined,
+    options: Record<string, unknown>,
+    recall: Record<string, unknown> = {},
+    _methodName?: string | null,
+  ): string {
+    const opts: Record<string, unknown> = { ...options };
+    // Rails Generator#normalize_controller_action_id! pulls
+    // controller/action/id from `recall` when missing from options (and
+    // stops at the first key it can't supply). Approximate that here so
+    // callers passing only a recall hash still resolve a route.
+    for (const key of ["controller", "action", "id"] as const) {
+      if (opts[key] == null && recall[key] != null) opts[key] = recall[key];
+      else if (opts[key] == null) break;
+    }
+    let route: Route | undefined;
+    if (routeName) route = this.namedRoutes.get(routeName);
+    route ??= this.routes.find(
+      (r) => r.controller === opts["controller"] && r.action === opts["action"],
+    );
+    if (!route) {
+      throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
+    }
+    const captureParams: Record<string, unknown> = Object.create(null);
+    for (const name of route.pathParamNames) {
+      const v = opts[name];
+      if (v != null) captureParams[name] = v;
+    }
+    return route.pathFor(captureParams as Record<string, string | number>);
+  }
+
+  /** Rails: `optimize_routes_generation?`. */
+  isOptimizeRoutesGeneration(): boolean {
+    return Object.keys(this.defaultUrlOptions).length === 0;
+  }
+
+  /** Rails: `find_script_name(options)`. */
+  findScriptName(options: Record<string, unknown>): string {
+    if (Object.hasOwn(options, "script_name")) {
+      const v = options["script_name"];
+      delete options["script_name"];
+      if (typeof v === "string") return v;
+    }
+    return "";
+  }
+
+  urlOptions(): Record<string, unknown> {
+    return urlOptionsFn.call(this as unknown as UrlForHost);
+  }
+
+  fullUrlFor(options?: UrlForOptions): string {
+    return fullUrlForFn.call(this as unknown as UrlForHost, options);
+  }
+
+  routeFor(name: string, ...args: unknown[]): string {
+    return routeForFn.call(this as unknown as UrlForHost, name, ...args);
+  }
+
+  polymorphicUrl(record: PolymorphicArg, options: PolymorphicOptions = {}): string {
+    return polymorphicUrlFn.call(this as unknown as PolymorphicHost, record, options);
+  }
+
+  /** @internal Rails: `private def _with_routes(routes)`. Sync only. */
+  _withRoutes<T>(
+    routes: UrlForRoutes,
+    block: () => Exclude<T, Promise<unknown>>,
+  ): Exclude<T, Promise<unknown>> {
+    return withRoutesFn.call(this as unknown as UrlForHost, routes, block) as Exclude<
+      T,
+      Promise<unknown>
+    >;
+  }
+
+  /** @internal Rails: `private def _routes_context`. */
+  _routesContext(): RouteSet {
+    return routesContextFn.call(this as unknown as UrlForHost) as RouteSet;
+  }
+
+  /** Rails: `recognize_path_with_request(...)` — engine recursion deferred. */
+  recognizePathWithRequest(
+    req: { requestMethod?: string; method?: string },
+    path: string,
+    extras: Record<string, unknown> = {},
+    options: { raiseOnMissing?: boolean } = {},
+  ): Record<string, unknown> | undefined {
+    const method = String(req.requestMethod ?? req.method ?? "GET").toUpperCase();
+    const matched = this.recognize(method, path);
+    if (matched) {
+      return {
+        ...matched.route.defaults,
+        controller: matched.route.controller,
+        action: matched.route.action,
+        ...matched.params,
+        ...extras,
+      };
+    }
+    if (options.raiseOnMissing !== false) {
+      throw new RoutingError(`No route matches ${JSON.stringify(path)}`);
+    }
+    return undefined;
   }
 
   /**
@@ -300,7 +577,8 @@ export class RouteSet {
   ): string {
     const path = this.pathFor(routeName, params);
     if (options.onlyPath) return path;
-    const host = options.host ?? this.defaultUrlOptions.host;
+    const rawHost = options.host ?? this.defaultUrlOptions["host"];
+    const host = typeof rawHost === "string" ? rawHost : undefined;
     if (!host) {
       throw new Error(
         "Missing host to link to! Please provide the :host parameter or set default_url_options[:host]",
@@ -317,13 +595,17 @@ export class RouteSet {
   }
 
   /**
-   * Clear all routes (for redraw).
+   * Clear all routes (for redraw). Kept for back-compat; new callers should
+   * use {@link clearBang}, which mirrors Rails `clear!` (also replays the
+   * `@prepend` blocks).
    */
   clear(): void {
+    this._finalized = false;
     this.routes = [];
     this.namedRoutes.clear();
     this.polymorphicMappings.clear();
     this.dispatcherRegistry.clear();
+    this.urlHelpers.clear();
     this._journeyRouter = null;
   }
 

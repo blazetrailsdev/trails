@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../../routing/route-set.js";
+import { Route } from "../../routing/route.js";
 import { escapeSegment } from "../../journey/router/utils.js";
 
 // ==========================================================================
@@ -130,5 +131,60 @@ describe("RouteSetTest", () => {
 
   it("escape new line for wildcard params", () => {
     expect(escapeSegment("a\nb")).toBe("a%0Ab");
+  });
+
+  it("isEmpty and clearBang", () => {
+    const routes = new RouteSet();
+    expect(routes.isEmpty()).toBe(true);
+    routes.draw((r) => r.get("/x", { to: "x#i", as: "x" }));
+    expect(routes.isEmpty()).toBe(false);
+    routes.clearBang();
+    expect(routes.isEmpty()).toBe(true);
+    expect(routes.getNamedRoutes().has("x")).toBe(false);
+  });
+
+  it("append/finalizeBang and prepend/clearBang", () => {
+    const routes = new RouteSet();
+    routes.append((r) => r.get("/late", { to: "late#i" }));
+    routes.finalizeBang();
+    expect(routes.recognize("GET", "/late")).not.toBeNull();
+    routes.prepend((r) => r.get("/seed", { to: "seed#i" }));
+    routes.clearBang();
+    expect(routes.recognize("GET", "/seed")).not.toBeNull();
+  });
+
+  it("addRoute rejects invalid names", () => {
+    const routes = new RouteSet();
+    expect(() => routes.addRoute(new Route("GET", "/x", "x", "i"), "9bad")).toThrow(
+      /Invalid route name/,
+    );
+  });
+
+  it("recognizePathWithRequest merges defaults+params+extras and raise/no-raise", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => r.get("/posts/:id", { to: "posts#show" }));
+    expect(
+      routes.recognizePathWithRequest({ requestMethod: "GET" }, "/posts/42", { from: "test" }),
+    ).toMatchObject({ controller: "posts", action: "show", id: "42", from: "test" });
+    expect(() => routes.recognizePathWithRequest({ method: "GET" }, "/nope")).toThrow(
+      /No route matches/,
+    );
+    expect(
+      routes.recognizePathWithRequest({ method: "GET" }, "/nope", {}, { raiseOnMissing: false }),
+    ).toBeUndefined();
+  });
+
+  it("findScriptName, isOptimizeRoutesGeneration, extraKeys", () => {
+    const routes = new RouteSet();
+    const opts: Record<string, unknown> = { script_name: "/app", x: 1 };
+    expect(routes.findScriptName(opts)).toBe("/app");
+    expect(opts).toEqual({ x: 1 });
+    expect(routes.isOptimizeRoutesGeneration()).toBe(true);
+    routes.setDefaultUrlOptions({ host: "ex.com" });
+    expect(routes.isOptimizeRoutesGeneration()).toBe(false);
+    routes.draw((r) => r.get("/posts/:id", { to: "posts#show", as: "post" }));
+    expect(routes.extraKeys({ controller: "posts", action: "show", id: 1, page: 2 })).toEqual([
+      "page",
+    ]);
   });
 });
