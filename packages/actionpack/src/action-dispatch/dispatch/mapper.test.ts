@@ -53,4 +53,17 @@ describe("Mapper#mount dispatch", () => {
     expect(res[0]).toBe(200);
     expect(seen).toEqual([{ SCRIPT_NAME: "/foo", PATH_INFO: "/bar" }]);
   });
+
+  it("dynamic mount points get SCRIPT_NAME from Journey's matched prefix", async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const engine = (env: Record<string, unknown>) => {
+      seen.push({ SCRIPT_NAME: env["SCRIPT_NAME"], PATH_INFO: env["PATH_INFO"] });
+      return [200, {}, [""]];
+    };
+    const routes = new RouteSet();
+    routes.draw((r) => r.mount(engine, { at: "/:tenant" }));
+
+    await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/acme/widgets" });
+    expect(seen).toEqual([{ SCRIPT_NAME: "/acme", PATH_INFO: "/widgets" }]);
+  });
 });

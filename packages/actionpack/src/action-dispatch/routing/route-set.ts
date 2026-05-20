@@ -1081,19 +1081,18 @@ export class RouteSet {
     // anchor: false dispatch into the engine's app.
     const mountedApp = route.app;
     if (mountedApp) {
+      // Use Journey's actual unanchored match data (matchedPrefix /
+      // postMatch) — same as Rails' Journey router: `req.script_name +
+      // match.to_s` and `match.post_match`. This handles dynamic mount
+      // points (`/:tenant`) and segment-boundary cases that a literal
+      // `route.path.startsWith(...)` would get wrong.
       const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
-      const mountPath = route.path.replace(/\/$/, "");
-      // Only strip the mount prefix when the next character is `/` or
-      // end-of-path. Otherwise `/foo-bar` against a `/foo` mount would forward
-      // `PATH_INFO: "-bar"`, violating the Rack origin-form invariant that
-      // PATH_INFO must be empty or start with `/` (packages/rack/src/lint.ts).
-      const after = path.length === mountPath.length ? "" : path.charAt(mountPath.length);
-      const stripped = path.startsWith(mountPath) && (after === "" || after === "/");
-      const remaining = stripped ? path.slice(mountPath.length) : path;
+      const matchedPrefix = matched.matchedPrefix ?? route.path.replace(/\/$/, "");
+      const remaining = matched.postMatch ?? "/";
       const forwarded: RackEnv = {
         ...env,
-        SCRIPT_NAME: scriptName + mountPath,
-        PATH_INFO: remaining.length === 0 ? "/" : remaining,
+        SCRIPT_NAME: scriptName + matchedPrefix,
+        PATH_INFO: remaining,
       };
       return typeof mountedApp === "function"
         ? await mountedApp(forwarded)

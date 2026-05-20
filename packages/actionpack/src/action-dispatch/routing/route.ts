@@ -70,6 +70,10 @@ export interface RedirectOptions {
 export interface MatchedRoute {
   route: Route;
   params: Record<string, string>;
+  /** For unanchored mount routes: matched prefix to append to SCRIPT_NAME. */
+  matchedPrefix?: string;
+  /** For unanchored mount routes: remaining PATH_INFO (always begins with `/`). */
+  postMatch?: string;
 }
 
 export class Route {
