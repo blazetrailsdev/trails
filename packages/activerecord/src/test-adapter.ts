@@ -715,7 +715,7 @@ class SchemaAdapter implements DatabaseAdapter {
     // (since _wireArelVisitor only fires when arelVisitor is defined).
     // Flipping either changes identifier quoting across dozens of
     // cross-adapter SQL assertions. Phase 9b will activate PG/MySQL.
-    if (adapterType !== "sqlite") return undefined;
+    if (this.inner?.adapterName !== "sqlite") return undefined;
     return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
 
