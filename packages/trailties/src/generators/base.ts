@@ -8,16 +8,29 @@ import {
   tableize as _tableize,
   dasherize as _dasherize,
 } from "@blazetrails/activesupport";
+import {
+  gem as _gem,
+  route as _route,
+  environment as _environment,
+  generate as _generate,
+  type GeneratorActionsState,
+} from "./actions.js";
 
 export interface GeneratorOptions {
   cwd: string;
   output: (msg: string) => void;
 }
 
-export abstract class GeneratorBase {
-  protected cwd: string;
-  protected output: (msg: string) => void;
+export abstract class GeneratorBase implements GeneratorActionsState {
+  cwd: string;
+  output: (msg: string) => void;
   protected createdFiles: string[] = [];
+  pendingGenerators: Array<{ what: string; args: string[] }> = [];
+
+  gem = _gem;
+  route = _route;
+  environment = _environment;
+  generate = _generate;
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
@@ -48,7 +61,7 @@ export abstract class GeneratorBase {
     this.output(`      create  ${relativePath}`);
   }
 
-  protected appendToFile(relativePath: string, content: string): void {
+  appendToFile(relativePath: string, content: string): void {
     const fullPath = this.path.join(this.cwd, relativePath);
     if (!this.fs.existsSync(fullPath)) {
       this.createFile(relativePath, content);
@@ -58,7 +71,7 @@ export abstract class GeneratorBase {
     this.output(`      append  ${relativePath}`);
   }
 
-  protected insertIntoFile(relativePath: string, marker: string, content: string): void {
+  insertIntoFile(relativePath: string, marker: string, content: string): void {
     const fullPath = this.path.join(this.cwd, relativePath);
     if (!this.fs.existsSync(fullPath)) return;
     const existing = this.fs.readFileSync(fullPath, "utf-8");
