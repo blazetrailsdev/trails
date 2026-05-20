@@ -38,7 +38,7 @@ export class ShowExceptions {
 
       const wrapper = new ExceptionWrapper(err);
 
-      if (mode === "rescuable" && !wrapper.show("rescuable")) {
+      if (mode === "rescuable" && !wrapper.rescueResponse()) {
         throw err;
       }
 
