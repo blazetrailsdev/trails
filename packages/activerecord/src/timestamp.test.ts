@@ -2,16 +2,17 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, MigrationContext, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -19,15 +20,16 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string", updated_at: "string", created_at: "string" },
       simples: { name: "string" },
       authors: { name: "string", updated_at: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makePost() {
     class Post extends Base {
@@ -652,11 +654,12 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { items: { updated_at: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("updates timestamps on all matching records", async () => {
     class Item extends Base {
@@ -714,14 +717,15 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string", created_at: "string", updated_at: "string" },
       simples: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("sets created_at and updated_at on create", async () => {
     class Post extends Base {
@@ -862,11 +866,12 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { items: { updated_at: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("touchAll updates timestamps on all records", async () => {
     class Item extends Base {
@@ -883,7 +888,7 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Article extends Base {
     static {
@@ -894,13 +899,14 @@ describe("TimestampTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       articles: { title: "string", body: "string", created_at: "string", updated_at: "string" },
     });
     Article.adapter = adapter;
   });
+  withTransactionalFixtures(() => adapter);
 
   it("created_at and updated_at match on first save", async () => {
     const article = await Article.create({ title: "Hello" });
@@ -945,15 +951,16 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string", updated_at: "string" },
       comments: { body: "string", post_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "touch parent on save"
   it("touches the parent record when child is saved", async () => {

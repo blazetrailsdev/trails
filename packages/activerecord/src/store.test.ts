@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { Base, registerModel, store, storedAttributes, localStoredAttributes } from "./index.js";
 import {
   IndifferentHashAccessor,
@@ -10,10 +10,11 @@ import {
   storeAccessorFor,
   storeAccessor,
 } from "./store.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -23,13 +24,14 @@ function freshAdapter(): DatabaseAdapter {
 }
 
 describe("StoreTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string", settings: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -740,14 +742,15 @@ describe("StoreTest", () => {
 });
 
 describe("StoreTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { settings: "json" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -861,14 +864,15 @@ describe("StoreTest", () => {
 });
 
 describe("StoreTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { settings: "json" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1076,14 +1080,15 @@ describe("storeAccessorsModule", () => {
 });
 
 describe("IndifferentCoder wiring via store() and Base.store()", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string", settings: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);

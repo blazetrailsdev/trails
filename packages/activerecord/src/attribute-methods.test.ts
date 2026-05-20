@@ -2,14 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, ReadonlyAttributeError } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 const TEST_SCHEMA = {
@@ -87,6 +88,9 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
 // ==========================================================================
+// Top describe is NOT migrated to beforeAll: tests call `freshAdapter()`
+// in their `it()` bodies, which under withTransactionalFixtures collides
+// with the outer-tx savepoint on MariaDB (ER_SP_DOES_NOT_EXIST).
 describe("AttributeMethodsTest", () => {
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
@@ -1784,7 +1788,7 @@ describe("AttributeMethodsTest", () => {
   });
 });
 describe("AttributeMethodsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Person extends Base {
     static {
@@ -1795,10 +1799,12 @@ describe("AttributeMethodsTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     Person.adapter = adapter;
   });
+  withTransactionalFixtures(() => adapter);
 
   describe("readAttribute / writeAttribute", () => {
     it("reads and writes attributes", () => {
@@ -1913,10 +1919,12 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 
 describe("attribute_alias arelTable integration", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("test_attribute_alias_in_where_references_association_name", () => {
     class User extends Base {
