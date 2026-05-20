@@ -1,6 +1,7 @@
 import { beforeAll, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
 import { defineSchema, type Schema } from "./define-schema.js";
+import { TEST_SCHEMA } from "./test-schema.js";
 
 /**
  * Subset of {@link DefineSchemaOpts} exposed through this helper.
@@ -25,9 +26,12 @@ export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
   /** Builds the adapter once per file in `beforeAll`. */
   factory: () => A | Promise<A>;
   /**
-   * Schema to declare via {@link defineSchema}. Defaults to `{}` so the file
-   * is marked Phase-5 compliant even when no expressible tables exist
-   * (e.g. PG-only types created via raw DDL in {@link setup}).
+   * Schema to declare via {@link defineSchema}. Defaults to the canonical
+   * {@link TEST_SCHEMA} (mirror of `vendor/rails/activerecord/test/schema/schema.rb`)
+   * so fixture-driven tests resolve named rows without inlining their own
+   * mini-schemas. Pass an explicit object (or `{}`) to override — useful for
+   * adapter-specific suites (e.g. PG-only types created via raw DDL in
+   * {@link setup}).
    */
   schema?: Schema;
   schemaOptions?: AdapterSuiteSchemaOpts;
@@ -97,7 +101,7 @@ export function setupAdapterSuite<A extends TransactionalFixturesAdapter>(
     adapter = await opts.factory();
     await defineSchema(
       adapter as unknown as DatabaseAdapter,
-      opts.schema ?? {},
+      opts.schema ?? TEST_SCHEMA,
       opts.schemaOptions,
     );
     if (opts.setup) await opts.setup(adapter);
