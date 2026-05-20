@@ -1083,15 +1083,21 @@ export class RouteSet {
     if (mountedApp) {
       const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
       const mountPath = route.path.replace(/\/$/, "");
-      const remaining = path.startsWith(mountPath) ? path.slice(mountPath.length) : path;
-      const forwarded: Record<string, unknown> = {
+      // Only strip the mount prefix when the next character is `/` or
+      // end-of-path. Otherwise `/foo-bar` against a `/foo` mount would forward
+      // `PATH_INFO: "-bar"`, violating the Rack origin-form invariant that
+      // PATH_INFO must be empty or start with `/` (packages/rack/src/lint.ts).
+      const after = path.length === mountPath.length ? "" : path.charAt(mountPath.length);
+      const stripped = path.startsWith(mountPath) && (after === "" || after === "/");
+      const remaining = stripped ? path.slice(mountPath.length) : path;
+      const forwarded: RackEnv = {
         ...env,
         SCRIPT_NAME: scriptName + mountPath,
         PATH_INFO: remaining.length === 0 ? "/" : remaining,
       };
-      const call =
-        typeof mountedApp === "function" ? mountedApp.bind(null) : mountedApp.call.bind(mountedApp);
-      return (await call(forwarded)) as RackResponse;
+      return typeof mountedApp === "function"
+        ? await mountedApp(forwarded)
+        : await mountedApp.call(forwarded);
     }
 
     // Merge route params into the env (like Rails does with request.params)

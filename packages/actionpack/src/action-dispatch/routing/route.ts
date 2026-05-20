@@ -11,6 +11,7 @@ import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 import { OptionRedirect, PathRedirect, Redirect, type RedirectBlock } from "./redirection.js";
 import type { Request } from "../http/request.js";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const PATHFOR_SEPARATORS = "/.?";
 
@@ -24,8 +25,8 @@ export interface RouteConstraints {
  * accepted, matching `app.respond_to?(:call)` in Rails' `mount`.
  */
 export type MountableApp =
-  | ((env: Record<string, unknown>) => unknown)
-  | { call: (env: Record<string, unknown>) => unknown };
+  | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
+  | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
 export interface RouteOptions {
   name?: string;
