@@ -338,27 +338,27 @@ export class IntegrationTest {
   // --- HTTP verb methods ---
 
   async get(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("GET", path, options);
+    await this.process("GET", path, options);
   }
 
   async post(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("POST", path, options);
+    await this.process("POST", path, options);
   }
 
   async put(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("PUT", path, options);
+    await this.process("PUT", path, options);
   }
 
   async patch(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("PATCH", path, options);
+    await this.process("PATCH", path, options);
   }
 
   async delete(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("DELETE", path, options);
+    await this.process("DELETE", path, options);
   }
 
   async head(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("HEAD", path, options);
+    await this.process("HEAD", path, options);
   }
 
   /**
@@ -552,7 +552,11 @@ export class IntegrationTest {
       },
       ...(options.env ?? {}),
     };
-    env.REQUEST_URI = this._buildFullUri(path, env);
+    // Build REQUEST_URI from the *finalized* env so options.env overrides of
+    // PATH_INFO/QUERY_STRING are honored.
+    const finalPath =
+      (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
+    env.REQUEST_URI = this._buildFullUri(finalPath, env);
 
     // Cookies from persistent jar
     if (Object.keys(this._persistentCookies).length > 0) {
