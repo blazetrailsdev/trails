@@ -107,3 +107,33 @@ export function filterActionMethodsForRoutes(
   const helpers = new Set(routes.namedRoutes.helperNames);
   return baseActionMethods.filter((name) => !helpers.has(name));
 }
+
+/**
+ * Rails-shaped class-level `_routes` reader. Returns the route set or
+ * `null`. Hosts override by assigning their route set onto the class
+ * (trails treats `_routes` as a property, not a method — see
+ * `UrlForClassMethods`). Exported here so `api:compare` matches Rails'
+ * `module ClassMethods; def _routes; nil; end; end`.
+ *
+ * @internal
+ */
+export function _routes(host?: { _routes?: RouteSetLike | null }): RouteSetLike | null {
+  // Use normal property lookup (not hasOwnProperty) so subclasses inherit
+  // a route set wired on a superclass — matches Rails' attribute
+  // inheritance via class_attribute.
+  return host?._routes ?? _routesClassDefault;
+}
+
+/**
+ * Rails-shaped class-level `action_methods` override. Mirrors
+ * `module ClassMethods; def action_methods; super - _routes.named_routes.helper_names; end; end`.
+ * Delegates to `filterActionMethodsForRoutes`.
+ *
+ * @internal
+ */
+export function actionMethods(
+  baseActionMethods: readonly string[],
+  routes: RouteSetLike | null = _routesClassDefault,
+): string[] {
+  return filterActionMethodsForRoutes(baseActionMethods, routes);
+}

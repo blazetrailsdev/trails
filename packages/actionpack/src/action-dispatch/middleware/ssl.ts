@@ -11,10 +11,12 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 
 export interface SSLOptions {
-  redirect?: boolean | { status?: number; body?: string; port?: number };
+  redirect?: boolean | { status?: number; port?: number };
   hsts?: boolean | HSTSOptions;
   secureCookies?: boolean;
   exclude?: (env: RackEnv) => boolean;
+  /** Mirrors Rails `ssl_default_redirect_status:` constructor kwarg. */
+  sslDefaultRedirectStatus?: number;
 }
 
 export interface HSTSOptions {
@@ -25,47 +27,51 @@ export interface HSTSOptions {
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
-const ONE_YEAR = 31536000;
+const HSTS_EXPIRES_IN = 63072000;
+const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
 
 export class SSL {
   private app: RackApp;
   private redirect: boolean;
-  private redirectStatus: number;
   private redirectPort: number | undefined;
-  private hsts: HSTSOptions | false;
+  private hsts: Required<HSTSOptions>;
   private secureCookies: boolean;
+  private sslDefaultRedirectStatus: number | undefined;
+  private redirectStatusOverride: number | undefined;
   private exclude?: (env: RackEnv) => boolean;
+
+  static defaultHstsOptions(): Required<HSTSOptions> {
+    return { expires: HSTS_EXPIRES_IN, subdomains: true, preload: false };
+  }
 
   constructor(app: RackApp, options: SSLOptions = {}) {
     this.app = app;
     this.exclude = options.exclude;
     this.secureCookies = options.secureCookies !== false;
+    this.sslDefaultRedirectStatus = options.sslDefaultRedirectStatus;
 
-    // Redirect config
     if (options.redirect === false) {
       this.redirect = false;
-      this.redirectStatus = 301;
     } else if (typeof options.redirect === "object") {
       this.redirect = true;
-      this.redirectStatus = options.redirect.status ?? 301;
+      this.redirectStatusOverride = options.redirect.status;
       this.redirectPort = options.redirect.port;
     } else {
       this.redirect = true;
-      this.redirectStatus = 301;
     }
 
-    // HSTS config
-    if (options.hsts === false) {
-      this.hsts = false;
-    } else if (typeof options.hsts === "object") {
-      this.hsts = {
-        expires: options.hsts.expires ?? ONE_YEAR,
-        subdomains: options.hsts.subdomains ?? false,
-        preload: options.hsts.preload ?? false,
-      };
-    } else {
-      this.hsts = { expires: ONE_YEAR, subdomains: false, preload: false };
+    this.hsts = this.normalizeHstsOptions(options.hsts);
+  }
+
+  /** @internal */
+  private normalizeHstsOptions(options: SSLOptions["hsts"]): Required<HSTSOptions> {
+    if (options === false) {
+      return { ...SSL.defaultHstsOptions(), expires: 0 };
     }
+    if (options == null || options === true) {
+      return SSL.defaultHstsOptions();
+    }
+    return { ...SSL.defaultHstsOptions(), ...options };
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
@@ -84,51 +90,71 @@ export class SSL {
 
     const [status, headers, body] = await this.app(env);
 
-    // Add HSTS header for HTTPS requests
-    if (isSSL && this.hsts) {
-      headers["strict-transport-security"] = this.buildHstsHeader();
+    if (isSSL) {
+      this.setHstsHeaderBang(headers);
     }
 
-    // Mark cookies as secure
     if (isSSL && this.secureCookies && headers["set-cookie"]) {
-      headers["set-cookie"] = this.flagCookiesAsSecure(headers["set-cookie"]);
+      this.flagCookiesAsSecureBang(headers);
     }
 
     return [status, headers, body];
   }
 
   private redirectToHttps(env: RackEnv): RackResponse {
-    const host = (env["HTTP_HOST"] as string) || (env["SERVER_NAME"] as string) || "localhost";
-    const path = (env["PATH_INFO"] as string) || "/";
-    const qs = (env["QUERY_STRING"] as string) || "";
-    const portSuffix = this.redirectPort ? `:${this.redirectPort}` : "";
-    const url = `https://${host.replace(/:\d+$/, "")}${portSuffix}${path}${qs ? "?" + qs : ""}`;
-
+    const location = this.httpsLocationFor(env);
     return [
-      this.redirectStatus,
-      {
-        "content-type": "text/html; charset=utf-8",
-        location: url,
-      },
-      bodyFromString(`<html><body>You are being <a href="${url}">redirected</a>.</body></html>`),
+      this.redirectStatusOverride ?? this.redirectionStatus(env),
+      { "content-type": "text/html; charset=utf-8", location },
+      bodyFromString(
+        `<html><body>You are being <a href="${location}">redirected</a>.</body></html>`,
+      ),
     ];
   }
 
+  /** @internal */
+  private redirectionStatus(env: RackEnv): number {
+    const method = (env["REQUEST_METHOD"] as string | undefined) ?? "";
+    if (PERMANENT_REDIRECT_REQUEST_METHODS.includes(method)) return 301;
+    if (this.sslDefaultRedirectStatus != null) return this.sslDefaultRedirectStatus;
+    return 307;
+  }
+
+  /** @internal */
+  private httpsLocationFor(env: RackEnv): string {
+    const httpHost = (env["HTTP_HOST"] as string) || (env["SERVER_NAME"] as string) || "localhost";
+    const hostNoPort = httpHost.replace(/:\d+$/, "");
+    const port = this.redirectPort;
+    const path = (env["PATH_INFO"] as string) || "/";
+    const qs = (env["QUERY_STRING"] as string) || "";
+    let location = `https://${hostNoPort}`;
+    if (port && port !== 80 && port !== 443) location += `:${port}`;
+    location += path;
+    if (qs) location += `?${qs}`;
+    return location;
+  }
+
+  /** @internal */
+  private setHstsHeaderBang(headers: Record<string, string>): void {
+    if (headers["strict-transport-security"]) return;
+    headers["strict-transport-security"] = this.buildHstsHeader();
+  }
+
   private buildHstsHeader(): string {
-    const opts = this.hsts as HSTSOptions;
+    const opts = this.hsts;
     let header = `max-age=${opts.expires}`;
     if (opts.subdomains) header += "; includeSubDomains";
     if (opts.preload) header += "; preload";
     return header;
   }
 
-  private flagCookiesAsSecure(setCookie: string): string {
-    return setCookie
+  /** @internal */
+  private flagCookiesAsSecureBang(headers: Record<string, string>): void {
+    const cookies = headers["set-cookie"];
+    if (!cookies) return;
+    headers["set-cookie"] = cookies
       .split("\n")
-      .map((cookie) => {
-        if (cookie.toLowerCase().includes("; secure")) return cookie;
-        return cookie + "; secure";
-      })
+      .map((cookie) => (/;\s*secure\s*(;|$)/i.test(cookie) ? cookie : `${cookie}; secure`))
       .join("\n");
   }
 }

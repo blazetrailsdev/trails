@@ -2,11 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, defineEnum } from "./index.js";
 import { InsertAll } from "./insert-all.js";
 import { UnknownAttributeError } from "./errors.js";
-import { adapterType, createTestAdapter } from "./test-adapter.js";
+import { adapterType, createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // Rails' insert_all_test.rb skips uniqueBy-dependent tests via
 // `skip unless supports_insert_conflict_target?`. MySQL's ON DUPLICATE KEY
@@ -913,13 +914,14 @@ describe("InsertAllTest", () => {
 });
 
 describe("insertAll / upsertAll", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       products: { name: "string", price: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("insert all", async () => {
     class Product extends Base {
@@ -953,14 +955,15 @@ describe("insertAll / upsertAll", () => {
 });
 
 describe("insertAll / upsertAll (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       books: { title: "string", author: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "insert_all inserts multiple records"
   it("insert all", async () => {

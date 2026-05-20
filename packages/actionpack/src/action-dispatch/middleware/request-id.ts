@@ -35,11 +35,14 @@ export class RequestId {
   private makeRequestId(env: RackEnv): string {
     const headerKey = `HTTP_${this.header.toUpperCase().replace(/-/g, "_")}`;
     const existing = env[headerKey] as string | undefined;
-    if (existing) {
-      // Sanitize: only allow alphanumeric, dashes, and underscores
-      const sanitized = existing.replace(/[^\w-]/g, "").slice(0, 255);
-      if (sanitized.length > 0) return sanitized;
+    if (existing != null && existing !== "") {
+      return existing.replace(/[^\w\-@]/g, "").slice(0, 255);
     }
+    return this.internalRequestId();
+  }
+
+  /** @internal */
+  private internalRequestId(): string {
     return getCrypto().randomUUID();
   }
 }

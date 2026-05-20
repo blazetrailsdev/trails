@@ -38,30 +38,58 @@ export class ShowExceptions {
 
       const wrapper = new ExceptionWrapper(err);
 
-      if (mode === "rescuable" && !wrapper.show("rescuable")) {
+      if (mode === "rescuable" && !wrapper.rescueResponse()) {
         throw err;
       }
 
       env["action_dispatch.exception"] = err;
-      const originalPath = env["PATH_INFO"];
-      env["action_dispatch.original_path"] = originalPath;
-      env["PATH_INFO"] = `/${wrapper.statusCode}`;
-
-      try {
-        try {
-          const response = await this.exceptionsApp(env);
-          const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
-          if (cascade === "pass") {
-            return [wrapper.statusCode, { "content-type": "text/plain" }, bodyFromString("")];
-          }
-          return response;
-        } catch {
-          return this.failsafeResponse(wrapper);
-        }
-      } finally {
-        env["PATH_INFO"] = originalPath;
-      }
+      return this.renderException(env, wrapper);
     }
+  }
+
+  /** @internal */
+  private async renderException(env: RackEnv, wrapper: ExceptionWrapper): Promise<RackResponse> {
+    const status = wrapper.statusCode;
+    const originalPath = env["PATH_INFO"];
+    const originalMethod = env["REQUEST_METHOD"];
+    env["action_dispatch.original_path"] = originalPath;
+    env["action_dispatch.original_request_method"] = originalMethod;
+    this.fallbackToHtmlFormatIfInvalidMimeType(env);
+    env["PATH_INFO"] = `/${status}`;
+    env["REQUEST_METHOD"] = "GET";
+    try {
+      try {
+        const response = await this.exceptionsApp(env);
+        const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
+        return cascade === "pass" ? this.passResponse(status) : response;
+      } catch {
+        return this.failsafeResponse(wrapper);
+      }
+    } finally {
+      env["PATH_INFO"] = originalPath;
+      env["REQUEST_METHOD"] = originalMethod;
+    }
+  }
+
+  /** @internal */
+  private fallbackToHtmlFormatIfInvalidMimeType(env: RackEnv): void {
+    const ct = env["CONTENT_TYPE"];
+    if (typeof ct === "string" && !isValidMimeLike(ct)) {
+      env["CONTENT_TYPE"] = "text/html";
+    }
+    const accept = env["HTTP_ACCEPT"];
+    if (typeof accept === "string" && !isValidMimeLike(accept)) {
+      env["HTTP_ACCEPT"] = "text/html";
+    }
+  }
+
+  /** @internal */
+  private passResponse(status: number): RackResponse {
+    return [
+      status,
+      { "content-type": "text/html; charset=utf-8", "content-length": "0" },
+      bodyFromString(""),
+    ];
   }
 
   private failsafeResponse(_wrapper: ExceptionWrapper): RackResponse {
@@ -71,4 +99,9 @@ export class ShowExceptions {
       bodyFromString("500 Internal Server Error\n"),
     ];
   }
+}
+
+function isValidMimeLike(value: string): boolean {
+  const first = value.split(",")[0]?.trim().split(";")[0]?.trim() ?? "";
+  return /^[\w!#$&^_.+*-]+\/[\w!#$&^_.+*-]+$/.test(first);
 }
