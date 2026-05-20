@@ -20,13 +20,12 @@ instead, and why.
 `YAML.safe_load` round-trips.
 **Us:** No-op. TypeScript has no built-in YAML deserialization that needs hooking.
 
-### DidYouMean corrections (`ParameterMissing.corrections`, `UrlGenerationError.corrections`)
+### DidYouMean corrections — closed (no longer a divergence)
 
-**Rails:** Uses `DidYouMean::SpellChecker` (Jaro-Winkler distance) integrated
-into Ruby's error reporting.
-**Us:** `ParameterMissing` uses Levenshtein distance ≤ 2.
-`UrlGenerationError` uses case-insensitive substring matching. Both produce
-useful suggestions but may differ from Rails in edge cases.
+Both `ParameterMissing#corrections` (#2097) and `UrlGenerationError#corrections`
+(#2100) now delegate to `@blazetrails/did-you-mean`'s `SpellChecker`, matching
+Rails. Remaining: `Template::Error#corrections` in actionview uses raw
+`Jaro.distance` (already exported from the barrel) — ~80 LOC follow-up.
 
 ### CSRF token stores (`SessionStore`, `CookieStore`)
 
@@ -257,7 +256,7 @@ Sequencing rules:
 - **metal/instrumentation.haltedCallbackHook** (#2098) — ~50 LOC: wire from AS::Callbacks `_runCallbacks` halt path (currently takes a Notifier argument but the chain doesn't call it yet).
 - **metal.buildMiddleware** (#2098) — ~10 LOC: promote inline `valid` augmentation onto the `Middleware` class.
 - **Two DoubleRenderError classes** (#2094) — consolidate abstract-controller vs action-controller versions (both extend `AbstractControllerError`; `instanceof` against parent works, identity-equality between layers doesn't).
-- **DidYouMean consumer left** — Template::Error#corrections needs `jaroDistance` export from `@blazetrails/did-you-mean` (Rails uses raw `DidYouMean::Jaro.distance`, not `SpellChecker`). ~80 LOC.
+- **DidYouMean consumer left** — Template::Error#corrections (actionview) calls Rails' raw `DidYouMean::Jaro.distance`; maps to the existing `Jaro.distance` export from `@blazetrails/did-you-mean` (no new barrel symbol needed). ~80 LOC.
 
 ### Tracking
 
