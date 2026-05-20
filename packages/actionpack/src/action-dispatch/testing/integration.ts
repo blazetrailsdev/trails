@@ -64,6 +64,19 @@ const STATUS_RANGES: Record<string, [number, number]> = {
   error: [500, 599],
 };
 
+// Match only paths that *begin* with a scheme (e.g. `http://…`). Rails uses
+// `path.include?("://")` which is fine in Ruby because `URI.parse` is lenient
+// with relative inputs, but JS `new URL` throws on relative paths — so we
+// have to be stricter to avoid breaking `/callback?return=http://example.com`.
+const ABSOLUTE_URL_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+const DEFAULT_HOST = "www.example.com";
+const DEFAULT_REMOTE_ADDR = "127.0.0.1";
+const DEFAULT_ACCEPT =
+  "text/xml,application/xml,application/xhtml+xml," +
+  "text/html;q=0.9,text/plain;q=0.8,image/png," +
+  "*/*;q=0.5";
+
 export class IntegrationTest {
   /** The route set for this test. */
   routes: RouteSet = new RouteSet();
@@ -73,6 +86,175 @@ export class IntegrationTest {
 
   /** Session data persisted across requests. */
   session: Record<string, unknown> = {};
+
+  /** The hostname used in the last request. */
+  host: string = DEFAULT_HOST;
+
+  /** The remote address used in the last request. */
+  remoteAddr: string = DEFAULT_REMOTE_ADDR;
+
+  /** The Accept header to send. */
+  accept: string = DEFAULT_ACCEPT;
+
+  /** A running counter of the number of requests processed. */
+  requestCount: number = 0;
+
+  /** @internal */
+  _https: boolean = false;
+
+  /** @internal */
+  _urlOptions?: Record<string, unknown>;
+
+  /**
+   * Caller-supplied defaults merged into {@link urlOptions}. Rails sources
+   * this from the `UrlFor` mixin; until UrlFor is ported, sessions can still
+   * populate it directly (it's also what `Runner#default_url_options=` writes
+   * through to).
+   *
+   * @internal
+   */
+  _defaultUrlOptions: Record<string, unknown> = {};
+
+  constructor() {
+    this.resetBang();
+  }
+
+  /**
+   * Reset the instance. Mirrors `Integration::Session#reset!`. Existing
+   * `reset()` is kept as a friendly alias.
+   */
+  resetBang(): void {
+    this.session = {};
+    this._persistentCookies = {};
+    this._cookieJar = undefined;
+    this.controller = undefined!;
+    this.request = undefined!;
+    this.response = undefined!;
+    this._https = false;
+    this._urlOptions = undefined;
+    this.requestCount = 0;
+    this.host = DEFAULT_HOST;
+    this.remoteAddr = DEFAULT_REMOTE_ADDR;
+    this.accept = DEFAULT_ACCEPT;
+  }
+
+  /** Mirror of Rails `Integration::Session#https!`. */
+  httpsBang(flag: boolean = true): void {
+    this._https = flag;
+  }
+
+  /** Returns true if the session is mimicking a secure HTTPS request. */
+  isHttps(): boolean {
+    return this._https;
+  }
+
+  /**
+   * Default URL options for this session, derived from host/scheme.
+   * Mirrors `Integration::Session#url_options`, memoized per-request like
+   * Rails (cleared inside `_processPath`).
+   */
+  urlOptions(): Record<string, unknown> {
+    if (!this._urlOptions) {
+      this._urlOptions = {
+        ...this._defaultUrlOptions,
+        host: this.host,
+        protocol: this._https ? "https" : "http",
+      };
+    }
+    return this._urlOptions;
+  }
+
+  /**
+   * Caller-supplied defaults merged into {@link urlOptions} (Rails
+   * `Runner#default_url_options`). Stored as a separate hash so writes don't
+   * clobber the per-request memo computed by {@link urlOptions}.
+   */
+  defaultUrlOptions(): Record<string, unknown> {
+    return this._defaultUrlOptions;
+  }
+
+  setDefaultUrlOptions(options: Record<string, unknown>): void {
+    this._defaultUrlOptions = options;
+    this._urlOptions = undefined;
+  }
+
+  /**
+   * Build the absolute URI for the current request. Matches Rails
+   * `Integration::Session#build_full_uri(path, env)`. Called by `_processPath`
+   * to populate `env.REQUEST_URI`.
+   *
+   * @internal
+   */
+  _buildFullUri(path: string, env: Record<string, unknown>): string {
+    return `${env["rack.url_scheme"]}://${env["SERVER_NAME"]}:${env["SERVER_PORT"]}${path}`;
+  }
+
+  /**
+   * Expand a path that may itself contain a scheme/host, optionally letting
+   * the caller observe the parsed location to update `host`/`https`. Mirrors
+   * `Integration::Session#build_expanded_path`.
+   *
+   * @internal
+   */
+  _buildExpandedPath(path: string, onLocation?: (url: URL) => void): string {
+    if (!ABSOLUTE_URL_RE.test(path)) return path;
+    const location = new URL(path);
+    onLocation?.(location);
+    return location.search ? `${location.pathname}${location.search}` : location.pathname;
+  }
+
+  /**
+   * Rails-shaped `Integration::Session#process`. Verb helpers delegate here.
+   */
+  async process(
+    method: string,
+    path: string,
+    options: IntegrationRequestOptions = {},
+  ): Promise<number> {
+    let expanded = path;
+    if (ABSOLUTE_URL_RE.test(path)) {
+      expanded = this._buildExpandedPath(path, (loc) => {
+        this.httpsBang(loc.protocol === "https:");
+        if (loc.host) this.host = loc.host;
+      });
+    }
+    await this._processPath(method.toUpperCase(), expanded, options);
+    return this.status;
+  }
+
+  /**
+   * Rails-shaped `RequestHelpers#follow_redirect!`. Preserves the verb on
+   * 307/308 (per RFC 7231/7538) and sets `HTTP_REFERER` to the previous URL,
+   * mirroring the Rails implementation.
+   */
+  async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
+    if (!this.response || this.status < 300 || this.status >= 400) {
+      throw new Error(`not a redirect! ${this.status}`);
+    }
+    const location = this.redirectUrl;
+    if (!location) throw new Error("not a redirect! (no Location header)");
+
+    const preserveVerb = this.status === 307 || this.status === 308;
+    const method = preserveVerb
+      ? ((this.request?.env?.REQUEST_METHOD as string | undefined)?.toLowerCase() ?? "get")
+      : "get";
+
+    const headers = { ...(options.headers ?? {}) };
+    const hasReferer = Object.keys(headers).some(
+      (k) => k === "HTTP_REFERER" || k.toLowerCase() === "referer",
+    );
+    if (!hasReferer && this.request) {
+      const env = this.request.env as Record<string, string | undefined>;
+      const qs = env.QUERY_STRING ? `?${env.QUERY_STRING}` : "";
+      const prev =
+        `${env["rack.url_scheme"] ?? "http"}://${env.HTTP_HOST ?? this.host}` +
+        `${env.PATH_INFO ?? ""}${qs}`;
+      headers["HTTP_REFERER"] = prev;
+    }
+
+    await this.process(method, location, { ...options, headers });
+    return this.status;
+  }
 
   /** Accumulated cookies across requests (simple key/value), seeds the jar. */
   private _persistentCookies: Record<string, string> = {};
@@ -162,27 +344,27 @@ export class IntegrationTest {
   // --- HTTP verb methods ---
 
   async get(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("GET", path, options);
+    await this.process("GET", path, options);
   }
 
   async post(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("POST", path, options);
+    await this.process("POST", path, options);
   }
 
   async put(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("PUT", path, options);
+    await this.process("PUT", path, options);
   }
 
   async patch(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("PATCH", path, options);
+    await this.process("PATCH", path, options);
   }
 
   async delete(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("DELETE", path, options);
+    await this.process("DELETE", path, options);
   }
 
   async head(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
-    await this._processPath("HEAD", path, options);
+    await this.process("HEAD", path, options);
   }
 
   /**
@@ -302,15 +484,10 @@ export class IntegrationTest {
   }
 
   /**
-   * Reset all session state (cookies, session, flash).
+   * Reset all session state (cookies, session, flash). Alias of {@link resetBang}.
    */
   reset(): void {
-    this.session = {};
-    this._persistentCookies = {};
-    this._cookieJar = undefined;
-    this.controller = undefined!;
-    this.request = undefined!;
-    this.response = undefined!;
+    this.resetBang();
   }
 
   // --- Internal ---
@@ -320,14 +497,48 @@ export class IntegrationTest {
     path: string,
     options: IntegrationRequestOptions,
   ): Promise<void> {
-    // Match route
-    const matched = this.routes.recognize(method, path);
+    this.requestCount += 1;
+    // Clear per-request memos up front so they don't leak across requests,
+    // including down the no-route 404 path.
+    this._cookieJar = undefined;
+    this._urlOptions = undefined;
+
+    // Split path into PATH_INFO + QUERY_STRING; Rack stores them separately.
+    const qIdx = path.indexOf("?");
+    const pathInfo = qIdx >= 0 ? path.slice(0, qIdx) : path;
+    const queryString = qIdx >= 0 ? path.slice(qIdx + 1) : "";
+    // Match route on pathname only.
+    const matched = this.routes.recognize(method, pathInfo);
     if (!matched) {
-      // No route matched — create a 404-like response
-      this.request = new Request({ REQUEST_METHOD: method, PATH_INFO: path });
+      // No route matched — create a 404-like response. Mirror the same
+      // host/scheme/cookie env keys as the matched branch so request.url and
+      // request.cookies are accurate for 404s too.
+      const noRouteEnv: Record<string, unknown> = {
+        REQUEST_METHOD: method,
+        PATH_INFO: pathInfo,
+        QUERY_STRING: queryString,
+        HTTP_HOST: this.host,
+        SERVER_NAME: this.host.split(":")[0],
+        SERVER_PORT: this.host.split(":")[1] ?? (this._https ? "443" : "80"),
+        HTTPS: this._https ? "on" : "off",
+        "rack.url_scheme": this._https ? "https" : "http",
+        REMOTE_ADDR: this.remoteAddr,
+        HTTP_ACCEPT: this.accept,
+      };
+      if (Object.keys(this._persistentCookies).length > 0) {
+        noRouteEnv.HTTP_COOKIE = Object.entries(this._persistentCookies)
+          .map(([k, v]) => `${k}=${v}`)
+          .join("; ");
+      }
+      noRouteEnv.REQUEST_URI = this._buildFullUri(
+        (noRouteEnv.PATH_INFO as string) +
+          (noRouteEnv.QUERY_STRING ? `?${noRouteEnv.QUERY_STRING as string}` : ""),
+        noRouteEnv,
+      );
+      this.request = new Request(noRouteEnv);
       this.response = new Response();
       this.response.status = 404;
-      this.response.body = `No route matches [${method}] "${path}"`;
+      this.response.body = `No route matches [${method}] "${pathInfo}"`;
       this.controller = undefined!;
       return;
     }
@@ -348,10 +559,15 @@ export class IntegrationTest {
     // Build env
     const env: Record<string, unknown> = {
       REQUEST_METHOD: method,
-      PATH_INFO: path,
-      HTTP_HOST: "www.example.com",
-      SERVER_NAME: "www.example.com",
-      SERVER_PORT: "80",
+      PATH_INFO: pathInfo,
+      QUERY_STRING: queryString,
+      HTTP_HOST: this.host,
+      SERVER_NAME: this.host.split(":")[0],
+      SERVER_PORT: this.host.split(":")[1] ?? (this._https ? "443" : "80"),
+      HTTPS: this._https ? "on" : "off",
+      "rack.url_scheme": this._https ? "https" : "http",
+      REMOTE_ADDR: this.remoteAddr,
+      HTTP_ACCEPT: this.accept,
       "rack.session": { ...this.session },
       "action_dispatch.request.path_parameters": {
         controller: controllerName,
@@ -360,6 +576,11 @@ export class IntegrationTest {
       },
       ...(options.env ?? {}),
     };
+    // Build REQUEST_URI from the *finalized* env so options.env overrides of
+    // PATH_INFO/QUERY_STRING are honored.
+    const finalPath =
+      (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
+    env.REQUEST_URI = this._buildFullUri(finalPath, env);
 
     // Cookies from persistent jar
     if (Object.keys(this._persistentCookies).length > 0) {
@@ -367,10 +588,6 @@ export class IntegrationTest {
         .map(([k, v]) => `${k}=${v}`)
         .join("; ");
     }
-
-    // Reset the TestProcess#cookies memoization slot — the jar must reflect
-    // the cookies parsed off this request, not the previous one.
-    this._cookieJar = undefined;
 
     // Format / content type
     if (options.format || options.as) {
@@ -406,8 +623,14 @@ export class IntegrationTest {
     this.request = new Request(env);
     this.response = new Response();
 
-    // Build params: route params + request params
+    // Build params: route params + parsed query string + caller-supplied params.
+    // Rails merges request.GET/request.POST into request.parameters via the
+    // ParamsParser; we mirror that here so query-string params survive the
+    // PATH_INFO/QUERY_STRING split done above.
     const allParams: Record<string, unknown> = { ...params };
+    if (env.QUERY_STRING) {
+      Object.assign(allParams, this.request.queryParameters);
+    }
     if (options.params) {
       Object.assign(allParams, options.params);
     }
