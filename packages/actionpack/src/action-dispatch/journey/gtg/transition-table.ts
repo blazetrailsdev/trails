@@ -1,5 +1,7 @@
+import { getChildProcess } from "@blazetrails/activesupport";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
-import { Symbol as SymbolNode } from "../nodes/node.js";
+import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
+import { renderVisualizer } from "../visualizer.js";
 import type { GtgState, TransitionTableLike } from "./simulator.js";
 
 export type Edge = string | RegExp;
@@ -55,6 +57,8 @@ export class TransitionTable implements TransitionTableLike, DotHost {
 
   // Rails-style Dot mixin via assigned function (CLAUDE.md "this-typed function" pattern).
   toDot = toDot;
+
+  constructor() {}
 
   addAccepting(state: number): void {
     this._accepting.add(state);
@@ -130,7 +134,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
 
   set(from: number, to: number, sym: Edge): void {
     if (sym instanceof RegExp) {
-      const map = this._regexpOrStdparam(sym);
+      const map = this.statesHashFor(sym);
       let inner = map.get(from);
       if (!inner) {
         inner = new Map();
@@ -180,25 +184,22 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   /**
-   * Rails `to_json` / `as_json` — emits a JSON-able snapshot of the table.
-   * The accepting set is materialized as a `{state: true}` object to match
-   * Ruby's Hash representation.
+   * Rails `as_json` — JSON-able snapshot of the table. Regex edges are keyed
+   * by `re.source` (matching Rails' `re.source`); duplicate sources from
+   * different flag sets collapse the same way Ruby's `Hash#[]=` does.
    */
-  toJSON(): Record<string, unknown> {
+  asJson(): Record<string, unknown> {
     const stringStates: Record<number, Record<string, number>> = {};
     for (const [from, inner] of this._stringStates) {
       stringStates[from] = Object.fromEntries(inner);
     }
-    // Encode flags in the key so two regex edges from the same state with the
-    // same source but different flags don't collapse to one JSON entry.
-    const regexKey = (re: RegExp) => (re.flags ? `${re.source}/${re.flags}` : re.source);
     const stdparamStates: Record<number, Record<string, number>> = {};
     for (const [from, inner] of this._stdparamStates) {
-      stdparamStates[from] = Object.fromEntries([...inner].map(([re, v]) => [regexKey(re), v]));
+      stdparamStates[from] = Object.fromEntries([...inner].map(([re, v]) => [re.source, v]));
     }
     const regexpStates: Record<number, Record<string, number>> = {};
     for (const [from, inner] of this._regexpStates) {
-      regexpStates[from] = Object.fromEntries([...inner].map(([re, v]) => [regexKey(re), v]));
+      regexpStates[from] = Object.fromEntries([...inner].map(([re, v]) => [re.source, v]));
     }
     const accepting: Record<number, true> = {};
     for (const s of this._accepting) accepting[s] = true;
@@ -210,14 +211,79 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     };
   }
 
-  /** @internal */
-  private _regexpOrStdparam(re: RegExp): Map<number, Map<RegExp, number>> {
-    return isDefaultExp(re) ? this._stdparamStates : this._regexpStates;
+  toJSON(): Record<string, unknown> {
+    return this.asJson();
   }
 
-  // Rails ships `to_svg` (shells out to the `dot` binary) and
-  // `visualizer` (renders an ERB template with an embedded JS visualizer).
-  // Neither is ported: `to_svg` would require a graphviz dependency we
-  // don't want to add, and `visualizer` depends on Rails-side ERB. Both
-  // are debug-only and out of scope for the Wave 7 path-matching work.
+  /**
+   * Render the DFA as SVG by shelling out to the Graphviz `dot` binary, the
+   * same way Rails does. Returns an empty string when `dot` is unavailable
+   * so the visualizer still produces a usable HTML page in dev sandboxes
+   * without Graphviz installed.
+   */
+  toSvg(): string {
+    let res;
+    try {
+      res = getChildProcess().spawnSync("dot", ["-Tsvg"], {
+        input: this.toDot(),
+        encoding: "utf8",
+      });
+    } catch {
+      return "";
+    }
+    if (res.status !== 0 || typeof res.stdout !== "string") return "";
+    const lines = res.stdout.split("\n");
+    lines.splice(0, 3);
+    return lines
+      .join("\n")
+      .replace(/width="[^"]*"/, "")
+      .replace(/height="[^"]*"/, "");
+  }
+
+  /**
+   * Rails `visualizer(paths, title="FSM")` — returns an HTML page embedding
+   * the FSM JSON and a d3 visualization for debugging. Mirrors
+   * `action_dispatch/journey/gtg/transition_table.rb#visualizer`.
+   */
+  visualizer(paths: readonly Node[], title = "FSM"): string {
+    const sampled = sample(paths, 3);
+    const funRoutes = sampled.map((ast) => {
+      const out: string[] = [];
+      for (const node of ast) {
+        if (node instanceof SymbolNode) {
+          if (node.left === ":id") out.push(String(Math.floor(Math.random() * 100)));
+          else if (node.left === ":format") out.push(Math.random() < 0.5 ? "xml" : "json");
+          else out.push("omg");
+        } else if (node instanceof Terminal) {
+          const sym = node.symbol;
+          if (typeof sym === "string") out.push(sym);
+        }
+      }
+      return out.join("");
+    });
+    return renderVisualizer({
+      title,
+      states: `function tt() { return ${JSON.stringify(this.asJson())}; }`,
+      svg: this.toSvg(),
+      funRoutes,
+      paths: paths.map((p) => p.toString()),
+    });
+  }
+
+  /** @internal */
+  private statesHashFor(re: RegExp): Map<number, Map<RegExp, number>> {
+    return isDefaultExp(re) ? this._stdparamStates : this._regexpStates;
+  }
+}
+
+/** Rails `Array#sample(n)` — pick up to n unique elements (random order). */
+function sample<T>(xs: readonly T[], n: number): T[] {
+  const pool = [...xs];
+  const out: T[] = [];
+  while (out.length < n && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    out.push(pool[i]);
+    pool.splice(i, 1);
+  }
+  return out;
 }
