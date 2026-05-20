@@ -15,6 +15,13 @@
  *   automatically expiring. Falls back to `expires` (Rails alias).
  */
 
+import { include } from "@blazetrails/activesupport";
+import {
+  Compatibility,
+  type SessionId,
+  SessionObject,
+  StaleSessionCheck,
+} from "./abstract-store.js";
 import { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
 
 export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {
@@ -32,4 +39,22 @@ export class MemCacheStore extends CacheStore {
     }
     super(app, options);
   }
+
+  /**
+   * Preserve the `SessionId`-returning shape inherited from
+   * `AbstractSecureStore` / `CacheStore`. Rails' `Compatibility` mixin
+   * redefines `generate_sid` as a hex string, which would otherwise be
+   * copied onto this prototype by the `include` calls below.
+   */
+  override generateSid(): SessionId {
+    return super.generateSid();
+  }
 }
+
+// Rails: `include Compatibility; include StaleSessionCheck; include SessionObject`.
+// The CacheStore parent also mixes these in, but Rails registers them on
+// MemCacheStore directly (since the parent there is Rack::Session::Dalli),
+// so api:compare expects the methods on MemCacheStore's own surface.
+include(MemCacheStore, Compatibility);
+include(MemCacheStore, StaleSessionCheck);
+include(MemCacheStore, SessionObject);
