@@ -224,7 +224,7 @@ export class SSE {
  * {@link Buffer}. Mirrors `ActionController::Live::Response`.
  */
 export class Response extends DispatchResponse {
-  stream: Buffer;
+  declare stream: Buffer;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     super(status, headers, body);
@@ -262,9 +262,9 @@ export class Response extends DispatchResponse {
    *
    * @internal
    */
-  protected buildBuffer(response: LiveResponseLike, body: Iterable<string>): Buffer {
+  buildBuffer(response: LiveResponseLike, body: unknown[]): Buffer {
     const buf = new Buffer(response);
-    for (const part of body) buf.write(part);
+    for (const part of body) buf.write(String(part));
     return buf;
   }
 }

@@ -9,6 +9,8 @@ import type { Request } from "./request.js";
 import {
   type CacheControlHash,
   cacheControl as _cacheControl,
+  generateStrongEtag as _generateStrongEtag,
+  generateWeakEtag as _generateWeakEtag,
   getDate as _getDate,
   getLastModified as _getLastModified,
   handleConditionalGetBang as _handleConditionalGetBang,
@@ -18,12 +20,76 @@ import {
   isStrongEtag as _isStrongEtag,
   mergeAndNormalizeCacheControlBang as _mergeAndNormalizeCacheControlBang,
   isWeakEtag as _isWeakEtag,
+  prepareCacheControlBang as _prepareCacheControlBang,
   setDate as _setDate,
   setLastModified as _setLastModified,
   strongEtag as _strongEtag,
   weakEtag as _weakEtag,
 } from "./cache.js";
 import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
+
+const CONTENT_TYPE = "Content-Type";
+const SET_COOKIE = "Set-Cookie";
+const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
+const CONTENT_TYPE_PARSER =
+  /^(?<mime_type>[^;\s]+\s*(?:;\s*(?!charset)[^;\s]+)*)?(?:;\s*charset="?(?<charset>[^;\s"]+)"?)?/;
+
+interface ContentTypeHeader {
+  readonly mimeType: string | undefined;
+  readonly charset: string | undefined;
+}
+const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
+
+/**
+ * Mirrors Rails' `ActionDispatch::Response::Buffer` (response.rb:100-157):
+ * wraps the body iterable so writes go through `Response#commit!` and reads
+ * cache a concatenated copy. Streamed chunks pass through `each`.
+ */
+export class ResponseBuffer {
+  private response: Response;
+  private buf: Array<unknown>;
+  private closed = false;
+  private strBody: string | null = null;
+
+  constructor(response: Response, buf: Array<unknown>) {
+    this.response = response;
+    this.buf = buf;
+  }
+
+  get body(): string {
+    if (this.strBody !== null) return this.strBody;
+    let acc = "";
+    for (const chunk of this.buf) acc += String(chunk);
+    this.strBody = acc;
+    return acc;
+  }
+
+  write(value: string): void {
+    if (this.closed) throw new Error("closed stream");
+    this.strBody = null;
+    this.response.commitBang();
+    this.buf.push(value);
+  }
+
+  *each(): IterableIterator<unknown> {
+    if (this.strBody !== null) {
+      yield this.strBody;
+      return;
+    }
+    for (const chunk of this.buf) yield chunk;
+  }
+
+  abort(): void {}
+
+  close(): void {
+    this.response.commitBang();
+    this.closed = true;
+  }
+
+  get isClosed(): boolean {
+    return this.closed;
+  }
+}
 
 export class Response {
   /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
@@ -36,9 +102,14 @@ export class Response {
   private _charset: string | undefined;
   private _cookies: Map<string, CookieValue> = new Map();
   private _sending = false;
+  private _sent = false;
+  /** Mirrors Rails `Response#stream` (`attr_reader :stream`). */
+  stream: unknown = null;
   /** Rails: `response.sending_file = true` flag set by `send_file_headers!`. */
   sendingFile = false;
   request: Request | null = null;
+  /** Rails: `cattr_accessor :default_headers`. */
+  static defaultHeaders: Record<string, string> | undefined;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;
@@ -307,6 +378,233 @@ export class Response {
 
   toRack(): [number, Record<string, string>, string[]] {
     return [this._status, { ...this._headers }, [...this._body]];
+  }
+
+  // --- Stream / body parts ---
+
+  /** Lazy stream-init helper (Rails: `initialize` calls `self.body = body`). */
+  private _ensureStream(): unknown {
+    if (!this.stream) this.stream = this.buildBuffer(this, this.mungeBodyObject(this._body));
+    return this.stream;
+  }
+
+  /** Mirrors `Response#body_parts` — drains the stream into a parts array. */
+  bodyParts(): unknown[] {
+    const parts: unknown[] = [];
+    for (const chunk of (this.stream as { each(): IterableIterator<unknown> }).each())
+      parts.push(chunk);
+    return parts;
+  }
+
+  /** Mirrors `Response#send_file(path)` — commits + replaces stream with a path-backed body. */
+  sendFile(path: string): void {
+    this.commitBang();
+    this.stream = { toPath: path, body: "", each: function* () {} };
+  }
+
+  /** Mirrors `Response#reset_body!` — discards stream contents. */
+  resetBodyBang(): void {
+    this.stream = this.buildBuffer(this, []);
+    this._body = [];
+  }
+
+  /** Mirrors `Response#each(&block)` — wraps stream iteration in `sending!`/`sent!`. */
+  *each(): IterableIterator<unknown> {
+    this.sendingBang();
+    for (const chunk of (this.stream as { each(): IterableIterator<unknown> }).each()) yield chunk;
+    this.sentBang();
+  }
+
+  /** Mirrors `Response#abort` — forwards to stream.abort, falling back to close. */
+  abort(): void {
+    const s = this.stream;
+    if (!s) return;
+    if (typeof (s as { abort?: () => void }).abort === "function") {
+      (s as { abort: () => void }).abort();
+    } else if (typeof (s as { close?: () => void }).close === "function") {
+      (s as { close: () => void }).close();
+    }
+  }
+
+  // --- Lifecycle (commit / sending / sent) ---
+
+  /** Mirrors `Response#commit!`. Idempotent; runs beforeCommitted on transition. */
+  commitBang(): void {
+    if (this._committed) return;
+    this.beforeCommitted();
+    this._committed = true;
+  }
+
+  /** Mirrors `Response#sending!`. */
+  sendingBang(): void {
+    if (this._sending) return;
+    this.beforeSending();
+    this._sending = true;
+  }
+
+  /** Mirrors `Response#sent!`. */
+  sentBang(): void {
+    this._sent = true;
+  }
+
+  /** Mirrors `Response#sending?`. */
+  get isSending(): boolean {
+    return this._sending;
+  }
+
+  /** Mirrors `Response#sent?`. */
+  get isSent(): boolean {
+    return this._sent;
+  }
+
+  /** Rails uses Ruby's MonitorMixin to block until committed; JS is single-threaded so this is a no-op once committed. */
+  async awaitCommit(): Promise<void> {}
+
+  /** Mirrors `Response#await_sent` — no-op in single-threaded JS. */
+  async awaitSent(): Promise<void> {}
+
+  // --- Header / mime helpers ---
+
+  /** Alias of `headers` — mirrors Rails' `alias_method :header, :headers`. */
+  get header(): Record<string, string> {
+    return this._headers;
+  }
+
+  hasHeader(key: string): boolean {
+    return this.getHeader(key) !== undefined;
+  }
+
+  /** Mirrors `Response#response_code` — the integer status. */
+  get responseCode(): number {
+    return this._status;
+  }
+
+  /** Alias of `message`. */
+  get statusMessage(): string {
+    return this.message;
+  }
+
+  /** Alias of `location` — Rails: `alias_method :redirect_url, :location`. */
+  get redirectUrl(): string {
+    return this.location;
+  }
+
+  /** Mirrors `Response#media_type` — parsed mime type, no charset. */
+  get mediaType(): string | undefined {
+    return this.parsedContentTypeHeader().mimeType;
+  }
+
+  // --- Content-type parsing (private in Rails) ---
+
+  /** @internal Rails: `parse_content_type(str)`. */
+  parseContentType(value: string | undefined): ContentTypeHeader {
+    if (!value) return NULL_CONTENT_TYPE_HEADER;
+    const match = CONTENT_TYPE_PARSER.exec(value);
+    if (!match) return NULL_CONTENT_TYPE_HEADER;
+    return {
+      mimeType: match.groups?.["mime_type"]?.trim() || undefined,
+      charset: match.groups?.["charset"] || undefined,
+    };
+  }
+
+  /** @internal Rails: `parsed_content_type_header` private. */
+  parsedContentTypeHeader(): ContentTypeHeader {
+    return this.parseContentType(this.getHeader(CONTENT_TYPE));
+  }
+
+  /** @internal Rails: `set_content_type(content_type, charset)` private. */
+  setContentType(contentType: string | undefined, charset: string | undefined): void {
+    const type = contentType ?? "";
+    const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
+    this.setHeader(CONTENT_TYPE, value);
+  }
+
+  // --- Lifecycle hooks (private) ---
+
+  /** @internal Rails: `before_committed` private. */
+  protected beforeCommitted(): void {
+    if (this._committed) return;
+    this.assignDefaultContentTypeAndCharsetBang();
+    // cacheControl wiring lives in cache.ts; no-op here when no parsed hash present.
+    this.handleNoContentBang();
+  }
+
+  /** @internal Rails: `before_sending` — flushes cookie jar via request before headers freeze. */
+  beforeSending(): void {
+    if (!this._committed) this.commitBang();
+    const req = this.request as (Request & { commitCookieJarBang?: () => void }) | null;
+    if (req && typeof req.commitCookieJarBang === "function") req.commitCookieJarBang();
+  }
+
+  /** @internal Rails: `build_buffer(response, body)` private. */
+  buildBuffer(response: unknown, body: unknown[]): unknown {
+    return new ResponseBuffer(response as Response, body);
+  }
+
+  /** @internal Rails: `munge_body_object(body)` — wraps non-iterables into a 1-element array. */
+  mungeBodyObject(body: unknown): unknown[] {
+    if (Array.isArray(body)) return body;
+    if (
+      body != null &&
+      typeof (body as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function" &&
+      typeof body !== "string"
+    ) {
+      return Array.from(body as Iterable<unknown>);
+    }
+    return [body];
+  }
+
+  /** @internal Rails: `assign_default_content_type_and_charset!`. */
+  assignDefaultContentTypeAndCharsetBang(): void {
+    if (this.mediaType) return;
+    const ct = this.parsedContentTypeHeader();
+    const charset = ct.charset ?? (this.constructor as typeof Response).defaultCharset;
+    this.setContentType(ct.mimeType ?? "text/html", charset);
+  }
+
+  /** @internal Rails: `handle_no_content!` — strips body headers on 1xx/204/205/304. */
+  handleNoContentBang(): void {
+    if ((NO_CONTENT_CODES as readonly number[]).includes(this._status)) {
+      this.deleteHeader(CONTENT_TYPE);
+      this.deleteHeader("Content-Length");
+    }
+  }
+
+  /** @internal Rails: `rack_response(status, headers)` — empty body for no-content statuses. */
+  rackResponse(
+    status: number,
+    headers: Record<string, string>,
+  ): [number, Record<string, string>, unknown[]] {
+    if ((NO_CONTENT_CODES as readonly number[]).includes(status)) return [status, headers, []];
+    return [status, headers, this.bodyParts()];
+  }
+
+  // --- ETag generators (delegated to cache module) ---
+
+  /** Rails: `generate_weak_etag(validators)`. */
+  generateWeakEtag(validators: unknown): string {
+    return _generateWeakEtag(validators);
+  }
+
+  /** Rails: `generate_strong_etag(validators)`. */
+  generateStrongEtag(validators: unknown): string {
+    return _generateStrongEtag(validators);
+  }
+
+  /** Rails: `prepare_cache_control!` private. */
+  prepareCacheControlBang(): CacheControlHash {
+    return _prepareCacheControlBang.call(this);
+  }
+
+  // --- Default-headers merge (static) ---
+
+  /** Rails: `Response.merge_default_headers(original, default)`. */
+  static mergeDefaultHeaders(
+    original: Record<string, string>,
+    defaults: Record<string, string> | undefined,
+  ): Record<string, string> {
+    if (!defaults) return original;
+    return { ...defaults, ...original };
   }
 
   // --- Inspect ---
