@@ -169,6 +169,8 @@ importers:
         specifier: workspace:*
         version: link:../activesupport
 
+  packages/did-you-mean: {}
+
   packages/globalid:
     dependencies:
       '@blazetrails/activesupport':
@@ -295,6 +297,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../../packages/arel
+      '@blazetrails/did-you-mean':
+        specifier: workspace:*
+        version: link:../../packages/did-you-mean
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../../packages/globalid
