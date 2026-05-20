@@ -1,5 +1,15 @@
 # DidYouMean port plan
 
+> **Status (2026-05-20):** Port complete — `@blazetrails/did-you-mean` ships
+> `SpellChecker`, `jaroWinklerDistance`, `levenshteinDistance` at 100%
+> api:compare (#2076, #2078, #2095, #2099). Consumers wired:
+> `ActionNotFound#corrections` (#2079), `ParameterMissing#corrections`
+> (#2097), `UrlGenerationError#corrections` (#2100),
+> `AssociationNotFoundError` family (#2103). **Remaining consumer:**
+> `Template::Error#corrections` in actionview — needs `jaroDistance`
+> exported from the barrel (Rails uses raw `DidYouMean::Jaro.distance`,
+> not `SpellChecker`); ~80 LOC follow-up.
+
 Port Ruby's `DidYouMean::SpellChecker` (with `Jaro`, `JaroWinkler`, and
 `Levenshtein`) into trails so that the half-dozen Rails call sites that
 currently stub a custom Levenshtein helper — or skip the feature entirely —
