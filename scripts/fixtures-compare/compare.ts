@@ -6,6 +6,11 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
+import type {
+  Schema,
+  TableSchema,
+} from "../../packages/activerecord/src/test-helpers/define-schema.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -17,7 +22,8 @@ type FixtureMap = Record<string, Row>;
 // prettier-ignore
 type Status = "MATCH" | "MISSING" | "DIFF" | "ERB-UNSUPPORTED" | "YAML-PARSE-ERR" | "TS-IMPORT-ERR" | "TS-EXPORT-MISSING";
 
-interface FileResult { yamlBase: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; notes: string[]; } // prettier-ignore
+// prettier-ignore
+interface FileResult { yamlBase: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; schemaPorted: boolean; schemaExtras: number; notes: string[]; }
 
 function parseArgs(argv: string[]): { pkg: string; filter: string | null } {
   let pkg = "activerecord";
@@ -110,12 +116,80 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   return false;
 }
 
+// Mirror of the (non-exported) discriminator in define-schema.ts. Kept in
+// strict step with `isWrappedSchema` there (require well-typed primaryKey,
+// columns map, AND no other top-level keys; PK arrays must be all strings).
+// Returns the column map plus whether `defineSchema` creates an implicit
+// `id` column — only the legacy shape gets one; define-schema.ts sets
+// `createOpts.id = false` for BOTH `primaryKey: false` and `primaryKey:
+// string[]`, so any wrapped form has no implicit `id`.
+const WRAPPER_KEYS = new Set(["columns", "primaryKey"]);
+function tableShape(table: TableSchema): {
+  columns: Record<string, unknown>;
+  hasImplicitId: boolean;
+} {
+  if (table && typeof table === "object" && "primaryKey" in table) {
+    const pk = (table as { primaryKey?: unknown }).primaryKey;
+    const cols = (table as { columns?: unknown }).columns;
+    const pkOk = pk === false || (Array.isArray(pk) && pk.every((v) => typeof v === "string"));
+    const onlyWrapperKeys = Object.keys(table).every((k) => WRAPPER_KEYS.has(k));
+    if (pkOk && cols && typeof cols === "object" && onlyWrapperKeys) {
+      return { columns: cols as Record<string, unknown>, hasImplicitId: false };
+    }
+  }
+  return { columns: table as Record<string, unknown>, hasImplicitId: true };
+}
+
+/**
+ * Per-fixture schema-parity check. Complements the Rails-YAML diff: catches
+ * drift between a TS fixture and `TEST_SCHEMA` even when the Rails YAML and
+ * TS rows agree (typo'd column, column dropped from schema, etc.). Stays
+ * useful after Rails-diff hits 100% — fixtures and schema can drift
+ * independently afterward.
+ *
+ * `id` is allowed only when defineSchema would create one — that's the
+ * legacy `Record<colName, ColumnSpec>` shape only. Any wrapped table
+ * (`primaryKey: false` *or* `primaryKey: string[]`) has `id` suppressed
+ * (see define-schema.ts setting `createOpts.id = false` for both),
+ * so a stray `id` on those flags as drift.
+ *
+ * Returns `ported=false` when the table hasn't landed in TEST_SCHEMA yet —
+ * expected during the 0.5a..0.5h schema port and treated as informational,
+ * not drift.
+ */
+export function schemaCheck(
+  snake: string,
+  tsRows: FixtureMap,
+  schema: Schema,
+  notes: string[],
+): { ported: boolean; extras: number } {
+  const table = schema[snake];
+  if (!table) return { ported: false, extras: 0 };
+  const shape = tableShape(table);
+  const declared = new Set(Object.keys(shape.columns));
+  if (shape.hasImplicitId) declared.add("id");
+  let extras = 0;
+  for (const [rowName, row] of Object.entries(tsRows)) {
+    // Skip non-object rows (null/undefined/scalar). compareFile's own row-
+    // shape pass reports those as "row missing in TS"; the schema check
+    // shouldn't promote a malformed-fixture soft DIFF to a runtime crash.
+    if (!row || typeof row !== "object") continue;
+    for (const attr of Object.keys(row)) {
+      if (!declared.has(attr)) {
+        notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
+        extras++;
+      }
+    }
+  }
+  return { ported: true, extras };
+}
+
 // prettier-ignore
-export async function compareFile(yamlBase: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined): Promise<FileResult> {
+export async function compareFile(yamlBase: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = TEST_SCHEMA): Promise<FileResult> {
   const snake = yamlBase.replace(/\.yml$/, "");
   const tsFile = path.join(TS_DIR, `${kebab(snake)}.ts`);
   const tsBase = existsSync(tsFile) ? `${kebab(snake)}.ts` : null;
-  const r: FileResult = { yamlBase, tsBase, status: "MATCH", rowsMatched: 0, rowsTotal: 0, attrsMatched: 0, attrsTotal: 0, notes: [] }; // prettier-ignore
+  const r: FileResult = { yamlBase, tsBase, status: "MATCH", rowsMatched: 0, rowsTotal: 0, attrsMatched: 0, attrsTotal: 0, schemaPorted: false, schemaExtras: 0, notes: [] }; // prettier-ignore
   if (prelimFailure) { r.status = prelimFailure; return r; } // prettier-ignore
   const railsRows = yamlByTable.get(snake)!;
   r.rowsTotal = Object.keys(railsRows).length;
@@ -138,7 +212,10 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
     r.notes.push(keys.length > 1 ? `${tsBase} exports ${keys.length} *FixtureData symbols (expected 1)` : `no *FixtureData export in ${tsBase}`); // prettier-ignore
     return r;
   }
-  let anyDiff = false;
+  const sc = schemaCheck(snake, tsRows, schema, r.notes);
+  r.schemaPorted = sc.ported;
+  r.schemaExtras = sc.extras;
+  let anyDiff = sc.extras > 0;
   for (const [rowName, railsRow] of Object.entries(railsRows)) {
     const tsRow = tsRows[rowName];
     if (!tsRow || typeof tsRow !== "object") {
@@ -171,14 +248,31 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
   return r;
 }
 
+// `schemaCheck` only runs after a successful TS import, so a result has
+// real schema data exactly when its final status is MATCH or DIFF. Early-
+// return statuses (MISSING, ERB-UNSUPPORTED, YAML-PARSE-ERR, TS-IMPORT-ERR,
+// TS-EXPORT-MISSING) skip the check entirely — distinguish "not evaluated"
+// from "evaluated, no schema entry" both in per-file output and totals.
+function schemaEvaluated(r: FileResult): boolean {
+  return r.status === "MATCH" || r.status === "DIFF";
+}
+
 function formatLine(r: FileResult): string {
   const pct = r.attrsTotal === 0 ? "—" : `${Math.round((r.attrsMatched / r.attrsTotal) * 100)}%`;
+  const sch = !schemaEvaluated(r)
+    ? ""
+    : !r.schemaPorted
+      ? "schema:not-ported"
+      : r.schemaExtras > 0
+        ? `schema:extras=${r.schemaExtras}`
+        : "schema:ok";
   return (
     r.yamlBase.padEnd(32) +
     (r.tsBase ?? "(missing)").padEnd(28) +
     `rows: ${r.rowsMatched}/${r.rowsTotal}`.padEnd(14) +
     `attrs: ${r.attrsMatched}/${r.attrsTotal}`.padEnd(16) +
     pct.padEnd(6) +
+    sch.padEnd(20) +
     r.status
   );
 }
@@ -220,7 +314,13 @@ async function main(): Promise<void> {
   }
   const n = (s: Status): number => results.filter((r) => r.status === s).length;
   const other = results.length - n("MATCH") - n("DIFF") - n("MISSING") - n("ERB-UNSUPPORTED");
+  const evaluated = results.filter(schemaEvaluated);
+  const ported = evaluated.filter((r) => r.schemaPorted).length;
+  const withExtras = evaluated.filter((r) => r.schemaExtras > 0).length;
   console.log(`\n${results.length} files — match=${n("MATCH")} diff=${n("DIFF")} missing=${n("MISSING")} erb-unsupported=${n("ERB-UNSUPPORTED")} other=${other}`); // prettier-ignore
+  console.log(
+    `schema — ported=${ported}/${evaluated.length} extras-flagged=${withExtras} (skipped ${results.length - evaluated.length})`,
+  );
   console.log("(MISSING/DIFF soft per Decision 4 until PR 7; runtime errors hard-fail)");
   // Decision 4 names DIFF/MISSING as soft; YAML/TS load errors are script-runtime, hard-fail.
   const hard: readonly Status[] = ["YAML-PARSE-ERR", "TS-IMPORT-ERR", "TS-EXPORT-MISSING"];
