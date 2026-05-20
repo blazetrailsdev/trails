@@ -678,3 +678,57 @@ describe("RequestFilterParameters", () => {
     expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
   });
 });
+
+describe("RequestContentSecurityPolicy", () => {
+  it("reads and writes the policy under the env header", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicy).toBeUndefined();
+    const policy = { build: () => "default-src 'self'" };
+
+    req.contentSecurityPolicy = policy as any;
+    expect(req.env["action_dispatch.content_security_policy"]).toBe(policy);
+    expect(req.contentSecurityPolicy).toBe(policy);
+  });
+
+  it("reportOnly toggles the report-only env flag", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyReportOnly).toBeUndefined();
+    req.contentSecurityPolicyReportOnly = true;
+    expect(req.contentSecurityPolicyReportOnly).toBe(true);
+  });
+
+  it("nonce is undefined without a generator and memoizes on read", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonce).toBeUndefined();
+    let calls = 0;
+    req.contentSecurityPolicyNonceGenerator = () => `nonce-${++calls}`;
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+  });
+
+  it("nonce directives default to undefined and round-trip arrays", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonceDirectives).toBeUndefined();
+    req.contentSecurityPolicyNonceDirectives = ["script-src"];
+    expect(req.contentSecurityPolicyNonceDirectives).toEqual(["script-src"]);
+  });
+
+  it("null assignments persist as null on the env (matches Rails setter)", () => {
+    const req = new Request({});
+    req.contentSecurityPolicyNonceGenerator = null;
+    expect(req.env["action_dispatch.content_security_policy_nonce_generator"]).toBeNull();
+    expect(req.contentSecurityPolicyNonceGenerator).toBeNull();
+  });
+});
+
+describe("RequestPermissionsPolicy", () => {
+  it("round-trips through the env header", () => {
+    const req = new Request({});
+    expect(req.permissionsPolicy).toBeUndefined();
+    const policy = { build: () => "geolocation=()" };
+
+    req.permissionsPolicy = policy as any;
+    expect(req.env["action_dispatch.permissions_policy"]).toBe(policy);
+    expect(req.permissionsPolicy).toBe(policy);
+  });
+});

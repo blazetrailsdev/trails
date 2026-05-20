@@ -425,8 +425,8 @@ export function setContentSecurityPolicyReportOnly(this: CspRequestHost, value: 
 
 export function contentSecurityPolicyNonceGenerator(
   this: CspRequestHost,
-): NonceGenerator | undefined {
-  return this.getHeader(NONCE_GENERATOR) as NonceGenerator | undefined;
+): NonceGenerator | null | undefined {
+  return this.getHeader(NONCE_GENERATOR) as NonceGenerator | null | undefined;
 }
 
 export function setContentSecurityPolicyNonceGenerator(
@@ -438,8 +438,8 @@ export function setContentSecurityPolicyNonceGenerator(
 
 export function contentSecurityPolicyNonceDirectives(
   this: CspRequestHost,
-): readonly string[] | undefined {
-  return this.getHeader(NONCE_DIRECTIVES) as readonly string[] | undefined;
+): readonly string[] | null | undefined {
+  return this.getHeader(NONCE_DIRECTIVES) as readonly string[] | null | undefined;
 }
 
 export function setContentSecurityPolicyNonceDirectives(

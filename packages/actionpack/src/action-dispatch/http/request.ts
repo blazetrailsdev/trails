@@ -433,16 +433,14 @@ export class Request {
   }
 
   get contentSecurityPolicyNonceGenerator(): NonceGenerator | null | undefined {
-    // Env may hold `null` from `request.csp_nonce_generator = nil`; widen to
-    // include it so callers see the same shape the setter accepts.
-    return _contentSecurityPolicyNonceGenerator.call(this) as NonceGenerator | null | undefined;
+    return _contentSecurityPolicyNonceGenerator.call(this);
   }
   set contentSecurityPolicyNonceGenerator(generator: NonceGenerator | null) {
     _setContentSecurityPolicyNonceGenerator.call(this, generator);
   }
 
   get contentSecurityPolicyNonceDirectives(): readonly string[] | null | undefined {
-    return _contentSecurityPolicyNonceDirectives.call(this) as readonly string[] | null | undefined;
+    return _contentSecurityPolicyNonceDirectives.call(this);
   }
   set contentSecurityPolicyNonceDirectives(directives: readonly string[] | null) {
     _setContentSecurityPolicyNonceDirectives.call(this, directives);

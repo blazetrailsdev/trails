@@ -42,7 +42,7 @@ export class ContentSecurityPolicyMiddleware {
     // (content_security_policy.rb:51).
     const context = request.controllerInstance ?? request;
 
-    headers[this.headerName(request)] = policy.build(context, nonce, nonceDirectives);
+    headers[this.headerName(request)] = policy.build(context, nonce, nonceDirectives ?? undefined);
     return response;
   }
 
