@@ -2,16 +2,17 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -25,15 +26,16 @@ function freshAdapter(): DatabaseAdapter {
 // DirtyTest — targets dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       topics: { title: "string" },
       people: { first_name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -212,10 +214,10 @@ describe("DirtyTest", () => {
 // DirtyTest2 — more targets for dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: {
         title: "string",
@@ -227,6 +229,7 @@ describe("DirtyTest", () => {
       authors: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -467,9 +470,9 @@ describe("DirtyTest", () => {
 // DirtyTest3 — additional missing tests from dirty_test.rb
 // ==========================================================================
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string" },
       pirates: {
@@ -480,6 +483,7 @@ describe("DirtyTest", () => {
       },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -720,13 +724,14 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       items: { name: "string", age: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -764,13 +769,14 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string", age: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -819,13 +825,14 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -870,13 +877,14 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -917,13 +925,14 @@ describe("DirtyTest", () => {
 });
 
 describe("DirtyTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: { name: "string", email: "string", age: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1091,15 +1100,16 @@ describe("DirtyTest", () => {
 // (test_changes_in_place) for the post-save forgettingAssignment reset
 // ==========================================================================
 describe("MutableAttributeAfterSave", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-    adapter = freshAdapter();
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       json_models: { payload: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
