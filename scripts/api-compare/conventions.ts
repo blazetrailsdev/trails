@@ -5,11 +5,36 @@
 
 import * as path from "path";
 
+/**
+ * Token-level Ruby→TS renames applied before camelization.
+ *
+ * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
+ * extension in place of Rails' `.erb` — see docs/actionview-100-percent.md.
+ *
+ * Applied to every identifier that flows through `snakeToCamel` —
+ * currently Ruby method names (via `rubyMethodToTs`) and constant
+ * fragments embedded in dot-notation method names like
+ * `visit_Arel_Nodes_X`. File paths get the equivalent substitution
+ * separately in `rubyFileToTs` below.
+ */
+const TOKEN_RENAMES: Record<string, string> = {
+  erb: "tse",
+  ERB: "TSE",
+  Erb: "Tse",
+};
+
+function applyTokenRenames(snake: string): string {
+  return snake.replace(
+    /(^|_)(erb|ERB|Erb)(?=_|$)/g,
+    (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok],
+  );
+}
+
 export function snakeToCamel(name: string): string {
   // Preserve leading underscores (e.g., _load_from → _loadFrom)
   const match = name.match(/^(_+)/);
   const prefix = match ? match[1] : "";
-  const rest = name.slice(prefix.length);
+  const rest = applyTokenRenames(name.slice(prefix.length));
   // Match runs of `_` followed by any letter or digit so Ruby names with
   // capitalized segments (e.g. `visit_Arel_Nodes_SelectStatement`) OR
   // doubled underscores (Ruby's private-alias-target convention, e.g.
