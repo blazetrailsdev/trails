@@ -188,7 +188,7 @@ export class Base extends Metal {
     }
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format ?? "html";
+    const format = this.request?.format?.symbol ?? "html";
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
     const layout =
@@ -288,7 +288,7 @@ export class Base extends Metal {
     const collector = new Collector();
     block(collector);
 
-    const format = this.request?.format ?? undefined;
+    const format = this.request?.format?.symbol ?? undefined;
     const accept = this.request?.getHeader("accept") ?? undefined;
 
     const result = collector.negotiate({ format, accept });
@@ -762,7 +762,7 @@ export class Base extends Metal {
     if (!resolver) return;
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format ?? "html";
+    const format = this.request?.format?.symbol ?? "html";
     const template = resolver(controllerPrefix, action, format);
     if (template) {
       this.contentType = "text/html; charset=utf-8";

@@ -15,7 +15,7 @@ export interface Notifier {
 export function instrumentAction(
   controllerName: string,
   actionName: string,
-  request: { method?: string; path?: string; format?: string },
+  request: { method?: string; path?: string; format?: { symbol: string | null } },
   fn: () => Promise<unknown>,
   notifier?: Notifier,
 ): Promise<unknown> {
@@ -25,7 +25,7 @@ export function instrumentAction(
     action: actionName,
     method: request.method,
     path: request.path,
-    format: request.format,
+    format: request.format?.symbol,
   };
 
   notifier?.instrument("start_processing.action_controller", { ...payload });
