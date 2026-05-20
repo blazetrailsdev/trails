@@ -225,12 +225,42 @@ export class UrlHelpersModule {
 
   constructor(routes: RouteSet, supportsPath: boolean) {
     this._supportsPath = supportsPath;
+    // Rails' proxy_class does `include UrlFor`; `_routes` on the proxy
+    // points at the RouteSet's own `_routes` adapter (the one whose
+    // `urlFor` has the Rails-shape `(options, routeName?)` signature).
+    // Passing the bare RouteSet here would route through its legacy
+    // positional `urlFor(routeName, params, options)` and break at runtime.
+    const target = routes._routes;
     const scope: UrlForHost = {
-      _routes: routes as unknown as UrlForRoutes,
+      _routes: target,
       defaultUrlOptions: routes.defaultUrlOptions,
       urlOptions: () => ({}),
     };
-    this._proxy = new RoutesProxy(routes as unknown as UrlForRoutes, scope, {});
+    this._proxy = new RoutesProxy(target, scope, {});
+    // `withRoutesHelpers` (abstract-controller/trailties/routes-helpers.ts)
+    // copies helper methods onto a controller's prototype via `for...in`,
+    // which only sees *own enumerable* properties. Class methods live on
+    // the prototype and are non-enumerable, so re-publish each as a bound
+    // own property here. The prototype methods remain (so `api:compare`
+    // extracts them); the own copies make them mountable.
+    for (const name of [
+      "urlFor",
+      "fullUrlFor",
+      "routeFor",
+      "polymorphicUrl",
+      "polymorphicPath",
+      "polymorphicUrlForAction",
+      "polymorphicPathForAction",
+      "polymorphicMapping",
+      "urlOptions",
+    ] as const) {
+      Object.defineProperty(this, name, {
+        value: (this[name] as (...a: unknown[]) => unknown).bind(this),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
   }
 
   /** Rails singleton: `def url_for(options)`. */
@@ -476,8 +506,9 @@ export class RouteSet {
 
   /**
    * Rails: `def from_requirements(requirements)` — lookup intended for
-   * Language Server tooling. Matches the first route whose `requirements`
-   * deep-equals the supplied hash.
+   * Language Server tooling. Matches the first route whose `defaults`
+   * (Trails's analog of Rails's `route.requirements`) is shallow-equal
+   * to the supplied hash — same shape Rails compares via `Hash#==`.
    */
   fromRequirements(requirements: Record<string, unknown>): Route | undefined {
     // Rails: `routes.find { |route| route.requirements == requirements }`.
@@ -526,8 +557,11 @@ export class RouteSet {
       const scope =
         (ctx as unknown as UrlForHost & { _routesContext?: () => UrlForHost })._routesContext?.() ??
         (ctx as unknown as UrlForHost);
+      // Pass the `_routes` adapter, not the RouteSet itself — RoutesProxy
+      // dispatches `urlFor` against the Rails-shape signature exposed by
+      // the adapter, not the legacy positional form on RouteSet.
       return new RoutesProxy(
-        this as unknown as UrlForRoutes,
+        this._routes,
         scope,
         helpers as unknown as Record<string, unknown>,
         scriptNamer,
@@ -597,14 +631,27 @@ export class RouteSet {
     this._finalized = true;
   }
 
-  /** Rails: `clear!` — drop routes and replay {@link prepend} blocks. */
+  /**
+   * Rails: `def clear!` (route_set.rb:490):
+   * `@finalized = false; named_routes.clear; set.clear; formatter.clear;
+   *  @polymorphic_mappings.clear; @prepend.each { |blk| eval_block(blk) }`.
+   * Trails additionally resets the memoized url_helpers and default_env
+   * (Rails relies on `@url_helpers_with_paths` etc. being reset via fresh
+   * Module construction in `generate_url_helpers`; clearing them here is
+   * the equivalent invalidation step).
+   */
   clearBang(): void {
     this._finalized = false;
     this.routes = [];
     this.namedRoutes.clear();
+    this.set.clear();
+    this.formatter.clear();
     this.polymorphicMappings.clear();
     this.dispatcherRegistry.clear();
     this._customUrlHelpers.clear();
+    this._urlHelpersWithPaths = undefined;
+    this._urlHelpersWithoutPaths = undefined;
+    this._defaultEnv = undefined;
     this._journeyRouter = null;
     for (const blk of this._prepend) this.evalBlock(blk);
   }
@@ -651,8 +698,11 @@ export class RouteSet {
   }
 
   /**
-   * Rails: `add_url_helper(name, options, &block)`. Stored in
-   * {@link urlHelpers} until NamedRouteCollection lands.
+   * Rails: `NamedRouteCollection#add_url_helper(name, defaults, &block)`.
+   * Stored in {@link _customUrlHelpers} (a private map) until
+   * NamedRouteCollection lands; once ported, these will be folded into
+   * the generated url-helpers module so `${name}Path` / `${name}Url`
+   * become callable on `urlHelpers()`.
    */
   addUrlHelper(
     name: string,
