@@ -708,10 +708,13 @@ class SchemaAdapter implements DatabaseAdapter {
 
   get arelVisitor(): Visitors.ToSql | undefined {
     // Phase 9a: only activate the wrapped adapter's visitor for SQLite.
-    // PG/MySQL test paths still hit the base ToSql fallback (which uses
-    // Arel's defaultQuoter via SchemaAdapter delegation) — flipping those
-    // would change identifier-quoting in dozens of cross-adapter SQL
-    // assertions. Phase 9b will activate them.
+    // For PG/MySQL, returning undefined keeps Relation#_arelVisitor on its
+    // `new Visitors.ToSql(adapter)` fallback (base ToSql with SchemaAdapter
+    // as the quoter — identifiers route through the inner adapter's quote*),
+    // and leaves Node#toSql() on Arel's defaultQuoter via the global registry
+    // (since _wireArelVisitor only fires when arelVisitor is defined).
+    // Flipping either changes identifier quoting across dozens of
+    // cross-adapter SQL assertions. Phase 9b will activate PG/MySQL.
     if (adapterType !== "sqlite") return undefined;
     return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
