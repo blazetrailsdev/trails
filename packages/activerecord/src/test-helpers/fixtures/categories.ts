@@ -1,0 +1,23 @@
+// activerecord/test/fixtures/categories.yml
+export const categoryFixtureData = {
+  general: {
+    id: 1,
+    name: "General",
+    type: "Category",
+  },
+  technology: {
+    id: 2,
+    name: "Technology",
+    type: "Category",
+  },
+  sti_test: {
+    id: 3,
+    name: "Special category",
+    type: "SpecialCategory",
+  },
+  cooking: {
+    id: 4,
+    name: "Cooking",
+    type: "Category",
+  },
+};
