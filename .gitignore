@@ -18,3 +18,5 @@ scripts/api-compare/.rails-source
 eslint/rails-private-methods.json
 eslint/rails-file-structure-method-order.json
 .claude/skills
+
+.claude/scheduled_tasks.lock
