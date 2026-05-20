@@ -606,41 +606,13 @@ export class Mapper {
   }
 
   /** @internal */
-  scopeActionOptions(method: "resource" | "resources"): RouteOptions {
-    const actions = this.applicableActionsFor(method);
-    const frame = this.scopeStack[this.scopeStack.length - 1];
-    const actionOptions = (frame as { actionOptions?: RouteOptions } | undefined)?.actionOptions;
-    if (!actionOptions) return {};
-    const result: RouteOptions = { ...actionOptions };
-    if (result.only) {
-      const only = Array.isArray(result.only) ? result.only : [result.only];
-      result.only = only.filter((a) => actions.includes(a));
-    }
-    if (result.except) {
-      const except = Array.isArray(result.except) ? result.except : [result.except];
-      result.except = except.filter((a) => actions.includes(a));
-    }
-    return result;
-  }
-
-  /** @internal */
   isResourceScope(): boolean {
     return this.scopeStack.some((f) => f.memberPath !== undefined);
   }
 
   /** @internal */
-  isResourceMethodScope(): boolean {
-    return this.isResourceScope();
-  }
-
-  /** @internal */
   isNestedScope(): boolean {
     return this.scopeStack.length > 1;
-  }
-
-  /** @internal */
-  isApiOnly(): boolean {
-    return false;
   }
 
   /** @internal */
@@ -666,34 +638,11 @@ export class Mapper {
   }
 
   /** @internal */
-  withScopeLevel<T>(_kind: string, body: () => T): T {
-    return body();
-  }
-
-  /** @internal */
-  resourcesPathNames(options: Record<string, string>): Record<string, string> {
-    const frame = this.scopeStack[this.scopeStack.length - 1] as
-      | { pathNames?: Record<string, string> }
-      | undefined;
-    const merged = { ...(frame?.pathNames ?? {}), ...options };
-    if (frame) (frame as { pathNames?: Record<string, string> }).pathNames = merged;
-    return merged;
-  }
-
-  /** @internal */
-  actionPath(name: string): string {
-    const frame = this.scopeStack[this.scopeStack.length - 1] as
-      | { pathNames?: Record<string, string> }
-      | undefined;
-    return frame?.pathNames?.[name] ?? name;
-  }
-
-  /** @internal */
   pathForAction(action: string, path: string | undefined): string {
     const prefix = this.currentPrefix();
     if (path) return `${prefix}/${path}`;
     if (this.canonicalAction(action)) return prefix;
-    return `${prefix}/${this.actionPath(action)}`;
+    return `${prefix}/${action}`;
   }
 
   /** @internal */
