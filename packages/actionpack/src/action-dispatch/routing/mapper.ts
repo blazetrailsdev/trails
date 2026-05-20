@@ -21,6 +21,7 @@ import {
   type RedirectOptions,
 } from "./route.js";
 import { Scope, type ScopeLevel } from "./scope.js";
+import { underscore } from "@blazetrails/activesupport";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -422,13 +423,318 @@ export class Mapper {
     }
   }
 
+  // --- HTTP helper extras ---
+
+  options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.mapMethod("OPTIONS", path, normalizeOptions(optionsOrEndpoint));
+  }
+
+  connect(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
+    this.match(path, { ...normalizeOptions(optionsOrEndpoint), via: ["GET", "CONNECT"] });
+  }
+
+  /** @internal */
+  mapMethod(method: string, path: string, options: RouteOptions): void {
+    this.match(path, { ...options, via: method });
+  }
+
+  /**
+   * Mirrors Rails `Scoping#controller(controller)` — pushes a `_scope` frame
+   * setting the controller name. Does NOT push onto `scopeStack`: that stack's
+   * `controller` field is a *module/namespace prefix* (used by `namespace`),
+   * whereas `controller(...)` overrides the controller name directly.
+   */
+  controller(controllerName: string, callback: MapperCallback): void {
+    const previous = this._scope;
+    this._scope = this._scope.newChild({ controller: controllerName });
+    try {
+      callback(this);
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  defaults(defaultsHash: Record<string, string>, callback: MapperCallback): void {
+    const previous = this._scope;
+    const merged = this.mergeDefaultsScope(
+      this._scope.get("defaults") as Record<string, string> | undefined,
+      defaultsHash,
+    );
+    this._scope = this._scope.newChild({ defaults: merged });
+    try {
+      callback(this);
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  // --- mount ---
+
+  mount(app: MountableApp, options: MountOptions = {}): void {
+    const path = options.at;
+    if (typeof (app as { call?: unknown })?.call !== "function") {
+      throw new Error("A rack application must be specified");
+    }
+    if (!path) {
+      throw new Error("Must be called with mount point: mount(SomeRackApp, { at: '/path' })");
+    }
+    const railsApp = this.isRailsApp(app);
+    const asName = options.as ?? this.appName(app, railsApp);
+    const matchOpts: RouteOptions & { via?: string | string[]; at?: string } = {
+      ...options,
+      via: options.via ?? "ALL",
+      anchor: false,
+      format: false,
+    };
+    if (asName) matchOpts.as = asName;
+    delete matchOpts.at;
+    this.match(path, matchOpts);
+    if (asName) this._mountedApps.set(asName, { app, path });
+    if (railsApp && asName) this.defineGeneratePrefix(app, asName, path);
+  }
+
+  /** @internal */
+  _mountedApps: Map<string, { app: MountableApp; path: string }> = new Map();
+
+  /** @internal */
+  isRailsApp(app: MountableApp): boolean {
+    return typeof app === "function" && Boolean((app as { railtieName?: unknown }).railtieName);
+  }
+
+  /** @internal */
+  appName(app: MountableApp, railsApp: boolean): string | undefined {
+    if (railsApp) {
+      return (app as { railtieName?: string }).railtieName;
+    }
+    if (typeof app === "function") {
+      const name = (app as { name?: string }).name;
+      if (!name) return undefined;
+      // Rails: ActiveSupport::Inflector.underscore(class_name).tr("/", "_")
+      return underscore(name).replace(/\//g, "_");
+    }
+    return undefined;
+  }
+
+  /**
+   * Records a `scriptNamer` for a mounted Rails engine so the engine's URL
+   * helpers can prefix generated paths with the mount point. Mirrors Rails'
+   * `define_generate_prefix(app, name)` registration step. Option keys
+   * (`scriptName`, `originalScriptName`) follow the project-wide camelCase
+   * convention (see CLAUDE.md); Rails' `:script_name` / `:original_script_name`
+   * are the same value under their Ruby-side names.
+   *
+   * @internal
+   */
+  defineGeneratePrefix(app: MountableApp, name: string, mountPath: string): void {
+    const scriptNamer = (options: Record<string, unknown>): string => {
+      if (options.originalScriptName) return mountPath;
+      const sn = options.scriptName;
+      return typeof sn === "string" && sn.length > 0 ? sn : mountPath;
+    };
+    this._mountedScriptNamers.set(name, { app, scriptNamer });
+  }
+
+  /** @internal */
+  _mountedScriptNamers: Map<
+    string,
+    { app: MountableApp; scriptNamer: (options: Record<string, unknown>) => string }
+  > = new Map();
+
+  // --- match privates (decomposition pipeline) ---
+
+  /** @internal */
+  mapMatch(
+    paths: string[],
+    options: RouteOptions & {
+      via?: string | string[];
+      on?: string;
+      format?: boolean;
+      anchor?: boolean;
+      path?: string;
+    },
+  ): void {
+    if (options.on !== undefined && !VALID_ON_OPTIONS.has(options.on)) {
+      throw new Error(`Unknown scope ${options.on} given to :on`);
+    }
+
+    const scopeTo = this._scope.get("to") as string | undefined;
+    if (scopeTo) options.to ??= scopeTo;
+    const scopeController = this._scope.get("controller") as string | undefined;
+    const scopeAction = this._scope.get("action") as string | undefined;
+    if (scopeController && scopeAction) {
+      options.to ??= `${scopeController}#${scopeAction}`;
+    }
+
+    const controller = options.controller ?? scopeController;
+    delete options.controller;
+    const optionPath = options.path;
+    delete options.path;
+    let to = options.to;
+    delete options.to;
+    const viaIn = options.via ?? (this._scope.get("via") as string | string[] | undefined) ?? "ALL";
+    delete options.via;
+    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+    delete options.format;
+    const anchor = options.anchor ?? true;
+    delete options.anchor;
+    const optionsConstraints = options.constraints ?? {};
+    delete options.constraints;
+
+    for (const p of paths) {
+      const routeOptions = { ...options };
+      if (p && optionPath) {
+        throw new Error(
+          "Ambiguous route definition. Both :path and the route path were specified as strings.",
+        );
+      }
+      to = this.getToFromPath(p, to, routeOptions.action);
+      this.decomposedMatch(
+        p,
+        controller,
+        routeOptions,
+        optionPath,
+        to,
+        viaIn,
+        formatted,
+        anchor,
+        optionsConstraints,
+      );
+    }
+  }
+
+  /** @internal */
+  getToFromPath(
+    path: string,
+    to: string | undefined,
+    action: string | undefined,
+  ): string | undefined {
+    if (to || action) return to;
+    const stripped = path.replace(/\(\.:format\)$/, "");
+    if (this.isUsingMatchShorthand(stripped)) {
+      return stripped
+        .replace(/^\//, "")
+        .replace(/\/([^/]*)$/, "#$1")
+        .replace(/-/g, "_");
+    }
+    return undefined;
+  }
+
+  /** @internal */
+  isUsingMatchShorthand(path: string): boolean {
+    return /^\/?[-\w]+\/[-\w/]+$/.test(path);
+  }
+
+  /** @internal */
+  decomposedMatch(
+    path: string,
+    controller: string | undefined,
+    options: RouteOptions & { on?: string },
+    optionPath: string | undefined,
+    to: string | undefined,
+    via: string | string[],
+    _formatted: boolean | undefined,
+    _anchor: boolean,
+    optionsConstraints: RouteConstraints,
+  ): void {
+    const recurse = () =>
+      this.decomposedMatch(
+        path,
+        controller,
+        options,
+        optionPath,
+        to,
+        via,
+        _formatted,
+        _anchor,
+        optionsConstraints,
+      );
+    const on = options.on;
+    if (on) {
+      delete options.on;
+      const dispatch = (this as unknown as Record<string, unknown>)[on];
+      if (typeof dispatch === "function")
+        (dispatch as (cb: MapperCallback) => void).call(this, recurse);
+      return;
+    }
+    if (this._scope.scopeLevel === "resources") return this.withScopeLevel("nested", recurse);
+    if (this._scope.scopeLevel === "resource") return this.member(recurse);
+    const merged: RouteOptions & { via?: string | string[] } = { ...options, via };
+    const mergedConstraints = { ...(optionsConstraints ?? {}), ...(options.constraints ?? {}) };
+    if (Object.keys(mergedConstraints).length > 0) merged.constraints = mergedConstraints;
+    if (to) merged.to = to;
+    if (controller && !merged.to) merged.controller = controller;
+    this.match(optionPath ?? path, merged);
+  }
+
+  /** @internal */
+  matchRootRoute(options: RouteOptions & { via?: string | string[] } = {}): void {
+    this.match("/", { as: "root", via: "GET", ...options });
+  }
+
+  // --- direct / resolve ---
+
+  direct(
+    name: string,
+    options: Record<string, unknown> | ((...a: unknown[]) => unknown) = {},
+    block?: (...args: unknown[]) => unknown,
+  ): void {
+    if (!this._scope.isRoot()) {
+      throw new Error("The direct method can't be used inside a routes scope block");
+    }
+    if (typeof options === "function") {
+      block = options;
+      options = {};
+    }
+    this._directHelpers.set(name, { options, block });
+  }
+
+  resolve(...args: unknown[]): void {
+    if (!this._scope.isRoot()) {
+      throw new Error("The resolve method can't be used inside a routes scope block");
+    }
+    let block: ((...args: unknown[]) => unknown) | undefined;
+    if (typeof args[args.length - 1] === "function") {
+      block = args.pop() as (...a: unknown[]) => unknown;
+    }
+    let options: Record<string, unknown> = {};
+    const tail = args[args.length - 1];
+    if (tail && typeof tail === "object" && !Array.isArray(tail)) {
+      options = args.pop() as Record<string, unknown>;
+    }
+    for (const klass of (args as unknown[]).flat()) {
+      this._polymorphicMappings.set(String(klass), { options, block });
+    }
+  }
+
+  /** @internal */
+  _directHelpers: Map<
+    string,
+    { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
+  > = new Map();
+  /** @internal */
+  _polymorphicMappings: Map<
+    string,
+    { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
+  > = new Map();
+
   // --- internals ---
 
   private addRoute(verb: string, path: string, options: RouteOptions): void {
     const fullPath = this.currentPrefix() + "/" + path.replace(/^\/+/, "");
-    const endpoint = options.to ?? `${options.controller ?? ""}#${options.action ?? ""}`;
+    // Apply _scope controller/action/to defaults set via controller(...)/defaults(...)/scope(...).
+    // Mirrors mapper.rb:1972-1980: scope[:to] and scope[:controller]+scope[:action] feed options[:to].
+    const scopeTo = this._scope.get("to") as string | undefined;
+    const scopeController = this._scope.get("controller") as string | undefined;
+    const scopeAction = this._scope.get("action") as string | undefined;
+    const effectiveTo =
+      options.to ??
+      scopeTo ??
+      (scopeController && scopeAction ? `${scopeController}#${scopeAction}` : undefined);
+    const effectiveController = options.controller ?? scopeController;
+    const endpoint =
+      effectiveTo ?? `${effectiveController ?? ""}#${options.action ?? scopeAction ?? ""}`;
     // Prepend controller module from scope stack (namespace support)
-    const scopeController = this.currentControllerPrefix();
+    const scopeModulePrefix = this.currentControllerPrefix();
 
     // Check if endpoint is a redirect
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
@@ -448,18 +754,26 @@ export class Mapper {
 
     const [parsedController, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
     let controller = parsedController;
-    if (scopeController && controller && !controller.includes("/")) {
-      controller = scopeController + "/" + controller;
+    if (scopeModulePrefix && controller && !controller.includes("/")) {
+      controller = scopeModulePrefix + "/" + controller;
     }
     const name = options.as ?? options.name;
     const namePrefix = this.currentNamePrefix();
     const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
+
+    // Merge scope defaults (set via the `defaults(...)` DSL) under per-call defaults.
+    const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
+    const mergedDefaults =
+      scopeDefaults || options.defaults
+        ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
+        : undefined;
 
     this.routes.push(
       new Route(verb, fullPath, controller, action, {
         ...options,
         name: fullName,
         redirect: redirectTarget,
+        defaults: mergedDefaults,
       }),
     );
   }
@@ -901,6 +1215,9 @@ export class Mapper {
 
 const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"];
 
+/** Rails `VALID_ON_OPTIONS = [:new, :collection, :member]` (mapper.rb:1160). */
+const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
+
 interface ScopeFrame {
   path: string;
   namePrefix?: string;
@@ -913,6 +1230,13 @@ interface ScopeFrame {
 interface ScopeOptions {
   as?: string;
   module?: string;
+}
+
+type MountableApp = ((...args: unknown[]) => unknown) | { call: (...args: unknown[]) => unknown };
+
+interface MountOptions extends RouteOptions {
+  at?: string;
+  via?: string | string[];
 }
 
 function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<ResourceAction> {
