@@ -115,7 +115,7 @@ export const TemplateHandlers = {
    * All registered extensions, lazily memoized. Rails memoizes via
    * `@@template_extensions ||= @@template_handlers.keys`.
    */
-  get extensions(): string[] {
+  extensions(): string[] {
     return (cachedExtensions ??= [...handlers.keys()]);
   },
 
@@ -149,7 +149,7 @@ export const TemplateHandlerRegistry = {
     return TemplateHandlers.handlerForExtension(ext);
   },
   get extensions(): string[] {
-    return TemplateHandlers.extensions;
+    return TemplateHandlers.extensions();
   },
   has(ext: string): boolean {
     return TemplateHandlers.registeredTemplateHandler(ext) !== undefined;

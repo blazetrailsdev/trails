@@ -74,12 +74,12 @@ describe("Template::Handlers", () => {
 
   it("extensions memoizes and invalidates on register/unregister", () => {
     TemplateHandlers.registerTemplateHandler("tse", makeHandler(["tse"]));
-    const first = TemplateHandlers.extensions;
-    expect(TemplateHandlers.extensions).toBe(first);
+    const first = TemplateHandlers.extensions();
+    expect(TemplateHandlers.extensions()).toBe(first);
 
     TemplateHandlers.registerTemplateHandler("raw", makeHandler(["raw"]));
-    expect(TemplateHandlers.extensions).not.toBe(first);
-    expect(TemplateHandlers.extensions).toEqual(["tse", "raw"]);
+    expect(TemplateHandlers.extensions()).not.toBe(first);
+    expect(TemplateHandlers.extensions()).toEqual(["tse", "raw"]);
   });
 });
 

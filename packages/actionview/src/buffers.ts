@@ -127,3 +127,85 @@ export class RawOutputBuffer {
     return this;
   }
 }
+
+/**
+ * StreamingBuffer — buffer that streams writes through a callback instead
+ * of accumulating into a string. Mirrors ActionView::StreamingBuffer; used
+ * by `render stream: true` to push chunks to the response as they're
+ * produced.
+ */
+export class StreamingBuffer {
+  private _block: (value: string) => void;
+
+  constructor(block: (value: string) => void) {
+    this._block = block;
+  }
+
+  /** The current chunk sink. Mirrors Rails `attr_reader :block`. */
+  get block(): (value: string) => void {
+    return this._block;
+  }
+
+  /** Append a value, escaping if not html-safe. */
+  concat(value: unknown): this {
+    if (value === null || value === undefined) return this;
+    const str = value instanceof SafeBuffer ? value.toString() : String(value);
+    this._block(isHtmlSafe(value) ? str : htmlEscape(str).toString());
+    return this;
+  }
+
+  /** Append without escaping. Mirrors Rails `safe_concat` / `safe_append=`. */
+  safeConcat(value: unknown): this {
+    this._block(value instanceof SafeBuffer ? value.toString() : String(value));
+    return this;
+  }
+
+  /**
+   * Swap the chunk sink for the duration of `fn`, returning everything it
+   * appended as an HTML-safe string. Mirrors Rails `capture`.
+   */
+  capture(fn: () => void): SafeBuffer {
+    let buffer = "";
+    const previous = this._block;
+    this._block = (value: string) => {
+      buffer += value;
+    };
+    try {
+      fn();
+      return htmlSafe(buffer);
+    } finally {
+      this._block = previous;
+    }
+  }
+
+  isHtmlSafe(): boolean {
+    return true;
+  }
+
+  htmlSafe(): this {
+    return this;
+  }
+
+  raw(): RawStreamingBuffer {
+    return new RawStreamingBuffer(this);
+  }
+}
+
+/**
+ * RawStreamingBuffer — bypasses escaping when streaming through a
+ * StreamingBuffer. Used by the template compiler for `<%== %>` in
+ * streaming responses.
+ */
+export class RawStreamingBuffer {
+  constructor(private readonly buffer: StreamingBuffer) {}
+
+  concat(value: unknown): this {
+    if (value === null || value === undefined) return this;
+    this.buffer.block(value instanceof SafeBuffer ? value.toString() : String(value));
+    return this;
+  }
+
+  raw(): this {
+    return this;
+  }
+}
