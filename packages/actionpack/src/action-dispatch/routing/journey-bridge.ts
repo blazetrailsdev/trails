@@ -26,6 +26,19 @@ const JOURNEY_TO_LOCAL = new WeakMap<JourneyRoute, LocalRoute>();
 export interface JourneyMatch {
   route: LocalRoute;
   params: Record<string, string>;
+  /**
+   * For unanchored routes (e.g. `mount`), the matched prefix that should be
+   * appended to `SCRIPT_NAME` when forwarding to a mounted Rack app. Mirrors
+   * `match.to_s` in Rails' `action_dispatch/journey/router.rb`. Undefined for
+   * anchored routes.
+   */
+  matchedPrefix?: string;
+  /**
+   * For unanchored routes, the un-matched remainder of `PATH_INFO` (always
+   * starting with `/`). Mirrors `match.post_match` in Rails' Journey router.
+   * Undefined for anchored routes.
+   */
+  postMatch?: string;
 }
 
 export interface BuildJourneyRouterOptions {
@@ -123,6 +136,14 @@ export function journeyRecognize(
       }
     }
     result = { route: local, params };
+    // For unanchored routes (mounts), expose the matched prefix and
+    // post-match so callers can rewrite SCRIPT_NAME / PATH_INFO the same
+    // way Rails' Journey router does (action_dispatch/journey/router.rb).
+    if (match && !journeyRoute.path.anchored) {
+      const post = match.postMatch();
+      result.matchedPrefix = match.toString().replace(/\/$/, "");
+      result.postMatch = post.startsWith("/") ? post : "/" + post;
+    }
     return true; // stop iterating after the first hit
   });
   return result;

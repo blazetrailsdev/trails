@@ -1076,6 +1076,43 @@ export class RouteSet {
       return [status, lowerHeaders, bodyFromString((bodyArr as string[]).join(""))];
     }
 
+    // Mounted Rack app: forward the request after stripping the mount prefix
+    // from PATH_INFO and appending it to SCRIPT_NAME. Mirrors Rails' Journey
+    // anchor: false dispatch into the engine's app.
+    const mountedApp = route.app;
+    if (mountedApp) {
+      // Mirrors Rails' `action_dispatch/journey/router.rb#serve`:
+      // - SCRIPT_NAME/PATH_INFO are rewritten ONLY for unanchored routes
+      //   (`unless route.path.anchored`). Anchored mounts forward env
+      //   unchanged. matchedPrefix / postMatch on `matched` are populated
+      //   by `journeyRecognize` from `match.to_s` / `match.post_match`,
+      //   so dynamic mount points (`/:tenant` → `/acme`) work without
+      //   relying on literal `route.path` slicing.
+      // - `path_parameters` is set on the forwarded request unconditionally
+      //   (Rails: `req.path_parameters = tmp_params` before `route.app.serve`).
+      const forwarded: RackEnv = { ...env };
+      if (matched.matchedPrefix !== undefined) {
+        const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
+        // Rails: `(script_name.to_s + match.to_s).chomp("/")` — chomp the
+        // combined value so a trailing slash on either side doesn't leak.
+        forwarded["SCRIPT_NAME"] = (scriptName + matched.matchedPrefix).replace(/\/$/, "");
+        forwarded["PATH_INFO"] = matched.postMatch ?? "/";
+      }
+      // Rails (journey/router.rb:45-50): `tmp_params = set_params.merge route.defaults`
+      // then overlay matched parameters. Preserves outer-mount captures
+      // when engines are nested.
+      const setParams =
+        (env["action_dispatch.request.path_parameters"] as Record<string, unknown>) ?? {};
+      forwarded["action_dispatch.request.path_parameters"] = {
+        ...setParams,
+        ...route.defaults,
+        ...params,
+      };
+      return typeof mountedApp === "function"
+        ? await mountedApp(forwarded)
+        : await mountedApp.call(forwarded);
+    }
+
     // Merge route params into the env (like Rails does with request.params)
     env["action_dispatch.request.path_parameters"] = {
       controller: route.controller,

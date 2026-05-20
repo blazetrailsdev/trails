@@ -19,6 +19,7 @@ import {
   type ResourceAction,
   type RedirectFunction,
   type RedirectOptions,
+  type MountableApp,
 } from "./route.js";
 import { Scope, type ScopeLevel } from "./scope.js";
 import { underscore } from "@blazetrails/activesupport";
@@ -621,19 +622,22 @@ export class Mapper {
 
   mount(app: MountableApp, options: MountOptions = {}): void {
     const path = options.at;
-    if (typeof (app as { call?: unknown })?.call !== "function") {
+    if (typeof app !== "function" && typeof (app as { call?: unknown })?.call !== "function") {
       throw new Error("A rack application must be specified");
     }
     if (!path) {
-      throw new Error("Must be called with mount point: mount(SomeRackApp, { at: '/path' })");
+      throw new Error('Must be called with mount point\n\n  mount SomeRackApp, at: "some_route"');
     }
     const railsApp = this.isRailsApp(app);
     const asName = options.as ?? this.appName(app, railsApp);
+    // Rails: `{ to: app, anchor: false, format: false }.merge(options)` — options
+    // override the anchor/format defaults but not the mounted app.
     const matchOpts: RouteOptions & { via?: string | string[]; at?: string } = {
-      ...options,
-      via: options.via ?? "ALL",
       anchor: false,
       format: false,
+      ...options,
+      via: options.via ?? "ALL",
+      app,
     };
     if (asName) matchOpts.as = asName;
     delete matchOpts.at;
@@ -1414,8 +1418,6 @@ interface ScopeOptions {
   as?: string;
   module?: string;
 }
-
-type MountableApp = ((...args: unknown[]) => unknown) | { call: (...args: unknown[]) => unknown };
 
 interface MountOptions extends RouteOptions {
   at?: string;
