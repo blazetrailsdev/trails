@@ -348,7 +348,7 @@ export { Map as TypeCasterMap } from "./type-caster/map.js";
 export { Trailtie } from "./trailtie.js";
 // deprecator.ts is Node-only (MigrationProxy uses node:module) — not in the main bundle.
 // Import directly: import { deprecator, gemVersion, version, MigrationProxy } from "@blazetrails/activerecord/deprecator"
-export { JobRuntime } from "./railties/job-runtime.js";
+export { JobRuntime } from "./trailties/job-runtime.js";
 export { Resolver as DatabaseSelectorResolver } from "./middleware/database-selector/resolver.js";
 export { Session as DatabaseSelectorSession } from "./middleware/database-selector/resolver/session.js";
 export { DatabaseSelector } from "./middleware/database-selector.js";

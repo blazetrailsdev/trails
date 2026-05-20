@@ -137,30 +137,24 @@ describe("rubyFileToTs", () => {
     );
   });
 
-  it("maps action_controller/railties/... to trailties/... via DIR_PREFIX_OVERRIDES", () => {
+  it("aliases `railtie` basename → `trailtie` across all framework source roots", () => {
+    // The path-segment alias table applies globally — no per-package
+    // override needed. Any framework's `railtie.rb` maps to `trailtie.ts`.
+    expect(rubyFileToTs("railtie.rb", "activerecord")).toBe("trailtie.ts");
+    expect(rubyFileToTs("railtie.rb", "actioncontroller")).toBe("trailtie.ts");
+    expect(rubyFileToTs("railtie.rb", "trailties")).toBe("trailtie.ts");
+  });
+
+  it("aliases `railties` directory segment → `trailties` across all framework source roots", () => {
     expect(rubyFileToTs("railties/helpers.rb", "actioncontroller")).toBe("trailties/helpers.ts");
     expect(rubyFileToTs("railties/asset_paths.rb", "actioncontroller")).toBe(
       "trailties/asset-paths.ts",
     );
-  });
-
-  it("maps abstract_controller/railties/... to trailties/... via DIR_PREFIX_OVERRIDES", () => {
     expect(rubyFileToTs("railties/routes_helpers.rb", "abstractcontroller")).toBe(
       "trailties/routes-helpers.ts",
     );
-  });
-
-  it("FILE_OVERRIDES takes precedence over DIR_PREFIX_OVERRIDES", () => {
-    // activerecord:railtie.rb → trailtie.ts is a FILE_OVERRIDES entry; it must
-    // win even if a hypothetical DIR_PREFIX_OVERRIDES entry would also match.
-    expect(rubyFileToTs("railtie.rb", "activerecord")).toBe("trailtie.ts");
-  });
-
-  it("maps action_controller/railtie.rb to trailtie.ts via FILE_OVERRIDES", () => {
-    expect(rubyFileToTs("railtie.rb", "actioncontroller")).toBe("trailtie.ts");
-  });
-
-  it("does not rewrite railties paths for other packages", () => {
-    expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("railties/some-file.ts");
+    // The alias is global, not per-package — any framework's railties/
+    // subdir maps to trailties/ uniformly.
+    expect(rubyFileToTs("railties/some_file.rb", "actiondispatch")).toBe("trailties/some-file.ts");
   });
 });

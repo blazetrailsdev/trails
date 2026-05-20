@@ -45,32 +45,16 @@ export function snakeToCamel(name: string): string {
 }
 
 /**
- * Package-scoped file overrides: `"pkg:ruby/file.rb"` → TS file path.
+ * Path-segment alias table applied across all framework source roots,
+ * before kebab-casing each directory segment and the basename.
  *
- * Used for cases where the TS file intentionally uses a different name
- * than the Rails convention would produce (e.g. activerecord's railtie →
- * trailtie to signal that trails railties are not Rails::Railtie subclasses).
- * Keyed by `pkg:rubyFile` to avoid collisions across packages that each
- * have their own `railtie.rb`.
+ * Trails railties are not `Rails::Railtie` subclasses — the alias signals
+ * that distinction (and avoids needing per-package overrides for every
+ * framework that ships a `railtie.rb` or a `railties/` directory).
  */
-const FILE_OVERRIDES: Record<string, string> = {
-  // Trails railties are not Rails::Railtie subclasses (different lifecycle,
-  // different surface). The .ts file is named trailtie.ts to signal that.
-  // Same convention is also applied directory-wide for the `railties/`
-  // subdir below (see DIR_PREFIX_OVERRIDES).
-  "activerecord:railtie.rb": "trailtie.ts",
-  "actioncontroller:railtie.rb": "trailtie.ts",
-};
-
-/**
- * Directory-level path prefix overrides. Applied after FILE_OVERRIDES (file-level wins).
- * Keyed by `pkg:rubyDirPrefix` — matched if the ruby file path starts with the prefix.
- */
-const DIR_PREFIX_OVERRIDES: Record<string, string> = {
-  // Rails: action_controller/railties/... → our trailties convention.
-  // Same convention for abstract_controller/railties/...
-  "actioncontroller:railties/": "trailties/",
-  "abstractcontroller:railties/": "trailties/",
+const PATH_SEGMENT_ALIASES: Record<string, string> = {
+  railtie: "trailtie",
+  railties: "trailties",
 };
 
 /**
@@ -81,25 +65,16 @@ const DIR_PREFIX_OVERRIDES: Record<string, string> = {
  * POSIX paths, and the default `path.join` would return backslashes
  * on Windows.
  */
-export function rubyFileToTs(rubyFile: string, pkg?: string): string {
-  if (pkg) {
-    const override = FILE_OVERRIDES[`${pkg}:${rubyFile}`];
-    if (override) return override;
-    for (const [key, replacement] of Object.entries(DIR_PREFIX_OVERRIDES)) {
-      const [keyPkg, prefix] = key.split(":");
-      if (keyPkg === pkg && rubyFile.startsWith(prefix)) {
-        rubyFile = replacement + rubyFile.slice(prefix.length);
-        break;
-      }
-    }
-  }
+export function rubyFileToTs(rubyFile: string, _pkg?: string): string {
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
-  const kebab = base.replace(/_/g, "-");
+  const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;
+  const kebab = aliasedBase.replace(/_/g, "-");
   const tsFile = kebab.replace(/\berb\b/g, "tse") + ".ts";
   if (dir === ".") return tsFile;
   const tsDir = dir
     .split("/")
+    .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
     .map((d) => d.replace(/_/g, "-").replace(/\berb\b/g, "tse"))
     .join("/");
   return path.posix.join(tsDir, tsFile);
