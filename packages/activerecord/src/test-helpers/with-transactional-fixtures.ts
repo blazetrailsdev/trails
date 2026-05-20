@@ -7,6 +7,10 @@ import {
   resetTestAdapterState,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
+import {
+  _restoreAppliedSchemaSignaturesForAdapter,
+  _snapshotAppliedSchemaSignaturesForAdapter,
+} from "./define-schema.js";
 
 interface TxnHost {
   transactionManager: {
@@ -39,6 +43,35 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
     );
   }
   return host.transactionManager;
+}
+
+/**
+ * Drop in-memory schema-reflection (columns/indexes/primary-key/data-source
+ * exists) so the next test re-reads from the live DB. DDL executed inside an
+ * `it()` body — `addColumn`, `createTable`, `changeTable`, etc. — populates
+ * the adapter's `SchemaCache`. The outer transaction's rollback reverts the
+ * DDL on the database side, but the cache entries it produced survive into
+ * the next test and report columns/tables that no longer exist (or vice
+ * versa for cached "missing" markers).
+ *
+ * Mirrors how Rails handles teardown via `ConnectionPool#unpin_connection!`:
+ * the pool drops its bound state after rollback so the next bind starts
+ * fresh. Calling `schemaCache.clear()` from the test-only afterEach keeps
+ * the production rollback path untouched.
+ *
+ * @internal
+ */
+function clearSchemaCache(adapter: TransactionalFixturesAdapter): void {
+  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
+  const host = (wrapped ?? adapter) as DatabaseAdapter;
+  host.schemaCache?.clear();
+}
+
+function adapterAndInner(
+  adapter: TransactionalFixturesAdapter,
+): readonly [DatabaseAdapter, DatabaseAdapter | null] {
+  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter ?? null;
+  return [adapter as DatabaseAdapter, wrapped];
 }
 
 /**
@@ -104,6 +137,13 @@ function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"
  */
 export function withTransactionalFixtures(getAdapter: () => TransactionalFixturesAdapter): void {
   let active = true;
+  // Snapshots of defineSchema's per-adapter signature cache taken at the
+  // start of each test. On rollback we restore — preserving signatures for
+  // tables created outside the test transaction (e.g. in `beforeAll`) while
+  // discarding signatures for any `defineSchema(...)` that ran inside the
+  // `it()` body (whose DDL was rolled back at the DB).
+  let outerSig: Map<string, string> | null = null;
+  let innerSig: Map<string, string> | null = null;
 
   beforeAll(() => {
     active = getUseTransactionalTests(getAdapter());
@@ -121,6 +161,9 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
 
   beforeEach(async () => {
     if (!active) return;
+    const [outer, inner] = adapterAndInner(getAdapter());
+    outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
+    innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
     // Mirrors Rails ConnectionPool#pin_connection!:
     //   @pinned_connection.begin_transaction joinable: false, _lazy: false
     await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
@@ -130,5 +173,11 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
     if (!active) return;
     const t = tm(getAdapter());
     while (t.openTransactions > 0) await t.rollbackTransaction();
+    clearSchemaCache(getAdapter());
+    const [outer, inner] = adapterAndInner(getAdapter());
+    if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
+    if (inner && innerSig) _restoreAppliedSchemaSignaturesForAdapter(inner, innerSig);
+    outerSig = null;
+    innerSig = null;
   });
 }

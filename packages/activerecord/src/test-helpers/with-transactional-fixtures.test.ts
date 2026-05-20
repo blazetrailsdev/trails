@@ -104,6 +104,122 @@ describe("withTransactionalFixtures (useTransactionalTests=false opt-out)", () =
   });
 });
 
+// DDL executed inside an it() body populates the adapter's SchemaCache.
+// The outer-transaction rollback reverts the DDL at the DB level, but the
+// cache entries it produced would otherwise survive into the next test —
+// reporting columns that no longer exist. The helper's afterEach calls
+// schemaCache.clear() after rollback to keep that in-memory reflection in
+// sync with the rolled-back DB.
+describe("withTransactionalFixtures (schema-cache invalidation)", () => {
+  let adapter: SQLite3Adapter;
+
+  beforeAll(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+    await defineSchema(adapter, { cache_inval_users: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  // Direct-adapter reads (`adapter.columns(...)`) bypass SchemaCache —
+  // SQLite3Adapter#columns runs PRAGMA against the live DB. To actually
+  // exercise `schemaCache.clear()`, populate the cache directly via
+  // `setColumns` (simulating how Model.loadSchema warms it in real
+  // adapter use) and then assert `isColumnsHashCached` flips false
+  // after rollback.
+  it("warming the schema cache inside a test leaves it populated", async () => {
+    await adapter.addColumn("cache_inval_users", "extra", "string");
+    const cols = await adapter.columns("cache_inval_users");
+    adapter.schemaCache.setColumns("cache_inval_users", cols);
+    expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "cache_inval_users")).toBe(true);
+  });
+
+  it("next test sees an empty schema cache because afterEach cleared it", async () => {
+    // Without `schemaCache.clear()` in the helper, this would be true —
+    // the cached hash from the previous test would still report the
+    // rolled-back `extra` column.
+    expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "cache_inval_users")).toBe(false);
+  });
+});
+
+// Parallel to schemaCache: defineSchema maintains its own per-adapter
+// signature WeakMap so repeated `defineSchema(adapter, sameSpec)` is a
+// no-op. If a test runs `defineSchema(...)` inside an `it()` body, the
+// rolled-back table at the DB would otherwise be paired with a stale
+// signature entry — the next test's `defineSchema` would think the table
+// still exists and skip recreating it.
+describe("withTransactionalFixtures (defineSchema signature cache invalidation)", () => {
+  let adapter: SQLite3Adapter;
+
+  beforeAll(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("defineSchema inside a test populates the signature cache", async () => {
+    await defineSchema(adapter, { defsig_table: { name: "string" } });
+    const cols = await adapter.columns("defsig_table");
+    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
+  });
+
+  it("next test re-runs defineSchema and the rolled-back table is recreated", async () => {
+    // If the signature cache hadn't been cleared, `defineSchema` would
+    // short-circuit on the cached signature without recreating the
+    // table. On SQLite `adapter.columns()` against a missing table
+    // returns `[]` (PRAGMA table_info on an unknown name yields no
+    // rows), so the bug would surface as an empty column list — not a
+    // throw.
+    await defineSchema(adapter, { defsig_table: { name: "string" } });
+    const cols = await adapter.columns("defsig_table");
+    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
+  });
+});
+
+// The signature-cache invalidation must NOT discard entries created
+// outside the rolled-back test transaction (e.g. tables registered in
+// `beforeAll`). For raw adapters, defineSchema treats a missing
+// signature as "table doesn't exist" — wiping the whole map would cause
+// a follow-up `defineSchema(adapter, sameSpec)` to CREATE TABLE over
+// the still-existing beforeAll table and fail.
+describe("withTransactionalFixtures (preserves beforeAll signatures across rollback)", () => {
+  let adapter: SQLite3Adapter;
+
+  beforeAll(async () => {
+    adapter = new SQLite3Adapter(":memory:");
+    // Outer-transaction table — must survive rollback in afterEach.
+    await defineSchema(adapter, { outer_table: { name: "string" } });
+  });
+
+  afterAll(async () => {
+    await adapter.close();
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("test adds an inner table via defineSchema", async () => {
+    await defineSchema(adapter, {
+      outer_table: { name: "string" },
+      inner_table: { label: "string" },
+    });
+  });
+
+  it("next test re-calls defineSchema with the same beforeAll spec — must be a no-op", async () => {
+    // If the signature cache were fully wiped, this call would treat
+    // outer_table as new and try to CREATE TABLE over the live table.
+    await defineSchema(adapter, { outer_table: { name: "string" } });
+    const cols = await adapter.columns("outer_table");
+    expect(cols.map((c) => c.name).sort()).toEqual(["id", "name"]);
+  });
+});
+
 // Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
 // raw DatabaseAdapter directly instead of going through createTestAdapter().
 // The helper must accept that shape — `transactionManager` lives on the
