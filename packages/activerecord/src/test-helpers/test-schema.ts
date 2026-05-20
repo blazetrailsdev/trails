@@ -733,6 +733,234 @@ export const TEST_SCHEMA: Schema = {
     color: "string",
   },
 
+  // PR 0.5e group: H-M range (no Rails H-table sits in this slice —
+  // `hardbacks` is sandwiched in the B-block and `having` in the G-block,
+  // both already ported). Covers I-tables (inept_wizards..items), J-tables
+  // (jobs..jobs_pool), K-tables (keyboards..kitchens), L-tables
+  // (legacy_things..lock_without_defaults_cust, plus the `students` row
+  // Rails sandwiches between lessons_students and lint_models), and
+  // M-tables (magazines..movies).
+
+  inept_wizards: {
+    name: { type: "string", null: false },
+    city: { type: "string", null: false },
+    type: "string",
+  },
+
+  // Rails loops i in 1..8 declaring `c_int_#{i}` with limit:i.
+  integer_limits: {
+    c_int_without_limit: "integer",
+    c_int_1: { type: "integer", limit: 1 },
+    c_int_2: { type: "integer", limit: 2 },
+    c_int_3: { type: "integer", limit: 3 },
+    c_int_4: { type: "integer", limit: 4 },
+    c_int_5: { type: "integer", limit: 5 },
+    c_int_6: { type: "integer", limit: 6 },
+    c_int_7: { type: "integer", limit: 7 },
+    c_int_8: { type: "integer", limit: 8 },
+  },
+
+  invoices: {
+    balance: "integer",
+    updated_at: "datetime",
+  },
+
+  iris: {
+    eye_id: "integer",
+    color: "string",
+  },
+
+  items: {
+    name: "string",
+  },
+
+  jobs: {
+    ideal_reference_id: "integer",
+  },
+
+  jobs_pool: {
+    columns: {
+      job_id: { type: "integer", null: false },
+      user_id: { type: "integer", null: false },
+    },
+    primaryKey: false,
+  },
+
+  // Rails declares `id: false` with `t.primary_key :key_number` — the
+  // table has a real PK, just not named `id`.
+  keyboards: {
+    columns: {
+      key_number: "integer",
+      name: "string",
+    },
+    primaryKey: ["key_number"],
+  },
+
+  kitchens: {},
+
+  legacy_things: {
+    tps_report_number: "integer",
+    version: { type: "integer", null: false, default: 0 },
+  },
+
+  lessons: {
+    name: "string",
+  },
+
+  lessons_students: {
+    columns: {
+      lesson_id: "integer",
+      student_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  // Rails sandwiches `students` inside the L-block, immediately after
+  // `lessons_students`, so it lands here rather than with the S-tables.
+  students: {
+    name: "string",
+    active: "boolean",
+    college_id: "integer",
+  },
+
+  lint_models: {},
+
+  line_items: {
+    invoice_id: "integer",
+    amount: "integer",
+  },
+
+  line_item_discount_applications: {
+    line_item_id: "integer",
+    discount_id: "integer",
+  },
+
+  lions: {
+    gender: "integer",
+    is_vegetarian: { type: "boolean", default: false },
+  },
+
+  // `t.timestamps null: true` expands to nullable created_at/updated_at.
+  lock_without_defaults: {
+    title: "string",
+    lock_version: "integer",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  lock_without_defaults_cust: {
+    title: "string",
+    custom_lock_version: "integer",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  magazines: {},
+
+  mateys: {
+    columns: {
+      pirate_id: "integer",
+      target_id: "integer",
+      weight: "integer",
+    },
+    primaryKey: false,
+  },
+
+  members: {
+    name: "string",
+    member_type_id: "integer",
+    admittable_id: "integer",
+    admittable_type: "string",
+  },
+
+  member_details: {
+    member_id: "integer",
+    organization_id: "integer",
+    extra_data: "string",
+  },
+
+  member_friends: {
+    columns: {
+      member_id: "integer",
+      friend_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  // `t.integer :club_id, :member_id` declares both columns as integer.
+  memberships: {
+    joined_on: "datetime",
+    club_id: "integer",
+    member_id: "integer",
+    favorite: { type: "boolean", default: false },
+    type: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  member_types: {
+    name: "string",
+  },
+
+  mentors: {
+    name: "string",
+  },
+
+  messages: {
+    subject: "string",
+    updated_at: "datetime",
+  },
+
+  // Rails declares `id: false`; `minivan_id` is the string PK at the AR
+  // layer (same pattern as `dashboards`).
+  minivans: {
+    columns: {
+      minivan_id: "string",
+      name: "string",
+      speedometer_id: "string",
+      color: "string",
+    },
+    primaryKey: false,
+  },
+
+  minimalistics: {
+    expires_at: "big_integer",
+  },
+
+  // Rails declares `id: false` with `t.primary_key :monkeyID` — real PK
+  // under a non-`id` (and intentionally camelCased) name.
+  mixed_case_monkeys: {
+    columns: {
+      monkeyID: "integer",
+      fleaCount: "integer",
+    },
+    primaryKey: ["monkeyID"],
+  },
+
+  mixins: {
+    parent_id: "integer",
+    pos: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+    lft: "integer",
+    rgt: "integer",
+    root_id: "integer",
+    type: "string",
+  },
+
+  mice: {
+    name: "string",
+  },
+
+  // Rails declares `id: false` with `t.primary_key :movieid` — real PK
+  // under a non-`id` name.
+  movies: {
+    columns: {
+      movieid: "integer",
+      name: "string",
+    },
+    primaryKey: ["movieid"],
+  },
   notifications: {
     message: "string",
   },
