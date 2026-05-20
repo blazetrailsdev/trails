@@ -49,6 +49,7 @@ import {
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
+import { DEFAULT_PROTECTED_INSTANCE_VARIABLES } from "../abstract-controller/rendering.js";
 
 // Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -79,6 +80,84 @@ export type RenderOptions = {
 
 export type RescueHandler = (error: Error) => void | Promise<void>;
 
+/**
+ * The full list of modules included by `ActionController::Base`. Mirrors
+ * Rails' `MODULES` constant in `action_controller/base.rb`. Trails wires
+ * these mixins onto `Base` directly (not via Ruby `include`), so this
+ * array is informational and used by {@link Base.withoutModules}.
+ */
+export const MODULES: readonly string[] = [
+  "AbstractController::Rendering",
+  "AbstractController::Translation",
+  "AbstractController::AssetPaths",
+  "Helpers",
+  "UrlFor",
+  "Redirecting",
+  "ActionView::Layouts",
+  "Rendering",
+  "Renderers::All",
+  "ConditionalGet",
+  "EtagWithTemplateDigest",
+  "EtagWithFlash",
+  "Caching",
+  "MimeResponds",
+  "ImplicitRender",
+  "StrongParameters",
+  "ParameterEncoding",
+  "Cookies",
+  "Flash",
+  "FormBuilder",
+  "RequestForgeryProtection",
+  "ContentSecurityPolicy",
+  "PermissionsPolicy",
+  "RateLimiting",
+  "AllowBrowser",
+  "Streaming",
+  "DataStreaming",
+  "HttpAuthentication::Basic::ControllerMethods",
+  "HttpAuthentication::Digest::ControllerMethods",
+  "HttpAuthentication::Token::ControllerMethods",
+  "DefaultHeaders",
+  "Logging",
+  "AbstractController::Callbacks",
+  "Rescue",
+  "Instrumentation",
+  "ParamsWrapper",
+];
+
+/**
+ * Instance variables that should not be propagated to the view. Mirrors
+ * Rails' `PROTECTED_IVARS` in `action_controller/base.rb`: extends the
+ * abstract-layer `DEFAULT_PROTECTED_INSTANCE_VARIABLES` with the controller-
+ * level slots (`_params`, `_response`, `_request`, …).
+ *
+ * Names follow the abstract-layer transliteration convention (Rails
+ * `@_action_name` → trails `_actionName`). This is currently a literal
+ * Rails-parity constant — `viewAssigns` already filters all leading-`_`
+ * fields plus `DEFAULT_PROTECTED_INSTANCE_VARIABLES`, so wiring through
+ * `_protectedIvars()` is unnecessary until trails grows underscored
+ * backing fields for `params`/`request`/`response` (Rails' `@_params`
+ * etc.) and the controller pipeline starts consulting it directly.
+ */
+export const PROTECTED_IVARS: readonly string[] = [
+  ...DEFAULT_PROTECTED_INSTANCE_VARIABLES,
+  "_params",
+  "_response",
+  "_request",
+  "_config",
+  "_urlOptions",
+  "_actionHasLayout",
+  "_viewContextClass",
+  "_viewRenderer",
+  "_lookupContext",
+  "_routes",
+  "_viewRuntime",
+  "_dbRuntime",
+  "_helperProxy",
+  "_markedForSameOriginVerification",
+  "_renderedFormat",
+];
+
 export class Base extends Metal {
   /** Flash messages for the current request. */
   flash: FlashHash = new FlashHash();
@@ -103,6 +182,27 @@ export class Base extends Metal {
     errorClass: new (...args: any[]) => Error;
     handler: RescueHandler;
   }> = [];
+
+  /**
+   * Returns all modules included in {@link MODULES} except those passed
+   * as arguments. Mirrors Rails `ActionController::Base.without_modules`.
+   *
+   *     Base.withoutModules("ParamsWrapper", "Streaming")
+   */
+  static withoutModules(...modules: string[]): readonly string[] {
+    const drop = new Set(modules);
+    return MODULES.filter((m) => !drop.has(m));
+  }
+
+  /**
+   * The ivar names hidden from `viewAssigns`. Rails declares this private
+   * on `Base` to extend the abstract-layer default with controller-level
+   * slots; see {@link PROTECTED_IVARS}.
+   * @internal
+   */
+  _protectedIvars(): readonly string[] {
+    return PROTECTED_IVARS;
+  }
 
   // --- Rendering ---
 

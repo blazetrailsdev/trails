@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Base, DoubleRenderError } from "../base.js";
+import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
@@ -652,5 +652,38 @@ describe("PerformActionTest", () => {
     const c = new ActionMissingController();
     await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
     expect(c.body).toBe("Response for arbitrary_action");
+  });
+});
+
+describe("withoutModules", () => {
+  it("returns MODULES minus the named entries", () => {
+    const result = Base.withoutModules("ParamsWrapper", "Streaming");
+    expect(result).not.toContain("ParamsWrapper");
+    expect(result).not.toContain("Streaming");
+    expect(result).toContain("Cookies");
+    expect(result.length).toBe(MODULES.length - 2);
+  });
+
+  it("returns the full list when no names are passed", () => {
+    expect(Base.withoutModules()).toEqual(MODULES);
+  });
+
+  it("ignores unknown names", () => {
+    expect(Base.withoutModules("NotAModule")).toEqual(MODULES);
+  });
+});
+
+describe("PROTECTED_IVARS", () => {
+  it("extends abstract-layer defaults with controller-level slots", () => {
+    expect(PROTECTED_IVARS).toContain("_actionName");
+    expect(PROTECTED_IVARS).toContain("_params");
+    expect(PROTECTED_IVARS).toContain("_request");
+    expect(PROTECTED_IVARS).toContain("_response");
+    expect(PROTECTED_IVARS).toContain("_renderedFormat");
+  });
+
+  it("is returned by Base#_protectedIvars", () => {
+    const c = new Base();
+    expect(c._protectedIvars()).toBe(PROTECTED_IVARS);
   });
 });
