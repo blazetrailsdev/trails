@@ -12,6 +12,9 @@
 
 import { getCrypto } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+
+type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
 /** Cookie expiry — accept either a Date or a Temporal.Instant from AR/AM. */
 export type CookieExpires = Date | Temporal.Instant;
@@ -372,4 +375,255 @@ function formatDeleteCookie(name: string, opts: { path?: string; domain?: string
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ===========================================================================
+// ActionDispatch::Cookies — middleware
+// ===========================================================================
+
+/**
+ * Rack env key under which the constructed {@link CookieJar} is cached for
+ * the duration of the request. Mirrors `ActionDispatch::Cookies::COOKIES_KEY`.
+ *
+ * @internal
+ */
+export const COOKIES_KEY = "action_dispatch.cookies";
+
+/**
+ * `ActionDispatch::Cookies` middleware. Builds a {@link CookieJar} on the
+ * way in, flushes accumulated `Set-Cookie` headers on the way out.
+ */
+export class Cookies {
+  private app: RackApp;
+
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    const cookiesAppOptions = (env[COOKIES_APP_OPTIONS_KEY] as CookieJarOptions | undefined) ?? {};
+    const seed = parseCookieHeader((env.HTTP_COOKIE as string | undefined) ?? "");
+    const jar = CookieJar.build({ cookiesAppOptions }, seed);
+    env[COOKIES_KEY] = jar;
+    const [status, headers, body] = await this.app(env);
+    const outHeaders: Record<string, string> = { ...headers };
+    const setHeaders = jar.getSetCookieHeaders();
+    if (setHeaders.length > 0) {
+      const existing = outHeaders["set-cookie"];
+      outHeaders["set-cookie"] = existing
+        ? [existing, ...setHeaders].join("\n")
+        : setHeaders.join("\n");
+    }
+    return [status, outHeaders, body];
+  }
+}
+
+function parseCookieHeader(header: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const pair of header.split(";")) {
+    const eq = pair.indexOf("=");
+    if (eq < 0) continue;
+    const k = pair.slice(0, eq).trim();
+    const v = pair.slice(eq + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  }
+  return out;
+}
+
+// ===========================================================================
+// ActionDispatch::RequestCookieMethods — Request mixin
+// ===========================================================================
+
+/**
+ * Host shape used by {@link requestCookieMethods}. The `env` is the
+ * underlying Rack env on the request; trails reads/writes Rails
+ * `action_dispatch.*` keys there.
+ *
+ * @internal
+ */
+export interface RequestCookieMethodsHost {
+  env: RackEnv;
+  cookiesAppOptions?: CookieJarOptions;
+  cookies: Record<string, string>;
+}
+
+const COOKIE_JAR_ENV = COOKIES_KEY;
+
+/** Returns the {@link CookieJar} for this request, building it on demand. */
+export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): CookieJar {
+  if (jar !== undefined) {
+    this.env[COOKIE_JAR_ENV] = jar;
+    return jar;
+  }
+  const existing = this.env[COOKIE_JAR_ENV] as CookieJar | undefined;
+  if (existing) return existing;
+  const built = CookieJar.build(this, this.cookies);
+  this.env[COOKIE_JAR_ENV] = built;
+  return built;
+}
+
+/** True iff a cookie jar has already been built for this request. */
+export function isHaveCookieJar(this: RequestCookieMethodsHost): boolean {
+  return this.env[COOKIE_JAR_ENV] !== undefined;
+}
+
+const requestEnvAccessor = <T>(key: string) =>
+  function (this: RequestCookieMethodsHost): T | undefined {
+    return this.env[key] as T | undefined;
+  };
+
+/** Rails: `request.key_generator` — the app key generator. @internal */
+export const keyGenerator = requestEnvAccessor<unknown>("action_dispatch.key_generator");
+/** @internal */
+export const signedCookieSalt = requestEnvAccessor<string>("action_dispatch.signed_cookie_salt");
+/** @internal */
+export const encryptedCookieSalt = requestEnvAccessor<string>(
+  "action_dispatch.encrypted_cookie_salt",
+);
+/** @internal */
+export const encryptedSignedCookieSalt = requestEnvAccessor<string>(
+  "action_dispatch.encrypted_signed_cookie_salt",
+);
+/** @internal */
+export const authenticatedEncryptedCookieSalt = requestEnvAccessor<string>(
+  "action_dispatch.authenticated_encrypted_cookie_salt",
+);
+/** @internal */
+export const useAuthenticatedCookieEncryption = requestEnvAccessor<boolean>(
+  "action_dispatch.use_authenticated_cookie_encryption",
+);
+/** @internal */
+export const encryptedCookieCipher = requestEnvAccessor<string>(
+  "action_dispatch.encrypted_cookie_cipher",
+);
+/** @internal */
+export const signedCookieDigest = requestEnvAccessor<string>(
+  "action_dispatch.signed_cookie_digest",
+);
+/** @internal */
+export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
+/** @internal */
+export const cookiesSerializer = requestEnvAccessor<string>("action_dispatch.cookies_serializer");
+/** @internal */
+export const cookiesSameSiteProtection = requestEnvAccessor<unknown>(
+  "action_dispatch.cookies_same_site_protection",
+);
+/** @internal */
+export const cookiesDigest = requestEnvAccessor<string>("action_dispatch.cookies_digest");
+/** @internal */
+export const cookiesRotations = requestEnvAccessor<unknown>("action_dispatch.cookies_rotations");
+/** @internal */
+export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
+  "action_dispatch.use_cookies_with_metadata",
+);
+
+// ===========================================================================
+// ActionDispatch::Cookies::ChainedCookieJars
+// ===========================================================================
+
+/**
+ * Combined signed-or-encrypted accessor on a jar. Rails picks `encrypted`
+ * when `secret_key_base` is configured, otherwise falls back to `signed`.
+ *
+ * @internal
+ */
+export function signedOrEncrypted(jar: CookieJar): SignedCookieJar | EncryptedCookieJar {
+  try {
+    return jar.encrypted;
+  } catch {
+    return jar.signed;
+  }
+}
+
+/**
+ * Rails: predicate that returns true while the deprecated HMAC-AES-CBC
+ * cookie format is still being read alongside the newer AEAD format.
+ * trails does not implement the legacy CBC path, so the predicate is
+ * permanently false.
+ *
+ * @internal
+ */
+export function isUpgradeLegacyHmacAesCbcCookies(): boolean {
+  return false;
+}
+
+/**
+ * Rails: rewriter predicate complementing
+ * {@link isUpgradeLegacyHmacAesCbcCookies}. Same rationale — false in
+ * trails.
+ *
+ * @internal
+ */
+export function isPrepareUpgradeLegacyHmacAesCbcCookies(): boolean {
+  return false;
+}
+
+// ===========================================================================
+// ActionDispatch::Cookies::SerializedCookieJars
+// ===========================================================================
+
+const MAX_COOKIE_SIZE = 4096;
+
+/**
+ * Selects the cookie value serializer. Mirrors Rails' `:json` / `:hybrid` /
+ * `:marshal` choices; trails ships JSON-only.
+ *
+ * @internal
+ */
+export function serializer(): { dump(v: unknown): string; load(s: string): unknown } {
+  return {
+    dump: (v) => JSON.stringify(v),
+    load: (s) => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+/**
+ * Rails: returns true when a stored cookie was written with the legacy
+ * serializer and must be re-serialized with the configured one. trails
+ * has only ever shipped JSON, so reserialize is never required.
+ *
+ * @internal
+ */
+export function isReserialize(): boolean {
+  return false;
+}
+
+/**
+ * Rails: hook called once the value has been mutated, before the jar is
+ * written back to the response. Trails performs no buffering, so commit
+ * is a no-op pass-through that returns the value unchanged.
+ *
+ * @internal
+ */
+export function commit<T>(value: T): T {
+  return value;
+}
+
+/**
+ * Rails raises `CookieOverflow` when a serialized value exceeds 4096
+ * bytes (the browser-imposed cookie ceiling). Mirror the check.
+ *
+ * @internal
+ */
+export function checkForOverflowBang(serialized: string): void {
+  if (Buffer.byteLength(serialized, "utf8") > MAX_COOKIE_SIZE) {
+    throw new CookieOverflow(
+      `Cookie overflow: serialized value is ${Buffer.byteLength(serialized, "utf8")} bytes; ` +
+        `maximum is ${MAX_COOKIE_SIZE}.`,
+    );
+  }
+}
+
+export class CookieOverflow extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "CookieOverflow";
+  }
 }
