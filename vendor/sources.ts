@@ -146,9 +146,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // derives that from the package name, so use the kebab form.
         name: "did-you-mean",
         libPath: "lib/did_you_mean",
-        // No testPath — did_you_mean's test/ uses a different layout from
-        // Rails (test/did_you_mean/spell_checking/*) and we aren't wiring
-        // test-compare for this package yet.
+        testPath: "test",
       },
     ],
   },
