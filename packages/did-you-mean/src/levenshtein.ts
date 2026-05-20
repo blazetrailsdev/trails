@@ -3,12 +3,14 @@
 // The Ruby implementation is itself based on the Text gem:
 // Copyright (c) 2006-2013 Paul Battley, Michael Neumann, Tim Fletcher.
 
+/** @internal */
 function codepoints(s: string): number[] {
   const out: number[] = [];
   for (const ch of s) out.push(ch.codePointAt(0)!);
   return out;
 }
 
+/** @internal */
 function min3(a: number, b: number, c: number): number {
   if (a < b && a < c) return a;
   if (b < c) return b;

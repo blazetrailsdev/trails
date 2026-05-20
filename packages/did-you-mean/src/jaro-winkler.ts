@@ -1,6 +1,7 @@
 // Ported from Ruby's did_you_mean/jaro_winkler.rb
 // (https://github.com/ruby/did_you_mean), MIT License.
 
+/** @internal */
 function codepoints(s: string): number[] {
   const out: number[] = [];
   for (const ch of s) out.push(ch.codePointAt(0)!);
@@ -47,20 +48,17 @@ export function jaroDistance(str1: string, str2: string): number {
   let k = 0;
   for (let i = 0; i < length1; i++) {
     if (flags1[i] !== 0) {
+      // flags1 and flags2 carry the same number of set bits (m matches),
+      // so this scan always finds one.
       let j = k;
       let index = k;
-      let found = false;
       while (j < length2) {
         index = j;
         if (flags2[j] !== 0) {
           k = j + 1;
-          found = true;
           break;
         }
         j += 1;
-      }
-      if (!found) {
-        // exhausted flags2 — leave index at last visited
       }
       if (cp1[i] !== cp2[index]) t += 1;
     }
