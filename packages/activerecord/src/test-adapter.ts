@@ -80,6 +80,41 @@ function _txLockStorage(): AsyncContext<true> {
 // `@pinned_connections_depth` (connection_pool.rb:327, 345).
 let _skipGlobalResetDepth = 0;
 
+/**
+ * Snapshot the global DDL trackers so a wrapping `withTransactionalFixtures`
+ * scope can restore them after the outer transaction rolls back. DDL parsed
+ * during an `it()` body adds entries to `_createdTables` / `_createdColumns`
+ * (via `recordDdlTracking`); the rollback reverts the DDL on the DB side, but
+ * the trackers would otherwise report the rolled-back table as still-created.
+ *
+ * Today this is harmless because `defineSchema` consults its signature cache
+ * first (which is snapshot/restored via `_snapshotAppliedSchemaSignaturesForAdapter`).
+ * But a future test pattern — `defineSchema` in `beforeAll` plus raw
+ * `createTable` inside an `it()` body — would leak. Snapshot/restore plugs
+ * that gap before it surfaces.
+ *
+ * @internal
+ */
+export function _snapshotDdlTrackers(): {
+  tables: Set<string>;
+  columns: Map<string, Set<string>>;
+} {
+  const columns = new Map<string, Set<string>>();
+  for (const [k, v] of _createdColumns) columns.set(k, new Set(v));
+  return { tables: new Set(_createdTables), columns };
+}
+
+/** @internal */
+export function _restoreDdlTrackers(snapshot: {
+  tables: Set<string>;
+  columns: Map<string, Set<string>>;
+}): void {
+  _createdTables.clear();
+  for (const t of snapshot.tables) _createdTables.add(t);
+  _createdColumns.clear();
+  for (const [k, v] of snapshot.columns) _createdColumns.set(k, new Set(v));
+}
+
 /** @internal */
 export function pushSkipGlobalReset(): void {
   _skipGlobalResetDepth += 1;

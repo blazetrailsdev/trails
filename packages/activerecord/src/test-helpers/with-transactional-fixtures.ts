@@ -1,6 +1,8 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
 import {
+  _restoreDdlTrackers,
+  _snapshotDdlTrackers,
   getUseTransactionalTests,
   popSkipGlobalReset,
   pushSkipGlobalReset,
@@ -135,7 +137,27 @@ function adapterAndInner(
  *   });
  *   withTransactionalFixtures(() => adapter);
  */
-export function withTransactionalFixtures(getAdapter: () => TransactionalFixturesAdapter): void {
+/**
+ * Options for {@link withTransactionalFixtures}.
+ */
+export interface WithTransactionalFixturesOptions {
+  /**
+   * Whether to call `schemaCache.clear()` on the adapter after the outer
+   * transaction rolls back. Defaults to `true`, matching the historical
+   * (and safe-by-default) behavior introduced in PR #2064.
+   *
+   * Files that do pure DML (no `addColumn` / `createTable` / `changeTable`
+   * inside `it()` bodies) can set this to `false` to skip the
+   * re-introspection cost on every teardown.
+   */
+  invalidateSchemaCache?: boolean;
+}
+
+export function withTransactionalFixtures(
+  getAdapter: () => TransactionalFixturesAdapter,
+  options: WithTransactionalFixturesOptions = {},
+): void {
+  const { invalidateSchemaCache = true } = options;
   let active = true;
   // Snapshots of defineSchema's per-adapter signature cache taken at the
   // start of each test. On rollback we restore — preserving signatures for
@@ -144,6 +166,7 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
   let innerSig: Map<string, string> | null = null;
+  let ddlSnapshot: ReturnType<typeof _snapshotDdlTrackers> | null = null;
 
   beforeAll(() => {
     active = getUseTransactionalTests(getAdapter());
@@ -164,6 +187,7 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
     const [outer, inner] = adapterAndInner(getAdapter());
     outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
     innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
+    ddlSnapshot = _snapshotDdlTrackers();
     // Mirrors Rails ConnectionPool#pin_connection!:
     //   @pinned_connection.begin_transaction joinable: false, _lazy: false
     await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
@@ -173,11 +197,13 @@ export function withTransactionalFixtures(getAdapter: () => TransactionalFixture
     if (!active) return;
     const t = tm(getAdapter());
     while (t.openTransactions > 0) await t.rollbackTransaction();
-    clearSchemaCache(getAdapter());
+    if (invalidateSchemaCache) clearSchemaCache(getAdapter());
     const [outer, inner] = adapterAndInner(getAdapter());
     if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
     if (inner && innerSig) _restoreAppliedSchemaSignaturesForAdapter(inner, innerSig);
+    if (ddlSnapshot) _restoreDdlTrackers(ddlSnapshot);
     outerSig = null;
     innerSig = null;
+    ddlSnapshot = null;
   });
 }
