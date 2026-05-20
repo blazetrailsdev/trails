@@ -158,6 +158,28 @@ describe("ShowExceptionsTest", () => {
     expect(headers["content-type"]).toContain("charset=utf-8");
   });
 
+  it("rewrites request method to GET and preserves original on env", async () => {
+    let seenMethod: string | undefined;
+    let seenOriginalMethod: string | undefined;
+    const captureApp = async (env: RackEnv): Promise<RackResponse> => {
+      seenMethod = env["REQUEST_METHOD"] as string;
+      seenOriginalMethod = env["action_dispatch.original_request_method"] as string;
+      return publicExceptionsApp(env);
+    };
+
+    const env: RackEnv = {
+      REQUEST_METHOD: "POST",
+      PATH_INFO: "/",
+      "action_dispatch.show_exceptions": "all",
+    };
+    const app = buildApp(captureApp);
+    await app.call(env);
+
+    expect(seenMethod).toBe("GET");
+    expect(seenOriginalMethod).toBe("POST");
+    expect(env["REQUEST_METHOD"]).toBe("POST");
+  });
+
   it("failsafe prevents raising if exceptions_app raises", async () => {
     const failApp = async (): Promise<RackResponse> => {
       throw new Error("exceptions app also failed");

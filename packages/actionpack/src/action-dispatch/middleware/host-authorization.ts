@@ -30,20 +30,18 @@ export class HostAuthorization {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (this.exclude?.(env)) {
-      return this.app(env);
-    }
+    if (this.hosts.length === 0) return this.app(env);
 
     const host = this.extractHost(env);
+    const blocked = this.blockedHosts(env, host);
 
-    if (this.isAuthorized(host)) {
+    if (blocked.length === 0 || this.isExcluded(env)) {
+      this.markAsAuthorized(env, host);
       return this.app(env);
     }
 
-    if (this.responseApp) {
-      return this.responseApp(env);
-    }
-
+    env["action_dispatch.blocked_hosts"] = blocked;
+    if (this.responseApp) return this.responseApp(env);
     return this.blockedResponse(host);
   }
 
@@ -51,6 +49,31 @@ export class HostAuthorization {
     const httpHost = env["HTTP_HOST"] as string | undefined;
     if (httpHost) return httpHost.replace(/:\d+$/, "").toLowerCase();
     return ((env["SERVER_NAME"] as string) || "localhost").toLowerCase();
+  }
+
+  /** @internal */
+  private blockedHosts(env: RackEnv, host: string): string[] {
+    const out: string[] = [];
+    if (!this.isAuthorized(host)) out.push(host);
+    const forwarded = (env["HTTP_X_FORWARDED_HOST"] as string | undefined)
+      ?.split(/,\s?/)
+      .pop()
+      ?.trim();
+    if (forwarded) {
+      const normalized = forwarded.replace(/:\d+$/, "").toLowerCase();
+      if (!this.isAuthorized(normalized)) out.push(normalized);
+    }
+    return out;
+  }
+
+  /** @internal */
+  private isExcluded(env: RackEnv): boolean {
+    return Boolean(this.exclude?.(env));
+  }
+
+  /** @internal */
+  private markAsAuthorized(env: RackEnv, host: string): void {
+    env["action_dispatch.authorized_host"] = host;
   }
 
   private isAuthorized(host: string): boolean {
