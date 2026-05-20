@@ -707,13 +707,9 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   get arelVisitor(): Visitors.ToSql | undefined {
-    // Phase 9b-1: activate the wrapped adapter's visitor for SQLite and
-    // PostgreSQL. MySQL still falls through the dormant `new Visitors.ToSql`
-    // fallback in Relation#_arelVisitor — flipping it changes identifier
-    // quoting (backticks) across cross-adapter SQL assertions; that goes in
-    // Phase 9b-2.
-    const name = this.inner?.adapterName;
-    if (name !== "sqlite" && name !== "postgres") return undefined;
+    // Phase 9b-2: all three adapters (SQLite #2127, PG #2139, MySQL here)
+    // now delegate. The `relation.ts:3614-3619` dormant fallback is dead
+    // code; Phase 9b-3+4 will delete it along with this SchemaAdapter.
     return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
 
