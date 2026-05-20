@@ -7,10 +7,11 @@ import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -48,10 +49,10 @@ describe("isBlank / isPresent", () => {
 // RelationTest — targets relations_test.rb
 // ==========================================================================
 describe("RelationTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       posts: { title: "string", body: "string", status: "string", author_id: "integer" },
       developers: { commits: "integer" },
@@ -69,6 +70,7 @@ describe("RelationTest", () => {
       eager_articles: { title: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);

@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
   transaction,
@@ -12,10 +12,11 @@ import {
   registerModel,
 } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
@@ -26,15 +27,16 @@ function freshAdapter(): DatabaseAdapter {
 // CallbacksTest — targets callbacks_test.rb
 // ==========================================================================
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       topics: { title: "string" },
       animals: { name: "string", type: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -98,9 +100,9 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       people: { name: "string" },
       animals: { name: "string", type: "string" },
@@ -108,6 +110,7 @@ describe("CallbacksTest", () => {
       cb_posts: { title: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -435,12 +438,13 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { topics: { title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -546,12 +550,13 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { topics: { title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -689,12 +694,13 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { trackeds: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -769,14 +775,15 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       things: { name: "string", status: "string" },
       records: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -820,13 +827,14 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       tasks: { name: "string", important: "boolean", skip: "boolean" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -880,11 +888,12 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { blocked: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -907,12 +916,13 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { users: { name: "string", updated_at: "datetime" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -938,9 +948,9 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       trackeds: { name: "string" },
       guardeds: { name: "string" },
@@ -949,6 +959,7 @@ describe("CallbacksTest", () => {
       multis: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1154,10 +1165,10 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       trackeds: { name: "string" },
       guardeds: { name: "string" },
@@ -1166,6 +1177,7 @@ describe("CallbacksTest", () => {
       multis: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1504,15 +1516,16 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       developers: { name: "string", salary: "integer" },
       animals: { name: "string", type: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1665,10 +1678,10 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       orders: { total: "integer", discount_code: "string", silent: "boolean" },
       widgets: { name: "string" },
@@ -1682,6 +1695,7 @@ describe("CallbacksTest", () => {
       immutables: { locked: "boolean" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
