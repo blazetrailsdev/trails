@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BinaryData } from "@blazetrails/activemodel";
 import { SQLite3Adapter, SQLiteDateTimeType } from "../sqlite3-adapter.js";
 import { Date as DateType } from "../../type/date.js";
 import { Time as TimeType } from "../../type/time.js";
@@ -183,6 +184,10 @@ describe("SQLite3::Quoting", () => {
   describe("quotedBinary", () => {
     it("formats as hex literal", () => {
       expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
+    });
+
+    it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {
+      expect(quote(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])))).toBe("x'deadbeef'");
     });
   });
 

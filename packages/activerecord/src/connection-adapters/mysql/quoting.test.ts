@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote,
   quoteIdentifier,
@@ -67,6 +68,10 @@ describe("MySQL quoting — typeCast", () => {
 
   it("quotes Uint8Array values as hex literals via quotedBinary", () => {
     expect(quote(new Uint8Array([0xca, 0xfe]))).toBe("x'cafe'");
+  });
+
+  it("quotes BinaryData by unwrapping to bytes via quotedBinary", () => {
+    expect(quote(new BinaryData(new Uint8Array([0xca, 0xfe])))).toBe("x'cafe'");
   });
 
   it("throws on Date — Date is no longer accepted", () => {

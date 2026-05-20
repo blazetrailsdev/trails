@@ -159,6 +159,10 @@ describe("PostgreSQL quoting", () => {
     expect(quote(new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
   });
 
+  it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {
+    expect(quote(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
+  });
+
   it("checkIntInRange is the Rails name for checkIntegerRange", () => {
     expect(() => checkIntInRange(BigInt("9223372036854775808"))).toThrow(IntegerOutOf64BitRange);
     expect(() => checkIntInRange(BigInt("9223372036854775807"))).not.toThrow();
