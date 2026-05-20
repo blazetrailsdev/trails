@@ -7,3 +7,7 @@ export { ControllerGenerator } from "./controller-generator.js";
 export { ScaffoldGenerator } from "./scaffold-generator.js";
 export { GeneratorBase } from "./base.js";
 export type { GeneratorOptions } from "./base.js";
+export { NamedBase } from "./named-base.js";
+export type { NamedBaseOptions } from "./named-base.js";
+export { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
+export type { AttrOptions, IndexType } from "./generated-attribute.js";
