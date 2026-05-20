@@ -64,7 +64,7 @@ import {
   type ContentSecurityPolicy,
   type NonceGenerator,
 } from "./content-security-policy.js";
-import { QueryParser, type QueryPair } from "./query-parser.js";
+import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
@@ -1000,7 +1000,10 @@ export class Request {
    * controllers for a route) until that bridge lands.
    */
   controllerClassFor(name: string | undefined | null): typeof PassNotFound {
-    if (name) {
+    // Ruby `if name` is truthy for empty strings; only nil/false fall through
+    // to the PASS_NOT_FOUND branch. Mirror with explicit null-check so `""`
+    // takes the resolution path (and surfaces the not-implemented error).
+    if (name != null) {
       throw new Error(
         `controllerClassFor(${name}): Trails has no global controller constant table; ` +
           `resolve the controller class via the router instead.`,
@@ -1018,10 +1021,12 @@ export class Request {
    * Returns `[]` when the body is empty and `null` when Rack parsed
    * multipart but did not preserve a pair list.
    */
-  requestParametersList(): QueryPair[] | null {
+  requestParametersList(): Array<[string, unknown]> | null {
     const rackPost = this.rackRequest.POST;
     const formPairs = this.env["rack.request.form_pairs"];
-    if (formPairs != null) return formPairs as QueryPair[];
+    // Multipart form_pairs values may be UploadedFile-like objects, not just
+    // strings; surface as `unknown` rather than narrowing to QueryPair.
+    if (formPairs != null) return formPairs as Array<[string, unknown]>;
     const formVars = this.env["rack.request.form_vars"];
     if (formVars != null) return Array.from(QueryParser.eachPair(formVars as string));
     if (rackPost && typeof rackPost === "object" && Object.keys(rackPost as object).length > 0) {
