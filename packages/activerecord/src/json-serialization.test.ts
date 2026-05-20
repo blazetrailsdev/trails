@@ -5,10 +5,9 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -17,20 +16,19 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// -- Helpers --
-function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
-}
-
 describe("JsonSerializationTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   let Contact: typeof Base;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       contacts: { name: "string", age: "integer", created_at: "string", type: "string" },
     });
+  });
+  withTransactionalFixtures(() => adapter);
+
+  beforeEach(() => {
     Contact = class extends Base {};
     Contact._tableName = "contacts";
     Contact.attribute("id", "integer");
@@ -136,15 +134,12 @@ describe("JsonSerializationTest", () => {
     contact.serializableHash(options);
     expect(options.only).toEqual(optionsBefore.only);
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       post_j1s: { title: "string" },
       comment_j1s: { body: "string", post_id: "integer" },
@@ -168,9 +163,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       post_j11s: { title: "string" },
     });
   });
-  afterAll(async () => {
-    await dropAllTables(adapter);
-  });
+  withTransactionalFixtures(() => adapter);
 
   it("includes uses association name", async () => {
     class CommentJ1 extends Base {

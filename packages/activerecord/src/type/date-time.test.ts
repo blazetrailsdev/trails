@@ -1,24 +1,23 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { DateTime } from "./date-time.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { Base } from "../index.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("DateTimeTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, { tasks: { starting: "datetime" } });
   });
+  withTransactionalFixtures(() => adapter);
 
-  afterAll(async () => {
-    await dropAllTables(adapter);
+  afterAll(() => {
     vi.unstubAllEnvs();
   });
 
