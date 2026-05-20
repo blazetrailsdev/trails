@@ -1,11 +1,21 @@
 /**
  * AbstractController::Callbacks
  *
- * Callback type definitions, options, and option-normalization helpers
- * for AbstractController action lifecycle.
+ * Action callback type definitions, option normalization, and the
+ * ActiveSupport::Callbacks integration that wires AbstractController#processAction
+ * onto an AS callback chain.
  * @see https://api.rubyonrails.org/classes/AbstractController/Callbacks.html
  */
 
+import {
+  defineCallbacks as asDefineCallbacks,
+  setCallback as asSetCallback,
+  runCallbacks as asRunCallbacks,
+  getCallbackChains,
+  type CallbackKind,
+  type CallbackCondition,
+  type CallbackOptions as ASCallbackOptions,
+} from "@blazetrails/activesupport";
 import { ActionNotFound, type AbstractController } from "./base.js";
 
 export type ActionCallback = (
@@ -56,11 +66,8 @@ type CallbackOptionsWithFilters = CallbackOptions & {
   filters?: Array<ActionCallback | AroundCallback>;
 };
 
-export interface CallbackEntry {
-  callback: ActionCallback | AroundCallback;
-  type: "before" | "after" | "around";
-  options: CallbackOptions;
-}
+/** Name of the AS::Callbacks chain that backs `processAction`. @internal */
+export const PROCESS_ACTION_CHAIN = "processAction";
 
 /**
  * Matches the controller's current action name against a fixed set of
@@ -206,100 +213,158 @@ export function _insertCallbacks(
   }
 }
 
-function _actionList(value: string | string[]): string[] {
-  return Array.isArray(value) ? value : [value];
-}
-
 /** Named fn → `:name`; anon → `#<Proc:…>` (Rails Proc#inspect parity). @internal */
 function _inspectFilter(filter: ActionCallback | AroundCallback): string {
   const fn = filter as { name?: string };
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
 }
 
-function _shouldRun(controller: AbstractController, entry: CallbackEntry, action: string): boolean {
-  const opts = entry.options;
-  if (opts.only !== undefined && !_actionList(opts.only).includes(action)) return false;
-  if (opts.except !== undefined && _actionList(opts.except).includes(action)) return false;
-  if (opts.if !== undefined && !_evalPredicate(controller, opts.if, true)) return false;
-  if (opts.unless !== undefined && _evalPredicate(controller, opts.unless, false)) return false;
-  return true;
+/** Lower CallbackPredicateLike entries (ActionFilter) into plain fns for AS. @internal */
+function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | undefined {
+  if (pred === undefined) return undefined;
+  const list = Array.isArray(pred) ? pred : [pred];
+  return list.map((item) =>
+    typeof item === "function"
+      ? (item as unknown as CallbackCondition)
+      : (c: object) => (item as CallbackPredicateLike).isMatch(c as AbstractController),
+  );
 }
 
-function _evalPredicate(
-  controller: AbstractController,
-  pred: NonNullable<CallbackOptions["if"]>,
-  requireAll: boolean,
-): boolean {
-  if (typeof pred === "function") return pred(controller);
-  if (requireAll) {
-    for (const p of pred) {
-      if (!(typeof p === "function" ? p(controller) : p.isMatch(controller))) return false;
-    }
-    return true;
-  }
-  for (const p of pred) {
-    if (typeof p === "function" ? p(controller) : p.isMatch(controller)) return true;
-  }
-  return false;
+interface WrappedBefore {
+  (target: object): Promise<unknown>;
+  __originalCb: ActionCallback;
 }
 
 /**
- * Rails `AC::Callbacks#process_action` — wraps the dispatch with the
- * registered `:process_action` callbacks. Ruby uses a `run_callbacks { super }`
- * override; here the wrapping lives in callbacks.ts and `Base#processAction`
- * delegates to it so the file layout matches Rails.
+ * Wrap a before callback to halt (return `false`) once the controller is
+ * marked performed. Replaces Rails' `terminator: ->(c, lambda) { lambda.call;
+ * c.performed? }`: AS rejects custom terminators paired with async befores,
+ * so we encode the check in the callback and rely on default `=== false` halt.
  * @internal
  */
-export async function processAction(
-  controller: AbstractController,
-  action: string,
-  dispatch: () => Promise<void>,
-): Promise<void> {
-  const Constructor = controller.constructor as unknown as {
-    getCallbacks: () => CallbackEntry[];
-    getSkipped: () => Array<{
-      callback: ActionCallback | AroundCallback;
-      options: CallbackOptions;
-    }>;
+function _wrapBefore(callback: ActionCallback): WrappedBefore {
+  const wrapped = async (target: object): Promise<unknown> => {
+    const result = await callback(target as AbstractController);
+    if ((target as AbstractController).performed) return false;
+    return result;
   };
-  const allCallbacks = Constructor.getCallbacks();
-  const skipped = Constructor.getSkipped();
+  (wrapped as WrappedBefore).__originalCb = callback;
+  return wrapped as WrappedBefore;
+}
 
-  const callbacks = allCallbacks.filter((entry) => {
-    return !skipped.some((s) => {
-      if (s.callback !== entry.callback) return false;
-      if (s.options.only !== undefined && !_actionList(s.options.only).includes(action))
-        return false;
-      if (s.options.except !== undefined && _actionList(s.options.except).includes(action))
-        return false;
-      return true;
-    });
-  });
+/** Provision the `processAction` AS::Callbacks chain on a class prototype. @internal */
+export function _defineActionCallbacks(prototype: object): void {
+  asDefineCallbacks(prototype, PROCESS_ACTION_CHAIN, { skipAfterCallbacksIfTerminated: true });
+}
 
-  const befores = callbacks.filter((c) => c.type === "before" && _shouldRun(controller, c, action));
-  const afters = callbacks.filter((c) => c.type === "after" && _shouldRun(controller, c, action));
-  const arounds = callbacks.filter((c) => c.type === "around" && _shouldRun(controller, c, action));
+/** Register a before/after/around action callback on `prototype`. @internal */
+export function _registerActionCallback(
+  prototype: object,
+  kind: CallbackKind,
+  callback: ActionCallback | AroundCallback,
+  options: CallbackOptions,
+): void {
+  const opts: CallbackOptionsWithFilters = { ...options, filters: [callback] };
+  _normalizeCallbackOptions(opts);
+  delete opts.filters;
 
-  const executeAction = async (): Promise<void> => {
-    for (const entry of befores) {
-      if (controller.performed) return;
-      const result = await (entry.callback as ActionCallback)(controller);
-      if (result === false) return;
+  // Name-based dedup: AS::Callbacks Callback#isDuplicates only fires for
+  // string (method-name) filters — trails registers function refs, so we
+  // dedupe via an explicit `name` stashed on options.
+  if (options.name !== undefined) {
+    const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
+    if (chain) {
+      for (const cb of [...chain.entries]) {
+        if (cb.kind !== kind) continue;
+        const stored = (cb.options as Record<string, unknown>)._trailsName;
+        if (stored === options.name) chain.delete(cb);
+      }
     }
-    if (controller.performed) return;
-    await dispatch();
-    for (const entry of afters.reverse()) {
-      await (entry.callback as ActionCallback)(controller);
-    }
-  };
-
-  let chain = executeAction;
-  for (const around of arounds.reverse()) {
-    const inner = chain;
-    chain = async () => {
-      await (around.callback as AroundCallback)(controller, inner);
-    };
   }
 
-  await chain();
+  const asOpts: ASCallbackOptions & Record<string, unknown> = {};
+  if (opts.prepend) asOpts.prepend = true;
+  const ifFns = _toConditionFns(opts.if);
+  const unlessFns = _toConditionFns(opts.unless);
+  if (ifFns) asOpts.if = ifFns;
+  if (unlessFns) asOpts.unless = unlessFns;
+  if (options.name !== undefined) asOpts._trailsName = options.name;
+
+  const filter = kind === "before" ? _wrapBefore(callback as ActionCallback) : callback;
+  asSetCallback(
+    prototype,
+    PROCESS_ACTION_CHAIN,
+    kind,
+    filter as unknown as Parameters<typeof asSetCallback>[3],
+    asOpts,
+  );
+}
+
+/**
+ * Skip an existing action callback. Mirrors Rails `skip_callback`: with
+ * `if`/`unless`/`only`/`except`, replaces the entry with one whose
+ * conditions are merged (`Callback#mergeConditionalOptions`); without
+ * conditions, removes outright.
+ * @internal
+ */
+export function _skipActionCallback(
+  prototype: object,
+  kind: CallbackKind,
+  filter: ActionCallback | AroundCallback | string,
+  options: CallbackOptions,
+): void {
+  // For string-name skips, thread a synthetic { name } so ActionFilter's
+  // raise-on-missing-action message renders `:name` rather than `[]`.
+  const namedFilter =
+    typeof filter === "function" ? filter : ({ name: filter } as unknown as ActionCallback);
+  const opts: CallbackOptionsWithFilters = { ...options, filters: [namedFilter] };
+  _normalizeCallbackOptions(opts);
+  delete opts.filters;
+
+  const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
+  if (!chain) return;
+
+  const hasConditional = opts.if !== undefined || opts.unless !== undefined;
+  const ifConds = _toConditionFns(opts.if) ?? [];
+  const unlessConds = _toConditionFns(opts.unless) ?? [];
+
+  for (const cb of [...chain.entries]) {
+    if (cb.kind !== kind) continue;
+    const stored = (cb.options as Record<string, unknown>)._trailsName;
+    let matches: boolean;
+    if (typeof filter === "string") {
+      matches = stored === filter;
+    } else if (kind === "before") {
+      const wrapped = cb.filter as Partial<WrappedBefore>;
+      matches = wrapped.__originalCb === filter || cb.filter === filter;
+    } else {
+      matches = cb.filter === filter;
+    }
+    if (!matches) continue;
+
+    if (hasConditional) {
+      const merged = cb.mergeConditionalOptions(
+        { name: PROCESS_ACTION_CHAIN, config: cb.chainConfig },
+        ifConds,
+        unlessConds,
+      );
+      // mergeConditionalOptions creates fresh options ({ if, unless } only),
+      // dropping trails' _trailsName metadata. Re-attach it so future name-based
+      // skips/overrides on this entry continue to match.
+      if (stored !== undefined) {
+        (merged.options as Record<string, unknown>)._trailsName = stored;
+      }
+      chain.insert(chain.index(cb), merged);
+    }
+    chain.delete(cb);
+  }
+}
+
+/** Rails `AC::Callbacks#process_action` — runs the chain around `dispatch`. @internal */
+export async function processAction(
+  controller: AbstractController,
+  _action: string,
+  dispatch: () => Promise<void>,
+): Promise<void> {
+  await asRunCallbacks(controller, PROCESS_ACTION_CHAIN, dispatch);
 }

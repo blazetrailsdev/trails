@@ -7,13 +7,15 @@
  */
 
 import {
+  _defineActionCallbacks,
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
+  _registerActionCallback,
+  _skipActionCallback,
   processAction as _runProcessActionCallbacks,
   type ActionCallback,
   type AroundCallback,
-  type CallbackEntry,
   type CallbackOptions,
 } from "./callbacks.js";
 export type {
@@ -62,15 +64,6 @@ export class AbstractController {
 
   /** Whether a response has been committed (render/redirect called). */
   protected _performed: boolean = false;
-
-  /** Registered callbacks (class-level, inherited). */
-  private static _callbacks: CallbackEntry[] = [];
-
-  /** Skipped callback identifiers. */
-  private static _skippedCallbacks: Array<{
-    callback: ActionCallback | AroundCallback;
-    options: CallbackOptions;
-  }> = [];
 
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
     "constructor",
@@ -152,89 +145,34 @@ export class AbstractController {
 
   /** Register a before_action callback. */
   static beforeAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    this._registerActionCallback("before", callback, options);
+    _registerActionCallback(this.prototype, "before", callback, options);
   }
 
   /** Register an after_action callback. */
   static afterAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    this._registerActionCallback("after", callback, options);
+    _registerActionCallback(this.prototype, "after", callback, options);
   }
 
   /** Register an around_action callback. */
   static aroundAction(callback: AroundCallback, options: CallbackOptions = {}): void {
-    this._registerActionCallback("around", callback, options);
+    _registerActionCallback(this.prototype, "around", callback, options);
   }
 
-  /** Pre-populates `options.filters` so ActionFilter retains the callback
-   * for diagnostic rendering. Mirrors `_insert_callbacks` filters wiring. @internal */
-  private static _registerActionCallback(
-    type: "before" | "after" | "around",
-    callback: ActionCallback | AroundCallback,
-    options: CallbackOptions,
-  ): void {
-    const opts = options as CallbackOptions & {
-      filters?: Array<ActionCallback | AroundCallback>;
-    };
-    opts.filters = [callback];
-    _normalizeCallbackOptions(options);
-    delete opts.filters;
-    const entry: CallbackEntry = { callback, type, options };
-    if (options.prepend) {
-      this._ensureOwnCallbacks().unshift(entry);
-    } else {
-      this._ensureOwnCallbacks().push(entry);
-    }
+  /** Skip a registered before_action. Accepts the callback reference or
+   * (for callbacks registered with `name`) the name string. Conditional
+   * options (`if`/`unless`/`only`/`except`) merge via Rails skip semantics. */
+  static skipBeforeAction(cb: ActionCallback | string, options: CallbackOptions = {}): void {
+    _skipActionCallback(this.prototype, "before", cb, options);
   }
 
-  /** Skip a previously registered before_action. */
-  static skipBeforeAction(callback: ActionCallback, options: CallbackOptions = {}): void {
-    this._ensureOwnSkipped().push({ callback, options });
+  /** Skip a registered after_action. */
+  static skipAfterAction(cb: ActionCallback | string, options: CallbackOptions = {}): void {
+    _skipActionCallback(this.prototype, "after", cb, options);
   }
 
-  /** Get all callbacks including inherited ones. */
-  static getCallbacks(): CallbackEntry[] {
-    const chain: CallbackEntry[] = [];
-    const hierarchy = this._getHierarchy();
-    for (const klass of hierarchy) {
-      if (Object.prototype.hasOwnProperty.call(klass, "_callbacks")) {
-        chain.push(...(klass as any)._callbacks);
-      }
-    }
-    // Dedup by (`options.name`, `type`): when a subclass registers a
-    // callback with the same name and kind, drop the inherited entry.
-    // Mirrors AS::Callbacks CallbackChain#remove_duplicates, which
-    // matches on Callback#duplicates? (same filter + same kind) — so
-    // `before_action :first` and `after_action :first` coexist, but a
-    // child's `before_action :first, except: :index` replaces the
-    // parent's `before_action :first`.
-    const seen = new Set<string>();
-    for (let i = chain.length - 1; i >= 0; i--) {
-      const entry = chain[i]!;
-      if (entry.options.name === undefined) continue;
-      const key = `${entry.type}\0${entry.options.name}`;
-      if (seen.has(key)) {
-        chain.splice(i, 1);
-      } else {
-        seen.add(key);
-      }
-    }
-    return chain;
-  }
-
-  /** Get all skipped callbacks. */
-  static getSkipped(): Array<{
-    callback: ActionCallback | AroundCallback;
-    options: CallbackOptions;
-  }> {
-    const skipped: Array<{ callback: ActionCallback | AroundCallback; options: CallbackOptions }> =
-      [];
-    const hierarchy = this._getHierarchy();
-    for (const klass of hierarchy) {
-      if (Object.prototype.hasOwnProperty.call(klass, "_skippedCallbacks")) {
-        skipped.push(...(klass as any)._skippedCallbacks);
-      }
-    }
-    return skipped;
+  /** Skip a registered around_action. */
+  static skipAroundAction(cb: AroundCallback | string, options: CallbackOptions = {}): void {
+    _skipActionCallback(this.prototype, "around", cb, options);
   }
 
   /**
@@ -348,31 +286,8 @@ export class AbstractController {
   availableActions(): string[] {
     return (this.constructor as typeof AbstractController).actionMethods();
   }
-
-  private static _ensureOwnCallbacks(): CallbackEntry[] {
-    if (!Object.prototype.hasOwnProperty.call(this, "_callbacks")) {
-      (this as any)._callbacks = [];
-    }
-    return (this as any)._callbacks;
-  }
-
-  private static _ensureOwnSkipped(): Array<{
-    callback: ActionCallback | AroundCallback;
-    options: CallbackOptions;
-  }> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_skippedCallbacks")) {
-      (this as any)._skippedCallbacks = [];
-    }
-    return (this as any)._skippedCallbacks;
-  }
-
-  private static _getHierarchy(): Array<typeof AbstractController> {
-    const chain: Array<typeof AbstractController> = [];
-    let klass = this as typeof AbstractController;
-    while (klass && klass !== (Object as unknown)) {
-      chain.unshift(klass);
-      klass = Object.getPrototypeOf(klass);
-    }
-    return chain;
-  }
 }
+
+// Provision the `processAction` AS::Callbacks chain on the root prototype;
+// all subclasses inherit through prototype-chain COW in AS::Callbacks.
+_defineActionCallbacks(AbstractController.prototype);
