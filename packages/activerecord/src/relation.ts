@@ -3394,7 +3394,10 @@ export class Relation<T extends Base> {
   }
 
   private _toSql(): string {
-    // Set operations: generate both sides and combine
+    // Set operations: SQLite rejects parens around compound-SELECT operands
+    // (Rails sqlite.rb#infix_value_with_paren strips them); PG/MySQL require
+    // parens when either operand carries its own ORDER BY/LIMIT/OFFSET so
+    // those clauses bind to the per-side SELECT instead of the compound.
     if (this._setOperation) {
       const leftSql = this._toSqlWithoutSetOp();
       const rightSql = this._setOperation.other._toSqlWithoutSetOp();
@@ -3404,7 +3407,8 @@ export class Relation<T extends Base> {
         intersect: "INTERSECT",
         except: "EXCEPT",
       }[this._setOperation.type];
-      return `(${leftSql}) ${op} (${rightSql})`;
+      const isSqlite = this._modelClass.adapter?.adapterName === "sqlite";
+      return isSqlite ? `${leftSql} ${op} ${rightSql}` : `(${leftSql}) ${op} (${rightSql})`;
     }
     return this._toSqlWithoutSetOp();
   }

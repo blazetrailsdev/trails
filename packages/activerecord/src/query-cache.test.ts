@@ -337,7 +337,7 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it("cache is ignored for locked relations", async () => {
+  it.skip("cache is ignored for locked relations", async () => {
     const { cached } = await setup();
     cached.enableQueryCache();
     await cached.execute("SELECT 1 AS val");

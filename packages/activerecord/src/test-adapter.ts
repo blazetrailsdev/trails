@@ -40,9 +40,6 @@ export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
     ? "mysql"
     : "sqlite";
 
-const isPg = (): boolean => !!PG_TEST_URL;
-const isMysql = (): boolean => !!MYSQL_TEST_URL;
-
 let _sharedAdapter: any = null;
 
 // Schema tracking — what tables/columns have been created. Maintained
@@ -491,61 +488,11 @@ class SchemaAdapter implements DatabaseAdapter {
     return _createdTables;
   }
 
-  private unwrapCompoundSelect(sql: string): string {
-    const ops = /^\s*(UNION\s+ALL|UNION|INTERSECT|EXCEPT)\s+/i;
-    const trimmed = sql.trim();
-    if (trimmed[0] !== "(") return sql;
-
-    // Find the matching close-paren for the opening paren
-    let depth = 0;
-    let i = 0;
-    for (; i < trimmed.length; i++) {
-      if (trimmed[i] === "(") depth++;
-      else if (trimmed[i] === ")") {
-        depth--;
-        if (depth === 0) break;
-      }
-    }
-    if (depth !== 0) return sql;
-
-    const left = trimmed.slice(1, i).trim();
-    const rest = trimmed.slice(i + 1).trim();
-    const opMatch = rest.match(ops);
-    if (!opMatch) return sql;
-
-    const op = opMatch[1];
-    let right = rest.slice(opMatch[0].length).trim();
-    // Unwrap right-side parens if present
-    if (right.startsWith("(") && right.endsWith(")")) {
-      right = right.slice(1, -1).trim();
-    }
-    return `${left} ${op} ${right}`;
-  }
-
-  private fixSqliteCompat(sql: string): string {
-    if (isPg() || isMysql()) return sql;
-    // SQLite doesn't support FOR UPDATE / FOR SHARE
-    sql = sql.replace(
-      /\s+FOR\s+(NO\s+KEY\s+)?(UPDATE|SHARE|KEY\s+SHARE)(\s+OF\s+\w+)?(\s+NOWAIT|\s+SKIP\s+LOCKED)?/gi,
-      "",
-    );
-    // SQLite doesn't support OFFSET without LIMIT
-    if (/OFFSET/i.test(sql) && !/LIMIT/i.test(sql)) {
-      sql = sql.replace(/(OFFSET)/i, "LIMIT -1 $1");
-    }
-    // SQLite doesn't support parenthesized compound SELECT: (SELECT ...) UNION (SELECT ...)
-    // Unwrap only top-level parens by tracking nesting depth
-    sql = this.unwrapCompoundSelect(sql);
-    return sql;
-  }
-
   async execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]> {
-    return this.inner.execute(this.fixSqliteCompat(sql), binds, name);
+    return this.inner.execute(sql, binds, name);
   }
 
   async executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number> {
-    sql = this.fixSqliteCompat(sql);
-
     const createMatch = sql.match(
       /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))/i,
     );
@@ -760,7 +707,16 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   get arelVisitor(): Visitors.ToSql | undefined {
-    return undefined;
+    // Phase 9a: only activate the wrapped adapter's visitor for SQLite.
+    // For PG/MySQL, returning undefined keeps Relation#_arelVisitor on its
+    // `new Visitors.ToSql(adapter)` fallback (base ToSql with SchemaAdapter
+    // as the quoter — identifiers route through the inner adapter's quote*),
+    // and leaves Node#toSql() on Arel's defaultQuoter via the global registry
+    // (since _wireArelVisitor only fires when arelVisitor is defined).
+    // Flipping either changes identifier quoting across dozens of
+    // cross-adapter SQL assertions. Phase 9b will activate PG/MySQL.
+    if (this.inner?.adapterName !== "sqlite") return undefined;
+    return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
 
   lookupCastTypeFromColumn(column: unknown): unknown {

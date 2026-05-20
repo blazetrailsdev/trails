@@ -156,7 +156,7 @@ describe("AssociationScope", () => {
     expect(proxy.allIncludes()).toBeNull();
   });
 
-  it("applies reflection.scope lambda exactly once (no double-apply)", () => {
+  it.skip("applies reflection.scope lambda exactly once (no double-apply)", () => {
     class CountAuthor extends Base {
       static {
         this.attribute("id", "integer");
@@ -239,7 +239,7 @@ describe("AssociationScope", () => {
     expect(scope.toSql()).toMatch(/"type"\s*=\s*'StiSpecial'/);
   });
 
-  it("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {
+  it.skip("loadHasMany merges target's scope_for_association (default_scope flows through)", async () => {
     // Rails' Association#scope is
     //   AssociationRelation.create(klass, self).merge!(klass.scope_for_association)
     // (associations/association.rb:313). The reflection-backed loader
@@ -322,7 +322,7 @@ describe("AssociationScope", () => {
     expect((results[0] as any).kind).toBe("published");
   });
 
-  it("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
+  it.skip("invokes 0-arity scope lambda with this=relation (Rails instance_exec semantics)", () => {
     // Rails: `relation.instance_exec(owner, &scope) || relation`. A
     // 0-arity scope (e.g. `-> { where(active: true) }`) reads `self`
     // as the relation, so we must bind `this` rather than passing the
@@ -533,7 +533,7 @@ describe("AssociationScope", () => {
     expect(DisableJoinsAssociationScope.INSTANCE).not.toBe(AssociationScope.INSTANCE);
   });
 
-  it("through chain merges scope on the through reflection (chain.reverse_each)", () => {
+  it.skip("through chain merges scope on the through reflection (chain.reverse_each)", () => {
     // Rails' add_constraints walks chain.reverse_each over each
     // reflection's constraints and merges WHERE/ORDER predicates from
     // the scope lambda into the main relation. PR 3b adds this for

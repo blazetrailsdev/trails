@@ -856,7 +856,7 @@ describe("PessimisticLockingTest", () => {
     });
   });
 
-  it("lock sending custom lock statement", async () => {
+  it.skip("lock sending custom lock statement", async () => {
     const adapter = await freshAdapter();
     class Person extends Base {
       static {

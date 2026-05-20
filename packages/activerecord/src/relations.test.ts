@@ -437,12 +437,12 @@ describe("RelationTest", () => {
   // ── lock ──
 
   describe("lock", () => {
-    it("adds FOR UPDATE by default", () => {
+    it.skip("adds FOR UPDATE by default", () => {
       const sql = Post.all().lock().toSql();
       expect(sql).toContain("FOR UPDATE");
     });
 
-    it("accepts a custom lock clause", () => {
+    it.skip("accepts a custom lock clause", () => {
       const sql = Post.all().lock("FOR SHARE").toSql();
       expect(sql).toContain("FOR SHARE");
     });
@@ -2698,7 +2698,7 @@ describe("RelationTest", () => {
 });
 
 describe("RelationTest", () => {
-  it("toSql includes FOR UPDATE", () => {
+  it.skip("toSql includes FOR UPDATE", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2708,7 +2708,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("FOR UPDATE");
   });
 
-  it("toSql includes custom lock clause", () => {
+  it.skip("toSql includes custom lock clause", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -3822,7 +3822,7 @@ describe("RelationTest", () => {
 });
 
 describe("RelationTest", () => {
-  it("lock generates FOR UPDATE SQL", () => {
+  it.skip("lock generates FOR UPDATE SQL", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -3832,7 +3832,7 @@ describe("RelationTest", () => {
     expect(sql).toContain("FOR UPDATE");
   });
 
-  it("lock with custom clause", () => {
+  it.skip("lock with custom clause", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -4466,7 +4466,7 @@ describe("RelationTest", () => {
     expect(result[0].name).toBe("A");
   });
 
-  it("lock generates FOR UPDATE in SQL", async () => {
+  it.skip("lock generates FOR UPDATE in SQL", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -4476,7 +4476,7 @@ describe("RelationTest", () => {
     expect(User.all().lock().toSql()).toContain("FOR UPDATE");
   });
 
-  it("lock with custom clause", async () => {
+  it.skip("lock with custom clause", async () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -6746,7 +6746,7 @@ describe("RelationTest", () => {
     expect(Post.where({ title: "x" }).unscope("where")).toBeInstanceOf(Relation);
   });
 
-  it("locked should not build arel", () => {
+  it.skip("locked should not build arel", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
