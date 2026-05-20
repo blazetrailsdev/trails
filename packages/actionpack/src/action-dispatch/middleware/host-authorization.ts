@@ -40,13 +40,13 @@ export class IPAddr {
     if (addr.includes(":")) {
       this.family = "v6";
       const full = parseIpv6(addr);
-      const prefix = prefixStr === undefined ? 128 : Number.parseInt(prefixStr, 10);
+      const prefix = parsePrefix(prefixStr, 128, spec);
       this.mask = prefixToMask(prefix, 128);
       this.network = full & this.mask;
     } else {
       this.family = "v4";
       const full = parseIpv4(addr);
-      const prefix = prefixStr === undefined ? 32 : Number.parseInt(prefixStr, 10);
+      const prefix = parsePrefix(prefixStr, 32, spec);
       this.mask = prefixToMask(prefix, 32);
       this.network = full & this.mask;
     }
@@ -68,9 +68,17 @@ export class IPAddr {
   }
 }
 
+function parsePrefix(prefixStr: string | undefined, bits: number, spec: string): number {
+  if (prefixStr === undefined) return bits;
+  if (!/^\d+$/.test(prefixStr)) throw new Error(`invalid IP prefix: ${spec}`);
+  const n = Number.parseInt(prefixStr, 10);
+  if (n < 0 || n > bits) throw new Error(`invalid IP prefix: ${spec}`);
+  return n;
+}
+
 function prefixToMask(prefix: number, bits: number): bigint {
-  if (prefix <= 0) return 0n;
-  if (prefix >= bits) return (1n << BigInt(bits)) - 1n;
+  if (prefix === 0) return 0n;
+  if (prefix === bits) return (1n << BigInt(bits)) - 1n;
   const full = (1n << BigInt(bits)) - 1n;
   return full ^ ((1n << BigInt(bits - prefix)) - 1n);
 }
@@ -178,7 +186,7 @@ function sanitizeHosts(
 }
 
 function sanitizeRegexp(host: RegExp): RegExp {
-  return new RegExp(`^(?:${host.source})${PORT_REGEX}?$`, host.flags.replace(/[gy]/g, ""));
+  return new RegExp(`^(?:${host.source})${PORT_REGEX}?$`, host.flags.replace(/[gym]/g, ""));
 }
 
 function sanitizeString(host: string): RegExp {

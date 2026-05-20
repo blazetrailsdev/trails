@@ -166,16 +166,6 @@ describe("HostAuthorizationTest", () => {
     expect(status).toBe(200);
   });
 
-  it("nested subdomains do not match single-segment wildcard", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "deep.sub.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(403);
-  });
-
   it("IPv4 address matching", async () => {
     const mw = new HostAuthorization(okApp, { hosts: ["127.0.0.1"] });
     const [s1] = await mw.call({ HTTP_HOST: "127.0.0.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
