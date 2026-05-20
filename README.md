@@ -185,7 +185,7 @@ Ruby-to-TypeScript translation table.
 | `@blazetrails/arel`         | [Arel](https://api.rubyonrails.org/classes/Arel.html)                 | **100%**  | **99.4%** | SQL AST builder and query generation                     |
 | `@blazetrails/activemodel`  | [ActiveModel](https://api.rubyonrails.org/classes/ActiveModel.html)   | **99.8%** | **99.6%** | Attributes, validations, callbacks, dirty tracking, i18n |
 
-**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **99.8% API** (4412/4419) | **~88% Tests** (9515/9531 across the three packages, weighted)
+**Data Layer Parity** (ActiveRecord + Arel + ActiveModel): **99.8% API** (4412/4419) | **87.4% Tests** (8326/9531 non-skipped, weighted across the three packages)
 
 Per-package deviation guides catalog the places where Trails diverges
 from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/activerecord-rails-deviations.md)
