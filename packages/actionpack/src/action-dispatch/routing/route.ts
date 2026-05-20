@@ -34,6 +34,7 @@ export interface RouteOptions {
   pathNames?: { new?: string; edit?: string };
   anchor?: boolean;
   shallow?: boolean;
+  internal?: boolean;
 }
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
@@ -67,6 +68,8 @@ export class Route {
   readonly ip: string | RegExp;
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
   readonly anchor: boolean;
+  /** Marks routes that should be hidden from `bin/rails routes` (info routes etc). */
+  readonly internal: boolean;
 
   private readonly paramNames: string[];
   /** @internal lazy single-route Journey router for match() */
@@ -99,6 +102,7 @@ export class Route {
     this.ip = options.ip ?? /(?:)/;
     this.redirectTarget = options.redirect;
     this.anchor = options.anchor !== false;
+    this.internal = options.internal === true;
 
     // Derive capture names from the Journey parser/AST — the same source
     // the Journey bridge uses. Keeps the path-vs-request constraint split
