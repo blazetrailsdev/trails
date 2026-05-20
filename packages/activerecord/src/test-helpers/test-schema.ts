@@ -732,4 +732,266 @@ export const TEST_SCHEMA: Schema = {
   guitars: {
     color: "string",
   },
+
+  notifications: {
+    message: "string",
+  },
+
+  // Rails declares precision/scale on each decimal/numeric column; the
+  // current Schema shape doesn't carry those, so we drop them (per the
+  // header note on features defineSchema doesn't express yet).
+  numeric_data: {
+    bank_balance: "decimal",
+    big_bank_balance: "decimal",
+    unscaled_bank_balance: "decimal",
+    world_population: "decimal",
+    my_house_population: "decimal",
+    decimal_number: "decimal",
+    decimal_number_with_default: { type: "decimal", default: 2.78 },
+    numeric_number: "decimal",
+    temperature: "float",
+    temperature_with_limit: { type: "float", limit: 24 },
+    decimal_number_big_precision: "decimal",
+    atoms_in_universe: "decimal",
+  },
+
+  orders: {
+    name: "string",
+    billing_customer_id: "integer",
+    shipping_customer_id: "integer",
+  },
+
+  organizations: {
+    name: "string",
+  },
+
+  owners: {
+    columns: {
+      owner_id: "integer",
+      name: "string",
+      updated_at: "datetime",
+      happy_at: "datetime",
+      essay_id: "string",
+    },
+    primaryKey: ["owner_id"],
+  },
+
+  paint_colors: {
+    non_poly_one_id: "integer",
+  },
+
+  paint_textures: {
+    non_poly_two_id: "integer",
+  },
+
+  parrots: {
+    name: "string",
+    breed: { type: "integer", default: 0 },
+    color: "string",
+    parrot_sti_class: "string",
+    killer_id: "integer",
+    updated_count: { type: "integer", default: 0 },
+    created_at: "datetime",
+    created_on: "datetime",
+    updated_at: "datetime",
+    updated_on: "datetime",
+  },
+
+  pirates: {
+    catchphrase: "string",
+    parrot_id: "integer",
+    non_validated_parrot_id: "integer",
+    created_on: "datetime",
+    updated_on: "datetime",
+  },
+
+  treasures: {
+    name: "string",
+    type: "string",
+    looter_id: "integer",
+    looter_type: "string",
+    ship_id: "integer",
+  },
+
+  parrots_pirates: {
+    columns: {
+      parrot_id: "integer",
+      pirate_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  parrots_treasures: {
+    columns: {
+      parrot_id: "integer",
+      treasure_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  parrot_treasures: {
+    columns: {
+      parrot_id: "integer",
+      treasure_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  people: {
+    first_name: { type: "string", null: false },
+    primary_contact_id: "integer",
+    gender: { type: "string", limit: 1 },
+    number1_fan_id: "integer",
+    lock_version: { type: "integer", null: false, default: 0 },
+    comments: "string",
+    followers_count: { type: "integer", default: 0 },
+    friends_too_count: { type: "integer", default: 0 },
+    best_friend_id: "integer",
+    best_friend_of_id: "integer",
+    insures: { type: "integer", null: false, default: 0 },
+    born_at: "datetime",
+    cars_count: { type: "integer", default: 0 },
+    created_at: { type: "datetime", null: false },
+    updated_at: { type: "datetime", null: false },
+  },
+
+  peoples_treasures: {
+    columns: {
+      rich_person_id: "integer",
+      treasure_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  personal_legacy_things: {
+    tps_report_number: "integer",
+    person_id: "integer",
+    version: { type: "integer", null: false, default: 0 },
+  },
+
+  pets: {
+    columns: {
+      pet_id: "integer",
+      name: "string",
+      owner_id: "integer",
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    primaryKey: ["pet_id"],
+  },
+
+  pets_treasures: {
+    treasure_id: "integer",
+    pet_id: "integer",
+    rainbow_color: "string",
+  },
+
+  posts: {
+    author_id: "integer",
+    title: { type: "string", null: false },
+    body: { type: "text", null: false },
+    type: "string",
+    legacy_comments_count: { type: "integer", default: 0 },
+    taggings_with_delete_all_count: { type: "integer", default: 0 },
+    taggings_with_destroy_count: { type: "integer", default: 0 },
+    tags_count: { type: "integer", default: 0 },
+    indestructible_tags_count: { type: "integer", default: 0 },
+    tags_with_destroy_count: { type: "integer", default: 0 },
+    tags_with_nullify_count: { type: "integer", default: 0 },
+  },
+
+  postesques: {
+    author_name: "string",
+    author_id: "string",
+  },
+
+  post_comments_counts: {
+    comments_count: { type: "integer", default: 0 },
+  },
+
+  serialized_posts: {
+    author_id: "integer",
+    title: { type: "string", null: false },
+  },
+
+  // Rails uses custom polymorphic column names here (not the
+  // `<name>_id`/`<name>_type` default) to exercise the
+  // `foreign_key:`/`foreign_type:` override path on `belongs_to ...,
+  // polymorphic: true`. Mirrored verbatim from schema.rb.
+  images: {
+    imageable_identifier: "integer",
+    imageable_class: "string",
+  },
+
+  price_estimates: {
+    estimate_of_type: "string",
+    estimate_of_id: "integer",
+    price: "integer",
+    currency: "string",
+  },
+
+  products: {
+    collection_id: "integer",
+    type_id: "integer",
+    name: "string",
+    price: "decimal",
+    discounted_price: "decimal",
+  },
+
+  product_types: {
+    name: "string",
+  },
+
+  projects: {
+    name: "string",
+    type: "string",
+    firm_id: "integer",
+    mentor_id: "integer",
+  },
+
+  publications: {
+    name: "string",
+    editor_in_chief_id: "integer",
+  },
+
+  randomly_named_table1: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  randomly_named_table2: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  randomly_named_table3: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  ratings: {
+    comment_id: "integer",
+    value: "integer",
+  },
+
+  readers: {
+    post_id: { type: "integer", null: false },
+    person_id: { type: "integer", null: false },
+    skimmer: { type: "boolean", default: false },
+    first_post_id: "integer",
+  },
+
+  references: {
+    person_id: "integer",
+    job_id: "integer",
+    favorite: "boolean",
+    lock_version: { type: "integer", default: 0 },
+  },
+
+  rooms: {
+    user_id: "integer",
+    owner_id: "integer",
+    landlord_id: "integer",
+    tenant_id: "integer",
+  },
 };
