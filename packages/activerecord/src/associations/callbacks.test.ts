@@ -2,19 +2,19 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 // ==========================================================================
 // AssociationCallbacksTest — targets associations/callbacks_test.rb
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   let cbIdx = 0;
   function makePostWithCallbacks(callbacks: any) {
     const idx = ++cbIdx;
@@ -43,13 +43,14 @@ describe("AssociationCallbacksTest", () => {
     return { Post, Comment };
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       comments: { body: "string", post_id: "integer" },
       posts: { title: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("adding macro callbacks", async () => {
     const log: string[] = [];
@@ -145,7 +146,7 @@ describe("AssociationCallbacksTest", () => {
 });
 
 describe("AssociationCallbacksTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   let cbIdx = 0;
   function makePostWithCallbacks(callbacks: any) {
     const idx = ++cbIdx;
@@ -174,7 +175,7 @@ describe("AssociationCallbacksTest", () => {
     return { Post, Comment };
   }
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = createTestAdapter();
     await defineSchema(adapter, {
       comments: { body: "string", post_id: "integer" },
@@ -183,6 +184,7 @@ describe("AssociationCallbacksTest", () => {
       users: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("add callback on has many", async () => {
     const log: string[] = [];
