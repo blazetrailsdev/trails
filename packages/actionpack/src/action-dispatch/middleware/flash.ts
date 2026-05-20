@@ -60,7 +60,7 @@ export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHa
  * @internal
  */
 export function flashHash(this: FlashRequestHost): FlashHash | null {
-  return (this.env[FLASH_KEY] as FlashHash | undefined) ?? null;
+  return (this.env[FLASH_KEY] as FlashHash | null | undefined) ?? null;
 }
 
 /**
