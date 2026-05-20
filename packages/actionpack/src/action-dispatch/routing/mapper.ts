@@ -725,14 +725,23 @@ export class Mapper {
     }
   }
 
-  /** @internal */
+  /**
+   * Mirrors `resource_scope(resource, &block)`: pushes `scopeLevelResource`,
+   * then wraps in `controller(resource.resourceScope, &block)` (which Rails
+   * implements as a `{controller: …}` scope).
+   *
+   * @internal
+   */
   resourceScope<T>(resource: ResourceLike, fn: () => T): T {
-    const previous = this._scope;
+    const before = this._scope;
     this._scope = this._scope.newChild({ scopeLevelResource: resource });
+    if (resource.resourceScope !== undefined) {
+      this._scope = this._scope.newChild({ controller: resource.resourceScope });
+    }
     try {
       return fn();
     } finally {
-      this._scope = previous;
+      this._scope = before;
     }
   }
 
@@ -844,7 +853,16 @@ export class Mapper {
     }
     if (options.shallow) {
       delete options.shallow;
-      this.shallowScope(() => dispatch(resources.pop()!, options, block));
+      // Rails calls the public `shallow do…end` DSL here, which just sets
+      // `shallow: true` on the scope (mapper.rb:1635). The private
+      // `shallow_scope` (path/as swap) runs later during resource emission.
+      const beforeShallow = this._scope;
+      this._scope = this._scope.newChild({ shallow: true });
+      try {
+        dispatch(resources.pop()!, options, block);
+      } finally {
+        this._scope = beforeShallow;
+      }
       return true;
     }
     if (this._scope.isResourceScope()) {
