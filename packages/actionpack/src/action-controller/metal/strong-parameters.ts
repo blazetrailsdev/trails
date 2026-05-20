@@ -7,11 +7,14 @@
  * @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html
  */
 
+import { SpellChecker } from "@blazetrails/did-you-mean";
+
 // --- Error classes ---
 
 export class ParameterMissing extends Error {
   readonly param: string;
   readonly keys: string[] | null;
+  #cachedCorrections?: string[];
 
   constructor(param: string, keys: string[] | null = null) {
     super(`param is missing or the value is empty or invalid: ${param}`);
@@ -20,14 +23,20 @@ export class ParameterMissing extends Error {
     this.keys = keys;
   }
 
+  /**
+   * Mirrors Rails' `ParameterMissing#corrections`, memoised via Ruby's
+   * `@corrections ||=` idiom. Runs the missing param name through
+   * `@blazetrails/did-you-mean`'s SpellChecker against the keys the
+   * caller had at the time of the raise.
+   */
   get corrections(): string[] {
-    if (!this.keys) return [];
-    const target = this.param.toLowerCase();
-    return this.keys.filter((k) => {
-      const candidate = k.toLowerCase();
-      if (candidate === target) return false;
-      return levenshteinDistance(target, candidate) <= 2;
-    });
+    if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
+    if (!this.keys) {
+      this.#cachedCorrections = [];
+      return this.#cachedCorrections;
+    }
+    this.#cachedCorrections = new SpellChecker({ dictionary: this.keys }).correct(this.param);
+    return this.#cachedCorrections;
   }
 }
 
@@ -64,23 +73,6 @@ export class InvalidParameterKey extends Error {
 }
 
 // --- Scalar type guard ---
-
-function levenshteinDistance(a: string, b: string): number {
-  const m = a.length;
-  const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
-  return dp[m][n];
-}
 
 /** @internal */
 function isPermittedScalar(value: unknown): boolean {
