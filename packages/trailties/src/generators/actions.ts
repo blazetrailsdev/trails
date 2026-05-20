@@ -1,35 +1,15 @@
-// Mirrors railties/lib/rails/generators/actions.rb. PR 1.10 ports gem/route/
+// Mirrors railties/lib/rails/generators/actions.rb. PR 1.10 ports route/
 // environment/generate; PR 1.10b adds git/after_bundle/rake/add_source/etc.
-
-export interface GemOptions {
-  version?: string | string[];
-  group?: string | string[];
-  git?: string;
-  comment?: string;
-  [key: string]: unknown;
-}
+// `gem` / `gem_group` / `github` / `add_source` are unported: trails uses
+// package.json, not a Gemfile, so the Ruby `gem "x"` DSL has no target.
 
 export interface ActionsHost {
   output: (msg: string) => void;
   insertIntoFile(rel: string, marker: string, content: string, opts?: { after?: boolean }): void;
-  appendWithNewline(rel: string, content: string): void;
 }
 
 export interface GeneratorActionsState {
   pendingGenerators: Array<{ what: string; args: string[] }>;
-}
-
-function quote(value: unknown): string {
-  if (typeof value === "string") return `"${value.replace(/'/g, '"')}"`;
-  if (value === null) return "nil";
-  if (typeof value === "boolean" || typeof value === "number") return String(value);
-  if (Array.isArray(value)) return `[${value.map(quote).join(", ")}]`;
-  if (typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>)
-      .map(([k, v]) => `${k}: ${quote(v)}`)
-      .join(", ");
-  }
-  return String(value);
 }
 
 function asArray<T>(v: T | T[] | undefined): T[] {
@@ -38,27 +18,6 @@ function asArray<T>(v: T | T[] | undefined): T[] {
 
 function indent(text: string, pad: string): string {
   return text.replace(/^(?=.)/gm, pad);
-}
-
-export function gem(this: ActionsHost, name: string, ...rest: Array<string | GemOptions>): void {
-  let options: GemOptions = {};
-  const versions: string[] = [];
-  for (const arg of rest) {
-    if (typeof arg === "string") versions.push(arg);
-    else options = arg;
-  }
-  const comment = options.comment;
-  const outOpts: Record<string, unknown> = { ...options };
-  delete outOpts.comment;
-  delete outOpts.version;
-
-  const versionList = versions.length > 0 ? versions : asArray(options.version);
-  const parts: string[] = [quote(name), ...versionList.map(quote)];
-  if (Object.keys(outOpts).length > 0) parts.push(quote(outOpts));
-
-  const prefix = comment ? indent(comment, "# ") + "\n" : "";
-  this.output(`      gemfile  ${name}`);
-  this.appendWithNewline("Gemfile", `${prefix}gem ${parts.join(", ")}`);
 }
 
 export function route(

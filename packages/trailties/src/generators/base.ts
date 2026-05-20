@@ -22,7 +22,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   protected createdFiles: string[] = [];
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
 
-  gem = Actions.gem;
   route = Actions.route;
   environment = Actions.environment;
   generate = Actions.generate;
@@ -64,14 +63,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
     this.fs.appendFileSync(fullPath, content);
     this.output(`      append  ${relativePath}`);
-  }
-
-  appendWithNewline(rel: string, content: string): void {
-    const fullPath = this.path.join(this.cwd, rel);
-    if (!this.fs.existsSync(fullPath)) return this.createFile(rel, content + "\n");
-    const existing = this.fs.readFileSync(fullPath, "utf-8");
-    this.fs.appendFileSync(fullPath, (existing.endsWith("\n") ? "" : "\n") + content + "\n");
-    this.output(`      append  ${rel}`);
   }
 
   insertIntoFile(

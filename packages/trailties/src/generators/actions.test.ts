@@ -26,37 +26,6 @@ function seed(name: string, body: string) {
 }
 
 describe("ActionsTest", () => {
-  it("gem should put gem dependency in gemfile", () => {
-    gen.gem("will-paginate");
-    expect(read("Gemfile")).toMatch(/gem "will-paginate"\n$/);
-  });
-
-  it("gem with version should include version in gemfile", () => {
-    gen.gem("nokogiri", { version: ">= 1.4.2" });
-    gen.gem("faker", { version: [">= 0.1.0", "< 0.3.0"] });
-    gen.gem("RedCloth", ">= 4.1.0", "< 4.2.0");
-    const c = read("Gemfile");
-    expect(c).toMatch(/gem "nokogiri", ">= 1\.4\.2"/);
-    expect(c).toMatch(/gem "faker", ">= 0\.1\.0", "< 0\.3\.0"/);
-    expect(c).toMatch(/gem "RedCloth", ">= 4\.1\.0", "< 4\.2\.0"/);
-  });
-
-  it("gem should include options", () => {
-    gen.gem("rspec", { github: "dchelimsky/rspec", require: false });
-    expect(read("Gemfile")).toMatch(/^gem "rspec", github: "dchelimsky\/rspec", require: false$/m);
-  });
-
-  it("gem should support multiline comments", () => {
-    gen.gem("rspec", { comment: "Use RSpec\nReplaces minitest" });
-    expect(read("Gemfile")).toMatch(/# Use RSpec\n# Replaces minitest\ngem "rspec"/);
-  });
-
-  it("gem with gemfile without newline at the end", () => {
-    seed("Gemfile", 'gem "rspec-rails"');
-    gen.gem("will-paginate");
-    expect(read("Gemfile")).toMatch(/gem "rspec-rails"\ngem "will-paginate"\n$/);
-  });
-
   it("route should add route", () => {
     seed("config/routes.rb", "App.routes.draw do\nend\n");
     gen.route('root "welcome#index"');
