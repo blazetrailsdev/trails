@@ -45,7 +45,7 @@ import { RoutingError, UrlGenerationError } from "../../action-controller/metal/
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
-import { Formatter as JourneyFormatter } from "../journey/formatter.js";
+import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 
 const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
 
@@ -53,7 +53,10 @@ const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
 function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const ka = Object.keys(a);
   if (ka.length !== Object.keys(b).length) return false;
-  for (const k of ka) if (a[k] !== b[k]) return false;
+  // Check key presence *and* value equality — bare value compare would
+  // accept `{a: undefined}` vs `{b: undefined}` as equal (both lookups
+  // yield `undefined`), incorrectly reusing a stale defaultEnv cache.
+  for (const k of ka) if (!Object.hasOwn(b, k) || a[k] !== b[k]) return false;
   return true;
 }
 
