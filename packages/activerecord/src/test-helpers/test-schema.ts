@@ -994,4 +994,209 @@ export const TEST_SCHEMA: Schema = {
     landlord_id: "integer",
     tenant_id: "integer",
   },
+
+  // PR 0.5f group: S-W range in Rails source order. Covers the second
+  // `disable_referential_integrity` block (seminars..sections), the
+  // shape_/shipping_/ship/* run, S-strays, T-tables, U-V, and
+  // "warehouse-things". Rails sandwiches `prisoners` (P-prefix) between
+  // `squeaks` and `sinks` at schema.rb:1137; we keep Rails' declaration
+  // order rather than alphabetizing (same convention as `having` in
+  // the G block and `cold_jokes` in the F block). The remaining tail
+  // (circles..long-table-name plus fk_test_* and overloaded_types)
+  // lands in sibling PR 0.5g.
+
+  seminars: { name: "string" },
+
+  sessions: {
+    start_date: "date",
+    end_date: "date",
+    name: "string",
+  },
+
+  sections: {
+    short_name: "string",
+    session_id: "integer",
+    seminar_id: "integer",
+  },
+
+  shape_expressions: {
+    paint_type: "string",
+    paint_id: "integer",
+    shape_type: "string",
+    shape_id: "integer",
+  },
+
+  shipping_lines: {
+    invoice_id: "integer",
+    amount: "integer",
+  },
+
+  shipping_line_discount_applications: {
+    shipping_line_id: "integer",
+    discount_id: "integer",
+  },
+
+  ships: {
+    name: "string",
+    pirate_id: "integer",
+    developer_id: "integer",
+    update_only_pirate_id: "integer",
+    treasures_count: { type: "integer", default: 0 },
+    created_at: "datetime",
+    created_on: "datetime",
+    updated_at: "datetime",
+    updated_on: "datetime",
+  },
+
+  ship_parts: {
+    name: "string",
+    ship_id: "integer",
+    updated_at: "datetime",
+  },
+
+  squeaks: { mouse_id: "integer" },
+
+  prisoners: { ship_id: "integer" },
+
+  sinks: { kitchen_id: "integer" },
+
+  shop_accounts: {
+    customer_id: "integer",
+    customer_carrier_id: "integer",
+  },
+
+  // Rails declares `id: false` with a string `speedometer_id` column; the
+  // model promotes `speedometer_id` to PK at the AR layer (dashboards shape).
+  speedometers: {
+    columns: {
+      speedometer_id: "string",
+      name: "string",
+      dashboard_id: "string",
+    },
+    primaryKey: false,
+  },
+
+  sponsors: {
+    club_id: "integer",
+    sponsorable_id: "integer",
+    sponsorable_type: "string",
+    sponsor_id: "integer",
+    sponsor_type: "string",
+  },
+
+  // Rails declares `id: false` with an explicit `t.string :id, null: false`
+  // column — model promotes `id` to PK (same shape as goofy_string_id).
+  string_key_objects: {
+    columns: {
+      id: { type: "string", null: false },
+      name: "string",
+      lock_version: { type: "integer", null: false, default: 0 },
+    },
+    primaryKey: false,
+  },
+
+  // Rails declares `id: false` with `nick` (promoted to PK at the AR layer)
+  // and a separate `id` integer column.
+  subscribers: {
+    columns: {
+      nick: { type: "string", null: false },
+      name: "string",
+      id: "integer",
+      books_count: { type: "integer", null: false, default: 0 },
+      update_count: { type: "integer", null: false, default: 0 },
+    },
+    primaryKey: false,
+  },
+
+  subscriptions: {
+    subscriber_id: "string",
+    book_id: "integer",
+  },
+
+  tags: {
+    name: "string",
+    taggings_count: { type: "integer", default: 0 },
+  },
+
+  taggings: {
+    tag_id: "integer",
+    super_tag_id: "integer",
+    taggable_type: "string",
+    taggable_id: "integer",
+    comment: "string",
+    type: "string",
+  },
+
+  tasks: {
+    starting: "datetime",
+    ending: "datetime",
+  },
+
+  topics: {
+    title: { type: "string", limit: 250 },
+    author_name: "string",
+    author_email_address: "string",
+    written_on: "datetime",
+    bonus_time: "time",
+    last_read: "date",
+    content: "text",
+    important: "text",
+    // Rails uses t.blob; mirrors as binary across our supported adapters.
+    binary_content: "binary",
+    approved: { type: "boolean", default: true },
+    replies_count: { type: "integer", default: 0 },
+    unique_replies_count: { type: "integer", default: 0 },
+    parent_id: "integer",
+    parent_title: "string",
+    type: "string",
+    group: "string",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  toys: {
+    columns: {
+      toy_id: "integer",
+      name: "string",
+      pet_id: "integer",
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    primaryKey: ["toy_id"],
+  },
+
+  traffic_lights: {
+    location: "string",
+    state: "string",
+    long_state: { type: "text", null: false },
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  translations: {
+    locale: { type: "string", null: false },
+    key: { type: "string", null: false },
+    value: { type: "string", null: false },
+    attachment_id: "integer",
+  },
+
+  tuning_pegs: {
+    guitar_id: "integer",
+    pitch: "float",
+  },
+
+  tyres: { car_id: "integer" },
+
+  unused_destroy_asyncs: {},
+
+  unused_belongs_to: { unused_destroy_async_id: "integer" },
+
+  variants: {
+    product_id: "integer",
+    name: "string",
+  },
+
+  vertices: { label: "string" },
+
+  "warehouse-things": { value: "integer" },
 };
