@@ -106,7 +106,7 @@ describe("topicFixtureData", () => {
     expect(parentRef.tableName).toBe("topics");
   });
 
-  it("defineFixtures resolves cross-refs: second.parent_id equals fixtureId(first)", async () => {
+  it("defineFixtures resolves cross-refs: second.parent_id equals first's declared id", async () => {
     const adapter = makeAdapter();
     const Topic = makeModel("topics");
     for (const k of Object.keys(topicFixtureData) as Array<keyof typeof topicFixtureData>) {
@@ -370,7 +370,7 @@ describe("accountFixtureData", () => {
     expect(firmRef.fixtureName).toBe("odegy");
   });
 
-  it("defineFixtures resolves signals37.firm_id to first_firm id", async () => {
+  it("defineFixtures: signals37.firm_id falls back to fixtureId('first_firm') when companies set isn't loaded", async () => {
     const adapter = makeAdapter();
     const Account = makeModel("accounts");
     for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {

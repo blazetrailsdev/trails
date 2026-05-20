@@ -69,6 +69,12 @@ export interface FixtureRef {
  * (populated by `defineFixtures()` when a row carries an explicit primary key), falling back
  * to `fixtureId(fixtureName)` (CRC32) when the target fixture set hasn't been loaded yet
  * or the target row has no declared PK.
+ *
+ * Ordering requirement: if the target fixture set declares explicit ids, load it BEFORE
+ * any set that references it. A `ref()` resolved before the target loads will return the
+ * CRC32 fallback and persist that value as the FK — loading the target afterwards does
+ * not retroactively update already-inserted rows. `useFixtures()` iterates its argument
+ * in declaration order, so list dependents after dependencies.
  */
 export function ref(tableName: string, fixtureName: string): FixtureRef {
   return { [REF_TAG]: true, tableName, fixtureName };
@@ -247,13 +253,17 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   // Pre-pass: build this table's label→id map locally, then swap it in atomically
   // so a mid-loop validation failure (e.g. non-integer declared PK) leaves the
   // registry untouched. The swap also replaces any prior label set, evicting
-  // entries for labels omitted from a subset reload.
+  // entries for labels omitted from a subset reload. The prior entry is captured
+  // so we can roll back if the INSERT itself fails — `ref()` resolution must not
+  // observe ids for rows that never landed in the database.
   const tableIds = new Map<string, number>();
   for (const label of labels) {
     const id = resolveDeclaredPk(tableName, pkCol, label, (fixtures[label] as FixtureAttrs)[pkCol]);
     tableIds.set(label, id);
   }
-  declaredIdsFor(adapter).set(tableName, tableIds);
+  const adapterIds = declaredIdsFor(adapter);
+  const priorTableIds = adapterIds.get(tableName);
+  adapterIds.set(tableName, tableIds);
 
   // Build rows with resolved IDs and references. Rows that declare `id: N` use it
   // verbatim (Rails parity); rows without one fall back to fixtureId(label).
@@ -374,9 +384,20 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   }
 
   // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.
-  await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
-    tableName,
-  ]);
+  // On failure, roll back the declared-id registry to its pre-call state so subsequent
+  // ref() calls don't resolve to ids for rows that never made it to the database.
+  try {
+    await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
+      tableName,
+    ]);
+  } catch (err) {
+    if (priorTableIds === undefined) {
+      adapterIds.delete(tableName);
+    } else {
+      adapterIds.set(tableName, priorTableIds);
+    }
+    throw err;
+  }
 
   // Reload persisted instances so AR attribute casting is applied
   const result = {} as { [P in K]: InstanceType<T> };
