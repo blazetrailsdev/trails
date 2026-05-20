@@ -264,6 +264,7 @@ export class FlashHash {
   dup(): FlashHash {
     const copy = new FlashHash();
     for (const [k, v] of this._flashes) copy._flashes.set(k, v);
+    for (const [k, v] of this._now) copy._now.set(k, v);
     for (const k of this._discard) copy._discard.add(k);
     for (const k of this._keep) copy._keep.add(k);
     return copy;
@@ -274,11 +275,19 @@ export class FlashHash {
   ): FlashHash {
     if (value === null || value === undefined) return new FlashHash();
     if (value instanceof FlashHash) return value.dup();
+    // Rails 4.0+ session shape: `{ "flashes" => Hash, "discard" => Array }`.
+    // Rails' `flashes.except!(*discard)` removes the keys the prior request
+    // marked for discard, then `new(flashes, flashes.keys)` marks every
+    // remaining key for sweep — they live through this request and are
+    // dropped on the next one.
     const flashes = (value["flashes"] ?? value) as Record<string, unknown>;
     const discard = (value["discard"] as string[]) ?? [];
+    const discardSet = new Set(discard);
     const out = new FlashHash();
     for (const [k, v] of Object.entries(flashes)) {
-      if (!discard.includes(k)) out._flashes.set(k, v);
+      if (discardSet.has(k)) continue;
+      out._flashes.set(k, v);
+      out._discard.add(k);
     }
     return out;
   }

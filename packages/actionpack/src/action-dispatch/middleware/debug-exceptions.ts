@@ -244,17 +244,10 @@ export class DebugExceptions {
   private renderException(env: RackEnv, exception: Error): RackResponse {
     const wrapper = new ExceptionWrapper(exception);
 
-    // Run interceptors
-    for (const interceptor of this.interceptors) {
-      try {
-        interceptor(env, exception);
-      } catch {
-        // Bad interceptors shouldn't break error handling
-      }
-    }
+    this.invokeInterceptors(env, exception, wrapper);
 
     // Log the exception
-    this.logException(env, exception, wrapper);
+    this.logError(env, wrapper);
 
     if (!this.showExceptions) {
       throw exception;
@@ -268,6 +261,14 @@ export class DebugExceptions {
     const accept = (env["HTTP_ACCEPT"] as string) ?? "";
     const xhr = env["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
     const contentType = (env["CONTENT_TYPE"] as string) ?? "";
+
+    // When configured for the api response format, route any non-HTML
+    // request through the Rails-shaped JSON body. Mirrors Rails'
+    // `api_request?(content_type) ? render_for_api_request(...) : ...`.
+    const negotiated = accept || contentType;
+    if (this.isApiRequest(negotiated)) {
+      return this.renderForApiRequest(wrapper);
+    }
 
     if (xhr || contentType.includes("text/plain")) {
       return this.renderTextError(wrapper);
@@ -381,34 +382,6 @@ export class DebugExceptions {
       { "content-type": "text/html; charset=utf-8" },
       bodyFromString(html),
     ];
-  }
-
-  private logException(env: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
-    if (!this.logRescuedResponses && wrapper.statusCode < 500) return;
-
-    const logger = (env["action_dispatch.logger"] as Logger) ?? this.logger;
-    if (!logger) return;
-
-    const lines = [
-      `${wrapper.exceptionName} (${wrapper.message}):`,
-      ...wrapper.applicationTrace.slice(0, 10),
-    ];
-
-    // Log causes
-    let cause = (exception as { cause?: Error }).cause;
-    while (cause) {
-      lines.push(`Caused by: ${cause.constructor?.name ?? "Error"} (${cause.message})`);
-      cause = (cause as { cause?: Error }).cause;
-    }
-
-    const message = lines.join("\n");
-    const logFn =
-      this.logLevel === "warn"
-        ? (logger.warn ?? logger.error)
-        : this.logLevel === "info"
-          ? (logger.info ?? logger.error)
-          : logger.error;
-    logFn.call(logger, message);
   }
 
   private escapeHtml(str: string): string {
