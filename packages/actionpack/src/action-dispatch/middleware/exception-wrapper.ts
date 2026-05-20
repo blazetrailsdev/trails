@@ -4,8 +4,13 @@
  * Wraps exceptions to provide consistent error metadata for error pages.
  */
 
-import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
+import { ActionableError, type BacktraceCleaner, getFs, getPath } from "@blazetrails/activesupport";
+import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
+
+interface ShowExceptionsRequest {
+  getHeader(name: string): unknown;
+}
 
 const STATUS_MAP: Record<string, number> = {
   Error: 500,
@@ -23,8 +28,8 @@ const STATUS_MAP: Record<string, number> = {
   ParamsTooDeepError: 400,
   UnpermittedParameters: 400,
   // ActionDispatch ParseError/ParamError family — Rails' rescue_responses uses
-  // the fully-qualified class names that `param-error.ts` and `parameters.ts`
-  // assign via `this.name`. All map to 400 Bad Request, matching Rails.
+  // the fully-qualified class names that param-error.ts and parameters.ts
+  // assign via `this.name`. All map to 400 Bad Request.
   "ActionDispatch::Http::Parameters::ParseError": 400,
   "ActionDispatch::ParamError": 400,
   "ActionDispatch::ParameterTypeError": 400,
@@ -32,7 +37,7 @@ const STATUS_MAP: Record<string, number> = {
   "ActionDispatch::ParamsTooDeepError": 400,
 };
 
-/** @internal Rails `rescue_templates` — exception class → diagnostics partial. */
+/** @internal */
 const RESCUE_TEMPLATES: Record<string, string> = {
   MissingTemplate: "missing_template",
   RoutingError: "routing_error",
@@ -42,16 +47,15 @@ const RESCUE_TEMPLATES: Record<string, string> = {
   MissingExactTemplate: "missing_exact_template",
 };
 
-/** @internal Rails `wrapper_exceptions` — classes whose `cause` is the real error. */
+/** @internal */
 const WRAPPER_EXCEPTIONS = new Set<string>(["ActionView::Template::Error", "TemplateError"]);
 
-/** @internal Rails `silent_exceptions` — never log/trace framework frames for these. */
+/** @internal */
 const SILENT_EXCEPTIONS = new Set<string>([
   "RoutingError",
   "ActionDispatch::Http::MimeNegotiation::InvalidType",
 ]);
 
-/** @internal Stable, monotonic id per exception, mirroring Ruby's `object_id`. */
 const EXCEPTION_IDS = new WeakMap<object, number>();
 let _nextExceptionId = 1;
 function _idFor(err: object): number {
@@ -76,15 +80,8 @@ export class ExceptionWrapper {
   constructor(exception: Error);
   constructor(backtraceCleaner: BacktraceCleaner | null, exception: Error);
   constructor(a: Error | BacktraceCleaner | null, b?: Error) {
-    let backtraceCleaner: BacktraceCleaner | null;
-    let exception: Error;
-    if (b !== undefined) {
-      backtraceCleaner = a as BacktraceCleaner | null;
-      exception = b;
-    } else {
-      backtraceCleaner = null;
-      exception = a as Error;
-    }
+    const backtraceCleaner = b !== undefined ? (a as BacktraceCleaner | null) : null;
+    const exception = b !== undefined ? b : (a as Error);
     this.backtraceCleaner = backtraceCleaner;
     this.exception = exception;
     this.exceptionClassName = exception.name || exception.constructor?.name || "Error";
@@ -93,11 +90,6 @@ export class ExceptionWrapper {
     this.statusText = STATUS_TEXTS[this.statusCode] ?? "Internal Server Error";
   }
 
-  /**
-   * Unwraps the inner cause when the exception is a registered wrapper
-   * (e.g. ActionView::Template::Error). Falls back to the exception itself.
-   * Mirrors Rails' `ExceptionWrapper#unwrapped_exception`.
-   */
   get unwrappedException(): Error {
     if (WRAPPER_EXCEPTIONS.has(this.exceptionClassName) && this.exception.cause instanceof Error) {
       return this.exception.cause;
@@ -105,30 +97,24 @@ export class ExceptionWrapper {
     return this.exception;
   }
 
-  /** The exception class/constructor name. */
   get exceptionName(): string {
     const cause = this.exception.cause;
-    if (cause && (cause as Error).constructor) {
-      return (cause as Error).constructor.name;
+    if (cause instanceof Error) {
+      return cause.name || cause.constructor?.name || "Error";
     }
     return this.exceptionClassName;
   }
 
-  /** The exception message. */
   get message(): string {
     return this.exception.message;
   }
 
-  /** Whether the wrapped exception is an ActionController::RoutingError. */
   isRoutingError(): boolean {
     return this.exception instanceof RoutingError || this.exceptionClassName === "RoutingError";
   }
 
-  /**
-   * Whether the wrapped exception is an ActionView::Template::Error. The
-   * concrete class isn't ported yet, so this falls back to a name check.
-   * @internal Blocked on ActionView::Base port — see PR body.
-   */
+  // ActionView::Template::Error class not yet ported; name match is the best
+  // we can do until ActionView::Base lands.
   isTemplateError(): boolean {
     return (
       this.exceptionClassName === "TemplateError" ||
@@ -136,70 +122,52 @@ export class ExceptionWrapper {
     );
   }
 
-  /** Delegates to ActionView::Template::Error#sub_template_message when available. */
-  subTemplateMessage(): string {
-    const e = this.exception as { subTemplateMessage?: () => string };
-    return typeof e.subTemplateMessage === "function" ? e.subTemplateMessage() : "";
-  }
-
-  /** Whether the wrapped exception has a cause (chained error). */
   hasCause(): boolean {
     return this.exception.cause != null;
   }
-
-  /** RoutingError-style `failures` accessor; empty array when not present. */
-  failures(): unknown[] {
-    const f = (this.exception as { failures?: unknown[] }).failures;
-    return Array.isArray(f) ? f : [];
-  }
-
-  /** Whether the exception exposes DidYouMean-style corrections. */
   hasCorrections(): boolean {
-    const e = this.exception as { originalMessage?: unknown; corrections?: unknown };
+    const e = this._e;
     return "originalMessage" in e && "corrections" in e;
   }
-
-  /** The DidYouMean original message; falls back to `message`. */
+  subTemplateMessage(): string {
+    const v = this._e.subTemplateMessage;
+    return typeof v === "function" ? v.call(this.exception) : "";
+  }
+  failures(): unknown[] {
+    return Array.isArray(this._e.failures) ? this._e.failures : [];
+  }
   originalMessage(): string {
-    const e = this.exception as { originalMessage?: string };
-    return typeof e.originalMessage === "string" ? e.originalMessage : this.message;
+    return typeof this._e.originalMessage === "string" ? this._e.originalMessage : this.message;
   }
-
-  /** DidYouMean correction suggestions; empty when none. */
   corrections(): string[] {
-    const e = this.exception as { corrections?: string[] };
-    return Array.isArray(e.corrections) ? e.corrections : [];
+    return Array.isArray(this._e.corrections) ? this._e.corrections : [];
   }
-
-  /** SyntaxError-style `file_name` accessor. */
+  annotatedSourceCode(): string[] {
+    const v = this._e.annotatedSourceCode;
+    return typeof v === "function" ? v.call(this.exception) : [];
+  }
   fileName(): string | null {
-    const e = this.exception as { fileName?: string };
-    return typeof e.fileName === "string" ? e.fileName : (this.sourceLocation?.file ?? null);
+    return typeof this._e.fileName === "string"
+      ? this._e.fileName
+      : (this.sourceLocation?.file ?? null);
   }
-
-  /** SyntaxError-style `line_number` accessor. */
   lineNumber(): number | null {
-    const e = this.exception as { lineNumber?: number };
-    return typeof e.lineNumber === "number" ? e.lineNumber : (this.sourceLocation?.line ?? null);
+    return typeof this._e.lineNumber === "number"
+      ? this._e.lineNumber
+      : (this.sourceLocation?.line ?? null);
   }
-
-  /** ActionableError actions registered for this exception. */
   actions(): Record<string, () => void> {
     return ActionableError.actions(this.exception);
   }
 
-  /** Annotated source code from the exception, when available. */
-  annotatedSourceCode(): string[] {
-    const e = this.exception as { annotatedSourceCode?: () => string[] };
-    return typeof e.annotatedSourceCode === "function" ? e.annotatedSourceCode() : [];
+  private get _e(): any {
+    return this.exception as any;
   }
 
-  /** Diagnostics template name for the exception class. */
   rescueTemplate(): string {
     return RESCUE_TEMPLATES[this.exceptionClassName] ?? "diagnostics";
   }
 
-  /** Get a clean stack trace as an array of lines. */
   get traces(): string[] {
     const stack = this.exception.stack;
     if (!stack) return [];
@@ -210,25 +178,18 @@ export class ExceptionWrapper {
       .filter((line) => line.length > 0);
   }
 
-  /** Get the application trace (filter out node_modules). */
   get applicationTrace(): string[] {
     return this.cleanBacktrace("silent");
   }
 
-  /** Get the framework trace (only node_modules lines). */
   get frameworkTrace(): string[] {
     return this.cleanBacktrace("noise");
   }
 
-  /** The full trace (application + framework combined). */
   get fullTrace(): string[] {
     return this.cleanBacktrace("all");
   }
 
-  /**
-   * Trace bucket for diagnostics: application trace when present, otherwise
-   * framework trace (suppressed entirely for silent exceptions).
-   */
   exceptionTrace(): string[] {
     const app = this.applicationTrace;
     if (app.length === 0 && !SILENT_EXCEPTIONS.has(this.exceptionClassName)) {
@@ -237,7 +198,6 @@ export class ExceptionWrapper {
     return app;
   }
 
-  /** Which trace bucket the diagnostics page should jump to. */
   traceToShow(): "Application Trace" | "Full Trace" {
     if (this.applicationTrace.length === 0 && this.rescueTemplate() !== "routing_error") {
       return "Full Trace";
@@ -245,61 +205,55 @@ export class ExceptionWrapper {
     return "Application Trace";
   }
 
-  /** Id of the first trace entry in the active bucket. */
   sourceToShowId(): number {
     return 0;
   }
 
-  /** Get the source file and line number of the exception. */
   get sourceLocation(): TraceEntry | null {
     const firstTrace = this.traces[0];
     if (!firstTrace) return null;
     return this.extractFileAndLineNumber(firstTrace);
   }
 
-  /** Register a custom exception → status code mapping. */
   static registerStatus(exceptionName: string, statusCode: number): void {
     STATUS_MAP[exceptionName] = statusCode;
   }
 
-  /** Get the status code for an exception name. */
   static statusCodeFor(exceptionName: string): number {
     return STATUS_MAP[exceptionName] ?? 500;
   }
 
-  /** Rails-named alias for `statusCodeFor`. */
   static statusCodeForException(exceptionName: string): number {
     return ExceptionWrapper.statusCodeFor(exceptionName);
   }
 
-  /** Whether this exception has a registered rescue response. */
   static rescueResponse(exceptionName: string): boolean {
     return Object.hasOwn(STATUS_MAP, exceptionName) && STATUS_MAP[exceptionName] !== 500;
   }
 
-  /** Whether this exception should be shown based on the show_exceptions mode. */
-  show(mode: "all" | "rescuable" | "none"): boolean {
-    if (mode === "all") return true;
-    if (mode === "none") return false;
-    return ExceptionWrapper.rescueResponse(this.exceptionName);
+  show(request: ShowExceptionsRequest): boolean {
+    const config = request.getHeader("action_dispatch.show_exceptions");
+    if (config === "none") return false;
+    if (config === "rescuable") return this.rescueResponse();
+    return true;
   }
 
-  /** `Object#inspect`-style summary of the wrapped exception. */
+  rescueResponse(): boolean {
+    return ExceptionWrapper.rescueResponse(this.exceptionClassName);
+  }
+
   exceptionInspect(): string {
     return `#<${this.exceptionClassName}: ${this.message}>`;
   }
 
-  /** Stable per-exception id, mirroring Ruby's `Object#object_id`. */
   exceptionId(): number {
     return _idFor(this.exception);
   }
 
-  /** Extract file paths and line numbers from the backtrace. */
   get sourceExtracts(): TraceEntry[] {
     return this.backtrace().map((trace) => this.extractSource(trace));
   }
 
-  /** Build a simple error response. */
   toResponse(): [number, Record<string, string>, string] {
     return [
       this.statusCode,
@@ -308,21 +262,20 @@ export class ExceptionWrapper {
     ];
   }
 
-  /** @internal Raw backtrace lines (Rails: `attr_reader :backtrace`). */
+  /** @internal */
   backtrace(): string[] {
     return this.buildBacktrace();
   }
 
-  /**
-   * @internal Rails walks the ActionView::PathRegistry to remap template
-   * frames; that path-registry is blocked on ActionView, so we return the
-   * raw stack lines and let the cleaner handle them.
-   */
+  // Rails walks ActionView::PathRegistry to remap template frames; that
+  // registry isn't ported yet, so we return the raw stack and let the cleaner
+  // handle it.
+  /** @internal */
   buildBacktrace(): string[] {
     return this.traces;
   }
 
-  /** @internal Yields each exception in the cause chain (Rails `causes_for`). */
+  /** @internal */
   *causesFor(exception: Error): Generator<Error> {
     let cur: unknown = exception.cause;
     while (cur instanceof Error) {
@@ -331,7 +284,7 @@ export class ExceptionWrapper {
     }
   }
 
-  /** @internal Wraps every cause in the chain into its own ExceptionWrapper. */
+  /** @internal */
   wrappedCausesFor(
     exception: Error,
     backtraceCleaner: BacktraceCleaner | null,
@@ -343,7 +296,7 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal Filters/silences raw backtrace via the configured cleaner. */
+  /** @internal */
   cleanBacktrace(kind: "silent" | "noise" | "all"): string[] {
     const lines = this.backtrace();
     if (this.backtraceCleaner) return this.backtraceCleaner.clean(lines);
@@ -352,17 +305,15 @@ export class ExceptionWrapper {
     return lines;
   }
 
-  /** @internal Source fragment + line number for a single backtrace line. */
-  extractSource(trace: string): TraceEntry {
+  /** @internal */
+  extractSource(trace: string): TraceEntry & { code?: Record<number, string> } {
     const loc = this.extractFileAndLineNumber(trace);
     if (!loc) return { file: trace, line: 0 };
-    return loc;
+    const code = this.sourceFragment(loc.file, loc.line);
+    return code ? { ...loc, code } : loc;
   }
 
-  /**
-   * @internal Pick six surrounding lines (line − 3 .. line + 2) keyed by
-   * 1-indexed line number — mirrors Rails' `extract_source_fragment_lines`.
-   */
+  /** @internal */
   extractSourceFragmentLines(sourceLines: string[], line: number): Record<number, string> {
     const start = Math.max(line - 3, 0);
     const slice = sourceLines.slice(start, start + 6);
@@ -371,12 +322,19 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal Reads surrounding source from disk; null when unavailable. */
-  sourceFragment(_path: string, _line: number): Record<number, string> | null {
-    return null;
+  /** @internal */
+  sourceFragment(file: string, line: number): Record<number, string> | null {
+    const full = getPath().resolve(cwd(), file);
+    if (!getFs().existsSync(full)) return null;
+    try {
+      const lines = getFs().readFileSync(full, "utf8").split(/\r?\n/);
+      return this.extractSourceFragmentLines(lines, line);
+    } catch {
+      return null;
+    }
   }
 
-  /** @internal Parse a stack frame into `{file, line}`. */
+  /** @internal */
   extractFileAndLineNumber(trace: string): TraceEntry | null {
     const match =
       trace.match(/\((.+):(\d+):\d+\)/) ??
