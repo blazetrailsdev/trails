@@ -113,7 +113,7 @@ export class Redirect extends Endpoint {
     return true;
   }
 
-  call(env: RackEnv): [number, Record<string, string>, string[]] {
+  call(env: RackEnv): [number, Record<string, string>, unknown] {
     const request = new Request(env);
     const response = this.buildResponse(request);
     return response.toRack();
