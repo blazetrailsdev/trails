@@ -212,7 +212,6 @@ export class IntegrationTest {
       });
     }
     await this._processPath(method.toUpperCase(), expanded, options);
-    this.requestCount += 1;
     return this.status;
   }
 
@@ -490,6 +489,7 @@ export class IntegrationTest {
     path: string,
     options: IntegrationRequestOptions,
   ): Promise<void> {
+    this.requestCount += 1;
     // Match route
     const matched = this.routes.recognize(method, path);
     if (!matched) {
