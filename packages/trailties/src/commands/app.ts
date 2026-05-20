@@ -2,6 +2,7 @@ import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import { getPath } from "@blazetrails/activesupport";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
+import { generateCommand } from "./generate.js";
 
 // Mirror of `bin/rails app:template`. Rails source:
 // railties/lib/rails/tasks/framework.rake.
@@ -16,8 +17,10 @@ export function appTemplateCommand(): Command {
       const mod = await import(path.pathToFileURL(abs).href);
       const tmpl: unknown = mod.default ?? mod.template ?? mod;
       if (typeof tmpl !== "function") throw new Error(`${location} does not export a function`);
-      await (tmpl as (g: AppGenerator) => unknown)(
-        new AppGenerator({ cwd: getCwd(), output: console.log }),
-      );
+      const gen = new AppGenerator({ cwd: getCwd(), output: console.log });
+      await (tmpl as (g: AppGenerator) => unknown)(gen);
+      for (const { what, args } of gen.pendingGenerators) {
+        await generateCommand().parseAsync(["node", "g", what, ...args]);
+      }
     });
 }
