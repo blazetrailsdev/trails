@@ -141,7 +141,7 @@ export class ContentSecurityPolicy {
   navigateTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("navigate-to", sources);
   }
-  sandbox(...sources: [false] | CSPSource[]): this {
+  sandbox(...sources: CSPSourceOrClear[]): this {
     // Rails: empty `*values` → bare directive (stored as `true`); `values.first`
     // nil/false → delete. Ruby truthiness only treats nil/false as falsy —
     // empty strings stay truthy.
@@ -156,7 +156,7 @@ export class ContentSecurityPolicy {
     }
     return this.setDirective("sandbox", sources as CSPSource[]);
   }
-  pluginTypes(...sources: [false] | CSPSource[]): this {
+  pluginTypes(...sources: CSPSourceOrClear[]): this {
     // Rails: `if types.first` — only nil/false delete (Ruby truthiness, so
     // empty string stays truthy and is passed through to the directive).
     const first = sources[0];
