@@ -19,7 +19,7 @@ import {
   readFragment as _readFragment,
   writeFragment as _writeFragment,
   type FragmentsHost,
-} from "./fragments.js";
+} from "./caching/fragments.js";
 
 const SLOTS = ["defaultStaticExtension", "performCaching", "enableFragmentCacheLogging"] as const;
 

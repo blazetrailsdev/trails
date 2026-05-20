@@ -13,6 +13,13 @@ function normalize(input: string): string {
   return input.toLowerCase().replaceAll("@", "");
 }
 
+/** @internal */
+function codepointLength(s: string): number {
+  let n = 0;
+  for (const _ of s) n++;
+  return n;
+}
+
 /**
  * Port of Ruby's DidYouMean::SpellChecker. Suggests dictionary entries close
  * to a misspelled input using Jaro-Winkler for ranking and Levenshtein for
@@ -28,7 +35,8 @@ export class SpellChecker {
   correct(input: string): string[] {
     const rawInput = String(input);
     const normalizedInput = normalize(rawInput);
-    const jwThreshold = normalizedInput.length > 3 ? 0.834 : 0.77;
+    const inputLen = codepointLength(normalizedInput);
+    const jwThreshold = inputLen > 3 ? 0.834 : 0.77;
 
     const candidates: Array<{ word: string; index: number; score: number }> = [];
     for (let i = 0; i < this.#dictionary.length; i++) {
@@ -51,7 +59,7 @@ export class SpellChecker {
       return b.index - a.index;
     });
 
-    const mistypeThreshold = Math.ceil(normalizedInput.length * 0.25);
+    const mistypeThreshold = Math.ceil(inputLen * 0.25);
     let corrections = candidates
       .filter((c) => levenshteinDistance(normalize(c.word), normalizedInput) <= mistypeThreshold)
       .map((c) => c.word);
@@ -60,7 +68,7 @@ export class SpellChecker {
       corrections = candidates
         .filter((c) => {
           const w = normalize(c.word);
-          const len = Math.min(normalizedInput.length, w.length);
+          const len = Math.min(inputLen, codepointLength(w));
           return levenshteinDistance(w, normalizedInput) < len;
         })
         .slice(0, 1)

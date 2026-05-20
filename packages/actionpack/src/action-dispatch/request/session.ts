@@ -18,8 +18,17 @@ export interface SessionStore {
 const ENV_SESSION_KEY = "rack.session";
 const ENV_SESSION_OPTIONS_KEY = "rack.session.options";
 
+export class DisabledSessionError extends Error {
+  constructor(
+    message = "Your application has sessions disabled. To write to the session you must first configure a session store",
+  ) {
+    super(message);
+    this.name = "DisabledSessionError";
+  }
+}
+
 export class Session {
-  private store: SessionStore;
+  private store: SessionStore | null;
   private env: Record<string, unknown>;
   private options: Record<string, unknown>;
   private data: Record<string, unknown> | null = null;
@@ -28,17 +37,20 @@ export class Session {
   private _idWas: unknown = null;
   private existed: boolean;
   private destroyed = false;
+  private _enabled: boolean;
 
   private constructor(
-    store: SessionStore,
+    store: SessionStore | null,
     env: Record<string, unknown>,
     options: Record<string, unknown>,
+    enabled = true,
   ) {
     this.store = store;
     this.env = env;
     this.options = options;
-    this.existed = store.sessionExists(env);
-    if (this.existed) {
+    this._enabled = enabled;
+    this.existed = enabled && store ? store.sessionExists(env) : false;
+    if (this.existed && store) {
       const [sessionId, data] = store.loadSession(env);
       this._idWas = sessionId;
       this.id = sessionId;
@@ -70,6 +82,12 @@ export class Session {
     return session;
   }
 
+  static disabled(req: { env: Record<string, unknown> }): Session {
+    const session = new Session(null, req.env, { id: null }, false);
+    req.env[ENV_SESSION_OPTIONS_KEY] = { id: null };
+    return session;
+  }
+
   static find(req: { env: Record<string, unknown> }): Session | null {
     const session = req.env[ENV_SESSION_KEY];
     if (session instanceof Session) return session;
@@ -77,12 +95,66 @@ export class Session {
   }
 
   private loadData(): void {
-    if (!this.loaded && !this.destroyed) {
+    if (!this.loaded && !this.destroyed && this.store) {
       const [sessionId, data] = this.store.loadSession(this.env);
       this.id = sessionId;
       this.data = { ...data };
       this.loaded = true;
+    } else if (!this.loaded && !this.destroyed) {
+      this.data = {};
+      this.loaded = true;
     }
+  }
+
+  isEnabled(): boolean {
+    return this._enabled;
+  }
+
+  isExists(): boolean {
+    if (!this._enabled) return false;
+    return this.existed;
+  }
+
+  hasKey(key: string): boolean {
+    return Object.hasOwn(this.getData(), key);
+  }
+
+  each(callback: (key: string, value: unknown) => void): void {
+    const data = this.toHash();
+    for (const [key, value] of Object.entries(data)) {
+      callback(key, value);
+    }
+  }
+
+  /** @internal */
+  loadForReadBang(): void {
+    if (!this.loaded && this.isExists()) this.loadBang();
+  }
+
+  /** @internal */
+  loadForWriteBang(): void {
+    if (this._enabled) {
+      if (!this.loaded) this.loadBang();
+    } else {
+      throw new DisabledSessionError();
+    }
+  }
+
+  /** @internal */
+  loadForDeleteBang(): void {
+    if (this._enabled && !this.loaded) this.loadBang();
+  }
+
+  /** @internal */
+  loadBang(): void {
+    if (this._enabled && this.store) {
+      const [sessionId, data] = this.store.loadSession(this.env);
+      this.id = sessionId;
+      this.data = { ...data };
+    } else if (this.data == null) {
+      this.data = {};
+    }
+    this.loaded = true;
   }
 
   private getData(): Record<string, unknown> {
@@ -131,7 +203,7 @@ export class Session {
 
   fetch(key: string, ...args: unknown[]): unknown {
     const data = this.getData();
-    if (key in data) return data[key];
+    if (Object.hasOwn(data, key)) return data[key];
     if (args.length > 0) {
       if (typeof args[0] === "function") {
         return (args[0] as (key: string) => unknown)(key);
@@ -164,7 +236,7 @@ export class Session {
     if (!this.loaded) {
       this.loadData();
     }
-    if (this.id != null) {
+    if (this.id != null && this.store) {
       this.store.deleteSession(this.env, this.id, this.options);
     }
     this.data = {};

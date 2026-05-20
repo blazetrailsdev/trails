@@ -49,14 +49,18 @@ describe("SpellChecker", () => {
   });
 
   it("falls through to the misspell fallback when Levenshtein filters all mistype candidates", () => {
-    // "caf" length 3 → mistypeThreshold = ceil(3 * 0.25) = 1. Levenshtein
-    // to "café"/"cafe" is 1/1, so both pass the mistype filter — but the
-    // ordering still matches Ruby (jw to original-cased "cafe" wins).
-    expect(correct("caf", ["café", "cafe"])).toEqual(["cafe", "café"]);
+    // "abcd" → mistypeThreshold = ceil(4 * 0.25) = 1. Lev("abcd","abdc") = 2
+    // (transposition costs two ops), so the mistype filter rejects it. JW is
+    // ~0.93 (above 0.834), so the candidate reaches the fallback, where
+    // Lev=2 < min(len)=4 keeps it.
+    expect(correct("abcd", ["abdc"])).toEqual(["abdc"]);
   });
 
-  it("treats non-BMP codepoints as one codepoint when ranking", () => {
-    expect(correct("café", ["cafe", "Cafe", "caf"])).toEqual(["caf", "cafe", "Cafe"]);
+  it("uses codepoint length (not UTF-16) when picking the JW threshold", () => {
+    // "🎉ab" is 3 codepoints (UTF-16 length 4). JW vs "🎉ac" is ~0.82, which
+    // sits between the short (0.77) and long (0.834) thresholds — so this
+    // test only passes if length is measured in codepoints.
+    expect(correct("🎉ab", ["🎉ac"])).toEqual(["🎉ac"]);
   });
 
   it("handles Rails-style action-name dictionaries", () => {

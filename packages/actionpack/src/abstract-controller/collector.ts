@@ -90,3 +90,20 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     return typeof prop === "string" && MimeType.lookup(prop) !== undefined;
   },
 };
+
+/**
+ * Rails generates a `format.<sym>(...)` method per registered MIME at
+ * class-eval time. The trails Proxy resolves MIME dispatch dynamically
+ * from `MimeType.lookup`, so the Rails-shaped eager generation step is
+ * a no-op for us — the Proxy already picks up any MIME registered later.
+ * Kept as a Rails-named entry point so `api:compare` matches and so
+ * `MimeType.register_callback`-style wiring has a target to call. The
+ * mime arg is validated (lookup must succeed) to surface typos early.
+ *
+ * @internal
+ */
+export function generateMethodForMime(mime: MimeType | string): void {
+  if (typeof mime === "string" && !MimeType.lookup(mime)) {
+    throw new TypeError(`generateMethodForMime: unknown MIME ${JSON.stringify(mime)}`);
+  }
+}

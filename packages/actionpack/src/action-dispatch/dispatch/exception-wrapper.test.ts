@@ -126,9 +126,13 @@ describe("ExceptionWrapperTest", () => {
     }
   });
 
+  const requestWith = (mode: "all" | "rescuable" | "none") => ({
+    getHeader: (k: string) => (k === "action_dispatch.show_exceptions" ? mode : undefined),
+  });
+
   it("#show? returns false when using :rescuable and the exceptions is not rescuable", () => {
-    const wrapper = new ExceptionWrapper(new Error("generic"));
-    expect(wrapper.show("rescuable")).toBe(false);
+    const wrapper = new ExceptionWrapper(null, new Error("generic"));
+    expect(wrapper.show(requestWith("rescuable"))).toBe(false);
   });
 
   it("#show? returns true when using :rescuable and the exceptions is rescuable", () => {
@@ -138,8 +142,8 @@ describe("ExceptionWrapperTest", () => {
       }
     }
     ExceptionWrapper.registerStatus("RoutingError", 404);
-    const wrapper = new ExceptionWrapper(new RoutingError("not found"));
-    expect(wrapper.show("rescuable")).toBe(true);
+    const wrapper = new ExceptionWrapper(null, new RoutingError("not found"));
+    expect(wrapper.show(requestWith("rescuable"))).toBe(true);
   });
 
   it("#show? returns false when using :none and the exceptions is rescuable", () => {
@@ -148,12 +152,12 @@ describe("ExceptionWrapperTest", () => {
         return "RoutingError";
       }
     }
-    const wrapper = new ExceptionWrapper(new RoutingError("not found"));
-    expect(wrapper.show("none")).toBe(false);
+    const wrapper = new ExceptionWrapper(null, new RoutingError("not found"));
+    expect(wrapper.show(requestWith("none"))).toBe(false);
   });
 
   it("#show? returns true when using :all and the exceptions is not rescuable", () => {
-    const wrapper = new ExceptionWrapper(new Error("generic"));
-    expect(wrapper.show("all")).toBe(true);
+    const wrapper = new ExceptionWrapper(null, new Error("generic"));
+    expect(wrapper.show(requestWith("all"))).toBe(true);
   });
 });
