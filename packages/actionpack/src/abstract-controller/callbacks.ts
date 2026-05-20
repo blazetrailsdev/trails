@@ -268,8 +268,9 @@ export function _registerActionCallback(
   _normalizeCallbackOptions(opts);
   delete opts.filters;
 
-  // Name-based dedup: AS::Callbacks#duplicates? only matches Symbol filters,
-  // so trails dedupes by an explicit `name` stashed on options.
+  // Name-based dedup: AS::Callbacks Callback#isDuplicates only fires for
+  // string (method-name) filters — trails registers function refs, so we
+  // dedupe via an explicit `name` stashed on options.
   if (options.name !== undefined) {
     const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
     if (chain) {
