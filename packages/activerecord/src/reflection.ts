@@ -10,7 +10,7 @@ import {
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
 import { Table } from "@blazetrails/arel";
-import { SpellChecker } from "@blazetrails/did-you-mean";
+import { _correctNames } from "./associations.js";
 
 import { modelRegistry } from "./associations.js";
 import {
@@ -1543,15 +1543,14 @@ export class ThroughReflection extends AbstractReflection {
   /**
    * @internal
    * Mirrors `HasManyThroughAssociationNotFoundError#corrections`: feeds the
-   * owner's reflection names (minus the failing one) into `SpellChecker`,
-   * which applies the Jaro-Winkler + Levenshtein thresholds from Ruby's
-   * `did_you_mean`.
+   * owner's reflection names (minus the failing one) into the shared
+   * did_you_mean-compatible SpellChecker.
    */
   private _throughCorrections(): string[] {
     const rawReflections: Record<string, unknown> =
       (this.activeRecord as { _reflections?: Record<string, unknown> })._reflections ?? {};
     const dictionary = Object.keys(rawReflections).filter((k) => k !== this.name);
-    return new SpellChecker({ dictionary }).correct(this.through);
+    return _correctNames(dictionary, this.through);
   }
 
   /**

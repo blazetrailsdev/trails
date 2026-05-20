@@ -233,7 +233,7 @@ function validateInverseOf(targetModel: typeof Base, assocName: string, inverseO
   if (targetAssocs.some((a) => a.name === inverseOf)) return;
 
   const dictionary = targetAssocs.map((a) => a.name);
-  const corrections = new SpellChecker({ dictionary }).correct(inverseOf);
+  const corrections = _correctNames(dictionary, inverseOf);
   throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections, targetModel.name);
 }
 
@@ -321,8 +321,17 @@ export function _hmtNotFound(
 ): HasManyThroughAssociationNotFoundError {
   const assocs: AssociationDefinition[] = ctor._associations ?? [];
   const dictionary = assocs.map((a) => a.name).filter((n) => n !== assocName);
-  const corrections = new SpellChecker({ dictionary }).correct(through);
+  const corrections = _correctNames(dictionary, through);
   return new HasManyThroughAssociationNotFoundError(ctor.name, through, assocName, corrections);
+}
+
+/**
+ * @internal
+ * Shared helper for did_you_mean-style name corrections used by the
+ * association error call sites (and reflection.ts).
+ */
+export function _correctNames(dictionary: string[], input: string): string[] {
+  return new SpellChecker({ dictionary }).correct(input);
 }
 
 /**
