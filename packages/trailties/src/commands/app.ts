@@ -22,7 +22,9 @@ export function appTemplateCommand(): Command {
       const gen = new AppGenerator({ cwd: getCwd(), output: console.log });
       await (tmpl as (g: AppGenerator) => unknown)(gen);
       for (const { what, args } of gen.pendingGenerators) {
-        await generateCommand().parseAsync(["node", "g", what, ...args]);
+        await generateCommand()
+          .exitOverride()
+          .parseAsync(["node", "g", what, ...args]);
       }
     });
 }
