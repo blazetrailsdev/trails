@@ -36,9 +36,11 @@ import {
   DIR_TO_PACKAGES,
   OUTPUT_DIR,
   PACKAGE_DIR_OVERRIDES,
+  PACKAGES,
   ROOT_DIR,
   packageSrcDir,
 } from "./config.js";
+import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
 import { isSourceUnported } from "./unported-files.js";
 
@@ -564,6 +566,13 @@ function main() {
     const value = args[pkgIndex + 1];
     if (!value || value.startsWith("--")) {
       console.error("--package requires a package name (e.g. --package activerecord)");
+      process.exit(1);
+    }
+    if (!PACKAGES.includes(value)) {
+      const suggestions = new SpellChecker({ dictionary: PACKAGES }).correct(value);
+      const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
+      console.error(`--package: unknown package "${value}".${hint}`);
+      console.error(`Available: ${PACKAGES.join(", ")}`);
       process.exit(1);
     }
     filterPkg = value;
