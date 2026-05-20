@@ -6,7 +6,8 @@
  */
 
 import type { RackEnv } from "@blazetrails/rack";
-import { parseNestedQuery } from "@blazetrails/rack";
+import { parseNestedQuery, Request as RackRequest } from "@blazetrails/rack";
+import { Session } from "../request/session.js";
 import {
   etagMatches as _etagMatches,
   fresh as _fresh,
@@ -828,8 +829,8 @@ export class Request {
   }
 
   /** @internal Rails: `default_session` — returns a disabled-session sentinel. */
-  protected defaultSession(): Record<string, unknown> {
-    return {};
+  protected defaultSession(): Session {
+    return Session.disabled(this);
   }
 
   // --- CSRF ---
@@ -881,8 +882,12 @@ export class Request {
 
   // --- Rack request wrapper (env-backed minimal shim) ---
 
-  get rackRequest(): { env: RackEnv } {
-    return { env: this.env };
+  get rackRequest(): RackRequest {
+    const cached = this.env["action_dispatch.rack_request"] as RackRequest | undefined;
+    if (cached) return cached;
+    const r = new RackRequest(this.env);
+    this.env["action_dispatch.rack_request"] = r;
+    return r;
   }
 
   // --- Mime-negotiation privates (declared; bound below via prototype) ---
