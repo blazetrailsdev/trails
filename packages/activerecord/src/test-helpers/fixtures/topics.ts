@@ -3,6 +3,7 @@ import { ref } from "../define-fixtures.js";
 // activerecord/test/fixtures/topics.yml
 export const topicFixtureData = {
   first: {
+    id: 1,
     title: "The First Topic",
     author_name: "David",
     author_email_address: "david@loudthinking.com",
@@ -15,6 +16,7 @@ export const topicFixtureData = {
     type: "Topic",
   },
   second: {
+    id: 2,
     title: "The Second Topic of the day",
     author_name: "Mary",
     written_on: "2004-07-15 14:28:00",
@@ -25,6 +27,7 @@ export const topicFixtureData = {
     type: "Reply",
   },
   third: {
+    id: 3,
     title: "The Third Topic of the day",
     author_name: "Carl",
     written_on: "2012-08-12 20:24:22",
@@ -34,6 +37,7 @@ export const topicFixtureData = {
     type: "Topic",
   },
   fourth: {
+    id: 4,
     title: "The Fourth Topic of the day",
     author_name: "Carl",
     written_on: "2006-07-15 14:28:00",
@@ -43,6 +47,7 @@ export const topicFixtureData = {
     type: "Reply",
   },
   fifth: {
+    id: 5,
     title: "The Fifth Topic of the day",
     author_name: "Jason",
     written_on: "2013-07-13 11:11:00",

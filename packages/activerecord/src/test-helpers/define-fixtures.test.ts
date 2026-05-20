@@ -340,6 +340,19 @@ describe("defineFixtures", () => {
     ).rejects.toThrow("polymorphic association");
   });
 
+  it("rejects non-integer declared primary keys with a clear error", async () => {
+    const adapter = makeAdapter();
+    const Model = makeModel("widgets", new Map());
+
+    await expect(
+      defineFixtures(adapter, Model, { thing: { id: "1" as unknown as number, name: "x" } }),
+    ).rejects.toThrow(/widgets\.thing declares a non-integer primary key/);
+
+    await expect(defineFixtures(adapter, Model, { thing: { id: 1.5, name: "x" } })).rejects.toThrow(
+      /non-integer primary key/,
+    );
+  });
+
   it("STI: type column passed explicitly is preserved in INSERT", async () => {
     const adapter = makeAdapter();
     const rows = new Map([

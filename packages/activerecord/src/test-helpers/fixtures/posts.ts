@@ -3,6 +3,7 @@ import { ref } from "../define-fixtures.js";
 // activerecord/test/fixtures/posts.yml
 export const postFixtureData = {
   welcome: {
+    id: 1,
     title: "Welcome to the weblog",
     body: "Such a lovely day",
     type: "Post",
@@ -11,6 +12,7 @@ export const postFixtureData = {
     tags_count: 1,
   },
   thinking: {
+    id: 2,
     title: "So I was thinking",
     body: "Like I hopefully always am",
     type: "SpecialPost",
@@ -19,12 +21,14 @@ export const postFixtureData = {
     tags_count: 1,
   },
   authorless: {
+    id: 3,
     title: "I don't have any comments",
     body: "I just don't want to",
     type: "Post",
     author_id: 0,
   },
   sti_comments: {
+    id: 4,
     title: "sti comments",
     body: "hello",
     type: "Post",
@@ -32,6 +36,7 @@ export const postFixtureData = {
     legacy_comments_count: 5,
   },
   sti_post_and_comments: {
+    id: 5,
     title: "sti me",
     body: "hello",
     type: "StiPost",
@@ -39,12 +44,14 @@ export const postFixtureData = {
     legacy_comments_count: 2,
   },
   sti_habtm: {
+    id: 6,
     title: "habtm sti test",
     body: "hello",
     type: "Post",
     author_id: ref("authors", "david"),
   },
   eager_other: {
+    id: 7,
     title: "eager loading with OR'd conditions",
     body: "hello",
     type: "Post",
@@ -53,6 +60,7 @@ export const postFixtureData = {
     tags_count: 3,
   },
   misc_by_bob: {
+    id: 8,
     title: "misc post by bob",
     body: "hello",
     type: "Post",
@@ -60,6 +68,7 @@ export const postFixtureData = {
     tags_count: 1,
   },
   misc_by_mary: {
+    id: 9,
     title: "misc post by mary",
     body: "hullo",
     type: "Post",
@@ -67,6 +76,7 @@ export const postFixtureData = {
     tags_count: 1,
   },
   other_by_bob: {
+    id: 10,
     title: "other post by bob",
     body: "hello",
     type: "Post",
@@ -74,6 +84,7 @@ export const postFixtureData = {
     tags_count: 1,
   },
   other_by_mary: {
+    id: 11,
     title: "other post by mary",
     body: "hello",
     type: "Post",

@@ -34,6 +34,27 @@ export function fixtureId(label: string): number {
   return crc32(label);
 }
 
+/**
+ * Resolves a row's primary key: the declared value if it's an integer (Rails
+ * fixture parity — YAML `id: N` parses as a number), else `fixtureId(label)`
+ * when the PK column is absent. A PK column present with any other value
+ * (string, boolean, fractional number) is rejected: it means the fixture
+ * author tried to declare an id but the type is wrong, and silently falling
+ * back to CRC32 would mask the bug.
+ */
+function resolveDeclaredPk(
+  tableName: string,
+  pkCol: string,
+  label: string,
+  declared: unknown,
+): number {
+  if (declared === undefined) return fixtureId(label);
+  if (typeof declared === "number" && Number.isInteger(declared)) return declared;
+  throw new Error(
+    `defineFixtures: ${tableName}.${label} declares a non-integer primary key (${typeof declared}: ${String(declared)}); use an integer literal (e.g. \`${pkCol}: 1\`) or omit the column.`,
+  );
+}
+
 const REF_TAG = Symbol("fixture-ref");
 
 export interface FixtureRef {
@@ -43,8 +64,17 @@ export interface FixtureRef {
 }
 
 /**
- * Cross-batch cross-reference sentinel. Resolves to the fixture's deterministic ID at insert time.
- * `tableName` is stored for readability and future validation; resolution uses only `fixtureName`.
+ * Cross-batch cross-reference sentinel. Resolves to the target fixture's id at insert time:
+ * `(tableName, fixtureName)` is looked up in the adapter-scoped declared-id registry first
+ * (populated by `defineFixtures()` when a row carries an explicit primary key), falling back
+ * to `fixtureId(fixtureName)` (CRC32) when the target fixture set hasn't been loaded yet
+ * or the target row has no declared PK.
+ *
+ * Ordering requirement: if the target fixture set declares explicit ids, load it BEFORE
+ * any set that references it. A `ref()` resolved before the target loads will return the
+ * CRC32 fallback and persist that value as the FK — loading the target afterwards does
+ * not retroactively update already-inserted rows. `useFixtures()` iterates its argument
+ * in declaration order, so list dependents after dependencies.
  */
 export function ref(tableName: string, fixtureName: string): FixtureRef {
   return { [REF_TAG]: true, tableName, fixtureName };
@@ -53,6 +83,43 @@ export function ref(tableName: string, fixtureName: string): FixtureRef {
 /** @internal */
 export function isFixtureRef(v: unknown): v is FixtureRef {
   return typeof v === "object" && v !== null && REF_TAG in v;
+}
+
+// Adapter-scoped registry of declared fixture ids, nested by table so a subsequent
+// defineFixtures() call for the same table fully replaces the prior label set —
+// no leakage of stale labels when the caller reloads a subset. Values are the row's
+// primary-key value (declared PK when the row carries one, else fixtureId(label)).
+const declaredIds = new WeakMap<object, Map<string, Map<string, number>>>();
+
+function declaredIdsFor(adapter: object): Map<string, Map<string, number>> {
+  let m = declaredIds.get(adapter);
+  if (!m) {
+    m = new Map();
+    declaredIds.set(adapter, m);
+  }
+  return m;
+}
+
+/** @internal */
+export function resolveFixtureId(
+  adapter: DatabaseAdapter,
+  tableName: string,
+  fixtureName: string,
+): number {
+  const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
+  return declared ?? fixtureId(fixtureName);
+}
+
+/**
+ * Returns the adapter's normalized name (`"postgres"` / `"mysql"` / `"sqlite"`).
+ * Lets ERB-style adapter-conditional fixture data translate to TS:
+ *
+ * ```ts
+ * { data: adapterName(adapter) === "postgres" ? a : b }
+ * ```
+ */
+export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql" | "sqlite" {
+  return adapter.adapterName;
 }
 
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---
@@ -73,6 +140,7 @@ function getRegistry(adapter: object): Map<string, BaseClass> {
 /** Clears the model registry for the given adapter. Useful in test suites that reuse one adapter across multiple files. */
 export function clearTableRegistry(adapter: DatabaseAdapter): void {
   tableRegistries.delete(adapter);
+  declaredIds.delete(adapter);
 }
 
 /** @internal */
@@ -173,21 +241,40 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
 
   const habtmParts = detectHabtmParts(registry, tableName);
   // Compute once per defineFixtures call; used for every row and column in the inner loop.
-  const habtmFkCols = habtmParts
-    ? new Set([`${singularize(habtmParts[0])}_id`, `${singularize(habtmParts[1])}_id`])
+  const habtmFkColToTable: Map<string, string> | null = habtmParts
+    ? new Map([
+        [`${singularize(habtmParts[0])}_id`, habtmParts[0]],
+        [`${singularize(habtmParts[1])}_id`, habtmParts[1]],
+      ])
     : null;
 
   const labels = Object.keys(fixtures) as K[];
 
-  // Build rows with deterministic IDs and resolved references
+  // Pre-pass: build this table's label→id map locally, then swap it in atomically
+  // so a mid-loop validation failure (e.g. non-integer declared PK) leaves the
+  // registry untouched. The swap also replaces any prior label set, evicting
+  // entries for labels omitted from a subset reload. The prior entry is captured
+  // so we can roll back if the INSERT itself fails — `ref()` resolution must not
+  // observe ids for rows that never landed in the database.
+  const tableIds = new Map<string, number>();
+  for (const label of labels) {
+    const id = resolveDeclaredPk(tableName, pkCol, label, (fixtures[label] as FixtureAttrs)[pkCol]);
+    tableIds.set(label, id);
+  }
+  const adapterIds = declaredIdsFor(adapter);
+  const priorTableIds = adapterIds.get(tableName);
+  adapterIds.set(tableName, tableIds);
+
+  // Build rows with resolved IDs and references. Rows that declare `id: N` use it
+  // verbatim (Rails parity); rows without one fall back to fixtureId(label).
   const rows: FixtureAttrs[] = [];
   for (const label of labels) {
     const attrs = fixtures[label];
-    const id = fixtureId(label);
+    const id = resolveDeclaredPk(tableName, pkCol, label, attrs[pkCol]);
     const row: FixtureAttrs = { [pkCol]: id };
 
     for (const [col, val] of Object.entries(attrs)) {
-      if (col === pkCol) continue; // deterministic ID wins; caller must not override it
+      if (col === pkCol) continue; // PK already set above (declared id or fixtureId fallback)
 
       // Evaluate poly once so both the ref guard and the expansion below share the result.
       const poly = findPolymorphicRef(ModelClass, col);
@@ -199,7 +286,7 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
               `Use explicit ${poly.typeColumn}/${poly.idColumn} if you need to reference by ID.`,
           );
         }
-        row[col] = fixtureId(val.fixtureName);
+        row[col] = resolveFixtureId(adapter, val.tableName, val.fixtureName);
         continue;
       }
 
@@ -258,11 +345,16 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
         );
       }
 
-      // HABTM auto-resolution: string label values for `a_id`/`b_id` columns auto-resolve.
-      // FK column names are pre-computed outside the loop (habtmFkCols).
-      if (habtmFkCols && typeof val === "string" && habtmFkCols.has(col)) {
-        row[col] = fixtureId(val);
-        continue;
+      // HABTM auto-resolution: string label values for `a_id`/`b_id` columns
+      // resolve through the same declared-id registry as ref(), so explicit
+      // Rails ids on the target fixture (e.g. developers.david.id = 1) win
+      // over the CRC32 fallback.
+      if (habtmFkColToTable && typeof val === "string") {
+        const targetTable = habtmFkColToTable.get(col);
+        if (targetTable !== undefined) {
+          row[col] = resolveFixtureId(adapter, targetTable, val);
+          continue;
+        }
       }
 
       if (val !== null && typeof val === "object" && pkCol in val) {
@@ -292,9 +384,20 @@ export async function defineFixtures<T extends BaseClass, K extends string>(
   }
 
   // Mirrors Rails: pass tableName as tablesToDelete so rows are replaced, not appended.
-  await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
-    tableName,
-  ]);
+  // On failure, roll back the declared-id registry to its pre-call state so subsequent
+  // ref() calls don't resolve to ids for rows that never made it to the database.
+  try {
+    await insertFixturesSet.call(adapter as unknown as InsertHost, { [tableName]: rows }, [
+      tableName,
+    ]);
+  } catch (err) {
+    if (priorTableIds === undefined) {
+      adapterIds.delete(tableName);
+    } else {
+      adapterIds.set(tableName, priorTableIds);
+    }
+    throw err;
+  }
 
   // Reload persisted instances so AR attribute casting is applied
   const result = {} as { [P in K]: InstanceType<T> };

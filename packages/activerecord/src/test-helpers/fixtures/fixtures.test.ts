@@ -45,12 +45,41 @@ function makeModel(tableName: string, pk = "id") {
   return Model;
 }
 
+function idOf(data: Record<string, { id?: number }>, label: string): number {
+  return data[label]?.id ?? fixtureId(label);
+}
+
+/**
+ * Find the INSERT statement whose VALUES tuple starts with the given primary key.
+ * Anchoring on the leading `VALUES (<id>` slot avoids false positives from small
+ * integer ids appearing elsewhere in the SQL (counts, dates, other FKs).
+ */
+function findInsertWithPk(sqls: string[], pk: number): string | undefined {
+  const re = new RegExp(`VALUES\\s*\\(\\s*${pk}\\b`);
+  return sqls.find((s) => re.test(s));
+}
+
+/**
+ * Assert that the row's VALUES tuple carries `fkId` as one of the column values.
+ * Word-boundary match prevents small integer ids from matching as substrings of
+ * unrelated values (counts, dates, etc.). Use after `findInsertWithPk` has
+ * narrowed the SQL to the specific row we care about.
+ */
+function expectValueInRow(sql: string | undefined, fkId: number): void {
+  expect(sql).toBeTruthy();
+  const valuesMatch = /VALUES\s*\(([^)]*)\)/.exec(sql ?? "");
+  const tuple = valuesMatch?.[1] ?? "";
+  const vals = tuple.split(",").map((v) => v.trim());
+  expect(vals).toContain(String(fkId));
+}
+
 function seedRows(
   Model: ReturnType<typeof makeModel>,
   label: string,
+  data: Record<string, { id?: number }>,
   extra: Record<string, unknown> = {},
 ) {
-  const id = fixtureId(label);
+  const id = idOf(data, label);
   Model._rows.set(id, { id, ...extra });
 }
 
@@ -77,11 +106,11 @@ describe("topicFixtureData", () => {
     expect(parentRef.tableName).toBe("topics");
   });
 
-  it("defineFixtures resolves cross-refs: second.parent_id equals fixtureId(first)", async () => {
+  it("defineFixtures resolves cross-refs: second.parent_id equals first's declared id", async () => {
     const adapter = makeAdapter();
     const Topic = makeModel("topics");
     for (const k of Object.keys(topicFixtureData) as Array<keyof typeof topicFixtureData>) {
-      seedRows(Topic, k, { title: topicFixtureData[k].title });
+      seedRows(Topic, k, topicFixtureData, { title: topicFixtureData[k].title });
     }
 
     const topics = await defineFixtures(adapter, Topic, topicFixtureData);
@@ -91,9 +120,9 @@ describe("topicFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("topics"));
-    const secondInsert = insertSqls.find((s) => s.includes(String(fixtureId("second"))));
+    const secondInsert = findInsertWithPk(insertSqls, topicFixtureData.second.id);
     expect(secondInsert).toBeTruthy();
-    expect(secondInsert).toContain(String(fixtureId("first")));
+    expectValueInRow(secondInsert, topicFixtureData.first.id);
   });
 });
 
@@ -130,7 +159,7 @@ describe("commentFixtureData", () => {
     const adapter = makeAdapter();
     const Comment = makeModel("comments");
     for (const k of Object.keys(commentFixtureData) as Array<keyof typeof commentFixtureData>) {
-      seedRows(Comment, k);
+      seedRows(Comment, k, commentFixtureData);
     }
 
     await defineFixtures(adapter, Comment, commentFixtureData);
@@ -138,7 +167,7 @@ describe("commentFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("comments"));
-    const greetingsInsert = insertSqls.find((s) => s.includes(String(fixtureId("greetings"))));
+    const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
     expect(greetingsInsert).toBeTruthy();
     expect(greetingsInsert).toContain(String(fixtureId("welcome")));
   });
@@ -167,7 +196,7 @@ describe("authorFixtureData", () => {
     const adapter = makeAdapter();
     const Author = makeModel("authors");
     for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
-      seedRows(Author, k, { name: authorFixtureData[k].name });
+      seedRows(Author, k, authorFixtureData, { name: authorFixtureData[k].name });
     }
 
     await defineFixtures(adapter, Author, authorFixtureData);
@@ -175,7 +204,7 @@ describe("authorFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("authors"));
-    const davidInsert = insertSqls.find((s) => s.includes(String(fixtureId("david"))));
+    const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
     expect(davidInsert).toBeTruthy();
     expect(davidInsert).toContain(String(fixtureId("david_address")));
   });
@@ -202,7 +231,7 @@ describe("bookFixtureData", () => {
     const adapter = makeAdapter();
     const Book = makeModel("books");
     for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
-      seedRows(Book, k, { name: bookFixtureData[k].name });
+      seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
     }
 
     await defineFixtures(adapter, Book, bookFixtureData);
@@ -210,9 +239,35 @@ describe("bookFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
-    const awdrInsert = insertSqls.find((s) => s.includes(String(fixtureId("awdr"))));
+    const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
     expect(awdrInsert).toContain(String(fixtureId("david")));
+  });
+
+  it("ref() resolves cross-table to declared id once target fixture set is loaded", async () => {
+    // Load authors first so the (authors, david) → id=1 entry lands in the
+    // adapter-scoped declared-id registry; then loading books must resolve
+    // books.awdr.author_id to authorFixtureData.david.id, NOT fixtureId("david").
+    const adapter = makeAdapter();
+    const Author = makeModel("authors");
+    const Book = makeModel("books");
+    for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
+      seedRows(Author, k, authorFixtureData, { name: authorFixtureData[k].name });
+    }
+    for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
+      seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
+    }
+
+    await defineFixtures(adapter, Author, authorFixtureData);
+    await defineFixtures(adapter, Book, bookFixtureData);
+
+    const bookInserts = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
+    const awdrInsert = findInsertWithPk(bookInserts, bookFixtureData.awdr.id);
+    expect(awdrInsert).toBeTruthy();
+    expectValueInRow(awdrInsert, authorFixtureData.david.id);
+    expect(authorFixtureData.david.id).not.toBe(fixtureId("david"));
   });
 });
 
@@ -270,7 +325,7 @@ describe("companyFixtureData", () => {
     const adapter = makeAdapter();
     const Company = makeModel("companies");
     for (const k of Object.keys(companyFixtureData) as Array<keyof typeof companyFixtureData>) {
-      seedRows(Company, k, { name: (companyFixtureData[k] as any).name });
+      seedRows(Company, k, companyFixtureData, { name: (companyFixtureData[k] as any).name });
     }
 
     await defineFixtures(adapter, Company, companyFixtureData);
@@ -278,9 +333,9 @@ describe("companyFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("companies"));
-    const clientInsert = insertSqls.find((s) => s.includes(String(fixtureId("first_client"))));
+    const clientInsert = findInsertWithPk(insertSqls, companyFixtureData.first_client.id);
     expect(clientInsert).toBeTruthy();
-    expect(clientInsert).toContain(String(fixtureId("first_firm")));
+    expectValueInRow(clientInsert, companyFixtureData.first_firm.id);
   });
 });
 
@@ -315,11 +370,13 @@ describe("accountFixtureData", () => {
     expect(firmRef.fixtureName).toBe("odegy");
   });
 
-  it("defineFixtures resolves signals37.firm_id to first_firm id", async () => {
+  it("defineFixtures: signals37.firm_id falls back to fixtureId('first_firm') when companies set isn't loaded", async () => {
     const adapter = makeAdapter();
     const Account = makeModel("accounts");
     for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {
-      seedRows(Account, k, { credit_limit: (accountFixtureData[k] as any).credit_limit });
+      seedRows(Account, k, accountFixtureData, {
+        credit_limit: (accountFixtureData[k] as any).credit_limit,
+      });
     }
 
     await defineFixtures(adapter, Account, accountFixtureData);
@@ -327,8 +384,10 @@ describe("accountFixtureData", () => {
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("accounts"));
-    const signals37Insert = insertSqls.find((s) => s.includes(String(fixtureId("signals37"))));
+    const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
     expect(signals37Insert).toBeTruthy();
+    // companies fixture set isn't loaded in this test, so ref("companies", "first_firm")
+    // falls back to fixtureId("first_firm") (no entry in declared-id registry).
     expect(signals37Insert).toContain(String(fixtureId("first_firm")));
   });
 });
@@ -356,13 +415,13 @@ describe("developerFixtureData", () => {
     const adapter = makeAdapter();
     const Developer = makeModel("developers");
     for (const k of Object.keys(developerFixtureData) as Array<keyof typeof developerFixtureData>) {
-      seedRows(Developer, k, { name: developerFixtureData[k].name });
+      seedRows(Developer, k, developerFixtureData, { name: developerFixtureData[k].name });
     }
     await defineFixtures(adapter, Developer, developerFixtureData);
     const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
       .map((c: unknown[]) => c[0] as string)
       .filter((s) => s.includes("INSERT INTO") && s.includes("developers"));
-    expect(insertSqls.some((s) => s.includes(String(fixtureId("david"))))).toBe(true);
+    expect(findInsertWithPk(insertSqls, developerFixtureData.david.id)).toBeTruthy();
   });
 });
 
@@ -403,8 +462,8 @@ describe("authorAddressFixtureData", () => {
     ]);
   });
 
-  it("address fixtures are empty objects (PK-only rows)", () => {
-    expect(authorAddressFixtureData.david_address).toEqual({});
-    expect(authorAddressFixtureData.mary_address).toEqual({});
+  it("address fixtures are PK-only rows mirroring Rails ids", () => {
+    expect(authorAddressFixtureData.david_address).toEqual({ id: 1 });
+    expect(authorAddressFixtureData.mary_address).toEqual({ id: 3 });
   });
 });

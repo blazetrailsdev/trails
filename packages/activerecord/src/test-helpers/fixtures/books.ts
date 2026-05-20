@@ -3,6 +3,7 @@ import { ref } from "../define-fixtures.js";
 // activerecord/test/fixtures/books.yml
 export const bookFixtureData = {
   awdr: {
+    id: 1,
     author_id: ref("authors", "david"),
     name: "Agile Web Development with Rails",
     format: "paperback",
@@ -17,6 +18,7 @@ export const bookFixtureData = {
     cover: "soft",
   },
   rfr: {
+    id: 2,
     author_id: ref("authors", "david"),
     name: "Ruby for Rails",
     format: "ebook",
@@ -24,12 +26,14 @@ export const bookFixtureData = {
     last_read: 2,
   },
   ddd: {
+    id: 3,
     author_id: ref("authors", "david"),
     name: "Domain-Driven Design",
     format: "hardcover",
     status: 2,
   },
   tlg: {
+    id: 4,
     author_id: ref("authors", "david"),
     name: "Thoughtleadering",
   },
