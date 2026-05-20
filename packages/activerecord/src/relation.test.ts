@@ -7,7 +7,11 @@ import { sql, Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, IrreversibleOrderError } from "./index.js";
 import { Associations, registerModel, modelRegistry } from "./associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import {
+  createTestAdapter,
+  resetTestAdapterState,
+  type TestDatabaseAdapter,
+} from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
@@ -42,6 +46,14 @@ describe("isBlank / isPresent", () => {
     await User.create({ name: "Alice" });
     expect(await User.all().isBlank()).toBe(false);
     expect(await User.all().isPresent()).toBe(true);
+  });
+
+  // Drop tables/rows this describe wrote on the shared adapter so the
+  // following transactional-fixture describe (RelationTest) doesn't inherit
+  // them — its withTransactionalFixtures pushes the global-reset opt-out
+  // before any cleanup would otherwise run.
+  afterAll(async () => {
+    await resetTestAdapterState();
   });
 });
 
