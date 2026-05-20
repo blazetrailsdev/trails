@@ -334,8 +334,15 @@ export class RouteSet {
     recall: Record<string, unknown> = {},
     _methodName?: string | null,
   ): string {
-    void recall;
     const opts: Record<string, unknown> = { ...options };
+    // Rails Generator#normalize_controller_action_id! pulls
+    // controller/action/id from `recall` when missing from options (and
+    // stops at the first key it can't supply). Approximate that here so
+    // callers passing only a recall hash still resolve a route.
+    for (const key of ["controller", "action", "id"] as const) {
+      if (opts[key] == null && recall[key] != null) opts[key] = recall[key];
+      else if (opts[key] == null) break;
+    }
     let route: Route | undefined;
     if (routeName) route = this.namedRoutes.get(routeName);
     route ??= this.routes.find(
