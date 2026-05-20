@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Base, ReadonlyAttributeError } from "./index.js";
@@ -88,13 +88,14 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
 // ==========================================================================
+// Top describe is NOT migrated to beforeAll: tests call `freshAdapter()`
+// in their `it()` bodies, which under withTransactionalFixtures collides
+// with the outer-tx savepoint on MariaDB (ER_SP_DOES_NOT_EXIST).
 describe("AttributeMethodsTest", () => {
-  let adapter: TestDatabaseAdapter;
-  beforeAll(async () => {
-    adapter = createTestAdapter();
-    await defineSchema(adapter, TEST_SCHEMA);
+  let adapter: DatabaseAdapter;
+  beforeEach(async () => {
+    adapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => adapter);
 
   it("attribute names returns list of attribute names", () => {
     class Post extends Base {
