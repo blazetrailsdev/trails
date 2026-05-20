@@ -450,6 +450,8 @@ export const Mime = {
     const found = MimeType.lookupByExtension(type);
     if (found) return found;
     if (fallback) return fallback(type);
-    throw new Error(`key not found: ${type}`);
+    const err = new Error(`key not found: "${type}"`);
+    err.name = "KeyError";
+    throw err;
   },
 };
