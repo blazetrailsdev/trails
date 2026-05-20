@@ -47,7 +47,7 @@ export class MemCacheStore extends CacheStore {
    * copied onto this prototype by the `include` calls below.
    */
   override generateSid(): SessionId {
-    return CacheStore.prototype.generateSid.call(this) as SessionId;
+    return super.generateSid();
   }
 }
 
