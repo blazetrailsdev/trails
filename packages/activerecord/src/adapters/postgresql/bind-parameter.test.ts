@@ -1,30 +1,41 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/bind_parameter_test.rb
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { defineSchema } from "../../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../../test-helpers/with-transactional-fixtures.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
+
+  beforeAll(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    // `dropExisting: true` makes this file repeatable against a
+    // non-empty PG test DB — a prior aborted run could leave `bind_test`
+    // behind, and the per-adapter signature cache starts empty in a
+    // fresh process, so defineSchema would otherwise try CREATE TABLE
+    // over an existing table.
+    await defineSchema(adapter, { bind_test: { name: "string" } }, { dropExisting: true });
+    await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
   });
-  afterEach(async () => {
+
+  afterAll(async () => {
+    await adapter.exec(`DROP TABLE IF EXISTS "bind_test"`).catch(() => {});
     await adapter.close();
   });
 
-  describe("BindParameterTest", () => {
-    beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS "bind_test"`);
-      await adapter.exec(`
-        CREATE TABLE "bind_test" (
-          "id" SERIAL PRIMARY KEY,
-          "name" TEXT
-        )
-      `);
-      await adapter.executeMutation(`INSERT INTO "bind_test" ("name") VALUES ('hello')`);
-    });
+  withTransactionalFixtures(() => adapter);
 
+  describe("BindParameterTest", () => {
     it("where with string for string column using bind parameters", async () => {
       const rows = await adapter.execute(`SELECT * FROM "bind_test" WHERE "name" = ?`, ["hello"]);
       expect(rows).toHaveLength(1);
