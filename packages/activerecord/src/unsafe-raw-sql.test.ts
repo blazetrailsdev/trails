@@ -1,22 +1,22 @@
 /**
  * Mirrors: activerecord/test/cases/unsafe_raw_sql_test.rb
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, UnknownAttributeReference } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
 describe("UnsafeRawSqlTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
   let Post: typeof Base;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       urs_posts: { title: "string", author_id: "integer", type: "string", tags_count: "integer" },
@@ -32,7 +32,10 @@ describe("UnsafeRawSqlTest", () => {
       }
     }
     Post = UrsPost;
+  });
+  withTransactionalFixtures(() => adapter);
 
+  beforeAll(async () => {
     await Post.create({ title: "Alpha", author_id: 2, tags_count: 3 });
     await Post.create({ title: "Beta", author_id: 1, tags_count: 1 });
     await Post.create({ title: "Gamma", author_id: 1, tags_count: 2 });
