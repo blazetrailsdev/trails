@@ -404,10 +404,16 @@ export class Mapper {
 
   /** Rails: `nested(&block)`. Wraps `block` in a nested resource scope. */
   nested(callback: MapperCallback): void {
-    if (!this.parentResource()) {
+    if (!this._scope.isResourceScope()) {
       throw new Error("can't use nested outside resource(s) scope");
     }
-    this.withScopeLevel("nested", () => callback(this));
+    this.withScopeLevel("nested", () => {
+      if (this.isShallow() && this.shallowNestingDepth() >= 1) {
+        this.shallowScope(() => callback(this));
+      } else {
+        callback(this);
+      }
+    });
   }
 
   /**
