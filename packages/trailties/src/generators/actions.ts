@@ -42,6 +42,10 @@ function asArray<T>(v: T | T[] | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
+function indent(text: string, pad: string): string {
+  return text.replace(/^(?=.)/gm, pad);
+}
+
 export function gem(this: ActionsHost, name: string, ...rest: Array<string | GemOptions>): void {
   let options: GemOptions = {};
   const versions: string[] = [];
@@ -73,18 +77,12 @@ export function route(
 ): void {
   let code = routingCode;
   for (const ns of asArray(options.namespace).reverse()) {
-    const indented = code
-      .split("\n")
-      .map((l) => (l ? "  " + l : l))
-      .join("\n");
-    code = `namespace :${ns} do\n${indented}\nend`;
+    code = `namespace :${ns} do\n${indent(code, "  ")}\nend`;
   }
   this.output(`      route  ${routingCode}`);
-  const indented = code
-    .split("\n")
-    .map((l) => (l ? "  " + l : l))
-    .join("\n");
-  this.insertIntoFile("config/routes.rb", ".routes.draw do\n", indented + "\n", { after: true });
+  this.insertIntoFile("config/routes.rb", ".routes.draw do\n", indent(code, "  ") + "\n", {
+    after: true,
+  });
 }
 
 export function environment(
@@ -102,12 +100,9 @@ export function environment(
     const marker = isApp
       ? "class Application < Rails::Application\n"
       : "Rails.application.configure do\n";
-    const pad = isApp ? "    " : "  ";
-    const indented = data
-      .split("\n")
-      .map((l) => (l ? pad + l : l))
-      .join("\n");
-    this.insertIntoFile(target, marker, indented + "\n", { after: true });
+    this.insertIntoFile(target, marker, indent(data, isApp ? "    " : "  ") + "\n", {
+      after: true,
+    });
   }
 }
 
