@@ -10,6 +10,18 @@
 
 import { getCrypto } from "@blazetrails/activesupport";
 
+import { includeContent as _includeContent } from "./head.js";
+
+/**
+ * Rails `Head#include_content?` — re-exposed because `ConditionalGet`
+ * includes `Head`, so the predicate is part of its mixed-in surface.
+ *
+ * @internal
+ */
+export function includeContent(status: number): boolean {
+  return _includeContent(status);
+}
+
 export function generateWeakEtag(seed: string): string {
   const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
   return `W/"${hash}"`;
