@@ -31,8 +31,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // BLOCKED on TM Phase 9a follow-up: encryption binary writes bypass
-  // type.serialize so the EncryptedMessage object reaches adapter.quote().
+  // BLOCKED on TM Phase 9a follow-up (Category B): encryption binary writes
+  // bypass type.serialize so the EncryptedMessage object reaches
+  // adapter.quote() and throws.
   it.skip("binary data can be serialized with message pack", async () => {
     const Book = makeEncryptedBookWithBinaryMessagePackSerialized(adapter);
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
@@ -40,7 +41,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
     await assertEncryptedAttribute(book, "logo", allBytes);
   });
 
-  // BLOCKED on TM Phase 9a follow-up: see preceding skip.
+  // BLOCKED on TM Phase 9a follow-up (Category B): see preceding skip.
   it.skip("binary data can be encrypted uncompressed and serialized with message pack", async () => {
     const Book = makeEncryptedBookWithBinaryMessagePackSerialized(adapter);
     // Rails: both ranges are 128 bytes (< 140 threshold) so neither is compressed.

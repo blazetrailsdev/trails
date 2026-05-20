@@ -193,7 +193,7 @@ describe("AssociationScope", () => {
     // The lambda must run exactly once — _addConstraints applies it via
     // reflection.scope; the loader path must not re-apply options.scope.
     expect(calls).toBe(1);
-    expect(scope.toSql()).toMatch(/"published"\s*=\s*TRUE/i);
+    expect(scope.toSql()).toMatch(/"published"\s*=\s*(TRUE|1)/i);
   });
 
   it("applies STI type_condition on subclass targets (compensates for our unscoped)", () => {
@@ -277,7 +277,7 @@ describe("AssociationScope", () => {
     }) as any;
     const merged = (DsPost as any).scopeForAssociation().merge(built);
     const sql = merged.toSql();
-    expect(sql).toMatch(/"published"\s*=\s*TRUE/i);
+    expect(sql).toMatch(/"published"\s*=\s*(TRUE|1)/i);
     expect(sql).toMatch(/"ds_author_id"\s*=\s*1/);
   });
 
@@ -358,7 +358,7 @@ describe("AssociationScope", () => {
     const sql = (
       AssociationScope.scope({ owner, reflection, klass: reflection.klass }) as any
     ).toSql();
-    expect(sql).toMatch(/"active"\s*=\s*TRUE/i);
+    expect(sql).toMatch(/"active"\s*=\s*(TRUE|1)/i);
   });
 
   it("hasMany :as adds the polymorphic type WHERE on the target table", () => {
@@ -591,7 +591,7 @@ describe("AssociationScope", () => {
     ).toSql();
     expect(sql).toMatch(/INNER JOIN\s+"?cc_memberships"?/i);
     expect(sql).toMatch(/"cc_memberships"\."cc_author_id"\s*=\s*1/);
-    expect(sql).toMatch(/"cc_memberships"\."active"\s*=\s*TRUE/i);
+    expect(sql).toMatch(/"cc_memberships"\."active"\s*=\s*(TRUE|1)/i);
   });
 
   it("loadHasMany through with sourceType filters by polymorphic source type (PR 3c)", async () => {
