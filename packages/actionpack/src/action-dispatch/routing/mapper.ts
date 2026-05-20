@@ -167,7 +167,9 @@ export class Mapper {
     const constraints = scopeConstraints
       ? { ...scopeConstraints, ...options.constraints }
       : options.constraints;
-    const pathNames = options.pathNames ?? {};
+    const scopePathNames =
+      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
@@ -207,6 +209,15 @@ export class Mapper {
         shallow,
         constraints: Object.keys(nestedConstraints).length > 0 ? nestedConstraints : undefined,
         memberPath: basePath + "/:id",
+        resource: {
+          memberName: singular,
+          collectionName: name,
+          nestedParam: `${singular}_id`,
+          param: "id",
+          resourceScope: controller,
+          actions: Array.from(allowed) as ResourceAction[],
+        },
+        resourceController: controller,
       });
       cb(this);
       this.scopeStack.pop();
@@ -273,7 +284,9 @@ export class Mapper {
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
     const allowed = allowedActions(options, ["show", "new", "create", "edit", "update", "destroy"]);
-    const pathNames = options.pathNames ?? {};
+    const scopePathNames =
+      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
@@ -319,6 +332,15 @@ export class Mapper {
         path: basePath,
         namePrefix: name,
         controller: undefined,
+        memberPath: basePath,
+        resource: {
+          memberName: name,
+          collectionName: pluralize(name),
+          param: "id",
+          resourceScope: controller,
+          actions: Array.from(allowed) as ResourceAction[],
+        },
+        resourceController: controller,
       });
       cb(this);
       this.scopeStack.pop();
@@ -470,16 +492,26 @@ export class Mapper {
    */
   setMemberMappingsForResource(): void {
     const parent = this.parentResource();
-    const actions = parent?.actions ?? [];
-    this.member((m) => {
-      if (actions.includes("edit")) m.get("edit", { action: "edit" });
-      if (actions.includes("show")) m.get("show", { action: "show" });
-      if (actions.includes("update")) {
-        m.patch("update", { action: "update" });
-        m.put("update", { action: "update" });
-      }
-      if (actions.includes("destroy")) m.delete("destroy", { action: "destroy" });
-    });
+    if (!parent) return;
+    const actions = parent.actions ?? [];
+    // Find the active resource frame for the canonical member path + controller.
+    const frame = [...this.scopeStack].reverse().find((f) => f.resource === parent);
+    const memberPath = frame?.memberPath ?? this.currentPrefix();
+    const controller = frame?.resourceController ?? "";
+    const editPath = this.actionPath("edit");
+    if (actions.includes("edit")) {
+      this.routes.push(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+    }
+    if (actions.includes("show")) {
+      this.routes.push(new Route("GET", memberPath, controller, "show"));
+    }
+    if (actions.includes("update")) {
+      this.routes.push(new Route("PATCH", memberPath, controller, "update"));
+      this.routes.push(new Route("PUT", memberPath, controller, "update"));
+    }
+    if (actions.includes("destroy")) {
+      this.routes.push(new Route("DELETE", memberPath, controller, "destroy"));
+    }
   }
 
   // --- constraints block ---
@@ -1192,6 +1224,10 @@ export class Mapper {
 
   /** @internal */
   parentResource(): ResourceLike | undefined {
+    for (let i = this.scopeStack.length - 1; i >= 0; i--) {
+      const r = this.scopeStack[i].resource;
+      if (r) return r;
+    }
     return this._scope.get("scopeLevelResource") as ResourceLike | undefined;
   }
 
@@ -1337,6 +1373,10 @@ interface ScopeFrame {
   shallow?: boolean;
   constraints?: RouteConstraints;
   memberPath?: string;
+  /** Snapshot of the active resource (Rails: `@scope[:scope_level_resource]`). */
+  resource?: ResourceLike;
+  /** Controller for member-route emission (Rails: resource_scope controller). */
+  resourceController?: string;
 }
 
 interface ScopeOptions {

@@ -138,14 +138,27 @@ describe("Mapper public DSL additions", () => {
     expect(m.defaultUrlOptions).toEqual({ port: 3000 });
   });
 
-  it("setMemberMappingsForResource emits member routes with explicit actions", () => {
+  it("setMemberMappingsForResource emits canonical member routes for the parent resource actions", () => {
     const m = new Mapper();
+    let before = 0;
     m.resources("posts", () => {
+      before = m.routes.length;
       m.setMemberMappingsForResource();
     });
-    const editRoute = m.routes.find((r) => r.action === "edit");
-    const showRoute = m.routes.find((r) => r.action === "show");
-    expect(editRoute?.controller).toBe("posts");
-    expect(showRoute?.controller).toBe("posts");
+    const added = m.routes.slice(before, before + 5);
+    expect(added.map((r) => `${r.verb} ${r.path}#${r.action}`)).toEqual([
+      "GET /posts/:id/edit#edit",
+      "GET /posts/:id#show",
+      "PATCH /posts/:id#update",
+      "PUT /posts/:id#update",
+      "DELETE /posts/:id#destroy",
+    ]);
+    expect(added.every((r) => r.controller === "posts")).toBe(true);
+  });
+
+  it("setMemberMappingsForResource is a safe no-op outside a resource scope", () => {
+    const m = new Mapper();
+    expect(() => m.setMemberMappingsForResource()).not.toThrow();
+    expect(m.routes).toEqual([]);
   });
 });
