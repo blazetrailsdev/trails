@@ -13,7 +13,7 @@ export interface InspectedRoute {
   action: string;
 }
 
-interface CollectedRoute {
+export interface CollectedRoute {
   name: string;
   verb: string;
   path: string;
