@@ -7,6 +7,12 @@
  */
 
 import { htmlEscape, isPresent } from "@blazetrails/activesupport";
+import {
+  DoubleRenderError,
+  render as abstractRender,
+  renderToString as abstractRenderToString,
+  type RenderingHost as AbstractRenderHost,
+} from "../../abstract-controller/rendering.js";
 import { Renderer } from "../renderer.js";
 import { resolveStatus } from "./status-codes.js";
 
@@ -155,6 +161,71 @@ export function _processOptions(
 export function renderToBody(options: Record<string, unknown> = {}): string {
   const body = _renderInPriorities(options);
   return body !== null ? String(body) : " ";
+}
+
+/**
+ * Mirrors Rails `ActionController::Rendering#render(*args)`. Raises
+ * `DoubleRenderError` if the response body has already been set, then
+ * delegates to the abstract `render`. `this`-typed so subclasses can
+ * mix it in via include-style assignment.
+ * @internal
+ */
+export function render<T extends { performed?: boolean } & AbstractRenderHost>(
+  this: T,
+  ...args: unknown[]
+): void {
+  // Rails: `if response_body` — Ruby-truthiness on the raw `@_response_body`
+  // ivar. Trails' Metal `responseBody` getter stringifies to `""` even when
+  // unrendered, so guarding on it would throw on the first render. Use
+  // `performed` (set by Metal `markPerformed()`), which is the trails
+  // equivalent of "has this action committed a response yet".
+  if (this.performed) throw new DoubleRenderError();
+  abstractRender.call(this, ...args);
+}
+
+/**
+ * Mirrors Rails `ActionController::Rendering#render_to_string(*)`. The
+ * abstract layer may produce an iterable (Rack body); collapse those
+ * into a single string. Non-iterables pass through.
+ * @internal
+ */
+export function renderToString<T extends AbstractRenderHost>(this: T, ...args: unknown[]): unknown {
+  const result = abstractRenderToString.call(this, ...args);
+  if (
+    result != null &&
+    typeof result === "object" &&
+    typeof (result as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+  ) {
+    const parts: string[] = [];
+    for (const chunk of result as Iterable<unknown>) parts.push(String(chunk));
+    return parts.join("");
+  }
+  return result;
+}
+
+/**
+ * Mirrors Rails `ActionController::Rendering#process_action(*)` — sets
+ * `self.formats` from `request.formats.filter_map(&:ref)` before the
+ * action runs. Rails calls `super` to continue the include chain; in
+ * trails the host class is responsible for chaining (this helper just
+ * applies the formats side-effect). Synchronous to mirror the Ruby
+ * source — host-side dispatch handles async separately.
+ * @internal
+ */
+export function processAction<
+  T extends {
+    request?: { formats?: Array<{ ref?: () => unknown } | { ref?: unknown }> | undefined };
+    formats?: unknown;
+  },
+>(this: T, ..._args: unknown[]): void {
+  const reqFormats = this.request?.formats ?? [];
+  const out: unknown[] = [];
+  for (const f of reqFormats) {
+    const ref = (f as { ref?: unknown }).ref;
+    const v = typeof ref === "function" ? (ref as () => unknown).call(f) : ref;
+    if (v != null) out.push(v);
+  }
+  this.formats = out;
 }
 
 type ControllerClass = abstract new (...args: unknown[]) => unknown;

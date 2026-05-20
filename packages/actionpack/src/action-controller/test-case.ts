@@ -33,6 +33,7 @@
  *   });
  */
 
+import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
@@ -60,6 +61,68 @@ const STATUS_RANGES: Record<string, [number, number]> = {
 };
 
 export class TestCase {
+  /** @internal Backing slot for the `controllerClass` static accessor. */
+  private static _controllerClass: ControllerClass | null = null;
+
+  /**
+   * Mirrors Rails `TestCase.tests(controller_class)`. Accepts a
+   * controller class or a string name; the string is camelized + suffixed
+   * with `Controller` and looked up on `globalThis` (the closest JS
+   * analogue to Ruby's `constantize`). Rails also accepts symbols; JS
+   * has no symbol/constant lookup, so the string form covers that case.
+   */
+  static tests(controllerClass: ControllerClass | string): void {
+    if (typeof controllerClass === "string") {
+      const constantName = `${camelize(controllerClass)}Controller`;
+      const klass = (globalThis as Record<string, unknown>)[constantName];
+      if (typeof klass !== "function") {
+        throw new Error(`uninitialized constant ${constantName}`);
+      }
+      this._controllerClass = klass as ControllerClass;
+      return;
+    }
+    if (typeof controllerClass !== "function") {
+      throw new Error("controller class must be a String or Class");
+    }
+    this._controllerClass = controllerClass;
+  }
+
+  /**
+   * Mirrors Rails `TestCase.controller_class` / `controller_class=`.
+   * Reading lazily falls back to `determineDefaultControllerClass(name)`.
+   * Per-class (not inherited): Rails class ivars don't walk the
+   * superclass chain, so we gate on `Object.hasOwn` to keep subclasses
+   * from picking up the base class's controller.
+   */
+  static get controllerClass(): ControllerClass | null {
+    if (Object.hasOwn(this, "_controllerClass") && this._controllerClass) {
+      return this._controllerClass;
+    }
+    const inferred = this.determineDefaultControllerClass(this.name);
+    if (inferred) this._controllerClass = inferred;
+    return Object.hasOwn(this, "_controllerClass") ? this._controllerClass : null;
+  }
+  static set controllerClass(v: ControllerClass | null) {
+    this._controllerClass = v;
+  }
+
+  /**
+   * Mirrors Rails `determine_default_controller_class(name)` — strips
+   * a trailing `Test` from the class name and looks the result up on
+   * `globalThis`. Returns `null` when no controller class can be found.
+   */
+  static determineDefaultControllerClass(name: string): ControllerClass | null {
+    if (!name) return null;
+    const stripped = name.replace(/Test$/, "");
+    const candidate = (globalThis as Record<string, unknown>)[stripped];
+    return typeof candidate === "function" ? (candidate as ControllerClass) : null;
+  }
+
+  /** Mirrors Rails `controller_class_name` — the class's `controllerClass.name`. */
+  controllerClassName(): string {
+    return (this.constructor as typeof TestCase).controllerClass?.name ?? "";
+  }
+
   private _controllerClass: ControllerClass;
 
   /** The controller instance from the last request. */
@@ -362,6 +425,13 @@ export class LiveTestResponse extends Response {}
 
 export class TestSession {
   private _data = new Map<string, unknown>();
+  /** @internal Mirrors Rails `@id`. */
+  private _id: string;
+
+  constructor(initial: Record<string, unknown> = {}, id?: string) {
+    this._id = id ?? randomHex(16);
+    for (const [k, v] of Object.entries(initial)) this._data.set(String(k), v);
+  }
 
   get(key: string): unknown {
     return this._data.get(key);
@@ -394,6 +464,77 @@ export class TestSession {
   toObject(): Record<string, unknown> {
     return this.toHash();
   }
+
+  /** Mirrors Rails `TestSession#exists?` — always `true`. */
+  isExists(): boolean {
+    return true;
+  }
+
+  /** Mirrors Rails `TestSession#keys` — stored data keys. */
+  keys(): string[] {
+    return [...this._data.keys()];
+  }
+
+  /** Mirrors Rails `TestSession#values` — stored data values. */
+  values(): unknown[] {
+    return [...this._data.values()];
+  }
+
+  /** Mirrors Rails `TestSession#destroy` — `def destroy; clear; end`. */
+  destroy(): void {
+    this.clear();
+  }
+
+  /** Mirrors Rails `TestSession#dig(*keys)` — first key is coerced to string. */
+  dig(...keys: unknown[]): unknown {
+    if (keys.length === 0) return undefined;
+    let cur: unknown = this._data.get(String(keys[0]));
+    for (let i = 1; i < keys.length; i++) {
+      if (cur == null) return undefined;
+      const k = keys[i] as string;
+      if (cur instanceof Map) cur = cur.get(k);
+      else if (typeof cur === "object") cur = (cur as Record<string, unknown>)[k];
+      else return undefined;
+    }
+    return cur;
+  }
+
+  /**
+   * Mirrors Rails `TestSession#fetch(key, *args, &block)`. Returns the
+   * value at `key`; if missing, returns `fallback` (or the result of
+   * `fallback()` when callable), else throws.
+   */
+  fetch(key: string, fallback?: unknown): unknown {
+    const k = String(key);
+    if (this._data.has(k)) return this._data.get(k);
+    if (arguments.length >= 2) {
+      // Ruby `Hash#fetch(key) { |k| ... }` yields the missing key to the
+      // block; mirror by passing the stringified key when fallback is callable.
+      return typeof fallback === "function" ? (fallback as (key: string) => unknown)(k) : fallback;
+    }
+    const err = new Error(`key not found: "${k}"`);
+    err.name = "KeyError";
+    throw err;
+  }
+
+  /** Mirrors Rails `TestSession#enabled?` — always `true`. */
+  isEnabled(): boolean {
+    return true;
+  }
+
+  /** Mirrors Rails `TestSession#id_was` — the session id frozen at init. */
+  idWas(): string {
+    return this._id;
+  }
+
+  /** @internal Mirrors Rails private `TestSession#load!` — returns `@id`. */
+  loadBang(): string {
+    return this._id;
+  }
+}
+
+function randomHex(bytes: number): string {
+  return getCrypto().randomBytes(bytes).toString("hex");
 }
 
 function formatToMime(format: string): string {
