@@ -472,7 +472,209 @@ export class Mapper {
     }
     return any ? merged : undefined;
   }
+
+  /**
+   * Normalize a path by collapsing duplicate slashes and re-ordering optional
+   * segments so a fully optional path evaluates to `/` when all options are
+   * absent.
+   *
+   * @internal
+   */
+  static normalizePath(path: string): string {
+    let result = "/" + path.replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
+    result = result.replace(/\/(\(+)\/?/g, "$1/");
+    if (/^(\(+[^)]+\))(\(+\/:[^)]+\))*$/.test(result)) {
+      result = result.replace(/^(\(+)\//, "/$1");
+    }
+    return result;
+  }
+
+  /** @internal */
+  static normalizeName(name: string): string {
+    return Mapper.normalizePath(name).slice(1).replace(/\//g, "_");
+  }
+
+  // --- Rails-private scope merge helpers ---
+  // These mirror ActionDispatch::Routing::Mapper::Scoping private methods.
+  // Each one combines a parent scope value with a child scope value.
+
+  /** @internal */
+  mergePathScope(parent: string | undefined, child: string): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  }
+
+  /** @internal */
+  mergeShallowPathScope(parent: string | undefined, child: string): string {
+    return Mapper.normalizePath(`${parent ?? ""}/${child}`);
+  }
+
+  /** @internal */
+  mergeAsScope(parent: string | undefined, child: string): string {
+    return parent ? `${parent}_${child}` : child;
+  }
+
+  /** @internal */
+  mergeShallowPrefixScope(parent: string | undefined, child: string): string {
+    return parent ? `${parent}_${child}` : child;
+  }
+
+  /** @internal */
+  mergeModuleScope(parent: string | undefined, child: string): string {
+    return parent ? `${parent}/${child}` : child;
+  }
+
+  /** @internal */
+  mergeControllerScope(_parent: string | undefined, child: string): string {
+    return child;
+  }
+
+  /** @internal */
+  mergeActionScope(_parent: string | undefined, child: string): string {
+    return child;
+  }
+
+  /** @internal */
+  mergeViaScope(_parent: unknown, child: string | string[]): string | string[] {
+    return child;
+  }
+
+  /** @internal */
+  mergeFormatScope(_parent: unknown, child: unknown): unknown {
+    return child;
+  }
+
+  /** @internal */
+  mergePathNamesScope(
+    parent: Record<string, string> | undefined,
+    child: Record<string, string>,
+  ): Record<string, string> {
+    return this.mergeOptionsScope(parent, child);
+  }
+
+  /** @internal */
+  mergeConstraintsScope(
+    parent: RouteConstraints | undefined,
+    child: RouteConstraints,
+  ): RouteConstraints {
+    return this.mergeOptionsScope(parent, child);
+  }
+
+  /** @internal */
+  mergeDefaultsScope<T extends Record<string, unknown>>(parent: T | undefined, child: T): T {
+    return this.mergeOptionsScope(parent, child);
+  }
+
+  /** @internal */
+  mergeBlocksScope(
+    parent: MapperCallback[] | undefined,
+    child: MapperCallback | undefined,
+  ): MapperCallback[] {
+    const merged = parent ? [...parent] : [];
+    if (child) merged.push(child);
+    return merged;
+  }
+
+  /** @internal */
+  mergeOptionsScope<T extends Record<string, unknown>>(parent: T | undefined, child: T): T {
+    return { ...(parent ?? ({} as T)), ...child };
+  }
+
+  /** @internal */
+  mergeShallowScope(_parent: unknown, child: unknown): boolean {
+    return child ? true : false;
+  }
+
+  /** @internal */
+  mergeToScope(_parent: unknown, child: unknown): unknown {
+    return child;
+  }
+
+  // --- Rails-private scope/action predicates ---
+
+  /** @internal */
+  isActionOptions(options: RouteOptions): boolean {
+    return Boolean(options.only || options.except);
+  }
+
+  /** @internal */
+  applicableActionsFor(method: "resource" | "resources"): ResourceAction[] {
+    if (method === "resources")
+      return ["index", "create", "new", "show", "update", "destroy", "edit"];
+    if (method === "resource") return ["create", "new", "show", "update", "destroy", "edit"];
+    return [];
+  }
+
+  /** @internal */
+  isResourceScope(): boolean {
+    return this.scopeStack.some((f) => f.memberPath !== undefined);
+  }
+
+  /** @internal */
+  isNestedScope(): boolean {
+    return this.scopeStack.length > 1;
+  }
+
+  /** @internal */
+  canonicalAction(action: string): boolean {
+    return CANONICAL_ACTIONS.includes(action);
+  }
+
+  /** @internal */
+  isParamConstraint(): boolean {
+    const c = this.currentScopeConstraints();
+    return Boolean(c && c.id instanceof RegExp);
+  }
+
+  /** @internal */
+  paramConstraint(): RegExp | undefined {
+    const c = this.currentScopeConstraints();
+    return c?.id instanceof RegExp ? c.id : undefined;
+  }
+
+  /** @internal */
+  shallowNestingDepth(): number {
+    return this.scopeStack.filter((f) => f.shallow).length;
+  }
+
+  /** @internal */
+  pathForAction(action: string, path: string | undefined): string {
+    const prefix = this.currentPrefix();
+    if (path) return `${prefix}/${path}`;
+    if (this.canonicalAction(action)) return prefix;
+    return `${prefix}/${action}`;
+  }
+
+  /** @internal */
+  prefixNameForAction(as: string | undefined, action: string | undefined): string | undefined {
+    let prefix: string | undefined;
+    if (as !== undefined && as !== null) prefix = as;
+    else if (action && !this.canonicalAction(action)) prefix = action;
+    if (prefix && prefix !== "/" && prefix.length > 0) {
+      return Mapper.normalizeName(prefix.replace(/-/g, "_"));
+    }
+    return undefined;
+  }
+
+  /** @internal */
+  nameForAction(as: string | undefined, action: string | undefined): string | undefined {
+    const prefix = this.prefixNameForAction(as, action);
+    const namePrefix = this.currentNamePrefix();
+    const parts = [namePrefix, prefix].filter((p): p is string => Boolean(p));
+    const candidate = parts.join("_");
+    if (!candidate) return undefined;
+    if (as === undefined) {
+      if (!/^[_a-z]/i.test(candidate) || this.hasNamedRoute(candidate)) return undefined;
+    }
+    return candidate;
+  }
+
+  /** @internal */
+  hasNamedRoute(name: string): boolean {
+    return this.routes.some((r) => r.name === name);
+  }
 }
+
+const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"];
 
 interface ScopeFrame {
   path: string;
