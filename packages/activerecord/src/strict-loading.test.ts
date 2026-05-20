@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
 import {
   Associations,
@@ -12,8 +12,9 @@ import {
   loadHasMany,
 } from "./associations.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 // -- Helpers --
@@ -25,10 +26,10 @@ function freshAdapter(): DatabaseAdapter {
 // StrictLoadingTest — targets strict_loading_test.rb
 // ==========================================================================
 describe("StrictLoadingTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       authors: { name: "string" },
       books: { title: "string", author_id: "integer", publisher_id: "integer" },
@@ -38,6 +39,7 @@ describe("StrictLoadingTest", () => {
       animals: { name: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
   it("raises on lazy loading a strict loading has many relation", async () => {
@@ -443,10 +445,10 @@ describe("StrictLoadingTest", () => {
 });
 
 describe("StrictLoadingTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       authors: { name: "string" },
       books: { title: "string", author_id: "integer" },
@@ -494,6 +496,7 @@ describe("StrictLoadingTest", () => {
       slnr_books: { title: "string", sl_nr_author_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test_raises_on_lazy_loading_a_strict_loading_has_many_relation
   // Rails: test_raises_on_lazy_loading_a_strict_loading_belongs_to_relation
@@ -1354,9 +1357,9 @@ describe("StrictLoadingFixturesTest", () => {
 });
 
 describe("strict_loading", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       authors: { name: "string" },
       books: { author_id: "integer" },
@@ -1364,6 +1367,7 @@ describe("strict_loading", () => {
       posts: { author2_id: "integer" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("raises StrictLoadingViolationError on lazy association load", async () => {
     class Author extends Base {
