@@ -488,4 +488,248 @@ export const TEST_SCHEMA: Schema = {
     },
     primaryKey: false,
   },
+
+  // PR 0.5c group: C-stragglers (contracts..customer_carriers), D-tables
+  // (dashboards..doubloons), E-tables (edges..eyes), F-tables
+  // (families..friendships, plus the `cold_jokes` row Rails sandwiches in
+  // the F block), and G-tables (goofy_string_id..guitars, plus the
+  // `having` row Rails sandwiches between goofy_string_id and guids).
+
+  contracts: {
+    developer_id: "integer",
+    company_id: "integer",
+    metadata: "string",
+    count: "integer",
+  },
+
+  customers: {
+    name: "string",
+    balance: { type: "integer", default: 0 },
+    address_street: "string",
+    address_city: "string",
+    address_country: "string",
+    gps_location: "string",
+  },
+
+  customer_carriers: {
+    customer_id: "integer",
+    carrier_id: "integer",
+  },
+
+  // Rails declares `id: false` with a string `dashboard_id` column — the
+  // model treats `dashboard_id` as the PK at the AR layer.
+  dashboards: {
+    columns: {
+      dashboard_id: "string",
+      name: "string",
+    },
+    primaryKey: false,
+  },
+
+  destroy_async_parents: {
+    columns: {
+      parent_id: "integer",
+      name: "string",
+      tags_count: { type: "integer", default: 0 },
+    },
+    primaryKey: ["parent_id"],
+  },
+
+  destroy_async_parent_soft_deletes: {
+    tags_count: { type: "integer", default: 0 },
+    deleted: "boolean",
+  },
+
+  discounts: {
+    amount: "integer",
+  },
+
+  dl_keyed_belongs_tos: {
+    columns: {
+      belongs_key: "integer",
+      destroy_async_parent_id: "integer",
+    },
+    primaryKey: ["belongs_key"],
+  },
+
+  dl_keyed_belongs_to_soft_deletes: {
+    destroy_async_parent_soft_delete_id: "integer",
+    deleted: "boolean",
+  },
+
+  dl_keyed_has_ones: {
+    columns: {
+      has_one_key: "integer",
+      destroy_async_parent_id: "integer",
+      destroy_async_parent_soft_delete_id: "integer",
+    },
+    primaryKey: ["has_one_key"],
+  },
+
+  dl_keyed_has_manies: {
+    columns: {
+      many_key: "integer",
+      destroy_async_parent_id: "integer",
+    },
+    primaryKey: ["many_key"],
+  },
+
+  dl_keyed_has_many_throughs: {
+    columns: {
+      through_key: "integer",
+    },
+    primaryKey: ["through_key"],
+  },
+
+  dl_keyed_joins: {
+    columns: {
+      joins_key: "integer",
+      destroy_async_parent_id: "integer",
+      dl_keyed_has_many_through_id: "integer",
+    },
+    primaryKey: ["joins_key"],
+  },
+
+  developers: {
+    name: "string",
+    first_name: "string",
+    salary: { type: "integer", default: 70000 },
+    firm_id: "integer",
+    mentor_id: "integer",
+    legacy_created_at: "datetime",
+    legacy_updated_at: "datetime",
+    legacy_created_on: "datetime",
+    legacy_updated_on: "datetime",
+  },
+
+  // Rails declares `id: false` — pure join table, no synthetic PK.
+  developers_projects: {
+    columns: {
+      developer_id: { type: "integer", null: false },
+      project_id: { type: "integer", null: false },
+      joined_on: "date",
+      access_level: { type: "integer", default: 1 },
+    },
+    primaryKey: false,
+  },
+
+  dog_lovers: {
+    trained_dogs_count: { type: "integer", default: 0 },
+    bred_dogs_count: { type: "integer", default: 0 },
+    dogs_count: { type: "integer", default: 0 },
+  },
+
+  dogs: {
+    trainer_id: "integer",
+    breeder_id: "integer",
+    dog_lover_id: "integer",
+    alias: "string",
+  },
+
+  doubloons: {
+    pirate_id: "integer",
+    weight: "integer",
+  },
+
+  // Rails declares `id: false`; unique index on [source_id, sink_id] is
+  // dropped per the secondary-index note at the top of this file.
+  edges: {
+    columns: {
+      source_id: { type: "integer", null: false },
+      sink_id: { type: "integer", null: false },
+    },
+    primaryKey: false,
+  },
+
+  editorships: {
+    publication_id: "string",
+    editor_id: "string",
+  },
+
+  editors: {
+    name: "string",
+  },
+
+  engines: {
+    car_id: "integer",
+  },
+
+  entrants: {
+    name: { type: "string", null: false },
+    course_id: { type: "integer", null: false },
+  },
+
+  entries: {
+    // Polymorphic reference expanded:
+    entryable_type: { type: "string", null: false },
+    entryable_id: { type: "integer", null: false },
+    account_id: { type: "integer", null: false },
+    updated_at: "datetime",
+  },
+
+  essays: {
+    type: "string",
+    name: "string",
+    writer_id: "string",
+    writer_type: "string",
+    category_id: "string",
+    author_id: "string",
+    book_id: "integer",
+  },
+
+  events: {
+    title: { type: "string", limit: 5 },
+  },
+
+  eyes: {},
+
+  families: {},
+
+  family_trees: {
+    family_id: "integer",
+    member_id: "integer",
+    token: "string",
+  },
+
+  frogs: {
+    name: "string",
+  },
+
+  funny_jokes: {
+    name: "string",
+  },
+
+  // Rails declares `cold_jokes` between funny_jokes and friendships.
+  cold_jokes: {
+    cold_name: "string",
+  },
+
+  friendships: {
+    friend_id: "integer",
+    follower_id: "integer",
+  },
+
+  // Rails declares `id: false` with an explicit `t.string :id, null: false`
+  // column — no DB-level PK constraint. The model promotes `id` to PK at
+  // the AR layer via `self.primary_key = "id"`, same shape as `dashboards`.
+  goofy_string_id: {
+    columns: {
+      id: { type: "string", null: false },
+      info: "string",
+    },
+    primaryKey: false,
+  },
+
+  // Rails declares `having` between goofy_string_id and guids.
+  having: {
+    where: "string",
+  },
+
+  guids: {
+    key: "string",
+  },
+
+  guitars: {
+    color: "string",
+  },
 };
