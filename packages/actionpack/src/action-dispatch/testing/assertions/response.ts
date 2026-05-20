@@ -118,7 +118,8 @@ export function normalizeArgumentToRedirection(
   return fragment;
 }
 
-function generateResponseMessage(
+/** @internal */
+export function generateResponseMessage(
   host: AssertionResponseHost,
   expected: number | string,
   actual: number,
@@ -132,11 +133,13 @@ function generateResponseMessage(
   return parts.join("");
 }
 
-function codeWithName(codeOrName: number | string): string {
+/** @internal */
+export function codeWithName(codeOrName: number | string): string {
   return new AssertionResponse(codeOrName).codeAndName();
 }
 
-function locationIfRedirected(host: AssertionResponseHost): string {
+/** @internal */
+export function locationIfRedirected(host: AssertionResponseHost): string {
   const status = host.response.status;
   if (status < 300 || status > 399) return "";
   const location = host.response.getHeader?.("location");
@@ -145,7 +148,8 @@ function locationIfRedirected(host: AssertionResponseHost): string {
   return ` redirect to <${String(normalized)}>`;
 }
 
-function exceptionIfPresent(host: AssertionResponseHost): string {
+/** @internal */
+export function exceptionIfPresent(host: AssertionResponseHost): string {
   const ex = host.request?.env?.["action_dispatch.exception"];
   if (!ex) return "";
   const name = ex instanceof Error ? ex.name || "Error" : "Error";
@@ -153,7 +157,8 @@ function exceptionIfPresent(host: AssertionResponseHost): string {
   return `\n\nException while processing request: ${name}: ${message}\n`;
 }
 
-function responseBodyIfShort(host: AssertionResponseHost): string {
+/** @internal */
+export function responseBodyIfShort(host: AssertionResponseHost): string {
   const body = host.response.body ?? "";
   if (body.length > 500) return "";
   return `\nResponse body: ${body}`;
