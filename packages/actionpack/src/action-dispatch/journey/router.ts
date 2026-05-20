@@ -1,4 +1,5 @@
 import { X_CASCADE } from "../constants.js";
+import { Builder } from "./gtg/index.js";
 import { unescapeUri } from "./router/utils.js";
 import type { Route } from "./route.js";
 import type { Routes } from "./routes.js";
@@ -104,6 +105,24 @@ export class Router {
       // blocks can; returning `true` from the block signals "stop iterating".
       if (block(route, merged) === true) return;
     }
+  }
+
+  /**
+   * Debug-only: render the routes FSM as HTML. Mirrors
+   * `action_dispatch/journey/router.rb#visualizer`.
+   */
+  visualizer(): string {
+    const ast = this.ast();
+    if (!ast) throw new Error("Router#visualizer requires a non-empty route set");
+    const tt = new Builder(ast).transitionTable();
+    const anchored = this.partitionedRoutes()[0];
+    const groups = new Map<string, Route>();
+    for (const r of anchored) {
+      const key = r.ast.toString();
+      if (!groups.has(key)) groups.set(key, r);
+    }
+    const asts = [...groups.values()].map((r) => r.ast);
+    return tt.visualizer(asts);
   }
 
   /** @internal */

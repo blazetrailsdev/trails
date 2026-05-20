@@ -3,7 +3,7 @@ import { Parser } from "../parser.js";
 import { Or } from "../nodes/node.js";
 import { Builder } from "./builder.js";
 import { Simulator } from "./simulator.js";
-import { TransitionTable } from "./transition_table.js";
+import { TransitionTable } from "./transition-table.js";
 
 function asts(strings: string[]) {
   const parser = new Parser();
