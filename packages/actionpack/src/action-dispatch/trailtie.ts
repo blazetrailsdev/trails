@@ -140,7 +140,7 @@ export class Trailtie extends BaseRailtie {
     this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
 
     this.initializer("action_dispatch.deprecator", () => {
-      BaseRailtie.deprecators["actionDispatch"] = deprecator;
+      BaseRailtie.deprecators["actionDispatch"] = deprecator();
     });
 
     this.initializer("action_dispatch.configure", () => {

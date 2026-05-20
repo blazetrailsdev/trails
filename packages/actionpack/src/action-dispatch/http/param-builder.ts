@@ -210,7 +210,7 @@ function storeNestedParamImpl(
         const matched = m[0];
         after = name.slice(matched.length);
         if (ignoreLeading !== true && (k !== matched || (after !== "" && !after.startsWith("[")))) {
-          deprecator.warn(
+          deprecator().warn(
             `Skipping over leading brackets in parameter name ${JSON.stringify(name)} is deprecated and will parse differently in Rails 8.1 or Rack 3.0.`,
           );
         }
