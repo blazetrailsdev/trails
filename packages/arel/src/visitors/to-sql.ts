@@ -1139,7 +1139,11 @@ export class ToSql extends Visitor implements NodeVisitor<SQLString> {
 
   private visitArelAttributesAttribute(node: Nodes.Attribute): SQLString {
     const tbl = node.relation.tableAlias || node.relation.name;
-    this.collector.append(`${this.quoteTableName(tbl)}.${this.quoteColumnName(node.name)}`);
+    // Rails: `quote_column_name(Arel.star)` returns the `SqlLiteral("*")`
+    // unchanged. We model `Arel.star` as the string sentinel `"*"` on the
+    // Attribute, so short-circuit identifier quoting here.
+    const col = node.name === "*" ? "*" : this.quoteColumnName(node.name);
+    this.collector.append(`${this.quoteTableName(tbl)}.${col}`);
     return this.collector;
   }
 

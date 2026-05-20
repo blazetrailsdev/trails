@@ -172,22 +172,28 @@ describe("TableTest", () => {
     expect(aliased.tableAlias).toBe("u");
   });
 
-  it("star returns table.*", () => {
-    expect(users.star.value).toBe('"users".*');
+  it("star returns an Attribute that compiles to table.*", () => {
+    expect(users.star).toBeInstanceOf(Nodes.Attribute);
+    expect(users.star.toSql()).toBe('"users".*');
   });
 
   it("star splits schema-qualified name", () => {
-    expect(new Table("test_schema.things").star.value).toBe('"test_schema"."things".*');
+    expect(new Table("test_schema.things").star.toSql()).toBe('"test_schema"."things".*');
   });
 
   it("star preserves quoted table name with dot", () => {
-    expect(new Table('test_schema."things.table"').star.value).toBe(
+    expect(new Table('test_schema."things.table"').star.toSql()).toBe(
       '"test_schema"."things.table".*',
     );
   });
 
   it("star preserves quoted schema name with dot", () => {
-    expect(new Table('"my.schema".articles').star.value).toBe('"my.schema"."articles".*');
+    expect(new Table('"my.schema".articles').star.toSql()).toBe('"my.schema"."articles".*');
+  });
+
+  it("star routes table-name quoting through the adapter visitor (MySQL=backticks)", () => {
+    const sql = new Visitors.MySQL().compile(users.star);
+    expect(sql).toBe("`users`.*");
   });
 
   it("alias references use the alias in SQL", () => {

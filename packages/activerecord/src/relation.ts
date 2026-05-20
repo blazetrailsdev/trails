@@ -3359,7 +3359,7 @@ export class Relation<T extends Base> {
    * caller's responsibility to ensure the target table is in
    * scope, or to override with `.select("*")`. We match.
    */
-  private _defaultProjection(table: Table): Nodes.SqlLiteral {
+  private _defaultProjection(table: Table): Nodes.Attribute {
     return table.star;
   }
 

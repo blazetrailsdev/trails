@@ -1,12 +1,10 @@
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
-import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { quoteSchemaQualifiedName } from "./visitors/split-schema-qualified-name.js";
 
 /** Structural duck-type for Rails' `@klass.attribute_aliases`.
  *  Kept minimal so arel does not import activerecord. */
@@ -194,8 +192,18 @@ export class Table extends Node {
     return this.get(name);
   }
 
-  get star(): SqlLiteral {
-    return new SqlLiteral(`${quoteSchemaQualifiedName(this.name)}.*`);
+  /**
+   * The `*` projection for this table — `table.*` after visitor compilation.
+   *
+   * Mirrors Rails' `Arel::Table#[Arel.star]`: returns an `Attribute` rather
+   * than a pre-baked SQL literal, so the table identifier is quoted by the
+   * adapter visitor (ANSI for SQLite/PG, backticks for MySQL). The `"*"`
+   * sentinel is handled by `visit_Arel_Attributes_Attribute` and skips
+   * column-name quoting (matches Rails' `quote_column_name(Arel.star)`,
+   * which passes the `SqlLiteral` through unchanged).
+   */
+  get star(): Attribute {
+    return new Attribute(this, "*");
   }
 
   /**
