@@ -102,8 +102,11 @@ const RFC_METHODS = [
   "MKCALENDAR",
   "PATCH",
 ] as const;
-const HTTP_METHOD_LOOKUP: Record<string, string> = Object.fromEntries(
-  RFC_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")]),
+// Null-prototype lookup so `__proto__` / `constructor` can't shadow
+// prototype-chain lookups into apparent membership in `checkMethod`.
+const HTTP_METHOD_LOOKUP: Record<string, string> = Object.assign(
+  Object.create(null) as Record<string, string>,
+  Object.fromEntries(RFC_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
 );
 
 const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
@@ -697,7 +700,7 @@ export class Request {
   /** @internal Validates `name` against the RFC methods list. */
   protected checkMethod(name: string | undefined): string | undefined {
     if (!name) return name;
-    if (HTTP_METHOD_LOOKUP[name] === undefined) {
+    if (!Object.hasOwn(HTTP_METHOD_LOOKUP, name)) {
       throw new Error(`${name}, accepted HTTP methods are ${RFC_METHODS.join(", ")}`);
     }
     return name;
