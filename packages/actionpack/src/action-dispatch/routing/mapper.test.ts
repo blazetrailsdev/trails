@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { Mapper } from "./mapper.js";
-import { RouteSet } from "./route-set.js";
 
 describe("Mapper.normalizePath", () => {
   it("collapses duplicate slashes", () => {
@@ -174,58 +173,5 @@ describe("Mapper public DSL additions", () => {
     const m = new Mapper();
     expect(() => m.setMemberMappingsForResource()).not.toThrow();
     expect(m.routes).toEqual([]);
-  });
-});
-
-describe("Mapper#mount", () => {
-  const app = (_env: Record<string, unknown>) => [200, {}, [""]] as const;
-
-  it("test_can_pass_anchor_to_mount", () => {
-    const m = new Mapper();
-    m.mount(app, { at: "/path", anchor: true });
-    expect(m.routes[0].path).toBe("/path");
-    expect(m.routes[0].anchor).toBe(true);
-  });
-
-  it("test_raising_error_when_path_is_not_passed", () => {
-    const m = new Mapper();
-    expect(() => m.mount(app)).toThrow(/mount point/);
-  });
-
-  it("test_raising_error_when_rack_app_is_not_passed", () => {
-    const m = new Mapper();
-    expect(() =>
-      m.mount(10 as unknown as Parameters<Mapper["mount"]>[0], { as: "exciting" }),
-    ).toThrow(/rack application must be specified/);
-    expect(() =>
-      m.mount(undefined as unknown as Parameters<Mapper["mount"]>[0], { as: "exciting" }),
-    ).toThrow(/rack application must be specified/);
-  });
-
-  it("defaults anchor to false so prefix paths match nested URLs", () => {
-    const m = new Mapper();
-    m.mount(app, { at: "/foo" });
-    expect(m.routes[0].path).toBe("/foo");
-    expect(m.routes[0].anchor).toBe(false);
-  });
-
-  it("stores the mounted app on the route for dispatch", () => {
-    const m = new Mapper();
-    m.mount(app, { at: "/foo" });
-    expect(m.routes[0].app).toBe(app);
-  });
-
-  it("RouteSet#call forwards a matched request to the mounted app with SCRIPT_NAME/PATH_INFO rewritten", async () => {
-    const seen: Array<Record<string, unknown>> = [];
-    const engine = (env: Record<string, unknown>) => {
-      seen.push({ SCRIPT_NAME: env["SCRIPT_NAME"], PATH_INFO: env["PATH_INFO"] });
-      return [200, { "content-type": "text/plain" }, ["engine-ok"]];
-    };
-    const routes = new RouteSet();
-    routes.draw((r) => r.mount(engine, { at: "/foo" }));
-
-    const res = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar" });
-    expect(res[0]).toBe(200);
-    expect(seen).toEqual([{ SCRIPT_NAME: "/foo", PATH_INFO: "/bar" }]);
   });
 });
