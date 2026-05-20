@@ -629,9 +629,7 @@ export class IntegrationTest {
     // PATH_INFO/QUERY_STRING split done above.
     const allParams: Record<string, unknown> = { ...params };
     if (queryString) {
-      for (const [k, v] of new URLSearchParams(queryString)) {
-        allParams[k] = v;
-      }
+      Object.assign(allParams, this.request.queryParameters);
     }
     if (options.params) {
       Object.assign(allParams, options.params);
