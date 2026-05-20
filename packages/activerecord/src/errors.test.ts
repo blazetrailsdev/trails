@@ -2,24 +2,25 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, RecordNotFound, RecordInvalid, ReadOnlyRecord, UnknownPrimaryKey } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
 describe("ErrorsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { posts: { title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
   it("can be instantiated with no args", () => {
     class Post extends Base {
       static {
@@ -34,8 +35,8 @@ describe("ErrorsTest", () => {
 });
 
 describe("error classes", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       items: {},
@@ -44,6 +45,7 @@ describe("error classes", () => {
       empties: {},
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("find throws RecordNotFound with metadata", async () => {
     class Item extends Base {
@@ -118,12 +120,13 @@ describe("error classes", () => {
 });
 
 describe("Error Classes (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { people: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "RecordNotFound"
   it("find raises RecordNotFound with model, primary_key, and id", async () => {

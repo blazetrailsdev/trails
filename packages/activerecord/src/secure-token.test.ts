@@ -2,28 +2,29 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
 describe("SecureTokenTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       users: { name: "string", token: "string" },
       user_with_tokens: { name: "string", token: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class User extends Base {
@@ -117,14 +118,15 @@ describe("SecureTokenTest", () => {
 });
 
 describe("has_secure_token", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       api_keys: { token: "string" },
       sessions: { auth_token: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("auto-generates a token on create", async () => {
     class ApiKey extends Base {
@@ -173,9 +175,9 @@ describe("has_secure_token", () => {
 });
 
 describe("has_secure_token (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, {
       users: { token: "string" },
@@ -184,6 +186,7 @@ describe("has_secure_token (Rails-guided)", () => {
       user2s: { token: "string" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test "generates a token on create"
   it("automatically generates a token on create", async () => {

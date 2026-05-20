@@ -2,15 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "./adapter.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 // -- Helpers --
-function freshAdapter(): DatabaseAdapter {
+function freshAdapter(): TestDatabaseAdapter {
   return createTestAdapter();
 }
 
@@ -18,12 +18,13 @@ function freshAdapter(): DatabaseAdapter {
 // ExcludingTest — targets excluding_test.rb
 // ==========================================================================
 describe("ExcludingTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { posts: { title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("result set does not include single excluded record", async () => {
     class Post extends Base {
@@ -51,11 +52,12 @@ describe("ExcludingTest", () => {
 });
 
 describe("ExcludingTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { posts: { title: "string", score: "integer" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   function makeModel() {
     class Post extends Base {
@@ -147,11 +149,12 @@ describe("ExcludingTest", () => {
 });
 
 describe("excluding() / without()", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { items: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("excludes specific records by PK", async () => {
     class Item extends Base {
@@ -187,11 +190,12 @@ describe("excluding() / without()", () => {
 });
 
 describe("Excluding (Rails-guided)", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
     adapter = freshAdapter();
     await defineSchema(adapter, { items: { name: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
 
   it("excluding removes specific records", async () => {
     class Item extends Base {
