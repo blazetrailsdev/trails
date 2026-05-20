@@ -134,6 +134,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [{ name: "rack", libPath: "lib/rack", testPath: "test" }],
   },
   {
+    name: "did_you_mean",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/did_you_mean.git",
+      ref: "v1.6.3",
+    },
+    packages: [
+      {
+        // TS-side workspace dir is `packages/did-you-mean/src`; api-compare
+        // derives that from the package name, so use the kebab form.
+        name: "did-you-mean",
+        libPath: "lib/did_you_mean",
+        testPath: "test",
+      },
+    ],
+  },
+  {
     name: "globalid",
     origin: {
       type: "git",

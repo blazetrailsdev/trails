@@ -679,6 +679,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     actionview: "packages/actionview/src/",
     trailties: "packages/trailties/src/",
     globalid: "packages/globalid/src/",
+    "did-you-mean": "packages/did-you-mean/src/",
   };
 
   const prefix = pkgDirs[pkg];
