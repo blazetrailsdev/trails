@@ -6,16 +6,19 @@
  * @see https://api.rubyonrails.org/classes/ActionController/LogSubscriber.html
  */
 
+import { LogSubscriber as BaseLogSubscriber, type Logger } from "@blazetrails/activesupport";
+
 export interface Event {
   name: string;
   payload: Record<string, unknown>;
   duration: number;
 }
 
-export class LogSubscriber {
-  private _logger: { info(msg: string): void; debug?(msg: string): void } | null;
+export class LogSubscriber extends BaseLogSubscriber {
+  private _logger: Logger | null;
 
-  constructor(logger?: { info(msg: string): void; debug?(msg: string): void }) {
+  constructor(logger?: Logger | null) {
+    super();
     this._logger = logger ?? null;
   }
 
@@ -79,7 +82,7 @@ export class LogSubscriber {
     );
   }
 
-  get logger(): { info(msg: string): void; debug?(msg: string): void } | null {
+  override get logger(): Logger | null {
     return this._logger;
   }
 }
