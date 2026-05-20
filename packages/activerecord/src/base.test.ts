@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import {
   Base,
   RecordNotFound,
@@ -24,6 +24,7 @@ import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport"
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType } from "@blazetrails/activemodel";
 
@@ -38,10 +39,10 @@ function freshAdapter(): DatabaseAdapter {
 // BasicsTest — targets base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, {
       users: {
         name: "string",
@@ -79,8 +80,11 @@ describe("BasicsTest", () => {
       orders: { shop_id: "integer", name: "string" },
       custom_users: { name: "string" },
       replies: { title: "string" },
+      pres_tz_topics: { written_on: "datetime", bonus_time: "time" },
+      tz_pets: { name: "string", created_at: "datetime", updated_at: "datetime" },
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   afterAll(async () => {
     await dropAllTables(adapter);
@@ -1829,9 +1833,6 @@ describe("BasicsTest", () => {
         this.adapter = adapter;
       }
     }
-    await defineSchema(adapter, {
-      pres_tz_topics: { written_on: "datetime", bonus_time: "time" },
-    });
     const inst1 = Temporal.Instant.from("2003-07-16T14:28:11.223300Z");
     const inst2 = Temporal.Instant.from("2003-07-16T14:28:11.009900Z");
     const inst3 = Temporal.Instant.from("2003-07-16T14:28:11.129346Z");
@@ -1871,7 +1872,6 @@ describe("BasicsTest", () => {
           this.adapter = adapter;
         }
       }
-      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
       // Rails: Time.local(2000) in EST = 2000-01-01 00:00:00-05:00 = 05:00 UTC.
       // Pass an offset-bearing string to exercise the cast/serialize conversion path.
       const expectedUtc = Temporal.Instant.from("2000-01-01T05:00:00Z");
@@ -1891,7 +1891,6 @@ describe("BasicsTest", () => {
           this.adapter = adapter;
         }
       }
-      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
       // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00-06:00 = 06:00 UTC.
       // Pass an offset-bearing string to exercise the cast/serialize conversion path.
       const expectedUtc = Temporal.Instant.from("2000-01-01T06:00:00Z");
@@ -1915,7 +1914,6 @@ describe("BasicsTest", () => {
           this.adapter = adapter;
         }
       }
-      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
       const utcMidnight = Temporal.Instant.from("2000-01-01T00:00:00Z");
       const topic = await Topic.create({ written_on: utcMidnight });
       const saved = await Topic.find(topic.id);
@@ -1942,7 +1940,6 @@ describe("BasicsTest", () => {
           this.adapter = adapter;
         }
       }
-      await defineSchema(adapter, { pres_tz_topics: { written_on: "datetime" } });
       // Rails: Time.zone.local(2000) in CST = 2000-01-01 00:00:00 CST (UTC-6) = 06:00 UTC = 01:00 EST
       const cstMidnight = Temporal.Instant.from("2000-01-01T06:00:00Z");
       const topic = await Topic.create({ written_on: cstMidnight });
@@ -1968,9 +1965,6 @@ describe("BasicsTest", () => {
           this.adapter = adapter;
         }
       }
-      await defineSchema(adapter, {
-        tz_pets: { name: "string", created_at: "datetime", updated_at: "datetime" },
-      });
       const pet = await Pet.create({ name: "Bidu" });
       expect(pet.isPersisted()).toBe(true);
       const savedPet = await Pet.find(pet.id);
@@ -3085,8 +3079,8 @@ describe("BasicsTest", () => {
 // ==========================================================================
 describe("BasicsTest", () => {
   let Post: typeof Base;
-  let _adp2: DatabaseAdapter;
-  beforeEach(async () => {
+  let _adp2: TestDatabaseAdapter;
+  beforeAll(async () => {
     _adp2 = createTestAdapter();
     await defineSchema(_adp2, {
       posts: { title: "string", body: "string" },
@@ -3102,6 +3096,7 @@ describe("BasicsTest", () => {
     }
     Post = PostClass;
   });
+  withTransactionalFixtures(() => _adp2);
 
   afterAll(async () => {
     await dropAllTables(_adp2);

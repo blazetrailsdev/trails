@@ -2,11 +2,12 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, RecordNotFound, SoleRecordExceeded } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
 
 const TEST_SCHEMA = {
@@ -2736,10 +2737,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("sole() returns the only matching record", async () => {
     class Item extends Base {
@@ -2819,10 +2822,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("returns the sole matching record", async () => {
     class Item extends Base {
@@ -2852,10 +2857,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("accepts conditions hash", async () => {
     class Item extends Base {
@@ -2885,10 +2892,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("second() returns the second record", async () => {
     class Item extends Base {
@@ -3370,7 +3379,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class Bird extends Base {
     static {
@@ -3379,10 +3388,12 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     Bird.adapter = adapter;
   });
+  withTransactionalFixtures(() => adapter);
 
   it("find_or_create_by finds existing", async () => {
     await Bird.create({ name: "Parrot", color: "green" });
@@ -3421,7 +3432,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class User extends Base {
     static {
@@ -3431,10 +3442,12 @@ describe("FinderTest", () => {
     }
   }
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     User.adapter = adapter;
   });
+  withTransactionalFixtures(() => adapter);
 
   // Rails: test_find_with_array_of_ids
   it("find with single id returns instance", async () => {
@@ -3489,10 +3502,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("finds a record by a single attribute", async () => {
     class User extends Base {
@@ -3523,10 +3538,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("returns true for valid dynamic finders", () => {
     class User extends Base {
@@ -3555,10 +3572,12 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
   });
+  withTransactionalFixtures(() => adapter);
 
   it("first(n) returns array of n records", async () => {
     class User extends Base {
