@@ -351,6 +351,16 @@ export class Pattern {
   }
 
   /** @internal */
+  private get regexpVisitor(): typeof AnchoredRegexp {
+    return this.anchored ? AnchoredRegexp : UnanchoredRegexp;
+  }
+
+  /** @internal */
+  private get offsets(): readonly number[] {
+    return this._computeOffsets();
+  }
+
+  /** @internal */
   private _computeOffsets(): readonly number[] {
     if (this._offsets) return this._offsets;
     const offsets: number[] = [0];

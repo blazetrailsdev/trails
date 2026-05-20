@@ -26,6 +26,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 import { libPathsManifest, SOURCES, testPathsManifest, type UpstreamSource } from "./sources.js";
+import { SpellChecker } from "../packages/did-you-mean/src/spell-checker.js";
 
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");
@@ -146,6 +147,12 @@ function verifyPackages(source: UpstreamSource): void {
 }
 
 function printPaths(filter: string | undefined): void {
+  if (filter && !SOURCES.some((s) => s.name === filter)) {
+    const names = SOURCES.map((s) => s.name);
+    const suggestions = new SpellChecker({ dictionary: names }).correct(filter);
+    const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
+    throw new Error(`--print-paths: no entry named "${filter}" in vendor/sources.ts.${hint}`);
+  }
   for (const source of SOURCES) {
     if (filter && source.name !== filter) continue;
     process.stdout.write(destFor(source) + "\n");
@@ -210,7 +217,10 @@ async function main(argv: string[]): Promise<void> {
 
   const targets = args.sourceFilter ? SOURCES.filter((s) => s.name === args.sourceFilter) : SOURCES;
   if (args.sourceFilter && targets.length === 0) {
-    throw new Error(`--source: no entry named "${args.sourceFilter}" in vendor/sources.ts`);
+    const names = SOURCES.map((s) => s.name);
+    const suggestions = new SpellChecker({ dictionary: names }).correct(args.sourceFilter);
+    const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
+    throw new Error(`--source: no entry named "${args.sourceFilter}" in vendor/sources.ts.${hint}`);
   }
 
   // Fetch in parallel: cold runs are sum(clone times) sequentially → max(...)

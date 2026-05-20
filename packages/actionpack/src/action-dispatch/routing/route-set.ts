@@ -373,7 +373,7 @@ export class RouteSet {
       const [status, headers, bodyArr] = redirectEndpoint.call(env);
       const lowerHeaders: Record<string, string> = {};
       for (const [k, v] of Object.entries(headers)) lowerHeaders[k.toLowerCase()] = v;
-      return [status, lowerHeaders, bodyFromString(bodyArr.join(""))];
+      return [status, lowerHeaders, bodyFromString((bodyArr as string[]).join(""))];
     }
 
     // Merge route params into the env (like Rails does with request.params)

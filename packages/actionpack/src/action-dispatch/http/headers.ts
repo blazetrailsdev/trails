@@ -62,6 +62,25 @@ export class Headers {
     return envName(String(key)) in this._env;
   }
 
+  /** Rails alias `key?` for `Hash#key?`. */
+  isKey(key: string): boolean {
+    return this.has(key);
+  }
+
+  /** Rails `merge!(other)` — mutating merge. Alias of `mergeInPlace`. */
+  mergeBang(other: Record<string, unknown>): this {
+    return this.mergeInPlace(other);
+  }
+
+  /**
+   * Rails `Headers.from_hash(hash)` — wraps the env hash directly so
+   * mutations via the returned `Headers` are reflected in the original
+   * hash, matching Rails' Request-backed wrapper semantics.
+   */
+  static fromHash(hash: Record<string, unknown>): Headers {
+    return new Headers(hash);
+  }
+
   add(key: string, value: unknown): void {
     if (value == null) return;
     const envKey = envName(String(key));

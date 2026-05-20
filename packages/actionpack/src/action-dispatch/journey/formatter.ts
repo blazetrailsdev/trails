@@ -92,15 +92,15 @@ export class Formatter {
     const constraints = { ...pathParameters, ...options };
     let missingKeys: string[] | null = null;
 
-    for (const route of this._matchRoute(name, constraints)) {
-      const parameterizedParts = this._extractParameterizedParts(route, options, pathParameters);
+    for (const route of this.matchRoute(name, constraints)) {
+      const parameterizedParts = this.extractParameterizedParts(route, options, pathParameters);
 
       // Skip this route unless a name has been provided or it is a standard Rails
       // route since we can't determine whether an options hash passed to url_for
       // matches a Rack application or a redirect.
       if (!name && !route.isDispatcher()) continue;
 
-      missingKeys = this._missingKeys(route, parameterizedParts);
+      missingKeys = this.missingKeys(route, parameterizedParts);
       if (missingKeys && missingKeys.length > 0) continue;
 
       const remainingOptions = { ...options };
@@ -142,11 +142,11 @@ export class Formatter {
   }
 
   eagerLoadBang(): void {
-    this._buildOrGetCache();
+    void this.cache;
   }
 
   /** @internal */
-  private _extractParameterizedParts(
+  private extractParameterizedParts(
     route: Route,
     options: Record<string, unknown>,
     recall: Record<string, unknown>,
@@ -186,15 +186,14 @@ export class Formatter {
   }
 
   /** @internal */
-  private *_matchRoute(name: string | null, options: Record<string, unknown>): Generator<Route> {
-    const named = this.routes.namedRoutes;
-    if (name != null && named.has(name)) {
-      const r = named.get(name);
+  private *matchRoute(name: string | null, options: Record<string, unknown>): Generator<Route> {
+    if (name != null && this.namedRoutes.has(name)) {
+      const r = this.namedRoutes.get(name);
       if (r) yield r;
       return;
     }
 
-    const routes = this._nonRecursive(this._buildOrGetCache(), options);
+    const routes = this.nonRecursive(this.cache, options);
 
     // Rails: `h[k.to_s] = true if v` — Ruby truthiness only excludes nil/false,
     // so `0` and `""` are considered supplied.
@@ -221,7 +220,7 @@ export class Formatter {
   }
 
   /** @internal */
-  private _nonRecursive(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
+  private nonRecursive(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
     const routes: [number, Route][] = [];
     const queue: CacheNode[] = [cache];
     for (let i = 0; i < queue.length; i++) {
@@ -237,7 +236,7 @@ export class Formatter {
   }
 
   /** @internal */
-  private _missingKeys(route: Route, parts: Record<string, unknown>): string[] | null {
+  private missingKeys(route: Route, parts: Record<string, unknown>): string[] | null {
     let missing: string[] | null = null;
     const tests = route.path.requirementsForMissingKeysCheck;
     for (const key of route.requiredParts) {
@@ -258,8 +257,23 @@ export class Formatter {
   }
 
   /** @internal */
-  private _buildOrGetCache(): CacheNode {
-    if (this._cache) return this._cache;
+  private get namedRoutes(): FormatterHost["namedRoutes"] {
+    return this.routes.namedRoutes;
+  }
+
+  /** @internal */
+  private possibles(cache: CacheNode, options: Record<string, unknown>): [number, Route][] {
+    const out: [number, Route][] = [...cache.routes];
+    for (const [k, v] of Object.entries(options)) {
+      const key = pairKey(k, v);
+      const child = cache.children.get(key);
+      if (child) out.push(...this.possibles(child, options));
+    }
+    return out;
+  }
+
+  /** @internal */
+  private buildCache(): CacheNode {
     const root: CacheNode = { children: new Map(), routes: [] };
     const list = this.routes.routes.routes;
     for (let i = 0; i < list.length; i++) {
@@ -276,8 +290,12 @@ export class Formatter {
       }
       h.routes.push([i, route]);
     }
-    this._cache = root;
     return root;
+  }
+
+  /** @internal */
+  private get cache(): CacheNode {
+    return (this._cache ??= this.buildCache());
   }
 }
 

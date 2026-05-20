@@ -34,6 +34,8 @@ import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest } from "./types.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
+import { PACKAGES } from "../api-compare/config.js";
+import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -163,10 +165,27 @@ interface TsTestInfo {
 
 function main() {
   const args = process.argv.slice(2);
-  const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
+  const pkgIndex = args.indexOf("--package");
+  let filterPkg: string | null = null;
+  if (pkgIndex !== -1) {
+    const value = args[pkgIndex + 1];
+    if (!value || value.startsWith("--")) {
+      console.error("--package requires a package name (e.g. --package activerecord)");
+      process.exit(1);
+    }
+    filterPkg = value;
+  }
   const showMissing = args.includes("--missing");
   const jsonOutput = args.includes("--json");
   const showIncomplete = args.includes("--incomplete");
+
+  if (filterPkg && !PACKAGES.includes(filterPkg)) {
+    const suggestions = new SpellChecker({ dictionary: PACKAGES }).correct(filterPkg);
+    const hint = suggestions.length ? ` Did you mean: ${suggestions.join(", ")}?` : "";
+    console.error(`--package: unknown package "${filterPkg}".${hint}`);
+    console.error(`Available: ${PACKAGES.join(", ")}`);
+    process.exit(1);
+  }
 
   const rubyPath = path.join(OUTPUT_DIR, "rails-tests.json");
   const tsPath = path.join(OUTPUT_DIR, "ts-tests.json");

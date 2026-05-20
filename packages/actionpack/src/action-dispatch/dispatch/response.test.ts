@@ -1,6 +1,20 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Request } from "../request.js";
 import { Response } from "../response.js";
+
+function withTempFile<T>(contents: string, fn: (path: string) => T): T {
+  const dir = mkdtempSync(join(tmpdir(), "trails-response-"));
+  const path = join(dir, "fixture");
+  writeFileSync(path, contents);
+  try {
+    return fn(path);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 describe("ResponseTest", () => {
   it("simple output", () => {
@@ -534,5 +548,60 @@ describe("Response Cache::Response wiring", () => {
     const res = new Response();
     res.handleConditionalGetBang();
     expect(res.getHeader("Cache-Control")).toBeUndefined();
+  });
+
+  describe("lifecycle (commit / sending / sent)", () => {
+    it("commitBang is idempotent and runs beforeCommitted once", () => {
+      const res = new Response();
+      res.commitBang();
+      expect(res.committed).toBe(true);
+      // Default content-type set by assignDefaultContentTypeAndCharsetBang
+      expect(res.getHeader("content-type")).toMatch(/text\/html/);
+      res.commitBang(); // second call is a no-op
+      expect(res.committed).toBe(true);
+    });
+
+    it("each wraps iteration in sending! / sent!", () => {
+      const res = new Response(200, {}, ["hello", " world"]);
+      const chunks: unknown[] = [];
+      for (const chunk of res.each()) chunks.push(chunk);
+      expect(chunks).toEqual(["hello", " world"]);
+      expect(res.isSending).toBe(true);
+      expect(res.isSent).toBe(true);
+    });
+  });
+
+  describe("sendFile", () => {
+    it("commits the response and exposes a Rack-compatible file body", () => {
+      withTempFile("hello", (path) => {
+        const res = new Response();
+        res.sendFile(path);
+        expect(res.committed).toBe(true);
+        const stream = res.stream as { toPath(): string; each(): IterableIterator<string> };
+        expect(typeof stream.toPath).toBe("function");
+        expect(stream.toPath()).toBe(path);
+      });
+    });
+
+    it("toRack surfaces the stream itself (preserving toPath) when sendFile was called", () => {
+      withTempFile("hello", (path) => {
+        const res = new Response();
+        res.sendFile(path);
+        const [status, , body] = res.toRack();
+        expect(status).toBe(200);
+        const stream = body as { toPath(): string; each(): IterableIterator<string> };
+        expect(stream.toPath()).toBe(path);
+        const chunks: string[] = [];
+        for (const c of stream.each()) chunks.push(c);
+        expect(chunks.join("")).toBe("hello");
+      });
+    });
+  });
+
+  describe("bodyParts", () => {
+    it("drains the buffered body when no explicit stream is set", () => {
+      const res = new Response(200, {}, ["a", "b"]);
+      expect(res.bodyParts()).toEqual(["a", "b"]);
+    });
   });
 });

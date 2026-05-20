@@ -26,70 +26,70 @@ export class Parser {
 
   parse(string: string): Node {
     this._scanner.scanSetup(string);
-    this._advanceToken();
-    return this._doParse();
+    this.advanceToken();
+    return this.doParse();
   }
 
   /** @internal */
-  private _advanceToken(): void {
+  private advanceToken(): void {
     this._nextToken = this._scanner.nextToken();
   }
 
   /** @internal */
-  private _doParse(): Node {
-    return this._parseExpressions();
+  private doParse(): Node {
+    return this.parseExpressions();
   }
 
   /** @internal */
-  private _parseExpressions(): Node {
-    let node = this._parseExpression();
+  private parseExpressions(): Node {
+    let node = this.parseExpression();
     while (this._nextToken !== null) {
       if (this._nextToken === "RPAREN") break;
       if (this._nextToken === "OR") {
-        node = this._parseOr(node);
+        node = this.parseOr(node);
       } else {
-        node = new Cat(node, this._parseExpressions());
+        node = new Cat(node, this.parseExpressions());
       }
     }
     return node;
   }
 
   /** @internal */
-  private _parseOr(lhs: Node): Node {
-    this._advanceToken();
-    const rhs = this._parseExpression();
+  private parseOr(lhs: Node): Node {
+    this.advanceToken();
+    const rhs = this.parseExpression();
     return new Or([lhs, rhs]);
   }
 
   /** @internal */
-  private _parseExpression(): Node {
-    if (this._nextToken === "STAR") return this._parseStar();
-    if (this._nextToken === "LPAREN") return this._parseGroup();
-    return this._parseTerminal();
+  private parseExpression(): Node {
+    if (this._nextToken === "STAR") return this.parseStar();
+    if (this._nextToken === "LPAREN") return this.parseGroup();
+    return this.parseTerminal();
   }
 
   /** @internal */
-  private _parseStar(): Node {
+  private parseStar(): Node {
     const sym = new SymbolNode(this._scanner.lastString(), SymbolNode.GREEDY_EXP);
     const node = new Star(sym);
-    this._advanceToken();
+    this.advanceToken();
     return node;
   }
 
   /** @internal */
-  private _parseGroup(): Node {
-    this._advanceToken();
-    const inner = this._parseExpressions();
+  private parseGroup(): Node {
+    this.advanceToken();
+    const inner = this.parseExpressions();
     if (this._nextToken !== "RPAREN") {
       throw new Error("missing right parenthesis.");
     }
     const node = new Group(inner);
-    this._advanceToken();
+    this.advanceToken();
     return node;
   }
 
   /** @internal */
-  private _parseTerminal(): Node {
+  private parseTerminal(): Node {
     let node: Node;
     switch (this._nextToken) {
       case "SYMBOL":
@@ -107,7 +107,7 @@ export class Parser {
       default:
         throw new Error(`unexpected token: ${this._nextToken}`);
     }
-    this._advanceToken();
+    this.advanceToken();
     return node;
   }
 }

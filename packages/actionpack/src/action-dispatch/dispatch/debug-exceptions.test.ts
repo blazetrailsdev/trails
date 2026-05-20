@@ -281,4 +281,29 @@ describe("DebugExceptionsTest", () => {
     const xml = await bodyToString(body);
     expect(xml).toContain("RoutingError");
   });
+
+  it("routes non-HTML requests through renderForApiRequest when responseFormat is 'api'", async () => {
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
+    expect(status).toBe(500);
+    expect(headers["content-type"]).toContain("application/json");
+    const json = JSON.parse(await bodyToString(body));
+    expect(json.exception).toBeDefined();
+    expect(json.traces["Application Trace"]).toBeDefined();
+    expect(json.traces["Framework Trace"]).toBeDefined();
+    // The api path goes through render(), which sets content-length.
+    expect(headers["content-length"]).toBe(String(Buffer.byteLength(JSON.stringify(json), "utf8")));
+  });
+
+  it("isApiRequest is false for HTML accept even when responseFormat is 'api'", () => {
+    const mw = new DebugExceptions(errorApp, { responseFormat: "api" });
+    expect(mw.isApiRequest("text/html")).toBe(false);
+    expect(mw.isApiRequest("application/json")).toBe(true);
+    expect(mw.isApiRequest(null)).toBe(true);
+  });
+
+  it("isApiRequest is false when responseFormat defaults to 'default'", () => {
+    const mw = new DebugExceptions(errorApp);
+    expect(mw.isApiRequest("application/json")).toBe(false);
+  });
 });

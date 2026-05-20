@@ -165,4 +165,48 @@ describe("FlashHashTest", () => {
     flash.sweep();
     expect(flash.has("a")).toBe(false);
   });
+
+  it("fromSessionValue loads Rails-shaped { flashes, discard } payload", () => {
+    const loaded = FlashHash.fromSessionValue({
+      flashes: { kept: "yes", dropped: "no" },
+      discard: ["dropped"],
+    });
+    expect(loaded.get("kept")).toBe("yes");
+    // Rails: flashes.except!(*discard) — `dropped` is removed at load.
+    expect(loaded.has("dropped")).toBe(false);
+  });
+
+  it("fromSessionValue marks all surviving keys for next-sweep discard", () => {
+    const loaded = FlashHash.fromSessionValue({
+      flashes: { kept: "yes" },
+      discard: [],
+    });
+    expect(loaded.get("kept")).toBe("yes");
+    // Rails: new(flashes, flashes.keys) — every surviving key is on
+    // the discard list for the next sweep.
+    loaded.sweep();
+    expect(loaded.has("kept")).toBe(false);
+  });
+
+  it("dup returns an independent copy", () => {
+    const original = new FlashHash({ notice: "hi" });
+    const copy = original.dup();
+    copy.set("notice", "changed");
+    expect(original.get("notice")).toBe("hi");
+    expect(copy.get("notice")).toBe("changed");
+  });
+
+  it("dup carries over the discard set so sweep behaves identically", () => {
+    const original = FlashHash.fromSessionValue({ flashes: { a: "1" }, discard: [] });
+    // After fromSessionValue, `a` is marked for discard on next sweep.
+    const copy = original.dup();
+    copy.sweep();
+    expect(copy.has("a")).toBe(false);
+  });
+
+  it("flashesForSession prunes keys marked for discard", () => {
+    const flash = new FlashHash({ kept: "1", dropped: "2" });
+    flash.discard("dropped");
+    expect(flash.flashesForSession()).toEqual({ kept: "1" });
+  });
 });

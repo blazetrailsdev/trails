@@ -121,6 +121,40 @@ export class UploadedFile {
     return this._tempfile;
   }
 
+  /** Rails `tempfile` accessor — returns the tempfile path string. */
+  get tempfile(): string | null {
+    return this._tempfile;
+  }
+  set tempfile(value: string | null) {
+    this._tempfile = value;
+  }
+
+  /** Rails `tempfile.open` — re-opens the underlying file for reading. */
+  open(): Buffer {
+    this._closed = false;
+    return this.read();
+  }
+
+  /** Rails `tempfile.path`. */
+  path(): string | null {
+    return this._tempfile;
+  }
+
+  /** Rails `tempfile.to_path`. */
+  toPath(): string | null {
+    return this._tempfile;
+  }
+
+  /** Rails `tempfile.eof?` — no streaming cursor, so reflects emptiness. */
+  isEof(): boolean {
+    return this.size === 0;
+  }
+
+  /** Rails `tempfile.to_io` — returns the raw bytes as an IO-like Buffer. */
+  toIo(): Buffer {
+    return this.read();
+  }
+
   /** Check if this looks like a valid uploaded file. */
   get valid(): boolean {
     return this.originalFilename.length > 0 && this.size > 0;

@@ -129,9 +129,8 @@ export class Metal extends AbstractController {
   async dispatch(action: string, request: Request, response: Response): Promise<Response> {
     this.setRequestBang(request);
     this.setResponseBang(response);
-    this.params =
-      (request as any).parameters ??
-      new Parameters({ ...request.params, ...request.pathParameters });
+    const reqParams = request.parameters;
+    this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
 
     await this.processAction(action);
 
