@@ -432,6 +432,17 @@ export class Cookies {
     const outHeaders: Record<string, string> = { ...headers };
     const setHeaders = jar.getSetCookieHeaders();
     if (setHeaders.length > 0) {
+      // Rack 3 standardizes on lowercase header keys, but Rails-shaped
+      // middleware can still emit `Set-Cookie` (or stranger casings).
+      // Find any existing variant case-insensitively, drop it, and
+      // canonicalize on lowercase `set-cookie`.
+      let existing: string | string[] | undefined;
+      for (const key of Object.keys(outHeaders)) {
+        if (key.toLowerCase() === "set-cookie") {
+          existing = outHeaders[key] as unknown as string | string[];
+          if (key !== "set-cookie") delete outHeaders[key];
+        }
+      }
       // Although the RackResponse tuple types headers as
       // Record<string, string>, downstream apps backed by
       // `Rack::Response` (Record<string, string | string[]>) can hand
@@ -439,7 +450,6 @@ export class Cookies {
       // template would stringify with commas and corrupt the header.
       // Normalize both shapes to a flat string[] before joining with
       // newlines (Rack's wire convention for multi-value set-cookie).
-      const existing = outHeaders["set-cookie"] as unknown as string | string[] | undefined;
       const existingList = existing ? (Array.isArray(existing) ? existing : [existing]) : [];
       outHeaders["set-cookie"] = [...existingList, ...setHeaders].join("\n");
     }
@@ -453,9 +463,10 @@ export class Cookies {
 // ===========================================================================
 
 /**
- * Host shape used by {@link requestCookieMethods}. The `env` is the
- * underlying Rack env on the request; trails reads/writes Rails
- * `action_dispatch.*` keys there.
+ * Host shape used by {@link cookieJar}, {@link isHaveCookieJar}, and
+ * the `action_dispatch.*` env-key accessors below ({@link keyGenerator}
+ * et al.). The `env` is the underlying Rack env on the request; trails
+ * reads/writes Rails `action_dispatch.*` keys there.
  *
  * @internal
  */

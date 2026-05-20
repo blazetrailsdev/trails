@@ -89,6 +89,22 @@ describe("Cookies middleware", () => {
     ]);
   });
 
+  it("merges with an existing Set-Cookie that uses non-lowercase casing", async () => {
+    const cookies = new Cookies(async (env) => {
+      const jar = new CookieJar();
+      jar.set("b", "2");
+      env[COOKIES_KEY] = jar;
+      return [200, { "Set-Cookie": "a=1; path=/" }, bodyFromString("")];
+    });
+    const [, headers] = await cookies.call({});
+    // The non-lowercase key is dropped; the merged canonical lowercase
+    // header carries both cookies.
+    expect(headers["Set-Cookie"]).toBeUndefined();
+    const lines = headers["set-cookie"]!.split("\n");
+    expect(lines[0]).toBe("a=1; path=/");
+    expect(lines[1]).toContain("b=2");
+  });
+
   it("commits the jar so further writes are dropped after the middleware runs", async () => {
     const jar = new CookieJar();
     const cookies = new Cookies(async (env) => {
