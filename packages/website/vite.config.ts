@@ -30,6 +30,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/globalid/wire", "../globalid/src/wire.ts"),
       pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"),
       pkgAlias("@blazetrails/globalid", "../globalid/src/index.ts"),
+      pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"),
     ],
   },
   build: {
