@@ -61,13 +61,20 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
   }
 
   call(t: PolymorphicHost, args: unknown[], onlyPath = false): string {
-    const last = args[args.length - 1];
-    const options =
-      last != null && typeof last === "object" && !Array.isArray(last)
-        ? (args.pop() as Record<string, unknown>)
-        : {};
+    // Rails: `options = args.extract_options!` — only strip a trailing
+    // *plain* Hash. Model instances, Dates, class instances all stay in
+    // the positional args. Work on a copy so the caller's array is
+    // unchanged.
+    const rest = args.slice();
+    const last = rest[rest.length - 1];
+    const isPlainHash =
+      last != null &&
+      typeof last === "object" &&
+      !Array.isArray(last) &&
+      (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null);
+    const options = isPlainHash ? (rest.pop() as Record<string, unknown>) : {};
     const merged = { ...this.defaults, ...options };
-    const result = this.block.apply(t, [...args, merged]);
+    const result = this.block.apply(t, [...rest, merged]);
     const url =
       typeof result === "string"
         ? result
@@ -555,7 +562,8 @@ export class RouteSet {
   ): string {
     const path = this.pathFor(routeName, params);
     if (options.onlyPath) return path;
-    const host = options.host ?? this.defaultUrlOptions.host;
+    const rawHost = options.host ?? this.defaultUrlOptions["host"];
+    const host = typeof rawHost === "string" ? rawHost : undefined;
     if (!host) {
       throw new Error(
         "Missing host to link to! Please provide the :host parameter or set default_url_options[:host]",
