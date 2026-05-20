@@ -17,22 +17,21 @@ async function runTemplate(location: string): Promise<void> {
   );
 }
 
+const TEMPLATE_ARG = "Path to a template file (.mjs/.js; .ts needs a TS loader like tsx)";
+
 export function appCommand(): Command {
-  const cmd = new Command("app");
-  cmd.description("Apply app templates and other app-level tasks");
+  const cmd = new Command("app").description("App-level tasks (template, ...)");
   cmd
     .command("template")
-    .alias("app:template")
-    .description("Apply the template supplied by <location>")
-    .argument("<location>", "Path to a template file (.mjs/.js; .ts requires a TS loader like tsx)")
+    .description("Apply the template")
+    .argument("<location>", TEMPLATE_ARG)
     .action(runTemplate);
   return cmd;
 }
 
-// Top-level `trails app:template <location>` mirroring Rails' bin/rails app:template.
 export function appTemplateCommand(): Command {
   return new Command("app:template")
     .description("Apply the template supplied by <location>")
-    .argument("<location>", "Path to a template file (.mjs/.js; .ts requires a TS loader like tsx)")
+    .argument("<location>", TEMPLATE_ARG)
     .action(runTemplate);
 }
