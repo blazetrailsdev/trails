@@ -208,7 +208,7 @@ export class Mapper {
         controller: undefined,
         shallow,
         constraints: Object.keys(nestedConstraints).length > 0 ? nestedConstraints : undefined,
-        memberPath: basePath + "/:id",
+        memberPath: `${shallowPath}/:id`,
         resource: {
           memberName: singular,
           collectionName: name,
