@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HostAuthorization } from "../middleware/host-authorization.js";
+import { HostAuthorization, IPAddr } from "../middleware/host-authorization.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 
@@ -166,16 +166,6 @@ describe("HostAuthorizationTest", () => {
     expect(status).toBe(200);
   });
 
-  it("nested subdomains match wildcard", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
-    const [status] = await mw.call({
-      HTTP_HOST: "deep.sub.example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
-  });
-
   it("IPv4 address matching", async () => {
     const mw = new HostAuthorization(okApp, { hosts: ["127.0.0.1"] });
     const [s1] = await mw.call({ HTTP_HOST: "127.0.0.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
@@ -192,5 +182,47 @@ describe("HostAuthorizationTest", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(200);
+  });
+
+  it("authorized_host preserves IPv6 brackets and strips port", async () => {
+    const env: Record<string, unknown> = {
+      HTTP_HOST: "[::1]:3000",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    };
+    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const [status] = await mw.call(env);
+    expect(status).toBe(200);
+    expect(env["action_dispatch.authorized_host"]).toBe("[::1]");
+  });
+
+  it("SUBDOMAIN_REGEX allows only a single subdomain segment", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
+    const [status] = await mw.call({
+      HTTP_HOST: "deep.sub.example.com",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(403);
+  });
+
+  it("IPv4-mapped IPv6 host matches CIDR allowlist", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const [status] = await mw.call({
+      HTTP_HOST: "[::ffff:127.0.0.1]",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(200);
+  });
+
+  it("non-IP hostname does not match IPv6 CIDR allowlist", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const [status] = await mw.call({
+      HTTP_HOST: "example.com:3000",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(403);
   });
 });
