@@ -20,6 +20,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "actionview",
     "trailties",
     "globalid",
+    "did-you-mean",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};

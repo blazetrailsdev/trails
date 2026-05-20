@@ -870,7 +870,7 @@ function main() {
     const excludedFiles = new Set<string>();
     for (const item of allRuby) {
       const file = item.info.file || "unknown.rb";
-      if (isSourceUnported(file)) {
+      if (isSourceUnported(file, pkg)) {
         excludedFiles.add(file);
         continue;
       }
@@ -1116,7 +1116,7 @@ function main() {
       };
 
       for (const { fqn, info } of allRuby) {
-        if (!info.file || isSourceUnported(info.file)) continue;
+        if (!info.file || isSourceUnported(info.file, pkg)) continue;
         if (primaryClassPerFile.get(info.file) !== fqn) continue;
         // `allRuby` mixes classes and modules; modules don't carry superclass.
         if (!(fqn in rubyPkg.classes)) continue;

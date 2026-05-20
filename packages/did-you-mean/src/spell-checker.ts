@@ -1,8 +1,8 @@
 // Ported from Ruby's did_you_mean/spell_checker.rb
 // (https://github.com/ruby/did_you_mean), MIT License.
 
-import { jaroWinklerDistance } from "./jaro-winkler.js";
-import { levenshteinDistance } from "./levenshtein.js";
+import { JaroWinkler } from "./jaro-winkler.js";
+import { Levenshtein } from "./levenshtein.js";
 
 export interface SpellCheckerOptions {
   dictionary: ReadonlyArray<string>;
@@ -42,12 +42,12 @@ export class SpellChecker {
     for (let i = 0; i < this.#dictionary.length; i++) {
       const word = this.#dictionary[i];
       if (rawInput === String(word)) continue;
-      const jw = jaroWinklerDistance(normalize(word), normalizedInput);
+      const jw = JaroWinkler.distance(normalize(word), normalizedInput);
       if (jw < jwThreshold) continue;
       candidates.push({
         word,
         index: i,
-        score: jaroWinklerDistance(String(word), normalizedInput),
+        score: JaroWinkler.distance(String(word), normalizedInput),
       });
     }
 
@@ -61,7 +61,7 @@ export class SpellChecker {
 
     const mistypeThreshold = Math.ceil(inputLen * 0.25);
     let corrections = candidates
-      .filter((c) => levenshteinDistance(normalize(c.word), normalizedInput) <= mistypeThreshold)
+      .filter((c) => Levenshtein.distance(normalize(c.word), normalizedInput) <= mistypeThreshold)
       .map((c) => c.word);
 
     if (corrections.length === 0) {
@@ -69,7 +69,7 @@ export class SpellChecker {
         .filter((c) => {
           const w = normalize(c.word);
           const len = Math.min(inputLen, codepointLength(w));
-          return levenshteinDistance(w, normalizedInput) < len;
+          return Levenshtein.distance(w, normalizedInput) < len;
         })
         .slice(0, 1)
         .map((c) => c.word);
