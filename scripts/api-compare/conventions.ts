@@ -9,10 +9,13 @@ import * as path from "path";
  * Token-level Ruby→TS renames applied before camelization.
  *
  * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
- * extension in place of Rails' `.erb`. Any Rails identifier referring to
- * ERB (file, method, module, parameter) is expected to use `tse` in
- * trails — see docs/actionview-100-percent.md. File paths get this same
- * substitution in `rubyFileToTs` below.
+ * extension in place of Rails' `.erb` — see docs/actionview-100-percent.md.
+ *
+ * Applied to every identifier that flows through `snakeToCamel` —
+ * currently Ruby method names (via `rubyMethodToTs`) and constant
+ * fragments embedded in dot-notation method names like
+ * `visit_Arel_Nodes_X`. File paths get the equivalent substitution
+ * separately in `rubyFileToTs` below.
  */
 const TOKEN_RENAMES: Record<string, string> = {
   erb: "tse",
