@@ -384,6 +384,74 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse("success");
     });
 
+    it("requestCount increments per request and resets on resetBang", async () => {
+      expect(app.requestCount).toBe(0);
+      await app.get("/posts");
+      await app.get("/posts");
+      expect(app.requestCount).toBe(2);
+      app.resetBang();
+      expect(app.requestCount).toBe(0);
+    });
+
+    it("httpsBang / isHttps flip the scheme on the rack env", async () => {
+      expect(app.isHttps()).toBe(false);
+      app.httpsBang();
+      expect(app.isHttps()).toBe(true);
+      await app.get("/posts");
+      expect(app.request.env["rack.url_scheme"]).toBe("https");
+      expect(app.request.env.HTTPS).toBe("on");
+      app.httpsBang(false);
+      expect(app.isHttps()).toBe(false);
+    });
+
+    it("host/remoteAddr/accept land in the rack env", async () => {
+      app.host = "api.example.com:8080";
+      app.remoteAddr = "10.0.0.5";
+      app.accept = "application/vnd.api+json";
+      await app.get("/posts");
+      expect(app.request.env.HTTP_HOST).toBe("api.example.com:8080");
+      expect(app.request.env.SERVER_NAME).toBe("api.example.com");
+      expect(app.request.env.SERVER_PORT).toBe("8080");
+      expect(app.request.env.REMOTE_ADDR).toBe("10.0.0.5");
+      expect(app.request.env.HTTP_ACCEPT).toBe("application/vnd.api+json");
+    });
+
+    it("urlOptions memoizes per request and clears across requests", async () => {
+      const before = app.urlOptions();
+      expect(before).toEqual({ host: "www.example.com", protocol: "http" });
+      expect(app.urlOptions()).toBe(before);
+      await app.get("/posts");
+      const after = app.urlOptions();
+      expect(after).not.toBe(before);
+    });
+
+    it("process() with an absolute URL updates host and https", async () => {
+      await app.process("get", "https://other.example.com/posts");
+      expect(app.host).toBe("other.example.com");
+      expect(app.isHttps()).toBe(true);
+      app.assertResponse("success");
+    });
+
+    it("_processPath splits query string off PATH_INFO", async () => {
+      await app.get("/posts?page=2&per=10");
+      expect(app.request.env.PATH_INFO).toBe("/posts");
+      expect(app.request.env.QUERY_STRING).toBe("page=2&per=10");
+      app.assertResponse("success");
+    });
+
+    it("followRedirectBang sets HTTP_REFERER to the prior request URL", async () => {
+      await app.get("/posts/redirect");
+      app.assertResponse("redirect");
+      const refererBefore = `http://www.example.com/posts/redirect`;
+      await app.followRedirectBang();
+      expect(app.request.env.HTTP_REFERER).toBe(refererBefore);
+    });
+
+    it("followRedirectBang throws when last response was not a redirect", async () => {
+      await app.get("/posts");
+      await expect(app.followRedirectBang()).rejects.toThrow(/not a redirect/);
+    });
+
     it("CRUD lifecycle", async () => {
       // Create
       await app.post("/posts", { params: { title: "CRUD" } });
