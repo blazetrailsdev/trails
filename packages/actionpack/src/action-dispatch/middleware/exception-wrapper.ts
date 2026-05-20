@@ -55,15 +55,18 @@ const SILENT_EXCEPTIONS = new Set<string>([
   "ActionDispatch::Http::MimeNegotiation::InvalidType",
 ]);
 
-// JS closest analog to Ruby's exception.class.name: prefer the actual
-// constructor name and only fall back to the `name` field if the constructor
-// chain is missing. Treats the default "Error" as unset so custom subclasses
-// that forget to set `name` don't collapse into the generic bucket.
+// JS closest analog to Ruby's exception.class.name. Prefer `e.name` first
+// since trails error classes set it to the Rails-qualified constant (e.g.
+// "ActionDispatch::Http::Parameters::ParseError") that STATUS_MAP /
+// SILENT_EXCEPTIONS key off. Fall back to the constructor name so custom
+// subclasses that forget to assign `name` don't collapse into the generic
+// "Error" bucket. The default inherited "Error" on either side is treated
+// as unset.
 function classNameOf(e: Error): string {
+  if (e.name && e.name !== "Error") return e.name;
   const ctor = e.constructor?.name;
   if (ctor && ctor !== "Error") return ctor;
-  if (e.name && e.name !== "Error") return e.name;
-  return ctor || e.name || "Error";
+  return e.name || ctor || "Error";
 }
 
 const EXCEPTION_IDS = new WeakMap<object, number>();
