@@ -21,6 +21,7 @@ import {
   type RedirectOptions,
 } from "./route.js";
 import { Scope, type ScopeLevel } from "./scope.js";
+import { underscore } from "@blazetrails/activesupport";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -437,22 +438,26 @@ export class Mapper {
     this.match(path, { ...options, via: method });
   }
 
+  /**
+   * Mirrors Rails `Scoping#controller(controller)` — pushes a `_scope` frame
+   * setting the controller name. Does NOT push onto `scopeStack`: that stack's
+   * `controller` field is a *module/namespace prefix* (used by `namespace`),
+   * whereas `controller(...)` overrides the controller name directly.
+   */
   controller(controllerName: string, callback: MapperCallback): void {
-    this.scopeStack.push({ path: this.currentPrefix(), controller: controllerName });
     const previous = this._scope;
     this._scope = this._scope.newChild({ controller: controllerName });
     try {
       callback(this);
     } finally {
       this._scope = previous;
-      this.scopeStack.pop();
     }
   }
 
-  defaults(defaultsHash: Record<string, unknown>, callback: MapperCallback): void {
+  defaults(defaultsHash: Record<string, string>, callback: MapperCallback): void {
     const previous = this._scope;
     const merged = this.mergeDefaultsScope(
-      this._scope.get("defaults") as Record<string, unknown> | undefined,
+      this._scope.get("defaults") as Record<string, string> | undefined,
       defaultsHash,
     );
     this._scope = this._scope.newChild({ defaults: merged });
@@ -504,10 +509,8 @@ export class Mapper {
     if (typeof app === "function") {
       const name = (app as { name?: string }).name;
       if (!name) return undefined;
-      return name
-        .replace(/([a-z\d])([A-Z])/g, "$1_$2")
-        .toLowerCase()
-        .replace(/\//g, "_");
+      // Rails: ActiveSupport::Inflector.underscore(class_name).tr("/", "_")
+      return underscore(name).replace(/\//g, "_");
     }
     return undefined;
   }
@@ -550,6 +553,10 @@ export class Mapper {
       path?: string;
     },
   ): void {
+    if (options.on !== undefined && !VALID_ON_OPTIONS.has(options.on)) {
+      throw new Error(`Unknown scope ${options.on} given to :on`);
+    }
+
     const scopeTo = this._scope.get("to") as string | undefined;
     if (scopeTo) options.to ??= scopeTo;
     const scopeController = this._scope.get("controller") as string | undefined;
@@ -1196,6 +1203,9 @@ export class Mapper {
 }
 
 const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"];
+
+/** Rails `VALID_ON_OPTIONS = [:new, :collection, :member]` (mapper.rb:1160). */
+const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
 interface ScopeFrame {
   path: string;
