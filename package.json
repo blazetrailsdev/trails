@@ -20,6 +20,7 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "api:compare": "bash scripts/api-compare/run.sh",
+    "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
     "api:moves": "pnpm tsx scripts/api-compare/moves.ts",
     "lint:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",

@@ -480,6 +480,8 @@ jobs:
         run: pnpm exec tsx scripts/build-rails-privates-manifest.ts && pnpm exec eslint packages/arel/src
       - name: Test comparison
         run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts
+      - name: Fixtures comparison (DIFF/MISSING soft per Decision 4 until PR 7; runtime errors hard-fail)
+        run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
