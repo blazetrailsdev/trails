@@ -2,7 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, Relation } from "./index.js";
 import { activeRecordConfig } from "./relation/batches.js";
 
@@ -128,13 +128,11 @@ describe("EachTest", () => {
 // More EachTest — targets batches_test.rb
 // ==========================================================================
 describe("EachTest", () => {
-  // NOTE: not migrated to beforeAll + withTransactionalFixtures — one test
-  // ("each should return a sized enumerator") calls freshAdapter() inline,
-  // which issues DDL on MariaDB and breaks the wrapping savepoint.
   let adapter: TestDatabaseAdapter;
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = await freshAdapter();
   });
+  withTransactionalFixtures(() => adapter);
 
   it("in batches has attribute readers", async () => {
     class Post extends Base {
@@ -151,11 +149,10 @@ describe("EachTest", () => {
   });
 
   it("each should return a sized enumerator", async () => {
-    const freshAdp = await freshAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
-        this.adapter = freshAdp;
+        this.adapter = adapter;
       }
     }
     for (let i = 0; i < 5; i++) await Post.create({ title: `post ${i}` });

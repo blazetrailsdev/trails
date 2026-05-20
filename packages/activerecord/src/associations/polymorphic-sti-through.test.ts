@@ -32,12 +32,12 @@
  *   - test_has_many_through_with_sti_on_through_reflection (STI variant)
  *   - test_has_many_through_reset_source_reflection_after_loading_is_complete
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, registerSubclass, enableSti } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 const TEST_SCHEMA: Schema = {
   ps_hotels: { name: "string" },
@@ -51,14 +51,8 @@ const TEST_SCHEMA: Schema = {
   ps_drink_designers: { name: "string" },
 };
 
-async function freshAdapter(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
-  await defineSchema(adapter, TEST_SCHEMA);
-  return adapter;
-}
-
 describe("HABTM Slot E — polymorphic + STI through", () => {
-  let adapter: DatabaseAdapter;
+  let adapter: TestDatabaseAdapter;
 
   class PsHotel extends Base {
     static {
@@ -101,8 +95,9 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
   enableSti(PsCakeDesigner);
   registerSubclass(PsSpecialCakeDesigner);
 
-  beforeEach(async () => {
-    adapter = await freshAdapter();
+  beforeAll(async () => {
+    adapter = createTestAdapter();
+    await defineSchema(adapter, TEST_SCHEMA);
     PsHotel.adapter = adapter;
     PsDepartment.adapter = adapter;
     PsChef.adapter = adapter;
@@ -115,9 +110,6 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     registerModel("PsCakeDesigner", PsCakeDesigner);
     registerModel("PsDrinkDesigner", PsDrinkDesigner);
     registerModel("PsSpecialCakeDesigner", PsSpecialCakeDesigner);
-    (PsHotel as any)._associations = [];
-    (PsDepartment as any)._associations = [];
-    (PsChef as any)._associations = [];
 
     Associations.hasMany.call(PsHotel, "psDepartments", {
       className: "PsDepartment",
@@ -151,6 +143,7 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
       sourceType: "PsDrinkDesigner",
     });
   });
+  withTransactionalFixtures(() => adapter);
 
   async function seed() {
     const hotel = await PsHotel.create({ name: "h" });
@@ -160,16 +153,23 @@ describe("HABTM Slot E — polymorphic + STI through", () => {
     })) as any;
     const cake1 = (await PsCakeDesigner.create({ name: "cake1" })) as any;
     const cake2 = (await PsCakeDesigner.create({ name: "cake2" })) as any;
-    // strayCake has no chef row pointing at it. Burn enough drink
-    // rows to bump the per-table sequence so the actual drink-type
-    // chef points at a drink whose id collides with strayCake (=3).
-    // If the source_type filter is missing, the unfiltered through
-    // walk hands strayCake.id to the cake-table load and strayCake
-    // leaks into the cakeDesigners result.
-    const strayCake = (await PsCakeDesigner.create({ name: "stray" })) as any;
-    await PsDrinkDesigner.create({ name: "filler1" });
-    await PsDrinkDesigner.create({ name: "filler2" });
-    const drink = (await PsDrinkDesigner.create({ name: "drink" })) as any;
+    // strayCake has no chef row pointing at it. Engineer a cross-table id
+    // collision dynamically by padding whichever sequence is behind until
+    // drink.id === strayCake.id (PG sequences don't roll back across the
+    // outer txn, so absolute sequence values drift between tests under
+    // withTransactionalFixtures — see feedback_tm_phase6_pg_sequence_drift).
+    // If the source_type filter is missing, the unfiltered through walk
+    // hands strayCake.id to the cake-table load and strayCake leaks into
+    // the cakeDesigners result.
+    let drink = (await PsDrinkDesigner.create({ name: "drink" })) as any;
+    let strayCake = (await PsCakeDesigner.create({ name: "stray" })) as any;
+    while (drink.id !== strayCake.id) {
+      if (drink.id < strayCake.id) {
+        drink = (await PsDrinkDesigner.create({ name: "drink-pad" })) as any;
+      } else {
+        strayCake = (await PsCakeDesigner.create({ name: "stray-pad" })) as any;
+      }
+    }
     expect(drink.id).toBe(strayCake.id);
 
     await PsChef.create({
