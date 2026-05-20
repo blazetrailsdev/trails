@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
-import { Collector } from "./collector.js";
+import { Collector, generateMethodForMime } from "./collector.js";
 
 // ==========================================================================
 // abstract/collector_test.rb
@@ -194,5 +194,20 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     expect("custom" in c).toBe(true);
     expect("html" in c).toBe(true);
     expect("bogusFormatXyz" in c).toBe(false);
+  });
+});
+
+describe("generateMethodForMime", () => {
+  it("accepts a registered MIME symbol without throwing", () => {
+    expect(() => generateMethodForMime("html")).not.toThrow();
+  });
+
+  it("accepts a MimeType instance without throwing", () => {
+    const mime = MimeType.lookup("json")!;
+    expect(() => generateMethodForMime(mime)).not.toThrow();
+  });
+
+  it("throws for an unregistered MIME symbol", () => {
+    expect(() => generateMethodForMime("bogusFormatXyz")).toThrow(/unknown MIME "bogusFormatXyz"/);
   });
 });

@@ -151,3 +151,38 @@ export function normalizeRender(...args: unknown[]): RenderOptions {
 export function _processVariant(_options: RenderOptions): void {
   // Empty in the abstract layer.
 }
+
+/**
+ * Hook — subclasses override to process the rendered format. Empty
+ * at the abstract layer (mirrors Rails' `_process_format` in
+ * `AbstractController::Rendering`).
+ *
+ * @internal
+ */
+export function _processFormat(_format: unknown): void {
+  // Empty in the abstract layer.
+}
+
+/**
+ * Rails-shaped private `_normalize_render(*args)` entry point. Same
+ * signature/behavior as `normalizeRender` (the trails-named public
+ * helper); kept here so the Rails-private name is exported for
+ * `api:compare` and for subclasses that override the private hook.
+ *
+ * @internal
+ */
+export function _normalizeRender(...args: unknown[]): RenderOptions {
+  return normalizeRender(...args);
+}
+
+/**
+ * The instance-field names excluded from `viewAssigns`. Mirrors Rails'
+ * private `_protected_ivars` (which simply returns the
+ * `DEFAULT_PROTECTED_INSTANCE_VARIABLES` constant). Exported as a
+ * function so subclasses can override and so `api:compare` matches.
+ *
+ * @internal
+ */
+export function _protectedIvars(): readonly string[] {
+  return DEFAULT_PROTECTED_INSTANCE_VARIABLES;
+}
