@@ -505,7 +505,9 @@ export class TestSession {
     if (arguments.length >= 2) {
       return typeof fallback === "function" ? (fallback as () => unknown)() : fallback;
     }
-    throw new Error(`key not found: ${k}`);
+    const err = new Error(`key not found: "${k}"`);
+    err.name = "KeyError";
+    throw err;
   }
 
   /** Mirrors Rails `TestSession#enabled?` — always `true`. */
