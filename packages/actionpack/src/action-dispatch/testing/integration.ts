@@ -628,7 +628,7 @@ export class IntegrationTest {
     // ParamsParser; we mirror that here so query-string params survive the
     // PATH_INFO/QUERY_STRING split done above.
     const allParams: Record<string, unknown> = { ...params };
-    if (queryString) {
+    if (env.QUERY_STRING) {
       Object.assign(allParams, this.request.queryParameters);
     }
     if (options.params) {
