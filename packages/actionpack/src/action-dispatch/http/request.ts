@@ -65,6 +65,7 @@ import {
   type NonceGenerator,
 } from "./content-security-policy.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
+import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
@@ -984,21 +985,25 @@ export class Request {
    * `action` path-parameter to `"index"` and resolves the controller class
    * via {@link controllerClassFor}.
    */
-  controllerClass(): typeof PassNotFound | unknown {
-    const params = this.pathParameters as Record<string, unknown>;
+  controllerClass(): typeof PassNotFound {
+    const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
   /**
-   * Rails: `request.controller_class_for(name)` (request.rb:94-110).
-   * Sentinel-only path: returns {@link PassNotFound} when `name` is absent.
-   * Registry-backed name resolution is a follow-up.
+   * Rails: `request.controller_class_for(name)` (request.rb:94-110). When
+   * `name` is absent, returns the {@link PassNotFound} sentinel; otherwise
+   * throws — Trails has no global constant table to back Rails'
+   * `"#{name.camelize}Controller".constantize` lookup, so callers must
+   * resolve the class through the router (which knows the registered
+   * controllers for a route) until that bridge lands.
    */
-  controllerClassFor(name: string | undefined | null): typeof PassNotFound | unknown {
+  controllerClassFor(name: string | undefined | null): typeof PassNotFound {
     if (name) {
       throw new Error(
-        `controllerClassFor(${name}): controller registry resolution not yet implemented`,
+        `controllerClassFor(${name}): Trails has no global controller constant table; ` +
+          `resolve the controller class via the router instead.`,
       );
     }
     return PassNotFound;
@@ -1181,12 +1186,15 @@ Request.prototype.logParseErrorOnce = function (this: Request) {
  * router falls through to the next matching route.
  */
 export class PassNotFound {
+  /** @internal */
   static action(_name: unknown): typeof PassNotFound {
     return PassNotFound;
   }
+  /** @internal */
   static call(_env: RackEnv): [number, Record<string, string>, string[]] {
-    return [404, { "x-cascade": "pass" }, []];
+    return [404, { [X_CASCADE]: "pass" }, []];
   }
+  /** @internal */
   static actionEncodingTemplate(_action: unknown): false {
     return false;
   }
