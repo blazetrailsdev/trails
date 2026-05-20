@@ -20,9 +20,32 @@ import {
   type RedirectFunction,
   type RedirectOptions,
 } from "./route.js";
+import { Scope, type ScopeLevel } from "./scope.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
+
+/** @internal */
+interface ResourceLike {
+  memberName?: string;
+  collectionName?: string;
+  nestedParam?: string;
+  param?: string;
+  resourceScope?: string;
+  actions?: ResourceAction[];
+  shallow?: () => boolean;
+}
+
+/** Resource-DSL options stripped before falling back to `scope()`. */
+const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
+  "as",
+  "controller",
+  "path",
+  "only",
+  "except",
+  "param",
+  "concerns",
+]);
 
 export class Mapper {
   readonly routes: Route[] = [];
@@ -30,6 +53,10 @@ export class Mapper {
   private concerns: Map<string, ConcernCallback> = new Map();
   private redirectFns: Map<string, RedirectFunction> = new Map();
   private redirectCounter = 0;
+  /** @internal */
+  _scope: Scope = new Scope({ pathNames: { new: "new", edit: "edit" } }, Scope.ROOT, null);
+  /** @internal */
+  _apiOnly = false;
 
   // --- HTTP verb methods ---
 
@@ -671,6 +698,186 @@ export class Mapper {
   /** @internal */
   hasNamedRoute(name: string): boolean {
     return this.routes.some((r) => r.name === name);
+  }
+
+  // --- Rails-private scope-chain helpers (mapper.rb privates) ---
+
+  /** @internal */
+  withScopeLevel<T>(kind: ScopeLevel, fn: () => T): T {
+    const previous = this._scope;
+    this._scope = this._scope.newLevel(kind);
+    try {
+      return fn();
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  /** @internal */
+  pathScope<T>(path: string, fn: () => T): T {
+    const previous = this._scope;
+    const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
+    this._scope = this._scope.newChild({ path: merged });
+    try {
+      return fn();
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  /** @internal */
+  resourceScope<T>(resource: ResourceLike, fn: () => T): T {
+    const previous = this._scope;
+    this._scope = this._scope.newChild({ scopeLevelResource: resource });
+    try {
+      return fn();
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  /** @internal */
+  shallowScope<T>(fn: () => T): T {
+    const previous = this._scope;
+    this._scope = this._scope.newChild({
+      as: this._scope.get("shallowPrefix"),
+      path: this._scope.get("shallowPath"),
+    });
+    try {
+      return fn();
+    } finally {
+      this._scope = previous;
+    }
+  }
+
+  /** @internal */
+  withDefaultScope(scopeOptions: ScopeOptions, callback: MapperCallback): void {
+    this.scope(scopeOptions, callback);
+  }
+
+  /** @internal */
+  parentResource(): ResourceLike | undefined {
+    return this._scope.get("scopeLevelResource") as ResourceLike | undefined;
+  }
+
+  /** @internal */
+  isResourceMethodScope(): boolean {
+    return this._scope.isResourceMethodScope();
+  }
+
+  /** @internal */
+  isNestedScopeLevel(): boolean {
+    return this._scope.isNested();
+  }
+
+  /** @internal */
+  isApiOnly(): boolean {
+    return this._apiOnly;
+  }
+
+  /** @internal */
+  resourcesPathNames(options: Record<string, string>): Record<string, string> {
+    const current = (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    Object.assign(current, options);
+    return current;
+  }
+
+  /** @internal */
+  actionPath(name: string): string {
+    const pathNames = (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    return pathNames[name] ?? name;
+  }
+
+  /** @internal */
+  nestedOptions(): { as?: string; constraints?: RouteConstraints } {
+    const parent = this.parentResource();
+    const options: { as?: string; constraints?: RouteConstraints } = { as: parent?.memberName };
+    if (this.isParamConstraint() && parent?.nestedParam) {
+      const c = this.paramConstraint();
+      if (c) options.constraints = { [parent.nestedParam]: c };
+    }
+    return options;
+  }
+
+  /** @internal */
+  scopeActionOptions(method: "resource" | "resources"): RouteOptions {
+    const stored = this._scope.get("actionOptions") as RouteOptions | undefined;
+    if (!stored) return {};
+    const actions = this.applicableActionsFor(method);
+    const result: RouteOptions = { ...stored };
+    if (stored.only) {
+      const only = Array.isArray(stored.only) ? stored.only : [stored.only];
+      result.only = only.filter((a) => actions.includes(a));
+    }
+    if (stored.except) {
+      const except = Array.isArray(stored.except) ? stored.except : [stored.except];
+      result.except = except.filter((a) => actions.includes(a));
+    }
+    return result;
+  }
+
+  /** @internal */
+  applyActionOptions(method: "resource" | "resources", options: RouteOptions): RouteOptions {
+    if (options.only || options.except) return options;
+    return { ...options, ...this.scopeActionOptions(method) };
+  }
+
+  /**
+   * Mirrors `apply_common_behavior_for`: short-circuits multi-resource
+   * splat, shallow unwrap, nested resource-scope, and scope-options unwrap.
+   * Returns `true` if handled, `false` otherwise.
+   *
+   * @internal
+   */
+  applyCommonBehaviorFor(
+    method: "resource" | "resources",
+    resources: string[],
+    options: RouteOptions,
+    block: MapperCallback | undefined,
+  ): boolean {
+    const dispatch = (...args: unknown[]) =>
+      (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
+
+    if (resources.length > 1) {
+      for (const r of resources) dispatch(r, options, block);
+      return true;
+    }
+    if (options.shallow) {
+      delete options.shallow;
+      this.shallowScope(() => dispatch(resources.pop()!, options, block));
+      return true;
+    }
+    if (this._scope.isResourceScope()) {
+      this.withScopeLevel("nested", () => dispatch(resources.pop()!, options, block));
+      return true;
+    }
+
+    const constraints = (options.constraints ?? {}) as RouteConstraints;
+    let pulledAny = false;
+    for (const k of Object.keys(options) as Array<keyof RouteOptions>) {
+      const v = options[k];
+      if (v instanceof RegExp) {
+        constraints[k as string] = v;
+        delete options[k];
+        pulledAny = true;
+      }
+    }
+    if (pulledAny) options.constraints = constraints;
+
+    const scopeOptions: ScopeOptions & Record<string, unknown> = {};
+    let hasScopeOption = false;
+    for (const k of Object.keys(options) as Array<keyof RouteOptions>) {
+      if (!RESOURCE_OPTIONS.has(k as string)) {
+        (scopeOptions as Record<string, unknown>)[k as string] = options[k];
+        delete options[k];
+        hasScopeOption = true;
+      }
+    }
+    if (hasScopeOption) {
+      this.scope(scopeOptions, () => dispatch(resources.pop()!, options, block));
+      return true;
+    }
+    return false;
   }
 }
 
