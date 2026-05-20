@@ -8,8 +8,12 @@ import {
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
+  processAction,
+  render,
+  renderToString,
   RENDER_FORMATS_IN_PRIORITY,
 } from "./rendering.js";
+import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 
 describe("_renderInPriorities", () => {
   test("returns first present priority key, ignoring prototype chain", () => {
@@ -207,6 +211,62 @@ describe("Metal wiring", () => {
     // when no key matches, so the " " fallback wins.
     expect(instance.renderToBody({ body: false })).toBe(" ");
     expect(instance.renderToBody({ body: null })).toBe(" ");
+  });
+
+  test("render throws DoubleRenderError when performed is already set", () => {
+    const host = {
+      performed: true,
+      responseBody: null,
+      renderToBody: () => "ignored",
+    };
+    expect(() => render.call(host)).toThrow(DoubleRenderError);
+  });
+
+  test("render delegates to abstract render when not yet performed", () => {
+    const host = {
+      performed: false,
+      responseBody: null as unknown,
+      renderToBody: (opts: Record<string, unknown>) => `body:${String(opts.plain ?? "")}`,
+      _setHtmlContentType: () => {},
+      _setRenderedContentType: () => {},
+      _setVaryHeader: () => {},
+      renderedFormat: () => null,
+    };
+    render.call(host, { plain: "hi" });
+    expect(host.responseBody).toBe("body:hi");
+  });
+
+  test("renderToString collapses iterable results into a string", () => {
+    const host = {
+      responseBody: null as unknown,
+      renderToBody: () => ["a", "b", "c"],
+    };
+    expect(renderToString.call(host, {})).toBe("abc");
+  });
+
+  test("renderToString passes non-iterable results through unchanged", () => {
+    const host = { responseBody: null as unknown, renderToBody: () => 42 };
+    expect(renderToString.call(host, {})).toBe(42);
+  });
+
+  test("processAction sets formats from request.formats via ref()", () => {
+    const host: { request: { formats: { ref: () => string }[] }; formats?: unknown } = {
+      request: {
+        formats: [{ ref: () => "html" }, { ref: () => "json" }],
+      },
+    };
+    processAction.call(host);
+    expect(host.formats).toEqual(["html", "json"]);
+  });
+
+  test("processAction filters out null refs (filter_map &:ref parity)", () => {
+    const host: { request: { formats: { ref: () => unknown }[] }; formats?: unknown } = {
+      request: {
+        formats: [{ ref: () => "html" }, { ref: () => null }, { ref: () => "json" }],
+      },
+    };
+    processAction.call(host);
+    expect(host.formats).toEqual(["html", "json"]);
   });
 
   test("renderToBody dispatches to a registered renderer before the priority resolver", async () => {

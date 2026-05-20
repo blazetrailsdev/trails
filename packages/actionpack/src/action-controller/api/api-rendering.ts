@@ -1,10 +1,38 @@
 /**
- * ActionController::ApiRendering
+ * ActionController::ApiRendering — aggregator mirroring
+ * `action_controller/api/api_rendering.rb`. Rails `includes Rendering`
+ * into the host class; trails re-exports the Rendering helpers here so
+ * api:compare sees the full mixed-in surface on this file.
  *
- * Rendering module included in API controllers. Overrides the default
- * render to use the API renderer (no template support).
  * @see https://api.rubyonrails.org/classes/ActionController/ApiRendering.html
  */
+
+import * as rendering from "../metal/rendering.js";
+
+/** @internal */
+export const renderToBody = rendering.renderToBody;
+/** @internal */
+export const render = rendering.render;
+/** @internal */
+export const renderToString = rendering.renderToString;
+/** @internal */
+export const processAction = rendering.processAction;
+/** @internal */
+export const _processVariant = rendering._processVariant;
+/** @internal */
+export const _renderInPriorities = rendering._renderInPriorities;
+/** @internal */
+export const _setHtmlContentType = rendering._setHtmlContentType;
+/** @internal */
+export const _setRenderedContentType = rendering._setRenderedContentType;
+/** @internal */
+export const _setVaryHeader = rendering._setVaryHeader;
+/** @internal */
+export const _normalizeOptions = rendering._normalizeOptions;
+/** @internal */
+export const _normalizeText = rendering._normalizeText;
+/** @internal */
+export const _processOptions = rendering._processOptions;
 
 function resolveContentType(options: Record<string, unknown>, fallback: string): string {
   return typeof options.contentType === "string" ? options.contentType : fallback;
