@@ -2,14 +2,15 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { Base } from "./index.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -72,11 +73,12 @@ describe("MysqlDefaultExpressionTest", () => {
 });
 
 describe("DefaultNumbersTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { counters: { value: "integer" } });
   });
+  withTransactionalFixtures(() => adapter);
   afterAll(async () => {
     await dropAllTables(adapter);
   });
@@ -111,11 +113,12 @@ describe("DefaultNumbersTest", () => {
 });
 
 describe("DefaultBinaryTest", () => {
-  let adp: DatabaseAdapter;
-  beforeEach(async () => {
-    adp = freshAdapter();
+  let adp: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adp = createTestAdapter();
     await defineSchema(adp, { bin_records: { data: "string" } });
   });
+  withTransactionalFixtures(() => adp);
   afterAll(async () => {
     await dropAllTables(adp);
   });
@@ -189,11 +192,12 @@ describe("DefaultsTestWithoutTransactionalFixtures", () => {
 });
 
 describe("DefaultTextTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { posts: { body: "string", title: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
   afterAll(async () => {
     await dropAllTables(adapter);
   });
@@ -220,11 +224,12 @@ describe("DefaultTextTest", () => {
 });
 
 describe("DefaultStringsTest", () => {
-  let adapter: DatabaseAdapter;
-  beforeEach(async () => {
-    adapter = freshAdapter();
+  let adapter: TestDatabaseAdapter;
+  beforeAll(async () => {
+    adapter = createTestAdapter();
     await defineSchema(adapter, { posts: { title: "string", body: "string" } });
   });
+  withTransactionalFixtures(() => adapter);
   afterAll(async () => {
     await dropAllTables(adapter);
   });

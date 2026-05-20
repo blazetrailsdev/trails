@@ -1,15 +1,16 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, serialize } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
-import type { DatabaseAdapter } from "../adapter.js";
+import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
-let adapter: DatabaseAdapter;
+let adapter: TestDatabaseAdapter;
 
-beforeEach(async () => {
+beforeAll(async () => {
   adapter = createTestAdapter();
   await defineSchema(adapter, { topics: { content: "string" } });
 });
+withTransactionalFixtures(() => adapter);
 
 describe("JSONTest", () => {
   it("returns nil if empty string given", async () => {
