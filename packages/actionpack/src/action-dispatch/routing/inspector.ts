@@ -30,6 +30,21 @@ export interface RoutesFilter {
 type NormalizedFilter = Record<string, RegExp | string> | null;
 
 /**
+ * @internal Render a constraint hash in a Rails-like shape: `{key: /regex/, ...}`.
+ * `JSON.stringify` loses RegExp values (serializes them as `{}`), which would
+ * make `rails routes` print `{id: {}}` instead of `{id: /\d+/}`. Mirror Ruby
+ * hash inspect for the RegExp/string cases the routing layer actually uses.
+ */
+function formatConstraints(c: Record<string, unknown>): string {
+  const parts = Object.entries(c).map(([k, v]) => {
+    if (v instanceof RegExp) return `${k}: ${v.toString()}`;
+    if (typeof v === "string") return `${k}: ${JSON.stringify(v)}`;
+    return `${k}: ${String(v)}`;
+  });
+  return `{${parts.join(", ")}}`;
+}
+
+/**
  * Display-time decorator around a Route. Mirrors Rails' SimpleDelegator-based
  * `ActionDispatch::Routing::RouteWrapper` — endpoint string, non-routing
  * constraints, normalized name/path.
@@ -72,14 +87,17 @@ export class RouteWrapper {
   /**
    * @internal Mirrors Rails RouteWrapper#requirements — combines the route's
    * routing constraints with the dispatched controller/action so the
-   * formatter can show `controller#action {constraint: …}`.
+   * formatter can show `controller#action {constraint: …}`. Built on a
+   * null-prototype object so a constraint keyed `__proto__` becomes a real
+   * own property instead of hitting the inherited setter (same defensive
+   * pattern Route#requestConstraints uses).
    */
   get requirements(): Record<string, unknown> {
-    return {
-      ...this.route.constraints,
-      controller: this.route.controller,
-      action: this.route.action,
-    };
+    const out: Record<string, unknown> = Object.create(null);
+    for (const k of Object.keys(this.route.constraints)) out[k] = this.route.constraints[k];
+    out.controller = this.route.controller;
+    out.action = this.route.action;
+    return out;
   }
 
   /** @internal Rack app of mounted engine — undefined until trails Route wraps one */
@@ -107,7 +125,7 @@ export class RouteWrapper {
     if (this._reqs !== undefined) return this._reqs;
     let s = this.endpoint;
     const c = this.constraints;
-    if (Object.keys(c).length > 0) s += ` ${JSON.stringify(c)}`;
+    if (Object.keys(c).length > 0) s += ` ${formatConstraints(c)}`;
     this._reqs = s;
     return s;
   }
