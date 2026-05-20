@@ -308,6 +308,50 @@ export class Metal extends AbstractController {
   static resolveStatus = resolveStatus;
 
   /**
+   * Rails `Metal.build_middleware` — wraps a middleware klass + args
+   * into the action-aware `:only`/`:except` predicate form consumed by
+   * the dispatch middleware stack.
+   *
+   * @internal
+   */
+  static buildMiddleware(
+    klass: MiddlewareEntry["klass"],
+    args: unknown[],
+    _block?: unknown,
+  ): Middleware & { valid(action: string): boolean } {
+    const next = [...args];
+    const last = next[next.length - 1];
+    // Clone the options object so we can safely delete `only`/`except`
+    // without mutating the caller's hash (Rails' `extract_options!` pops
+    // the trailing hash off `args` — the hash itself is still the caller's
+    // reference; trails defensively copies to avoid surprising the caller).
+    const options: Record<string, unknown> =
+      last && typeof last === "object" && !Array.isArray(last)
+        ? { ...(next.pop() as Record<string, unknown>) }
+        : {};
+    const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
+    const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
+    delete options.only;
+    delete options.except;
+    if (Object.keys(options).length > 0) next.push(options);
+
+    let strategy: (list: string[] | null, action: string) => boolean = () => true;
+    let list: string[] | null = null;
+    if (only.length > 0) {
+      strategy = (l, a) => (l ?? []).includes(a);
+      list = only;
+    } else if (except.length > 0) {
+      strategy = (l, a) => !(l ?? []).includes(a);
+      list = except;
+    }
+    const wrapped = new Middleware(klass, next) as Middleware & {
+      valid(action: string): boolean;
+    };
+    wrapped.valid = (action: string) => strategy(list, action);
+    return wrapped;
+  }
+
+  /**
    * Composes the Rails `render_to_body` chain. With `ActionController::Base`'s
    * include order, the effective chain is:
    *
