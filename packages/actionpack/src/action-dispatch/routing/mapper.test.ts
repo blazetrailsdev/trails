@@ -81,3 +81,97 @@ describe("scope-merge helpers", () => {
     expect(m.mergeShallowScope(false, "anything")).toBe(true);
   });
 });
+
+describe("Mapper public DSL additions", () => {
+  it("nested throws outside a resource scope", () => {
+    const m = new Mapper();
+    expect(() => m.nested(() => {})).toThrow(/can't use nested outside resource\(s\) scope/);
+  });
+
+  it("nested runs inside a resources block", () => {
+    const m = new Mapper();
+    let ran = false;
+    m.resources("posts", () => {
+      m.nested(() => {
+        ran = true;
+      });
+    });
+    expect(ran).toBe(true);
+  });
+
+  it("shallow preserves the outer path prefix on its frame", () => {
+    const m = new Mapper();
+    let observedInside: string | undefined;
+    m.scope("/admin", () => {
+      m.shallow(() => {
+        observedInside = m["currentPrefix"]();
+      });
+    });
+    expect(observedInside).toBe("/admin");
+  });
+
+  it("draw runs a callback form", () => {
+    const m = new Mapper();
+    let inner: Mapper | undefined;
+    m.draw((inside) => {
+      inner = inside;
+    });
+    expect(inner).toBe(m);
+  });
+
+  it("draw throws on the string (file-load) form", () => {
+    const m = new Mapper();
+    expect(() => m.draw("admin")).toThrow(/file-based draw is not supported/);
+  });
+
+  it("defaultUrlOptions getter/setter round-trip", () => {
+    const m = new Mapper();
+    m.defaultUrlOptions = { host: "example.com" };
+    expect(m.defaultUrlOptions).toEqual({ host: "example.com" });
+  });
+
+  it("defaultUrlOptions delegates to an attached set", () => {
+    const set: { defaultUrlOptions: Record<string, unknown> } = { defaultUrlOptions: {} };
+    const m = new Mapper(set);
+    m.defaultUrlOptions = { port: 3000 };
+    expect(set.defaultUrlOptions).toEqual({ port: 3000 });
+    expect(m.defaultUrlOptions).toEqual({ port: 3000 });
+  });
+
+  it("setMemberMappingsForResource emits canonical member routes for the parent resource actions", () => {
+    const m = new Mapper();
+    let before = 0;
+    m.resources("posts", () => {
+      before = m.routes.length;
+      m.setMemberMappingsForResource();
+    });
+    const added = m.routes.slice(before, before + 5);
+    expect(added.map((r) => `${r.verb} ${r.path}#${r.action}`)).toEqual([
+      "GET /posts/:id/edit#edit",
+      "GET /posts/:id#show",
+      "PATCH /posts/:id#update",
+      "PUT /posts/:id#update",
+      "DELETE /posts/:id#destroy",
+    ]);
+    expect(added.every((r) => r.controller === "posts")).toBe(true);
+  });
+
+  it("shallow inside a namespace preserves the namespace prefix on member paths", () => {
+    const m = new Mapper();
+    m.namespace("admin", () => {
+      m.resources("posts", { shallow: true }, () => {
+        m.resources("comments");
+      });
+    });
+    const commentShow = m.routes.find(
+      (r) => r.action === "show" && r.controller.endsWith("comments"),
+    );
+    expect(commentShow?.path).toBe("/admin/comments/:id");
+  });
+
+  it("setMemberMappingsForResource is a safe no-op outside a resource scope", () => {
+    const m = new Mapper();
+    expect(() => m.setMemberMappingsForResource()).not.toThrow();
+    expect(m.routes).toEqual([]);
+  });
+});

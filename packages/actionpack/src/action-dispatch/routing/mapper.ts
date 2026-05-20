@@ -48,6 +48,13 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "concerns",
 ]);
 
+/** @internal Subset of `RouteSet` consumed by the {@link Mapper} constructor. */
+interface RouteSetLike {
+  resourcesPathNames?: Record<string, string>;
+  drawPaths?: string[];
+  defaultUrlOptions?: Record<string, unknown>;
+}
+
 export class Mapper {
   readonly routes: Route[] = [];
   private scopeStack: ScopeFrame[] = [];
@@ -55,9 +62,34 @@ export class Mapper {
   private redirectFns: Map<string, RedirectFunction> = new Map();
   private redirectCounter = 0;
   /** @internal */
-  _scope: Scope = new Scope({ pathNames: { new: "new", edit: "edit" } }, Scope.ROOT, null);
+  _set: RouteSetLike | undefined;
+  /** @internal */
+  _drawPaths: string[];
+  /** @internal */
+  _scope: Scope;
   /** @internal */
   _apiOnly = false;
+  /** @internal Local fallback when no RouteSet is attached. */
+  private _defaultUrlOptions: Record<string, unknown> = {};
+
+  /** Mirrors Rails `Mapper#initialize(set)`. The `set` is optional in trails. */
+  constructor(set?: RouteSetLike) {
+    this._set = set;
+    this._drawPaths = set?.drawPaths ?? [];
+    const pathNames = set?.resourcesPathNames ?? { new: "new", edit: "edit" };
+    this._scope = new Scope({ pathNames }, Scope.ROOT, null);
+  }
+
+  /** Rails: `default_url_options=(options)`. */
+  set defaultUrlOptions(options: Record<string, unknown>) {
+    if (this._set) this._set.defaultUrlOptions = options;
+    else this._defaultUrlOptions = options;
+  }
+
+  /** Rails: `alias_method :default_url_options, :default_url_options=`. */
+  get defaultUrlOptions(): Record<string, unknown> {
+    return this._set?.defaultUrlOptions ?? this._defaultUrlOptions;
+  }
 
   // --- HTTP verb methods ---
 
@@ -118,8 +150,11 @@ export class Mapper {
     const namePrefix = this.currentNamePrefix();
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
-    // For shallow routes, member routes use un-nested paths
-    const shallowPath = shallow ? `/${name}` : basePath;
+    // For shallow routes, member routes drop *parent resource* segments but
+    // keep outer scope/namespace prefixes. Rails: shallow_path = path until
+    // outermost resource.
+    const shallowPrefix = shallow ? this.outerNonResourcePrefix() : prefix;
+    const shallowPath = shallow ? `${shallowPrefix}/${name}` : basePath;
     const shallowName = (suffix: string) => (shallow ? suffix : routeName(suffix));
 
     const allowed = allowedActions(options, [
@@ -135,7 +170,9 @@ export class Mapper {
     const constraints = scopeConstraints
       ? { ...scopeConstraints, ...options.constraints }
       : options.constraints;
-    const pathNames = options.pathNames ?? {};
+    const scopePathNames =
+      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
@@ -174,7 +211,17 @@ export class Mapper {
         controller: undefined,
         shallow,
         constraints: Object.keys(nestedConstraints).length > 0 ? nestedConstraints : undefined,
-        memberPath: basePath + "/:id",
+        memberPath: `${shallowPath}/:id`,
+        resource: {
+          memberName: singular,
+          collectionName: name,
+          nestedParam: `${singular}_id`,
+          param: "id",
+          resourceScope: controller,
+          actions: Array.from(allowed) as ResourceAction[],
+        },
+        resourceController: controller,
+        resourcePathNames: pathNames,
       });
       cb(this);
       this.scopeStack.pop();
@@ -241,7 +288,9 @@ export class Mapper {
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
     const allowed = allowedActions(options, ["show", "new", "create", "edit", "update", "destroy"]);
-    const pathNames = options.pathNames ?? {};
+    const scopePathNames =
+      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
+    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
@@ -287,6 +336,16 @@ export class Mapper {
         path: basePath,
         namePrefix: name,
         controller: undefined,
+        memberPath: basePath,
+        resource: {
+          memberName: name,
+          collectionName: pluralize(name),
+          param: "id",
+          resourceScope: controller,
+          actions: Array.from(allowed) as ResourceAction[],
+        },
+        resourceController: controller,
+        resourcePathNames: pathNames,
       });
       cb(this);
       this.scopeStack.pop();
@@ -368,6 +427,96 @@ export class Mapper {
     });
     callback(this);
     this.scopeStack.pop();
+  }
+
+  /** Rails: `nested(&block)`. Wraps `block` in a nested resource scope. */
+  nested(callback: MapperCallback): void {
+    if (!this.isResourceScope()) {
+      throw new Error("can't use nested outside resource(s) scope");
+    }
+    this.withScopeLevel("nested", () => {
+      // Only enter shallowScope if Rails-style shallow keys have been
+      // populated; trails resources() currently tracks path nesting via
+      // scopeStack rather than _scope.shallowPath/Prefix, so the
+      // shallowScope branch would otherwise clobber as/path with undefined.
+      const shallowKeysSet =
+        this._scope.get("shallowPath") !== undefined ||
+        this._scope.get("shallowPrefix") !== undefined;
+      if (shallowKeysSet && this.isShallow() && this.shallowNestingDepth() >= 1) {
+        this.shallowScope(() => callback(this));
+      } else {
+        callback(this);
+      }
+    });
+  }
+
+  /**
+   * Rails: `shallow(&block)`. Pushes a `shallow: true` scope so nested
+   * `resources` inside use shallow path/name conventions. The current
+   * prefix is preserved — Rails clones the scope hash, which keeps `:path`
+   * unchanged.
+   */
+  shallow(callback: MapperCallback): void {
+    this.scopeStack.push({
+      path: this.currentPrefix(),
+      namePrefix: undefined,
+      controller: undefined,
+      shallow: true,
+    });
+    try {
+      callback(this);
+    } finally {
+      this.scopeStack.pop();
+    }
+  }
+
+  /**
+   * Rails: `draw(name)`. Loads `config/routes/<name>.rb` and evaluates it
+   * in the current Mapper context. The file-loading form is Ruby-specific
+   * (`instance_eval(File.read…)`); in trails, pass a callback that receives
+   * this Mapper instead. Passing a string throws — file-based draw is not
+   * supported.
+   */
+  draw(nameOrCallback: string | MapperCallback): void {
+    if (typeof nameOrCallback === "function") {
+      nameOrCallback(this);
+      return;
+    }
+    throw new Error(
+      `Mapper#draw(${JSON.stringify(nameOrCallback)}): file-based draw is not supported in trails. ` +
+        "Pass a callback (mapper) => void with the route definitions, or import and invoke a routes module directly.",
+    );
+  }
+
+  /**
+   * Rails: `set_member_mappings_for_resource`. Inside a `member { … }` block,
+   * adds the standard member verb mappings (`edit`, `show`, `update`,
+   * `destroy`) when the parent resource's `actions` allows them.
+   *
+   * @internal
+   */
+  setMemberMappingsForResource(): void {
+    const parent = this.parentResource();
+    if (!parent) return;
+    const actions = parent.actions ?? [];
+    // Find the active resource frame for the canonical member path + controller.
+    const frame = [...this.scopeStack].reverse().find((f) => f.resource === parent);
+    const memberPath = frame?.memberPath ?? this.currentPrefix();
+    const controller = frame?.resourceController ?? "";
+    const editPath = frame?.resourcePathNames?.edit ?? this.actionPath("edit");
+    if (actions.includes("edit")) {
+      this.routes.push(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+    }
+    if (actions.includes("show")) {
+      this.routes.push(new Route("GET", memberPath, controller, "show"));
+    }
+    if (actions.includes("update")) {
+      this.routes.push(new Route("PATCH", memberPath, controller, "update"));
+      this.routes.push(new Route("PUT", memberPath, controller, "update"));
+    }
+    if (actions.includes("destroy")) {
+      this.routes.push(new Route("DELETE", memberPath, controller, "destroy"));
+    }
   }
 
   // --- constraints block ---
@@ -783,6 +932,30 @@ export class Mapper {
     return this.scopeStack[this.scopeStack.length - 1].path;
   }
 
+  /**
+   * Path contributed by the outermost non-resource scope frames (namespaces,
+   * scopes) — used to compute the shallow base path so it preserves
+   * `/admin` etc. but drops parent-resource `/:user_id` segments.
+   *
+   * @internal
+   */
+  private outerNonResourcePrefix(): string {
+    // Walk bottom-up to find the deepest non-resource frame that comes
+    // *before* the outermost resource frame. A `scope(...)` opened
+    // inside a resource (e.g. `resources('posts') { scope('/foo') {…} }`)
+    // is NOT outer — its path already contains the parent-resource
+    // segments shallow routing is meant to drop. Shallow-marker frames
+    // carry no real path contribution; they snapshot currentPrefix()
+    // only to keep `member()` from resetting it.
+    let last = "";
+    for (const f of this.scopeStack) {
+      if (f.resource) return last;
+      if (f.shallow) continue;
+      last = f.path;
+    }
+    return last;
+  }
+
   private prefixedName(name: string): string {
     const prefix = this.currentNamePrefix();
     return prefix ? `${prefix}_${name}` : name;
@@ -1080,6 +1253,10 @@ export class Mapper {
 
   /** @internal */
   parentResource(): ResourceLike | undefined {
+    for (let i = this.scopeStack.length - 1; i >= 0; i--) {
+      const r = this.scopeStack[i].resource;
+      if (r) return r;
+    }
     return this._scope.get("scopeLevelResource") as ResourceLike | undefined;
   }
 
@@ -1225,6 +1402,12 @@ interface ScopeFrame {
   shallow?: boolean;
   constraints?: RouteConstraints;
   memberPath?: string;
+  /** Snapshot of the active resource (Rails: `@scope[:scope_level_resource]`). */
+  resource?: ResourceLike;
+  /** Controller for member-route emission (Rails: resource_scope controller). */
+  resourceController?: string;
+  /** Merged pathNames (scope + options) for this resource frame. */
+  resourcePathNames?: Record<string, string>;
 }
 
 interface ScopeOptions {
