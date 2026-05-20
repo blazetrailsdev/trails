@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { bodyFromString } from "@blazetrails/rack";
 import { Mapper } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 
@@ -14,7 +15,7 @@ describe("MapperTest", () => {
     expect(routes.getRoutes().length).toBeGreaterThan(0);
   });
 
-  const app = (_env: Record<string, unknown>) => [200, {}, [""]] as const;
+  const app = (_env: Record<string, unknown>) => [200, {}, bodyFromString("")] as const;
 
   it("can pass anchor to mount", () => {
     const m = new Mapper();
@@ -44,7 +45,7 @@ describe("Mapper#mount dispatch", () => {
     const seen: Array<Record<string, unknown>> = [];
     const engine = (env: Record<string, unknown>) => {
       seen.push({ SCRIPT_NAME: env["SCRIPT_NAME"], PATH_INFO: env["PATH_INFO"] });
-      return [200, { "content-type": "text/plain" }, ["engine-ok"]];
+      return [200, { "content-type": "text/plain" }, bodyFromString("engine-ok")];
     };
     const routes = new RouteSet();
     routes.draw((r) => r.mount(engine, { at: "/foo" }));
@@ -62,7 +63,7 @@ describe("Mapper#mount dispatch", () => {
         PATH_INFO: env["PATH_INFO"],
         path_parameters: env["action_dispatch.request.path_parameters"],
       });
-      return [200, {}, [""]];
+      return [200, {}, bodyFromString("")];
     };
     const routes = new RouteSet();
     routes.draw((r) => r.mount(engine, { at: "/:tenant" }));
