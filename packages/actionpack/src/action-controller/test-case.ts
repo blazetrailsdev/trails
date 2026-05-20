@@ -33,7 +33,7 @@
  *   });
  */
 
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
@@ -73,11 +73,10 @@ export class TestCase {
    */
   static tests(controllerClass: ControllerClass | string): void {
     if (typeof controllerClass === "string") {
-      const klass = (globalThis as Record<string, unknown>)[
-        `${camelize(controllerClass)}Controller`
-      ];
+      const constantName = `${camelize(controllerClass)}Controller`;
+      const klass = (globalThis as Record<string, unknown>)[constantName];
       if (typeof klass !== "function") {
-        throw new Error("controller class must be a String or Class");
+        throw new Error(`uninitialized constant ${constantName}`);
       }
       this._controllerClass = klass as ControllerClass;
       return;
@@ -526,13 +525,7 @@ export class TestSession {
 }
 
 function randomHex(bytes: number): string {
-  let out = "";
-  for (let i = 0; i < bytes; i++) {
-    out += Math.floor(Math.random() * 256)
-      .toString(16)
-      .padStart(2, "0");
-  }
-  return out;
+  return Buffer.from(getCrypto().randomBytes(bytes)).toString("hex");
 }
 
 function formatToMime(format: string): string {

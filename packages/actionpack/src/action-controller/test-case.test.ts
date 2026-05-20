@@ -53,15 +53,20 @@ describe("TestCase class helpers", () => {
 
   it("tests(string) resolves <Name>Controller via globalThis", () => {
     (globalThis as Record<string, unknown>).WidgetController = PostsController;
-    class Sub extends TestCase {}
-    Sub.tests("widget");
-    expect(Sub.controllerClass).toBe(PostsController);
-    delete (globalThis as Record<string, unknown>).WidgetController;
+    try {
+      class Sub extends TestCase {}
+      Sub.tests("widget");
+      expect(Sub.controllerClass).toBe(PostsController);
+    } finally {
+      delete (globalThis as Record<string, unknown>).WidgetController;
+    }
   });
 
-  it("tests(string) raises when no matching constant exists", () => {
+  it("tests(string) raises NameError-style when no matching constant exists", () => {
     class Sub extends TestCase {}
-    expect(() => Sub.tests("nonexistent_blarg")).toThrow(/String or Class/);
+    expect(() => Sub.tests("nonexistent_blarg")).toThrow(
+      /uninitialized constant NonexistentBlargController/,
+    );
   });
 
   it("controllerClassName returns the configured class name", () => {
@@ -73,8 +78,11 @@ describe("TestCase class helpers", () => {
 
   it("determineDefaultControllerClass strips trailing Test and looks up", () => {
     (globalThis as Record<string, unknown>).BooksController = PostsController;
-    expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
-    expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();
-    delete (globalThis as Record<string, unknown>).BooksController;
+    try {
+      expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
+      expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();
+    } finally {
+      delete (globalThis as Record<string, unknown>).BooksController;
+    }
   });
 });

@@ -170,15 +170,16 @@ export function renderToBody(options: Record<string, unknown> = {}): string {
  * mix it in via include-style assignment.
  * @internal
  */
-export function render<T extends { responseBody?: unknown } & AbstractRenderHost>(
+export function render<T extends { performed?: boolean } & AbstractRenderHost>(
   this: T,
   ...args: unknown[]
 ): void {
-  // Rails: `if response_body` — Ruby truthiness, so `""` and `0` already
-  // count as rendered. JS truthiness drops `""`/`0`, so explicit null-check.
-  if (this.responseBody != null && this.responseBody !== false) {
-    throw new DoubleRenderError();
-  }
+  // Rails: `if response_body` — Ruby-truthiness on the raw `@_response_body`
+  // ivar. Trails' Metal `responseBody` getter stringifies to `""` even when
+  // unrendered, so guarding on it would throw on the first render. Use
+  // `performed` (set by Metal `markPerformed()`), which is the trails
+  // equivalent of "has this action committed a response yet".
+  if (this.performed) throw new DoubleRenderError();
   abstractRender.call(this, ...args);
 }
 
