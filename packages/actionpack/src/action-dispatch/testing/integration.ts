@@ -96,16 +96,18 @@ export class IntegrationTest {
   /** @internal */
   _https: boolean = false;
 
+  /** @internal */
+  _urlOptions?: Record<string, unknown>;
+
   /**
-   * Memoized mock-session slot. Rails uses `Rack::MockSession`; we have no
-   * equivalent, so it just holds the persistent cookie/session bag.
+   * Caller-supplied defaults merged into {@link urlOptions}. Rails sources
+   * this from the `UrlFor` mixin; until UrlFor is ported, sessions can still
+   * populate it directly (it's also what `Runner#default_url_options=` writes
+   * through to).
    *
    * @internal
    */
-  _mockSessionMemo?: { cookies: Record<string, string>; session: Record<string, unknown> };
-
-  /** @internal */
-  _urlOptions?: Record<string, unknown>;
+  _defaultUrlOptions: Record<string, unknown> = {};
 
   constructor() {
     this.resetBang();
@@ -123,7 +125,6 @@ export class IntegrationTest {
     this.request = undefined!;
     this.response = undefined!;
     this._https = false;
-    this._mockSessionMemo = undefined;
     this._urlOptions = undefined;
     this.requestCount = 0;
     this.host = DEFAULT_HOST;
@@ -147,42 +148,38 @@ export class IntegrationTest {
    * Rails (cleared inside `_processPath`).
    */
   urlOptions(): Record<string, unknown> {
-    this._urlOptions ??= {
-      host: this.host,
-      protocol: this._https ? "https" : "http",
-    };
+    if (!this._urlOptions) {
+      this._urlOptions = {
+        ...this._defaultUrlOptions,
+        host: this.host,
+        protocol: this._https ? "https" : "http",
+      };
+    }
     return this._urlOptions;
   }
 
   /**
-   * Default URL options getter that Runner clients (e.g. `urlFor`) call.
-   * Returns the same object as `urlOptions()`.
+   * Caller-supplied defaults merged into {@link urlOptions} (Rails
+   * `Runner#default_url_options`). Stored as a separate hash so writes don't
+   * clobber the per-request memo computed by {@link urlOptions}.
    */
   defaultUrlOptions(): Record<string, unknown> {
-    return this.urlOptions();
+    return this._defaultUrlOptions;
   }
 
-  /**
-   * Lazily-built mock-session bag. No `Rack::MockSession` to wrap, so we
-   * surface the persistent state used by the request loop.
-   *
-   * @internal
-   */
-  _mockSession(): { cookies: Record<string, string>; session: Record<string, unknown> } {
-    this._mockSessionMemo ??= { cookies: this._persistentCookies, session: this.session };
-    return this._mockSessionMemo;
+  setDefaultUrlOptions(options: Record<string, unknown>): void {
+    this._defaultUrlOptions = options;
+    this._urlOptions = undefined;
   }
 
   /**
    * Build the absolute URI used by `process` when a relative path is given.
+   * Matches Rails `Integration::Session#build_full_uri(path, env)`.
    *
    * @internal
    */
-  _buildFullUri(path: string): string {
-    const scheme = this._https ? "https" : "http";
-    const port = this._https ? "443" : "80";
-    const hostPart = this.host.includes(":") ? this.host : `${this.host}:${port}`;
-    return `${scheme}://${hostPart}${path}`;
+  _buildFullUri(path: string, env: Record<string, unknown>): string {
+    return `${env["rack.url_scheme"]}://${env["SERVER_NAME"]}:${env["SERVER_PORT"]}${path}`;
   }
 
   /**
@@ -219,11 +216,36 @@ export class IntegrationTest {
     return this.status;
   }
 
-  /** Rails-shaped `RequestHelpers#follow_redirect!`. */
+  /**
+   * Rails-shaped `RequestHelpers#follow_redirect!`. Preserves the verb on
+   * 307/308 (per RFC 7231/7538) and sets `HTTP_REFERER` to the previous URL,
+   * mirroring the Rails implementation.
+   */
   async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
+    if (!this.response || this.status < 300 || this.status >= 400) {
+      throw new Error(`not a redirect! ${this.status}`);
+    }
     const location = this.redirectUrl;
-    if (!location) throw new Error("not a redirect!");
-    await this.get(location, options);
+    if (!location) throw new Error("not a redirect! (no Location header)");
+
+    const preserveVerb = this.status === 307 || this.status === 308;
+    const method = preserveVerb
+      ? ((this.request?.env?.REQUEST_METHOD as string | undefined)?.toLowerCase() ?? "get")
+      : "get";
+
+    const headers = { ...(options.headers ?? {}) };
+    const hasReferer = Object.keys(headers).some(
+      (k) => k === "HTTP_REFERER" || k.toLowerCase() === "referer",
+    );
+    if (!hasReferer && this.request) {
+      const env = this.request.env as Record<string, string | undefined>;
+      const prev =
+        `${env["rack.url_scheme"] ?? "http"}://${env.HTTP_HOST ?? this.host}` +
+        `${env.PATH_INFO ?? ""}`;
+      headers["HTTP_REFERER"] = prev;
+    }
+
+    await this.process(method, location, { ...options, headers });
     return this.status;
   }
 
