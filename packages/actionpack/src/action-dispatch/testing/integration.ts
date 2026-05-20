@@ -42,8 +42,18 @@ import {
   cookies as testProcessCookies,
   flash as testProcessFlash,
   redirectToUrl as testProcessRedirectToUrl,
+  fileFixtureUpload as testProcessFileFixtureUpload,
+  fixtureFileUpload as testProcessFixtureFileUpload,
+  assigns as assignsFn,
   type TestProcessHost,
 } from "./test-process.js";
+import * as routingAssertions from "./assertions/routing.js";
+import * as responseAssertions from "./assertions/response.js";
+import * as urlForMod from "../routing/url-for.js";
+import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
+import type { UrlForRoutes } from "../routing/url-for.js";
+import { RequestEncoder } from "./request-encoder.js";
+import type { UploadedFile } from "../http/upload.js";
 
 type ControllerClass = new () => Metal;
 
@@ -166,17 +176,56 @@ export class IntegrationTest {
 
   /**
    * Caller-supplied defaults merged into {@link urlOptions} (Rails
-   * `Runner#default_url_options`). Stored as a separate hash so writes don't
-   * clobber the per-request memo computed by {@link urlOptions}.
+   * `Runner#default_url_options`). Exposed as a getter so the `UrlFor`
+   * mixin can read it as a record (`Object.keys(this.defaultUrlOptions)`)
+   * while writes still invalidate the per-request memo computed by
+   * {@link urlOptions}.
    */
-  defaultUrlOptions(): Record<string, unknown> {
+  get defaultUrlOptions(): Record<string, unknown> {
     return this._defaultUrlOptions;
   }
 
-  setDefaultUrlOptions(options: Record<string, unknown>): void {
+  set defaultUrlOptions(options: Record<string, unknown>) {
     this._defaultUrlOptions = options;
     this._urlOptions = undefined;
   }
+
+  /**
+   * Rails-shaped routes adapter consumed by the `UrlFor` and
+   * `PolymorphicRoutes` mixins. Delegates to `RouteSet._routes`, the same
+   * inner adapter Rails wires through `proxy_class.new(routes)._routes` —
+   * it carries `polymorphicMappings` (so `polymorphicUrl/Path` resolve
+   * direct routes) and a `urlFor(options, routeName?)` slot that
+   * currently throws a documented "needs Rails-shape signature — see
+   * PR b" error until trails' legacy `RouteSet.urlFor(name, params,
+   * options)` is rewritten. Callers of `urlFor/fullUrlFor/routeFor` will
+   * surface that same error; `polymorphicUrl/Path` and
+   * `polymorphicMapping` (which read only `polymorphicMappings`) work
+   * end-to-end today. Writable (Rails: `attr_accessor :_routes` via
+   * UrlFor) so `_withRoutes` can swap the adapter for a block.
+   *
+   * @internal
+   */
+  get _routes(): UrlForRoutes {
+    return this._routesOverride ?? (this.routes._routes as UrlForRoutes);
+  }
+
+  set _routes(value: UrlForRoutes | null) {
+    // `_withRoutes` saves `old = this._routes` (the computed delegate) and
+    // later writes it back. If we stored that snapshot verbatim, the
+    // override would shadow future updates to `this.routes`. Detect
+    // round-trips back to the natural delegate and clear the override so
+    // delegation resumes — mirrors Rails' `attr_accessor :_routes` where
+    // the ivar simply re-points at the same object.
+    if (value == null || value === this.routes._routes) {
+      this._routesOverride = undefined;
+    } else {
+      this._routesOverride = value;
+    }
+  }
+
+  /** @internal */
+  _routesOverride?: UrlForRoutes;
 
   /**
    * Build the absolute URI for the current request. Matches Rails
@@ -185,7 +234,7 @@ export class IntegrationTest {
    *
    * @internal
    */
-  _buildFullUri(path: string, env: Record<string, unknown>): string {
+  buildFullUri(path: string, env: Record<string, unknown>): string {
     return `${env["rack.url_scheme"]}://${env["SERVER_NAME"]}:${env["SERVER_PORT"]}${path}`;
   }
 
@@ -196,7 +245,7 @@ export class IntegrationTest {
    *
    * @internal
    */
-  _buildExpandedPath(path: string, onLocation?: (url: URL) => void): string {
+  buildExpandedPath(path: string, onLocation?: (url: URL) => void): string {
     if (!ABSOLUTE_URL_RE.test(path)) return path;
     const location = new URL(path);
     onLocation?.(location);
@@ -213,7 +262,7 @@ export class IntegrationTest {
   ): Promise<number> {
     let expanded = path;
     if (ABSOLUTE_URL_RE.test(path)) {
-      expanded = this._buildExpandedPath(path, (loc) => {
+      expanded = this.buildExpandedPath(path, (loc) => {
         this.httpsBang(loc.protocol === "https:");
         if (loc.host) this.host = loc.host;
       });
@@ -367,6 +416,11 @@ export class IntegrationTest {
     await this.process("HEAD", path, options);
   }
 
+  /** Performs an OPTIONS request. Mirrors `RequestHelpers#options`. */
+  async options(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
+    await this.process("OPTIONS", path, options);
+  }
+
   /**
    * Follow the redirect from the last response.
    * Issues a GET to the Location header.
@@ -377,6 +431,249 @@ export class IntegrationTest {
       throw new Error("No redirect to follow (no Location header)");
     }
     await this.get(location);
+  }
+
+  // --- Runner / Behavior surface ---
+
+  /**
+   * The current integration session. Rails has separate `Runner` and
+   * `Session` classes; trails collapses them into a single `IntegrationTest`,
+   * so the session is `this`.
+   */
+  get integrationSession(): this {
+    return this;
+  }
+
+  /**
+   * Create a new session for `app`. Rails dynamically subclasses
+   * `Integration::Session`, mixing in `app.routes.url_helpers` and
+   * `mounted_helpers`. trails doesn't yet have a Rack-app facade with
+   * generated helpers, so this creates a fresh `IntegrationTest` and
+   * propagates the current routes + controller registry — the
+   * functional equivalent for tests that share `this.routes`/`this.app`.
+   *
+   * @internal
+   */
+  createSession(app?: unknown): IntegrationTest {
+    const Ctor = this.constructor as new () => IntegrationTest;
+    const sess = new Ctor();
+    sess.routes = this.routes;
+    sess.controllers = this.controllers;
+    sess._app = app ?? this._app;
+    return sess;
+  }
+
+  /**
+   * Releases the current session so the next access lazily creates a new
+   * one. Mirrors Rails `Runner#remove!`.
+   *
+   * @internal
+   */
+  removeBang(): void {
+    this.resetBang();
+  }
+
+  /**
+   * Open a new session, optionally yielding it to a block before returning.
+   * Mirrors Rails `Runner#open_session`, which is `dup.tap { reset!; ... }` —
+   * the dup preserves the integration test's class-level configuration
+   * (`app`, registered controllers, routes) while `resetBang` clears all
+   * per-request state on the copy.
+   */
+  openSession(block?: (sess: IntegrationTest) => void): IntegrationTest {
+    const sess: IntegrationTest = Object.assign(
+      Object.create(Object.getPrototypeOf(this) as object),
+      this,
+    );
+    // Routes/controllers are shared with the parent (Rails dup is shallow
+    // for object refs); per-request state is cleared by resetBang below.
+    sess.resetBang();
+    sess.rootSession = this.rootSession ?? this;
+    block?.(sess);
+    return sess;
+  }
+
+  /**
+   * Root session for nested `openSession` instances. Rails: `attr_accessor
+   * :root_session`. `undefined` on a top-level test; the field is set by
+   * {@link openSession} on each spawned child.
+   *
+   * @internal
+   */
+  rootSession?: IntegrationTest;
+
+  /**
+   * Assertions counter. Rails delegates to Minitest; trails keeps a plain
+   * integer so frameworks that wrap us can read/write it.
+   *
+   * @internal
+   */
+  get assertions(): number {
+    return this.rootSession ? this.rootSession.assertions : (this._assertions ?? 0);
+  }
+
+  set assertions(value: number) {
+    if (this.rootSession) this.rootSession.assertions = value;
+    else this._assertions = value;
+  }
+
+  /** @internal */
+  _assertions: number = 0;
+
+  /**
+   * Copies session-owned ivars onto the test. In Rails the Runner uses
+   * this after delegating to the Session; trails uses a single class so
+   * this is a no-op kept for parity.
+   *
+   * @internal
+   */
+  copySessionVariablesBang(): void {
+    // No-op: Runner and Session share `this` in trails.
+  }
+
+  /**
+   * Lifecycle hook (Rails `Runner#before_setup`). Resets `app` so the next
+   * call lazily falls back to the class default.
+   *
+   * @internal
+   */
+  beforeSetup(): void {
+    this._app = undefined;
+  }
+
+  /**
+   * Lifecycle hook (Rails `Session#setup`). Currently delegates to the
+   * routing-assertions setup so `this.routes` matches the integration
+   * default. Tests rarely call this directly.
+   */
+  setup(): void {
+    routingAssertions.setup.call(this);
+  }
+
+  /**
+   * Per-instance app override. Reads through to the class-level default
+   * (mirrors `Behavior#app` falling back to `self.class.app`).
+   *
+   * @internal
+   */
+  _app?: unknown;
+
+  /**
+   * Application under test. Mirrors `Behavior#app` (instance method that
+   * falls back to the class-level default).
+   */
+  get app(): unknown {
+    return this._app ?? (this.constructor as typeof IntegrationTest).app;
+  }
+
+  set app(value: unknown) {
+    this._app = value;
+  }
+
+  /** Class-level default app for the test process. Mirrors `Behavior.app=`. */
+  static app: unknown = null;
+
+  /**
+   * Register a custom request encoder. Mirrors `Behavior::ClassMethods#register_encoder`.
+   */
+  static registerEncoder(
+    mimeName: string,
+    options: {
+      paramEncoder?: (params: unknown) => unknown;
+      responseParser?: (body: string) => unknown;
+    } = {},
+  ): void {
+    RequestEncoder.registerEncoder(mimeName, options);
+  }
+
+  /**
+   * Controller-instance-variable accessor. Rails extracted this to a gem;
+   * trails mirrors the deprecation by raising via TestProcess#assigns.
+   */
+  assigns(key?: string | symbol): never {
+    return assignsFn.call(this as unknown as TestProcessHost, key) as never;
+  }
+
+  /**
+   * Shortcut for an UploadedFile from `file_fixture_path`. Delegates to
+   * `TestProcess::FixtureFile#fileFixtureUpload`.
+   */
+  fileFixtureUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
+    return testProcessFileFixtureUpload.call(
+      this as unknown as TestProcessHost,
+      path,
+      mimeType,
+      binary,
+    ) as UploadedFile;
+  }
+
+  /** Alias of {@link fileFixtureUpload}. */
+  fixtureFileUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
+    return testProcessFixtureFileUpload.call(
+      this as unknown as TestProcessHost,
+      path,
+      mimeType,
+      binary,
+    ) as UploadedFile;
+  }
+
+  /** Human-friendly description used by debuggers. Mirrors `Session#inspect`. */
+  inspect(): string {
+    const url = this.request?.env?.REQUEST_URI ?? "(no request)";
+    return `#<${this.constructor.name} ${url}>`;
+  }
+
+  // --- Mixin surface (attached via prototype below) ---------------------
+  // Declared as class properties so api:compare sees the names. Real
+  // implementations live in the imported `this`-typed modules and are
+  // wired onto `IntegrationTest.prototype` after the class body. The
+  // `_`-prefixed and helper-message slots are Rails-private — keep
+  // `@internal` JSDoc grouped at the prototype block, not per-line.
+  declare assertRecognizes: typeof routingAssertions.assertRecognizes;
+  declare assertGenerates: typeof routingAssertions.assertGenerates;
+  declare assertRouting: typeof routingAssertions.assertRouting;
+  declare withRouting: typeof routingAssertions.withRouting;
+  declare createRoutes: typeof routingAssertions.createRoutes;
+  declare resetRoutes: typeof routingAssertions.resetRoutes;
+  declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
+  declare failOn: typeof routingAssertions.failOn;
+  declare urlFor: typeof urlForMod.urlFor;
+  declare fullUrlFor: typeof urlForMod.fullUrlFor;
+  declare routeFor: typeof urlForMod.routeFor;
+  declare optimizeRoutesGeneration: typeof urlForMod.optimizeRoutesGeneration;
+  declare _withRoutes: typeof urlForMod._withRoutes;
+  declare _routesContext: typeof urlForMod._routesContext;
+  declare polymorphicUrl: typeof polymorphicRoutes.polymorphicUrl;
+  declare polymorphicPath: typeof polymorphicRoutes.polymorphicPath;
+  declare polymorphicUrlForAction: typeof polymorphicRoutes.polymorphicUrlForAction;
+  declare polymorphicPathForAction: typeof polymorphicRoutes.polymorphicPathForAction;
+  declare polymorphicMapping: typeof polymorphicRoutes.polymorphicMapping;
+  declare parameterize: typeof responseAssertions.parameterize;
+  declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
+  // The remaining response-message helpers (generateResponseMessage,
+  // responseBodyIfShort, exceptionIfPresent, locationIfRedirected,
+  // codeWithName) take an explicit host argument in `assertions/response.ts`;
+  // re-expose them as Rails-shape (`this`-only) instance methods below so
+  // call sites can use Rails-private patterns directly.
+  /** @internal */
+  generateResponseMessage(expected: number | string, actual: number): string {
+    return responseAssertions.generateResponseMessage(this, expected, actual);
+  }
+  /** @internal */
+  responseBodyIfShort(): string {
+    return responseAssertions.responseBodyIfShort(this);
+  }
+  /** @internal */
+  exceptionIfPresent(): string {
+    return responseAssertions.exceptionIfPresent(this);
+  }
+  /** @internal */
+  locationIfRedirected(): string {
+    return responseAssertions.locationIfRedirected(this);
+  }
+  /** @internal */
+  codeWithName(codeOrName: number | string): string {
+    return responseAssertions.codeWithName(codeOrName);
   }
 
   // --- Assertions ---
@@ -530,7 +827,7 @@ export class IntegrationTest {
           .map(([k, v]) => `${k}=${v}`)
           .join("; ");
       }
-      noRouteEnv.REQUEST_URI = this._buildFullUri(
+      noRouteEnv.REQUEST_URI = this.buildFullUri(
         (noRouteEnv.PATH_INFO as string) +
           (noRouteEnv.QUERY_STRING ? `?${noRouteEnv.QUERY_STRING as string}` : ""),
         noRouteEnv,
@@ -580,7 +877,7 @@ export class IntegrationTest {
     // PATH_INFO/QUERY_STRING are honored.
     const finalPath =
       (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
-    env.REQUEST_URI = this._buildFullUri(finalPath, env);
+    env.REQUEST_URI = this.buildFullUri(finalPath, env);
 
     // Cookies from persistent jar
     if (Object.keys(this._persistentCookies).length > 0) {
@@ -683,6 +980,43 @@ export class IntegrationTest {
     this._cookieJar = undefined;
   }
 }
+
+// --- Mixin attachments ---------------------------------------------------
+// Rails composes IntegrationTest from `RoutingAssertions`,
+// `Routing::UrlFor`, `PolymorphicRoutes`, and the response-message helpers
+// from `Assertions::ResponseAssertions`. trails ports each module as
+// `this`-typed standalone functions (CLAUDE.md "Module mixins" pattern).
+// We declare the surface here and attach the implementations on
+// `IntegrationTest.prototype` so api:compare sees the names and runtime
+// callers get a working method.
+
+const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
+proto.assertRecognizes = routingAssertions.assertRecognizes;
+proto.assertGenerates = routingAssertions.assertGenerates;
+proto.assertRouting = routingAssertions.assertRouting;
+proto.withRouting = routingAssertions.withRouting;
+proto.createRoutes = routingAssertions.createRoutes;
+proto.resetRoutes = routingAssertions.resetRoutes;
+proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
+proto.failOn = routingAssertions.failOn;
+proto.urlFor = urlForMod.urlFor;
+proto.fullUrlFor = urlForMod.fullUrlFor;
+proto.routeFor = urlForMod.routeFor;
+proto.optimizeRoutesGeneration = urlForMod.optimizeRoutesGeneration;
+proto._withRoutes = urlForMod._withRoutes;
+proto._routesContext = urlForMod._routesContext;
+proto.polymorphicUrl = polymorphicRoutes.polymorphicUrl;
+proto.polymorphicPath = polymorphicRoutes.polymorphicPath;
+proto.polymorphicUrlForAction = polymorphicRoutes.polymorphicUrlForAction;
+proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
+proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
+proto.parameterize = responseAssertions.parameterize;
+proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
+// generateResponseMessage / responseBodyIfShort / exceptionIfPresent /
+// locationIfRedirected / codeWithName are defined as real instance
+// methods on the class above (their source signatures take an explicit
+// host arg, so wrapping them into Rails-shape `this`-only methods keeps
+// call sites idiomatic).
 
 function formatToMime(format: string): string {
   const MIMES: Record<string, string> = {
