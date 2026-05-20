@@ -21,12 +21,41 @@ export interface MiddlewareEntry {
 export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   private entries: MiddlewareEntry[] = [];
 
+  constructor() {
+    // matches Rails `initialize(*args)` — block form is not ported.
+  }
+
+  get middlewares(): MiddlewareEntry[] {
+    return this.entries;
+  }
+
+  set middlewares(value: MiddlewareEntry[]) {
+    this.entries = value;
+  }
+
   get length(): number {
     return this.entries.length;
   }
 
   get size(): number {
     return this.entries.length;
+  }
+
+  each(callback: (entry: MiddlewareEntry) => void): void {
+    for (const entry of this.entries) callback(entry);
+  }
+
+  last(): MiddlewareEntry | undefined {
+    return this.entries[this.entries.length - 1];
+  }
+
+  deleteBang(target: MiddlewareFactory): void {
+    const idx = this.findIndex(target);
+    if (idx === -1) {
+      const name = (target as { name?: string }).name;
+      throw new Error(`No such middleware to remove: ${name || String(target)}`);
+    }
+    this.entries.splice(idx, 1);
   }
 
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
@@ -152,5 +181,28 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
 
   private findIndex(klass: MiddlewareFactory): number {
     return this.entries.findIndex((e) => e.klass === klass);
+  }
+
+  /** @internal */
+  assertIndex(index: number | MiddlewareFactory, where: "before" | "after"): number {
+    const i = typeof index === "number" ? index : this.indexOf(index);
+    if (i === -1) {
+      throw new Error(`No such middleware to insert ${where}: ${String(index)}`);
+    }
+    return i;
+  }
+
+  /** @internal */
+  buildMiddleware(
+    klass: MiddlewareFactory,
+    args: unknown[],
+    block?: (app: RackApp) => RackApp,
+  ): MiddlewareEntry {
+    return { klass, args, block };
+  }
+
+  /** @internal */
+  indexOf(klass: MiddlewareFactory): number {
+    return this.findIndex(klass);
   }
 }
