@@ -33,8 +33,7 @@ function quote(value: unknown): string {
 }
 
 function asArray<T>(v: T | T[] | undefined): T[] {
-  if (v === undefined) return [];
-  return Array.isArray(v) ? v : [v];
+  return v === undefined ? [] : Array.isArray(v) ? v : [v];
 }
 
 function indent(text: string, pad: string): string {
@@ -57,12 +56,14 @@ export function gem(this: ActionsHost, name: string, ...rest: Array<string | Gem
   const parts: string[] = [quote(name), ...versionList.map(quote)];
   if (Object.keys(outOpts).length > 0) parts.push(quote(outOpts));
 
-  const lines: string[] = [];
-  if (comment) for (const line of comment.split("\n")) lines.push(`# ${line}`);
-  lines.push(`gem ${parts.join(", ")}`);
-
+  const prefix = comment
+    ? comment
+        .split("\n")
+        .map((l) => `# ${l}\n`)
+        .join("")
+    : "";
   this.output(`      gemfile  ${name}`);
-  this.appendWithNewline("Gemfile", lines.join("\n"));
+  this.appendWithNewline("Gemfile", `${prefix}gem ${parts.join(", ")}`);
 }
 
 export function route(
