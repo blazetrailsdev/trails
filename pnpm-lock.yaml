@@ -126,6 +126,9 @@ importers:
       '@blazetrails/arel':
         specifier: workspace:*
         version: link:../arel
+      '@blazetrails/did-you-mean':
+        specifier: workspace:*
+        version: link:../did-you-mean
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid

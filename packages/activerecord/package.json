@@ -51,6 +51,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
   },
