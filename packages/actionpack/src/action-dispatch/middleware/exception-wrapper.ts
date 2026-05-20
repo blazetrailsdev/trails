@@ -7,7 +7,7 @@
 import { ActionableError, type BacktraceCleaner, getFs, getPath } from "@blazetrails/activesupport";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
-interface ShowExceptionsRequest {
+export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
 }
 
@@ -66,7 +66,7 @@ function _idFor(err: object): number {
   return id;
 }
 
-type TraceEntry = { file: string; line: number };
+export type TraceEntry = { file: string; line: number };
 
 export class ExceptionWrapper {
   readonly exception: Error;
