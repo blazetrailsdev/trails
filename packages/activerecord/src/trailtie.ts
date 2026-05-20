@@ -17,8 +17,8 @@ import {
   processAction,
   cleanupViewRuntime,
   appendInfoToPayload,
-} from "./railties/controller-runtime.js";
-import { instrument } from "./railties/job-runtime.js";
+} from "./trailties/controller-runtime.js";
+import { instrument } from "./trailties/job-runtime.js";
 
 export const ControllerRuntime = { processAction, cleanupViewRuntime, appendInfoToPayload };
 export const JobRuntime = { instrument };
