@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Request } from "../request.js";
+import { Request, PassNotFound } from "../request.js";
 import { MimeType } from "../http/mime-type.js";
+import { X_CASCADE } from "../constants.js";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -676,5 +677,113 @@ describe("RequestFilterParameters", () => {
     const req = new Request({});
     // No filter list set → identity-style filter.
     expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
+  });
+});
+
+describe("RequestContentSecurityPolicy", () => {
+  it("reads and writes the policy under the env header", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicy).toBeUndefined();
+    const policy = { build: () => "default-src 'self'" };
+
+    req.contentSecurityPolicy = policy as any;
+    expect(req.env["action_dispatch.content_security_policy"]).toBe(policy);
+    expect(req.contentSecurityPolicy).toBe(policy);
+  });
+
+  it("reportOnly toggles the report-only env flag", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyReportOnly).toBeUndefined();
+    req.contentSecurityPolicyReportOnly = true;
+    expect(req.contentSecurityPolicyReportOnly).toBe(true);
+  });
+
+  it("nonce is undefined without a generator and memoizes on read", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonce).toBeUndefined();
+    let calls = 0;
+    req.contentSecurityPolicyNonceGenerator = () => `nonce-${++calls}`;
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+    expect(req.contentSecurityPolicyNonce).toBe("nonce-1");
+  });
+
+  it("nonce directives default to undefined and round-trip arrays", () => {
+    const req = new Request({});
+    expect(req.contentSecurityPolicyNonceDirectives).toBeUndefined();
+    req.contentSecurityPolicyNonceDirectives = ["script-src"];
+    expect(req.contentSecurityPolicyNonceDirectives).toEqual(["script-src"]);
+  });
+
+  it("null assignments persist as null on the env (matches Rails setter)", () => {
+    const req = new Request({});
+    req.contentSecurityPolicyNonceGenerator = null;
+    expect(req.env["action_dispatch.content_security_policy_nonce_generator"]).toBeNull();
+    expect(req.contentSecurityPolicyNonceGenerator).toBeNull();
+  });
+});
+
+describe("RequestControllerClass", () => {
+  it("controllerClassFor returns PassNotFound when name is absent", () => {
+    const req = new Request({});
+    expect(req.controllerClassFor(null)).toBe(PassNotFound);
+    expect(req.controllerClassFor(undefined)).toBe(PassNotFound);
+  });
+
+  it("controllerClassFor throws when a controller name is supplied", () => {
+    const req = new Request({});
+    expect(() => req.controllerClassFor("posts")).toThrow(/no global controller constant table/);
+  });
+
+  it("controllerClass defaults action to 'index' and returns PassNotFound without a controller", () => {
+    const req = new Request({});
+    expect(req.controllerClass()).toBe(PassNotFound);
+    expect(req.pathParameters["action"]).toBe("index");
+  });
+
+  it("PassNotFound.call returns 404 with x-cascade pass", async () => {
+    const [status, headers, body] = PassNotFound.call({});
+    expect(status).toBe(404);
+    expect(headers[X_CASCADE]).toBe("pass");
+    const chunks: unknown[] = [];
+    for await (const c of body) chunks.push(c);
+    expect(chunks).toEqual([]);
+  });
+
+  it("PassNotFound.action returns the sentinel itself", () => {
+    expect(PassNotFound.action("show")).toBe(PassNotFound);
+    expect(PassNotFound.actionEncodingTemplate("show")).toBe(false);
+  });
+});
+
+describe("RequestParametersList", () => {
+  it("returns rack.request.form_pairs verbatim when present", () => {
+    const pairs: Array<[string, unknown]> = [["a", "1"]];
+    const req = new Request({ "rack.request.form_pairs": pairs });
+    expect(req.requestParametersList()).toBe(pairs);
+  });
+
+  it("parses rack.request.form_vars via QueryParser.eachPair", () => {
+    const req = new Request({ "rack.request.form_vars": "a=1&b=2" });
+    expect(req.requestParametersList()).toEqual([
+      ["a", "1"],
+      ["b", "2"],
+    ]);
+  });
+
+  it("returns [] when no body has been parsed", () => {
+    const req = new Request({});
+    expect(req.requestParametersList()).toEqual([]);
+  });
+});
+
+describe("RequestPermissionsPolicy", () => {
+  it("round-trips through the env header", () => {
+    const req = new Request({});
+    expect(req.permissionsPolicy).toBeUndefined();
+    const policy = { build: () => "geolocation=()" };
+
+    req.permissionsPolicy = policy as any;
+    expect(req.env["action_dispatch.permissions_policy"]).toBe(policy);
+    expect(req.permissionsPolicy).toBe(policy);
   });
 });
