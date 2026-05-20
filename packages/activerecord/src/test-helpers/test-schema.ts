@@ -1427,4 +1427,197 @@ export const TEST_SCHEMA: Schema = {
   vertices: { label: "string" },
 
   "warehouse-things": { value: "integer" },
+
+  // Tail section: Rails' schema.rb declares these after the alphabetical
+  // block (lines 1273..1462 of schema.rb). Kept in Rails source order to
+  // keep the diff against the source minimal.
+
+  circles: {},
+  squares: {},
+  triangles: {},
+  non_poly_ones: {},
+  non_poly_twos: {},
+
+  humans: { name: "string" },
+
+  faces: {
+    description: "string",
+    human_id: "integer",
+    polymorphic_human_id: "integer",
+    polymorphic_human_type: "string",
+    poly_human_without_inverse_id: "integer",
+    poly_human_without_inverse_type: "string",
+    puzzled_polymorphic_human_id: "integer",
+    puzzled_polymorphic_human_type: "string",
+    super_human_id: "integer",
+    super_human_type: "string",
+  },
+
+  interests: {
+    topic: "string",
+    human_id: "integer",
+    polymorphic_human_id: "integer",
+    polymorphic_human_type: "string",
+    zine_id: "integer",
+  },
+
+  zines: { title: "string" },
+  strict_zines: { title: "string" },
+
+  wheels: {
+    size: "integer",
+    wheelable_id: "integer",
+    wheelable_type: "string",
+  },
+
+  // Rails declares `id: false` with `t.string :<x>_id, primary_key: true` —
+  // a real DB-level primary key on the string column rather than the
+  // implicit `id`. Modeled via `primaryKey: [name]` (NOT NULL implied).
+  countries: {
+    columns: {
+      country_id: "string",
+      name: "string",
+    },
+    primaryKey: ["country_id"],
+  },
+
+  treaties: {
+    columns: {
+      treaty_id: "string",
+      name: "string",
+    },
+    primaryKey: ["treaty_id"],
+  },
+
+  countries_treaties: {
+    columns: {
+      country_id: { type: "string", null: false },
+      treaty_id: { type: "string", null: false },
+    },
+    primaryKey: ["country_id", "treaty_id"],
+  },
+
+  liquid: { name: "string" },
+  molecules: { liquid_id: "integer", name: "string" },
+  electrons: { molecule_id: "integer", name: "string" },
+
+  // Rails column names include special characters; keep them verbatim as
+  // string keys.
+  weirds: {
+    a$b: "string",
+    なまえ: "string",
+    from: "string",
+  },
+
+  nodes: {
+    tree_id: "integer",
+    parent_id: "integer",
+    name: "string",
+    updated_at: "datetime",
+  },
+  trees: {
+    name: "string",
+    updated_at: "datetime",
+  },
+
+  hotels: {},
+  departments: { hotel_id: "integer" },
+  cake_designers: {},
+  drink_designers: { name: "string" },
+  chefs: {
+    employable_id: "integer",
+    employable_type: "string",
+    department_id: "integer",
+    employable_list_type: "string",
+    employable_list_id: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+  recipes: { chef_id: "integer", hotel_id: "integer" },
+
+  recipients: {
+    message_id: "integer",
+    email_address: "string",
+  },
+
+  records: {},
+
+  // Rails declares `primary_key: "pk_id"` — DB-level PK on a non-`id`
+  // column; no synthetic `id`. The foreign_key constraint Rails declares
+  // on fk_test_has_fk is dropped (defineSchema can't express FKs; see
+  // header note).
+  fk_test_has_pk: {
+    columns: {
+      pk_id: { type: "integer", null: false },
+    },
+    primaryKey: ["pk_id"],
+  },
+  fk_test_has_fk: {
+    fk_id: { type: "integer", null: false },
+  },
+
+  fk_object_to_point_tos: {},
+  fk_pointing_to_non_existent_objects: {
+    fk_object_to_point_to_id: { type: "integer", null: false },
+  },
+
+  overloaded_types: {
+    overloaded_float: { type: "float", default: 500 },
+    unoverloaded_float: "float",
+    overloaded_string_with_limit: { type: "string", limit: 255 },
+    string_with_default: { type: "string", default: "the original default" },
+    inferred_string: { type: "string", limit: 255 },
+    starts_at: "datetime",
+    ends_at: "datetime",
+  },
+
+  users: {
+    token: "string",
+    auth_token: "string",
+    password_digest: "string",
+    recovery_password_digest: "string",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  user_comments_counts: {
+    comments_count: { type: "integer", default: 0 },
+  },
+
+  test_with_keyword_column_name: {
+    desc: "string",
+  },
+
+  // Rails declares `id: false` with an explicit integer `id` column — no
+  // DB-level PK constraint.
+  non_primary_keys: {
+    columns: {
+      id: "integer",
+      created_at: "datetime",
+    },
+    primaryKey: false,
+  },
+
+  toooooooooooooooooooooooooooooooooo_long_table_names: {
+    toooooooo_long_a_id: { type: "big_integer", null: false },
+    toooooooo_long_b_id: { type: "big_integer", null: false },
+  },
+
+  // Rails declares these on alternate connections (Course/College/
+  // Professor.lease_connection). In our test suite the canonical schema
+  // loads them on the default adapter; per-connection placement is the
+  // responsibility of multi-DB tests.
+  courses: {
+    name: { type: "string", null: false },
+    college_id: "integer",
+  },
+  colleges: { name: { type: "string", null: false } },
+  professors: { name: { type: "string", null: false } },
+  courses_professors: {
+    columns: {
+      course_id: "integer",
+      professor_id: "integer",
+    },
+    primaryKey: false,
+  },
 };
