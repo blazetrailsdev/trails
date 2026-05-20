@@ -136,7 +136,7 @@ export function inspectExplainOption(o: unknown): string {
  * Normalized adapter family name used for dialect branching.
  *
  * Mirrors: the three families Rails branches on throughout
- * ActiveRecord (sqlite3, postgresql, mysql2/trilogy).
+ * ActiveRecord (sqlite3, postgresql, mysql2).
  */
 export type AdapterName = "sqlite" | "postgres" | "mysql";
 
@@ -157,7 +157,6 @@ export function adapterNameFromConfig(configAdapter: string | undefined): Adapte
       return "postgres";
     case "mysql":
     case "mysql2":
-    case "trilogy":
     case "mariadb":
       return "mysql";
     default:

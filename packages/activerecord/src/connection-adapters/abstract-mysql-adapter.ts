@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter
  *
- * Provides shared behavior for Mysql2Adapter and TrilogyAdapter.
+ * Provides shared behavior for Mysql2Adapter.
  * Includes MySQL-specific feature detection, DDL operations,
  * transaction handling, and advisory lock support.
  */
@@ -157,7 +157,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `AbstractMysqlAdapter#columns` (via `SchemaStatements#columns`):
    * `column_definitions` rows mapped through `new_column_from_field`, which
    * centralizes function-default and on_update detection. Concrete adapters
-   * (Mysql2Adapter, TrilogyAdapter) may still override for performance.
+   * (Mysql2Adapter) may still override for performance.
    */
   async columns(tableName: string): Promise<Column[]> {
     const fields = await this.columnDefinitions(tableName);
@@ -215,8 +215,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   // Rails' `statement_limit` database.yml key — max prepared
   // statements cached per session before LRU eviction (default 1000).
   // Mirrors the same surface we expose on PostgreSQLAdapter; driver-
-  // specific subclasses (Mysql2Adapter, TrilogyAdapter) decide how to
-  // actually wire the per-connection pool.
+  // specific subclasses (Mysql2Adapter) decide how to actually wire
+  // the per-connection pool.
   protected _statementLimit = 1000;
 
   /**
@@ -255,12 +255,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Quote a value using MySQL-family escape rules (`\0 \n \r \Z \\ ''`
    * via MYSQL_ESCAPE_MAP, booleans as `1/0`, Dates as
-   * `'YYYY-MM-DD HH:MM:SS[.microseconds]'`). Defined here so every
-   * MySQL-family adapter (Mysql2, Trilogy) inherits MySQL semantics
-   * by default without needing to override themselves; without this,
-   * Trilogy would fall through to the abstract SQL-92 defaults
-   * (booleans → `TRUE/FALSE`, plain `''` string escaping) and
-   * diverge from Rails.
+   * `'YYYY-MM-DD HH:MM:SS[.microseconds]'`). Defined here so the
+   * MySQL-family adapter inherits MySQL semantics by default instead
+   * of falling through to the abstract SQL-92 defaults (booleans →
+   * `TRUE/FALSE`, plain `''` string escaping).
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#quote
    */
@@ -270,8 +268,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Cast a value to the primitive form MySQL drivers expect for
-   * binds. Same motivation as `quote()` above — inherited by
-   * Trilogy so it gets MySQL semantics automatically.
+   * binds. Same motivation as `quote()` above.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::Quoting#type_cast
    */
@@ -599,7 +596,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Execute a DDL/DML statement on the concrete adapter.
    * AbstractMysqlAdapter itself does not hold a connection; this delegates to
-   * the concrete subclass (Mysql2Adapter, TrilogyAdapter) which implements
+   * the concrete subclass (Mysql2Adapter) which implements
    * executeMutation on DatabaseAdapter.
    * @internal
    */
@@ -1151,8 +1148,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Build the printed header prefix used by `Relation#explain` on MySQL
-   * (`"EXPLAIN ANALYZE FORMAT=JSON for:"`). Shared by Mysql2 and Trilogy
-   * adapters — the clause shape is driver-independent.
+   * (`"EXPLAIN ANALYZE FORMAT=JSON for:"`). The clause shape is
+   * driver-independent.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#build_explain_clause
    */
@@ -1430,7 +1427,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Fetch the raw version string from the MySQL server (e.g. "8.0.28-ubuntu").
-   * Concrete adapters (Mysql2Adapter, TrilogyAdapter) override this to query
+   * Concrete adapters (Mysql2Adapter) override this to query
    * the live connection. Base implementation throws — callers must call
    * `getDatabaseVersion()` only after a subclass has wired this.
    * @internal

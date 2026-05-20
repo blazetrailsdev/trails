@@ -1,6 +1,6 @@
 /**
  * Mirrors Rails activerecord/test/cases/migration_test.rb
- * BulkAlterTableMigrationsTest — MySQL/Trilogy-only cases.
+ * BulkAlterTableMigrationsTest — MySQL-only cases.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";

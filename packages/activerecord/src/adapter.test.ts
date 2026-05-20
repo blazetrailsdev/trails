@@ -63,12 +63,12 @@ describe("AdapterTest", () => {
   });
   it.skip("charset", () => {
     // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#charset: MySQL/Trilogy-only; needs MYSQL_TEST_URL test context
+    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#charset: MySQL-only; needs MYSQL_TEST_URL test context
     // SCOPE: ~10 LOC port; affects ~3 tests
   });
   it.skip("show nonexistent variable returns nil", () => {
     // BLOCKED: adapter-mysql
-    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#showVariable: MySQL/Trilogy-only; needs MYSQL_TEST_URL test context
+    // ROOT-CAUSE: connection-adapters/abstract-mysql-adapter.ts#showVariable: MySQL-only; needs MYSQL_TEST_URL test context
     // SCOPE: ~5 LOC port; affects ~1 test
   });
   it.skip("not specifying database name for cross database selects", () => {

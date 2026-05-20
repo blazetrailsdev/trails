@@ -164,7 +164,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
     };
   }
 
-  // --- MySQL adapter (mysql2 / trilogy / abstract-mysql) ---
+  // --- MySQL adapter (mysql2 / abstract-mysql); `trilogy` is unported ---
   if (
     p.startsWith("adapters/mysql2/") ||
     p.startsWith("adapters/trilogy/") ||

@@ -83,9 +83,9 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
  * Quote a string value for use in SQL. Single/double quotes, backslash,
  * and control characters (NUL, newline, carriage return, Ctrl-Z) are
  * escaped with backslashes. Mirrors Rails MySQL `quote_string`, which
- * delegates to `mysql2`/`trilogy`'s connection-level escape — both of
- * which use backslash-escapes (not SQL-standard `''` doubling). The npm
- * `mysql2` driver's `escape()` matches this same shape.
+ * delegates to `mysql2`'s connection-level escape — uses backslash-escapes
+ * (not SQL-standard `''` doubling). The npm `mysql2` driver's `escape()`
+ * matches this same shape.
  */
 export function quoteString(value: string): string {
   return `'${value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch)}'`;

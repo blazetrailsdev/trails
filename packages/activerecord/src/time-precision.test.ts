@@ -71,7 +71,7 @@ describe("TimePrecisionTest", () => {
     expect(nsecTime((foo as any).finish)).toBe(123456000);
   });
 
-  // Rails skips this on Mysql2Adapter/TrilogyAdapter: a `TIME` column without
+  // Rails skips this on Mysql2Adapter: a `TIME` column without
   // explicit precision is `TIME(0)` on MySQL/MariaDB, so the assignment does
   // truncate. See vendor/rails/activerecord/test/cases/time_precision_test.rb.
   it.skipIf(adapterType === "mysql")("no time precision isnt truncated on assignment", async () => {

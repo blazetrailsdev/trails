@@ -2544,7 +2544,7 @@ describe("MigrationTest", () => {
     // functions on columns" live in adapters/postgresql/change-schema.test.ts
     // (describeIfPg) — they require PostgreSQL.
     // "updating auto increment" lives in adapters/abstract-mysql-adapter/bulk-alter.test.ts
-    // (describeIfMysql) — it requires MySQL/Trilogy.
+    // (describeIfMysql) — it requires MySQL.
 
     it("changing index", async () => {
       // Create table with a non-unique index, then swap to a unique index

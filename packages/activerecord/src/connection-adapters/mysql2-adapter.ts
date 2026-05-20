@@ -892,8 +892,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   //
   // `buildExplainClause` / `_validateExplainOptions` / `_explainStatementClause`
   // and the EXPLAIN_FLAGS / EXPLAIN_FORMATS allowlists live on
-  // AbstractMysqlAdapter so TrilogyAdapter inherits the same MySQL
-  // clause shape.
+  // AbstractMysqlAdapter.
 
   /**
    * Execute raw SQL (for DDL and other non-query statements).

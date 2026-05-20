@@ -523,7 +523,7 @@ Followup from #1873. File passes audit but fails `AR_NO_AUTO_SCHEMA=1` — large
 
 ### Batch B1898 — MySQL precision helper extraction (~20 LOC, risk: low)
 
-Followup from #1898. Lift `extractMysqlTimePrecision` from `initializeTypeMap` local to a shared `mysql/schema-statements.ts` export for the `fetchTypeMetadata` (SHOW FULL FIELDS) path. Also audit `Trilogy` adapter for the same `register_class_with_precision` pattern (deferred until Trilogy is ported).
+Followup from #1898. Lift `extractMysqlTimePrecision` from `initializeTypeMap` local to a shared `mysql/schema-statements.ts` export for the `fetchTypeMetadata` (SHOW FULL FIELDS) path.
 
 ### Batch B1872 — actionpack CacheStore session options + Rails.cache (~25 LOC, risk: low, cross-package)
 

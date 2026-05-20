@@ -1233,7 +1233,6 @@ describe("adapterNameFromConfig", () => {
   it("maps mysql variants to mysql", () => {
     expect(adapterNameFromConfig("mysql2")).toBe("mysql");
     expect(adapterNameFromConfig("mysql")).toBe("mysql");
-    expect(adapterNameFromConfig("trilogy")).toBe("mysql");
     expect(adapterNameFromConfig("mariadb")).toBe("mysql");
   });
 

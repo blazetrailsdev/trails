@@ -235,7 +235,6 @@ function inferAdapterFromUrl(url: string): string | undefined {
         return "postgresql";
       case "mysql:":
       case "mysql2:":
-      case "trilogy:":
         return "mysql2";
       case "sqlite:":
       case "sqlite3:":
