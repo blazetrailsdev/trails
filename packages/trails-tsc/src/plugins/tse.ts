@@ -76,6 +76,10 @@ function parseLocalsSignature(sig: string): LocalEntry[] {
   for (const raw of parts) {
     const trimmed = raw.trim();
     if (trimmed === "") continue;
+    // Rails accepts `**nil` mixed with named kwargs (e.g.
+    // `locals: (user:, **nil)`) to mean "these locals plus no
+    // extras". Skip the sentinel; treat surrounding entries normally.
+    if (trimmed === "**nil") continue;
     const colon = trimmed.indexOf(":");
     if (colon === -1) {
       throw new TseLocalsSignatureError(

@@ -128,6 +128,12 @@ describe("virtualizeTse", () => {
     expect(() => virtualizeTse("<%# locals: (a: {1, 2]) %>")).toThrow(/mismatched/);
   });
 
+  it("accepts mixed named kwargs + `**nil` sentinel (Rails parity)", () => {
+    const out = virtualizeTse("<%# locals: (user:, **nil) %><%= user %>");
+    expect(out).toContain("const { user } = locals;");
+    expect(out).toContain("locals: { user: unknown }");
+  });
+
   it("throws on an empty / invalid local name", () => {
     expect(() => virtualizeTse("<%# locals: (: 1) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (1bad: 1) %>")).toThrow(/invalid local name/);
