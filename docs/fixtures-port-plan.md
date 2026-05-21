@@ -13,8 +13,14 @@ below.
 
 PR 7 flips `fixtures:compare` MISSING/DIFF to hard-fail and removes the
 four fixtures-related entries from `scripts/api-compare/unported-files.ts`.
-Everything below is what must close (or move to an explicit allow-list)
-first. Cross-referenced to merged PRs; the source finding files this
+**Strict-mode blockers** (must close or move to an explicit allow-list
+before PR 7b can ship): the compare-script DIFF enhancements, the
+ERB-UNSUPPORTED handling, and the PR 7a test-body port. The remaining
+subsections — loader gaps and schema-side residuals — are _informational
+follow-ups_ recorded here so PR 8 (PoC conversion) doesn't pick a
+non-loadable fixture and so future schema-column policy changes have a
+sized list ready; neither blocks strict mode under current behavior.
+Cross-referenced to merged PRs; the source finding files this
 section was distilled from are available in each PR's GitHub review
 thread and (for local runs of btwhooks) under
 `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/`.
