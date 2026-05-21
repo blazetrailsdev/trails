@@ -1,4 +1,8 @@
-import type { ClassDecl, Import, InterfaceDecl, ModuleSource, RawDecl, Ref } from "./types.js";
+import type { Import, ModuleSource, RawDecl, Ref } from "./types.js";
+
+export function tsRaw(text: string): RawDecl {
+  return { __kind: "raw", text };
+}
 import { emitClass } from "./emit-class.js";
 import { emitInterface } from "./emit-interface.js";
 import { emitImport, mergeImports } from "./emit-import.js";
@@ -8,17 +12,22 @@ export function tsModule(src: ModuleSource): string {
   const refs: Ref[] = [];
   const declTexts: string[] = [];
   for (const d of src.declarations) {
-    const kind = (d as unknown as { __kind: "class" | "interface" | "raw" }).__kind;
-    if (kind === "class") {
-      const e = emitClass(d as ClassDecl);
-      refs.push(...e.refs);
-      declTexts.push(e.text);
-    } else if (kind === "interface") {
-      const e = emitInterface(d as InterfaceDecl);
-      refs.push(...e.refs);
-      declTexts.push(e.text);
-    } else {
-      declTexts.push((d as RawDecl).text);
+    switch (d.__kind) {
+      case "class": {
+        const e = emitClass(d);
+        refs.push(...e.refs);
+        declTexts.push(e.text);
+        break;
+      }
+      case "interface": {
+        const e = emitInterface(d);
+        refs.push(...e.refs);
+        declTexts.push(e.text);
+        break;
+      }
+      case "raw":
+        declTexts.push(d.text);
+        break;
     }
   }
   const explicit = src.imports ?? [];

@@ -12,8 +12,14 @@
       "types": "./dist/server/vite-plugin.d.ts",
       "default": "./dist/server/vite-plugin.js"
     },
-    "./template-builder": "./dist/template-builder/index.js",
-    "./template-builder/testing": "./dist/template-builder/testing.js"
+    "./template-builder": {
+      "types": "./dist/template-builder/index.d.ts",
+      "default": "./dist/template-builder/index.js"
+    },
+    "./template-builder/testing": {
+      "types": "./dist/template-builder/testing.d.ts",
+      "default": "./dist/template-builder/testing.js"
+    }
   },
   "files": [
     "dist",

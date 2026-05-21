@@ -11,6 +11,7 @@ import {
   tsClass,
   tsInterface,
   tsModule,
+  tsRaw,
 } from "./index.js";
 import { assertNoRubySource, parseTs } from "./testing.js";
 
@@ -93,7 +94,7 @@ describe("template-builder", () => {
     const base = ref("Base", "./base.js");
     const out = tsModule({
       declarations: [
-        { __kind: "raw", text: "// hand-rolled banner" } as never,
+        tsRaw("// hand-rolled banner"),
         tsInterface({ name: "Sub", extends: [base], body: [tsField("id", "number")] }),
       ],
     });

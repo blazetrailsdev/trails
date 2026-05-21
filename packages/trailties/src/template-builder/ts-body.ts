@@ -17,7 +17,7 @@ function interp(parts: TemplateStringsArray, vals: ReadonlyArray<Ref | string>) 
   return { text, refs };
 }
 
-export function type(parts: TemplateStringsArray, ...vals: Array<Ref | string>): Type {
+export function type(parts: TemplateStringsArray, ...vals: Ref[]): Type {
   const { text, refs } = interp(parts, vals);
   return { __kind: "type", text, refs } as unknown as Type;
 }

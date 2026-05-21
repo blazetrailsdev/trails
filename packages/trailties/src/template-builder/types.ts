@@ -53,7 +53,7 @@ export interface ClassOpts {
   exported?: boolean;
   body: Array<Field | Method>;
 }
-export type ClassDecl = ClassOpts & { readonly [REF_BRAND]: "class" };
+export type ClassDecl = ClassOpts & { readonly __kind: "class" };
 
 export interface InterfaceOpts {
   name: string;
@@ -61,9 +61,9 @@ export interface InterfaceOpts {
   exported?: boolean;
   body: Field[];
 }
-export type InterfaceDecl = InterfaceOpts & { readonly [REF_BRAND]: "interface" };
+export type InterfaceDecl = InterfaceOpts & { readonly __kind: "interface" };
 
-export type RawDecl = { readonly [REF_BRAND]: "raw"; text: string };
+export type RawDecl = { readonly __kind: "raw"; text: string };
 export type Declaration = ClassDecl | InterfaceDecl | RawDecl;
 
 export interface ModuleSource {
