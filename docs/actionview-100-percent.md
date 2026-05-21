@@ -1,8 +1,9 @@
 # actionview — Road to 100%
 
-Current (2026-05-18): actionview 32/2530 methods (1.3%), files 6/109. Existing
-package is a skeletal EJS-based renderer at flat layout — most of the work is
-ahead of us.
+As of 2026-05-21: Phase 0 foundations + Phase 1a/1b/1d + most of Phase 5 T1
+have shipped. The skeletal EJS renderer is gone (#2008). Critical path
+remaining: Phase 2 (TSE compiler), Phase 3 (Renderer), Phase 4 (Base /
+Rendering / Layouts / Context). Per-phase status is annotated inline below.
 
 Refresh counts:
 
@@ -81,38 +82,35 @@ pnpm tsx scripts/api-compare/compare.ts | awk '/actionview  —/,/^=/' | head -1
 
 ## Phase 0 — Foundations (must land before anything else)
 
-### 0a. Extract `@blazetrails/trails-tsc`
+### 0a. Extract `@blazetrails/trails-tsc` ✅ Shipped (#1943)
 
-- Move `packages/activerecord/src/tsc-wrapper/` → `packages/trails-tsc/src/`.
-- Define a `TscPlugin` interface: `{ extensions: string[]; virtualize(path, source): { ts: string } }`.
-- Refactor existing AR auto-import/remap logic into an `ar-models` plugin.
-- AR depends on trails-tsc; existing `bin/trails-tsc.js` shim re-exports.
-- ~300 LOC restructure + tests. **Blocker for everything else AV-typing.**
+- `packages/trails-tsc/` exists with `TscPlugin` interface and `ar-models`
+  plugin extracted.
 
-### 0b. SafeBuffer / OutputBuffer
+### 0b. SafeBuffer / OutputBuffer ✅ Shipped (#1941, closed to 100% in #2117)
 
-- Port `ActiveSupport::SafeBuffer` into activesupport if absent (HTML-safe
-  string subclass; `+`, `concat`, `<<` propagate safety).
-- Port `ActionView::OutputBuffer` (wraps SafeBuffer with `<<`-collecting
-  semantics for ERB-style templates).
-- Pure leaf — no template / no renderer deps. ~150 LOC + tests.
+- `ActiveSupport::SafeBuffer` at
+  `packages/activesupport/src/core-ext/string/output-safety.ts`.
+- `ActionView::OutputBuffer` + `RawOutputBuffer` + `StreamingBuffer` +
+  `RawStreamingBuffer` at `packages/actionview/src/buffers.ts`.
 
-### 0c. PathSet / TemplatePath / TemplateDetails
+### 0c. PathSet / TemplatePath / TemplateDetails ✅ Shipped (#1942)
 
-- `PathSet` — ordered collection of view paths with resolver protocol.
-- `TemplatePath` — virtual/physical path parsing (`users/show` → name + prefix).
-- `TemplateDetails` — `{locale, handler, formats, variants}` tuple used by
-  LookupContext keying.
-- All three are data-shape leaves with no rendering deps. ~200 LOC.
+- `path-set.ts`, `template-path.ts`, `template-details.ts` in place.
+
+### 0d. Remove dead EJS renderer ✅ Shipped (#2008)
+
+- Skeletal EJS handler removed ahead of Phase 2 TSE compiler work.
 
 ---
 
-## Phase 0.5 — actionpack-unblocking stubs
+## Phase 0.5 — actionpack-unblocking stubs ✅ Shipped (#1939)
 
-actionpack already imports from actionview and has several followups blocked
-on AV symbols that don't yet exist. These are all _interface-only_ — AP needs
-a type to reference, not real behavior. Land as one bundled PR before
-diving into the core port.
+All stub symbols below are exported from `packages/actionview/src/index.ts`
+(`Template`, `PathRegistry`, `Digestor`, `Base`, `Rendering`/`Layouts`/`ViewPaths`
+interfaces in `rendering.ts`, `FormBuilder` in `helpers/form-builder.ts`,
+`DetailsKey` from `lookup-context.ts`, `MissingTemplate`). Real impls per
+phase table below; stubs are tagged `@internal stub - real impl in Phase X`.
 
 | Symbol                                | Shape                                                                                                                                                              | AP unblocks                                                                   | Real impl phase         |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------- |
@@ -139,38 +137,36 @@ stays blocked on a multi-quarter AV port. With it, those AP items move from
 
 ## Phase 1 — Template core
 
-### 1a. `Template::Handlers` registry + `Raw` handler
+### 1a. `Template::Handlers` registry + `Raw` handler ✅ Shipped (#1962, closed to 100% in #2117)
 
-- `Template::Handlers` — registry keyed by extension.
-- `Template::Handlers::Raw` — trivial passthrough handler for `.txt`, `.html`,
-  etc. Useful smoke test for the registry.
-- Existing `TemplateHandlerRegistry` lives at `packages/actionview/src/template-handler.ts`
-  — relocate to `template/handlers.ts` to match Rails layout.
+- Registry at `src/template/handlers.ts`, `Raw` handler at
+  `src/template/handlers/raw.ts`.
 
-### 1b. `Template` (base class)
+### 1b. `Template` (base class) ✅ Shipped (#1973)
 
-- `Template` represents a single template file (path + handler + source).
-- `Template#render(context, locals)` runs the compiled body.
-- Existing `template.ts` is a type stub — replace with real port.
-- Depends on 0b, 0c, 1a.
+- Real port at `src/template.ts` (~200 LOC).
 
-### 1c. `Resolver` / `FileSystemResolver` / `OptimizedFileSystemResolver`
+### 1c. `Resolver` / `FileSystemResolver` / `OptimizedFileSystemResolver` ⚠️ Partial
 
-- Resolver = source of templates given `TemplatePath` + `TemplateDetails`.
-- Existing `template-resolver.ts` has `FileSystemResolver` + `InMemoryResolver`
-  — keep, restructure under `resolver/` to match Rails.
-- Add `OptimizedFileSystemResolver` (Rails' default; caches glob results).
+- `FileSystemResolver` + `InMemoryResolver` exist at top-level
+  `src/template-resolver.ts`.
+- **Still pending:** restructure under `src/resolver/` to match Rails;
+  add `OptimizedFileSystemResolver` (Rails default; caches glob results).
+  `PathRegistry` is also still a Phase 0.5 stub (`allResolvers()` returns
+  `[]`) — fold real impl in here.
 
-### 1d. `LookupContext`
+### 1d. `LookupContext` ✅ Shipped (#1994)
 
-- `LookupContext` = "find me a template by name in this PathSet, given the
-  current request's locale/format/variant."
-- Existing `lookup-context.ts` is partial — flesh out the
-  `formats`/`locale`/`variants` cascade and `find_all` semantics.
+- Full `formats`/`locale`/`variants` cascade + `DetailsKey` at
+  `src/lookup-context.ts` (~680 LOC).
 
 ---
 
-## Phase 2 — TSE compiler + trails-tsc plugin
+## Phase 2 — TSE compiler + trails-tsc plugin ⏳ Not started
+
+(Only `src/template/tse-util.test.ts` placeholder exists. EJS handler was
+removed in #2008 to clear the path.) See `docs/tse-plan.md` for the
+detailed TSE handler design — Phase 0b is unblocked, so 2a is next.
 
 ### 2a. `Template::Handlers::TSE` (runtime)
 
@@ -205,7 +201,9 @@ stays blocked on a multi-quarter AV port. With it, those AP items move from
 
 ---
 
-## Phase 3 — Renderer
+## Phase 3 — Renderer ⏳ Not started
+
+(`src/renderer.ts` is still a ~110 LOC stub; no `renderer/` subdir yet.)
 
 ### 3a. `Renderer`
 
@@ -230,17 +228,21 @@ stays blocked on a multi-quarter AV port. With it, those AP items move from
 
 ---
 
-## Phase 4 — `Rendering` / `Layouts` / `Context` / `Base`
+## Phase 4 — `Rendering` / `Layouts` / `Context` / `Base` ⏳ Not started
 
-These mix into ActionController and are the integration surface.
+Stubs from Phase 0.5 exist (`base.ts`, `rendering.ts` interfaces) but
+hold no real behavior. These mix into ActionController and are the
+integration surface.
 
 - **Context** — module providing `output_buffer`, `view_flow`, `view_renderer`.
 - **Rendering** — `render` / `render_to_string` / `render_to_body` /
-  `_normalize_args` / `_normalize_options`. Mixes into AC.
+  `_normalize_args` / `_normalize_options`. Mixes into AC. (`rendering.ts`
+  currently holds only the interface stubs from Phase 0.5.)
 - **Layouts** — layout lookup with `layout :foo` DSL, `_layout_for`,
   conditional layouts.
 - **Base** — combines Context + Helpers + Rendering into a standalone view
   context (used by mailers, `render_to_string` outside a controller).
+  (`base.ts` is a 23-LOC Phase 0.5 stub.)
 
 Land in this order. Each depends on Phase 3.
 
@@ -252,29 +254,25 @@ Land in this order. Each depends on Phase 3.
 
 ### T1 — Pure utility, no template/context needed
 
-- `number_helper` (`number_to_currency`, `number_to_human`, etc.) — pure
-  functions; ~300 LOC. **Leaf.**
-- `text_helper` (`truncate`, `pluralize`, `word_wrap`, `simple_format`) —
-  pure-ish; some need SafeBuffer. **Leaf after 0b.**
-- `output_safety_helper` — `html_safe`, `raw`, `safe_join`. **Leaf after 0b.**
-  (Partial exists.)
-- `sanitize_helper` — depends on a sanitizer library (jsdom or sanitize-html);
-  partial exists. **Leaf after picking sanitizer dep.**
-- `date_helper` (date formatting only; date _select tags_ are T3) — leaf for
-  the formatting half.
-- `debug_helper` — `debug(obj)` pretty-prints to YAML-ish; trivial.
+- `number_helper` ✅ Shipped (#1954).
+- `text_helper` ✅ Shipped (#1965, #2005, #2006 — truncate, pluralize,
+  word_wrap, simple_format, highlight, excerpt, cycle, concat/safeConcat).
+- `output_safety_helper` ✅ Shipped (closed to 100% in #2117).
+- `sanitize_helper` ✅ Shipped (closed to 100% in #2117).
+- `date_helper` (formatting half) ✅ Shipped (#1984 —
+  distanceOfTimeInWords, timeAgoInWords).
+- `debug_helper` ✅ Shipped (#1955).
 
 ### T2 — Need OutputBuffer / context
 
-- `tag_helper` — `tag`, `content_tag`, `tag.div(...)`. Partial exists.
-  Foundation for all form/asset helpers. **Land first in T2.**
-- `capture_helper` — `capture`, `content_for`, `provide`. Needs OutputBuffer
-  swap-and-restore.
-- `javascript_helper` — partial exists; small.
-- `csp_helper` / `csrf_helper` — small, need Request access.
-- `cache_helper` — needs `ActiveSupport::Cache` + Digestor (Phase 6).
+- `tag_helper` ✅ Shipped (#1990 — full TagBuilder API surface).
+- `capture_helper` ⏳ pending. `capture`, `content_for`, `provide`.
+  Needs OutputBuffer swap-and-restore (now unblocked by Phase 0b).
+- `javascript_helper` ⏳ pending; partial exists.
+- `csp_helper` / `csrf_helper` ⏳ pending; small, need Request access.
+- `cache_helper` ⏳ pending; needs `ActiveSupport::Cache` + Digestor (Phase 6).
 
-### T3 — Need routing / models
+### T3 — Need routing / models ⏳ Not started
 
 - `url_helper` — `link_to`, `button_to`, `mail_to`. Needs RoutesProxy +
   url_for. **Cross-package blocker: actionpack url_for.**
@@ -296,16 +294,20 @@ Land in this order. Each depends on Phase 3.
 
 ## Phase 6 — Digestor / DependencyTracker / CacheExpiry
 
-- `Digestor` — recursive template digesting for cache keys; pure leaf.
-- `DependencyTracker` — parses templates for `render` calls to build dep
-  graph. Per-handler (ERB tracker, etc.). For us: TSE tracker only.
-- `CacheExpiry` — file-system watcher for dev reload.
+- `Digestor` — Phase 0.5 stub exists at `src/digestor.ts` (stable hash of
+  resolved source, no dep walk). Real recursive digesting still pending.
+- `DependencyTracker` ⏳ pending. Parses templates for `render` calls to
+  build dep graph. Per-handler — for us, TSE tracker only.
+- `CacheExpiry` ⏳ pending. File-system watcher for dev reload.
 
 All three can land late; they're independent of rendering correctness.
 
 ---
 
 ## Phase 7 — TestCase + Trailtie
+
+`Trailtie` exists at `src/trailtie.ts` and has been wired per-framework
+(#2165). `TestCase` ⏳ pending — depends on Phase 4.
 
 - `TestCase` — view-context test harness (mixes Rendering + Helpers, fakes
   LookupContext). Depends on Phase 4.
@@ -334,33 +336,36 @@ All three can land late; they're independent of rendering correctness.
 
 ## Restructuring debt in existing package
 
-Current layout is flat (`src/template.ts`, `src/lookup-context.ts`,
-`src/ejs-handler.ts`, `src/helpers/`). Rails layout is nested
-(`template.rb` + `template/` dir, `renderer.rb` + `renderer/` dir, etc.).
+Partially done. Current state:
 
-Restructure as a `<base>` mechanical-rename PR before Phase 1c:
+- ✅ `src/template/` subdir exists with `handlers.ts`, `handlers/raw.ts`,
+  `error.ts`, and helper-test mirrors.
+- ✅ EJS handler deleted (#2008).
+- ⏳ `src/template-resolver.ts` still at top level — move to
+  `src/resolver/` and split `FileSystemResolver` / `InMemoryResolver`
+  per Rails layout. Bundle with Phase 1c work.
+- ⏳ `src/renderer.ts` stays; add
+  `src/renderer/{template,partial,streaming,object,collection}-renderer.ts`
+  as Phase 3 lands.
+- ✅ `src/helpers/` already correct; new helpers slot in alongside.
 
-- `src/template.ts` stays; add `src/template/{handlers,error,resolver}.ts`.
-- `src/template-handler.ts` → `src/template/handlers.ts`.
-- `src/template-resolver.ts` → `src/template/resolver.ts` (+ split
-  `FileSystemResolver` / `InMemoryResolver` into own files under `resolver/`).
-- `src/renderer.ts` stays; add `src/renderer/{template,partial,streaming,object,collection}-renderer.ts`.
-- `src/ejs-handler.ts` → delete after TSE handler lands (or keep behind a
-  `legacy/` dir for migration).
-- `src/helpers/` already correct; just add files as ported.
-
-Note the mechanical rename in PR body per CLAUDE.md rule.
+Note any mechanical rename in PR body per CLAUDE.md rule.
 
 ---
 
 ## Priority order (one-line summary)
 
-0a trails-tsc extract → 0b SafeBuffer/OutputBuffer → 0c PathSet/TemplatePath
-→ **0.5 AP-unblocking stubs** → restructure → 1a Handlers/Raw → 1b Template
-→ 1c Resolver → 1d LookupContext
-→ 2a TSE runtime compiler → 2b trails-tsc TSE plugin → 2c build CLI
-→ 3a–c Renderer/Template/Partial → T1 helpers (parallel after 0b)
-→ 4 Rendering/Layouts/Context/Base → T2 helpers → T3 helpers (as blockers clear)
-→ 3d Streaming → 6 Digestor/DepTracker → 7 TestCase/Trailtie.
+~~0a trails-tsc extract~~ ✅ → ~~0b SafeBuffer/OutputBuffer~~ ✅
+→ ~~0c PathSet/TemplatePath~~ ✅ → ~~0.5 AP-unblocking stubs~~ ✅
+→ ~~1a Handlers/Raw~~ ✅ → ~~1b Template~~ ✅
+→ **1c Resolver finish (OptimizedFileSystemResolver + restructure + PathRegistry real impl)**
+→ ~~1d LookupContext~~ ✅
+→ **2a TSE runtime compiler → 2b trails-tsc TSE plugin → 2c build CLI** (critical path)
+→ **3a–c Renderer/Template/Partial**
+→ T1 helpers (mostly ✅; date-formatting + remaining bits)
+→ **4 Rendering/Layouts/Context/Base**
+→ T2 helpers (tag_helper ✅; capture/js/csp/csrf/cache pending)
+→ T3 helpers (as blockers clear) → 3d Streaming → 6 Digestor/DepTracker
+→ 7 TestCase (Trailtie ✅).
 
-Phases 0–2 are the critical path. T1 helpers can fork off after 0b lands.
+Critical path remaining: **Phase 1c finish → Phase 2 → Phase 3 → Phase 4.**
