@@ -45,6 +45,8 @@ export {
 
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 
+export { OutputFlow } from "./flows.js";
+
 export { PathSet, type PathSetResolver } from "./path-set.js";
 export { TemplatePath } from "./template-path.js";
 export {
