@@ -57,10 +57,11 @@ export abstract class AppBase extends GeneratorBase {
     // Mirrors AppBase#set_default_accessors!: destination_root resolves
     // app_path against the parent destination_root. Subclasses generate
     // into this directory, not the parent cwd.
-    // PathAdapter.isAbsolute is optional; fall back to a POSIX/Win check.
-    const isAbs =
-      this.path.isAbsolute?.(options.appPath) ??
-      (options.appPath.startsWith("/") || /^[A-Za-z]:[\\/]/.test(options.appPath));
+    // PathAdapter.isAbsolute is optional; adapters that omit it (e.g.
+    // in-memory VFS) don't model absolute paths and the contract says
+    // callers should treat the path as absolute — see PathAdapter docs
+    // in activesupport/src/fs-adapter.ts.
+    const isAbs = this.path.isAbsolute ? this.path.isAbsolute(options.appPath) : true;
     this.destinationRoot = isAbs ? options.appPath : this.path.join(options.cwd, options.appPath);
     this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions(options);

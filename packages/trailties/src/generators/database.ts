@@ -65,6 +65,11 @@ export abstract class Database {
     }
   }
 
+  // Mirrors Rails' Database.all in railties/lib/rails/generators/database.rb:
+  // intentionally returns five adapters and excludes plain Trilogy — Rails
+  // ships Trilogy in DATABASES (`rails new -d trilogy`) but does not list
+  // it among the introspectable adapters returned here. Do not derive this
+  // from DATABASES.
   static all(): Database[] {
     return [
       new MySQL2(),
