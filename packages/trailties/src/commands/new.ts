@@ -38,9 +38,14 @@ export function newCommand(): Command {
       }
 
       if (!options.skipInstall) {
-        const pm = getPackageManager(appDir);
+        // Detect from the *caller* cwd, not appDir: a freshly generated app
+        // has no lockfile, so detecting in appDir always falls back to npm
+        // and silently downgrades anyone who invoked `trails new` from a
+        // pnpm/yarn/bun workspace. Falls back to pnpm (the historical
+        // trails default) when caller cwd has no lockfile either.
+        const pm = getPackageManager(cwd, { fallback: "pnpm" });
         console.log(`  Installing dependencies with ${pm.name}...`);
-        const result = packageManagerInstall(appDir);
+        const result = packageManagerInstall(appDir, pm);
         if (result.status === 0) {
           console.log("  Dependencies installed");
         } else {

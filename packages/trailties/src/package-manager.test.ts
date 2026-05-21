@@ -26,6 +26,10 @@ const stubFs = {
   existsSync: (p: string) => lockFiles.has(p),
 } as unknown as FsAdapter;
 
+const stubPath = {
+  join: (...parts: string[]) => parts.join("/"),
+} as unknown as PathAdapter;
+
 const stubCp: ChildProcessAdapter = {
   spawnSync(cmd, args) {
     spawnCalls.push({ cmd, args });
@@ -36,7 +40,7 @@ const stubCp: ChildProcessAdapter = {
 beforeEach(() => {
   lockFiles = new Set();
   spawnCalls = [];
-  registerFsAdapter("pm-test", stubFs, {} as PathAdapter);
+  registerFsAdapter("pm-test", stubFs, stubPath);
   registerChildProcessAdapter("pm-test", stubCp);
   previousFs = fsAdapterConfig.adapter;
   previousCp = childProcessAdapterConfig.adapter;
@@ -70,6 +74,10 @@ describe("detectPackageManager", () => {
 
   it("falls back to npm when no lockfile is present", () => {
     expect(detectPackageManager("/app").name).toBe("npm");
+  });
+
+  it("uses the fallback option when no lockfile is present", () => {
+    expect(detectPackageManager("/app", { fallback: "pnpm" }).name).toBe("pnpm");
   });
 
   it("resolves pnpm before yarn when both lockfiles coexist", () => {

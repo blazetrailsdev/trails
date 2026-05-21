@@ -102,6 +102,11 @@ describe("ActionsTest", () => {
     expect(() => makeGen().rake("invalid", { abortOnFailure: true })).toThrow(/aborted/);
   });
 
+  it("rake with abort_on_failure should include signal name when killed by signal", () => {
+    nextResult = { status: null, signal: "SIGTERM", stdout: "", stderr: "" };
+    expect(() => makeGen().rake("slow", { abortOnFailure: true })).toThrow(/SIGTERM/);
+  });
+
   it("rake with abort_on_failure should raise when spawn errored (status null)", () => {
     nextResult = {
       status: null,

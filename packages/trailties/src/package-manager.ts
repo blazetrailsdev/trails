@@ -6,7 +6,7 @@
 // any single one in generator code locks users out of the others. Adapter
 // at the boundary, hardcoded only at registration time.
 
-import { getChildProcess, getFs } from "@blazetrails/activesupport";
+import { getChildProcess, getFs, getPath } from "@blazetrails/activesupport";
 
 export interface PackageManagerAdapter {
   /** CLI binary name (`pnpm`, `npm`, `yarn`, `bun`). */
@@ -69,37 +69,49 @@ export const packageManagerAdapterConfig = {
  * its lockfile is the most-recent convention and the most authoritative
  * about hoisting). Falls back to `npm` since every Node install ships it.
  */
-export function detectPackageManager(cwd: string): PackageManagerAdapter {
+export interface DetectOptions {
+  /** Adapter name to return when no lockfile is found. Defaults to `npm`. */
+  fallback?: string;
+}
+
+export function detectPackageManager(cwd: string, opts: DetectOptions = {}): PackageManagerAdapter {
   const fs = getFs();
-  if (fs.existsSync(`${cwd}/pnpm-lock.yaml`)) return registry.get("pnpm")!;
-  if (fs.existsSync(`${cwd}/yarn.lock`)) return registry.get("yarn")!;
-  if (fs.existsSync(`${cwd}/bun.lockb`)) return registry.get("bun")!;
-  return registry.get("npm")!;
+  const path = getPath();
+  if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return registry.get("pnpm")!;
+  if (fs.existsSync(path.join(cwd, "yarn.lock"))) return registry.get("yarn")!;
+  if (fs.existsSync(path.join(cwd, "bun.lockb"))) return registry.get("bun")!;
+  const fallback = opts.fallback ?? "npm";
+  const adapter = registry.get(fallback);
+  if (!adapter) throw new Error(`Package manager "${fallback}" is not registered.`);
+  return adapter;
 }
 
 /**
  * Resolve the active package manager. Honors an explicit
  * `packageManagerAdapterConfig.adapter` override; otherwise auto-detects
- * from `cwd`.
+ * from `cwd` (with optional `fallback`).
  */
-export function getPackageManager(cwd: string): PackageManagerAdapter {
+export function getPackageManager(cwd: string, opts: DetectOptions = {}): PackageManagerAdapter {
   if (currentAdapterName) {
     const adapter = registry.get(currentAdapterName);
     if (!adapter) throw new Error(`Package manager "${currentAdapterName}" is not registered.`);
     return adapter;
   }
-  return detectPackageManager(cwd);
+  return detectPackageManager(cwd, opts);
 }
 
 /**
- * Run the active package manager's install command in `cwd`. Returns the
- * spawn result so callers can decide whether non-zero exit aborts.
+ * Run a package manager's install command in `cwd`. If `pm` is omitted,
+ * resolves via {@link getPackageManager}.
  */
-export function packageManagerInstall(cwd: string): {
+export function packageManagerInstall(
+  cwd: string,
+  pm?: PackageManagerAdapter,
+): {
   status: number | null;
   stderr: string;
 } {
-  const pm = getPackageManager(cwd);
-  const result = getChildProcess().spawnSync(pm.name, pm.installArgs, { cwd });
+  const resolved = pm ?? getPackageManager(cwd);
+  const result = getChildProcess().spawnSync(resolved.name, resolved.installArgs, { cwd });
   return { status: result.status, stderr: result.stderr };
 }

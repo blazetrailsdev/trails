@@ -87,7 +87,11 @@ function executeCommand(
     env: { ...processEnv, TRAILS_ENV: envName, RAILS_ENV: envName } as NodeJS.ProcessEnv,
   });
   if (opts.abortOnFailure && (result.status !== 0 || result.error)) {
-    const detail = result.error ? `: ${result.error.message}` : ` exit status ${result.status}`;
+    const detail = result.error
+      ? `: ${result.error.message}`
+      : result.signal
+        ? ` signal ${result.signal}`
+        : ` exit status ${result.status}`;
     throw new Error(`${name} ${command} aborted${detail}`);
   }
   if (opts.capture) return result.stdout;
