@@ -204,6 +204,9 @@ importers:
 
   packages/trails-tsc:
     dependencies:
+      '@blazetrails/tse-compiler':
+        specifier: workspace:*
+        version: link:../tse-compiler
       typescript:
         specifier: ^5.0.0
         version: 5.9.3

@@ -27,9 +27,20 @@ export interface VirtualizeOutput {
 
 /**
  * Line-mapping record produced by a virtualizing plugin.
- * `insertedAtLine` is the 0-indexed line in the VIRTUALIZED text
- * where an injected block begins (sentinel `-1` = prepended above
- * line 0); the block spans `lineCount` virtual lines.
+ *
+ * `insertedAtLine` is the 0-indexed virtual line IMMEDIATELY BEFORE
+ * the injected block — i.e., the start coordinate is exclusive. The
+ * injected lines themselves are `insertedAtLine + 1 .. insertedAtLine + lineCount`
+ * (inclusive on both ends); those virtual lines have no original-source
+ * counterpart and `remapLine()` returns `null` for them. Later virtual
+ * lines are shifted up by `lineCount` to recover original-source lines.
+ *
+ * The sentinel value `-1` means the block was prepended ABOVE virtual
+ * line 0 — so a header of length N occupies virtual lines `0..N-1`.
+ *
+ * Plugins emitting a trailing footer should use
+ * `insertedAtLine: <last unmapped body line>`; the next `lineCount`
+ * virtual lines are then treated as injected.
  */
 export interface LineDelta {
   insertedAtLine: number;

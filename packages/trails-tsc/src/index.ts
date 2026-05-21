@@ -17,3 +17,4 @@ export {
   type TrailsSolutionBuilder,
 } from "./build.js";
 export { remapDiagnostics, remapLine } from "./remap.js";
+export { createTsePlugin, virtualizeTse } from "./plugins/tse.js";
