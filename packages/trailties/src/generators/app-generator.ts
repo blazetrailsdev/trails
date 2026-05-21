@@ -1,4 +1,16 @@
 import { GeneratorBase, GeneratorOptions } from "./base.js";
+import { Database, type DatabaseName } from "./database.js";
+
+// AppGenerator currently scaffolds dbConfig templates only for the three
+// CLI-exposed adapters. The MariaDB-via-mysql2 variant exists in
+// `database.ts` but rendering a template for it is deferred to PR 1.14d
+// alongside the AppBase rewrite. Keeping the surface narrow here
+// prevents producing an app scaffold whose `package.json` and
+// `database.ts` disagree.
+const DB_ALIAS: Record<string, DatabaseName> = {
+  sqlite: "sqlite3",
+  postgres: "postgresql",
+};
 
 export interface AppOptions {
   database: "sqlite" | "postgres" | "mysql";
@@ -909,20 +921,13 @@ dist
   }
 
   private dbDependency(db: string): Record<string, string> {
-    switch (db) {
-      case "postgres":
-        return { pg: "^8.19.0" };
-      case "mysql":
-        return { mysql2: "^3.18.0" };
-      case "sqlite":
-      default:
-        return { "better-sqlite3": "^12.6.0" };
-    }
+    const dep = Database.build(DB_ALIAS[db] ?? db).pkgDependency;
+    return { [dep.name]: dep.version };
   }
 
   private dbConfig(appName: string, db: string): string {
-    switch (db) {
-      case "postgres":
+    switch (DB_ALIAS[db] ?? db) {
+      case "postgresql":
         return `export default {
   development: {
     adapter: "postgresql",

@@ -25,7 +25,15 @@ export function destroyCommand(): Command {
       // Find and remove migration
       const migrationsDir = path.join(cwd, "db", "migrations");
       if (fs.existsSync(migrationsDir)) {
-        const pattern = new RegExp(`create-${tableName}\\.ts$`);
+        // Match both the underscore form (post-1.12c, Rails-faithful)
+        // and the hyphen form (pre-1.12c transitional). Escape the
+        // user-derived tableName so regex metacharacters can't widen
+        // the match.
+        const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // Anchor to the start of the filename and require the timestamp
+        // + separator so names like `..._recreate_posts.ts` cannot match
+        // `create_posts.ts`.
+        const pattern = new RegExp(`^\\d+[_-]create[_-]${escaped}\\.(ts|js)$`);
         for (const f of fs.readdirSync(migrationsDir)) {
           if (pattern.test(f)) {
             removeFile(cwd, `db/migrations/${f}`);
@@ -54,9 +62,16 @@ export function destroyCommand(): Command {
       const migrationsDir = path.join(cwd, "db", "migrations");
       if (!fs.existsSync(migrationsDir)) return;
 
-      const dashed = dasherize(name);
+      // Anchor on `^<timestamp>[_-]<name>\.(ts|js)$` so a name like
+      // `create_posts` does not also match `..._add_create_posts_flag.ts`.
+      // Escape first so regex metacharacters in the user-supplied name
+      // can't widen the match.
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const dashed = dasherize(escaped);
+      const underscored = dashed.replace(/-/g, "_");
+      const pattern = new RegExp(`^\\d+[_-](${dashed}|${underscored})\\.(ts|js)$`);
       for (const f of fs.readdirSync(migrationsDir)) {
-        if (f.includes(dashed)) {
+        if (pattern.test(f)) {
           removeFile(cwd, `db/migrations/${f}`);
         }
       }
@@ -83,8 +98,10 @@ export function destroyCommand(): Command {
       // Migration
       const migrationsDir = path.join(cwd, "db", "migrations");
       if (fs.existsSync(migrationsDir)) {
+        const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(`^\\d+[_-]create[_-]${escaped}\\.(ts|js)$`);
         for (const f of fs.readdirSync(migrationsDir)) {
-          if (f.includes(`create-${tableName}`) || f.includes(`create_${tableName}`)) {
+          if (pattern.test(f)) {
             removeFile(cwd, `db/migrations/${f}`);
           }
         }
