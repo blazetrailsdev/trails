@@ -93,6 +93,18 @@ describe("Trails", () => {
     expect(Trails.groups({ assets: ["production"] })).toEqual(["default", "development"]);
   });
 
+  it("Trails.groups concatenates TRAILS_GROUPS env entries (Rails-faithful: no trim)", () => {
+    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`. No trim,
+    // empty segments dropped. Trails mirrors that on TRAILS_GROUPS.
+    Trails.env = "development";
+    setEnv("TRAILS_GROUPS", "assets,workers");
+    try {
+      expect(Trails.groups()).toEqual(["default", "development", "assets", "workers"]);
+    } finally {
+      setEnv("TRAILS_GROUPS", undefined);
+    }
+  });
+
   it("Trails.root resolves to undefined when no app is registered", async () => {
     expect(await Trails.root()).toBeUndefined();
   });
@@ -107,5 +119,21 @@ describe("Trails", () => {
 
   it("Trails.initialize() throws when no application is registered", async () => {
     await expect(Trails.initialize()).rejects.toThrow(/Trails.application is not set/);
+  });
+
+  it("Trails.publicPath returns null when no application is registered", async () => {
+    expect(await Trails.publicPath()).toBeNull();
+  });
+
+  it('Trails.publicPath returns the first expanded entry of paths["public"]', async () => {
+    class PubApp extends Application {}
+    Application.register(PubApp);
+    const app = PubApp.instance();
+    const stubPath = { expanded: async () => ["/srv/app/public", "/srv/app/public-alt"] };
+    app.paths = async () =>
+      ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as Awaited<
+        ReturnType<typeof app.paths>
+      >;
+    expect(await Trails.publicPath()).toBe("/srv/app/public");
   });
 });
