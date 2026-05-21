@@ -24,9 +24,10 @@ type ReloadHook = () => boolean | undefined;
 let reloadHook: ReloadHook = () => undefined;
 
 /**
- * Inject the `Trails.application?.reloadRoutesUnlessLoaded` callback.
- * PR 2.6's `Trails.application` setter calls this; tests use it to assert
- * that each routing op consults the hook exactly once.
+ * @internal Trails-private. Inject the
+ * `Trails.application?.reloadRoutesUnlessLoaded` callback. PR 2.6's
+ * `Trails.application` setter calls this; tests use it to assert each
+ * routing op consults the hook exactly once. Not part of Rails.
  */
 export function setReloadRoutesHook(fn: ReloadHook): void {
   reloadHook = fn;

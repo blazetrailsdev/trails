@@ -17,7 +17,7 @@ export class Updater {
   private static _generator?: UpdaterGenerator;
   private static _factory?: UpdaterGeneratorFactory;
 
-  /** Inject the `PluginGenerator` factory. Resets the memoised generator. */
+  /** @internal Trails-private. Inject the `PluginGenerator` factory. Resets the memoised generator. Not part of Rails. */
   static setGeneratorFactory(factory: UpdaterGeneratorFactory): void {
     this._factory = factory;
     this._generator = undefined;
