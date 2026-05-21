@@ -382,6 +382,13 @@ generators to extend it. **Refactor existing, don't keep parallel impls.**
 - **1.14a** — credentials, master_key, encrypted_file, encryption_key_file (depends on PR 1.6)
 - **1.14b** — helper, migration, model, resource, resource_route, scaffold_controller, controller (depends on PR 1.12)
 - **1.14c** — benchmark, task, script, generator, devcontainer, db/system/change, authentication
+  - **1.14c-2 (authentication) is blocked.** A TS port (not the Rails `.rb`
+    templates) depends on `has_secure_password`,
+    `ActiveSupport::CurrentAttributes`, `normalizes`, `rate_limit`, signed
+    cookies, `ActionMailer` + `ActionMailer::Preview`,
+    `ActionController::Concern` (`before_action` / `helper_method`), and
+    `ActionCable::Connection::Base`. PR #2182 attempted a verbatim Ruby
+    port and was closed; revisit once the prerequisites land.
 - **1.14d** — rewrite `app-generator.ts` to extend `AppBase`
 
 ---
