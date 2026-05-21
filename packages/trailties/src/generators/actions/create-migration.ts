@@ -118,7 +118,10 @@ export class CreateMigration {
       this.sayStatus("create", "green");
       if (!this.pretend()) {
         const e = await this.existingMigration();
-        if (e && this.base.fs.unlink) await this.base.fs.unlink(e);
+        if (e) {
+          if (!this.base.fs.unlink) throw new Error("FsAdapter.unlink is required");
+          await this.base.fs.unlink(e);
+        }
         await this.writeRendered();
       }
       return this.destination;

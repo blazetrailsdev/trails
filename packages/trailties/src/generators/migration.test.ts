@@ -59,7 +59,11 @@ describe("migration", () => {
     let captured: MigrationAssigns | undefined;
     const host = {
       fs: f,
-      path: { ...path, dirname: (p: string) => p.split("/").slice(0, -1).join("/") || "/" },
+      path: {
+        ...path,
+        dirname: (p: string) => p.split("/").slice(0, -1).join("/") || "/",
+        isAbsolute: (p: string) => p.startsWith("/"),
+      },
       output: () => undefined,
       options: {},
       migrationFileName: "create_articles",

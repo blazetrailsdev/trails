@@ -98,9 +98,13 @@ export async function migrationTemplate(
   render: (assigns: MigrationAssigns) => string | Promise<string>,
   config: CreateMigrationConfig = {},
 ): Promise<string> {
-  const resolved = host.path.isAbsolute?.(destination)
-    ? destination
-    : host.path.join(host.destinationRoot, destination);
+  // Per PathAdapter contract: when isAbsolute is undefined, any path is
+  // treated as already absolute; only join with destinationRoot when the
+  // adapter declares the destination is relative.
+  const resolved =
+    host.path.isAbsolute && !host.path.isAbsolute(destination)
+      ? host.path.join(host.destinationRoot, destination)
+      : destination;
   const dir = host.path.dirname(resolved);
   const nextNumber = String(await host.nextMigrationNumber(dir));
   const assigns = buildMigrationAssigns(host.path, resolved, nextNumber);
