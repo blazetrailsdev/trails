@@ -15,7 +15,7 @@ import {
   modelRegistry,
 } from "./index.js";
 
-import { createTestAdapter } from "./test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -2135,11 +2135,10 @@ describe("TransactionTest", () => {
 
     it("calls clearCacheBang and re-raises when the body throws the expired error", async () => {
       const { PreparedStatementCacheExpired } = await import("./errors.js");
-      // TM routes through this.inner (the real connection), so spy on innerAdapter.
-      // SchemaAdapter.clearCacheBang delegates to inner, and TM calls clearCacheBang
-      // on _connection (= inner) directly — spying on the wrapper would miss it.
-      const innerAdapter = (adapter as any).innerAdapter ?? adapter;
-      const spy = vi.spyOn(innerAdapter as Required<DatabaseAdapter>, "clearCacheBang");
+      // TM calls clearCacheBang on _connection (the real adapter) directly,
+      // so spy on the shared real adapter via the sidecar handle.
+      const { adapter: realAdapter } = createSidecarTestAdapter();
+      const spy = vi.spyOn(realAdapter as Required<DatabaseAdapter>, "clearCacheBang");
       await expect(
         transaction(Account, async () => {
           throw new PreparedStatementCacheExpired("cached plan expired");
@@ -2149,8 +2148,8 @@ describe("TransactionTest", () => {
     });
 
     it("does not call clearCacheBang for unrelated errors", async () => {
-      const innerAdapter = (adapter as any).innerAdapter ?? adapter;
-      const spy = vi.spyOn(innerAdapter as Required<DatabaseAdapter>, "clearCacheBang");
+      const { adapter: realAdapter } = createSidecarTestAdapter();
+      const spy = vi.spyOn(realAdapter as Required<DatabaseAdapter>, "clearCacheBang");
       await expect(
         transaction(Account, async () => {
           throw new Error("unrelated");
@@ -2343,10 +2342,14 @@ describe("SchemaAdapter TM delegation", () => {
   // DDL savepoints are released eagerly (releaseSavepoint right after exec);
   // TM does not track them and never tries to release them again.
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
+    // Keep the wrapper for defineSchema/Model.adapter so the per-wrapper
+    // signature cache stays isolated across tests in this describe; spy on
+    // the shared real adapter via the sidecar — that's what the wrapper's
+    // withinNewTransaction routes to and what TM dispatches against.
     const testAdapter = createTestAdapter();
     await defineSchema(testAdapter, { items: { name: "string" } });
-    const inner = (testAdapter as any).innerAdapter;
-    const spy = vi.spyOn(inner, "withinNewTransaction");
+    const { adapter: realAdapter } = createSidecarTestAdapter();
+    const spy = vi.spyOn(realAdapter as any, "withinNewTransaction");
     class Item extends Base {
       static {
         this.attribute("name", "string");

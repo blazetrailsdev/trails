@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { adapterType, createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import {
+  adapterType,
+  createSidecarTestAdapter,
+  createTestAdapter,
+  type TestDatabaseAdapter,
+} from "../test-adapter.js";
 import { snapshotDdlTrackers } from "./ddl-tracker.js";
 import { shouldSkipGlobalReset } from "./skip-global-reset.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
@@ -9,11 +14,14 @@ import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 interface AdapterWithExec {
   exec(sql: string): Promise<void>;
   execute(sql: string): Promise<unknown[]>;
-  innerAdapter: {
-    transactionManager: {
-      beginTransaction(opts: Record<string, unknown>): Promise<unknown>;
-      commitTransaction(): Promise<void>;
-    };
+}
+
+interface TmHandle {
+  transactionManager: {
+    beginTransaction(opts: Record<string, unknown>): Promise<unknown>;
+    commitTransaction(): Promise<void>;
+    rollbackTransaction(): Promise<void>;
+    openTransactions: number;
   };
 }
 
@@ -43,9 +51,10 @@ describe("withTransactionalFixtures", () => {
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {
-    await a().innerAdapter.transactionManager.beginTransaction({});
+    const tm = (createSidecarTestAdapter().adapter as unknown as TmHandle).transactionManager;
+    await tm.beginTransaction({});
     await a().exec(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
-    await a().innerAdapter.transactionManager.commitTransaction();
+    await tm.commitTransaction();
     const rows = await a().execute(`SELECT * FROM fixture_users`);
     expect(rows).toHaveLength(1);
   });
@@ -83,11 +92,7 @@ describe("withTransactionalFixtures (useTransactionalTests=false opt-out)", () =
   // (openTransactions==2); when inactive, openTransactions==1 after our
   // manual begin.
   it("does not open a transaction in beforeEach when opted out", async () => {
-    const tm = a().innerAdapter.transactionManager as unknown as {
-      openTransactions: number;
-      beginTransaction(opts: Record<string, unknown>): Promise<unknown>;
-      rollbackTransaction(): Promise<void>;
-    };
+    const tm = (createSidecarTestAdapter().adapter as unknown as TmHandle).transactionManager;
     expect(tm.openTransactions).toBe(0);
     await tm.beginTransaction({});
     expect(tm.openTransactions).toBe(1);

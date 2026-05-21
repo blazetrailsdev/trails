@@ -8,7 +8,7 @@ import { Base, MigrationContext, MigrationRunner, Migrator } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
-import { createTestAdapter, adapterType } from "./test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { DatabaseAdapter } from "./adapter.js";
 import { Migration } from "./migration.js";
@@ -2171,8 +2171,7 @@ describe("MigrationTest", () => {
   );
 
   it.skipIf(adapterType === "sqlite")("migrator generates valid lock id", async () => {
-    const testAdapter = createTestAdapter();
-    const realAdapter = testAdapter.innerAdapter;
+    const { adapter: realAdapter } = createSidecarTestAdapter();
     const migrator = new Migrator(realAdapter, []);
     const lockId = await migrator.generateMigratorAdvisoryLockId();
     const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
@@ -2238,24 +2237,23 @@ describe("MigrationTest", () => {
     //   (1) acquire/release are called symmetrically, and
     //   (2) _advisoryLockClient is null after migration — the pinned pool client
     //       was actually returned (not just nulled without release).
-    const testAdapter = createTestAdapter();
-    const inner = testAdapter.innerAdapter as any;
-    const getSpy = vi.spyOn(inner, "getAdvisoryLock");
-    const releaseSpy = vi.spyOn(inner, "releaseAdvisoryLock");
+    const { adapter: realAdapter } = createSidecarTestAdapter();
+    const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
+    const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
     try {
       const proxy: MigrationProxy = {
         version: "200",
         name: "NoOp",
         migration: () => ({ up: async () => {}, down: async () => {} }),
       };
-      const migrator = new Migrator(testAdapter, [proxy]);
+      const migrator = new Migrator(realAdapter, [proxy]);
       await migrator.migrate();
       expect(getSpy).toHaveBeenCalledTimes(1);
       expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
       // The pinned advisory-lock client must be released back to the pool.
       // A null _advisoryLockClient after migration means the pool client was
       // not leaked — the connection was closed as Rails expects.
-      expect(inner._advisoryLockClient).toBeNull();
+      expect((realAdapter as any)._advisoryLockClient).toBeNull();
       expect(await migrator.getAllVersions()).toContain("200");
     } finally {
       getSpy.mockRestore();

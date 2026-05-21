@@ -15,7 +15,7 @@ import {
 import { SubclassNotFound, NameError } from "./errors.js";
 import { quoteSqlValue } from "./base.js";
 
-import { createTestAdapter, adapterType, type TestDatabaseAdapter } from "./test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./test-helpers/quote-regex.js";
 import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
@@ -2631,9 +2631,8 @@ describe("BasicsTest", () => {
   });
   it("column types on queries on postgresql", async () => {
     if (adapterType !== "postgres") return;
-    const result = await (adapter as TestDatabaseAdapter).innerAdapter.execQuery(
-      "SELECT 1 AS test",
-    );
+    const { adapter: pgAdapter } = createSidecarTestAdapter();
+    const result = await pgAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
   it.skip("connection_handler can be overridden", () => {
