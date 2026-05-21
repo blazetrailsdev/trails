@@ -1,6 +1,10 @@
 import { ref } from "../define-fixtures.js";
 
 // activerecord/test/fixtures/other_topics.yml
+// Loaded into the `topics` table under Topic (Rails uses `set_fixture_class`
+// to map the other_topics fixture file onto Topic). Intra-set refs use
+// `ref("topics", ...)` because the loader keys the declared-id registry by
+// destination tableName, not by fixture-file name.
 export const otherTopicFixtureData = {
   first: {
     id: 1,
@@ -22,7 +26,7 @@ export const otherTopicFixtureData = {
     content: "Have a nice day",
     approved: true,
     replies_count: 0,
-    parent_id: ref("other_topics", "first"),
+    parent_id: ref("topics", "first"),
     type: "Reply",
   },
   third: {
@@ -42,6 +46,6 @@ export const otherTopicFixtureData = {
     content: "Why not?",
     approved: true,
     type: "Reply",
-    parent_id: ref("other_topics", "third"),
+    parent_id: ref("topics", "third"),
   },
 };
