@@ -3,8 +3,8 @@ import {
   GeneratorOptions,
   migrationTimestamp,
   classify,
-  dasherize,
   tableize,
+  underscore,
   ColumnType,
 } from "./base.js";
 import { pluralize, singularize } from "@blazetrails/activesupport";
@@ -226,7 +226,7 @@ export class MigrationGenerator extends GeneratorBase {
     }
     lastTimestamp = timestamp;
     const ext = this.ext();
-    const filename = `db/migrations/${timestamp}-${dasherize(name)}${ext}`;
+    const filename = `db/migrations/${timestamp}_${underscore(name)}${ext}`;
     const ts = this.isTypeScript();
     const returnType = ts ? ": Promise<void>" : "";
 

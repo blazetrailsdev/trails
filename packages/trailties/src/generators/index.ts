@@ -21,6 +21,20 @@ export type { AttrOptions, IndexType } from "./generated-attribute.js";
 // CreateMigration action deferred to a 1.12b follow-up PR to stay under the
 // 300 LOC ceiling — see docs/trailties-plan.md.
 export { ActiveModel } from "./active-model.js";
+export { AppBase } from "./app-base.js";
+export type { AppBaseOptions } from "./app-base.js";
+export { OPTION_IMPLICATIONS } from "./app-base.js";
+export {
+  Database,
+  MySQL2,
+  PostgreSQL,
+  Trilogy,
+  SQLite3,
+  MariaDBMySQL2,
+  MariaDBTrilogy,
+  DATABASES,
+} from "./database.js";
+export type { DatabaseName, PkgDependency, DockerService } from "./database.js";
 export * from "./migration.js";
 export * from "./model-helpers.js";
 export * from "./resource-helpers.js";

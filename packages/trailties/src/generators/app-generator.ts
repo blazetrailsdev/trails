@@ -1,13 +1,26 @@
 import { GeneratorBase, GeneratorOptions } from "./base.js";
+import { Database, type DatabaseName } from "./database.js";
+
+// Legacy adapter shorthand used by the CLI before PR 1.12c. We map it to
+// the Rails-canonical name on entry so downstream code talks to Database.
+const LEGACY_DB_ALIAS: Record<string, DatabaseName> = {
+  sqlite: "sqlite3",
+  postgres: "postgresql",
+  mysql: "mysql",
+};
 
 export interface AppOptions {
-  database: "sqlite" | "postgres" | "mysql";
+  database: "sqlite" | "postgres" | "mysql" | DatabaseName;
   skipDocker?: boolean;
 }
 
 export class AppGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);
+  }
+
+  private buildDatabase(name: string): Database {
+    return Database.build(LEGACY_DB_ALIAS[name] ?? name);
   }
 
   async run(name: string, options: AppOptions): Promise<string[]> {
@@ -909,20 +922,14 @@ dist
   }
 
   private dbDependency(db: string): Record<string, string> {
-    switch (db) {
-      case "postgres":
-        return { pg: "^8.19.0" };
-      case "mysql":
-        return { mysql2: "^3.18.0" };
-      case "sqlite":
-      default:
-        return { "better-sqlite3": "^12.6.0" };
-    }
+    const dep = this.buildDatabase(db).pkgDependency;
+    return { [dep.name]: dep.version };
   }
 
   private dbConfig(appName: string, db: string): string {
-    switch (db) {
-      case "postgres":
+    const canonical = LEGACY_DB_ALIAS[db] ?? db;
+    switch (canonical) {
+      case "postgresql":
         return `export default {
   development: {
     adapter: "postgresql",
