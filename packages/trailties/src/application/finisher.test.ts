@@ -6,53 +6,41 @@ import {
   Finisher,
   type FinisherConfig,
   type FinisherEnv,
-  type FinisherHost,
   type FinisherReloader,
   type FinisherRoutes,
 } from "./finisher.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 
-function buildHost(env: "development" | "production" = "development"): {
-  app: FinisherHost & Finisher;
-  calls: string[];
-  internalRoutes: string[];
-  toPrepared: ConfigurationBlock[];
-  mountedHelpers: string[];
-} {
-  const calls: string[] = [];
-  const internalRoutes: string[] = [];
-  const toPrepared: ConfigurationBlock[] = [];
-  const mountedHelpers: string[] = [];
+class TestApp extends Finisher {
+  config: FinisherConfig = { toPrepareBlocks: [] };
+  env: FinisherEnv = { isDevelopment: () => true };
+  calls: string[] = [];
+  internalRoutes: string[] = [];
+  toPrepared: ConfigurationBlock[] = [];
+  mountedHelpers: string[] = [];
 
-  class TestApp extends Finisher implements FinisherHost {
-    config: FinisherConfig = { toPrepareBlocks: [] };
-    env: FinisherEnv = { isDevelopment: () => env === "development" };
-    routes: FinisherRoutes = {
-      prepend: (block) => block(),
-      defineMountedHelper: (name) => mountedHelpers.push(name),
-    };
-    reloader: FinisherReloader = {
-      toPrepare: (block) => toPrepared.push(block),
-      prepareBang: () => calls.push("prepare!"),
-    };
-    ensureGeneratorTemplatesAdded(): void {
-      calls.push("generator_templates");
-    }
-    buildMiddlewareStack(): void {
-      calls.push("middleware_stack");
-    }
-    appendInternalRoute(verb: string, path: string, to: string): void {
-      internalRoutes.push(`${verb} ${path} -> ${to}`);
-    }
-  }
-
-  return {
-    app: new TestApp() as FinisherHost & Finisher,
-    calls,
-    internalRoutes,
-    toPrepared,
-    mountedHelpers,
+  routes: FinisherRoutes = {
+    prepend: (block) => block(),
+    defineMountedHelper: (name) => this.mountedHelpers.push(name),
   };
+  reloader: FinisherReloader = {
+    toPrepare: (block) => this.toPrepared.push(block),
+    prepareBang: () => this.calls.push("prepare!"),
+  };
+
+  ensureGeneratorTemplatesAdded(): void {
+    this.calls.push("generator_templates");
+  }
+  buildMiddlewareStack(): void {
+    this.calls.push("middleware_stack");
+  }
+  appendInternalRoute(verb: string, path: string, to: string): void {
+    this.internalRoutes.push(`${verb} ${path} -> ${to}`);
+  }
+}
+
+function run(app: TestApp, name: string): void {
+  app.initializers.find((i) => i.name === name)!.run();
 }
 
 describe("Finisher", () => {
@@ -70,50 +58,56 @@ describe("Finisher", () => {
 
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
-    expect(names).not.toContain("eager_load!");
-    expect(names).not.toContain("setup_main_autoloader");
-    expect(names).not.toContain("set_routes_reloader_hook");
-    expect(names).not.toContain("set_clear_dependencies_hook");
-    expect(names).not.toContain("enable_yjit");
-    expect(names).not.toContain("configure_executor_for_concurrency");
+    for (const skipped of [
+      "eager_load!",
+      "setup_main_autoloader",
+      "setup_default_session_store",
+      "finisher_hook",
+      "configure_executor_for_concurrency",
+      "set_routes_reloader_hook",
+      "set_clear_dependencies_hook",
+      "enable_yjit",
+    ]) {
+      expect(names).not.toContain(skipped);
+    }
   });
 
   it("add_generator_templates calls ensureGeneratorTemplatesAdded", () => {
-    const { app, calls } = buildHost();
-    app.initializers.find((i) => i.name === "add_generator_templates")!.run(app);
-    expect(calls).toContain("generator_templates");
+    const app = new TestApp();
+    run(app, "add_generator_templates");
+    expect(app.calls).toEqual(["generator_templates"]);
   });
 
   it("build_middleware_stack calls buildMiddlewareStack", () => {
-    const { app, calls } = buildHost();
-    app.initializers.find((i) => i.name === "build_middleware_stack")!.run(app);
-    expect(calls).toContain("middleware_stack");
+    const app = new TestApp();
+    run(app, "build_middleware_stack");
+    expect(app.calls).toEqual(["middleware_stack"]);
   });
 
   it("define_main_app_helper defines the main_app mounted helper", () => {
-    const { app, mountedHelpers } = buildHost();
-    app.initializers.find((i) => i.name === "define_main_app_helper")!.run(app);
-    expect(mountedHelpers).toEqual(["main_app"]);
+    const app = new TestApp();
+    run(app, "define_main_app_helper");
+    expect(app.mountedHelpers).toEqual(["main_app"]);
   });
 
   it("add_to_prepare_blocks forwards config.toPrepareBlocks to the reloader", () => {
-    const { app, toPrepared } = buildHost();
+    const app = new TestApp();
     const block: ConfigurationBlock = () => {};
     app.config.toPrepareBlocks.push(block);
-    app.initializers.find((i) => i.name === "add_to_prepare_blocks")!.run(app);
-    expect(toPrepared).toEqual([block]);
+    run(app, "add_to_prepare_blocks");
+    expect(app.toPrepared).toEqual([block]);
   });
 
   it("run_prepare_callbacks runs reloader.prepare!", () => {
-    const { app, calls } = buildHost();
-    app.initializers.find((i) => i.name === "run_prepare_callbacks")!.run(app);
-    expect(calls).toContain("prepare!");
+    const app = new TestApp();
+    run(app, "run_prepare_callbacks");
+    expect(app.calls).toEqual(["prepare!"]);
   });
 
   it("add_internal_routes prepends rails/info routes in development", () => {
-    const { app, internalRoutes } = buildHost("development");
-    app.initializers.find((i) => i.name === "add_internal_routes")!.run(app);
-    expect(internalRoutes).toEqual([
+    const app = new TestApp();
+    run(app, "add_internal_routes");
+    expect(app.internalRoutes).toEqual([
       "get /rails/info/properties -> rails/info#properties",
       "get /rails/info/routes -> rails/info#routes",
       "get /rails/info/notes -> rails/info#notes",
@@ -122,14 +116,15 @@ describe("Finisher", () => {
   });
 
   it("add_internal_routes is a no-op outside development", () => {
-    const { app, internalRoutes } = buildHost("production");
-    app.initializers.find((i) => i.name === "add_internal_routes")!.run(app);
-    expect(internalRoutes).toEqual([]);
+    const app = new TestApp();
+    app.env = { isDevelopment: () => false };
+    run(app, "add_internal_routes");
+    expect(app.internalRoutes).toEqual([]);
   });
 
-  it("runs all finisher initializers in order via runInitializers", () => {
-    const { app, calls } = buildHost();
+  it("runs all finisher initializers in declared order via runInitializers", () => {
+    const app = new TestApp();
     app.runInitializers();
-    expect(calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);
+    expect(app.calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);
   });
 });
