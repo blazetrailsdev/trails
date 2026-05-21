@@ -40,6 +40,14 @@ describe("AppBase", () => {
     expect(g.skip("ActiveStorage")).toBe(false);
   });
 
+  it("destinationRoot joins relative appPath, keeps absolute as-is", () => {
+    expect(build({ cwd: "/work", appPath: "blog" }).destinationRoot).toBe("/work/blog");
+    expect(build({ cwd: "/work", appPath: "/elsewhere/blog" }).destinationRoot).toBe(
+      "/elsewhere/blog",
+    );
+    expect(build({ cwd: "/work", appPath: "blog" }).cwd).toBe("/work/blog");
+  });
+
   it("dependsOnSystemTest false when api or skipTest", () => {
     expect(build({ api: true }).dependsOnSystemTest()).toBe(false);
     expect(build({ skipTest: true }).dependsOnSystemTest()).toBe(false);

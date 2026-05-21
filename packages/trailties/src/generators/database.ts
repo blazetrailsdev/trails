@@ -1,8 +1,8 @@
 // Mirrors railties/lib/rails/generators/database.rb. Ports the Database
 // class hierarchy with npm-flavored substitutions (Rails `gem` →
 // `pkgDependency`, base/build packages map to apt packages used in the
-// Dockerfile template). Trilogy and MariaDB variants are kept for parity
-// even though the wave-1 adapter set is sqlite/postgres/mysql.
+// Dockerfile template). Rails uses method definitions; we use readonly
+// class fields for compactness — behavior is identical.
 
 export const DATABASES = [
   "mysql",
@@ -18,6 +18,7 @@ export interface PkgDependency {
   name: string;
   version: string;
 }
+
 export interface DockerService {
   image: string;
   restart: string;
@@ -27,30 +28,16 @@ export interface DockerService {
 }
 
 export abstract class Database {
-  abstract get name(): string;
-  abstract get template(): string;
-  abstract get pkgDependency(): PkgDependency;
-  get basePackage(): string | undefined {
-    return undefined;
-  }
-  get buildPackage(): string | undefined {
-    return undefined;
-  }
-  get featureName(): string | undefined {
-    return undefined;
-  }
-  get service(): DockerService | undefined {
-    return undefined;
-  }
-  get port(): number | undefined {
-    return undefined;
-  }
-  get socket(): string | undefined {
-    return undefined;
-  }
-  get host(): string | undefined {
-    return undefined;
-  }
+  abstract readonly name: string;
+  abstract readonly template: string;
+  abstract readonly pkgDependency: PkgDependency;
+  readonly basePackage?: string;
+  readonly buildPackage?: string;
+  readonly featureName?: string;
+  readonly service?: DockerService;
+  readonly port?: number;
+  readonly socket?: string;
+  readonly host?: string;
 
   get feature(): Record<string, Record<string, never>> | undefined {
     return this.featureName ? { [this.featureName]: {} } : undefined;
@@ -106,118 +93,57 @@ const mariaDBService: DockerService = {
 };
 
 export class MySQL2 extends Database {
-  get name(): string {
-    return "mysql";
-  }
-  get template(): string {
-    return "config/databases/mysql.yml";
-  }
-  get pkgDependency(): PkgDependency {
-    return { name: "mysql2", version: "^3.18.0" };
-  }
-  override get basePackage(): string | undefined {
-    return "default-mysql-client";
-  }
-  override get buildPackage(): string | undefined {
-    return "default-libmysqlclient-dev";
-  }
-  override get featureName(): string | undefined {
-    return "ghcr.io/rails/devcontainer/features/mysql-client";
-  }
-  override get service(): DockerService | undefined {
-    return mysqlService;
-  }
-  override get port(): number | undefined {
-    return 3306;
-  }
-  override get host(): string | undefined {
-    return "127.0.0.1";
-  }
+  readonly name: string = "mysql";
+  readonly template: string = "config/databases/mysql.yml";
+  readonly pkgDependency: PkgDependency = { name: "mysql2", version: "^3.18.0" };
+  override readonly basePackage: string | undefined = "default-mysql-client";
+  override readonly buildPackage: string | undefined = "default-libmysqlclient-dev";
+  override readonly featureName: string | undefined =
+    "ghcr.io/rails/devcontainer/features/mysql-client";
+  override readonly service: DockerService | undefined = mysqlService;
+  override readonly port: number | undefined = 3306;
+  override readonly host: string | undefined = "127.0.0.1";
 }
 
 export class PostgreSQL extends Database {
-  get name(): string {
-    return "postgres";
-  }
-  get template(): string {
-    return "config/databases/postgresql.yml";
-  }
-  get pkgDependency(): PkgDependency {
-    return { name: "pg", version: "^8.19.0" };
-  }
-  override get basePackage(): string | undefined {
-    return "postgresql-client";
-  }
-  override get buildPackage(): string | undefined {
-    return "libpq-dev";
-  }
-  override get featureName(): string | undefined {
-    return "ghcr.io/rails/devcontainer/features/postgres-client";
-  }
-  override get port(): number | undefined {
-    return 5432;
-  }
-  override get service(): DockerService | undefined {
-    return {
-      image: "postgres:16.1",
-      restart: "unless-stopped",
-      networks: ["default"],
-      volumes: ["postgres-data:/var/lib/postgresql/data"],
-      environment: { POSTGRES_USER: "postgres", POSTGRES_PASSWORD: "postgres" },
-    };
-  }
+  readonly name = "postgres";
+  readonly template = "config/databases/postgresql.yml";
+  readonly pkgDependency: PkgDependency = { name: "pg", version: "^8.19.0" };
+  override readonly basePackage = "postgresql-client";
+  override readonly buildPackage = "libpq-dev";
+  override readonly featureName = "ghcr.io/rails/devcontainer/features/postgres-client";
+  override readonly port = 5432;
+  override readonly service: DockerService = {
+    image: "postgres:16.1",
+    restart: "unless-stopped",
+    networks: ["default"],
+    volumes: ["postgres-data:/var/lib/postgresql/data"],
+    environment: { POSTGRES_USER: "postgres", POSTGRES_PASSWORD: "postgres" },
+  };
 }
 
 export class Trilogy extends MySQL2 {
-  override get template(): string {
-    return "config/databases/trilogy.yml";
-  }
-  override get pkgDependency(): PkgDependency {
-    return { name: "trilogy", version: "^2.7.0" };
-  }
-  override get basePackage(): string | undefined {
-    return undefined;
-  }
-  override get buildPackage(): string | undefined {
-    return undefined;
-  }
-  override get featureName(): string | undefined {
-    return undefined;
-  }
+  override readonly template = "config/databases/trilogy.yml";
+  override readonly pkgDependency: PkgDependency = { name: "trilogy", version: "^2.7.0" };
+  override readonly basePackage = undefined;
+  override readonly buildPackage = undefined;
+  override readonly featureName = undefined;
 }
 
 export class SQLite3 extends Database {
-  get name(): string {
-    return "sqlite3";
-  }
-  get template(): string {
-    return "config/databases/sqlite3.yml";
-  }
-  get pkgDependency(): PkgDependency {
-    return { name: "better-sqlite3", version: "^12.6.0" };
-  }
-  override get basePackage(): string | undefined {
-    return "sqlite3";
-  }
-  override get featureName(): string | undefined {
-    return "ghcr.io/rails/devcontainer/features/sqlite3";
-  }
+  readonly name = "sqlite3";
+  readonly template = "config/databases/sqlite3.yml";
+  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^12.6.0" };
+  override readonly basePackage = "sqlite3";
+  override readonly featureName = "ghcr.io/rails/devcontainer/features/sqlite3";
 }
 
 export class MariaDBMySQL2 extends MySQL2 {
-  override get name(): string {
-    return "mariadb";
-  }
-  override get service(): DockerService | undefined {
-    return mariaDBService;
-  }
+  override readonly name = "mariadb";
+  override readonly service = mariaDBService;
 }
 
 export class MariaDBTrilogy extends Trilogy {
-  override get name(): string {
-    return "mariadb";
-  }
-  override get service(): DockerService | undefined {
-    return mariaDBService;
-  }
+  override readonly name = "mariadb";
+  override readonly service = mariaDBService;
 }

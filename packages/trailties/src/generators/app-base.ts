@@ -49,12 +49,20 @@ export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOpti
 
 export abstract class AppBase extends GeneratorBase {
   readonly appPath: string;
+  readonly destinationRoot: string;
   readonly options: AppBaseOptions;
   private _database?: Database;
 
   constructor(options: AppBaseOptions) {
     super(options);
     this.appPath = options.appPath;
+    // Mirrors AppBase#set_default_accessors!: destination_root resolves
+    // app_path against the parent destination_root. Subclasses generate
+    // into this directory, not the parent cwd.
+    this.destinationRoot = options.appPath.startsWith("/")
+      ? options.appPath
+      : this.path.join(options.cwd, options.appPath);
+    this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions(options);
   }
 
