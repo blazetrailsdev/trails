@@ -22,7 +22,11 @@ import { modelRegistry } from "../associations.js";
 import { reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
 import { ConnectionNotDefined } from "../errors.js";
-import { quote as abstractQuote } from "../connection-adapters/abstract/quoting.js";
+import {
+  quote as abstractQuote,
+  quoteTableName as abstractQuoteTableName,
+  quoteColumnName as abstractQuoteColumnName,
+} from "../connection-adapters/abstract/quoting.js";
 
 export interface JoinNode {
   tableIndex: number;
@@ -176,6 +180,24 @@ export class JoinDependency {
     return abstractQuote(value);
   }
 
+  /**
+   * Adapter-aware table identifier quoting for JOIN SQL construction.
+   * Mirrors `_quoteString` resolution: delegate to the active adapter so
+   * MySQL emits backticks (avoids mixed-quote SQL when the MySQL Arel
+   * visitor is active), fall back to the ANSI portable form otherwise.
+   * @internal
+   */
+  private _qt(name: string): string {
+    const fn = (this._adapter as any)?.quoteTableName;
+    return typeof fn === "function" ? fn.call(this._adapter, name) : abstractQuoteTableName(name);
+  }
+
+  /** @internal */
+  private _qc(name: string): string {
+    const fn = (this._adapter as any)?.quoteColumnName;
+    return typeof fn === "function" ? fn.call(this._adapter, name) : abstractQuoteColumnName(name);
+  }
+
   get nodes(): JoinNode[] {
     return this._nodes;
   }
@@ -222,7 +244,7 @@ export class JoinDependency {
       const targetPk = assocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
       // effectiveName resolved below after targetTable is known
-      joinOn = `PLACEHOLDER."${targetPk}" = "${sourceAlias}"."${foreignKey}"`;
+      joinOn = `PLACEHOLDER.${this._qc(targetPk)} = ${this._qt(sourceAlias)}.${this._qc(foreignKey)}`;
     } else if (
       assocDef.type === "hasMany" ||
       assocDef.type === "hasOne" ||
@@ -252,11 +274,11 @@ export class JoinDependency {
       if (Array.isArray(foreignKey)) return null;
       const primaryKey = assocDef.options.primaryKey ?? sourcePk;
       if (Array.isArray(primaryKey)) return null;
-      joinOn = `PLACEHOLDER."${foreignKey}" = "${sourceAlias}"."${primaryKey}"`;
+      joinOn = `PLACEHOLDER.${this._qc(foreignKey)} = ${this._qt(sourceAlias)}.${this._qc(primaryKey)}`;
 
       if (assocDef.options.as) {
         const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        joinOn += ` AND PLACEHOLDER."${typeCol}" = ${this._quoteString(modelClass.name)}`;
+        joinOn += ` AND PLACEHOLDER.${this._qc(typeCol)} = ${this._quoteString(modelClass.name)}`;
       }
     } else {
       return null;
@@ -273,7 +295,10 @@ export class JoinDependency {
     this._usedTableNames.add(targetTable!);
 
     // Substitute the PLACEHOLDER with the effective SQL name
-    joinOn = joinOn.replace(/PLACEHOLDER/g, `"${effectiveName}"`);
+    // Function replacer avoids `$&`/`$'`/`` $` ``/`$N` expansion in the
+    // replacement string when an identifier contains `$`.
+    const effectiveQuoted = this._qt(effectiveName);
+    joinOn = joinOn.replace(/PLACEHOLDER/g, () => effectiveQuoted);
 
     // Apply association scope as additional ON conditions
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
@@ -282,7 +307,8 @@ export class JoinDependency {
       if (scopeSql) {
         const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
         if (whereMatch) {
-          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable!}"`, `"${effectiveName}"`);
+          const toQ = this._qt(effectiveName);
+          const scopeWhere = whereMatch[1].replaceAll(this._qt(targetTable!), () => toQ);
           joinOn += ` AND ${scopeWhere}`;
         }
       }
@@ -300,7 +326,9 @@ export class JoinDependency {
     // Build JOIN SQL: only emit the alias clause when effectiveName differs
     // from the real table name (i.e. there was a collision and we used tN).
     const joinTableExpr =
-      effectiveName === targetTable! ? `"${targetTable!}"` : `"${targetTable!}" "${effectiveName}"`;
+      effectiveName === targetTable!
+        ? this._qt(targetTable!)
+        : `${this._qt(targetTable!)} ${this._qt(effectiveName)}`;
 
     const node: JoinNode = {
       tableIndex,
@@ -381,7 +409,7 @@ export class JoinDependency {
     return this._aliases.map((a) => {
       const effectiveName = effectiveNameByIndex.get(a.tableIndex)!;
       // Rails emits column aliases as SqlLiteral (bare, not quoted).
-      return `"${effectiveName}"."${a.column}" AS ${a.alias}`;
+      return `${this._qt(effectiveName)}.${this._qc(a.column)} AS ${a.alias}`;
     });
   }
 
@@ -446,7 +474,10 @@ export class JoinDependency {
     }
     const selectExprs = this.aliases()
       .columns()
-      .map((a) => `"${effectiveNameByIndex.get(a.tableIndex)!}"."${a.column}" AS ${a.alias}`);
+      .map(
+        (a) =>
+          `${this._qt(effectiveNameByIndex.get(a.tableIndex)!)}.${this._qc(a.column)} AS ${a.alias}`,
+      );
     if (typeof relation.reselectBang === "function") {
       relation.reselectBang(...selectExprs);
       return relation;
@@ -491,7 +522,7 @@ export class JoinDependency {
     if (inheritanceCol && isStiSubclass(model)) {
       const stiNames = [model.name, ...((model as any).descendants ?? []).map((d: any) => d.name)];
       const inList = stiNames.map((n: string) => this._quoteString(n)).join(", ");
-      joinOn += ` AND "${alias}"."${inheritanceCol}" IN (${inList})`;
+      joinOn += ` AND ${this._qt(alias)}.${this._qc(inheritanceCol)} IN (${inList})`;
     }
     return joinOn;
   }
@@ -653,15 +684,15 @@ export class JoinDependency {
     // the set with tables we never actually joined.
     const throughEffective = this._usedTableNames.has(throughTable) ? throughAlias : throughTable;
 
-    let throughJoinOn = `"${throughEffective}"."${throughFk}" = "${sourceAlias}"."${sourcePk}"`;
+    let throughJoinOn = `${this._qt(throughEffective)}.${this._qc(throughFk)} = ${this._qt(sourceAlias)}.${this._qc(sourcePk)}`;
     if (throughAssocDef.options.as) {
       const typeCol = `${_toUnderscore(throughAssocDef.options.as)}_type`;
-      throughJoinOn += ` AND "${throughEffective}"."${typeCol}" = ${this._quoteString(String(modelClass.name))}`;
+      throughJoinOn += ` AND ${this._qt(throughEffective)}.${this._qc(typeCol)} = ${this._quoteString(String(modelClass.name))}`;
     }
     const throughJoinTableExpr =
       throughEffective === throughTable
-        ? `"${throughTable}"`
-        : `"${throughTable}" "${throughEffective}"`;
+        ? this._qt(throughTable)
+        : `${this._qt(throughTable)} ${this._qt(throughEffective)}`;
     const throughJoinSql = `LEFT OUTER JOIN ${throughJoinTableExpr} ON ${throughJoinOn}`;
 
     const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
@@ -772,13 +803,13 @@ export class JoinDependency {
       targetTable = (targetModel as any).tableName;
       const targetPk = sourceAssocDef.options.primaryKey ?? (targetModel as any).primaryKey ?? "id";
       if (Array.isArray(targetPk)) return null;
-      targetJoinOn = `"TARGET_PLACEHOLDER"."${targetPk}" = "${throughEffective}"."${targetFk}"`;
+      targetJoinOn = `TARGET_PLACEHOLDER.${this._qc(targetPk)} = ${this._qt(throughEffective)}.${this._qc(targetFk)}`;
       if (isPoly) {
         // Mirrors Rails ThroughReflection / BelongsToReflection: the
         // polymorphic type column is `foreign_type` (options[:foreign_type]
         // || "#{name}_type"), and the value is the literal :source_type.
         const typeCol = sourceAssocDef.options.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        targetJoinOn += ` AND "${throughEffective}"."${typeCol}" = ${this._quoteString(String(assocDef.options.sourceType))}`;
+        targetJoinOn += ` AND ${this._qt(throughEffective)}.${this._qc(typeCol)} = ${this._quoteString(String(assocDef.options.sourceType))}`;
       }
     } else {
       const className = sourceAssocDef?.options?.className ?? _camelize(_singularize(sourceName));
@@ -790,7 +821,7 @@ export class JoinDependency {
       if (Array.isArray(targetFk)) return null;
       const throughPk = (throughModel as any).primaryKey ?? "id";
       if (Array.isArray(throughPk)) return null;
-      targetJoinOn = `"TARGET_PLACEHOLDER"."${targetFk}" = "${throughEffective}"."${throughPk}"`;
+      targetJoinOn = `TARGET_PLACEHOLDER.${this._qc(targetFk)} = ${this._qt(throughEffective)}.${this._qc(throughPk)}`;
     }
 
     // Mirror addAssociation collision-check for the target table too.
@@ -801,7 +832,8 @@ export class JoinDependency {
     // tN alias rather than colliding on the same unaliased identifier.
     const targetCollides = this._usedTableNames.has(targetTable) || targetTable === throughTable;
     const targetEffective = targetCollides ? targetAlias : targetTable;
-    targetJoinOn = targetJoinOn.replaceAll("TARGET_PLACEHOLDER", targetEffective);
+    const targetEffectiveQuoted = this._qt(targetEffective);
+    targetJoinOn = targetJoinOn.replaceAll("TARGET_PLACEHOLDER", () => targetEffectiveQuoted);
 
     // Apply association scope
     if (assocDef.options.scope && typeof assocDef.options.scope === "function") {
@@ -810,7 +842,8 @@ export class JoinDependency {
       if (scopeSql) {
         const whereMatch = scopeSql.match(/\bWHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s*$)/i);
         if (whereMatch) {
-          const scopeWhere = whereMatch[1].replaceAll(`"${targetTable}"`, `"${targetEffective}"`);
+          const toQ = this._qt(targetEffective);
+          const scopeWhere = whereMatch[1].replaceAll(this._qt(targetTable), () => toQ);
           targetJoinOn += ` AND ${scopeWhere}`;
         }
       }
@@ -844,8 +877,8 @@ export class JoinDependency {
 
     const targetJoinTableExpr =
       targetEffective === targetTable
-        ? `"${targetTable}"`
-        : `"${targetTable}" "${targetEffective}"`;
+        ? this._qt(targetTable)
+        : `${this._qt(targetTable)} ${this._qt(targetEffective)}`;
     const node: JoinNode = {
       tableIndex: targetTableIndex,
       tableAlias: targetAlias,
