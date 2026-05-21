@@ -175,6 +175,8 @@ export function exclude(str: string, search: string): boolean {
 export function chomp(str: string, separator?: string): string {
   if (separator === undefined) return str.replace(/(\r\n|\r|\n)$/, "");
   if (separator === "") return str.replace(/[\r\n]+$/, "");
+  // Ruby quirk: chomp("\n") also eats a preceding CR — "x\r\n".chomp("\n") == "x".
+  if (separator === "\n") return str.replace(/\r?\n$/, "");
   return str.endsWith(separator) ? str.slice(0, str.length - separator.length) : str;
 }
 

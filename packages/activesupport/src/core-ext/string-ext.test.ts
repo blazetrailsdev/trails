@@ -796,6 +796,11 @@ describe("String#chomp", () => {
   it("returns the string unchanged when the suffix is absent", () => {
     expect(chomp("hello", "x")).toBe("hello");
   });
+  it("with separator '\\n', also eats a preceding CR (Ruby quirk)", () => {
+    expect(chomp("hello\r\n", "\n")).toBe("hello");
+    expect(chomp("hello\n", "\n")).toBe("hello");
+    expect(chomp("hello\r", "\n")).toBe("hello\r");
+  });
   it("with an empty separator, removes all trailing newline characters", () => {
     expect(chomp("hello\r\n\r\n", "")).toBe("hello");
     expect(chomp("hello\n\n\n", "")).toBe("hello");
