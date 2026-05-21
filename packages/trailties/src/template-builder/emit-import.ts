@@ -91,5 +91,10 @@ export function mergeImports(imports: Import[]): Import[] {
       e.named = merged;
     }
   }
+  for (const imp of map.values()) {
+    if (imp.default && imp.named && Object.prototype.hasOwnProperty.call(imp.named, imp.default)) {
+      throw new Error(`Import from "${imp.from}" binds "${imp.default}" as both default and named`);
+    }
+  }
   return [...map.values()].sort((a, b) => a.from.localeCompare(b.from));
 }

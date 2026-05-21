@@ -126,24 +126,27 @@ export type Body = {
 export function tsBody(parts: TemplateStringsArray, ...interps: Array<Ref | string>): Body;
 
 export interface ClassDecl {
-  readonly [REF_BRAND]: "class";
+  readonly __kind: "class";
   name: string;
-  extends?: Ref; // must be a Ref, not a string — brand enforces this
+  extends?: Ref; // must be a Ref, not a string — Ref's REF_BRAND enforces this
   implements?: Ref[];
   exported?: boolean; // defaults true
   body: Array<Field | Method>;
 }
-export function tsClass(opts: Omit<ClassDecl, typeof REF_BRAND>): ClassDecl;
+export type ClassOpts = Omit<ClassDecl, "__kind">;
+export function tsClass(opts: ClassOpts): ClassDecl;
 
 export interface InterfaceDecl {
-  readonly [REF_BRAND]: "interface";
+  readonly __kind: "interface";
   /* analogous to ClassDecl */
 }
-export function tsInterface(opts: Omit<InterfaceDecl, typeof REF_BRAND>): InterfaceDecl;
+export function tsInterface(opts: Omit<InterfaceDecl, "__kind">): InterfaceDecl;
+
+export function tsRaw(text: string): RawDecl;
 
 export interface ModuleSource {
   imports?: Import[]; // optional — refs from declarations are auto-collected
-  declarations: Array<ClassDecl | InterfaceDecl | { readonly [REF_BRAND]: "raw"; text: string }>;
+  declarations: Array<ClassDecl | InterfaceDecl | RawDecl>;
   preamble?: string; // file-level comment block
 }
 
@@ -163,6 +166,15 @@ symbol`, so it cannot be constructed structurally — the only ways
   to obtain one are `ref("Name", "package")` or the `.refs[alias]`
   field of an `ImportResult` returned by `tsImport*`. This is the
   load-bearing constraint that blocks the Ruby-emission failure mode.
+- **Declarations use a public `__kind` discriminator.** `ClassDecl` /
+  `InterfaceDecl` / `RawDecl` are discriminated by a runtime
+  `__kind: "class" | "interface" | "raw"` field, not the `REF_BRAND`
+  unique symbol. The `REF_BRAND` is type-level only (never assigned
+  at runtime), so declarations need a real runtime field for
+  `tsModule`'s dispatch. Constructor exclusivity is provided by the
+  `tsClass` / `tsInterface` / `tsRaw` factories; the brand-level
+  unforgeability is reserved for `Ref` / `Type` / `Body`, which
+  carry refs through emitted string output.
 - **`Type` and `Body` carry refs.** `` type`Array<${userRef}>` `` and `` tsBody`return new ${userRef}();` `` propagate refs to `tsModule`'s import collector.
 - **`tsModule` resolves imports.** Walks every `Ref` in declarations,
   collects the implied imports, dedupes, sorts, and emits the import

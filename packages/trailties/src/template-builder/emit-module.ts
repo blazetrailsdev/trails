@@ -37,6 +37,7 @@ export function tsModule(src: ModuleSource): string {
   const covered = new Set<string>();
   for (const imp of explicit) {
     if (imp.typeOnly) continue;
+    if (imp.default) covered.add(`${imp.from}|${imp.default}`);
     for (const alias of Object.keys(imp.named ?? {})) covered.add(`${imp.from}|${alias}`);
   }
   const fromRefs: Import[] = [];

@@ -122,6 +122,33 @@ describe("template-builder", () => {
     expect(out).toContain(`import { Bar, Foo } from "x";`);
   });
 
+  it("does not add a duplicate named binding when an explicit default import covers it", () => {
+    const d = tsImportDefault("./foo.js", "Foo");
+    const r = ref("Foo", "./foo.js");
+    const out = tsModule({
+      imports: [d.import],
+      declarations: [
+        tsClass({
+          name: "C",
+          body: [
+            tsMethod({ name: "f", params: [], returnType: "void", body: tsBody`new ${r}();` }),
+          ],
+        }),
+      ],
+    });
+    expect(out).toContain(`import Foo from "./foo.js";`);
+    expect(out).not.toContain(`{ Foo }`);
+  });
+
+  it("throws when an import binds the same identifier as both default and named", () => {
+    expect(() =>
+      tsModule({
+        imports: [{ from: "x", default: "Foo", named: { Foo: "named" } }],
+        declarations: [],
+      }),
+    ).toThrow(/both default and named/);
+  });
+
   it("tsImportDefault preserves the default name as the refs key type", () => {
     const d = tsImportDefault("./foo.js", "Foo");
     // Compile-time: d.refs.Foo is Ref; runtime: shape is correct.
