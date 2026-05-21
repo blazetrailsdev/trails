@@ -170,6 +170,36 @@ branch). The PG-bytea case needs the parallel fix at the
 type-serialize layer, not at `quote()`. Likely also resolves any
 MySQL BLOB skips 9b-2b surfaces.
 
+**9b-2e — re-enable #2155's skips via Rails-idiomatic assertions —
+sized per file, no shared helper.** 9b-2b (#2155) `.skip`s the ~50
+tests in `relation.test.ts` (and any other files surfaced by CI)
+whose assertions hardcode ANSI `"name"` quoting. **The `.skip` with
+rationale is itself the correct Rails idiom** — Rails has no shared
+adapter-quote-rewriting helper ([[feedback_no_q_wrap_helper]]).
+
+Two options per skipped test, picked individually:
+
+1. **Inline `Regexp.escape(quote_*_name(name))` in the assertion** —
+   Rails' canonical pattern, no exported helper. From
+   `vendor/rails/activerecord/test/cases/relation/predicate_builder_test.rb`:
+   ```ruby
+   assert_match %r{#{Regexp.escape(quote_table_name("topics.title"))} ~ 'rails'}i, ...to_sql
+   ```
+   In trails: `expect(sql).toMatch(new RegExp(escapeRegExp(adapter.quoteColumnName("name"))))`
+   — full names, no abbreviation, no exported helper. If a single
+   test has many quoted identifiers, a local
+   `const escaped = (name) => escapeRegExp(adapter.quoteColumnName(name))`
+   binding scoped to that test mirrors Rails' local lambda — but it
+   stays local.
+2. **Rewrite to behavior-based assertion** — assert the SQL
+   _outcome_ (returned rows, computed values) instead of the SQL
+   string structure. Often cleaner; some `.toSql()` assertions are
+   really testing query construction that's better verified by
+   executing the query and checking results.
+
+When neither fits cleanly, the `.skip` stays. Don't ship a shared
+helper; don't ship a post-hoc rewriter.
+
 **9b-3 + 9b-4 — delete the dormant-visitor fallback and
 `SchemaAdapter`.** Bundled because the fallback deletion is small (~50
 LOC) and the dependent class deletion is the natural follow-on:
