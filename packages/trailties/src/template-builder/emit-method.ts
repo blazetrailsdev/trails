@@ -1,7 +1,9 @@
 import type { Field, FieldType, Method, Ref } from "./types.js";
 import { isRef, refMeta } from "./refs.js";
 
-export function tsField(name: string, type: FieldType, opts: Partial<Field> = {}): Field {
+export type FieldOpts = Omit<Field, "name" | "type">;
+
+export function tsField(name: string, type: FieldType, opts: FieldOpts = {}): Field {
   return { name, type, ...opts };
 }
 export function tsMethod(opts: Method): Method {

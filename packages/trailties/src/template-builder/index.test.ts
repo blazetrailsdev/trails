@@ -66,6 +66,20 @@ describe("template-builder", () => {
     expect(out).toContain(`return u;`);
   });
 
+  it("supports tsInterface extends and raw declarations", () => {
+    const base = ref("Base", "./base.js");
+    const out = tsModule({
+      declarations: [
+        { __kind: "raw", text: "// hand-rolled banner" } as never,
+        tsInterface({ name: "Sub", extends: [base], body: [tsField("id", "number")] }),
+      ],
+    });
+    expect(out).toContain(`// hand-rolled banner`);
+    expect(out).toContain(`export interface Sub extends Base {`);
+    expect(out).toContain(`import { Base } from "./base.js";`);
+    expect(parseTs(out).diagnostics).toEqual([]);
+  });
+
   it("emits a valid hand-built module (snapshot + parse + no-Ruby)", () => {
     const { refs: ar } = tsImport("@blazetrails/activerecord", { Base: "named" });
     const out = tsModule({
