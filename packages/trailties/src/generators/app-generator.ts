@@ -1,12 +1,11 @@
 import { GeneratorBase, GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
-// Legacy adapter shorthand used by the CLI before PR 1.12c. We map it to
-// the Rails-canonical name on entry so downstream code talks to Database.
-const LEGACY_DB_ALIAS: Record<string, DatabaseName> = {
+// Legacy adapter shorthand from the pre-1.12c CLI. Mapped to the
+// Rails-canonical name before talking to Database.
+const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
   postgres: "postgresql",
-  mysql: "mysql",
 };
 
 export interface AppOptions {
@@ -17,10 +16,6 @@ export interface AppOptions {
 export class AppGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);
-  }
-
-  private buildDatabase(name: string): Database {
-    return Database.build(LEGACY_DB_ALIAS[name] ?? name);
   }
 
   async run(name: string, options: AppOptions): Promise<string[]> {
@@ -922,13 +917,12 @@ dist
   }
 
   private dbDependency(db: string): Record<string, string> {
-    const dep = this.buildDatabase(db).pkgDependency;
+    const dep = Database.build(DB_ALIAS[db] ?? db).pkgDependency;
     return { [dep.name]: dep.version };
   }
 
   private dbConfig(appName: string, db: string): string {
-    const canonical = LEGACY_DB_ALIAS[db] ?? db;
-    switch (canonical) {
+    switch (DB_ALIAS[db] ?? db) {
       case "postgresql":
         return `export default {
   development: {

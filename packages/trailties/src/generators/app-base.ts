@@ -9,6 +9,10 @@
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
+// Skip flags consumed by AppBase predicates and OPTION_IMPLICATIONS. The
+// app-generator may pass additional flags (skipDocker, skipGit, etc.);
+// `skip(...)` reads any `skip<X>` field, the union just type-checks the
+// names used here.
 type Skip =
   | "ActiveRecord"
   | "ActiveStorage"
@@ -17,26 +21,20 @@ type Skip =
   | "ActionMailbox"
   | "ActionText"
   | "ActiveJob"
-  | "AssetPipeline"
   | "Javascript"
   | "Hotwire"
-  | "Jbuilder"
+  | "Solid"
   | "Test"
   | "SystemTest"
-  | "Docker"
-  | "Git"
-  | "Keeps"
-  | "Ci"
-  | "Kamal"
-  | "Solid"
-  | "Thruster";
+  | "Keeps";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
   database?: DatabaseName;
   api?: boolean;
   devcontainer?: boolean;
-} & { [K in Skip as `skip${K}`]?: boolean };
+  [k: `skip${string}`]: boolean | undefined;
+};
 
 // Mirrors AppBase::OPTION_IMPLICATIONS: meta options activate their
 // implications unless explicitly revoked with `false`.

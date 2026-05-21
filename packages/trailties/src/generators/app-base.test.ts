@@ -3,52 +3,41 @@ import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {}
 const build = (o: Partial<AppBaseOptions> = {}) =>
-  new T({ cwd: "/tmp/x", output: () => {}, appPath: "myapp", ...o });
+  new T({ cwd: "/work", output: () => {}, appPath: "blog", ...o });
 
 describe("AppBase", () => {
-  it("defaults to sqlite3 with keeps and system tests", () => {
+  it("defaults: sqlite3, keeps, system tests, destinationRoot joins cwd+appPath", () => {
     const g = build();
     expect(g.sqlite3()).toBe(true);
     expect(g.database.name).toBe("sqlite3");
     expect(g.keeps()).toBe(true);
     expect(g.dependsOnSystemTest()).toBe(true);
+    expect(g.destinationRoot).toBe("/work/blog");
+    expect(g.cwd).toBe("/work/blog");
+    expect(build({ appPath: "/abs/blog" }).destinationRoot).toBe("/abs/blog");
   });
 
-  it("skip(what) reads skip<What> options", () => {
+  it("skip(what), devcontainer, postgres delegate", () => {
     const g = build({ skipActionCable: true, skipKeeps: true, devcontainer: true });
     expect(g.skip("ActionCable")).toBe(true);
     expect(g.keeps()).toBe(false);
     expect(g.devcontainer()).toBe(true);
     expect(g.skipDevcontainer()).toBe(false);
+    expect(build({ database: "postgresql" }).database.name).toBe("postgres");
+    expect(build({ database: "postgresql" }).sqlite3()).toBe(false);
   });
 
-  it("postgres database delegate", () => {
-    const g = build({ database: "postgresql" });
-    expect(g.database.name).toBe("postgres");
-    expect(g.sqlite3()).toBe(false);
-  });
-
-  it("skipActiveRecord implies skipActiveStorage and onward", () => {
+  it("option implications: skipActiveRecord ⇒ skipActiveStorage ⇒ skipActionMailbox/Text", () => {
     const g = build({ skipActiveRecord: true });
     expect(g.skip("ActiveStorage")).toBe(true);
     expect(g.skip("ActionMailbox")).toBe(true);
     expect(g.skip("ActionText")).toBe(true);
-  });
-
-  it("explicit skipActiveStorage=false revokes the implication", () => {
-    const g = build({ skipActiveRecord: true, skipActiveStorage: false });
-    expect(g.skip("ActiveStorage")).toBe(false);
-  });
-
-  it("destinationRoot joins relative appPath, keeps absolute as-is", () => {
-    expect(build({ cwd: "/work", appPath: "blog" }).destinationRoot).toBe("/work/blog");
-    expect(build({ cwd: "/work", appPath: "/elsewhere/blog" }).destinationRoot).toBe(
-      "/elsewhere/blog",
+    expect(build({ skipActiveRecord: true, skipActiveStorage: false }).skip("ActiveStorage")).toBe(
+      false,
     );
-    expect(build({ cwd: "/work", appPath: "blog" }).cwd).toBe("/work/blog");
   });
 
-  it("dependsOnSystemTest false when api or skipTest", () => {
+  it("dependsOnSystemTest false when api or skipTest or skipSystemTest", () => {
     expect(build({ api: true }).dependsOnSystemTest()).toBe(false);
     expect(build({ skipTest: true }).dependsOnSystemTest()).toBe(false);
     expect(build({ skipSystemTest: true }).dependsOnSystemTest()).toBe(false);
