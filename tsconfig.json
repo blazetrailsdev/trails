@@ -19,6 +19,7 @@
   "files": [],
   "references": [
     { "path": "packages/activesupport" },
+    { "path": "packages/tse-compiler" },
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },
     { "path": "packages/trails-tsc" },

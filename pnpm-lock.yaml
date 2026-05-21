@@ -226,6 +226,8 @@ importers:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  packages/tse-compiler: {}
+
   packages/website:
     devDependencies:
       '@sveltejs/adapter-static':
@@ -321,6 +323,9 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../../packages/trailties
+      '@blazetrails/tse-compiler':
+        specifier: workspace:*
+        version: link:../../packages/tse-compiler
 
   scripts/parity:
     dependencies:

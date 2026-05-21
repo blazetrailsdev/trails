@@ -16,6 +16,7 @@
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*"
   }
 }
