@@ -48,25 +48,68 @@ export function stripErb(text: string): { rendered: string; unsupported: boolean
   return { rendered, unsupported: /<%[=#]?[^%]*%>/.test(rendered) };
 }
 
+// Exported under a `*ForTest` alias so the test suite can pin parsing
+// fidelity (merge keys, `_fixture.ignore`, list-form auto-labels, `$LABEL`)
+// without going through `main()`. Internal callers still use `loadRailsYaml`.
+export { loadRailsYaml as loadRailsYamlForTest };
 // prettier-ignore
-function loadRailsYaml(file: string): { ok: true; data: FixtureMap } | { ok: false; reason: Status } {
+function loadRailsYaml(file: string, basename: string): { ok: true; data: FixtureMap } | { ok: false; reason: Status } {
   const raw = readFileSync(file, "utf8");
   const { rendered, unsupported } = stripErb(raw);
   if (unsupported) return { ok: false, reason: "ERB-UNSUPPORTED" };
   let parsed: unknown;
   try {
-    parsed = parseYaml(rendered);
+    parsed = parseYaml(rendered, { merge: true });
   } catch {
     return { ok: false, reason: "YAML-PARSE-ERR" };
   }
   const out: FixtureMap = {};
   if (!parsed || typeof parsed !== "object") return { ok: true, data: out };
-  // YAML !omap → array of single-key maps; otherwise a plain object.
-  const entries = Array.isArray(parsed)
-    ? parsed.flatMap((e) => (e && typeof e === "object" ? Object.entries(e) : []))
-    : Object.entries(parsed as Record<string, unknown>);
+  // Three shapes Rails accepts:
+  //   1) plain map: `label: { col: val }` → Object.entries.
+  //   2) `!omap` (array of single-key maps; labels preserved in source order)
+  //      — Rails opts in via the document tag `--- !omap`. Disambiguates from
+  //      list-form: without the tag, a single-key array entry is a bare row,
+  //      not a labeled entry (e.g. `- settings: { theme: dark }` is one row
+  //      with column `settings`, not an entry labeled `settings`).
+  //   3) list-form (array of bare maps, no label) → Rails auto-labels as
+  //      `<basename>_<index>` via `Fixtures::ClassCache#auto_named_fixtures`.
+  const isOmap = /^---\s*!omap\b/m.test(rendered);
+  let entries: [string, unknown][];
+  if (Array.isArray(parsed)) {
+    const flat: [string, unknown][] = [];
+    parsed.forEach((e, i) => {
+      if (!e || typeof e !== "object") return;
+      const ks = Object.keys(e);
+      if (isOmap && ks.length === 1) flat.push(...(Object.entries(e) as [string, unknown][]));
+      else flat.push([`${basename}_${i}`, e]);
+    });
+    entries = flat;
+  } else entries = Object.entries(parsed as Record<string, unknown>);
+  // `_fixture` is the only YAML metadata key Rails reserves at parse time
+  // (carries `model_class` / `ignore` for `set_fixture_class`). Anchor labels
+  // like `DEFAULTS` (`&NAME`) are *still real fixture rows* — Rails inserts
+  // them unless they're explicitly listed in `_fixture.ignore` (e.g.
+  // `_fixture: { ignore: DEAD_PARROT }` skips only the DEAD_PARROT anchor).
+  // For array-shaped (`!omap`) documents `_fixture` shows up as an entry,
+  // not a top-level key; pull from `entries` so omap fixtures honor `ignore`.
+  const meta = entries.find(([k]) => k === "_fixture")?.[1]
+    ?? (parsed as Record<string, unknown>)._fixture;
+  const ignored = new Set<string>(["_fixture"]);
+  if (meta && typeof meta === "object" && "ignore" in meta) {
+    const ig = (meta as { ignore: unknown }).ignore;
+    if (typeof ig === "string") ignored.add(ig);
+    else if (Array.isArray(ig)) for (const n of ig) if (typeof n === "string") ignored.add(n);
+  }
   for (const [k, v] of entries)
-    if (v && typeof v === "object" && !Array.isArray(v)) out[k] = v as Row;
+    if (v && typeof v === "object" && !Array.isArray(v) && !ignored.has(k))
+      out[k] = v as Row;
+  // Interpolate Rails' `$LABEL` token (the row name) on scalar string values.
+  for (const [name, row] of Object.entries(out)) {
+    for (const [col, val] of Object.entries(row)) {
+      if (typeof val === "string" && val.includes("$LABEL")) row[col] = val.replace(/\$LABEL/g, name); // prettier-ignore
+    }
+  }
   return { ok: true, data: out };
 }
 
@@ -112,6 +155,11 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
     return false;
   }
   if (tsVal === railsVal) return true;
+  // Array-typed columns (postgres `text[]`, etc.) appear as arrays on both
+  // sides; compare structurally so identical contents don't flag.
+  if (Array.isArray(tsVal) && Array.isArray(railsVal)
+    && tsVal.length === railsVal.length && tsVal.every((v, i) => v === railsVal[i]))
+    return true;
   notes.push(`value-differs: ${attr}: ts=${JSON.stringify(tsVal)} rails=${JSON.stringify(railsVal)}`); // prettier-ignore
   return false;
 }
@@ -184,6 +232,47 @@ export function schemaCheck(
   return { ported: true, extras };
 }
 
+/**
+ * Rails fixture loader maps association names to FK columns: `pirate: blackbeard`
+ * → `pirate_id`, `pirate: blackbeard (Pirate)` → `pirate_id` + `pirate_type` for
+ * polymorphic. HABTM keys (`treasures: diamond, sapphire`) populate a join table,
+ * not a column on the host row. The TS side encodes the materialized FK columns
+ * directly. Rewrite the Rails row to canonical TS shape so the per-attr diff
+ * doesn't drown in shorthand-vs-canonical noise.
+ *
+ * Without schema (`columns === null`, i.e. table not yet ported in TEST_SCHEMA)
+ * we can't tell HABTM from a real column the TS side dropped, so we *preserve*
+ * unknown Rails keys verbatim — the downstream per-attr pass surfaces them as
+ * `missing-in-ts` drift instead of silently dropping them. Only when we have a
+ * column list AND the `_id` form is missing do we drop the key as HABTM-like.
+ */
+// prettier-ignore
+export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null): Row {
+  const out: Row = {};
+  // Use Object.hasOwn for the schemaless tsRow probe so prototype keys
+  // (`toString`, `constructor`, …) don't read as columns.
+  const known = (k: string): boolean => (columns ? columns.has(k) : Object.hasOwn(tsRow, k));
+  const hasIdForm = (k: string): boolean =>
+    columns ? columns.has(`${k}_id`) : Object.hasOwn(tsRow, `${k}_id`);
+  for (const [k, v] of Object.entries(railsRow)) {
+    if (known(k)) { out[k] = v; continue; } // prettier-ignore
+    if (hasIdForm(k)) {
+      const idKey = `${k}_id`;
+      if (typeof v === "string") {
+        const m = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(v);
+        if (m) { out[idKey] = m[1]; out[`${k}_type`] = m[2]; }
+        else out[idKey] = v;
+      } else out[idKey] = v as Row[string];
+      continue;
+    }
+    // With a schema: drop as HABTM / unknown association (won't be a column on
+    // this table). Without a schema: keep verbatim so the downstream attr-diff
+    // can surface "missing-in-ts: <k>" — silently dropping would mask drift.
+    if (!columns) out[k] = v;
+  }
+  return out;
+}
+
 // prettier-ignore
 export async function compareFile(yamlBase: string, yamlByTable: Map<string, FixtureMap>, idIndex: Map<string, Map<number, string[]>>, prelimFailure: Status | undefined, schema: Schema = TEST_SCHEMA): Promise<FileResult> {
   const snake = yamlBase.replace(/\.yml$/, "");
@@ -216,13 +305,21 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
   r.schemaPorted = sc.ported;
   r.schemaExtras = sc.extras;
   let anyDiff = sc.extras > 0;
-  for (const [rowName, railsRow] of Object.entries(railsRows)) {
+  const tableShapeForCols = schema[snake] ? tableShape(schema[snake]) : null;
+  const cols: Set<string> | null = tableShapeForCols
+    ? new Set([
+        ...Object.keys(tableShapeForCols.columns),
+        ...(tableShapeForCols.hasImplicitId ? ["id"] : []),
+      ])
+    : null;
+  for (const [rowName, railsRowRaw] of Object.entries(railsRows)) {
     const tsRow = tsRows[rowName];
     if (!tsRow || typeof tsRow !== "object") {
       r.notes.push(`row missing in TS: ${rowName}`);
       anyDiff = true;
       continue;
     }
+    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols);
     r.rowsMatched++;
     if ("id" in railsRow && (!("id" in tsRow) || tsRow.id !== railsRow.id)) {
       r.notes.push(`id-divergence: ${rowName} ts=${String(tsRow.id)} rails=${String(railsRow.id)}`);
@@ -294,7 +391,7 @@ async function main(): Promise<void> {
   const prelim = new Map<string, Status>();
   for (const f of allYamls) {
     const snake = f.replace(/\.yml$/, "");
-    const loaded = loadRailsYaml(path.join(YML_DIR, f));
+    const loaded = loadRailsYaml(path.join(YML_DIR, f), snake);
     if (loaded.ok) yamlByTable.set(snake, loaded.data);
     else prelim.set(snake, loaded.reason);
   }
