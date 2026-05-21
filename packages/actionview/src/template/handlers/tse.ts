@@ -58,6 +58,16 @@ export class Tse implements TemplateHandler {
   static implementation: TseImplementation = compileJs;
 
   /**
+   * Class-level convenience. Mirrors `Handlers::ERB.call` which does
+   * `new.call(template, source)`. `Template::Handlers` registers the
+   * class itself in Rails; calling `Tse.call(template, source)` matches
+   * that protocol without forcing callers to construct an instance.
+   */
+  static call(template: TseTemplate, source: string): string {
+    return new this().call(template, source);
+  }
+
+  /**
    * Streaming render protocol marker. Mirrors
    * `Template::Handlers::ERB#supports_streaming?`.
    */

@@ -91,6 +91,11 @@ describe("Template::Handlers::Tse", () => {
     expect(calls).toEqual([{ source: "src", escapeIgnore: true }]);
   });
 
+  it("Tse.call mirrors `Handlers::ERB.call` and delegates to a fresh instance", () => {
+    const code = Tse.call({ type: "text/html" }, "<%= name %>");
+    expect(code).toMatch(/_ob\.append\(name\)/);
+  });
+
   it("registers against the .tse extension via Template::Handlers", () => {
     const tse = new Tse();
     TemplateHandlers.registerTemplateHandler("tse", tse);
