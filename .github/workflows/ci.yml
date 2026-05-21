@@ -38,6 +38,10 @@ jobs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
       actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
+      actionview_affected: ${{ steps.filter.outputs.actionview_affected }}
+      trailties_affected: ${{ steps.filter.outputs.trailties_affected }}
+      trails_tsc_affected: ${{ steps.filter.outputs.trails_tsc_affected }}
+      tse_compiler_affected: ${{ steps.filter.outputs.tse_compiler_affected }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
@@ -73,14 +77,43 @@ jobs:
           # here affects all packages: workspace topology, root tooling
           # config, shared scripts, this workflow, composite actions.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
-          AR_PKGS_RE='^packages/(activerecord|arel|activemodel|activesupport|globalid)/'
+          # AR workspace deps: arel/activemodel/activesupport/globalid/
+          # did-you-mean (per packages/activerecord/package.json). Also
+          # consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
+          # CLI + type-virtualization modules (see packages/activerecord/src/
+          # tsc-wrapper, schema-columns-dump.test.ts), so trails-tsc changes
+          # can fail AR vitest suites — include it in the gate.
+          AR_PKGS_RE='^packages/(activerecord|arel|activemodel|activesupport|globalid|did-you-mean|trails-tsc)/'
           # actionpack_affected gates actionpack-tests. True for actionpack +
-          # its runtime deps (actionview/activemodel/activesupport/rack).
-          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack)/'
+          # its runtime deps (actionview/activemodel/activesupport/rack/did-you-mean).
+          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
+          # actionview_affected gates actionview-tests. ActionView's only
+          # workspace dependency is activesupport (see actionview/package.json).
+          AV_PKGS_RE='^packages/(actionview|activesupport)/'
+          # trailties_affected gates trailties-tests. Trailties consumes
+          # actionpack/actionview/activerecord/rack/activesupport, so any of
+          # their workspace upstreams also flips this on.
+          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activemodel|activesupport|globalid|rack|did-you-mean|trails-tsc)/'
+          # trails_tsc_affected gates the virtualized DX type tests.
+          # Workspace consumers of @blazetrails/trails-tsc today: activerecord
+          # (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
+          # AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
+          TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
+          # tse_compiler_affected gates tse-compiler-tests. The package has
+          # no workspace dependencies today (no activesupport import), so
+          # the gate matches the package path only.
+          TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
+          force_all_affected() {
+            echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
+            echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
+            echo "actionview_affected=true"   >> "$GITHUB_OUTPUT"
+            echo "trailties_affected=true"    >> "$GITHUB_OUTPUT"
+            echo "trails_tsc_affected=true"   >> "$GITHUB_OUTPUT"
+            echo "tse_compiler_affected=true" >> "$GITHUB_OUTPUT"
+          }
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
-            echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
+            force_all_affected
           # Triple-dot: diff against the merge-base of $base and $head, not
           # against the current tip of the base branch. Using `$base $head`
           # would also include every commit merged to main since this branch
@@ -89,8 +122,7 @@ jobs:
           elif ! files=$(git diff --name-only "$base"..."$head" 2>/dev/null); then
             echo "git diff failed (base may be unreachable after force-push) — running full matrix"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
-            echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
+            force_all_affected
           else
             echo "Changed files:"
             echo "$files"
@@ -105,27 +137,36 @@ jobs:
             else
               echo "docs_only=true" >> "$GITHUB_OUTPUT"
             fi
-            # On push to main / schedule / workflow_dispatch always run everything.
+            # On push to main / schedule / workflow_dispatch force every
+            # package gate true. Downstream jobs still honor docs_only, so a
+            # docs-only push to main still short-circuits the matrix.
             case "${{ github.event_name }}" in
               push|schedule|workflow_dispatch)
-                echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
-                echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
+                force_all_affected
                 ;;
               *)
                 if [ -z "$files" ]; then
                   echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
-                  echo "actionpack_affected=false" >> "$GITHUB_OUTPUT"
+                  echo "actionpack_affected=false"   >> "$GITHUB_OUTPUT"
+                  echo "actionview_affected=false"   >> "$GITHUB_OUTPUT"
+                  echo "trailties_affected=false"    >> "$GITHUB_OUTPUT"
+                  echo "trails_tsc_affected=false"   >> "$GITHUB_OUTPUT"
+                  echo "tse_compiler_affected=false" >> "$GITHUB_OUTPUT"
                 else
-                  if echo "$files" | grep -qE "$INFRA_RE|$AR_PKGS_RE"; then
-                    echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
-                  fi
-                  if echo "$files" | grep -qE "$INFRA_RE|$AP_PKGS_RE"; then
-                    echo "actionpack_affected=true" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "actionpack_affected=false" >> "$GITHUB_OUTPUT"
-                  fi
+                  set_gate() {
+                    local name="$1" re="$2"
+                    if echo "$files" | grep -qE "$INFRA_RE|$re"; then
+                      echo "${name}=true"  >> "$GITHUB_OUTPUT"
+                    else
+                      echo "${name}=false" >> "$GITHUB_OUTPUT"
+                    fi
+                  }
+                  set_gate activerecord_affected "$AR_PKGS_RE"
+                  set_gate actionpack_affected   "$AP_PKGS_RE"
+                  set_gate actionview_affected   "$AV_PKGS_RE"
+                  set_gate trailties_affected    "$TRAILTIES_PKGS_RE"
+                  set_gate trails_tsc_affected   "$TRAILS_TSC_PKGS_RE"
+                  set_gate tse_compiler_affected "$TSE_COMPILER_PKGS_RE"
                 fi
                 ;;
             esac
@@ -227,7 +268,10 @@ jobs:
   virtualized-dx-type-tests:
     name: Virtualized DX Type Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.activerecord_affected == 'true' ||
+       needs.changes.outputs.trails_tsc_affected == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -264,7 +308,6 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/rack
-          packages/trailties
           scripts/guides-typecheck
 
   actionpack-tests:
@@ -284,7 +327,9 @@ jobs:
   actionview-tests:
     name: Action View Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.actionview_affected == 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
@@ -292,6 +337,34 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm vitest run packages/actionview
+
+  trailties-tests:
+    name: Trailties Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.trailties_affected == 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run packages/trailties
+
+  tse-compiler-tests:
+    name: TSE Compiler Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.tse_compiler_affected == 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run packages/tse-compiler
 
   sqlite-tests:
     name: SQLite Tests
@@ -735,6 +808,8 @@ jobs:
       - unit-tests
       - actionpack-tests
       - actionview-tests
+      - trailties-tests
+      - tse-compiler-tests
       - sqlite-tests
       - postgres-tests
       - mariadb-tests
@@ -757,6 +832,10 @@ jobs:
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           AR_AFFECTED: ${{ needs.changes.outputs.activerecord_affected }}
           AP_AFFECTED: ${{ needs.changes.outputs.actionpack_affected }}
+          AV_AFFECTED: ${{ needs.changes.outputs.actionview_affected }}
+          TRAILTIES_AFFECTED: ${{ needs.changes.outputs.trailties_affected }}
+          TRAILS_TSC_AFFECTED: ${{ needs.changes.outputs.trails_tsc_affected }}
+          TSE_COMPILER_AFFECTED: ${{ needs.changes.outputs.tse_compiler_affected }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
@@ -794,13 +873,28 @@ jobs:
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
                   [ "$AP_AFFECTED" = "false" ] && continue
                   ;;
+                actionview-tests)
+                  [ "$AV_AFFECTED" = "false" ] && continue
+                  ;;
+                trailties-tests)
+                  [ "$TRAILTIES_AFFECTED" = "false" ] && continue
+                  ;;
+                tse-compiler-tests)
+                  [ "$TSE_COMPILER_AFFECTED" = "false" ] && continue
+                  ;;
+                virtualized-dx-type-tests)
+                  # Legitimate skip when neither activerecord nor trails-tsc paths changed.
+                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
                 schema-parity-rails|schema-parity-trails|schema-parity-diff|\
                 query-parity-frozen-at|query-parity-rails|query-parity-trails|query-parity-diff)
                   # Parity skip is legitimate when no parity gate is on.
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
