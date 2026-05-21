@@ -2,11 +2,11 @@ import { GeneratorBase, GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
 // AppGenerator currently scaffolds dbConfig templates only for the three
-// CLI-exposed adapters. Trilogy and the MariaDB variants exist in
-// `database.ts` for parity with Rails' Database hierarchy, but rendering
-// templates for them is deferred to PR 1.14d alongside the AppBase
-// rewrite. Keeping the surface narrow here prevents producing an app
-// scaffold whose `package.json` and `database.ts` disagree.
+// CLI-exposed adapters. The MariaDB-via-mysql2 variant exists in
+// `database.ts` but rendering a template for it is deferred to PR 1.14d
+// alongside the AppBase rewrite. Keeping the surface narrow here
+// prevents producing an app scaffold whose `package.json` and
+// `database.ts` disagree.
 const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
   postgres: "postgresql",

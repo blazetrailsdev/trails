@@ -1,30 +1,14 @@
 import { describe, it, expect } from "vitest";
-import {
-  Database,
-  MySQL2,
-  PostgreSQL,
-  SQLite3,
-  Trilogy,
-  MariaDBMySQL2,
-  MariaDBTrilogy,
-} from "./database.js";
+import { Database, MySQL2, PostgreSQL, SQLite3, MariaDBMySQL2 } from "./database.js";
 
 describe("Database", () => {
   it("build dispatches on name and defaults to sqlite3", () => {
     expect(Database.build("mysql")).toBeInstanceOf(MySQL2);
     expect(Database.build("postgresql")).toBeInstanceOf(PostgreSQL);
     expect(Database.build("sqlite3")).toBeInstanceOf(SQLite3);
-    expect(Database.build("trilogy")).toBeInstanceOf(Trilogy);
     expect(Database.build("mariadb-mysql")).toBeInstanceOf(MariaDBMySQL2);
-    expect(Database.build("mariadb-trilogy")).toBeInstanceOf(MariaDBTrilogy);
     expect(Database.build("unknown")).toBeInstanceOf(SQLite3);
-    expect(Database.all().map((d) => d.name)).toEqual([
-      "mysql",
-      "postgres",
-      "sqlite3",
-      "mariadb",
-      "mariadb",
-    ]);
+    expect(Database.all().map((d) => d.name)).toEqual(["mysql", "postgres", "sqlite3", "mariadb"]);
   });
 
   it("each adapter exposes packages, service, feature, volume", () => {
@@ -43,13 +27,9 @@ describe("Database", () => {
     expect(sl.pkgDependency.name).toBe("better-sqlite3");
   });
 
-  it("trilogy and mariadb variants inherit and override", () => {
-    const tr = new Trilogy();
-    expect(tr.service?.image).toBe("mysql/mysql-server:8.0");
-    expect(tr.pkgDependency.name).toBe("trilogy");
-    expect(tr.basePackage).toBeUndefined();
+  it("mariadb variant overrides name and service", () => {
     expect(new MariaDBMySQL2().name).toBe("mariadb");
     expect(new MariaDBMySQL2().service?.image).toBe("mariadb:10.5");
-    expect(new MariaDBTrilogy().pkgDependency.name).toBe("trilogy");
+    expect(new MariaDBMySQL2().pkgDependency.name).toBe("mysql2");
   });
 });

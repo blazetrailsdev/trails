@@ -1,17 +1,11 @@
 // Mirrors railties/lib/rails/generators/database.rb. Ports the Database
 // class hierarchy with npm-flavored substitutions (Rails `gem` →
 // `pkgDependency`, base/build packages map to apt packages used in the
-// Dockerfile template). Rails uses method definitions; we use readonly
-// class fields for compactness — behavior is identical.
+// Dockerfile template). Trilogy is intentionally omitted — it's a
+// Ruby-only mysql driver with no Node equivalent — so the set here is
+// mysql / postgresql / sqlite3 plus the MariaDB-via-mysql2 variant.
 
-export const DATABASES = [
-  "mysql",
-  "trilogy",
-  "postgresql",
-  "sqlite3",
-  "mariadb-mysql",
-  "mariadb-trilogy",
-] as const;
+export const DATABASES = ["mysql", "postgresql", "sqlite3", "mariadb-mysql"] as const;
 export type DatabaseName = (typeof DATABASES)[number];
 
 export interface PkgDependency {
@@ -34,9 +28,8 @@ export abstract class Database {
    * the `Database.build` argument or `DatabaseName`: Rails deliberately
    * exposes `"postgres"` (not `"postgresql"`) so the Docker volume,
    * service image, and devcontainer feature share an identifier, while
-   * Trilogy keeps `"mysql"` (via `include MySQL`) and the MariaDB
-   * variants surface `"mariadb"`. Use `Database.build(name)` for the
-   * adapter id; use `db.name` for service-layer identity.
+   * the MariaDB variant surfaces `"mariadb"`. Use `Database.build(name)`
+   * for the adapter id; use `db.name` for service-layer identity.
    */
   abstract readonly name: string;
   abstract readonly template: string;
@@ -62,32 +55,17 @@ export abstract class Database {
         return new MySQL2();
       case "postgresql":
         return new PostgreSQL();
-      case "trilogy":
-        return new Trilogy();
       case "sqlite3":
         return new SQLite3();
       case "mariadb-mysql":
         return new MariaDBMySQL2();
-      case "mariadb-trilogy":
-        return new MariaDBTrilogy();
       default:
         return new SQLite3();
     }
   }
 
-  // Mirrors Rails' Database.all in railties/lib/rails/generators/database.rb:
-  // intentionally returns five adapters and excludes plain Trilogy — Rails
-  // ships Trilogy in DATABASES (`rails new -d trilogy`) but does not list
-  // it among the introspectable adapters returned here. Do not derive this
-  // from DATABASES.
   static all(): Database[] {
-    return [
-      new MySQL2(),
-      new PostgreSQL(),
-      new SQLite3(),
-      new MariaDBMySQL2(),
-      new MariaDBTrilogy(),
-    ];
+    return [new MySQL2(), new PostgreSQL(), new SQLite3(), new MariaDBMySQL2()];
   }
 }
 
@@ -137,14 +115,6 @@ export class PostgreSQL extends Database {
   };
 }
 
-export class Trilogy extends MySQL2 {
-  override readonly template = "config/databases/trilogy.yml";
-  override readonly pkgDependency: PkgDependency = { name: "trilogy", version: "^2.7.0" };
-  override readonly basePackage = undefined;
-  override readonly buildPackage = undefined;
-  override readonly featureName = undefined;
-}
-
 export class SQLite3 extends Database {
   readonly name = "sqlite3";
   readonly template = "config/databases/sqlite3.yml";
@@ -154,11 +124,6 @@ export class SQLite3 extends Database {
 }
 
 export class MariaDBMySQL2 extends MySQL2 {
-  override readonly name = "mariadb";
-  override readonly service = mariaDBService;
-}
-
-export class MariaDBTrilogy extends Trilogy {
   override readonly name = "mariadb";
   override readonly service = mariaDBService;
 }
