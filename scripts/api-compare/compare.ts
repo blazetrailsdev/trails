@@ -246,10 +246,13 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
 //   too generic in TS, so the flattened class keeps the `Model` prefix.
 // - `Railtie` → `Trailtie`: Trails railties are not Rails::Railtie subclasses;
 //   the pun name signals that distinction across all packages.
+// - `Rails` → `Trails`: top-level `module Rails` in `railties/lib/rails.rb`
+//   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
 // - `Registry` → `TypeRegistry`: same rationale for `ActiveModel::Type::Registry`.
 const TS_CLASS_RENAMES: Record<string, string> = {
   Name: "ModelName",
   Railtie: "Trailtie",
+  Rails: "Trails",
   Registry: "TypeRegistry",
 };
 

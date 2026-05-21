@@ -31,6 +31,9 @@ import {
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
+import { Trails } from "./rails.js";
+import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
+import { bodyToString } from "@blazetrails/rack";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
@@ -205,6 +208,25 @@ describe("Application", () => {
   });
 });
 
+describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
+  afterEach(() => {
+    Trails.application = null;
+  });
+
+  it("initializes a registered Application subclass and serves a route through actionpack", async () => {
+    Application.register(HelloWorldApp);
+    expect(Trails.application).toBeInstanceOf(HelloWorldApp);
+    await Trails.initialize();
+    expect(Trails.initialized()).toBe(true);
+    const [status, , body] = await buildRoutes().call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/hello",
+    });
+    expect(status).toBe(200);
+    expect(await bodyToString(body)).toBe("hello world");
+  });
+});
+
 describe("Application::Configuration", () => {
   it("defaults match Rails::Application::Configuration#initialize", () => {
     const c = new Configuration();
@@ -230,6 +252,13 @@ describe("Application::Configuration", () => {
     expect(c.addAutoloadPathsToLoadPath).toBe(true);
     expect(c.encoding).toBe("utf-8");
     expect(c.requireMasterKey).toBe(false);
+  });
+
+  it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
+    // Rails: application/configuration.rb#paths adds public, tmp, log, etc.
+    // Trails only ports `public` today (the rest follow in PR 2.7-followups).
+    const c = new Configuration();
+    expect(c.paths().get("public")).toBeDefined();
   });
 
   it("config.enable_reloading is !config.cache_classes", () => {
