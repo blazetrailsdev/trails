@@ -1,4 +1,4 @@
-import { ref, tsClass } from "./index.js";
+import { ref, tsClass } from "@blazetrails/trailties/template-builder";
 
 // `extends` must be a Ref, not a string. The Ref brand is module-private,
 // so a string literal cannot satisfy the type — this is the load-bearing

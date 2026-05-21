@@ -195,6 +195,25 @@ describe("template-builder", () => {
     assertNoRubySource(out);
   });
 
+  it("sanitizes JSDoc comments against terminator-injection", () => {
+    const out = tsModule({
+      declarations: [
+        tsClass({
+          name: "C",
+          body: [
+            tsField("a", "string", { comment: "evil */ injected" }),
+            tsField("b", "string", { comment: "first line\nsecond line" }),
+          ],
+        }),
+      ],
+    });
+    expect(out).not.toMatch(/evil \*\/ injected/);
+    expect(out).toContain("evil *\\/ injected");
+    expect(out).toContain("   * first line");
+    expect(out).toContain("   * second line");
+    expect(parseTs(out).diagnostics).toEqual([]);
+  });
+
   it("assertNoRubySource flags Ruby class/module/def lines", () => {
     expect(() => assertNoRubySource("class User < Base\nend")).toThrow();
     expect(() => assertNoRubySource("module Foo\nend")).toThrow();

@@ -19,11 +19,20 @@ export function emitType(t: FieldType): { text: string; refs: Ref[] } {
   return { text: t.text, refs: [...t.refs] };
 }
 
+function emitJsDoc(comment: string): string {
+  // Neutralize comment terminator and split on newlines so the JSDoc block
+  // cannot be broken out of by user-supplied text.
+  const safe = comment.replace(/\*\//g, "*\\/");
+  const lines = safe.split("\n");
+  if (lines.length === 1) return `/** ${lines[0]} */\n  `;
+  return `/**\n${lines.map((l) => `   * ${l}`).join("\n")}\n   */\n  `;
+}
+
 export function emitField(f: Field): { text: string; refs: Ref[] } {
   const t = emitType(f.type);
   const opt = f.nullable ? "?" : "";
   const init = f.initializer ? ` = ${f.initializer}` : "";
-  const head = f.comment ? `/** ${f.comment} */\n  ` : "";
+  const head = f.comment ? emitJsDoc(f.comment) : "";
   return { text: `${head}${f.name}${opt}: ${t.text}${init};`, refs: t.refs };
 }
 
