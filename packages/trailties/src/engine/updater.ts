@@ -10,7 +10,7 @@
 // {@link setGeneratorFactory}. The PR 1.x `PluginGenerator` port will call
 // `setGeneratorFactory` at module load.
 
-export type UpdaterGenerator = Record<string, (...args: unknown[]) => unknown>;
+export type UpdaterGenerator = Record<string, unknown>;
 export type UpdaterGeneratorFactory = () => UpdaterGenerator;
 
 export class Updater {
