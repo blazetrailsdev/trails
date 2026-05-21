@@ -1722,4 +1722,33 @@ describe("UniquenessValidationTest", () => {
     const t3 = new Topic({ title: "world" });
     expect(await t3.save()).toBe(true);
   });
+
+  // Regression: PostgreSQLAdapter#caseInsensitiveComparison is async (OID
+  // lookup via pg_proc). buildRelation must await it — passing the bare
+  // Promise to Relation#where yields "Unsupported argument type:
+  // [object Promise]". Stubbed here so the contract is exercised without
+  // requiring a live PG connection.
+  it("awaits async adapter.caseInsensitiveComparison without leaking a Promise into where()", async () => {
+    const adp = await freshAdapterValidation2();
+    let wasAwaited = false;
+    (adp as any).caseInsensitiveComparison = async (attribute: any, value: unknown) => {
+      await Promise.resolve();
+      wasAwaited = true;
+      return attribute.lower().eq((attribute.relation as any).lower(value));
+    };
+
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+        this.adapter = adp;
+        this.validatesUniqueness("title", { caseSensitive: false });
+      }
+    }
+
+    await Topic.create({ title: "Hello" });
+    const t2 = new Topic({ title: "HELLO" });
+    expect(await t2.save()).toBe(false);
+    expect(wasAwaited).toBe(true);
+    expect(t2.errors.on("title")).toBeTruthy();
+  });
 });
