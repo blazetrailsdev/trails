@@ -17,7 +17,7 @@ Everything below is what must close (or move to an explicit allow-list)
 first. Cross-referenced to merged PRs and the source finding files under
 `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/`.
 
-### Compare-script enhancements blocking strict mode (~180 LOC total)
+### Compare-script enhancements blocking strict mode (~150 LOC total)
 
 The 8 remaining DIFFs are all `scripts/fixtures-compare/compare.ts`
 gaps, not fixture-data bugs. Per #2228 post-merge findings:
@@ -29,8 +29,9 @@ gaps, not fixture-data bugs. Per #2228 post-merge findings:
    `compareValue`.
 2. **~30 LOC — HABTM key handling.**
    `dead_parrots.deadbird.treasures: [ruby, sapphire]` and
-   `live_parrots.dusty.treasures` are HABTM list-form. canonicalize
-   keeps the key when `columns === null` (STI subclasses report
+   `live_parrots.dusty.treasures` are HABTM list-form.
+   `canonicalizeRailsRow` keeps the key when `columns === null` (STI
+   subclasses report
    `schema:not-ported`); either look up the STI parent's schema or
    drop array-valued association keys.
 3. **~30 LOC — custom `foreign_key:` override map.** `sponsors`:
@@ -106,7 +107,8 @@ break out cleanly as `7a`:
 - `vendor/rails/activerecord/test/cases/encryption/encrypted_fixtures_test.rb`
   — 22 LOC.
 
-Once these land (with the 4 entries still in `unported-files.ts`), the
+Once these land (with the 4 entries still in
+`scripts/api-compare/unported-files.ts`), the
 **~30 LOC PR 7b** flips compare to hard-fail + removes those exclusions.
 
 ### Loader gaps required by ported-but-not-yet-loadable fixtures
