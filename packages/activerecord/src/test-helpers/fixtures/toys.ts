@@ -1,0 +1,18 @@
+// activerecord/test/fixtures/toys.yml
+export const toyFixtureData = {
+  bone: {
+    toy_id: 1,
+    name: "Bone",
+    pet_id: 1,
+  },
+  doll: {
+    toy_id: 2,
+    name: "Doll",
+    pet_id: 2,
+  },
+  bulbuli: {
+    toy_id: 3,
+    name: "Bulbuli",
+    pet_id: 4,
+  },
+};
