@@ -166,15 +166,14 @@ const ENCRYPTION_SCHEMA: Schema = {
   encrypted_book_with_custom_compressors: { name: { type: "string", limit: 1024 } },
   book_that_will_fail_to_encrypt_names: { name: { type: "string", limit: 1024 } },
   encrypted_traffic_light_with_store_states: { state: "text" },
-  // Encrypted binary payloads (ciphertext + IV + auth tag, JSON-wrapped and
-  // base64-encoded) exceed VARCHAR(255) — defineSchema maps `binary` →
-  // VARCHAR on MySQL, which truncates. Rails' fixture schema uses a single
-  // shared `encrypted_books` table with `t.binary :logo` (= BLOB on MySQL);
-  // we approximate with `text` to give MariaDB enough room.
-  encrypted_book_with_binaries: { logo: "text" },
+  // Mirrors Rails' `t.binary :logo` on `encrypted_books`. Maps to BYTEA on
+  // PG and BLOB on MySQL/SQLite via defineSchema's `binary` mapping. A TEXT
+  // column does not round-trip on PG: BinaryData-wrapped ciphertext binds
+  // as bytea and pg stores the `\x{hex}` literal in the TEXT column.
+  encrypted_book_with_binaries: { logo: "binary" },
   encrypted_book_with_serialized_first_binaries: { logo: "text" },
   encrypted_book_with_serialized_second_binaries: { logo: "text" },
-  encrypted_book_with_binary_message_pack_serializeds: { logo: "text" },
+  encrypted_book_with_binary_message_pack_serializeds: { logo: "binary" },
 };
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {

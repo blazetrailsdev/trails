@@ -31,7 +31,6 @@ import { Configurable } from "./configurable.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import { isEncryptedAttribute } from "../encryption.js";
-import { adapterType } from "../test-adapter.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -593,14 +592,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect((await Book.create({ logo: null })).logo).toBeNull();
     expect((await Book.create({ logo: new Uint8Array(0) })).logo).toEqual(new Uint8Array(0));
   });
-  // Phase 9b-2d: PG bytea round-trip of encrypted binary attributes is still
-  // broken even after routing the bind path through `_bindForPg` (BinaryData
-  // → Buffer for node-postgres). Write completes; reload's decrypt fails at
-  // `JSON.parse` on the Latin-1-decoded bytes from PG, meaning the bytes
-  // stored ≠ bytes sent. Needs reproduction against a live PG instance to
-  // diagnose (suspect pg-node param encoding for bytea). Tracked as the
-  // remaining Phase 9b-2 follow-up.
-  it.skipIf(adapterType === "postgres")("binary data can be encrypted uncompressed", async () => {
+  it("binary data can be encrypted uncompressed", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
