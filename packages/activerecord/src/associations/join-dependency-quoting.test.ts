@@ -101,6 +101,41 @@ describe("JoinDependency adapter-aware quoting", () => {
     expect(node!.joinSql).toContain(`"owner_type" = 'Owner'`);
   });
 
+  it("routes JOIN identifiers through the adapter's quoteTableName/quoteColumnName", () => {
+    const tcalls: string[] = [];
+    const ccalls: string[] = [];
+    stubConnection(Owner, {
+      quote: (v: unknown) => `'${String(v)}'`,
+      quoteTableName: (n: string) => (tcalls.push(n), `[T:${n}]`),
+      quoteColumnName: (n: string) => (ccalls.push(n), `[C:${n}]`),
+    } as any);
+
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner);
+    const node = jd.addAssociation("assets");
+    expect(node).not.toBeNull();
+    // Both table and column identifiers in the ON predicate are quoted by the
+    // adapter, not by the ANSI fallback.
+    expect(node!.joinSql).toContain("[T:assets].[C:owner_id] = [T:owners].[C:id]");
+    expect(tcalls).toContain("assets");
+    expect(tcalls).toContain("owners");
+    expect(ccalls).toContain("owner_id");
+    expect(ccalls).toContain("id");
+  });
+
+  it("falls back to the abstract identifier quoter when the adapter lacks quoteTableName/quoteColumnName", () => {
+    // Stub a quote()-only adapter (resolves through _resolveAdapter but has no
+    // identifier-quoting methods). Should still produce ANSI identifiers.
+    stubConnection(Owner, { quote: (v: unknown) => `'${String(v)}'` } as any);
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner);
+    const node = jd.addAssociation("assets");
+    expect(node).not.toBeNull();
+    expect(node!.joinSql).toContain(`"assets"."owner_id" = "owners"."id"`);
+  });
+
   it("propagates non-ConnectionNotDefined errors from connection()", () => {
     stubConnection(Owner, () => {
       throw new Error("pool exhausted");
