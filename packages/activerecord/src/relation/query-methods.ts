@@ -1852,7 +1852,7 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
       return table?.get(attrName) ?? arelSql(attrName);
     }
     const quoted = safeQuoteColumnName(modelClass, attrName);
-    return arelSql(quoted);
+    return new Nodes.SqlLiteral(quoted, { retryable: true });
   });
 }
 
