@@ -1,18 +1,19 @@
-// Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell only:
-// find / findRoot / findRootWithFlag, the paths defaults, and the railties()
-// collection. EngineConfiguration + route mounting → 2.2b; lazy_route_set
-// + updater → 2.2c. See PR description for the Rails-skipped surface.
+// Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell +
+// EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
+// → 2.2c. `env_config`/`endpoint`/`call`/`helpers` → blocked on PR 2.5.
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
+import { EngineConfiguration } from "./engine/configuration.js";
 
 type EngineHost = { _calledFrom?: string; _isolated?: boolean };
 const host = (k: typeof Engine): EngineHost => k as unknown as EngineHost;
 
 export class Engine extends Trailtie {
-  private _paths?: Root;
   private _railtiesCollection?: Trailties;
+  private _allLoadPathsCache?: string[];
+  private _routes?: unknown;
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) host(this)._calledFrom = value;
@@ -72,40 +73,43 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).isolated();
   }
 
+  /** Returns the resolved root, or undefined when `calledFrom` is unset.
+   * Diverges from Rails (which raises) so consumers can construct an
+   * Engine before its source location is known — matches PR 2.2a. */
   async root(): Promise<string | undefined> {
     const klass = this.constructor as typeof Engine;
     const from = klass.calledFrom();
     return from === undefined ? undefined : await klass.findRoot(from);
   }
 
-  // Default paths layout. `.rb` → `.ts`; autoload/eager surface → 2.2b.
+  /** Mirrors `Engine#config` — overrides `Trailtie#config` to return
+   * an `EngineConfiguration` so `middleware`, `paths`, `tableNamePrefix`,
+   * etc. are reachable through the single `config` surface. */
+  override get config(): EngineConfiguration {
+    if (!(this._config instanceof EngineConfiguration))
+      this._config = new EngineConfiguration(null);
+    return this._config as EngineConfiguration;
+  }
+
+  tableNamePrefix(): string | null {
+    return this.config.tableNamePrefix ?? this.defaultTableNamePrefix();
+  }
+
+  /** Implicit fallback when `tableNamePrefix` is unset but `isolated` is on. */
+  private defaultTableNamePrefix(): string | null {
+    return this.isolated() ? `${this.engineName()}_` : null;
+  }
+
+  /** Mirrors `Engine#paths`. Resolves root before delegating to
+   * `EngineConfiguration#paths` so the `Root` instance carries the
+   * expanded root for subsequent `expanded`/`existent` calls. */
   async paths(): Promise<Root> {
-    if (this._paths) return this._paths;
-    const root = (await this.root()) ?? null;
-    const paths = new Root(root);
-    paths.add("app", { glob: "{*,*/concerns}" });
-    paths.add("app/assets", { glob: "*" });
-    paths.add("app/controllers");
-    paths.add("app/channels");
-    paths.add("app/helpers");
-    paths.add("app/models");
-    paths.add("app/mailers");
-    paths.add("app/views");
-    paths.add("lib", { loadPath: true });
-    paths.add("lib/assets", { glob: "*" });
-    paths.add("lib/tasks", { glob: "**/*.rake" });
-    paths.add("config");
-    paths.add("config/initializers", { glob: "**/*.{ts,js}" });
-    paths.add("config/locales", { glob: "**/*.{ts,js,json}" });
-    paths.add("config/routes.ts");
-    paths.add("config/routes", { glob: "**/*.{ts,js}" });
-    paths.add("db");
-    paths.add("db/migrate");
-    paths.add("db/seeds.ts");
-    paths.add("vendor", { loadPath: true });
-    paths.add("vendor/assets", { glob: "*" });
-    if (root !== null) this._paths = paths;
-    return paths;
+    const cfg = this.config;
+    if (cfg.root === null) {
+      const resolved = await this.root();
+      if (resolved !== undefined) cfg.setRoot(resolved);
+    }
+    return cfg.paths();
   }
 
   async helpersPaths(): Promise<string[]> {
@@ -116,6 +120,35 @@ export class Engine extends Trailtie {
   railties(): Trailties {
     if (!this._railtiesCollection) this._railtiesCollection = new Trailties();
     return this._railtiesCollection;
+  }
+
+  /** `Engine#routes(&block)` — undefined when no `routeSetClass` is set. */
+  routes(block?: (this: unknown) => void): unknown {
+    if (!this._routes) {
+      const cfg = this.config;
+      if (!cfg.routeSetClass) return undefined;
+      this._routes = new cfg.routeSetClass(cfg);
+    }
+    const r = this._routes as { append?: (b: (this: unknown) => void) => void };
+    if (block) r.append?.(block);
+    return this._routes;
+  }
+  hasRoutes(): boolean {
+    return this._routes !== undefined;
+  }
+
+  /** @internal Rails `_all_load_paths(add_autoload_paths_to_load_path)`. */
+  async allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
+    if (this._allLoadPathsCache) return this._allLoadPathsCache;
+    const paths = await this.paths();
+    const cfg = this.config;
+    const out = [...(await paths.loadPaths())];
+    if (addAutoloadPathsToLoadPath) {
+      for (const p of cfg.allAutoloadPaths()) out.push(p);
+      for (const p of cfg.allAutoloadOncePaths()) out.push(p);
+    }
+    this._allLoadPathsCache = Array.from(new Set(out));
+    return this._allLoadPathsCache;
   }
 }
 
