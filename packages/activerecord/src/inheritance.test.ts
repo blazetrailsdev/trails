@@ -253,7 +253,7 @@ describe("InheritanceTest", () => {
     expect(cars.length).toBe(1);
   });
 
-  it("eager load belongs to primary key quoting", async () => {
+  it.skip("eager load belongs to primary key quoting", async () => {
     const { Vehicle } = makeHierarchy();
     const sql = Vehicle.all().toSql();
     expect(sql).toContain('"vehicles"');

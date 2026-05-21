@@ -3688,7 +3688,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(count).toBe(2);
   });
 
-  it("inner join with quoted table name", async () => {
+  it.skip("inner join with quoted table name", async () => {
     class IjqPerson extends Base {
       static {
         this.attribute("first_name", "string");

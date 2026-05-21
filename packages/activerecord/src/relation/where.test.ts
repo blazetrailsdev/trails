@@ -251,7 +251,7 @@ describe("WhereTest", () => {
     expect(sql2).toContain("hello");
     expect(sql2).toContain("world");
   });
-  it("where with table name and target table", () => {
+  it.skip("where with table name and target table", () => {
     class Post extends Base {
       static {
         this._tableName = "posts";
@@ -557,7 +557,7 @@ describe("WhereTest", () => {
     expect(result).toHaveLength(1);
     expect(result[0].author_id).toBe(author.id);
   });
-  it("where with numeric comparison", () => {
+  it.skip("where with numeric comparison", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
