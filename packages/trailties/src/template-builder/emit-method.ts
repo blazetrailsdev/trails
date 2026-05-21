@@ -40,16 +40,22 @@ export function emitField(f: Field): EmitResult {
       `tsField "${f.name}": inferType requires an initializer (otherwise the emitted property has no type).`,
     );
   }
-  const t = emitType(f.type);
   const suffix = f.nullable ? "?" : f.definite ? "!" : "";
   const init = f.initializer ? ` = ${f.initializer}` : "";
   const head = f.comment ? emitJsDoc(f.comment) : "";
-  const ann = f.inferType ? "" : `: ${t.text}`;
   const staticPrefix = f.static ? "static " : "";
+  if (f.inferType) {
+    return {
+      text: `${head}${staticPrefix}${f.name}${suffix}${init};`,
+      valueRefs: [],
+      typeRefs: [],
+    };
+  }
+  const t = emitType(f.type);
   return {
-    text: `${head}${staticPrefix}${f.name}${suffix}${ann}${init};`,
+    text: `${head}${staticPrefix}${f.name}${suffix}: ${t.text}${init};`,
     valueRefs: [],
-    typeRefs: f.inferType ? [] : t.refs,
+    typeRefs: t.refs,
   };
 }
 
