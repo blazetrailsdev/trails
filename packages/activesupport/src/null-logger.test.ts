@@ -24,4 +24,16 @@ describe("NullLogger", () => {
     expect(log.warnEnabled).toBe(true);
     expect(log.debugEnabled).toBe(false);
   });
+
+  it("short-circuits add/log without invoking the formatter", () => {
+    const log = nullLogger();
+    let formatterCalls = 0;
+    log.formatter = () => {
+      formatterCalls += 1;
+      return "";
+    };
+    log.info("hot path");
+    log.add(Logger.ERROR, "boom");
+    expect(formatterCalls).toBe(0);
+  });
 });

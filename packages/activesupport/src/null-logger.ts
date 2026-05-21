@@ -2,6 +2,10 @@
  * No-op Logger — discards all output while honoring the Logger interface
  * (level filtering, silence blocks, tagged logging). Used as a safe default
  * before applications wire up real logging (e.g. `Trails.logger` pre-init).
+ *
+ * `add` / `log` short-circuit to avoid formatter calls and
+ * `Temporal.Now.instant()` allocations on the boot hot path; level
+ * predicates (`debugEnabled`, `warnEnabled`, …) still reflect `this.level`.
  */
 import { Logger } from "./logger.js";
 
@@ -10,11 +14,19 @@ export class NullLogger extends Logger {
     super(null);
   }
 
+  override add(_severity: number, _message?: string | null, _progname?: string): boolean {
+    return true;
+  }
+
+  override log(_severity: number, _message?: string | (() => string), _progname?: string): boolean {
+    return true;
+  }
+
   override append(_s: string): void {}
   override close(): void {}
 }
 
-/** Convenience factory matching the `nullStore()` style used elsewhere. */
+/** Convenience factory; equivalent to `new NullLogger()`. */
 export function nullLogger(): NullLogger {
   return new NullLogger();
 }
