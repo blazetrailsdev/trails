@@ -86,6 +86,18 @@ const alias = {
     __dirname,
     "packages/activesupport/src/process-adapter.ts",
   ),
+  "@blazetrails/activesupport/child-process-adapter": path.resolve(
+    __dirname,
+    "packages/activesupport/src/child-process-adapter.ts",
+  ),
+  "@blazetrails/activesupport/fs-adapter": path.resolve(
+    __dirname,
+    "packages/activesupport/src/fs-adapter.ts",
+  ),
+  "@blazetrails/activesupport/encrypted-file": path.resolve(
+    __dirname,
+    "packages/activesupport/src/encrypted-file.ts",
+  ),
   "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
     __dirname,
     "packages/activesupport/src/testing/temporal-helpers.ts",
