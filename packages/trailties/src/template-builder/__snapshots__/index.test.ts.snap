@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`template-builder > emits a valid hand-built module (snapshot + parse + no-Ruby) 1`] = `
+"// auto-generated
+
+import { Base } from "@blazetrails/activerecord";
+
+export class User extends Base {
+  name: string;
+
+  greet(): string {
+    return "hi " + this.name;
+  }
+}
+
+export interface UserShape {
+  name: string;
+}
+"
+`;

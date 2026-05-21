@@ -14,11 +14,31 @@ export default defineConfig({
   resolve: { alias },
   test: {
     include: [],
-    typecheck: {
-      enabled: true,
-      only: true,
-      include: ["packages/activerecord/dx-tests/**/*.test-d.ts"],
-      tsconfig: "./packages/activerecord/dx-tests/tsconfig.json",
-    },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "activerecord",
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ["packages/activerecord/dx-tests/**/*.test-d.ts"],
+            tsconfig: "./packages/activerecord/dx-tests/tsconfig.json",
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "trailties",
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ["packages/trailties/dx-tests/**/*.test-d.ts"],
+            tsconfig: "./packages/trailties/dx-tests/tsconfig.json",
+          },
+        },
+      },
+    ],
   },
 });
