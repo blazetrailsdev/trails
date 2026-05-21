@@ -21,8 +21,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   output: (msg: string) => void;
   protected createdFiles: string[] = [];
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
+  afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
   generate = Actions.generate;
+  git = Actions.git;
+  afterInstall = Actions.afterInstall;
+  rake = Actions.rake;
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;

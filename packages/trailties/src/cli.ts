@@ -13,6 +13,15 @@ import { statsCommand } from "./commands/stats.js";
 import { credentialsCommand } from "./commands/credentials.js";
 import { encryptedCommand } from "./commands/encrypted.js";
 
+export {
+  registerPackageManagerAdapter,
+  packageManagerAdapterConfig,
+  detectPackageManager,
+  getPackageManager,
+  packageManagerInstall,
+  type PackageManagerAdapter,
+} from "./package-manager.js";
+
 export function createProgram(): Command {
   const program = new Command();
 
