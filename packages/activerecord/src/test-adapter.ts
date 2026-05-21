@@ -21,6 +21,7 @@ import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import { SidecarFixtures } from "./test-helpers/sidecar-fixtures.js";
 import {
   clearDdlTrackers,
   getCreatedTables,
@@ -37,6 +38,8 @@ import type { Result } from "./result.js";
 // test-setup-worker-db.ts (a setupFile that runs before this module loads).
 const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
+
+export { SidecarFixtures };
 
 /** Which adapter backend is active. */
 export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
@@ -110,6 +113,25 @@ export interface TestDatabaseAdapter extends DatabaseAdapter {
  */
 export function createTestAdapter(): TestDatabaseAdapter {
   return _factory();
+}
+
+/**
+ * Path 2 sidecar factory: returns the shared real {@link DatabaseAdapter}
+ * directly alongside a fresh {@link SidecarFixtures} handle. Use this
+ * when migrating off the `TestAdapterFixtures` wrapper — callers can
+ * issue DB ops on `adapter` directly (no delegation overhead) and use
+ * `fixtures` for the test-only TX visibility / DDL tracking concerns.
+ *
+ * Additive in sub-PR (a); consumers migrate in sub-PR (b); the wrapper
+ * is deleted in sub-PR (c).
+ *
+ * @internal
+ */
+export function createSidecarTestAdapter(): {
+  adapter: DatabaseAdapter;
+  fixtures: SidecarFixtures;
+} {
+  return { adapter: _sharedAdapter, fixtures: new SidecarFixtures(_sharedAdapter) };
 }
 
 /**
