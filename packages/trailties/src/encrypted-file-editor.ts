@@ -1,10 +1,7 @@
-/**
- * Shared `edit` / `show` flow for the `credentials` and `encrypted` commands.
- * Ports `Rails::Command::Helpers::Editor`. Divergences: no `.gitignore`
- * append, no `validate!` warning (needs EncryptedConfiguration, PR 1.6-pre-b),
- * editor split is whitespace not Shellwords.
- */
-
+// Shared edit/show flow for `credentials` and `encrypted`. Ports
+// Rails::Command::Helpers::Editor. Divergences: no .gitignore append, no
+// validate! warning (needs EncryptedConfiguration, PR 1.6-pre-b), editor
+// split is whitespace not Shellwords.
 import {
   EncryptedFile,
   MissingContentError,
@@ -14,16 +11,11 @@ import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getChildProcessAsync } from "@blazetrails/activesupport/child-process-adapter";
 import { env, stdout, setExitCode } from "@blazetrails/activesupport/process-adapter";
 
-function pickEditor(): string | null {
-  const v = env.VISUAL;
-  if (v && v.length > 0) return v;
-  const e = env.EDITOR;
-  return e && e.length > 0 ? e : null;
-}
+const pickEditor = (): string | null => env.VISUAL || env.EDITOR || null;
 
-function displayEditorHint(): void {
+function displayEditorHint(invocation: string): void {
   stdout.write(
-    'No $VISUAL or $EDITOR to open file in. Assign one like this:\n\n  VISUAL="code --wait" trails credentials edit\n\nFor editors that fork and exit immediately, it\'s important to pass a wait flag;\notherwise, the file will be saved immediately with no chance to edit.\n',
+    `No $VISUAL or $EDITOR to open file in. Assign one like this:\n\n  VISUAL="code --wait" ${invocation}\n\nFor editors that fork and exit immediately, it's important to pass a wait flag;\notherwise, the file will be saved immediately with no chance to edit.\n`,
   );
 }
 
@@ -35,12 +27,12 @@ async function ensureKeyFile(file: EncryptedFile): Promise<void> {
   await fs.writeFile!(file.keyPath, `${EncryptedFile.generateKey()}\n`, { mode: 0o600 });
 }
 
-export async function editEncryptedFile(file: EncryptedFile): Promise<void> {
+export async function editEncryptedFile(file: EncryptedFile, invocation: string): Promise<void> {
   await ensureKeyFile(file);
   const editor = pickEditor();
-  if (editor === null) return displayEditorHint();
+  if (editor === null) return displayEditorHint(invocation);
   const [cmd, ...args] = editor.split(/\s+/).filter((p) => p.length > 0);
-  if (!cmd) return displayEditorHint();
+  if (!cmd) return displayEditorHint(invocation);
   const cp = await getChildProcessAsync();
   try {
     await file.change(async (tmpPath) => {

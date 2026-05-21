@@ -3,14 +3,14 @@ import { writeFileSync } from "node:fs";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/activesupport/process-adapter";
+import { setEnv, setExitCode } from "@blazetrails/activesupport/process-adapter";
 import {
   registerChildProcessAdapter,
   childProcessAdapterConfig,
 } from "@blazetrails/activesupport/child-process-adapter";
-import { editEncryptedFile } from "./encrypted-file-editor.js";
+import { editEncryptedFile, showEncryptedFile } from "./encrypted-file-editor.js";
 
-describe("editEncryptedFile", () => {
+describe("encrypted-file-editor", () => {
   let dir: string, contentPath: string, keyPath: string;
   const saved = { v: "", e: "", a: null as string | null };
   const calls: string[][] = [];
@@ -18,8 +18,8 @@ describe("editEncryptedFile", () => {
   beforeEach(async () => {
     const [fs, path, os] = await Promise.all([getFsAsync(), getPathAsync(), getOsAsync()]);
     dir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}enc-editor-`);
-    contentPath = path.join(dir, "secret.yml.enc");
-    keyPath = path.join(dir, "secret.key");
+    contentPath = path.join(dir, "c.yml.enc");
+    keyPath = path.join(dir, "c.key");
     [saved.v, saved.e, saved.a] = [
       process.env.VISUAL ?? "",
       process.env.EDITOR ?? "",
@@ -27,6 +27,7 @@ describe("editEncryptedFile", () => {
     ];
     setEnv("VISUAL", undefined);
     setEnv("EDITOR", undefined);
+    setExitCode(0);
     calls.length = 0;
     registerChildProcessAdapter("fake", {
       spawnSync: (cmd, args) => (
@@ -45,14 +46,9 @@ describe("editEncryptedFile", () => {
   });
 
   const build = () =>
-    new EncryptedFile({
-      contentPath,
-      keyPath,
-      envKey: "ENC_EDITOR_TEST_KEY",
-      raiseIfMissingKey: true,
-    });
+    new EncryptedFile({ contentPath, keyPath, envKey: "ENC_TEST_KEY", raiseIfMissingKey: true });
 
-  it("generates a key file on first edit when missing", async () => {
+  it("edit generates a key file on first run and re-encrypts editor output", async () => {
     setEnv("EDITOR", "fake");
     registerChildProcessAdapter("write", {
       spawnSync: (_c, args) => (
@@ -62,17 +58,28 @@ describe("editEncryptedFile", () => {
     });
     childProcessAdapterConfig.adapter = "write";
     const file = build();
-    await editEncryptedFile(file);
+    await editEncryptedFile(file, "test edit");
     expect(await (await getFsAsync()).exists!(keyPath)).toBe(true);
     expect(await file.read()).toBe("hello\n");
   });
 
-  it("does nothing when neither $VISUAL nor $EDITOR is set", async () => {
-    await (
-      await getFsAsync()
-    ).writeFile!(keyPath, EncryptedFile.generateKey());
-    await editEncryptedFile(build());
+  it("edit does nothing when neither $VISUAL nor $EDITOR is set", async () => {
+    const fs = await getFsAsync();
+    await fs.writeFile!(keyPath, EncryptedFile.generateKey());
+    await editEncryptedFile(build(), "test edit");
     expect(calls).toHaveLength(0);
-    expect(await (await getFsAsync()).exists!(contentPath)).toBe(false);
+    expect(await fs.exists!(contentPath)).toBe(false);
+  });
+
+  it("show round-trips on success and sets exit 1 when key is absent", async () => {
+    await showEncryptedFile(build(), "missing");
+    expect(process.exitCode).toBe(1);
+    const fs = await getFsAsync();
+    await fs.writeFile!(keyPath, EncryptedFile.generateKey());
+    const f = build();
+    await f.write("payload");
+    setExitCode(0);
+    await showEncryptedFile(f, "missing");
+    expect(process.exitCode).not.toBe(1);
   });
 });

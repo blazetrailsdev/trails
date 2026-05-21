@@ -36,7 +36,7 @@ export function credentialsCommand(): Command {
     .command("edit")
     .description("Open the decrypted credentials in `$VISUAL` or `$EDITOR` for editing")
     .option(...envOpt)
-    .action(async (opts: Opts) => editEncryptedFile(buildFile(opts)));
+    .action(async (opts: Opts) => editEncryptedFile(buildFile(opts), "trails credentials edit"));
 
   cmd
     .command("show")

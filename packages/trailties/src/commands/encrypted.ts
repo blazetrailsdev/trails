@@ -34,7 +34,9 @@ export function encryptedCommand(): Command {
     .command("edit <file>")
     .description("Open the decrypted file in `$VISUAL` or `$EDITOR` for editing")
     .option(...keyOpt)
-    .action(async (file: string, opts: Opts) => editEncryptedFile(buildFile(file, opts)));
+    .action(async (file: string, opts: Opts) =>
+      editEncryptedFile(buildFile(file, opts), `trails encrypted edit ${file}`),
+    );
 
   cmd
     .command("show <file>")
