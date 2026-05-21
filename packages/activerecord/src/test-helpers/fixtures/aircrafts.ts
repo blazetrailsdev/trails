@@ -1,0 +1,11 @@
+// activerecord/test/fixtures/aircrafts.yml
+export const aircraftFixtureData = {
+  no_wheels: {
+    name: "boeing-with-no-wheels",
+    manufactured_at: "2024-01-01",
+  },
+  no_manufactured_at: {
+    name: "boeing-with-no-manufactured-at",
+    wheels_count: 2,
+  },
+};

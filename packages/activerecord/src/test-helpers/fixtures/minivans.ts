@@ -1,0 +1,9 @@
+// activerecord/test/fixtures/minivans.yml
+export const minivanFixtureData = {
+  cool_first: {
+    minivan_id: "m1",
+    name: "my_minivan",
+    speedometer_id: "s1",
+    color: "blue",
+  },
+};

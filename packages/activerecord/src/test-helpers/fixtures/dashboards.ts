@@ -1,0 +1,11 @@
+// activerecord/test/fixtures/dashboards.yml
+export const dashboardFixtureData = {
+  cool_first: {
+    dashboard_id: "d1",
+    name: "my_dashboard",
+  },
+  second: {
+    dashboard_id: "d2",
+    name: "second",
+  },
+};
