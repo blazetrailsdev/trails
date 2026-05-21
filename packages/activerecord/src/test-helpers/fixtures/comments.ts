@@ -74,6 +74,6 @@ export const commentFixtureData = {
     body: "afrase",
     post_id: ref("posts", "sti_post_and_comments"),
     type: "Comment",
-    company_id: ref("companies", "recursive_association_fk"),
+    company: ref("companies", "recursive_association_fk"),
   },
 };

@@ -7,7 +7,7 @@ export const authorFixtureData = {
     name: "David",
     author_address_id: ref("author_addresses", "david_address"),
     author_address_extra_id: ref("author_addresses", "david_address_extra"),
-    owned_essay_id: ref("essays", "a modest proposal"),
+    owned_essay_id: "A Modest Proposal",
     organization_id: "No Such Agency",
   },
   mary: {
