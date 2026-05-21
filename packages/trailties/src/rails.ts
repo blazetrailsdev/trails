@@ -38,9 +38,14 @@ export class Trails {
   }
 
   static get application(): Application | null {
+    // Rails: `@application ||= (app_class.instance if app_class)`. The `||=`
+    // caches the first non-nil result, so a later `Application.appClass =`
+    // does not retroactively change `Trails.application`.
     if (_application) return _application;
     const klass = Application.appClass;
-    return klass ? (klass.instance() as Application) : null;
+    if (!klass) return null;
+    _application = klass.instance() as Application;
+    return _application;
   }
   static set application(app: Application | null) {
     _application = app;
@@ -123,12 +128,27 @@ export class Trails {
    * order.
    */
   static groups(...args: Array<string | Record<string, string[]>>): string[] {
+    // Rails' `extract_options!` only pops a plain Hash; arrays and other
+    // objects fall through as group identifiers. Require a plain Object
+    // prototype (or null) to mirror that.
     const last = args[args.length - 1];
-    const opts = last && typeof last === "object" ? (args.pop() as Record<string, string[]>) : {};
+    const isPlainObject =
+      last !== null &&
+      typeof last === "object" &&
+      !Array.isArray(last) &&
+      (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null);
+    const opts = isPlainObject ? (args.pop() as Record<string, string[]>) : {};
     const env = Trails.env.toString();
     const out: string[] = ["default", env, ...(args as string[])];
+    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`.
+    // Ruby's `String#split(",")` (no -1 limit) drops trailing empty
+    // segments but preserves middle ones — mirror exactly.
     const envGroups = getEnv("TRAILS_GROUPS");
-    if (envGroups) for (const g of envGroups.split(",")) if (g) out.push(g);
+    if (envGroups) {
+      const parts = envGroups.split(",");
+      while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
+      for (const g of parts) out.push(g);
+    }
     for (const [k, envs] of Object.entries(opts)) {
       if (envs.includes(env)) out.push(k);
     }

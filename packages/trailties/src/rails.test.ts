@@ -33,6 +33,17 @@ describe("Trails", () => {
     expect(Trails.application).toBeInstanceOf(MyApp);
   });
 
+  it("Trails.application memoizes the first non-null result (Rails: @application ||= ...)", () => {
+    class MyApp extends Application {}
+    Application.register(MyApp);
+    const first = Trails.application;
+    class OtherApp extends Application {}
+    Application.register(OtherApp);
+    // Even though appClass is now OtherApp, the memoized application sticks.
+    expect(Trails.application).toBe(first);
+    expect(Trails.application).toBeInstanceOf(MyApp);
+  });
+
   it("Trails.application= overrides the appClass-derived instance", () => {
     class MyApp extends Application {}
     Application.register(MyApp);
@@ -94,12 +105,26 @@ describe("Trails", () => {
   });
 
   it("Trails.groups concatenates TRAILS_GROUPS env entries (Rails-faithful: no trim)", () => {
-    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`. No trim,
-    // empty segments dropped. Trails mirrors that on TRAILS_GROUPS.
+    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`. No trim;
+    // Ruby `split(",")` preserves middle empties and drops trailing
+    // empties. Trails mirrors that on TRAILS_GROUPS.
     Trails.env = "development";
     setEnv("TRAILS_GROUPS", "assets,workers");
     try {
       expect(Trails.groups()).toEqual(["default", "development", "assets", "workers"]);
+    } finally {
+      setEnv("TRAILS_GROUPS", undefined);
+    }
+  });
+
+  it("Trails.groups TRAILS_GROUPS drops trailing empties but keeps middle ones (Ruby split semantics)", () => {
+    Trails.env = "development";
+    setEnv("TRAILS_GROUPS", "assets,,workers,,");
+    try {
+      // Trailing two empties dropped; the middle empty between assets and
+      // workers is preserved (matches `"assets,,workers,,".split(",")` in
+      // Ruby → `["assets", "", "workers"]`).
+      expect(Trails.groups()).toEqual(["default", "development", "assets", "", "workers"]);
     } finally {
       setEnv("TRAILS_GROUPS", undefined);
     }
