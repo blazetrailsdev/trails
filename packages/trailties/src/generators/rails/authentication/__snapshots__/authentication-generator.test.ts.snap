@@ -1,24 +1,56 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/channels/application-cable/connection.ts 1`] = `
-"export class Connection {
-  static identifiedBy() {
-    // currentUser
-  }
+exports[`AuthenticationGenerator > matches snapshot for the full TS emit set 1`] = `
+"// === src/app/models/session.ts ===
+import { ApplicationRecord } from "./application-record.js";
 
-  async connect(): Promise<void> {
-    // setCurrentUser || rejectUnauthorizedConnection
-  }
-
-  private async setCurrentUser(): Promise<void> {
-    // Session.findBy(cookies.signed.sessionId)
+export class Session extends ApplicationRecord {
+  static associations() {
+    // belongsTo: User
   }
 }
-"
-`;
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/controllers/concerns/authentication.ts 1`] = `
-"export class Authentication {
+// === src/app/models/user.ts ===
+import { ApplicationRecord } from "./application-record.js";
+
+export class User extends ApplicationRecord {
+  static associations() {
+    // hasSecurePassword; hasMany sessions, dependent: destroy
+  }
+
+  static normalizes() {
+    // emailAddress → e.strip().toLowerCase()
+  }
+}
+
+// === src/app/models/current.ts ===
+import { ActiveSupport } from "@blazetrails/activesupport";
+
+export class Current extends ActiveSupport.CurrentAttributes {
+  static attributes() {
+    // attribute :session
+  }
+}
+
+// === src/app/controllers/sessions-controller.ts ===
+import { ApplicationController } from "../application-controller.js";
+
+export class SessionsController extends ApplicationController {
+  async new_(): Promise<void> {
+    // allowUnauthenticatedAccess only: [new_, create]
+  }
+
+  async create(): Promise<void> {
+    // User.authenticateBy → startNewSessionFor → redirect
+  }
+
+  async destroy(): Promise<void> {
+    // terminateSession → redirect to /session/new
+  }
+}
+
+// === src/app/controllers/concerns/authentication.ts ===
+export class Authentication {
   static includeInto(klass: any) {
     klass.beforeAction?.("requireAuthentication");
     klass.helperMethod?.("authenticated");
@@ -48,11 +80,9 @@ exports[`AuthenticationGenerator > matches snapshot for src/app/controllers/conc
     // Current.session.destroy + cookies.delete
   }
 }
-"
-`;
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/controllers/passwords-controller.ts 1`] = `
-"import { ApplicationController } from "../application-controller.js";
+// === src/app/controllers/passwords-controller.ts ===
+import { ApplicationController } from "../application-controller.js";
 
 export class PasswordsController extends ApplicationController {
   async new_(): Promise<void> {
@@ -75,78 +105,33 @@ export class PasswordsController extends ApplicationController {
     // User.findByPasswordResetTokenBang
   }
 }
-"
-`;
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/controllers/sessions-controller.ts 1`] = `
-"import { ApplicationController } from "../application-controller.js";
-
-export class SessionsController extends ApplicationController {
-  async new_(): Promise<void> {
-    // allowUnauthenticatedAccess only: [new_, create]
+// === src/app/channels/application-cable/connection.ts ===
+export class Connection {
+  static identifiedBy() {
+    // currentUser
   }
 
-  async create(): Promise<void> {
-    // User.authenticateBy → startNewSessionFor → redirect
+  async connect(): Promise<void> {
+    // setCurrentUser || rejectUnauthorizedConnection
   }
 
-  async destroy(): Promise<void> {
-    // terminateSession → redirect to /session/new
+  private async setCurrentUser(): Promise<void> {
+    // Session.findBy(cookies.signed.sessionId)
   }
 }
-"
-`;
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/mailers/passwords-mailer.ts 1`] = `
-"import { ApplicationMailer } from "./application-mailer.js";
+// === src/app/mailers/passwords-mailer.ts ===
+import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
   async reset(user: any): Promise<void> {
     // mail subject: "Reset your password", to: user.emailAddress
   }
 }
-"
-`;
 
-exports[`AuthenticationGenerator > matches snapshot for src/app/models/current.ts 1`] = `
-"import { ActiveSupport } from "@blazetrails/activesupport";
-
-export class Current extends ActiveSupport.CurrentAttributes {
-  static attributes() {
-    // attribute :session
-  }
-}
-"
-`;
-
-exports[`AuthenticationGenerator > matches snapshot for src/app/models/session.ts 1`] = `
-"import { ApplicationRecord } from "./application-record.js";
-
-export class Session extends ApplicationRecord {
-  static associations() {
-    // belongsTo: User
-  }
-}
-"
-`;
-
-exports[`AuthenticationGenerator > matches snapshot for src/app/models/user.ts 1`] = `
-"import { ApplicationRecord } from "./application-record.js";
-
-export class User extends ApplicationRecord {
-  static associations() {
-    // hasSecurePassword; hasMany sessions, dependent: destroy
-  }
-
-  static normalizes() {
-    // emailAddress → e.strip().toLowerCase()
-  }
-}
-"
-`;
-
-exports[`AuthenticationGenerator > matches snapshot for test/mailers/previews/passwords-mailer-preview.ts 1`] = `
-"export class PasswordsMailerPreview {
+// === test/mailers/previews/passwords-mailer-preview.ts ===
+export class PasswordsMailerPreview {
   reset() {
     // TODO: preview PasswordsMailer.reset
   }
