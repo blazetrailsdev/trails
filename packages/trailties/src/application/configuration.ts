@@ -2,7 +2,7 @@
 // `railties/lib/rails/application/configuration.rb`. PR 2.5b: scalar/state
 // defaults only — `loadDefaults(version)` version-dispatch + credentials +
 // `databaseConfiguration` are 2.5c or later.
-import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
+import { EngineConfiguration } from "../engine/configuration.js";
 
 export interface PublicFileServer {
   enabled: boolean;
@@ -18,7 +18,7 @@ type WeekDay = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "fri
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
 /** Mirrors Rails' `Rails::Application::Configuration`. */
-export class Configuration extends TrailtieConfiguration {
+export class Configuration extends EngineConfiguration {
   allowConcurrency: boolean | null = null;
   considerAllRequestsLocal = false;
   filterParameters: Array<string | RegExp> = [];
@@ -49,6 +49,11 @@ export class Configuration extends TrailtieConfiguration {
   railtiesOrder: Array<string | symbol> = ["all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
+  secretKeyBase: string | null = null;
+  credentials: { contentPath: string | null; keyPath: string | null } = {
+    contentPath: null,
+    keyPath: null,
+  };
   disableSandbox = false;
   sandboxByDefault = false;
   encoding = "utf-8";

@@ -1,20 +1,23 @@
-// Port of `Rails::Application` from `railties/lib/rails/application.rb`.
-// PR 2.5a: the Application shell — findRoot, `initialize!` happy path
-// (Bootstrap + inherited Engine/Trailtie chain), `initialized?`, `name`,
-// and the `appClass` accessor that PR 2.6's `Rails.application` reads.
-// Configuration defaults + default middleware stack + Finisher splicing
-// land in PR 2.5b; routes-reloader + config_for + credentials in PR 2.5c.
-// Skipped from upstream (see docs/trailties-plan.md): secrets, eager_load!,
-// assets, sandbox, executor, reloader, autoloaders, helpers_paths, to_app,
-// migration_railties, load_generators, require_environment!, console/
-// runner/generators/server block runners (PR 2.1b Configurable work).
-// Trailties differs from Rails by using `config.ts` as the root flag
-// (trails' rackup analog) and explicit `Application.register(klass)`
-// instead of Ruby's `inherited` hook.
-import { dasherize, getFsAsync, runLoadHooks, underscore } from "@blazetrails/activesupport";
+// Port of `Rails::Application`. PR 2.5c adds routesReloader/configFor/
+// credentials/encrypted/keyGenerator/messageVerifier. Skipped methods
+// listed in docs/trailties-plan.md.
+import {
+  dasherize,
+  EncryptedFile,
+  getEnv,
+  getFsAsync,
+  getPathAsync,
+  runLoadHooks,
+  underscore,
+} from "@blazetrails/activesupport";
+import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import { Bootstrap } from "./application/bootstrap.js";
+import { Configuration } from "./application/configuration.js";
+import { RoutesReloader } from "./application/routes-reloader.js";
+import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 
@@ -24,6 +27,9 @@ const _registered = new WeakSet<typeof Application>();
 
 export class Application extends Engine {
   private _initialized = false;
+  private _routesReloader?: RoutesReloader;
+  private _keyGenerators = new Map<string, CachingKeyGenerator>();
+  private _credentials?: EncryptedFile;
   logger: Logger | null = null;
   cache: CacheStore | null = null;
 
@@ -58,6 +64,11 @@ export class Application extends Engine {
   static async findRoot(from: string): Promise<string> {
     const fs = await getFsAsync();
     return this.findRootWithFlag("config.ts", from, fs.cwd());
+  }
+
+  override get config(): Configuration {
+    if (!(this._config instanceof Configuration)) this._config = new Configuration(null);
+    return this._config as Configuration;
   }
 
   /** Returns true once {@link Application#initialize} has completed. */
@@ -97,4 +108,86 @@ export class Application extends Engine {
     runLoadHooks("after_initialize", this);
     return this;
   }
+
+  routesReloader(): RoutesReloader {
+    return (this._routesReloader ??= new RoutesReloader());
+  }
+
+  /** `config.secretKeyBase` wins, else `SECRET_KEY_BASE` env. */
+  secretKeyBase(): string | null {
+    return this.config.secretKeyBase ?? getEnv("SECRET_KEY_BASE") ?? null;
+  }
+
+  /** 1000 iterations match Rails for cookie compatibility. */
+  keyGenerator(secret: string | null = this.secretKeyBase()): CachingKeyGenerator {
+    if (secret === null) throw new Error("Missing secret_key_base.");
+    let gen = this._keyGenerators.get(secret);
+    if (!gen) {
+      gen = new CachingKeyGenerator(new KeyGenerator(secret, { iterations: 1000 }));
+      this._keyGenerators.set(secret, gen);
+    }
+    return gen;
+  }
+
+  /** Raw 64-byte derived key — Rails feeds `generate_key(salt)` bytes to
+   * HMAC, not hex; required for signed-cookie compatibility. */
+  messageVerifier(name: string): MessageVerifier {
+    return new MessageVerifier(this.keyGenerator().generateKey(name));
+  }
+
+  async credentials(): Promise<EncryptedFile> {
+    if (this._credentials) return this._credentials;
+    const c = this.config.credentials;
+    const def = await defaultCredentialPaths(await this.requireRoot());
+    return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
+      keyPath: c.keyPath ?? def.keyPath,
+    }));
+  }
+
+  /** `contentPath` matches Rails' `encrypted(path, ...)` arg — absolute or
+   * root-relative; both flow through Rails.root.join / path.resolve. */
+  async encrypted(
+    contentPath: string,
+    opts: { keyPath?: string; envKey?: string } = {},
+  ): Promise<EncryptedFile> {
+    const p = await getPathAsync();
+    const root = await this.requireRoot();
+    return new EncryptedFile({
+      contentPath: p.resolve(root, contentPath),
+      keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
+      envKey: opts.envKey ?? "RAILS_MASTER_KEY",
+      raiseIfMissingKey: this.config.requireMasterKey,
+    });
+  }
+
+  /** Trails: only `"database"` — dynamic `import()` of config/database.{ts,js}. */
+  async configFor(name: string, opts: { env?: string } = {}): Promise<DatabaseConfig> {
+    if (name !== "database") {
+      throw new Error(`configFor: only "database" is supported in trailties (got "${name}").`);
+    }
+    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.requireRoot());
+  }
+
+  private async requireRoot(): Promise<string> {
+    return (await this.root()) ?? (await getFsAsync()).cwd();
+  }
+}
+
+async function defaultCredentialPaths(
+  root: string,
+): Promise<{ contentPath: string; keyPath: string }> {
+  const path = await getPathAsync();
+  const fs = await getFsAsync();
+  const env = resolveEnv();
+  const envContent = path.resolve(root, "config", "credentials", `${env}.yml.enc`);
+  if (await fs.exists(envContent)) {
+    return {
+      contentPath: envContent,
+      keyPath: path.resolve(root, "config", "credentials", `${env}.key`),
+    };
+  }
+  return {
+    contentPath: path.resolve(root, "config", "credentials.yml.enc"),
+    keyPath: path.resolve(root, "config", "master.key"),
+  };
 }

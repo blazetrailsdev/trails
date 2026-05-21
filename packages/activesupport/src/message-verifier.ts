@@ -44,12 +44,12 @@ interface VerifyOptions {
 }
 
 export class MessageVerifier {
-  private secret: string;
+  private secret: string | Buffer;
   private digest: string;
   private serializer: Serializer;
   private urlSafe: boolean;
 
-  constructor(secret: string, options: MessageVerifierOptions = {}) {
+  constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
     this.secret = secret;
     this.digest = options.digest ?? "sha1";
     this.serializer = options.serializer ?? JSONSerializer;

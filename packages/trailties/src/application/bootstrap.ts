@@ -60,7 +60,9 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
   if (!this.cache) {
     const store = this.config.cacheStore;
-    this.cache = typeof store === "function" ? store() : (store ?? new NullStore());
+    // Array form (Rails `[:file_store, "tmp/cache/"]`) needs Cache.lookup_store — not ported yet.
+    if (Array.isArray(store)) this.cache = new NullStore();
+    else this.cache = typeof store === "function" ? store() : (store ?? new NullStore());
   }
 });
 

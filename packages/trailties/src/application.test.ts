@@ -310,3 +310,59 @@ describe("Application::DefaultMiddlewareStack", () => {
     expect(app.config.sessionOptions.secure).toBe(true);
   });
 });
+
+describe("Application key/message/credentials wiring", () => {
+  beforeEach(() => resetLoadHooks());
+  afterEach(() => {
+    fsAdapterConfig.adapter = PREV;
+    resetLoadHooks();
+    Application.appClass = null;
+  });
+
+  const setSecret = (app: Application, s: string) => {
+    app.config.secretKeyBase = s;
+  };
+
+  it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
+    expect(new Configuration().credentials).toEqual({ contentPath: null, keyPath: null });
+    expect(new Configuration().secretKeyBase).toBeNull();
+    class A extends Application {}
+    Application.register(A);
+    const app = A.instance();
+    expect(app.routesReloader()).toBe(app.routesReloader());
+    expect(() => app.keyGenerator()).toThrow(/secret_key_base/);
+    setSecret(app, "test-secret");
+    const gen = app.keyGenerator();
+    expect(gen.generateKey("salt", 16)).toBeInstanceOf(Buffer);
+    expect(app.keyGenerator()).toBe(gen);
+    const v = app.messageVerifier("cookies");
+    expect(v.verify(v.generate({ foo: 1 }))).toEqual({ foo: 1 });
+    await expect(app.configFor("exception_notification")).rejects.toThrow(/only "database"/);
+  });
+
+  it("credentials prefers env-specific config/credentials/{env}.yml.enc, else config/credentials.yml.enc", async () => {
+    const b = "/app/config/credentials";
+    installFs(
+      new Set(["/", "/app", "/app/config", b]),
+      new Set(["/app/config.ts", `${b}/development.yml.enc`, `${b}/development.key`]),
+    );
+    class A extends Application {}
+    A.calledFrom("/app");
+    Application.register(A);
+    let f = await A.instance().credentials();
+    expect([f.contentPath, f.keyPath]).toEqual([
+      `${b}/development.yml.enc`,
+      `${b}/development.key`,
+    ]);
+    installFs(new Set(["/", "/o", "/o/config"]), new Set(["/o/config.ts"]));
+    class B extends Application {}
+    B.calledFrom("/o");
+    Application.register(B);
+    f = await B.instance().credentials();
+    expect([f.contentPath, f.keyPath, f.envKey]).toEqual([
+      "/o/config/credentials.yml.enc",
+      "/o/config/master.key",
+      "RAILS_MASTER_KEY",
+    ]);
+  });
+});
