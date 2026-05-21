@@ -207,12 +207,18 @@ const COLUMN_TYPE_MAP_MYSQL: Record<PrimitiveColumnSpec, string> = {
   json: "string",
 };
 
-// SQLite stores temporal types as TEXT; `binary` routes through the native
-// BLOB mapping (inherited from MYSQL) so encrypted binary attributes round-trip.
+// SQLite has type affinity rules but accepts native datetime/date/time/json
+// type names — they store as TEXT/BLOB under the hood while preserving the
+// declared type for schema reflection (so the type registry resolves to
+// SQLiteDateTimeType/DateType/TimeType/JsonType on load). `binary` inherits
+// from `COLUMN_TYPE_MAP_MYSQL` (BLOB).
 /** @internal */
 const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
   ...COLUMN_TYPE_MAP_MYSQL,
-  datetime: "string",
+  datetime: "datetime",
+  date: "date",
+  time: "time",
+  json: "json",
 };
 
 /**
