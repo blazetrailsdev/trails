@@ -593,10 +593,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect((await Book.create({ logo: null })).logo).toBeNull();
     expect((await Book.create({ logo: new Uint8Array(0) })).logo).toEqual(new Uint8Array(0));
   });
-  // Phase 9b-1: PG bytea round-trip of encrypted binary attributes — see
-  // encryptable-record-message-pack-serialized.test.ts for the shared
-  // follow-up. The compressed variant above passes because its assertion
-  // is in-memory only.
+  // Phase 9b-2d: PG bytea round-trip of encrypted binary attributes is still
+  // broken even after routing the bind path through `_bindForPg` (BinaryData
+  // → Buffer for node-postgres). Write completes; reload's decrypt fails at
+  // `JSON.parse` on the Latin-1-decoded bytes from PG, meaning the bytes
+  // stored ≠ bytes sent. Needs reproduction against a live PG instance to
+  // diagnose (suspect pg-node param encoding for bytea). Tracked as the
+  // remaining Phase 9b-2 follow-up.
   it.skipIf(adapterType === "postgres")("binary data can be encrypted uncompressed", async () => {
     const Book = makeEncryptedBookWithBinary(await freshAdapter());
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);

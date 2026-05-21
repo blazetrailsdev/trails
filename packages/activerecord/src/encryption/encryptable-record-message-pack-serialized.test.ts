@@ -31,11 +31,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // Phase 9b-1: PG bytea round-trip for encrypted binary columns produces
-  // invalid JSON in the decryptor. Same Category B follow-up as 9a's SQLite
-  // skips — encryption type/serialize layer needs to route writes through
-  // type.serialize so the encrypted string reaches adapter.quote, not the
-  // EncryptedMessage object. Tracked alongside the 9a follow-up.
+  // Phase 9b-2d: PG bytea round-trip of encrypted binary attributes is still
+  // broken after the bind-path fix in this PR. Write completes; reload's
+  // decrypt fails at `JSON.parse` on the Latin-1-decoded bytes — bytes
+  // stored ≠ bytes sent. Needs reproduction against a live PG instance to
+  // diagnose. Tracked as the remaining Phase 9b-2 follow-up.
   it.skipIf(adapterType === "postgres")(
     "binary data can be serialized with message pack",
     async () => {

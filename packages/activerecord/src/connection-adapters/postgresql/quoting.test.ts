@@ -35,8 +35,13 @@ describe("PostgreSQL quoting", () => {
     expect(quoteIdentifier('foo"bar')).toBe('"foo""bar"');
   });
 
-  it("type casts binary data using the PG binary bind shape", () => {
-    expect(typeCast(new BinaryData("hello"))).toEqual({ value: "hello", format: 1 });
+  it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
+    // node-postgres natively binds Buffer as bytea (hex literal in text mode).
+    // Returning a Buffer preserves bytes 128–255 that the prior
+    // `{ value: value.toString(), format: 1 }` shape corrupted via UTF-8 decode.
+    const cast = typeCast(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])));
+    expect(Buffer.isBuffer(cast)).toBe(true);
+    expect(Array.from(cast as Buffer)).toEqual([0xde, 0xad, 0xbe, 0xef]);
   });
 
   it("quotes PostgreSQL OID wrapper values before delegating other values", () => {
