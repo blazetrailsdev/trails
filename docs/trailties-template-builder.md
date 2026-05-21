@@ -43,8 +43,8 @@ PR T1–T5 below.
 | Imports        | Deduplicated centrally by `tsModule` from collected refs |
 | Method bodies  | `` tsBody`...` `` (dedent + ref-carrying)                |
 | Escape hatches | `{ kind: "raw"; text }` declarations, bounded            |
-| YAML output    | Separate `yamlBuilder` — quoting + scalar disambig only  |
 | JSON output    | `JSON.stringify(value, null, 2)`                         |
+| `compose.yaml` | JSON syntax (YAML 1.2 ⊇ JSON; Compose accepts it)        |
 | Dockerfile     | Raw strings (too small a surface for a builder)          |
 
 The TS builder is **never** reused for non-TS content. This is the
@@ -121,9 +121,6 @@ export interface ModuleSource {
 /** The sole record→source resolver. */
 export function tsModule(src: ModuleSource): string;
 
-/** YAML output (devcontainer / compose.yaml only). Not a full YAML emitter. */
-export function yamlBuilder(value: unknown): string;
-
 /** Test helpers, exported from "@blazetrails/trailties/templates/testing". */
 export function parseTs(source: string): { diagnostics: readonly Diagnostic[] };
 export function assertNoRubySource(text: string): void;
@@ -172,7 +169,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Source:** new.
 
-- `packages/trailties/src/templates/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body,yaml-builder}.ts`
+- `packages/trailties/src/templates/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body}.ts`
 - `packages/trailties/src/templates/testing.ts` — exports `parseTs`, `assertNoRubySource`.
 - Unit tests:
   - Import dedup; default+named in same import; type-only.
@@ -219,14 +216,14 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 ### PR T5 — DevcontainerGenerator (~250 LOC)
 
-**Blocked by:** PR T1 (builder + `yamlBuilder`).
+**Blocked by:** PR T1 (builder).
 
 - `packages/trailties/src/generators/rails/devcontainer/devcontainer-generator.ts`
-- `update_devcontainer_db_host` / `update_devcontainer_db_feature`
-  ports operate on parsed `devcontainer.json` and re-emit via
-  `JSON.stringify(..., null, 2)`.
-- `edit_compose_yaml` port emits a **fresh** `compose.yaml` per database
-  config via `yamlBuilder`. No mutation of an existing compose file.
+- `update_devcontainer_db_host` / `update_devcontainer_db_feature` /
+  `edit_compose_yaml` ports emit `devcontainer.json` AND `compose.yaml`
+  via `JSON.stringify(..., null, 2)`. The `.yaml` extension stays
+  (Compose's filename convention); the contents are JSON syntax, which
+  YAML 1.2 accepts as a strict superset. No YAML emitter needed.
 - `update_application_system_test_case` stays a plain string replace.
 
 ## Resolved decisions
@@ -235,10 +232,10 @@ PR T1 lands alone; T2–T5 parallelize off T1.
    Plain strings accepted only for trivial one-liners; multi-line use is
    linted against.
 2. **Cross-generator imports** — file-local. No shared symbol table.
-3. **Non-TS output** — `yamlBuilder` for YAML (quoting + scalar
-   disambiguation only); `JSON.stringify(..., null, 2)` for JSON;
-   Dockerfile stays raw strings. The TS builder is never reused for
-   non-TS content.
+3. **Non-TS output** — `JSON.stringify(..., null, 2)` for JSON,
+   `devcontainer.json`, and `compose.yaml` contents (YAML 1.2 ⊇ JSON;
+   Docker Compose accepts it). Dockerfile stays raw strings. The TS
+   builder is never reused for non-TS content.
 4. **`.tts` / `.tse` for generators** — not shipping. Re-evaluate when
    any of these is observed in practice: (a) a generator's builder
    emit exceeds ~150 LOC of structural calls and is materially harder

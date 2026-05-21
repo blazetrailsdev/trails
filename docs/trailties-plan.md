@@ -137,10 +137,9 @@ Every PR must pass:
 
 **Scope:**
 
-- `packages/trailties/src/templates/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body,yaml-builder}.ts`.
+- `packages/trailties/src/templates/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body}.ts`.
 - `Ref` (branded `{ kind: "ref"; name: string; from?: string }`), `type` tagged template, `tsImport` family (named / default / type-only), `tsField`, `tsMethod`, `tsBody` (dedent + ref-carrying tagged template), `tsClass`, `tsInterface`, `tsModule`.
 - `tsModule` is the sole record→source resolver. It walks every `Ref` in declarations, dedupes imports, and emits the final file as one string.
-- `yamlBuilder` ships in the same module for devcontainer YAML (quoting + scalar disambiguation only; not a full YAML lib).
 - Unit tests cover: import dedup, default+named in same import, type-only, ref propagation through `type` / `tsBody`, dedent behavior, snapshot golden for a hand-built module, **`extends: "ApplicationRecord"` fails to typecheck** (compile-error assertion via `// @ts-expect-error` in a `*.test-d.ts` file, executed by the existing `test:types` pass).
 
 **Acceptance:**
@@ -193,18 +192,18 @@ the controller emit via T1 primitives.
 
 ### PR T5 — DevcontainerGenerator (~250 LOC) — supersedes prior PR 1.14c-3 scope
 
-**Blocked by:** PR T1 (builder + `yamlBuilder`).
+**Blocked by:** PR T1 (builder).
 
 Resolves the YAML carve-out from open question pre-existing in
 `trailties-plan.md` PR 1.14c-3 entry: emit a fresh `compose.yaml` per
-database config via `yamlBuilder`, not by mutating an existing file.
-Generators must never reuse the TS emitter for non-TS content (hard
-rule from template-builder spec Q3).
+database config — file extension stays `.yaml` (Compose looks for it),
+but the contents are JSON syntax (YAML 1.2 is a strict superset of
+JSON; Docker Compose parses it fine). No YAML emitter, no new infra.
 
 - `packages/trailties/src/generators/rails/devcontainer/devcontainer-generator.ts`
 - `update_devcontainer_db_host` / `update_devcontainer_db_feature` /
-  `edit_compose_yaml` ports use `yamlBuilder` for compose emit and
-  `JSON.stringify(..., null, 2)` for `devcontainer.json`.
+  `edit_compose_yaml` ports emit both `compose.yaml` and
+  `devcontainer.json` via `JSON.stringify(..., null, 2)`.
 - `update_application_system_test_case` stays a plain string replace.
 - **SQLite driver awareness**: when the app was created with
   `--sqlite-driver=node-sqlite`, omit `better-sqlite3` native-build
@@ -290,18 +289,18 @@ it; if not, this PR inlines via T1 primitives.
 > **PR 1.14c-2 (authentication) is replaced by PR T4 above.**
 
 > **PR 1.14c-3 (devcontainer) is superseded by PR T5 above.** YAML carve-out
-> resolved: `yamlBuilder` ships in T1, `compose.yaml` emitted fresh per
-> config (no mutation).
+> resolved: `compose.yaml` contents are JSON syntax (Compose accepts it),
+> emitted fresh per config. No YAML emitter.
 
 ### PR 1.14c-4 — db/system/change generator (~200 LOC)
 
-**Blocked by:** PR T5 (shares devcontainer's `Database` registry usage patterns and `yamlBuilder`).
+**Blocked by:** PR T5 (shares devcontainer's `Database` registry usage patterns and compose-emit conventions).
 
 **Source:** `vendor/rails/railties/lib/rails/generators/rails/db/system/change/change_generator.rb`.
 
 **Node/TS fit:** clean — config-file rewriting via builder; database adapter swap in app skeletons.
 
-**Dependencies:** Database registry (shipped); `yamlBuilder` (T1); the devcontainer prose helpers factored out in T5.
+**Dependencies:** Database registry (shipped); the devcontainer prose helpers factored out in T5.
 
 ### PR 1.14d — `AppGenerator` extends `AppBase` (~250–350 LOC, may split)
 
