@@ -14,6 +14,10 @@
 //   - `method_missing_module` / `ProxyUrlHelpers#optimize_routes_generation?` —
 //     JS has no `method_missing`; the proxy wraps explicit helper methods
 //     instead (see {@link generateUrlHelpers}).
+//   - `def routes; ...; super; end` — trails' `RouteSet#routes` is a private
+//     field (no `attr_reader :routes`), so there is no parent method to wrap.
+//     If `routes` is later exposed as a Rails-shape getter, mirror the
+//     `reloadHook(); super` pattern then.
 import { RouteSet, type DrawCallback } from "@blazetrails/actionpack";
 
 type ReloadHook = () => boolean | undefined;
