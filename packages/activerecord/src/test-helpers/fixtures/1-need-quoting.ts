@@ -1,12 +1,13 @@
 // activerecord/test/fixtures/1_need_quoting.yml
-// YAML list-form fixture (no row labels in Rails); synthesized labels here
-// for the TS loader's row-name map. The Rails file uses bare `- name: Foo`
-// entries, which Rails auto-labels at load time.
+// YAML list-form fixture: Rails auto-labels list-form entries as
+// `<basename>_<index>` (here `1_need_quoting_0`, `1_need_quoting_1`).
+// Mirrored verbatim so fixtures:compare and any test resolving by label
+// sees the same names Rails would.
 export const oneNeedQuotingFixtureData = {
-  foo: {
+  "1_need_quoting_0": {
     name: "Foo",
   },
-  bar: {
+  "1_need_quoting_1": {
     name: "Bar",
   },
 };
