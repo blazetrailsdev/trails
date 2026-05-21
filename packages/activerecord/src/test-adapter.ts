@@ -707,9 +707,9 @@ class SchemaAdapter implements DatabaseAdapter {
   }
 
   get arelVisitor(): Visitors.ToSql | undefined {
-    // Phase 9b-2b: all three adapters now delegate. The dormant
-    // `new Visitors.ToSql` fallback in `Relation#_arelVisitor` is dead
-    // code; Phase 9b-3+4 will delete the fallback and this wrapper class.
+    // Phase 9b-3 deleted the dormant `new Visitors.ToSql` fallback in
+    // `Relation#_arelVisitor`; this wrapper still delegates. Phase 9b-4
+    // (follow-up) will delete this wrapper class entirely.
     return (this.inner as { arelVisitor?: Visitors.ToSql }).arelVisitor;
   }
 

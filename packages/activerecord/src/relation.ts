@@ -3613,9 +3613,15 @@ export class Relation<T extends Base> {
 
   private _arelVisitor(): Visitors.ToSql {
     const adapter = (this._modelClass as any)._adapter as
-      | (Visitors.ArelQuoter & { arelVisitor?: Visitors.ToSql })
-      | null;
-    return adapter?.arelVisitor ?? new Visitors.ToSql(adapter ?? undefined);
+      | { arelVisitor?: Visitors.ToSql }
+      | null
+      | undefined;
+    if (!adapter?.arelVisitor) {
+      throw new Error(
+        "Relation requires a model class with an adapter exposing arelVisitor to compile SQL",
+      );
+    }
+    return adapter.arelVisitor;
   }
 
   /**
