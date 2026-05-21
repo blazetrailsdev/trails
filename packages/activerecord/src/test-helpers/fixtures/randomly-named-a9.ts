@@ -2,10 +2,10 @@
 export const randomlyNamedA9FixtureData = {
   first_instance: {
     some_attribute: "AAA",
-    another_attribute: "000",
+    another_attribute: 0,
   },
   second_instance: {
     some_attribute: "BBB",
-    another_attribute: "999",
+    another_attribute: 999,
   },
 };
