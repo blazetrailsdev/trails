@@ -57,7 +57,7 @@ export function contentFor(
   options?: { flush?: boolean },
   block?: () => unknown,
 ): SafeBuffer | null {
-  if (content !== undefined || block) {
+  if (content != null || block) {
     let opts = options;
     let body: unknown = content;
     if (block) {
