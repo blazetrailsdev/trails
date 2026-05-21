@@ -47,32 +47,53 @@ gaps, not fixture-data bugs. Per #2228 post-merge findings:
 
 ### ERB-UNSUPPORTED files (20 — all 0 rows compared)
 
-These are skipped entirely under soft mode; strict mode will need a
-decision per the list below. From #2208, #2214, #2227 findings:
+These are skipped entirely under soft mode; strict mode needs each
+either parseable by the compare script or covered by an explicit
+allow-list. From #2208, #2214, #2227 findings:
 
-- `pirates.yml`, `mateys.yml`, `parrots_pirates.yml`,
-  `peoples_treasures.yml`, `memberships.yml`, `sharded_blog_posts.yml`,
-  `sharded_blog_posts_tags.yml`, `sharded_comments.yml`,
-  `sharded_tags.yml`, `cpk_order_agreements.yml`, `cpk_order_tags.yml`,
-  `cpk_reviews.yml` — use `<%= FixtureSet.identify(:label) %>` or
-  `<%= composite_identify(...) %>`; the TS port stores the CRC32
-  equivalent via `fixtureId()`. Needs **~30 LOC** in `stripErb` to
-  reverse `identify(:label)` → `fixtureId("label")` and recognize
-  `composite_identify`.
-- `developers.yml`, `paragraphs.yml`, `mixins.yml`, `binaries.yml`,
-  `categories_ordered.yml`, `citations.yml`, `edges.yml`,
-  `vertices.yml` — use loop ERB (`<% (1..N).each %>`,
-  `<%= binary(...) %>`, `<%= 2.weeks.ago.to_fs(:db) %>`). Needs
-  **~30 LOC** loop expander in `stripErb` for the common
-  `<% N.times do |i| %>` / `<% (1..N).each %>` shapes, plus an
-  attr-level skip (rather than file-level) for ERB the comparer
-  can't resolve (#2208 item 3).
+6. **~30 LOC — `stripErb` `FixtureSet.identify` reverse-resolution.**
+   Affects `pirates.yml`, `mateys.yml`, `parrots_pirates.yml`,
+   `peoples_treasures.yml`, `memberships.yml`, `sharded_blog_posts.yml`,
+   `sharded_blog_posts_tags.yml`, `sharded_comments.yml`,
+   `sharded_tags.yml`, `cpk_order_agreements.yml`, `cpk_order_tags.yml`,
+   `cpk_reviews.yml`. These use
+   `<%= FixtureSet.identify(:label) %>` or
+   `<%= composite_identify(...) %>`; the TS port already stores the
+   CRC32-equivalent via `fixtureId()`. Teach `stripErb` to reverse
+   `identify(:label)` → `fixtureId("label")` and to recognize
+   `composite_identify`.
+7. **~30 LOC — `stripErb` simple-loop expander + attr-level skip.**
+   Affects `developers.yml`, `paragraphs.yml`, `mixins.yml`,
+   `binaries.yml`, `categories_ordered.yml`, `citations.yml`,
+   `edges.yml`, `vertices.yml`. These use loop ERB
+   (`<% (1..N).each %>`, `<%= binary(...) %>`,
+   `<%= 2.weeks.ago.to_fs(:db) %>`). Add a loop expander for the
+   common `<% N.times do |i| %>` / `<% (1..N).each %>` shapes, plus
+   an attr-level skip (rather than file-level) for residual
+   non-resolvable ERB (#2208 item 3).
+8. **Fallback (~10 LOC):** if (6)+(7) don't fully clear the 20 in
+   one PR cycle, PR 7b ships with an explicit allow-list
+   (e.g. `scripts/fixtures-compare/erb-allowlist.txt`) so the listed
+   files stay soft while every other status hard-fails.
 
-(6) **~30 LOC — `stripErb` `FixtureSet.identify` reverse-resolution.**
-(7) **~30 LOC — `stripErb` simple-loop expander + attr-level skip.**
-(8) Either (6)+(7) clear the 20 ERB-UNSUPPORTED, OR PR 7 ships with
-an explicit ERB-allow-list (e.g. `scripts/fixtures-compare/erb-allowlist.txt`)
-that keeps the 20 soft while every other status hard-fails.
+### Schema-side residuals (informational column, not a hard-fail blocker)
+
+`pnpm fixtures:compare` reports a `schema:…` token per file independent
+of the MATCH/DIFF status. Today: **`schema — ported=87/102
+extras-flagged=0 (skipped 20)`**. 15 fixtures still report
+`schema:not-ported` — most are STI subclasses sharing a parent table
+(`dead_parrots`, `live_parrots`, `other_*`, `bad_posts`,
+`encrypted_book_that_ignores_cases`) or a singular/plural mismatch
+(`aircrafts.yml` vs `:aircraft`). These are comparator lookup
+quirks, not real schema gaps, and current behavior doesn't hard-fail
+on the schema column. If PR 7b promotes `schema:not-ported` to
+hard-fail, address with:
+
+9. **~15 LOC — STI parent-table lookup + fixture-file → table alias
+   map** in `scripts/fixtures-compare/compare.ts` so STI children
+   pick up the parent's column list and `aircrafts.yml` validates
+   against `TEST_SCHEMA.aircraft`. (#2213.) Otherwise skip and keep
+   the schema column informational.
 
 ### Test-body port (PR 7a — ceiling waiver section, ~1.9k LOC of Ruby)
 
