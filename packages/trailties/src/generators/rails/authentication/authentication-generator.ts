@@ -65,8 +65,6 @@ export class AuthenticationGenerator extends GeneratorBase {
         asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
       ],
     );
-    // ActionCable stub — full Connection extending ActionCable.Connection.Base
-    // lands when @blazetrails/actioncable is ported.
     this.emit("src/app/channels/application-cable/connection.ts", "Connection", undefined, [
       stub("identifiedBy", "// currentUser", { static: true }),
       asyncStub("connect", "// setCurrentUser || rejectUnauthorizedConnection"),
@@ -101,7 +99,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createFile(file, tsModule({ declarations: [cls] }));
   }
 
-  // Anchored on the class declaration; idempotent (a duplicate TS import would be a syntax error).
+  // Anchored on the class declaration; idempotent.
   private configureApplicationController(): void {
     const file = "src/app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
@@ -110,21 +108,18 @@ export class AuthenticationGenerator extends GeneratorBase {
     if (src.includes("Authentication.includeInto(this)")) return;
     const m = src.match(/export\s+class\s+ApplicationController\b[^{]*\{/);
     if (!m || m.index === undefined) return;
-    // Detect any existing `Authentication` named import, regardless of specifier.
     const hasImport = /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
     const at = m.index + m[0].length;
     src = (hasImport ? "" : AUTH_IMPORT) + src.slice(0, at) + STATIC_INIT + src.slice(at);
     this.fs.writeFileSync(full, src);
-    this.output(`      inject  ${file}`);
   }
 
-  // Each route checked independently so a partial pre-existing config converges.
+  // Each route checked independently for partial-config convergence.
   private configureAuthenticationRoutes(): void {
     for (const f of ["src/config/routes.ts", "src/config/routes.js"]) {
       if (!this.fileExists(f)) continue;
       const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
       const lines: string[] = [];
-      // Match `param: "token"` so a token-less pre-existing declaration is still augmented.
       if (!/router\.resources\("passwords"[^)]*param:\s*"token"/.test(src))
         lines.push(`  router.resources("passwords", { param: "token" });`);
       if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
@@ -134,13 +129,12 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 }
 
-// includeInto only wires hooks; full mixin semantics arrive with actionpack.
 const AUTH_CONCERN_METHODS: Method[] = [
   tsMethod({
     name: "includeInto",
     params: [{ name: "klass", type: "any" }],
     static: true,
-    body: tsBody`klass.beforeAction?.("requireAuthentication");\nklass.helperMethod?.("authenticated");`,
+    body: tsBody`klass.beforeAction?.((c: any) => c.requireAuthentication());\nklass.helperMethod?.("authenticated");`,
   }),
   asyncStub("authenticated", "// resumeSession"),
   asyncStub("requireAuthentication", "// resumeSession || requestAuthentication"),
@@ -159,21 +153,19 @@ interface StubOpts {
   param?: string;
   async?: boolean;
 }
-
-function stub(name: string, comment: string, opts: StubOpts = {}): Method {
+function stub(name: string, comment: string, o: StubOpts = {}): Method {
   return tsMethod({
     name,
-    params: opts.param ? [{ name: opts.param, type: "any" }] : [],
-    static: opts.static,
-    visibility: opts.visibility,
-    async: opts.async,
-    returnType: opts.async ? "Promise<void>" : undefined,
+    params: o.param ? [{ name: o.param, type: "any" }] : [],
+    static: o.static,
+    visibility: o.visibility,
+    async: o.async,
+    returnType: o.async ? "Promise<void>" : undefined,
     body: tsBody`${comment}`,
   });
 }
-
-function asyncStub(name: string, comment: string, opts: StubOpts = {}): Method {
-  return stub(name, comment, { ...opts, async: true });
+function asyncStub(name: string, comment: string, o: StubOpts = {}): Method {
+  return stub(name, comment, { ...o, async: true });
 }
 
 const AUTH_IMPORT = `import { Authentication } from "./concerns/authentication.js";\n`;

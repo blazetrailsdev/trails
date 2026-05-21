@@ -86,8 +86,6 @@ describe("AuthenticationGenerator", () => {
     expect(() => makeGen().run()).toThrow(/TypeScript only/);
   });
 
-  // session route already present; passwords route present but token-less;
-  // Authentication import present via extensionless specifier.
   it("partial pre-existing config: only the missing pieces are injected", () => {
     write(
       "src/config/routes.ts",

@@ -52,7 +52,7 @@ export class SessionsController extends ApplicationController {
 === src/app/controllers/concerns/authentication.ts ===
 export class Authentication {
   static includeInto(klass: any) {
-    klass.beforeAction?.("requireAuthentication");
+    klass.beforeAction?.((c: any) => c.requireAuthentication());
     klass.helperMethod?.("authenticated");
   }
 
