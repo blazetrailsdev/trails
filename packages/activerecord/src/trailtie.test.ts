@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie, type ActiveRecordConfig } from "./trailtie.js";
+import { Base } from "./base.js";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
@@ -7,14 +8,20 @@ const { deprecators } = BaseRailtie;
 
 describe("RailtieTest", () => {
   let savedSubclasses: (typeof BaseRailtie)[];
+  let savedConfig: ActiveRecordConfig;
+  let savedTimeZoneAware: boolean;
 
   beforeEach(() => {
     savedSubclasses = [...BaseRailtie.subclasses];
+    savedConfig = { ...(Trailtie.config["activeRecord"] as ActiveRecordConfig) };
+    savedTimeZoneAware = Base.timeZoneAwareAttributes;
   });
 
   afterEach(() => {
     (BaseRailtie.subclasses as (typeof BaseRailtie)[]).length = 0;
     (BaseRailtie.subclasses as (typeof BaseRailtie)[]).push(...savedSubclasses);
+    Trailtie.config["activeRecord"] = savedConfig;
+    Base.timeZoneAwareAttributes = savedTimeZoneAware;
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
     }
@@ -44,5 +51,11 @@ describe("RailtieTest", () => {
     expect(cfg.generateSecureTokenOn).toBe("create");
     expect(cfg.encryption).toEqual({});
     expect(cfg.queues).toEqual({});
+  });
+
+  it("runInitializers enables time_zone_aware_attributes on Base", () => {
+    Base.timeZoneAwareAttributes = false;
+    Trailtie.runInitializers();
+    expect(Base.timeZoneAwareAttributes).toBe(true);
   });
 });

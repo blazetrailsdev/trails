@@ -24,6 +24,7 @@
  * been ported to trails. See docs/trailties-plan.md PR 2.7 follow-ups.
  */
 import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { Base } from "./base.js";
 import { deprecator } from "./deprecator.js";
 import {
   processAction,
@@ -85,6 +86,12 @@ export class Trailtie extends BaseRailtie {
 
     this.initializer("active_record.deprecator", () => {
       BaseRailtie.deprecators["activeRecord"] = deprecator();
+    });
+
+    this.initializer("active_record.initialize_timezone", () => {
+      // Rails: `ActiveSupport.on_load(:active_record) { self.time_zone_aware_attributes = true }`.
+      // The on_load registry isn't ported yet, so apply directly to Base.
+      Base.timeZoneAwareAttributes = true;
     });
   }
 }
