@@ -30,7 +30,7 @@ export function destroyCommand(): Command {
         // user-derived tableName so regex metacharacters can't widen
         // the match.
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const pattern = new RegExp(`create[_-]${escaped}\\.ts$`);
+        const pattern = new RegExp(`create[_-]${escaped}\\.(ts|js)$`);
         for (const f of fs.readdirSync(migrationsDir)) {
           if (pattern.test(f)) {
             removeFile(cwd, `db/migrations/${f}`);
