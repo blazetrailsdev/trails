@@ -1,0 +1,11 @@
+// activerecord/test/fixtures/tasks.yml
+export const taskFixtureData = {
+  first_task: {
+    id: 1,
+    starting: "2005-03-30t06:30:00.00+01:00",
+    ending: "2005-03-30t08:30:00.00+01:00",
+  },
+  another_task: {
+    id: 2,
+  },
+};
