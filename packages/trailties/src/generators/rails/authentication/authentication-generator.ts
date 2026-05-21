@@ -27,6 +27,8 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   run(options: AuthenticationRunOptions = {}): string[] {
+    if (!this.isTypeScript())
+      throw new Error("AuthenticationGenerator currently emits TypeScript only.");
     const { api = false, skipMailer = false } = options;
     this.emit("src/app/models/session.ts", "Session", APP_RECORD, [
       stub("associations", "// belongsTo: User", { static: true }),
@@ -101,36 +103,44 @@ export class AuthenticationGenerator extends GeneratorBase {
     );
   }
 
-  // Rails' inject_into_class re-injects on every run; we skip the second
-  // pass because a duplicate TS `import` declaration is a syntax error.
+  // Anchored on the class declaration (not a stray "}") and idempotent —
+  // Rails' inject_into_class isn't, but a duplicate TS `import` is a syntax error.
   private configureApplicationController(): void {
     const file = "src/app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
     const full = this.path.join(this.cwd, file);
     let src = this.fs.readFileSync(full, "utf-8");
     if (src.includes("Authentication.includeInto(this)")) return;
-    const classRe = /export\s+class\s+ApplicationController\b[^{]*\{/;
-    const m = src.match(classRe);
+    const m = src.match(/export\s+class\s+ApplicationController\b[^{]*\{/);
     if (!m || m.index === undefined) return;
+    const hasImport =
+      /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["']\.\/concerns\/authentication\.js["']/.test(
+        src,
+      );
+    const prefix = hasImport
+      ? ""
+      : `import { Authentication } from "./concerns/authentication.js";\n`;
+    const at = m.index + m[0].length;
     src =
-      `import { Authentication } from "./concerns/authentication.js";\n` +
-      src.slice(0, m.index + m[0].length) +
+      prefix +
+      src.slice(0, at) +
       `\n  static {\n    Authentication.includeInto(this);\n  }` +
-      src.slice(m.index + m[0].length);
+      src.slice(at);
     this.fs.writeFileSync(full, src);
     this.output(`      inject  ${file}`);
   }
 
+  // Each route checked independently so a partially-configured app still
+  // ends up with the missing one(s).
   private configureAuthenticationRoutes(): void {
     for (const f of ["src/config/routes.ts", "src/config/routes.js"]) {
       if (!this.fileExists(f)) continue;
-      const full = this.path.join(this.cwd, f);
-      if (this.fs.readFileSync(full, "utf-8").includes('router.resource("session")')) return;
-      this.insertIntoFile(
-        f,
-        "// routes",
-        `  router.resources("passwords", { param: "token" });\n  router.resource("session");\n`,
-      );
+      const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
+      const lines: string[] = [];
+      if (!src.includes('router.resources("passwords"'))
+        lines.push(`  router.resources("passwords", { param: "token" });`);
+      if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
+      if (lines.length) this.insertIntoFile(f, "// routes", lines.join("\n") + "\n");
       return;
     }
   }

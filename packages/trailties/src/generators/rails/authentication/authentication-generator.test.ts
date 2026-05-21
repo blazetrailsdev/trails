@@ -5,49 +5,37 @@ import * as os from "node:os";
 import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
-const TS_EMIT = [
-  "src/app/models/session.ts",
-  "src/app/models/user.ts",
-  "src/app/models/current.ts",
-  "src/app/controllers/sessions-controller.ts",
-  "src/app/controllers/concerns/authentication.ts",
-  "src/app/controllers/passwords-controller.ts",
-  "src/app/channels/application-cable/connection.ts",
-  "src/app/mailers/passwords-mailer.ts",
-  "test/mailers/previews/passwords-mailer-preview.ts",
-];
-const ALL_EMIT = [
-  ...TS_EMIT,
+// prettier-ignore
+const TS_EMIT = ["src/app/models/session.ts","src/app/models/user.ts","src/app/models/current.ts","src/app/controllers/sessions-controller.ts","src/app/controllers/concerns/authentication.ts","src/app/controllers/passwords-controller.ts","src/app/channels/application-cable/connection.ts","src/app/mailers/passwords-mailer.ts","test/mailers/previews/passwords-mailer-preview.ts"];
+const VIEWS = [
   "src/app/views/passwords-mailer/reset.html.tse",
   "src/app/views/passwords-mailer/reset.text.tse",
 ];
+const APP_CTRL_PATH = "src/app/controllers/application-controller.ts";
+const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n}\n`;
 
 let tmpDir: string;
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
 const makeGen = () => new AuthenticationGenerator({ cwd: tmpDir, output: () => {} });
 
+function write(rel: string, content: string) {
+  const full = path.join(tmpDir, rel);
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, content);
+}
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
-  fs.mkdirSync(path.join(tmpDir, "src/app/controllers"), { recursive: true });
-  fs.mkdirSync(path.join(tmpDir, "src/config"), { recursive: true });
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-  fs.writeFileSync(
-    path.join(tmpDir, "src/app/controllers/application-controller.ts"),
-    `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n}\n`,
-  );
-  fs.writeFileSync(path.join(tmpDir, "src/config/routes.ts"), "// routes\n");
+  write("tsconfig.json", "{}");
+  write(APP_CTRL_PATH, APP_CTRL_EMPTY);
+  write("src/config/routes.ts", "// routes\n");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("AuthenticationGenerator", () => {
-  it("creates the full authentication file set", () => {
+  it("emits the full file set; each .ts file parses + carries no Ruby source", () => {
     makeGen().run();
-    for (const rel of ALL_EMIT) expect(exists(rel), rel).toBe(true);
-  });
-
-  it("emits TypeScript that parses without diagnostics and contains no Ruby source", () => {
-    makeGen().run();
+    for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     for (const rel of TS_EMIT) {
       const src = read(rel);
       expect(parseTs(src).diagnostics, `diagnostics for ${rel}`).toEqual([]);
@@ -76,17 +64,43 @@ describe("AuthenticationGenerator", () => {
     expect(routes).toContain('router.resource("session");');
   });
 
-  it("injects the mixin inside the class even when ApplicationController has a body", () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "src/app/controllers/application-controller.ts"),
-      `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n  async preexisting(): Promise<void> { return; }\n}\n`,
+  it("injects inside the class even when ApplicationController has a body", () => {
+    write(
+      APP_CTRL_PATH,
+      APP_CTRL_EMPTY.replace("{\n}", "{\n  async preexisting(): Promise<void> { return; }\n}"),
     );
     makeGen().run();
-    const ac = read("src/app/controllers/application-controller.ts");
+    const ac = read(APP_CTRL_PATH);
     expect(parseTs(ac).diagnostics).toEqual([]);
-    // A brittle "first }" marker would have landed the injection after
-    // the method's closing brace.
     expect(ac.indexOf("Authentication.includeInto")).toBeLessThan(ac.indexOf("preexisting"));
+  });
+
+  it("no-op for missing application-controller / routes; throws clearly in JS projects", () => {
+    fs.unlinkSync(path.join(tmpDir, APP_CTRL_PATH));
+    fs.unlinkSync(path.join(tmpDir, "src/config/routes.ts"));
+    expect(() => makeGen().run()).not.toThrow();
+    expect(exists("src/app/models/user.ts")).toBe(true);
+    fs.unlinkSync(path.join(tmpDir, "tsconfig.json"));
+    expect(() => makeGen().run()).toThrow(/TypeScript only/);
+  });
+
+  it("partial pre-existing config: only the missing pieces are injected", () => {
+    write("src/config/routes.ts", `// routes\n  router.resource("session");\n`);
+    write(
+      APP_CTRL_PATH,
+      APP_CTRL_EMPTY.replace(
+        "\n\nexport",
+        `\nimport { Authentication } from "./concerns/authentication.js";\n\nexport`,
+      ),
+    );
+    makeGen().run();
+    const routes = read("src/config/routes.ts");
+    expect(routes).toContain('router.resources("passwords", { param: "token" });');
+    expect(routes.match(/router\.resource\("session"\)/g)).toHaveLength(1);
+    const ac = read(APP_CTRL_PATH);
+    expect(ac.match(/import\s+\{\s*Authentication\b/g)).toHaveLength(1);
+    expect(ac).toContain("Authentication.includeInto(this);");
+    expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
   it("is idempotent — re-running does not duplicate imports or routes", () => {
@@ -101,7 +115,6 @@ describe("AuthenticationGenerator", () => {
 
   it("matches snapshot for the full TS emit set", () => {
     makeGen().run();
-    const combined = TS_EMIT.map((rel) => `// === ${rel} ===\n${read(rel)}`).join("\n");
-    expect(combined).toMatchSnapshot();
+    expect(TS_EMIT.map((r) => `// === ${r} ===\n${read(r)}`).join("\n")).toMatchSnapshot();
   });
 });
