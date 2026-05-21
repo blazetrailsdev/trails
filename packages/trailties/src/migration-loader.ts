@@ -25,9 +25,9 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
   }
 
   // Sort the directory listing so dedupe is deterministic regardless of
-  // readdir order. Underscore (`_`, 0x5F) sorts after hyphen (`-`, 0x2D),
-  // so iterating in sorted order means an underscore variant overwrites
-  // the hyphen alias as a deterministic tie-break.
+  // readdir order. Precedence inside the dedupe loop is: extension first
+  // (.ts beats .js), then separator (underscore beats hyphen alias) when
+  // the extensions are equal.
   const rawFiles = fs
     .readdirSync(migrationsDir)
     .filter((f) => MIGRATION_FILE_PATTERN.test(f))
@@ -73,7 +73,10 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
     if (!match) continue;
 
     const version = match[1];
-    const name = match[2];
+    // Canonicalize the proxy name to the underscore form so
+    // Migrator.validate()'s duplicate-name check sees hyphen-alias and
+    // underscore-form migrations as the same logical name.
+    const name = match[2]!.replace(/-/g, "_");
     const filePath = path.join(migrationsDir, file);
 
     proxies.push({
