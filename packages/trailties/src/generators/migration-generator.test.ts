@@ -30,7 +30,7 @@ describe("MigrationGeneratorTest", () => {
     const gen = makeGen();
     const files = gen.run("change_title_body_from_posts", []);
     expect(files.length).toBe(1);
-    expect(files[0]).toMatch(/^db\/migrations\/\d{14}-change-title-body-from-posts\.ts$/);
+    expect(files[0]).toMatch(/^db\/migrations\/\d{14}_change_title_body_from_posts\.ts$/);
     const content = readMigration(files);
     expect(content).toContain("class ChangeTitleBodyFromPosts extends Migration");
   });
@@ -40,8 +40,8 @@ describe("MigrationGeneratorTest", () => {
     const gen2 = makeGen();
     const files1 = gen1.run("change_title_body_from_posts", []);
     const files2 = gen2.run("change_email_from_comments", []);
-    const ts1 = path.basename(files1[0]).split("-")[0];
-    const ts2 = path.basename(files2[0]).split("-")[0];
+    const ts1 = path.basename(files1[0]).split("_")[0];
+    const ts2 = path.basename(files2[0]).split("_")[0];
     expect(ts1).not.toBe(ts2);
   });
 
