@@ -30,8 +30,15 @@ export interface Field {
   name: string;
   type: FieldType;
   nullable?: boolean;
+  definite?: boolean;
   initializer?: string;
   comment?: string;
+  static?: boolean;
+  /**
+   * Omit the `: type` annotation; rely on the initializer for typing.
+   * Requires `initializer` — `emitField` throws otherwise.
+   */
+  inferType?: boolean;
 }
 export interface MethodParam {
   name: string;

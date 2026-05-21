@@ -262,6 +262,39 @@ describe("template-builder", () => {
     expect(parseTs(out).diagnostics).toEqual([]);
   });
 
+  it("supports static, definite, and inferType field opts; empty method body emits {}", () => {
+    const out = tsModule({
+      declarations: [
+        tsClass({
+          name: "M",
+          body: [
+            tsField("version", "string", { static: true, inferType: true, initializer: `"1"` }),
+            tsField("name", "string", { definite: true }),
+            tsMethod({
+              name: "noop",
+              async: true,
+              params: [],
+              returnType: "Promise<void>",
+              body: tsBody``,
+            }),
+          ],
+        }),
+      ],
+    });
+    expect(out).toContain(`  static version = "1";`);
+    expect(out).toContain(`  name!: string;`);
+    expect(out).toContain(`async noop(): Promise<void> {}`);
+    expect(parseTs(out).diagnostics).toEqual([]);
+  });
+
+  it("rejects inferType without an initializer", () => {
+    expect(() =>
+      tsModule({
+        declarations: [tsClass({ name: "C", body: [tsField("v", "string", { inferType: true })] })],
+      }),
+    ).toThrow(/inferType requires an initializer/);
+  });
+
   it("assertNoRubySource flags Ruby class/module/def lines", () => {
     expect(() => assertNoRubySource("class User < Base\nend")).toThrow();
     expect(() => assertNoRubySource("module Foo\nend")).toThrow();

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ResourceRouteGenerator } from "./resource-route-generator.js";
+import { ResourceRouteGenerator, emitResourceRouteSnippet } from "./resource-route-generator.js";
+import { assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
 const mk = (name: string): ResourceRouteGenerator =>
@@ -35,5 +36,13 @@ describe("ResourceRouteGeneratorTest", () => {
   it("skips when actions are present", () => {
     mk("product").addResourceRoute({ actions: ["index"] });
     expect(read()).not.toContain("router.resources");
+  });
+
+  it("snippet matrix (snapshot + no-Ruby)", () => {
+    const flat = emitResourceRouteSnippet([], "products");
+    const nested = emitResourceRouteSnippet(["admin", "users"], "products");
+    expect({ flat, nested }).toMatchSnapshot();
+    assertNoRubySource(flat);
+    assertNoRubySource(nested);
   });
 });

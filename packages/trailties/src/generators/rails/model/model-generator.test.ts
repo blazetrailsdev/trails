@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ModelGenerator } from "./model-generator.js";
+import { ModelGenerator, emitModelSource } from "./model-generator.js";
 import { ModelHelpers } from "../../model-helpers.js";
+import { assertNoRubySource, parseTs } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
 beforeEach(() => {
@@ -40,5 +41,21 @@ describe("ModelGeneratorTest", () => {
     expect(fs.readFileSync(path.join(tmpDir, files[0]!), "utf-8")).toContain(
       "export class AdminUser extends Base",
     );
+  });
+
+  it("emits valid TS over the attribute-type matrix (snapshot + parse + no-Ruby)", () => {
+    const out = emitModelSource("Post", [
+      ["title", "string"],
+      ["views", "number"],
+      ["price", "number"],
+      ["published", "boolean"],
+      ["published_at", "Date"],
+      ["payload", "Uint8Array"],
+      ["author_id", "number"],
+      ["password_digest", "string"],
+    ]);
+    expect(out).toMatchSnapshot();
+    expect(parseTs(out).diagnostics).toEqual([]);
+    assertNoRubySource(out);
   });
 });

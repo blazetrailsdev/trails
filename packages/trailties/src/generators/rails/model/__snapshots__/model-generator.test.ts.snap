@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ModelGeneratorTest > emits valid TS over the attribute-type matrix (snapshot + parse + no-Ruby) 1`] = `
+"import { Base } from "@blazetrails/activerecord";
+
+export class Post extends Base {
+  title!: string;
+
+  views!: number;
+
+  price!: number;
+
+  published!: boolean;
+
+  published_at!: Date;
+
+  payload!: Uint8Array;
+
+  author_id!: number;
+
+  password_digest!: string;
+}
+"
+`;

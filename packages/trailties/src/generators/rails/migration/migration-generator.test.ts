@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { MigrationGenerator } from "./migration-generator.js";
+import { MigrationGenerator, emitMigrationSource } from "./migration-generator.js";
+import { assertNoRubySource, parseTs } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
 beforeEach(() => {
@@ -38,5 +39,12 @@ describe("MigrationGeneratorTest", () => {
 
   it("exit on failure", () => {
     expect(MigrationGenerator.exitOnFailure()).toBe(true);
+  });
+
+  it("emits valid TS (snapshot + parse + no-Ruby)", () => {
+    const out = emitMigrationSource("AddTitleToPosts", "20260521120000");
+    expect(out).toMatchSnapshot();
+    expect(parseTs(out).diagnostics).toEqual([]);
+    assertNoRubySource(out);
   });
 });

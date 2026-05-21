@@ -1,3 +1,11 @@
+import {
+  tsBody,
+  tsClass,
+  tsField,
+  tsImport,
+  tsMethod,
+  tsModule,
+} from "../../../template-builder/index.js";
 import { NamedBase } from "../../named-base.js";
 import { classify, dasherize, migrationTimestamp } from "../../base.js";
 
@@ -6,6 +14,32 @@ import { classify, dasherize, migrationTimestamp } from "../../base.js";
 // minimal Migration shell; CreateX/AddXToY inference lives in the existing
 // top-level MigrationGenerator and folds in when the ORM hook lands.
 let lastTimestamp: string | null = null;
+
+export function emitMigrationSource(className: string, timestamp: string): string {
+  const { refs } = tsImport("@blazetrails/activerecord", { Migration: "named" });
+  return tsModule({
+    declarations: [
+      tsClass({
+        name: className,
+        extends: refs.Migration,
+        body: [
+          tsField("version", "string", {
+            static: true,
+            inferType: true,
+            initializer: `"${timestamp}"`,
+          }),
+          tsMethod({
+            name: "change",
+            async: true,
+            params: [],
+            returnType: "Promise<void>",
+            body: tsBody``,
+          }),
+        ],
+      }),
+    ],
+  });
+}
 
 export class MigrationGenerator extends NamedBase {
   static exitOnFailure(): boolean {
@@ -22,18 +56,7 @@ export class MigrationGenerator extends NamedBase {
     }
     lastTimestamp = timestamp;
     const filename = `db/migrations/${timestamp}-${dasherize(this.fileName)}${this.ext()}`;
-    const className = classify(this.fileName);
-    this.createFile(
-      filename,
-      `import { Migration } from "@blazetrails/activerecord";
-
-export class ${className} extends Migration {
-  static version = "${timestamp}";
-
-  async change(): Promise<void> {}
-}
-`,
-    );
+    this.createFile(filename, emitMigrationSource(classify(this.fileName), timestamp));
     return this.getCreatedFiles();
   }
 }

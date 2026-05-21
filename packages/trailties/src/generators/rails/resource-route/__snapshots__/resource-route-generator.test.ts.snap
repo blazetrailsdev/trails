@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ResourceRouteGeneratorTest > snippet matrix (snapshot + no-Ruby) 1`] = `
+{
+  "flat": "  router.resources("products");
+",
+  "nested": "  router.namespace("admin", (router) => {
+    router.namespace("users", (router) => {
+      router.resources("products");
+    });
+  });
+",
+}
+`;

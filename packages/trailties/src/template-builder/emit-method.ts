@@ -35,12 +35,25 @@ export interface EmitResult {
 }
 
 export function emitField(f: Field): EmitResult {
-  const t = emitType(f.type);
-  const opt = f.nullable ? "?" : "";
+  if (f.inferType && !f.initializer) {
+    throw new Error(
+      `tsField "${f.name}": inferType requires an initializer (otherwise the emitted property has no type).`,
+    );
+  }
+  const suffix = f.nullable ? "?" : f.definite ? "!" : "";
   const init = f.initializer ? ` = ${f.initializer}` : "";
   const head = f.comment ? emitJsDoc(f.comment) : "";
+  const staticPrefix = f.static ? "static " : "";
+  if (f.inferType) {
+    return {
+      text: `${head}${staticPrefix}${f.name}${suffix}${init};`,
+      valueRefs: [],
+      typeRefs: [],
+    };
+  }
+  const t = emitType(f.type);
   return {
-    text: `${head}${f.name}${opt}: ${t.text}${init};`,
+    text: `${head}${staticPrefix}${f.name}${suffix}: ${t.text}${init};`,
     valueRefs: [],
     typeRefs: t.refs,
   };
@@ -59,13 +72,17 @@ export function emitMethod(m: Method): EmitResult {
     typeRefs.push(...t.refs);
     ret = `: ${t.text}`;
   }
-  const indented = m.body.text
-    .split("\n")
-    .map((l) => (l ? `    ${l}` : ""))
-    .join("\n");
   const vis = m.visibility && m.visibility !== "public" ? `${m.visibility} ` : "";
+  const head = `  ${vis}${m.static ? "static " : ""}${m.async ? "async " : ""}${m.name}(${paramTexts.join(", ")})${ret}`;
+  const bodyText =
+    m.body.text === ""
+      ? `${head} {}`
+      : `${head} {\n${m.body.text
+          .split("\n")
+          .map((l) => (l ? `    ${l}` : ""))
+          .join("\n")}\n  }`;
   return {
-    text: `  ${vis}${m.static ? "static " : ""}${m.async ? "async " : ""}${m.name}(${paramTexts.join(", ")})${ret} {\n${indented}\n  }`,
+    text: bodyText,
     valueRefs: [...m.body.refs],
     typeRefs,
   };

@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MigrationGeneratorTest > emits valid TS (snapshot + parse + no-Ruby) 1`] = `
+"import { Migration } from "@blazetrails/activerecord";
+
+export class AddTitleToPosts extends Migration {
+  static version = "20260521120000";
+
+  async change(): Promise<void> {}
+}
+"
+`;
