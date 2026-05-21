@@ -81,7 +81,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("permits the parameters passed", () => {
     makeGen().run("User", ["name:string", "age:integer"]);
     const c = read("src/app/controllers/users-controller.ts");
-    expect(c).toContain('this.params.expect("user", ["name", "age"])');
+    expect(c).toContain('this.params.expect({ user: ["name", "age"] })');
     expect(c).toContain("userParams()");
   });
 
@@ -104,9 +104,26 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(c).toContain("renderJson");
     expect(c).not.toContain("async new_()");
     expect(c).not.toContain("async edit()");
-    expect(c).toContain('this.params.expect("user", ["name"])');
+    expect(c).toContain('this.params.expect({ user: ["name"] })');
     expect(parseTs(c).diagnostics).toEqual([]);
     assertNoRubySource(c);
     expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/users-helper.ts"))).toBe(false);
+  });
+
+  it("generated test file parses as valid TypeScript", () => {
+    makeGen().run("User");
+    const t = read("test/controllers/users-controller.test.ts");
+    expect(parseTs(t).diagnostics).toEqual([]);
+  });
+
+  it("namespaced scaffold controller emits flattened class name and nested paths", () => {
+    makeGen().run("admin/account", ["name:string"]);
+    const c = read("src/app/controllers/admin/accounts-controller.ts");
+    expect(c).toContain("class AdminAccountsController");
+    expect(c).not.toMatch(/::/);
+    expect(c).toContain('this.params.expect({ account: ["name"] })');
+    expect(parseTs(c).diagnostics).toEqual([]);
+    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/admin/accounts-helper.ts"))).toBe(true);
+    expect(read("src/config/routes.ts")).toContain('router.resources("admin/accounts")');
   });
 });

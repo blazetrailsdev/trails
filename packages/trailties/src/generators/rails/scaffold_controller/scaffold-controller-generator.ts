@@ -29,11 +29,17 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
     options: ScaffoldControllerRunOptions = {},
   ): string[] {
     const { api = false, skipRoutes = false, test = true, helper = true } = options;
-    const className = classify(name.replace(/_?controller$/i, ""));
-    const resourceName = tableize(className);
-    const singular = underscore(className);
-    const controllerClassName = classify(resourceName) + "Controller";
-    const controllerFileName = dasherize(resourceName) + "-controller";
+    const stripped = name.replace(/_?controller$/i, "");
+    const parts = stripped.split("/");
+    const leaf = parts[parts.length - 1]!;
+    const nsClass = parts.slice(0, -1).map((p) => classify(p));
+    const nsDashed = parts.slice(0, -1).map((p) => dasherize(underscore(p)));
+    const modelClassName = [...nsClass, classify(leaf)].join("");
+    const resourceName = tableize(classify(leaf));
+    const singular = underscore(classify(leaf));
+    const controllerClassName = [...nsClass, classify(resourceName)].join("") + "Controller";
+    const controllerFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-controller";
+    const routeResource = [...nsDashed, resourceName].join("/");
     const ext = this.ext();
     const ts = this.isTypeScript();
     const attrNames = parseColumns(attributes).map((c) => c.name);
@@ -43,18 +49,19 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
       emitControllerClass({
         className: controllerClassName,
         methods: api
-          ? apiCrudMethods(className, singular, resourceName, attrNames, ts)
-          : crudMethods(className, singular, resourceName, attrNames, ts),
+          ? apiCrudMethods(modelClassName, singular, resourceName, attrNames, ts)
+          : crudMethods(modelClassName, singular, resourceName, attrNames, ts),
       }),
     );
 
     if (test) {
       const skip = (a: string) =>
         api && (a === "new" || a === "edit") ? "" : `  it("${a}", () => {});\n`;
+      const importPrefix = "../".repeat(nsDashed.length + 2);
       this.createFile(
         `test/controllers/${controllerFileName}.test${ext}`,
         `import { describe, it } from "vitest";
-import { ${controllerClassName} } from "../../src/app/controllers/${controllerFileName}.js";
+import { ${controllerClassName} } from "${importPrefix}src/app/controllers/${controllerFileName}.js";
 
 describe("${controllerClassName}", () => {
   it("references controller", () => { void ${controllerClassName}; });
@@ -64,9 +71,11 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
     }
 
     if (helper && !api) {
+      const helperFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-helper";
+      const helperConstName = [...nsClass, classify(resourceName)].join("") + "Helper";
       this.createFile(
-        `src/app/helpers/${dasherize(resourceName)}-helper${ext}`,
-        `export const ${classify(resourceName)}Helper = {\n};\n`,
+        `src/app/helpers/${helperFileName}${ext}`,
+        `export const ${helperConstName} = {\n};\n`,
       );
     }
 
@@ -77,7 +86,7 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
           ? "src/config/routes.js"
           : null;
       if (routesFile) {
-        this.insertIntoFile(routesFile, "// routes", `  router.resources("${resourceName}");\n`);
+        this.insertIntoFile(routesFile, "// routes", `  router.resources("${routeResource}");\n`);
       }
     }
     return this.getCreatedFiles();
@@ -98,7 +107,7 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
   const list =
     attrs.length === 0
       ? `return this.params.fetch("${singular}", {});`
-      : `return this.params.expect("${singular}", [${attrs.map((a) => `"${a}"`).join(", ")}]);`;
+      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
     name: `${singular}Params`,
     params: [],
