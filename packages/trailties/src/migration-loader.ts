@@ -3,7 +3,10 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { MigrationProxy } from "@blazetrails/activerecord";
 
-const MIGRATION_FILE_PATTERN = /^(\d+)-(.+)\.(ts|js)$/;
+// Rails uses `<timestamp>_<name>.rb` (railties/lib/rails/generators/migration.rb).
+// trailties matches the underscore form; the pre-1.12c hyphen form is accepted
+// as a transitional alias so apps generated against earlier PRs still load.
+const MIGRATION_FILE_PATTERN = /^(\d+)[_-](.+)\.(ts|js)$/;
 
 /**
  * Discover migration files from a directory and return MigrationProxy objects
