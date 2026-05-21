@@ -47,9 +47,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 
-export interface HashDigestClass {
-  hexdigest(data: string): string;
-}
+type HashDigestClass = typeof Digest.hashDigestClass;
 
 type DeprecationCallable = (...args: unknown[]) => void;
 type BehaviorSetting = DeprecationBehavior | DeprecationBehavior[] | DeprecationCallable | null;
@@ -92,7 +90,7 @@ export class Trailtie extends BaseRailtie {
     // (ordering + DeprecatorsProxy) and is a follow-up on PR 2.7a, not a
     // local patch here.
     this.initializer("active_support.deprecation_behavior", () => {
-      const cfg = (Trailtie.config["activeSupport"] as ActiveSupportConfig | undefined) ?? {};
+      const cfg = (this.config["activeSupport"] as ActiveSupportConfig | undefined) ?? {};
       const all = Object.values(BaseRailtie.deprecators).filter((d): d is Deprecation => d != null);
       if (cfg.reportDeprecations === false) {
         for (const d of all) {
@@ -114,7 +112,7 @@ export class Trailtie extends BaseRailtie {
     });
 
     this.initializer("active_support.set_hash_digest_class", () => {
-      const klass = (Trailtie.config["activeSupport"] as ActiveSupportConfig | undefined)
+      const klass = (this.config["activeSupport"] as ActiveSupportConfig | undefined)
         ?.hashDigestClass;
       if (klass) {
         Digest.hashDigestClass = klass;
