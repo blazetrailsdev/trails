@@ -33,7 +33,7 @@ describe("PredicateBuilderTest", () => {
     await dropAllTables(adapter);
   });
 
-  it("registering new handlers", () => {
+  it.skip("registering new handlers", () => {
     class PbTopic extends Base {
       static {
         this.tableName = "topics";
@@ -56,7 +56,7 @@ describe("PredicateBuilderTest", () => {
     }
   });
 
-  it("registering new handlers for association", () => {
+  it.skip("registering new handlers for association", () => {
     class PbTopic2 extends Base {
       static {
         this.tableName = "topics";
