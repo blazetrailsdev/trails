@@ -5,6 +5,11 @@ export {
   TemplateHandlerRegistry,
 } from "./template/handlers.js";
 export { Raw as RawHandler } from "./template/handlers/raw.js";
+export {
+  Tse as TseHandler,
+  type TseTemplate,
+  type TseImplementation,
+} from "./template/handlers/tse.js";
 
 // Merged: `Template` is both the interface (data shape) and a namespace
 // exposing the Rails-spelled `Template.Error` class.

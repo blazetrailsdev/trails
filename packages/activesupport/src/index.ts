@@ -182,6 +182,7 @@ export {
   from,
   to,
   indent,
+  chomp,
 } from "./string-utils.js";
 
 export {

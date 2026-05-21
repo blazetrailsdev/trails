@@ -167,6 +167,20 @@ export function exclude(str: string, search: string): boolean {
 }
 
 /**
+ * Ruby `String#chomp`. With no separator (or `undefined`), removes a single
+ * trailing `\n`, `\r\n`, or `\r`. With a separator string, removes that
+ * suffix if present. Empty-string separator (Ruby paragraph mode) strips
+ * all trailing newline characters.
+ */
+export function chomp(str: string, separator?: string): string {
+  if (separator === undefined) return str.replace(/(\r\n|\r|\n)$/, "");
+  if (separator === "") return str.replace(/[\r\n]+$/, "");
+  // Ruby quirk: chomp("\n") also eats a preceding CR — "x\r\n".chomp("\n") == "x".
+  if (separator === "\n") return str.replace(/\r?\n$/, "");
+  return str.endsWith(separator) ? str.slice(0, str.length - separator.length) : str;
+}
+
+/**
  * Returns the first n characters of the string (default 1).
  * Raises if n is negative (mirrors Rails behaviour).
  */
