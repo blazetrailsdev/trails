@@ -51,7 +51,7 @@ export interface ActiveRecordConfig {
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
   queryLogTagsEnabled: boolean;
-  queryLogTags: readonly string[];
+  queryLogTags: string[];
   queryLogTagsFormat: "legacy" | "sqlcommenter";
   cacheQueryLogTags: boolean;
   raiseOnAssignToAttrReadonly: boolean;
