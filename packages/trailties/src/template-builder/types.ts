@@ -1,7 +1,7 @@
 /** @internal */
 declare const REF_BRAND: unique symbol;
 
-export type Ref = { readonly [REF_BRAND]: "ref"; readonly name: string; readonly from?: string };
+export type Ref = { readonly [REF_BRAND]: true; readonly name: string; readonly from?: string };
 export type Type = {
   readonly [REF_BRAND]: "type";
   readonly text: string;
@@ -16,7 +16,8 @@ export type Body = {
 export interface Import {
   from: string;
   default?: string;
-  named?: Record<string, string>;
+  /** `"named"` value is shorthand for "alias === original name". */
+  named?: Record<string, string | "named">;
   typeOnly?: boolean;
 }
 export interface ImportResult<TNames extends string = string> {

@@ -67,21 +67,59 @@ describe("template-builder", () => {
     expect(out).toContain(`return u;`);
   });
 
-  it("preserves explicit renamed imports when refs also reference the same module", () => {
-    const r = ref("LocalName", "y");
+  it("preserves explicit renames AND auto-collects additional refs from the same module", () => {
+    const renamed = ref("LocalName", "y");
+    const other = ref("Sibling", "y");
     const out = tsModule({
       imports: [{ from: "y", named: { LocalName: "Original" } }],
       declarations: [
         tsClass({
           name: "C",
           body: [
-            tsMethod({ name: "f", params: [], returnType: "void", body: tsBody`new ${r}();` }),
+            tsMethod({
+              name: "f",
+              params: [],
+              returnType: "void",
+              body: tsBody`new ${renamed}(); new ${other}();`,
+            }),
           ],
         }),
       ],
     });
-    expect(out).toContain(`import { Original as LocalName } from "y";`);
+    expect(out).toContain(`import { Original as LocalName, Sibling } from "y";`);
     expect(out.match(/from "y"/g) ?? []).toHaveLength(1);
+  });
+
+  it("throws on conflicting default imports from the same module", () => {
+    expect(() =>
+      tsModule({
+        imports: [
+          { from: "x", default: "Foo" },
+          { from: "x", default: "Bar" },
+        ],
+        declarations: [],
+      }),
+    ).toThrow(/Conflicting default imports/);
+  });
+
+  it("throws on conflicting named imports for the same alias", () => {
+    expect(() =>
+      tsModule({
+        imports: [
+          { from: "x", named: { A: "Alpha" } },
+          { from: "x", named: { A: "Beta" } },
+        ],
+        declarations: [],
+      }),
+    ).toThrow(/Conflicting named imports/);
+  });
+
+  it('accepts the "named" shorthand in Import.named', () => {
+    const out = tsModule({
+      imports: [{ from: "x", named: { Foo: "named", Bar: "named" } }],
+      declarations: [],
+    });
+    expect(out).toContain(`import { Bar, Foo } from "x";`);
   });
 
   it("tsImportDefault preserves the default name as the refs key type", () => {

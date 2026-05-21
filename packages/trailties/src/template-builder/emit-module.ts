@@ -31,15 +31,22 @@ export function tsModule(src: ModuleSource): string {
     }
   }
   const explicit = src.imports ?? [];
-  const explicitValueFroms = new Set(explicit.filter((i) => !i.typeOnly).map((i) => i.from));
+  // Per-(from,alias) coverage set built from value-side explicit imports so
+  // auto-collection adds new bindings from the same module but does not
+  // duplicate (or conflict with) ones the caller has already declared.
+  const covered = new Set<string>();
+  for (const imp of explicit) {
+    if (imp.typeOnly) continue;
+    for (const alias of Object.keys(imp.named ?? {})) covered.add(`${imp.from}|${alias}`);
+  }
   const fromRefs: Import[] = [];
   for (const r of refs) {
     const m = refMeta(r);
-    if (m.from && !explicitValueFroms.has(m.from)) {
-      fromRefs.push({ from: m.from, named: { [m.name]: m.name } });
-    }
+    if (!m.from) continue;
+    if (covered.has(`${m.from}|${m.name}`)) continue;
+    fromRefs.push({ from: m.from, named: { [m.name]: m.name } });
+    covered.add(`${m.from}|${m.name}`);
   }
-  // Auto-collected refs come first so explicit src.imports wins on merge.
   const merged = mergeImports([...fromRefs, ...explicit]);
   const importBlock = merged.map(emitImport).join("\n");
   const pre = src.preamble ? `${src.preamble}\n\n` : "";

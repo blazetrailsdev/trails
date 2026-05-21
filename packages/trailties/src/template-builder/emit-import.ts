@@ -5,13 +5,9 @@ export function tsImport<TNames extends string>(
   from: string,
   names: Record<TNames, string | "named">,
 ): ImportResult<TNames> {
-  const named: Record<string, string> = {};
+  const named: Record<string, string | "named"> = { ...names };
   const refs: Record<string, Ref> = {};
-  for (const alias in names) {
-    const v = names[alias];
-    named[alias] = v === "named" ? alias : (v as string);
-    refs[alias] = ref(alias, from);
-  }
+  for (const alias in names) refs[alias] = ref(alias, from);
   return { import: { from, named }, refs: refs as { [K in TNames]: Ref } };
 }
 
@@ -42,7 +38,8 @@ export function emitImport(imp: Import): string {
     const entries = keys
       .sort((a, b) => a.localeCompare(b))
       .map((a) => {
-        const o = imp.named![a];
+        const raw = imp.named![a];
+        const o = raw === "named" ? a : raw;
         return a === o ? a : `${o} as ${a}`;
       });
     parts.push(`{ ${entries.join(", ")} }`);
@@ -51,6 +48,10 @@ export function emitImport(imp: Import): string {
     throw new Error(`Import from "${imp.from}" has no default or named bindings`);
   }
   return `${imp.typeOnly ? "import type" : "import"} ${parts.join(", ")} from "${imp.from}";`;
+}
+
+function resolveOriginal(alias: string, raw: string | "named"): string {
+  return raw === "named" ? alias : raw;
 }
 
 export function mergeImports(imports: Import[]): Import[] {
@@ -65,9 +66,29 @@ export function mergeImports(imports: Import[]): Import[] {
         default: imp.default,
         named: imp.named ? { ...imp.named } : undefined,
       });
-    } else {
-      if (imp.default && !e.default) e.default = imp.default;
-      if (imp.named) e.named = { ...(e.named ?? {}), ...imp.named };
+      continue;
+    }
+    if (imp.default) {
+      if (e.default && e.default !== imp.default) {
+        throw new Error(
+          `Conflicting default imports from "${imp.from}": "${e.default}" vs "${imp.default}"`,
+        );
+      }
+      e.default = imp.default;
+    }
+    if (imp.named) {
+      const merged: Record<string, string | "named"> = { ...(e.named ?? {}) };
+      for (const alias of Object.keys(imp.named)) {
+        const next = imp.named[alias];
+        const prev = merged[alias];
+        if (prev !== undefined && resolveOriginal(alias, prev) !== resolveOriginal(alias, next)) {
+          throw new Error(
+            `Conflicting named imports for "${alias}" from "${imp.from}": "${resolveOriginal(alias, prev)}" vs "${resolveOriginal(alias, next)}"`,
+          );
+        }
+        merged[alias] = next;
+      }
+      e.named = merged;
     }
   }
   return [...map.values()].sort((a, b) => a.from.localeCompare(b.from));
