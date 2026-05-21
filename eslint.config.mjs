@@ -277,6 +277,21 @@ export default defineConfig(
     },
   },
 
+  // ── activerecord: only no-conditional-tests is clean today.
+  // no-conditional-in-test and no-conditional-expect have outstanding
+  // violations; enable them in follow-up PRs as they're driven to zero.
+  {
+    files: [
+      "packages/activerecord/src/**/*.test.ts",
+      "packages/activerecord/dx-tests/**/*.test.ts",
+      "packages/activerecord/virtualized-dx-tests/**/*.test.ts",
+    ],
+    plugins: { vitest },
+    rules: {
+      "vitest/no-conditional-tests": "error",
+    },
+  },
+
   // ── activesupport ──
   {
     files: ["packages/activesupport/src/**/*.ts"],

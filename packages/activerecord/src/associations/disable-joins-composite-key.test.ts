@@ -405,12 +405,9 @@ describe("DJAS — composite key support", () => {
     // No orders — through step plucks nothing, final step gets
     // composite `where([...], [])` which PredicateBuilder resolves to
     // none().
-    const observed: string[] = [];
+    const allSql: unknown[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
-      const sql = event?.payload?.sql;
-      if (typeof sql === "string" && /\bFROM\b\s+["`]?ck_line_items\b/i.test(sql)) {
-        observed.push(sql);
-      }
+      allSql.push(event?.payload?.sql);
     });
     try {
       const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsEmpty");
@@ -421,6 +418,10 @@ describe("DJAS — composite key support", () => {
     }
     // The none() short-circuit means no SELECT against ck_line_items
     // at all. A full-table scan (regression) would show at least one.
+    const observed = allSql.filter(
+      (sql): sql is string =>
+        typeof sql === "string" && /\bFROM\b\s+["`]?ck_line_items\b/i.test(sql),
+    );
     expect(observed).toEqual([]);
   });
 
