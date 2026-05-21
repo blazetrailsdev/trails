@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
 import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { clearAppliedSchemaSignatures, defineSchema, type ColumnSpec } from "./define-schema.js";
@@ -376,40 +376,39 @@ describe("defineSchema", () => {
   });
 
   describe("clearAppliedSchemaSignatures", () => {
-    // Regression: under the sidecar shape a single shared adapter survives
-    // across tests, so the signature cache must be invalidated alongside
-    // dropAllTables — otherwise defineSchema(sameSpec) no-ops over a now-
-    // missing table.
-    it("re-runs DDL after the table is dropped underneath the cache", async () => {
+    // Regression: under the sidecar shape a single shared raw adapter
+    // survives across tests, so the signature cache must be invalidated
+    // alongside dropAllTables — otherwise defineSchema(sameSpec) no-ops
+    // over a now-missing table.
+    //
+    // Use the raw sidecar adapter (no `tables: Set`) so this exercises the
+    // cache-only path. The wrapper's `tables` Set would let
+    // `adapterKnownTables` detect the drop and force DDL re-execution
+    // without the explicit clear, masking the bug.
+    it("re-runs DDL after the table is dropped underneath the cache (per-adapter clear)", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
       const spec = { widgets: { name: "string" as ColumnSpec } };
-      await defineSchema(adapter, spec);
-      await dropAllTables(adapter);
-      clearAppliedSchemaSignatures(adapter);
+      await defineSchema(raw, spec);
+      await dropAllTables(raw);
+      clearAppliedSchemaSignatures(raw);
 
-      await defineSchema(adapter, spec);
+      await defineSchema(raw, spec);
 
       await expect(
-        adapter.executeMutation(`INSERT INTO widgets (name) VALUES ('ok')`),
+        raw.executeMutation(`INSERT INTO widgets (name) VALUES ('ok')`),
       ).resolves.toBeDefined();
     });
 
-    it("no-arg form clears all tracked adapters", async () => {
-      const a = createTestAdapter();
-      const b = createTestAdapter();
+    it("no-arg form rebinds the WeakMap so the next defineSchema re-runs DDL", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
       const spec = { gizmos: { name: "string" as ColumnSpec } };
-      await defineSchema(a, spec);
-      await defineSchema(b, spec);
-      await dropAllTables(a);
-      await dropAllTables(b);
+      await defineSchema(raw, spec);
+      await dropAllTables(raw);
       clearAppliedSchemaSignatures();
 
-      await defineSchema(a, spec);
-      await defineSchema(b, spec);
+      await defineSchema(raw, spec);
       await expect(
-        a.executeMutation(`INSERT INTO gizmos (name) VALUES ('a')`),
-      ).resolves.toBeDefined();
-      await expect(
-        b.executeMutation(`INSERT INTO gizmos (name) VALUES ('b')`),
+        raw.executeMutation(`INSERT INTO gizmos (name) VALUES ('ok')`),
       ).resolves.toBeDefined();
     });
   });
