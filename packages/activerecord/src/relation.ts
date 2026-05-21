@@ -3783,7 +3783,7 @@ export class Relation<T extends Base> {
             if (rawCol.includes(".")) {
               manager.order(new Nodes.SqlLiteral(trimmed));
             } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
-              const lit = new Nodes.SqlLiteral(this._quoteBareColumn(rawCol), { retryable: true });
+              const lit = this.orderColumn(rawCol) as Nodes.Node;
               manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
             } else {
               const node = table.get(rawCol);
@@ -3796,11 +3796,7 @@ export class Relation<T extends Base> {
             // everything else (positional "1", NULLS FIRST, commas, etc.) is raw SQL.
             if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
               if (!this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)) {
-                manager.order(
-                  new Nodes.Ascending(
-                    new Nodes.SqlLiteral(this._quoteBareColumn(trimmed), { retryable: true }),
-                  ),
-                );
+                manager.order(new Nodes.Ascending(this.orderColumn(trimmed) as Nodes.Node));
               } else {
                 manager.order(new Nodes.Ascending(table.get(trimmed)));
               }
@@ -3817,7 +3813,7 @@ export class Relation<T extends Base> {
           const lit = new Nodes.SqlLiteral(col);
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {
-          const lit = new Nodes.SqlLiteral(this._quoteBareColumn(col), { retryable: true });
+          const lit = this.orderColumn(col) as Nodes.Node;
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else {
           manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
