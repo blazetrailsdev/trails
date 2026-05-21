@@ -152,11 +152,20 @@ describe("Trails", () => {
     expect(await Trails.publicPath()).toBeNull();
   });
 
+  it("Trails.publicPath returns null when app.root() is unresolved (no throw)", async () => {
+    class UnrootedApp extends Application {}
+    Application.register(UnrootedApp);
+    const app = UnrootedApp.instance();
+    app.root = async () => undefined;
+    await expect(Trails.publicPath()).resolves.toBeNull();
+  });
+
   it('Trails.publicPath returns the first expanded entry of paths["public"]', async () => {
     class PubApp extends Application {}
     Application.register(PubApp);
     const app = PubApp.instance();
     const stubPath = { expanded: async () => ["/srv/app/public", "/srv/app/public-alt"] };
+    app.root = async () => "/srv/app";
     app.paths = async () =>
       ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as Awaited<
         ReturnType<typeof app.paths>
