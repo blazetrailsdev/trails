@@ -78,6 +78,18 @@ describe("buildViews", () => {
     expect(manifest).not.toContain("gone.html");
   });
 
+  it("refuses to build when outDir is a symlink escaping cwd", () => {
+    const cwd = mkScratch();
+    const elsewhere = mkScratch();
+    // `.trails` inside cwd is a symlink to a sibling tempdir. Lexically
+    // the mirror path is fine; realpath check must catch the escape.
+    fs.symlinkSync(elsewhere, path.join(cwd, ".trails"));
+    write(cwd, "app/views/home.html.tse", "x");
+    expect(() => buildViews({ cwd })).toThrow(/symlink escape/);
+    // Sanity: the symlinked-to dir was not wiped.
+    expect(fs.existsSync(elsewhere)).toBe(true);
+  });
+
   it("honors custom viewsDir / outDir", () => {
     const cwd = mkScratch();
     write(cwd, "src/templates/home.html.tse", "hi");

@@ -39,11 +39,28 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   const files = walkTse(viewsDir);
   // Safety: refuse to wipe a mirror dir that escapes `cwd`. A mistaken
   // `--out /` would otherwise resolve `outViews` to `/views` and recurse
-  // into shared system state. Require a non-empty relative segment.
-  const relFromCwd = path.relative(cwd, outViews);
-  if (relFromCwd === "" || relFromCwd.startsWith("..") || path.isAbsolute(relFromCwd)) {
+  // into shared system state. Two checks:
+  //
+  //   (1) Lexical — outViews resolves under cwd. Catches obvious escapes
+  //       (`--out /tmp/x`, `--out ../sibling`).
+  //   (2) Symlink-aware — realpath of the deepest existing ancestor of
+  //       outViews stays under realpath(cwd). A symlinked `.trails`
+  //       (or any ancestor) pointing outside the project would pass the
+  //       lexical check but `fs.rmSync` follows symlinks and could
+  //       delete shared state. We compare realpaths because `cwd` itself
+  //       may legitimately be reached through a symlink.
+  const lexicalRel = path.relative(cwd, outViews);
+  if (lexicalRel === "" || lexicalRel.startsWith("..") || path.isAbsolute(lexicalRel)) {
     throw new Error(
       `refusing to build into ${JSON.stringify(outViews)} — outDir must resolve under cwd ${JSON.stringify(cwd)}`,
+    );
+  }
+  const realCwd = fs.realpathSync(cwd);
+  const realOutAncestor = fs.realpathSync(deepestExisting(outViews));
+  const realRel = path.relative(realCwd, realOutAncestor);
+  if (realRel !== "" && (realRel.startsWith("..") || path.isAbsolute(realRel))) {
+    throw new Error(
+      `refusing to build into ${JSON.stringify(outViews)} — resolved path ${JSON.stringify(realOutAncestor)} is outside cwd ${JSON.stringify(realCwd)} (symlink escape)`,
     );
   }
   // Wipe the mirror dir so deleted .tse sources don't leave orphan shims
@@ -64,6 +81,20 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "views-manifest.ts"), emitManifest(files));
   return { count: files.length, files };
+}
+
+/** Walk up from `p` until we find an extant path. Always terminates at the
+ * filesystem root, which is guaranteed to exist. Used by the realpath-based
+ * safety check so we resolve symlinks on the deepest portion of the target
+ * mirror dir that actually exists on disk. */
+function deepestExisting(p: string): string {
+  let cur = path.resolve(p);
+  while (!fs.existsSync(cur)) {
+    const parent = path.dirname(cur);
+    if (parent === cur) return cur;
+    cur = parent;
+  }
+  return cur;
 }
 
 function walkTse(dir: string): string[] {
