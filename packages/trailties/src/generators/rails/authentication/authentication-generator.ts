@@ -120,7 +120,8 @@ export class AuthenticationGenerator extends GeneratorBase {
       if (!this.fileExists(f)) continue;
       const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
       const lines: string[] = [];
-      if (!/router\.resources\("passwords"[^)]*param:\s*"token"/.test(src))
+      // Skip if any passwords route exists; appending alongside would duplicate it.
+      if (!src.includes('router.resources("passwords"'))
         lines.push(`  router.resources("passwords", { param: "token" });`);
       if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
       if (lines.length) this.insertIntoFile(f, "// routes", lines.join("\n") + "\n");
