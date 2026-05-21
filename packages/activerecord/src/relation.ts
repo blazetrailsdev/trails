@@ -3768,11 +3768,12 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _orderColumn(field: string): unknown {
-    return this.arelColumn(
-      field,
-      (attrName: string) =>
-        new Nodes.SqlLiteral(this._quoteBareColumn(attrName), { retryable: true }),
-    );
+    return this.arelColumn(field, (attrName: string) => {
+      if (attrName === "count" && this._groupColumns.length > 0) {
+        return this._modelClass.arelTable.get(attrName);
+      }
+      return new Nodes.SqlLiteral(this._quoteBareColumn(attrName), { retryable: true });
+    });
   }
 
   private _applyOrderToManager(manager: SelectManager, table: Table): void {
