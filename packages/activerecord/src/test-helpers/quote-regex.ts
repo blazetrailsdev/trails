@@ -53,7 +53,13 @@ export const quoteTableName: (name: string) => string = _impl.quoteTableName;
 /** Active adapter's `quoteColumnName(name)`. Single segment only. */
 export const quoteColumnName: (name: string) => string = _impl.quoteColumnName;
 
-/** Ruby `Regexp.escape` equivalent — escapes regex metacharacters in `s`. */
+/**
+ * Escapes JS RegExp metacharacters in `s` so it can be dropped into a
+ * `RegExp` pattern as a literal. Used at call sites the way Rails uses
+ * `Regexp.escape`, but only covers the JS metachar set — sufficient for
+ * quoted SQL identifiers (backticks, double quotes, dots) but narrower
+ * than Ruby's `Regexp.escape`, which also escapes whitespace and `#`.
+ */
 export function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
