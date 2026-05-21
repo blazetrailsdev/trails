@@ -248,31 +248,92 @@ block specify.
 trim modes, magic comments, trails-tsc plugin behavior — all
 identical across formats.
 
-### 2.3 Components
+### 2.3 Components — three-package split
+
+The lexer, AST, and emitters are needed by **both** the runtime handler
+(to produce `.tse.js`) and the build plugin (to produce `.tse.ts` +
+`.d.ts`). Putting them in either consumer creates a dependency
+inversion (trails-tsc → actionview, or vice versa). Instead, factor
+them into a leaf package — directly mirroring how Rails ships `erubi`
+as a separate gem that actionview consumes.
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                                                                │
-│   .tse source ──► TseLexer ──► TseAst ──► Emitter ──► output   │
-│                                                                │
-│                                          ├─► .tse.js (runtime) │
-│                                          └─► .tse.ts (for tsc) │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│  @blazetrails/tse-compiler  (leaf — only depends on activesupport) │
+│                                                                    │
+│   .tse source ──► TseLexer ──► TseAst ──► Emitter ──► artifacts    │
+│                                                                    │
+│                                            ├─► .tse.js (+ .js.map) │
+│                                            ├─► .tse.ts             │
+│                                            └─► .d.ts (+ .d.ts.map) │
+└────────────────────────────────────────────────────────────────────┘
+            ▲                                              ▲
+            │                                              │
+            │ depends on                       depends on  │
+            │                                              │
+┌───────────┴────────────────────┐    ┌────────────────────┴──────────┐
+│  @blazetrails/actionview       │    │  @blazetrails/trails-tsc      │
+│                                │    │                               │
+│  • Tse handler class           │    │  • TscPlugin infra            │
+│  • OutputBuffer                │    │  • tse plugin (writes files)  │
+│  • Template, Resolver,         │    │  • build CLI, watch           │
+│    Renderer, helpers, ...      │    │  • TS language service plugin │
+│  • Render-time integration     │    │  • views-manifest generator   │
+└────────────────────────────────┘    └───────────────────────────────┘
 ```
 
-- **`@blazetrails/actionview/template/handlers/tse.ts`** — runtime handler.
-  Owns lexer + AST + JS emitter. Rails analogue: `Template::Handlers::ERB`
-  - `Erubi::Engine` collapsed into one module (TS doesn't need the engine
-    swap-out plugin point Erubi exists to provide — but we expose
-    `Tse.emitter` for the rare case someone wants to swap).
-- **`@blazetrails/trails-tsc/plugins/tse.ts`** — virtualization plugin.
-  Reads the same lexer output and re-emits as TS for typechecking. Rails
-  has no analogue (Rails has no static type-check phase).
-- **`@blazetrails/actionview/output-buffer.ts`** and
-  **`@blazetrails/activesupport/safe-string.ts`** — runtime substrates.
-  Direct Rails analogues: `ActionView::OutputBuffer` and
-  `ActiveSupport::SafeBuffer`.
+**`@blazetrails/tse-compiler`** — leaf package, no runtime template
+behavior. Pure source → emit pipeline. Rails analogue: `erubi` gem.
+
+- `TseLexer` — `<%`/`%>` tokenizer with trim-mode + magic-comment awareness.
+- `TseAst` — typed nodes (`Text`, `Code`, `Expr`, `RawExpr`, `Comment`,
+  `BlockExpr`).
+- `JsEmitter` — AST → `{ code: string, sourceMap: RawSourceMap }`.
+  Produces the runtime module.
+- `TsEmitter` — AST → typecheck shim with declared locals signature.
+- `DtsEmitter` — AST → `.d.ts` + `.d.ts.map` for publishing.
+- `parseFilename(path) → { name, format, handler }`.
+- `parseMagicComments(source) → { locals, format, sourceWithoutMagic }`.
+- No I/O. No file watching. Everything is `(string, options) → string`-ish.
+- Dependencies: `activesupport` (type-only, for the `SafeString` brand).
+- Tested in-package against fixture `.tse` strings → expected `.tse.js`
+  output. Snapshot tests catch emit-shape regressions.
+
+**`@blazetrails/actionview`** — owns the Tse _handler_, not the
+_compiler_. The handler is the runtime wrapper that knows about
+`template.type`, `escape_ignore_list`, view context, etc., and
+delegates the actual source → string compile to tse-compiler.
+
+- `template/handlers/tse.ts` — `Tse.call(template, source)`. Reads
+  class attrs, resolves format-derived options, calls
+  `tseCompiler.compileJs(source, options)`, returns
+  `{ code, sourceMap }`.
+- `output-buffer.ts` — runtime substrate. Used by emitted `.tse.js`.
+- `template.ts`, `resolver.ts`, `renderer.ts`, helpers — none of these
+  touch the compiler; they consume the compiled module via dynamic
+  import or the `TemplateRegistry`.
+- Dependencies: `tse-compiler`, `activesupport`, `activemodel` (for
+  helpers).
+
+**`@blazetrails/trails-tsc`** — owns the build plugin and tooling. The
+plugin is a thin shell over tse-compiler.
+
+- `plugins/tse.ts` — `TscPlugin` impl: takes `.tse` paths, calls
+  `tseCompiler.compileTs(source)` + `compileDts(source)`, writes the
+  artifacts under `.trails/views/`.
+- `cli/build.ts`, `cli/dev.ts` — walk `app/views/**/*.tse`, run the
+  plugin, generate `views-manifest.ts`.
+- `ts-plugin.ts` — TS language service plugin (`compilerOptions.plugins`).
+  Intercepts `.tse` imports in-editor without requiring a build.
+- Dependencies: `tse-compiler`, `typescript` (peer). **No
+  actionview dependency** — trails-tsc stays usable for AR-only
+  projects.
+
+**Why this matches Rails' shape.** Rails' `erubi` gem knows nothing
+about templates, views, or HTTP. It's a pure source → Ruby compiler.
+`actionview` wraps it with the handler + template machinery. The
+`@blazetrails/tse-compiler` ↔ `@blazetrails/actionview` split is the
+direct port of that boundary.
 
 ### 2.4 Syntax (1-for-1 with ERB, plus one extension)
 
@@ -722,6 +783,21 @@ Maps to [actionview-100-percent.md](actionview-100-percent.md):
 
 This doc does not change phasing; it formalizes the 1-for-1 contract so
 each phase has a fidelity bar to hit.
+
+### Package ownership per phase
+
+| Phase | New package or file?                                                  | Owning package             | Depends on              |
+| ----- | --------------------------------------------------------------------- | -------------------------- | ----------------------- |
+| 0a    | extract trails-tsc                                                    | `@blazetrails/trails-tsc`  | activerecord (existing) |
+| 0b    | SafeString / OutputBuffer                                             | activesupport / actionview | —                       |
+| 2a-0  | **new** `@blazetrails/tse-compiler` (lexer, AST, JS/TS/d.ts emitters) | `tse-compiler`             | activesupport           |
+| 2a-1  | `Tse` handler class                                                   | `actionview`               | tse-compiler            |
+| 2b    | `tse` plugin (file I/O + manifest writes)                             | `trails-tsc`               | tse-compiler            |
+| 2c    | build CLI + watch + TS language service plugin                        | `trails-tsc`               | tse-compiler            |
+
+Phase 2a-0 (the new tse-compiler package) is the largest single piece
+and must land first; both 2a-1 and 2b depend on it but are independent
+of each other and can land in parallel from sibling branches.
 
 ---
 
