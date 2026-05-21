@@ -1,7 +1,14 @@
 // Port of `Rails` module from `railties/lib/rails.rb`.
 // Renamed `Rails` → `Trails`; `api:compare` wires the alias via the
 // `Rails: "Trails"` entry in `TS_CLASS_RENAMES` (compare.ts).
-import { EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
+//
+// Modeled as a class with static accessors (cf. `log-subscriber.ts`,
+// `digest.ts`) so the api-compare extractor harvests getters/setters —
+// `harvestObjectLiteralMethods` ignores accessors on object literals, but
+// the class extractor walks `ts.isGetAccessorDeclaration` for static
+// members. `Trails` is never instantiated.
+import { EnvironmentInquirer } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -17,47 +24,50 @@ let _env: EnvironmentInquirer | undefined;
 let _backtraceCleaner: BacktraceCleaner | undefined;
 
 /**
- * Trails-renamed `Rails` module. Exposed as an object literal with
- * accessors because TS has no module-singleton pattern. Mutations flow
- * through explicit setters (`Trails.application = app`,
+ * Trails-renamed `Rails` module from `railties/lib/rails.rb`. Mutations
+ * flow through explicit setters (`Trails.application = app`,
  * `Trails.env = "test"`).
  *
  * `Trails.version` returns the `@blazetrails/trailties` package version
  * (`packages/trailties/src/version.ts`), NOT the tracked Rails upstream
  * version — resolves open question #3 in `docs/trailties-plan.md`.
  */
-export const Trails = {
-  get application(): Application | null {
+export class Trails {
+  private constructor() {
+    throw new Error("Trails is a static-only namespace; do not instantiate.");
+  }
+
+  static get application(): Application | null {
     if (_application) return _application;
     const klass = Application.appClass;
     return klass ? (klass.instance() as Application) : null;
-  },
-  set application(app: Application | null) {
+  }
+  static set application(app: Application | null) {
     _application = app;
-  },
+  }
 
-  get cache(): CacheStore | null {
+  static get cache(): CacheStore | null {
     return _cache;
-  },
-  set cache(value: CacheStore | null) {
+  }
+  static set cache(value: CacheStore | null) {
     _cache = value;
-  },
+  }
 
-  get logger(): Logger | null {
+  static get logger(): Logger | null {
     return _logger;
-  },
-  set logger(value: Logger | null) {
+  }
+  static set logger(value: Logger | null) {
     _logger = value;
-  },
+  }
 
-  get version(): string {
+  static get version(): string {
     return VERSION;
-  },
+  }
 
   /** Rails: `Rails.configuration` → `application.config`. */
-  get configuration(): Configuration | null {
+  static get configuration(): Configuration | null {
     return Trails.application?.config ?? null;
-  },
+  }
 
   /**
    * Rails: `@_env ||= ActiveSupport::EnvironmentInquirer.new(...)`.
@@ -67,44 +77,44 @@ export const Trails = {
    * the rationale: JS ecosystem treats `NODE_ENV` as a build-time hint,
    * not a runtime selector).
    */
-  get env(): EnvironmentInquirer {
+  static get env(): EnvironmentInquirer {
     return (_env ??= new EnvironmentInquirer(resolveEnv()));
-  },
-  set env(value: string | EnvironmentInquirer) {
+  }
+  static set env(value: string | EnvironmentInquirer) {
     _env = typeof value === "string" ? new EnvironmentInquirer(value) : value;
-  },
+  }
 
   /** Rails: `delegate :initialize!, to: :application`. Throws when no app
    * is registered, matching Rails' `NoMethodError` on `nil.initialize!`. */
-  async initialize(group: InitializerGroup = "default"): Promise<Application> {
+  static async initialize(group: InitializerGroup = "default"): Promise<Application> {
     const app = Trails.application;
     if (!app)
       throw new Error("Trails.application is not set — register an Application subclass first.");
     return app.initialize(group);
-  },
+  }
 
   /** Rails: `delegate :initialized?, to: :application`. */
-  initialized(): boolean {
+  static initialized(): boolean {
     return Trails.application?.initialized() ?? false;
-  },
+  }
 
-  get backtraceCleaner(): BacktraceCleaner {
+  static get backtraceCleaner(): BacktraceCleaner {
     return (_backtraceCleaner ??= new BacktraceCleaner());
-  },
+  }
 
   /** Rails: `application && application.config.root`. */
-  async root(): Promise<string | undefined> {
+  static async root(): Promise<string | undefined> {
     return Trails.application?.root();
-  },
+  }
 
   /** Rails: `application && Pathname.new(application.paths["public"].first)`. */
-  async publicPath(): Promise<string | null> {
+  static async publicPath(): Promise<string | null> {
     const app = Trails.application;
     if (!app) return null;
     const paths = await app.paths();
     const expanded = await paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
-  },
+  }
 
   /**
    * Rails: `Rails.groups(*groups)`. Combines `"default"`, current env, the
@@ -112,7 +122,7 @@ export const Trails = {
    * includes the current env. Result is deduped, preserving insertion
    * order.
    */
-  groups(...args: Array<string | Record<string, string[]>>): string[] {
+  static groups(...args: Array<string | Record<string, string[]>>): string[] {
     const last = args[args.length - 1];
     const opts = last && typeof last === "object" ? (args.pop() as Record<string, string[]>) : {};
     const env = Trails.env.toString();
@@ -123,8 +133,8 @@ export const Trails = {
       if (envs.includes(env)) out.push(k);
     }
     return [...new Set(out)];
-  },
-};
+  }
+}
 
 /** @internal Test-only — drops the cached EnvironmentInquirer. */
 export function _resetTrailsEnv(): void {
