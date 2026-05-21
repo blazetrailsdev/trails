@@ -13,6 +13,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@blazetrails/activesupport": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*"
   }
 }
