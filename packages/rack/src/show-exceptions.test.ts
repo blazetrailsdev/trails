@@ -91,11 +91,7 @@ it("responds with HTML only to requests accepting HTML", async () => {
     expect(res.bodyString).toContain("Error");
     expect(res.bodyString).toContain("It was never supposed to work");
 
-    if (expectedMime === "text/html") {
-      expect(res.bodyString).toContain("</html>");
-    } else {
-      expect(res.bodyString).not.toContain("</html>");
-    }
+    expect(res.bodyString.includes("</html>")).toBe(expectedMime === "text/html");
   }
 });
 

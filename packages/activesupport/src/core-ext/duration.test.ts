@@ -349,10 +349,7 @@ describe("DurationTest", () => {
 
   it("case when", () => {
     const d = Duration.days(1);
-    // In TS we just check instanceof
-    let result: string | undefined;
-    if (d instanceof Duration) result = "ok";
-    expect(result).toBe("ok");
+    expect(d instanceof Duration).toBe(true);
   });
 
   it("respond to", () => {

@@ -13,12 +13,7 @@ describe("TestLoadError", () => {
 
   it("path", async () => {
     const mod = "nor/this/one";
-    try {
-      await import(/* @vite-ignore */ mod);
-      expect.unreachable("should have thrown");
-    } catch (e: any) {
-      expect(e.message).toContain("nor/this/one");
-    }
+    await expect(import(/* @vite-ignore */ mod)).rejects.toThrow(/nor\/this\/one/);
   });
 
   it("is missing with nil path", () => {

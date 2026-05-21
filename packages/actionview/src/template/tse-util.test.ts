@@ -41,11 +41,7 @@ describe("TseUtilTest", () => {
       const expected = JSON.parse(raw);
       const escaped = jsonEscape(raw) as string;
       const actual = JSON.parse(escaped);
-      if (expected === null) {
-        expect(actual).toBeNull();
-      } else {
-        expect(actual).toEqual(expected);
-      }
+      expect(actual).toEqual(expected);
     }
   });
 

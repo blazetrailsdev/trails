@@ -27,6 +27,15 @@ function fakeResponse(
   };
 }
 
+function captureThrow(fn: () => unknown): string {
+  try {
+    fn();
+  } catch (e) {
+    return (e as Error).message;
+  }
+  throw new Error("expected fn to throw");
+}
+
 function host(
   response: FakeResponse,
   request?: AssertionResponseHost["request"],
@@ -105,14 +114,9 @@ describe("ResponseAssertionsTest", () => {
 
   it("error message does not show long response body", () => {
     const h = host(fakeResponse(400, { body: "not too long".repeat(50) }));
-    try {
-      assertResponse.call(h, 200);
-      throw new Error("should not reach");
-    } catch (e) {
-      const msg = (e as Error).message;
-      expect(msg).toContain("Expected response to be a <200: OK>, but was a <400: Bad Request>");
-      expect(msg).not.toContain("Response body:");
-    }
+    const msg = captureThrow(() => assertResponse.call(h, 200));
+    expect(msg).toContain("Expected response to be a <200: OK>, but was a <400: Bad Request>");
+    expect(msg).not.toContain("Response body:");
   });
 
   it("error message shows rescued exception", () => {

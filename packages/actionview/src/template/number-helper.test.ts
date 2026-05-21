@@ -135,11 +135,15 @@ describe("NumberHelperTest", () => {
 
   it("number helpers should raise error if invalid when specified", () => {
     for (const fn of fns) expect(() => fn("x", { raise: true })).toThrow(InvalidNumberError);
-    try {
-      numberToCurrency("x", { raise: true });
-    } catch (e) {
-      expect((e as InvalidNumberError).number).toBe("x");
-    }
+    const thrown = (() => {
+      try {
+        numberToCurrency("x", { raise: true });
+        return null;
+      } catch (e) {
+        return e as InvalidNumberError;
+      }
+    })();
+    expect(thrown?.number).toBe("x");
   });
 
   it("number helpers should not raise error if valid when specified", () => {

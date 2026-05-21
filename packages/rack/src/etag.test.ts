@@ -127,6 +127,6 @@ it("close the original body", async () => {
   const app = async () => [200, {}, body] as any;
   const response = await etag(app).call(request());
   expect(closed).toBe(false);
-  if (response[2].close) response[2].close();
+  response[2].close();
   expect(closed).toBe(true);
 });

@@ -421,7 +421,7 @@ it("doesn't return invalid responses", () => {
   const r = new Response(["foo", "bar"], 204);
   const [, header, body] = r.finish();
   let str = "";
-  if (Array.isArray(body)) body.forEach((part: string) => (str += part));
+  (Array.isArray(body) ? body : []).forEach((part: string) => (str += part));
   expect(str).toBe("");
   expect(header["content-type"]).toBeUndefined();
   expect(header["content-length"]).toBeUndefined();

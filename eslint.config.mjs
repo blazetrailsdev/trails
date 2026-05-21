@@ -261,6 +261,22 @@ export default defineConfig(
     },
   },
 
+  // ── no conditionals in tests (all packages except activerecord) ──
+  {
+    files: [
+      "packages/*/src/**/*.test.ts",
+      "packages/*/dx-tests/**/*.test.ts",
+      "packages/*/virtualized-dx-tests/**/*.test.ts",
+    ],
+    ignores: ["packages/activerecord/**"],
+    plugins: { vitest },
+    rules: {
+      "vitest/no-conditional-in-test": "error",
+      "vitest/no-conditional-expect": "error",
+      "vitest/no-conditional-tests": "error",
+    },
+  },
+
   // ── activesupport ──
   {
     files: ["packages/activesupport/src/**/*.ts"],

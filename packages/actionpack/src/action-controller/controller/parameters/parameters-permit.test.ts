@@ -95,11 +95,8 @@ describe("ParametersPermitTest", () => {
     const params = new Parameters({ prefs: { theme: "dark" } });
     const permitted = params.permit({ prefs: {} });
     const prefs = permitted.get("prefs");
-    if (prefs instanceof Parameters) {
-      expect(prefs._toRawHash()).toEqual({ theme: "dark" });
-    } else {
-      expect(prefs).toEqual({ theme: "dark" });
-    }
+    const raw = prefs instanceof Parameters ? prefs._toRawHash() : prefs;
+    expect(raw).toEqual({ theme: "dark" });
   });
 
   it("fetch raises ParameterMissing exception", () => {

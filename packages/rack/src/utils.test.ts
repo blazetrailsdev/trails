@@ -160,13 +160,15 @@ it("parse nested query strings correctly", () => {
 it("can parse a query string with a key that has invalid UTF-8 encoded bytes", () => {
   // JS decodeURIComponent throws on invalid UTF-8, so we test that parsing handles it
   // The key will be partially decoded or left as-is
-  try {
-    const result = Utils.parseNestedQuery("foo%81E=1");
-    expect(Object.values(result)[0]).toBe("1");
-  } catch {
-    // JS may throw on invalid UTF-8 decoding, which is acceptable
-    expect(true).toBe(true);
-  }
+  // JS may throw on invalid UTF-8 decoding (acceptable) or partially decode
+  const result = (() => {
+    try {
+      return Utils.parseNestedQuery("foo%81E=1");
+    } catch {
+      return null;
+    }
+  })();
+  expect(result === null || Object.values(result)[0] === "1").toBe(true);
 });
 
 it("only moves to a new array when the full key has been seen", () => {

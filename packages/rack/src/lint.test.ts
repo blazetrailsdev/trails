@@ -178,7 +178,7 @@ it("can call close", async () => {
   };
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
   const [, , b] = await app.call(validEnv());
-  if (b && typeof b.close === "function") b.close();
+  b.close();
   expect(closed).toBe(true);
 });
 
