@@ -274,6 +274,7 @@ export function _restoreAppliedSchemaSignaturesForAdapter(
 export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
   if (adapter) {
     _appliedSchemaSignatures.delete(adapter);
+    _trackedAdapters.delete(adapter);
     return;
   }
   // Snapshots taken via `_snapshotAppliedSchemaSignaturesForAdapter` are
