@@ -101,12 +101,15 @@ function localsParamType(ast: TseAst, locals: LocalEntry[]): string {
   return `{ ${fields.join("; ")} }`;
 }
 
-function destructureLine(locals: LocalEntry[]): string {
-  if (locals.length === 0) return "";
+function destructureLines(locals: LocalEntry[]): string[] {
+  if (locals.length === 0) return [];
   const pieces = locals.map((l) =>
     l.defaultExpr === null ? l.name : `${l.name} = ${l.defaultExpr}`,
   );
-  return `  const { ${pieces.join(", ")} } = locals;`;
+  // `void name;` shields unused destructured locals from `noUnusedLocals`,
+  // matching the `void context; void locals;` shield on the parameters.
+  const voids = `  ${locals.map((l) => `void ${l.name};`).join(" ")}`;
+  return [`  const { ${pieces.join(", ")} } = locals;`, voids];
 }
 
 function emitNode(node: TseAst["nodes"][number]): string {
@@ -163,8 +166,7 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
     "  void context; void locals;",
     "  const _ob = context.outputBuffer;",
   ];
-  const destruct = destructureLine(locals);
-  if (destruct !== "") header.push(destruct);
+  for (const line of destructureLines(locals)) header.push(line);
   const body: string[] = [];
   for (const node of ast.nodes) body.push(emitNode(node));
   const footer = ["  return _ob;", "}", ""];
@@ -188,13 +190,36 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
   return { ts, deltas };
 }
 
+/**
+ * Build a virtualized TS source that surfaces `msg` as a tsc error
+ * diagnostic at line 1 (via a `@ts-expect-error`-defying type clash),
+ * so a single malformed `.tse` produces a readable error instead of
+ * crashing the whole `tsc` run.
+ */
+function errorShim(filePath: string, msg: string): string {
+  const safe = JSON.stringify(`${filePath}: ${msg}`);
+  // `string` is not assignable to `never`, so tsc reports a clear
+  // semantic error whose message includes the failure detail.
+  return [
+    `// .tse virtualization failed: ${safe}`,
+    `const __tseFailure: never = ${safe};`,
+    `export default __tseFailure;`,
+    "",
+  ].join("\n");
+}
+
 export function createTsePlugin(): TscPlugin {
   return {
     name: "tse",
     extensions: [".tse"],
-    virtualize(_filePath, source): VirtualizeOutput {
-      const { ts, deltas } = virtualizeTseWithDeltas(source);
-      return { ts, deltas };
+    virtualize(filePath, source): VirtualizeOutput {
+      try {
+        const { ts, deltas } = virtualizeTseWithDeltas(source);
+        return { ts, deltas };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { ts: errorShim(filePath, msg) };
+      }
     },
   };
 }

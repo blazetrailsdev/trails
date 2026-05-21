@@ -21,6 +21,19 @@ describe("createTsePlugin", () => {
     expect(out?.ts).toContain('_ob.safeAppend("<h1>");');
     expect(out?.ts).toContain("_ob.append(1);");
   });
+
+  it("emits an error shim instead of throwing when virtualization fails", () => {
+    const plugin = createTsePlugin();
+    // Unbalanced brackets in the locals signature would otherwise raise
+    // and crash the host's `tsc` invocation.
+    const out = plugin.virtualize("/x/bad.tse", "<%# locals: (a: (1, 2) %>");
+    expect(out?.ts).toContain("/x/bad.tse");
+    expect(out?.ts).toContain(".tse virtualization failed");
+    // The shim is itself a valid TS source that produces a clear
+    // diagnostic when tsc compiles it.
+    const diags = diagnose(out!.ts);
+    expect(diags.length).toBeGreaterThan(0);
+  });
 });
 
 describe("virtualizeTse", () => {
@@ -71,6 +84,12 @@ describe("virtualizeTse", () => {
 
   it("throws on a malformed locals entry (no colon)", () => {
     expect(() => virtualizeTse("<%# locals: (user) %>")).toThrow(TseLocalsSignatureError);
+  });
+
+  it("shields unused destructured locals with `void name;`", () => {
+    const out = virtualizeTse("<%# locals: (user:, count: 0) %><p>hi</p>");
+    expect(out).toContain("const { user, count = 0 } = locals;");
+    expect(out).toContain("void user; void count;");
   });
 
   it("reports LineDeltas covering header and footer so diagnostics remap back to .tse", () => {
