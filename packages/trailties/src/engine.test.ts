@@ -9,6 +9,7 @@ import {
   type PathAdapter,
 } from "@blazetrails/activesupport";
 import { Engine } from "./engine.js";
+import { EngineConfiguration } from "./engine/configuration.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 
@@ -128,6 +129,111 @@ describe("Engine", () => {
     Trailtie.register(HelpersEngine);
     HelpersEngine.calledFrom("/blog");
     expect(await HelpersEngine.instance().helpersPaths()).toEqual(["/blog/app/helpers"]);
+  });
+
+  describe("EngineConfiguration", () => {
+    it("defaults match Rails Engine::Configuration", () => {
+      const cfg = new EngineConfiguration();
+      expect(cfg.root).toBeNull();
+      expect(cfg.middleware).toEqual([]);
+      expect(cfg.javascriptPath).toBe("javascript");
+      expect(cfg.routeSetClass).toBeNull();
+      expect(cfg.defaultScope).toBeNull();
+      expect(cfg.autoloadPaths).toEqual([]);
+      expect(cfg.autoloadOncePaths).toEqual([]);
+      expect(cfg.eagerLoadPaths).toEqual([]);
+      expect(cfg.tableNamePrefix).toBeNull();
+    });
+
+    it("root= re-expands paths.path", () => {
+      const cfg = new EngineConfiguration(null);
+      const paths = cfg.paths();
+      expect(paths.path).toBeNull();
+      cfg.setRoot("/blog");
+      expect(cfg.root).toBe("/blog");
+      expect(paths.path).toBe("/blog");
+      expect(cfg.paths()).toBe(paths);
+    });
+
+    it("paths declares the Rails default layout", () => {
+      const paths = new EngineConfiguration("/blog").paths();
+      for (const k of ["app", "app/models", "lib", "config/routes.ts", "db/migrate", "vendor"]) {
+        expect(paths.get(k), k).toBeDefined();
+      }
+      expect(paths.get("lib")!.isLoadPath()).toBe(true);
+      expect(paths.get("vendor")!.isLoadPath()).toBe(true);
+    });
+
+    it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", () => {
+      const cfg = new EngineConfiguration();
+      cfg.autoloadPaths.push("/x/auto");
+      cfg.autoloadOncePaths.push("/x/once");
+      cfg.eagerLoadPaths.push("/x/eager");
+      expect(cfg.allAutoloadPaths()).toEqual(["/x/auto"]);
+      expect(cfg.allAutoloadOncePaths()).toEqual(["/x/once"]);
+      expect(cfg.allEagerLoadPaths()).toEqual(["/x/eager"]);
+    });
+  });
+
+  describe("tableNamePrefix", () => {
+    it("defaults to null when not isolated and unset", () => {
+      class PlainNamespacedEngine extends Engine {}
+      Trailtie.register(PlainNamespacedEngine);
+      expect(PlainNamespacedEngine.instance().tableNamePrefix()).toBeNull();
+    });
+
+    it("returns the explicit option when set", () => {
+      class ShopEngine extends Engine {}
+      Trailtie.register(ShopEngine);
+      ShopEngine.instance().config.tableNamePrefix = "shop_";
+      expect(ShopEngine.instance().tableNamePrefix()).toBe("shop_");
+    });
+
+    it("falls back to `${engine_name}_` when isolated and unset", () => {
+      class IsoEngine extends Engine {}
+      Trailtie.register(IsoEngine);
+      IsoEngine.isolated(true);
+      expect(IsoEngine.instance().tableNamePrefix()).toBe("iso_engine_");
+    });
+  });
+
+  it("config.eager_load_namespaces accumulates across engines", () => {
+    class A extends Engine {}
+    class B extends Engine {}
+    Trailtie.register(A);
+    Trailtie.register(B);
+    const before = A.instance().config.eagerLoadNamespaces.length;
+    A.instance().config.eagerLoadNamespaces.push("ANs");
+    B.instance().config.eagerLoadNamespaces.push("BNs");
+    expect(A.instance().config.eagerLoadNamespaces).toBe(B.instance().config.eagerLoadNamespaces);
+    expect(A.instance().config.eagerLoadNamespaces.length).toBe(before + 2);
+  });
+
+  it("routes lazily instantiates routeSetClass, append-buffers blocks, and hasRoutes flips", () => {
+    const blocks: Array<() => void> = [];
+    class FakeRouteSet {
+      constructor(public cfg: EngineConfiguration) {}
+      append(b: () => void): void {
+        blocks.push(b);
+      }
+    }
+    class MountedEngine extends Engine {}
+    Trailtie.register(MountedEngine);
+    expect(MountedEngine.instance().hasRoutes()).toBe(false);
+    MountedEngine.instance().config.routeSetClass = FakeRouteSet;
+    const r1 = MountedEngine.instance().routes(() => {});
+    expect(r1).toBeInstanceOf(FakeRouteSet);
+    expect(MountedEngine.instance().routes(() => {})).toBe(r1);
+    expect(blocks).toHaveLength(2);
+    expect(MountedEngine.instance().hasRoutes()).toBe(true);
+  });
+
+  it("generators(block) yields a mutable options bag", () => {
+    const cfg = new EngineConfiguration();
+    cfg.generators((g) => {
+      g.orm = "active_record";
+    });
+    expect(cfg.generators()).toEqual({ orm: "active_record" });
   });
 
   it("railties returns a Trailties collection over registered subclasses", () => {
