@@ -8,16 +8,21 @@ import {
   tableize as _tableize,
   dasherize as _dasherize,
 } from "@blazetrails/activesupport";
+import * as Actions from "./actions.js";
+import type { GeneratorActionsState } from "./actions.js";
 
 export interface GeneratorOptions {
   cwd: string;
   output: (msg: string) => void;
 }
 
-export abstract class GeneratorBase {
-  protected cwd: string;
-  protected output: (msg: string) => void;
+export abstract class GeneratorBase implements GeneratorActionsState {
+  cwd: string;
+  output: (msg: string) => void;
   protected createdFiles: string[] = [];
+  pendingGenerators: Array<{ what: string; args: string[] }> = [];
+
+  generate = Actions.generate;
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;

@@ -320,8 +320,16 @@ When PR 2.5 lands, wire `Rails.application.encrypted` and delegate.
 
 **Split if needed:**
 
-- **1.10** — `gem`, `route`, `environment`, `generate` + smoke
-- **1.10b** — `git`, `after_bundle`, `rake`, `add_source` + full tests
+- **1.10** — `generate` + `app:template` command + smoke
+- **1.10b** — `git`, `after_bundle`, `rake` + full tests
+- **Unported (no trails equivalent — DSL targets Ruby files that don't
+  exist in a trails app):**
+  - `gem`, `gem_group`, `github`, `add_source` — trails uses
+    `package.json`, not a Gemfile
+  - `route` — trails uses `src/config/routes.ts` with a `// routes`
+    marker; the Ruby `namespace :x do ... end` syntax isn't valid TS
+  - `environment`, `application` — trails uses `src/config/application.ts`
+    and TS env files, not `config/application.rb`
 
 ### PR 1.11 — Rails-specific Rack middleware (~150 LOC)
 

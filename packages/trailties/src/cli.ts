@@ -7,6 +7,7 @@ import { dbCommand } from "./commands/db.js";
 import { routesCommand } from "./commands/routes.js";
 import { consoleCommand } from "./commands/console.js";
 import { destroyCommand } from "./commands/destroy.js";
+import { appTemplateCommand } from "./commands/app.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -24,6 +25,7 @@ export function createProgram(): Command {
   program.addCommand(routesCommand());
   program.addCommand(consoleCommand());
   program.addCommand(destroyCommand());
+  program.addCommand(appTemplateCommand());
 
   return program;
 }
