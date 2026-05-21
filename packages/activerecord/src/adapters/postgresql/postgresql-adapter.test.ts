@@ -21,6 +21,74 @@ import {
 } from "../../errors.js";
 import { withSecondAdapter } from "../../test-helpers/second-connection.js";
 
+// Run `fn` with `ext` guaranteed disabled; restore the pre-state (enabled
+// or disabled) on exit even if `fn` throws before tearing down whatever it
+// created.
+async function withExtensionDisabled(
+  adapter: PostgreSQLAdapter,
+  ext: string,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const wasEnabled = await adapter.extensionEnabled(ext);
+  const ensureDisabled = wasEnabled ? () => adapter.disableExtension(ext) : async () => {};
+  const restore = wasEnabled
+    ? () => adapter.enableExtension(ext)
+    : () => adapter.disableExtension(ext);
+  await ensureDisabled();
+  try {
+    await fn();
+  } finally {
+    await restore();
+  }
+}
+
+// Same as withExtensionDisabled but inverted: `ext` is guaranteed enabled
+// inside `fn` and its pre-state (enabled or disabled) is restored on exit
+// even if `fn` throws before touching the extension itself.
+async function withExtensionEnabled(
+  adapter: PostgreSQLAdapter,
+  ext: string,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const wasEnabled = await adapter.extensionEnabled(ext);
+  const ensureEnabled = wasEnabled ? async () => {} : () => adapter.enableExtension(ext);
+  const restore = wasEnabled
+    ? () => adapter.enableExtension(ext)
+    : () => adapter.disableExtension(ext);
+  await ensureEnabled();
+  try {
+    await fn();
+  } finally {
+    await restore();
+  }
+}
+
+// PG 15+ supports NULLS NOT DISTINCT on unique indexes. The helpers below
+// gate index creation + expected value on that version so the test body has
+// no version branching.
+const PG_NND_MIN_VERSION = 150000;
+
+async function maybeCreateNullsNotDistinctIndex(adapter: PostgreSQLAdapter): Promise<void> {
+  const version = await adapter.getDatabaseVersion();
+  const creators = {
+    supported: async () =>
+      adapter.exec(
+        `CREATE UNIQUE INDEX "ex_idx_opts_nnd" ON "ex_idx_opts" ("n") NULLS NOT DISTINCT`,
+      ),
+    unsupported: async () => {},
+  };
+  await creators[version >= PG_NND_MIN_VERSION ? "supported" : "unsupported"]();
+}
+
+async function expectedNullsNotDistinctValue(
+  adapter: PostgreSQLAdapter,
+): Promise<boolean | undefined> {
+  const version = await adapter.getDatabaseVersion();
+  return ({ supported: true, unsupported: undefined } as const)[
+    version >= PG_NND_MIN_VERSION ? "supported" : "unsupported"
+  ];
+}
+
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
@@ -107,24 +175,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("indexes() returns where and nullsNotDistinct from definition", async () => {
       await adapter.exec(`CREATE TABLE "ex_idx_opts" ("id" SERIAL PRIMARY KEY, "n" INTEGER)`);
       await adapter.exec(`CREATE INDEX "ex_idx_opts_where" ON "ex_idx_opts" ("n") WHERE n > 0`);
-      const pgVersion = await adapter.getDatabaseVersion();
-      const supportsNnd = pgVersion >= 150000;
-      if (supportsNnd) {
-        await adapter.exec(
-          `CREATE UNIQUE INDEX "ex_idx_opts_nnd" ON "ex_idx_opts" ("n") NULLS NOT DISTINCT`,
-        );
-      }
+      await maybeCreateNullsNotDistinctIndex(adapter);
       const indexes = await adapter.indexes("ex_idx_opts");
       const whereIdx = indexes.find((i) => i.name === "ex_idx_opts_where") as
         | { where?: string }
         | undefined;
       expect(whereIdx?.where).toMatch(/n > 0/);
-      if (supportsNnd) {
-        const nndIdx = indexes.find((i) => i.name === "ex_idx_opts_nnd") as
-          | { nullsNotDistinct?: boolean }
-          | undefined;
-        expect(nndIdx?.nullsNotDistinct).toBe(true);
-      }
+      const nndIdx = indexes.find((i) => i.name === "ex_idx_opts_nnd") as
+        | { nullsNotDistinct?: boolean }
+        | undefined;
+      expect(nndIdx?.nullsNotDistinct).toBe(await expectedNullsNotDistinctValue(adapter));
     });
 
     it("index with opclass", async () => {
@@ -1011,34 +1071,32 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("extensions omits current schema name", async () => {
-      const wasEnabled = await adapter.extensionEnabled("hstore");
-      if (wasEnabled) await adapter.disableExtension("hstore");
-      await adapter.exec(`CREATE SCHEMA IF NOT EXISTS customschema`);
-      try {
-        await adapter.exec(`CREATE EXTENSION hstore SCHEMA customschema`);
-        const exts = await adapter.extensions();
-        expect(exts).toContain("customschema.hstore");
-      } finally {
-        await adapter.exec(`DROP SCHEMA IF EXISTS customschema CASCADE`);
-        if (wasEnabled) await adapter.enableExtension("hstore");
-      }
+      await withExtensionDisabled(adapter, "hstore", async () => {
+        await adapter.exec(`CREATE SCHEMA IF NOT EXISTS customschema`);
+        try {
+          await adapter.exec(`CREATE EXTENSION hstore SCHEMA customschema`);
+          const exts = await adapter.extensions();
+          expect(exts).toContain("customschema.hstore");
+        } finally {
+          await adapter.exec(`DROP SCHEMA IF EXISTS customschema CASCADE`);
+        }
+      });
     });
 
     it("extensions includes non current schema name", async () => {
-      const wasEnabled = await adapter.extensionEnabled("hstore");
       const currentSchemaRows = await adapter.execute(
         `SELECT quote_ident(current_schema()) AS quoted_current_schema`,
       );
       const quotedCurrentSchema = currentSchemaRows[0].quoted_current_schema as string;
-      if (wasEnabled) await adapter.disableExtension("hstore");
-      try {
-        await adapter.exec(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
-        const exts = await adapter.extensions();
-        expect(exts).toContain("hstore");
-      } finally {
-        await adapter.exec(`DROP EXTENSION IF EXISTS hstore`);
-        if (wasEnabled) await adapter.enableExtension("hstore");
-      }
+      await withExtensionDisabled(adapter, "hstore", async () => {
+        try {
+          await adapter.exec(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
+          const exts = await adapter.extensions();
+          expect(exts).toContain("hstore");
+        } finally {
+          await adapter.exec(`DROP EXTENSION IF EXISTS hstore`);
+        }
+      });
     });
     describe("db_warnings_action", () => {
       let savedAction: typeof PostgreSQLAdapter.dbWarningsAction;
@@ -1160,32 +1218,27 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("disable extension with schema", async () => {
-      const wasEnabled = await adapter.extensionEnabled("hstore");
-      if (wasEnabled) await adapter.disableExtension("hstore");
-      await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "ex_extensions"`);
-      try {
-        await adapter.exec(`CREATE EXTENSION "hstore" WITH SCHEMA "ex_extensions"`);
-        const before = await adapter.extensionEnabled("hstore");
-        expect(before).toBe(true);
-        await adapter.disableExtension("hstore", { schema: "ex_extensions" });
-        const after = await adapter.extensionEnabled("hstore");
-        expect(after).toBe(false);
-      } finally {
-        await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
-        if (wasEnabled) await adapter.enableExtension("hstore");
-      }
+      await withExtensionDisabled(adapter, "hstore", async () => {
+        await adapter.exec(`CREATE SCHEMA IF NOT EXISTS "ex_extensions"`);
+        try {
+          await adapter.exec(`CREATE EXTENSION "hstore" WITH SCHEMA "ex_extensions"`);
+          const before = await adapter.extensionEnabled("hstore");
+          expect(before).toBe(true);
+          await adapter.disableExtension("hstore", { schema: "ex_extensions" });
+          const after = await adapter.extensionEnabled("hstore");
+          expect(after).toBe(false);
+        } finally {
+          await adapter.exec(`DROP SCHEMA IF EXISTS "ex_extensions" CASCADE`);
+        }
+      });
     });
 
     it("disable extension without schema", async () => {
-      const wasEnabled = await adapter.extensionEnabled("hstore");
-      if (!wasEnabled) await adapter.enableExtension("hstore");
-      try {
+      await withExtensionEnabled(adapter, "hstore", async () => {
         await adapter.disableExtension("hstore");
         const enabled = await adapter.extensionEnabled("hstore");
         expect(enabled).toBe(false);
-      } finally {
-        if (wasEnabled) await adapter.enableExtension("hstore");
-      }
+      });
     });
     it("connection error", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");

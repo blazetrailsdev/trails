@@ -3490,8 +3490,8 @@ describe("CalculationsTest", () => {
       .scoping(async () => {
         captured = await Topic.findOrCreateBy({ title: "Via class-level entry" });
       });
-    if (captured === null) throw new Error("Expected topic to be present");
-    const topic = captured as Topic;
+    expect(captured).not.toBeNull();
+    const topic = captured!;
     expect(topic.status).toBe("scoped-default");
     expect(topic.title).toBe("Via class-level entry");
   });
@@ -3524,8 +3524,8 @@ describe("CalculationsTest", () => {
         insideScope = await Topic.findBy({ title: "published-only" });
         insideScopeOther = await Topic.findBy({ title: "draft-only" });
       });
-    if (insideScope === null) throw new Error("Expected insideScope to be present");
-    expect((insideScope as Topic).status).toBe("published");
+    expect(insideScope).not.toBeNull();
+    expect((insideScope as Topic | null)!.status).toBe("published");
     // draft-only is excluded by the active where(status: 'published') scope.
     expect(insideScopeOther).toBeNull();
   });
@@ -7284,8 +7284,8 @@ describe("CalculationsTest", () => {
       .scoping(async () => {
         captured = await Topic.firstOrCreate({ title: "via-class-firstOrCreate" });
       });
-    if (captured === null) throw new Error("Expected topic to be present");
-    const topic = captured as InstanceType<typeof Topic>;
+    expect(captured).not.toBeNull();
+    const topic = captured! as InstanceType<typeof Topic>;
     expect(topic.status).toBe("scoped-default");
     expect(topic.title).toBe("via-class-firstOrCreate");
   });
@@ -7300,8 +7300,8 @@ describe("CalculationsTest", () => {
       .scoping(async () => {
         captured = await Topic.firstOrInitialize();
       });
-    if (captured === null) throw new Error("Expected topic to be present");
-    const topic = captured as InstanceType<typeof Topic>;
+    expect(captured).not.toBeNull();
+    const topic = captured! as InstanceType<typeof Topic>;
     expect(topic.isNewRecord()).toBe(true);
     expect(topic.title).toBe("to-be-initialized");
     expect(topic.status).toBe("draft");

@@ -1786,13 +1786,11 @@ describe("BasicsTest", () => {
     expect(ref).toBeDefined();
     expect(ref!.type).toBeDefined();
     // The pk column is loaded from the schema after create; type may vary by adapter
-    // but when both are defined they must match (Rails: pk.sql_type == ref.sql_type)
-    if (pk?.type !== undefined && pk?.type !== null) {
-      expect(pk.type).toBe(ref!.type);
-    } else {
-      // pk not in schema cache — at minimum ref is integer-typed
-      expect(ref!.type).toMatch(/integer|bigint|int/i);
-    }
+    // but ref must always be integer-typed.
+    expect(ref!.type).toMatch(/integer|bigint|int/i);
+    // When pk.type is populated, Rails requires pk.sql_type == ref.sql_type.
+    const pkTypes = pk?.type == null ? [ref!.type] : [pk.type];
+    expect(pkTypes[0]).toBe(ref!.type);
   });
   it("invalid limit", () => {
     class User extends Base {
@@ -2629,8 +2627,7 @@ describe("BasicsTest", () => {
     class Concrete extends AbstractMiddle {}
     expect(Concrete.tableName).toBe("concretes");
   });
-  it("column types on queries on postgresql", async () => {
-    if (adapterType !== "postgres") return;
+  it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
     const { adapter: pgAdapter } = createSidecarTestAdapter();
     const result = await pgAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);

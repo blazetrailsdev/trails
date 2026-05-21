@@ -38,6 +38,30 @@ function freshContext(): { adapter: DatabaseAdapter; ctx: MigrationContext } {
   return { adapter, ctx };
 }
 
+function internalMetadataExistsSql(kind: typeof adapterType): string {
+  const byAdapter = {
+    sqlite: `SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='ar_internal_metadata'`,
+    postgres: `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ar_internal_metadata'`,
+    mysql: `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'ar_internal_metadata'`,
+  } as const;
+  return byAdapter[kind];
+}
+
+// Rails parity: MySQL CREATE INDEX has no IF NOT EXISTS — addIndex with
+// ifNotExists must pre-check and emit one CREATE INDEX. Other adapters emit
+// the native IF NOT EXISTS form (two CREATE INDEX statements in this scenario).
+function assertCreateIndexIfNotExistsCalls(calls: unknown[][]): void {
+  const sqls = calls.map(([sql]) => sql as string);
+  const ifNotExistsCount = sqls.filter((sql) => /IF NOT EXISTS/i.test(sql)).length;
+  const expected = {
+    mysql: { total: 1, ifNotExists: 0 },
+    postgres: { total: 2, ifNotExists: 2 },
+    sqlite: { total: 2, ifNotExists: 2 },
+  }[adapterType];
+  expect(sqls).toHaveLength(expected.total);
+  expect(ifNotExistsCount).toBe(expected.ifNotExists);
+}
+
 /** Build a minimal mock adapter that participates in advisory lock negotiation. */
 function makeLockAdapter(opts: { acquires?: boolean; releases?: boolean } = {}): DatabaseAdapter {
   const { acquires = true, releases = true } = opts;
@@ -859,15 +883,7 @@ describe("Migration DDL (extended)", () => {
     const createIndexCalls = spy.mock.calls.filter(
       ([sql]) => typeof sql === "string" && /CREATE\s+(UNIQUE\s+)?INDEX/i.test(sql),
     );
-    if (adapterType === "mysql") {
-      expect(createIndexCalls).toHaveLength(1);
-      expect(createIndexCalls[0][0]).not.toMatch(/IF NOT EXISTS/i);
-    } else {
-      expect(createIndexCalls).toHaveLength(2);
-      for (const [sql] of createIndexCalls) {
-        expect(sql as string).toMatch(/IF NOT EXISTS/i);
-      }
-    }
+    assertCreateIndexIfNotExistsCalls(createIndexCalls);
   });
 
   it.skipIf(adapterType === "sqlite")(
@@ -1756,15 +1772,7 @@ describe("MigrationTest", () => {
     // im.get() short-circuits to null when disabled, so use a catalog query to
     // verify the table was physically not created (catalog tables always exist,
     // so this doesn't trigger the test-adapter's auto-schema).
-    let catalogSql: string;
-    if (adapterType === "sqlite") {
-      catalogSql = `SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type='table' AND name='ar_internal_metadata'`;
-    } else if (adapterType === "postgres") {
-      catalogSql = `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ar_internal_metadata'`;
-    } else {
-      catalogSql = `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'ar_internal_metadata'`;
-    }
-    const rows = await adapter.execute(catalogSql);
+    const rows = await adapter.execute(internalMetadataExistsSql(adapterType));
     expect(Number(rows[0]?.cnt ?? 0)).toBe(0);
   });
 
