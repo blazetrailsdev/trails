@@ -1,7 +1,7 @@
 # Fixtures port plan
 
-Port the remaining Rails `activerecord/test/fixtures/*.yml` files to TS so
-that ported AR tests can call `useFixtures([...])` instead of inlining
+Tracks the port of Rails `activerecord/test/fixtures/*.yml` to TS so that
+ported AR tests can call `useFixtures([...])` instead of inlining
 `defineSchema()` / row inserts in `beforeAll`. **All 122 fixtures
 translated** (PRs 0–6b + 0.5a–g + 0.75 + 4-late merged 2026-05-20…21).
 `pnpm fixtures:compare` reports **match=94 diff=8 missing=0
@@ -14,7 +14,9 @@ below.
 PR 7 flips `fixtures:compare` MISSING/DIFF to hard-fail and removes the
 four fixtures-related entries from `scripts/api-compare/unported-files.ts`.
 Everything below is what must close (or move to an explicit allow-list)
-first. Cross-referenced to merged PRs and the source finding files under
+first. Cross-referenced to merged PRs; the source finding files this
+section was distilled from live in each PR's GitHub review thread and,
+for contributors running btwhooks locally, under
 `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/`.
 
 ### Compare-script enhancements blocking strict mode (~150 LOC total)
