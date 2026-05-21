@@ -5,12 +5,12 @@
 import { describe, it, expect } from "vitest";
 import { Base, defineEnum } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
-  return createTestAdapter();
+  return createSidecarTestAdapter().adapter;
 }
 
 // ==========================================================================

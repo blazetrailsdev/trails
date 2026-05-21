@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 describe("Relation#unscope — full Rails key coverage", () => {
@@ -25,7 +25,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
   }
 
   beforeEach(() => {
-    adapter = createTestAdapter();
+    ({ adapter } = createSidecarTestAdapter());
     UscAuthor.adapter = adapter;
     UscPost.adapter = adapter;
     registerModel("UscAuthor", UscAuthor);

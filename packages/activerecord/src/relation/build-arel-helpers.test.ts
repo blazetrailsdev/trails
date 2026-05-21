@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base, Relation, UnmodifiableRelation } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 
 class Post extends Base {
   static _tableName = "posts";
@@ -17,7 +17,7 @@ class Post extends Base {
 Post.attribute("id", "integer");
 Post.attribute("title", "string");
 Post.attribute("body", "text");
-Post.adapter = createTestAdapter();
+Post.adapter = createSidecarTestAdapter().adapter;
 
 function relation(): Relation<Post> {
   return Post.all() as unknown as Relation<Post>;

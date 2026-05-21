@@ -12,12 +12,12 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("Relation#where — composite-key form", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: SidecarAdapter;
 
   class CompOrder extends Base {
     static {
@@ -30,7 +30,7 @@ describe("Relation#where — composite-key form", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    ({ adapter: adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, {
       comp_orders: {
         columns: {
