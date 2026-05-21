@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createTestAdapter, getUseTransactionalTests } from "../test-adapter.js";
+import { createTestAdapter } from "../test-adapter.js";
+import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { defineSchema, type ColumnSpec } from "./define-schema.js";
 

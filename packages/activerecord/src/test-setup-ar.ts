@@ -12,7 +12,8 @@
 // for non-test consumers.
 import "@blazetrails/activesupport/sqlite/better-sqlite3";
 import { beforeEach } from "vitest";
-import { resetTestAdapterState, shouldSkipGlobalReset } from "./test-adapter.js";
+import { resetTestAdapterState } from "./test-adapter.js";
+import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
 
 // Wipe shared test-adapter state before every test. The previous lazy
 // "clean up on first DB op of next test" model left a window where a

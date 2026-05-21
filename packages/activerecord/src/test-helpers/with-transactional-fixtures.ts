@@ -1,14 +1,9 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
-import {
-  _restoreDdlTrackers,
-  _snapshotDdlTrackers,
-  getUseTransactionalTests,
-  popSkipGlobalReset,
-  pushSkipGlobalReset,
-  resetTestAdapterState,
-  type TestDatabaseAdapter,
-} from "../test-adapter.js";
+import { resetTestAdapterState, type TestDatabaseAdapter } from "../test-adapter.js";
+import { restoreDdlTrackers, snapshotDdlTrackers } from "./ddl-tracker.js";
+import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
+import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import {
   _restoreAppliedSchemaSignaturesForAdapter,
   _snapshotAppliedSchemaSignaturesForAdapter,
@@ -166,7 +161,7 @@ export function withTransactionalFixtures(
   // `it()` body (whose DDL was rolled back at the DB).
   let outerSig: Map<string, string> | null = null;
   let innerSig: Map<string, string> | null = null;
-  let ddlSnapshot: ReturnType<typeof _snapshotDdlTrackers> | null = null;
+  let ddlSnapshot: ReturnType<typeof snapshotDdlTrackers> | null = null;
 
   beforeAll(() => {
     active = getUseTransactionalTests(getAdapter());
@@ -187,7 +182,7 @@ export function withTransactionalFixtures(
     const [outer, inner] = adapterAndInner(getAdapter());
     outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
     innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
-    ddlSnapshot = _snapshotDdlTrackers();
+    ddlSnapshot = snapshotDdlTrackers();
     // Mirrors Rails ConnectionPool#pin_connection!:
     //   @pinned_connection.begin_transaction joinable: false, _lazy: false
     await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
@@ -201,7 +196,7 @@ export function withTransactionalFixtures(
     const [outer, inner] = adapterAndInner(getAdapter());
     if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
     if (inner && innerSig) _restoreAppliedSchemaSignaturesForAdapter(inner, innerSig);
-    if (ddlSnapshot) _restoreDdlTrackers(ddlSnapshot);
+    if (ddlSnapshot) restoreDdlTrackers(ddlSnapshot);
     outerSig = null;
     innerSig = null;
     ddlSnapshot = null;

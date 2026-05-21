@@ -21,6 +21,11 @@ import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+import {
+  clearDdlTrackers,
+  getCreatedTables,
+  recordDdlTracking,
+} from "./test-helpers/ddl-tracker.js";
 import { Base } from "./base.js";
 import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
@@ -42,13 +47,6 @@ export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
 
 let _sharedAdapter: any = null;
 
-// Schema tracking — what tables/columns have been created. Maintained
-// passively by `recordDdlTracking` after successful CREATE/DROP TABLE,
-// and consumed by `defineSchema`'s cache-invalidation logic
-// (`adapterKnownTables` in test-helpers/define-schema.ts).
-const _createdTables = new Set<string>();
-const _createdColumns = new Map<string, Set<string>>();
-
 // Async-chain visibility flag for `currentTransaction()` / `inTransaction` /
 // `openTransactions` on the wrapper. Set while a `withinNewTransaction` body
 // is executing on this chain so callers in OUR chain see the inner adapter's
@@ -66,225 +64,6 @@ function _txLockStorage(): AsyncContext<true> {
     _txLockHeldAdapter = asyncContext;
   }
   return _txLockHeld;
-}
-
-// Refcount of active `withTransactionalFixtures` scopes. When > 0, the
-// global beforeEach in test-setup-ar.ts skips resetTestAdapterState() so a
-// one-time schema set up in `beforeAll` survives across tests in the file.
-// Refcounted (not a bool) so nested describes / multiple suites that each
-// call withTransactionalFixtures don't clobber an outer scope's skip when
-// an inner scope's afterAll runs. Mirrors Rails ConnectionPool's
-// `@pinned_connections_depth` (connection_pool.rb:327, 345).
-let _skipGlobalResetDepth = 0;
-
-/**
- * Snapshot the global DDL trackers so a wrapping `withTransactionalFixtures`
- * scope can restore them after the outer transaction rolls back. DDL parsed
- * during an `it()` body adds entries to `_createdTables` / `_createdColumns`
- * (via `recordDdlTracking`); the rollback reverts the DDL on the DB side, but
- * the trackers would otherwise report the rolled-back table as still-created.
- *
- * Today this is harmless because `defineSchema` consults its signature cache
- * first (which is snapshot/restored via `_snapshotAppliedSchemaSignaturesForAdapter`).
- * But a future test pattern — `defineSchema` in `beforeAll` plus raw
- * `createTable` inside an `it()` body — would leak. Snapshot/restore plugs
- * that gap before it surfaces.
- *
- * @internal
- */
-export function _snapshotDdlTrackers(): {
-  tables: Set<string>;
-  columns: Map<string, Set<string>>;
-} {
-  const columns = new Map<string, Set<string>>();
-  for (const [k, v] of _createdColumns) columns.set(k, new Set(v));
-  return { tables: new Set(_createdTables), columns };
-}
-
-/** @internal */
-export function _restoreDdlTrackers(snapshot: {
-  tables: Set<string>;
-  columns: Map<string, Set<string>>;
-}): void {
-  _createdTables.clear();
-  for (const t of snapshot.tables) _createdTables.add(t);
-  _createdColumns.clear();
-  for (const [k, v] of snapshot.columns) _createdColumns.set(k, new Set(v));
-}
-
-/** @internal */
-export function pushSkipGlobalReset(): void {
-  _skipGlobalResetDepth += 1;
-}
-
-/** @internal */
-export function popSkipGlobalReset(): number {
-  if (_skipGlobalResetDepth > 0) _skipGlobalResetDepth -= 1;
-  return _skipGlobalResetDepth;
-}
-
-/** @internal */
-export function shouldSkipGlobalReset(): boolean {
-  return _skipGlobalResetDepth > 0;
-}
-
-// Per-adapter opt-out for the Phase 6.3 global BEGIN/ROLLBACK wrap.
-// Mirrors Rails' `self.use_transactional_tests = false` (per-test-class
-// in Rails; per-adapter here since adapters are the per-test-file unit
-// in trails). Written by `defineSchema(..., { useTransactionalTests })`,
-// read by the global `beforeEach` in `test-setup-ar.ts` (B6.3) and by
-// any future helper that needs to know whether transactional fixtures
-// are active. A WeakMap keeps the flag off the adapter's public surface
-// (it's purely a test concern) and avoids leaking adapters across
-// test files.
-const _useTransactionalTests = new WeakMap<object, boolean>();
-
-/** @internal */
-export function setUseTransactionalTests(adapter: object, value: boolean): void {
-  _useTransactionalTests.set(adapter, value);
-}
-
-/**
- * Read the per-adapter opt-out for transactional fixtures. Defaults to
- * `true` when the adapter has never been seen — the Phase 6.3 wrap is
- * on-by-default, and `defineSchema` always records an explicit value
- * before any DDL runs, so an unseen adapter means the file never called
- * `defineSchema` (e.g. test-helper unit tests) and the wrap is harmless.
- *
- * @internal
- */
-export function getUseTransactionalTests(adapter: object): boolean {
-  return _useTransactionalTests.get(adapter) ?? true;
-}
-
-/**
- * Extract the top-level column names from a `CREATE TABLE ... (...)` body.
- * Used to seed `_createdColumns` so `defineSchema`'s cache-invalidation
- * logic has accurate per-table column sets.
- *
- * Tracks paren depth so a nested type like `DECIMAL(10,2)` doesn't count
- * as a top-level comma; identifiers may be quoted with `"`, `` ` ``, or
- * unquoted. Skips quoted SQL literals so a default like `DEFAULT ')'`
- * doesn't close the column list. Returns `Set(["id"])` if no body is found.
- *
- * @internal exported for unit testing.
- */
-export function parseCreateTableColumns(sql: string): Set<string> {
-  const m = sql.match(/CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`]?\w+["`]?\s*\(/i);
-  if (!m) return new Set(["id"]);
-  const start = m.index! + m[0].length;
-
-  // Walk the body tracking paren depth, but skip over quoted literals so a
-  // `DEFAULT ')'` in a column definition doesn't close the column list.
-  // Supports single-quoted SQL strings (with `''` escape), double/backtick-
-  // quoted identifiers (which may legitimately contain parens), and MySQL's
-  // `\)` escape inside single-quoted strings.
-  const skipQuoted = (i: number, quote: string): number => {
-    i++;
-    while (i < sql.length) {
-      const ch = sql[i];
-      if (quote === "'" && ch === "\\" && i + 1 < sql.length) {
-        i += 2;
-        continue;
-      }
-      if (ch === quote) {
-        if (quote === "'" && sql[i + 1] === "'") {
-          i += 2;
-          continue;
-        }
-        return i + 1;
-      }
-      i++;
-    }
-    return i;
-  };
-
-  let depth = 1;
-  let end = -1;
-  let i = start;
-  while (i < sql.length) {
-    const ch = sql[i];
-    if (ch === "'" || ch === '"' || ch === "`") {
-      i = skipQuoted(i, ch);
-      continue;
-    }
-    if (ch === "(") depth++;
-    else if (ch === ")") {
-      depth--;
-      if (depth === 0) {
-        end = i;
-        break;
-      }
-    }
-    i++;
-  }
-  if (end < 0) return new Set(["id"]);
-
-  const cols = new Set<string>();
-  const body = sql.slice(start, end);
-  let part = "";
-  let pd = 0;
-  const flush = () => {
-    const piece = part.trim();
-    part = "";
-    if (!piece) return;
-    // Skip table-level constraints: PRIMARY KEY (...), FOREIGN KEY, UNIQUE, INDEX, KEY, CHECK, CONSTRAINT.
-    if (/^(PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE\b|INDEX\b|KEY\b|CHECK\b|CONSTRAINT\b)/i.test(piece))
-      return;
-    const colMatch = piece.match(/^(?:["`](\w+)["`]|(\w+))/);
-    if (colMatch) cols.add(colMatch[1] ?? colMatch[2]);
-  };
-  let j = 0;
-  while (j < body.length) {
-    const ch = body[j];
-    if (ch === "'" || ch === '"' || ch === "`") {
-      const next = skipQuoted(start + j, ch) - start;
-      part += body.slice(j, next);
-      j = next;
-      continue;
-    }
-    if (ch === "(") pd++;
-    else if (ch === ")") pd--;
-    if (ch === "," && pd === 0) {
-      flush();
-      j++;
-      continue;
-    }
-    part += ch;
-    j++;
-  }
-  flush();
-  if (cols.size === 0) cols.add("id");
-  return cols;
-}
-
-/**
- * Update `_createdTables`/`_createdColumns` after a CREATE TABLE or DROP TABLE
- * has successfully executed. For CREATE: when the table was already tracked,
- * the CREATE was likely `IF NOT EXISTS` against a pre-existing table whose
- * real column set may differ from the SQL we're parsing — fall back to
- * `{id}` rather than recording columns that might not exist.
- *
- * @internal
- */
-function recordDdlTracking(
-  sql: string,
-  createMatch: RegExpMatchArray | null,
-  dropMatch: RegExpMatchArray | null,
-): void {
-  if (createMatch) {
-    const table = createMatch[1] ?? createMatch[2];
-    const wasTracked = _createdTables.has(table);
-    _createdTables.add(table);
-    if (!_createdColumns.has(table)) {
-      _createdColumns.set(table, wasTracked ? new Set(["id"]) : parseCreateTableColumns(sql));
-    }
-  }
-  if (dropMatch) {
-    const table = dropMatch[1] ?? dropMatch[2];
-    _createdTables.delete(table);
-    _createdColumns.delete(table);
-  }
 }
 
 let _factory: () => TestAdapterFixtures;
@@ -370,8 +149,7 @@ export async function resetTestAdapterState(): Promise<void> {
     await dropAllTables(_sharedAdapter);
     _sharedAdapter.schemaCache?.clear();
   }
-  _createdTables.clear();
-  _createdColumns.clear();
+  clearDdlTrackers();
   Base._modelsByName.clear();
 }
 
@@ -485,7 +263,7 @@ class TestAdapterFixtures implements DatabaseAdapter {
 
   /** Expose created tables for test introspection. */
   get tables(): Set<string> {
-    return _createdTables;
+    return getCreatedTables();
   }
 
   async execute(sql: string, binds?: unknown[], name?: string): Promise<Record<string, unknown>[]> {
