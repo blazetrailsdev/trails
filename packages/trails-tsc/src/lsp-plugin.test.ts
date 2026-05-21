@@ -56,4 +56,24 @@ describe("lspPluginInit", () => {
       path.join(root, "app/views/users/show.html.tse"),
     ]);
   });
+
+  it("infers script kind by extension when host lacks getScriptKind, and honors config.viewsDir", () => {
+    const host = { ...makeHost({}), getScriptKind: undefined } as ts.LanguageServiceHost;
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-lsp-cfg-"));
+    fs.mkdirSync(path.join(root, "src/templates"), { recursive: true });
+    fs.writeFileSync(path.join(root, "src/templates/x.html.tse"), "x");
+    const plugin = init({ typescript: ts });
+    plugin.create({
+      languageService: {} as ts.LanguageService,
+      languageServiceHost: host,
+      project: { getCurrentDirectory: () => root },
+      config: { viewsDir: "src/templates" },
+    });
+    expect(host.getScriptKind!("/a.ts")).toBe(ts.ScriptKind.TS);
+    expect(host.getScriptKind!("/a.json")).toBe(ts.ScriptKind.JSON);
+    expect(host.getScriptKind!("/a.tse")).toBe(ts.ScriptKind.TS);
+    expect(plugin.getExternalFiles({ getCurrentDirectory: () => root })).toEqual([
+      path.join(root, "src/templates/x.html.tse"),
+    ]);
+  });
 });

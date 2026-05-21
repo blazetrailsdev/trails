@@ -24,6 +24,11 @@ export function init(modules: { typescript: typeof ts }): {
   getExternalFiles(project: { getCurrentDirectory(): string }): string[];
 } {
   const tsLib = modules.typescript;
+  // Per-project `viewsDir` resolved from plugin config, keyed by the
+  // project's current directory so multiple loaded projects don't clobber
+  // each other's setting. `getExternalFiles` only receives a bare project
+  // handle, so this is the only place the config can survive between calls.
+  const viewsRootByCwd = new Map<string, string>();
 
   const virtualize = (content: string): string => {
     try {
@@ -34,8 +39,29 @@ export function init(modules: { typescript: typeof ts }): {
     }
   };
 
+  // Mirror tsserver's filename-based dispatch for the case where the
+  // host doesn't implement `getScriptKind`. Without this, our wrapper
+  // would mask every non-.tse file as `Unknown` — breaking .ts/.tsx
+  // diagnostics in any host that relied on TS's default inference.
+  const inferKindFromExt = (p: string): ts.ScriptKind => {
+    const e = p.slice(p.lastIndexOf(".")).toLowerCase();
+    return e === ".ts"
+      ? tsLib.ScriptKind.TS
+      : e === ".tsx"
+        ? tsLib.ScriptKind.TSX
+        : e === ".js"
+          ? tsLib.ScriptKind.JS
+          : e === ".jsx"
+            ? tsLib.ScriptKind.JSX
+            : e === ".json"
+              ? tsLib.ScriptKind.JSON
+              : tsLib.ScriptKind.Unknown;
+  };
+
   return {
     create(info) {
+      const cwd = info.project.getCurrentDirectory();
+      viewsRootByCwd.set(cwd, path.resolve(cwd, info.config.viewsDir ?? "app/views"));
       const host = info.languageServiceHost;
       const origReadFile = host.readFile?.bind(host);
       const origGetSnapshot = host.getScriptSnapshot.bind(host);
@@ -60,15 +86,14 @@ export function init(modules: { typescript: typeof ts }): {
       };
 
       host.getScriptKind = (p) =>
-        p.endsWith(".tse")
-          ? tsLib.ScriptKind.TS
-          : (origGetScriptKind?.(p) ?? tsLib.ScriptKind.Unknown);
+        p.endsWith(".tse") ? tsLib.ScriptKind.TS : (origGetScriptKind?.(p) ?? inferKindFromExt(p));
 
       return info.languageService;
     },
 
     getExternalFiles(project) {
-      return listTseFiles(path.resolve(project.getCurrentDirectory(), "app/views"));
+      const cwd = project.getCurrentDirectory();
+      return listTseFiles(viewsRootByCwd.get(cwd) ?? path.resolve(cwd, "app/views"));
     },
   };
 }
