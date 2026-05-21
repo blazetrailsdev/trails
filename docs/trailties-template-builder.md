@@ -55,7 +55,7 @@ codified hard rule.
 ```ts
 // packages/trailties/src/template-builder/index.ts
 
-declare const REF_BRAND: unique symbol;
+declare const refBrand: unique symbol;
 
 /**
  * Opaque branded identifier. Structurally NOT constructible — the
@@ -63,11 +63,11 @@ declare const REF_BRAND: unique symbol;
  * ways to obtain a `Ref` are `ref(...)` and the `*.refs` field on the
  * result of a `tsImport*` call.
  */
-export type Ref = { readonly [REF_BRAND]: true; readonly name: string; readonly from?: string };
+export type Ref = { readonly [refBrand]: true; readonly name: string; readonly from?: string };
 
 /** Tagged-template result carrying refs through interpolation. */
 export type Type = {
-  readonly [REF_BRAND]: "type";
+  readonly [refBrand]: "type";
   readonly text: string;
   readonly refs: readonly Ref[];
 };
@@ -119,7 +119,7 @@ export function tsMethod(opts: Method): Method;
 
 /** Dedent + ref-carrying tagged template for method bodies. */
 export type Body = {
-  readonly [REF_BRAND]: "body";
+  readonly [refBrand]: "body";
   readonly text: string;
   readonly refs: readonly Ref[];
 };
@@ -128,7 +128,7 @@ export function tsBody(parts: TemplateStringsArray, ...interps: Array<Ref | stri
 export interface ClassDecl {
   readonly __kind: "class";
   name: string;
-  extends?: Ref; // must be a Ref, not a string — Ref's REF_BRAND enforces this
+  extends?: Ref; // must be a Ref, not a string — Ref's refBrand enforces this
   implements?: Ref[];
   exported?: boolean; // defaults true
   body: Array<Field | Method>;
@@ -168,8 +168,8 @@ symbol`, so it cannot be constructed structurally — the only ways
   load-bearing constraint that blocks the Ruby-emission failure mode.
 - **Declarations use a public `__kind` discriminator.** `ClassDecl` /
   `InterfaceDecl` / `RawDecl` are discriminated by a runtime
-  `__kind: "class" | "interface" | "raw"` field, not the `REF_BRAND`
-  unique symbol. The `REF_BRAND` is type-level only (never assigned
+  `__kind: "class" | "interface" | "raw"` field, not the `refBrand`
+  unique symbol. The `refBrand` is type-level only (never assigned
   at runtime), so declarations need a real runtime field for
   `tsModule`'s dispatch. Constructor exclusivity is provided by the
   `tsClass` / `tsInterface` / `tsRaw` factories; the brand-level

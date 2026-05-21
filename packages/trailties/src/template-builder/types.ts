@@ -1,14 +1,14 @@
 /** @internal */
-declare const REF_BRAND: unique symbol;
+declare const refBrand: unique symbol;
 
-export type Ref = { readonly [REF_BRAND]: true; readonly name: string; readonly from?: string };
+export type Ref = { readonly [refBrand]: true; readonly name: string; readonly from?: string };
 export type Type = {
-  readonly [REF_BRAND]: "type";
+  readonly [refBrand]: "type";
   readonly text: string;
   readonly refs: readonly Ref[];
 };
 export type Body = {
-  readonly [REF_BRAND]: "body";
+  readonly [refBrand]: "body";
   readonly text: string;
   readonly refs: readonly Ref[];
 };
