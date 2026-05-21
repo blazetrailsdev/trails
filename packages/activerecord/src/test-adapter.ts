@@ -19,6 +19,7 @@ import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
+import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
@@ -117,6 +118,17 @@ export function createTestAdapter(): TestDatabaseAdapter {
 }
 
 /**
+ * Adapter shape returned by {@link createSidecarTestAdapter}. The shared
+ * real adapter is always one of the concrete `AbstractAdapter` subclasses
+ * (SQLite3 / PostgreSQL / Mysql2), so `transactionManager` is guaranteed
+ * at runtime. Exposing it on the type lets sidecar callers satisfy
+ * {@link TransactionalFixturesAdapter} without casts.
+ *
+ * @internal
+ */
+export type SidecarAdapter = DatabaseAdapter & { transactionManager: TransactionManager };
+
+/**
  * Path 2 sidecar factory: returns the shared real {@link DatabaseAdapter}
  * directly alongside a fresh {@link SidecarFixtures} handle. Use this
  * when migrating off the `TestAdapterFixtures` wrapper — callers can
@@ -129,7 +141,7 @@ export function createTestAdapter(): TestDatabaseAdapter {
  * @internal
  */
 export function createSidecarTestAdapter(): {
-  adapter: DatabaseAdapter;
+  adapter: SidecarAdapter;
   fixtures: SidecarFixtures;
 } {
   return { adapter: _sharedAdapter, fixtures: new SidecarFixtures(_sharedAdapter) };
