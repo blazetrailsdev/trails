@@ -19,6 +19,25 @@ import type { DatabaseAdapter } from "./adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 
+async function assertUpsertConflictTargetBehavior(
+  Book: any,
+  existing: any,
+  supports: boolean,
+): Promise<void> {
+  const args = [{ id: existing.id, title: "Updated", author: "Author" }];
+  const opts = { uniqueBy: "id" } as const;
+  if (supports) {
+    await Book.upsertAll(args, opts);
+    const found = await Book.find(existing.id);
+    expect(found.title).toBe("Updated");
+    return;
+  }
+  // Rails parity: insert_all.rb#find_unique_index_for raises ArgumentError
+  // when :unique_by is given to an adapter without conflict-target support
+  // (MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax).
+  await expect(Book.upsertAll(args, opts)).rejects.toThrow(/does not support :uniqueBy/);
+}
+
 // -- Helpers --
 function freshAdapter(): DatabaseAdapter {
   return createTestAdapter();
@@ -205,18 +224,7 @@ describe("InsertAllTest", () => {
     // Read from adapterType, not adapter.supportsInsertConflictTarget(): PG's
     // implementation reads databaseVersion synchronously, which throws before
     // the first connection has populated the version cache.
-    if (supportsConflictTarget) {
-      await Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" });
-      const found = await Book.find(b.id);
-      expect(found.title).toBe("Updated");
-    } else {
-      // Rails parity: insert_all.rb#find_unique_index_for raises ArgumentError
-      // when :unique_by is given to an adapter without conflict-target support
-      // (MySQL's ON DUPLICATE KEY UPDATE has no conflict-target syntax).
-      await expect(
-        Book.upsertAll([{ id: b.id, title: "Updated", author: "Author" }], { uniqueBy: "id" }),
-      ).rejects.toThrow(/does not support :uniqueBy/);
-    }
+    await assertUpsertConflictTargetBehavior(Book, b, supportsConflictTarget);
   });
 
   it.skip("insert all raises on duplicate records", () => {

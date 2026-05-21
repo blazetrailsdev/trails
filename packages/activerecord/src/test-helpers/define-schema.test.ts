@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
+import { adapterType, createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
 import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import type { DatabaseAdapter } from "../adapter.js";
 import { clearAppliedSchemaSignatures, defineSchema, type ColumnSpec } from "./define-schema.js";
@@ -230,9 +230,8 @@ describe("defineSchema", () => {
   // PG-only-type guards fire only on MySQL/SQLite — skip these when the
   // test adapter resolves to PG. PG positive path lives in
   // adapters/postgresql/define-schema-pg-types.test.ts.
-  describe("PG-only column types", () => {
+  describe.skipIf(adapterType === "postgres")("PG-only column types", () => {
     it("rejects citext/hstore/uuid/interval/oid against non-PG adapters", async () => {
-      if (adapter.adapterName === "postgres") return;
       for (const ty of ["citext", "hstore", "uuid", "interval", "oid"] as const) {
         await expect(
           defineSchema(adapter, { t: { col: ty } }, { dropExisting: true }),
@@ -241,7 +240,6 @@ describe("defineSchema", () => {
     });
 
     it("rejects array:true against non-PG adapters", async () => {
-      if (adapter.adapterName === "postgres") return;
       await expect(
         defineSchema(adapter, {
           t: { tags: { type: "integer", array: true } },

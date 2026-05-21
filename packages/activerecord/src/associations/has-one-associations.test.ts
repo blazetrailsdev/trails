@@ -724,8 +724,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = await Firm.create({ name: "InvClear" });
     const account = await Account.create({ firm_id: firm.id, credit_limit: 100 });
     // Set inverse on account
-    if (!(account as any)._cachedAssociations) (account as any)._cachedAssociations = new Map();
-    (account as any)._cachedAssociations.set("firm", firm);
+    ((account as any)._cachedAssociations ??= new Map()).set("firm", firm);
     // Clear has_one by setting to null
     await setHasOne(firm, "account", null, { className: "Account", foreignKey: "firm_id" });
     const loaded = await loadHasOne(firm, "account", {

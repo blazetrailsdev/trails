@@ -5701,9 +5701,7 @@ describe("BelongsToAssociationsTest", () => {
     await firm.save();
 
     // Reload by clearing cache and reloading
-    if ((account as any)._cachedAssociations) {
-      (account as any)._cachedAssociations.delete("reloadFirm");
-    }
+    (account as any)._cachedAssociations?.delete("reloadFirm");
     const second = await loadBelongsTo(account, "reloadFirm", {
       className: "ReloadFirm",
       foreignKey: "firm_id",

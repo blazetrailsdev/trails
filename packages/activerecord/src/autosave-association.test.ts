@@ -3035,7 +3035,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     });
     // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
     const reflection = (Pirate as any)._reflectOnAssociation("parrots");
-    if (reflection) addAutosaveAssociationCallbacks(Pirate, reflection);
+    expect(reflection).toBeDefined();
+    addAutosaveAssociationCallbacks(Pirate, reflection);
 
     const pirate = await Pirate.create({ catchphrase: "Arrr" });
     const parrot = await Parrot.create({ name: "Polly" });
@@ -3979,8 +3980,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const invalidBird = new Bird({ name: "" });
-    if (!(pirate as any)._cachedAssociations) (pirate as any)._cachedAssociations = new Map();
-    (pirate as any)._cachedAssociations.set("birds", [invalidBird]);
+    ((pirate as any)._cachedAssociations ??= new Map()).set("birds", [invalidBird]);
     const saved = await pirate.save();
     expect(saved).toBe(false);
   });
