@@ -303,6 +303,7 @@ export { benchmark } from "./benchmarkable.js";
 export type { BenchmarkLogger, BenchmarkOptions } from "./benchmarkable.js";
 
 export { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
+export { NullLogger, nullLogger } from "./null-logger.js";
 export { BroadcastLogger } from "./broadcast-logger.js";
 export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
 export { Subscriber } from "./subscriber.js";
