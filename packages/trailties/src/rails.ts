@@ -2,8 +2,10 @@
 // Renamed `Rails` → `Trails`; `api:compare` wires the alias via the
 // `Rails: "Trails"` entry in `TS_CLASS_RENAMES` (compare.ts).
 //
-// Modeled as a class with static accessors (cf. `log-subscriber.ts`,
-// `digest.ts`) so the api-compare extractor harvests getters/setters —
+// Modeled as a class with static accessors (cf.
+// `packages/activesupport/src/log-subscriber.ts`,
+// `packages/activesupport/src/digest.ts`) so the api-compare extractor
+// harvests getters/setters —
 // `harvestObjectLiteralMethods` ignores accessors on object literals, but
 // the class extractor walks `ts.isGetAccessorDeclaration` for static
 // members. `Trails` is never instantiated.
@@ -132,9 +134,12 @@ export class Trails {
    * order.
    */
   static groups(...args: Array<string | Record<string, string[]>>): string[] {
-    // Rails' `extract_options!` only pops a plain Hash; arrays and other
-    // objects fall through as group identifiers. Require a plain Object
-    // prototype (or null) to mirror that.
+    // Rails' `extract_options!` only pops a plain Hash. The TS signature
+    // restricts callers to `string` group identifiers + an optional
+    // trailing plain object, but at runtime someone could still pass an
+    // array (`String(arr)` would yield a comma-joined identifier). The
+    // plain-Object-prototype check is the defensive guard that mirrors
+    // `extract_options!` exactly.
     const last = args[args.length - 1];
     const isPlainObject =
       last !== null &&
