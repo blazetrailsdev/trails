@@ -1,16 +1,19 @@
 import ts from "typescript";
 
 export function parseTs(source: string): { diagnostics: readonly ts.Diagnostic[] } {
-  const sf = ts.createSourceFile(
-    "__test__.ts",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-  const diagnostics =
-    (sf as unknown as { parseDiagnostics?: ts.Diagnostic[] }).parseDiagnostics ?? [];
-  return { diagnostics };
+  // `transpileModule` with `reportDiagnostics: true` exposes syntactic
+  // diagnostics through the public API — unlike the internal
+  // `SourceFile.parseDiagnostics` field, this contract is stable.
+  const result = ts.transpileModule(source, {
+    reportDiagnostics: true,
+    compilerOptions: {
+      target: ts.ScriptTarget.Latest,
+      module: ts.ModuleKind.ESNext,
+      isolatedModules: true,
+      noEmit: true,
+    },
+  });
+  return { diagnostics: result.diagnostics ?? [] };
 }
 
 const RUBY_RE = /^\s*(class|module|def)\s+\w+($|\s+<)/m;

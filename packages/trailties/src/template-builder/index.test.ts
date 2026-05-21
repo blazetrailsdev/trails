@@ -195,6 +195,37 @@ describe("template-builder", () => {
     assertNoRubySource(out);
   });
 
+  it("promotes a renamed type-only import to value when the binding is used as a value", () => {
+    const local = ref("Local", "x");
+    const out = tsModule({
+      imports: [{ from: "x", typeOnly: true, named: { Local: "Original" } }],
+      declarations: [
+        tsClass({
+          name: "C",
+          body: [
+            tsMethod({ name: "f", params: [], returnType: "void", body: tsBody`new ${local}();` }),
+          ],
+        }),
+      ],
+    });
+    expect(out).toContain(`import { Original as Local } from "x";`);
+    expect(out).not.toContain(`import type { Local }`);
+    expect(out).not.toContain(`import type { Original`);
+  });
+
+  it("reconciles overlapping value + type-only imports for the same binding", () => {
+    const out = tsModule({
+      imports: [
+        { from: "x", named: { Foo: "Foo" } },
+        { from: "x", typeOnly: true, named: { Foo: "Foo", Bar: "Bar" } },
+      ],
+      declarations: [],
+    });
+    expect(out).toContain(`import { Foo } from "x";`);
+    expect(out).toContain(`import type { Bar } from "x";`);
+    expect(out).not.toMatch(/import type \{[^}]*Foo[^}]*\} from "x"/);
+  });
+
   it("auto-imports type-only refs as 'import type' when never used as a value", () => {
     const t = ref("Opts", "./opts.js");
     const out = tsModule({

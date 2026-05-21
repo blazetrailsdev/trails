@@ -91,6 +91,25 @@ export function mergeImports(imports: Import[]): Import[] {
       e.named = merged;
     }
   }
+  // Reconcile value vs type-only entries for the same `from`: any binding
+  // present on the value side should be dropped from the type-only side
+  // (TS treats the duplicate as conflicting; value subsumes type).
+  for (const [key, imp] of map) {
+    if (!imp.typeOnly) continue;
+    const valueTwin = map.get(imp.from);
+    if (!valueTwin) continue;
+    if (imp.default && valueTwin.default === imp.default) imp.default = undefined;
+    if (imp.named) {
+      for (const alias of Object.keys(imp.named)) {
+        if (valueTwin.default === alias) delete imp.named[alias];
+        else if (valueTwin.named && Object.prototype.hasOwnProperty.call(valueTwin.named, alias)) {
+          delete imp.named[alias];
+        }
+      }
+    }
+    const namedEmpty = !imp.named || Object.keys(imp.named).length === 0;
+    if (!imp.default && namedEmpty) map.delete(key);
+  }
   for (const imp of map.values()) {
     if (imp.default && imp.named && Object.prototype.hasOwnProperty.call(imp.named, imp.default)) {
       throw new Error(`Import from "${imp.from}" binds "${imp.default}" as both default and named`);
