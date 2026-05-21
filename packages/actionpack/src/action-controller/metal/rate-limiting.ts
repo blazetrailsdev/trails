@@ -167,7 +167,8 @@ export interface RateLimitingClassHost {
    * missing keys, so plugging it in here will silently disable enforcement
    * (matches Rails — same caveat applies to `ActiveSupport::Cache::MemoryStore`
    * upstream). See the "RateLimiting" entry in
-   * docs/actioncontroller-100-percent.md "Known divergences".
+   * docs/actionpack-100-percent.md, "ActionController — remaining" →
+   * "Known divergences from Rails (intentional)".
    */
   cacheStore?: RateLimitStore | null;
 }
