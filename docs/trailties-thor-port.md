@@ -253,7 +253,7 @@ Thor's gemspec has **zero runtime gem deps** (dev-only `bundler`). Stdlib reache
 
 Enforcement note: `scripts/api-compare/lint-deps.ts` only checks cross-`@blazetrails/*` workspace imports — it does **not** lint Node builtin imports today. Until an ESLint rule (or a `lint-builtins.ts` companion) is added to the lint surface, this rule is **policy enforced at review time**. A bootstrap-track sub-PR can wire up the lint as soon as a Rails-mirroring package needs it — Thor will be the first.
 
-ERB pipeline is already solved: `@blazetrails/tse-compiler`'s compiler-only entry point (`compileJs(source) → { code, sourceMap }`) is exactly the surface `actions/template` needs. We use it with a stripped-down `RenderContext` (just `outputBuffer`, no view helpers) — no separate ERB renderer required.
+ERB pipeline is already solved: `@blazetrails/tse-compiler`'s compiler-only entry point (`compileJs(source) → { code, localsSignature, typesAnnotation }`) is exactly the surface `actions/template` needs. Thor's `actions/template` consumes `code` and ignores the `*Annotation` fields (TSE's typecheck artifacts are TS-tooling concerns, not relevant to a generator that wants `eval`-and-write). We use it with a stripped-down `RenderContext` (just `outputBuffer`, no view helpers) — no separate ERB renderer required.
 
 Workspace deps of `@blazetrails/thor`: `@blazetrails/activesupport` (fs / process / child-process adapters, `SafeString`) and `@blazetrails/tse-compiler` (ERB). Nothing else.
 
