@@ -1,8 +1,14 @@
 import { camelize, type FsAdapter, type PathAdapter } from "@blazetrails/activesupport";
+import {
+  CreateMigration,
+  type CreateMigrationConfig,
+  type CreateMigrationHost,
+  type MigrationRenderer,
+} from "./actions/create-migration.js";
 
-// Mirrors railties/lib/rails/generators/migration.rb. `migration_template`
-// (ERB rendering) is deferred to PR 1.12c where generators are reworked to
-// consume templates.
+// Mirrors railties/lib/rails/generators/migration.rb. ERB template rendering
+// is supplied by the caller (a render callback) until PR 1.12c lands the
+// template pipeline.
 export interface MigrationAssigns {
   migrationNumber: string;
   migrationFileName: string;
@@ -62,4 +68,45 @@ export function buildMigrationAssigns(
     migrationFileName: base,
     migrationClassName: camelize(base),
   };
+}
+
+// Rails source: railties/lib/rails/generators/migration.rb#create_migration.
+// The action runs immediately rather than queuing through a Thor action stack.
+export async function createMigration(
+  host: CreateMigrationHost,
+  destination: string,
+  data: MigrationRenderer,
+  config: CreateMigrationConfig = {},
+): Promise<string> {
+  return new CreateMigration(host, destination, data, config).invoke();
+}
+
+export interface MigrationTemplateHost extends CreateMigrationHost {
+  destinationRoot: string;
+  nextMigrationNumber(dirname: string): Promise<string> | string;
+  setMigrationAssigns(assigns: MigrationAssigns): void;
+}
+
+// Rails source: railties/lib/rails/generators/migration.rb#migration_template.
+// The Rails version reads the ERB source and renders it inline; here the
+// caller supplies a `render` callback that receives the migration assigns
+// (so the EJS/template pipeline can be swapped in later without changing
+// this dispatch).
+export async function migrationTemplate(
+  host: MigrationTemplateHost,
+  destination: string,
+  render: (assigns: MigrationAssigns) => string | Promise<string>,
+  config: CreateMigrationConfig = {},
+): Promise<string> {
+  const resolved = host.path.isAbsolute?.(destination)
+    ? destination
+    : host.path.join(host.destinationRoot, destination);
+  const migrationDir = host.path.dirname(resolved);
+  const nextNumber = String(await host.nextMigrationNumber(migrationDir));
+  const assigns = buildMigrationAssigns(host.path, resolved, nextNumber);
+  host.setMigrationAssigns(assigns);
+  const dir = host.path.dirname(resolved);
+  const baseName = host.path.basename(resolved);
+  const numbered = host.path.join(dir, `${nextNumber}_${baseName}`);
+  return createMigration(host, numbered, () => render(assigns), config);
 }
