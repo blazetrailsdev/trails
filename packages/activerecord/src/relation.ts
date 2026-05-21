@@ -3732,17 +3732,30 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Quote a bare column identifier using the active adapter. Mirrors Rails'
-   * `arel_column` fallback (`yield field` → `connection.quote_table_name(name)`):
-   * an unknown column under a `from(subquery)` context must emit as bare
-   * `"col"` / `` `col` ``, not `table.col`. We can't use
-   * `Nodes.UnqualifiedColumn(table.get(col))` here because the MySQL visitor
-   * overrides that to delegate to the inner Attribute (needed for `UPDATE
-   * SET t.x = t.x + 1`), which re-qualifies the name.
+   * Quote a bare column identifier so an unknown column under a `from(subquery)`
+   * context emits as bare `"col"` / `` `col` `` rather than `table.col`.
+   * Mirrors Rails' `order_column` fallback (query_methods.rb): `Arel.sql(
+   * model.adapter_class.quote_table_name(attr_name), retryable: true)`.
+   * (Rails uses `quote_table_name` for a bare identifier; we use the
+   * adapter's `quoteColumnName` — same emission for a single identifier
+   * on all three dialects.)
+   *
+   * We can't use `Nodes.UnqualifiedColumn(table.get(col))` here: the MySQL
+   * visitor — matching Rails' `arel/visitors/mysql.rb` — overrides that node
+   * to delegate to the inner Attribute (Rails needs the table prefix for
+   * `UPDATE t SET t.x = t.x + 1`), so MySQL would re-qualify.
+   *
+   * Quote against the visitor that will actually emit the SELECT so the
+   * bare identifier matches the rest of the SQL's identifier quoting.
+   * `_compileSelectSql` uses `_selectVisitor()` when defined, else
+   * `manager.toSql()` (which is the global ANSI ToSql).
    * @internal
    */
   private _quoteBareColumn(name: string): string {
-    return this._modelClass.adapter.quoteColumnName(name);
+    if (this._selectVisitor() !== null) {
+      return this._modelClass.adapter.quoteColumnName(name);
+    }
+    return `"${name.replace(/"/g, '""')}"`;
   }
 
   private _applyOrderToManager(manager: SelectManager, table: Table): void {
