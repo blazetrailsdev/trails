@@ -131,16 +131,23 @@ export function init(modules: { typescript: typeof ts }): {
 }
 
 function listTseFiles(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
+  // tsserver re-walks `getExternalFiles` periodically; any throw here
+  // would propagate and disable the plugin. Swallow per-directory errors
+  // (dir removed mid-scan, EACCES, etc.) and return a best-effort list.
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
   const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...listTseFiles(full));
     else if (entry.isFile() && entry.name.endsWith(".tse")) out.push(full);
   }
-  // Sort for stable order across platforms/filesystems — tsserver
-  // re-walks `getExternalFiles` periodically, and an order-only diff
-  // would otherwise churn the project graph.
+  // Sort for stable order across platforms/filesystems — tsserver re-walks
+  // periodically, and an order-only diff would churn the project graph.
   return out.sort();
 }
 

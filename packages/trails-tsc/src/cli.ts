@@ -57,7 +57,12 @@ export function runCli(argv: readonly string[]): number {
       return 1;
     }
   }
-  // `dev`: process stays alive on the open fs.watch handle; SIGINT/SIGTERM close cleanly.
+  // `dev`: process stays alive on the open fs.watch handle; SIGINT/SIGTERM
+  // close cleanly. The initial `buildViews` runs synchronously inside
+  // `watchViews`, so capturing its failure via `onError` lets us exit
+  // non-zero before the watcher takes over the event loop.
+  let initialErr: Error | null = null;
+  let started = false;
   let handle: WatchHandle;
   try {
     handle = watchViews({
@@ -66,12 +71,19 @@ export function runCli(argv: readonly string[]): number {
         process.stdout.write(
           `trails-tsc-views: ${kind === "initial" ? "initial build" : `rebuilt (${trigger ?? "?"})`} — ${result.count} view${result.count === 1 ? "" : "s"}\n`,
         ),
-      onError: (err, trigger) =>
-        process.stderr.write(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}\n`),
+      onError: (err, trigger) => {
+        if (!started) initialErr = err;
+        process.stderr.write(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}\n`);
+      },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     process.stderr.write(`trails-tsc-views: ${msg}\n`);
+    return 1;
+  }
+  started = true;
+  if (initialErr !== null) {
+    handle.close();
     return 1;
   }
   const stop = (): void => {
