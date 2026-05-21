@@ -101,41 +101,7 @@ export class UniquenessValidator extends EachValidator {
       return;
     }
 
-    let relation = buildRelation(
-      modelClass,
-      attribute,
-      mapped,
-      this.options as Record<string, unknown>,
-    );
-
-    if (record.isPersisted?.()) {
-      const pk = modelClass.primaryKey ?? "id";
-      if (Array.isArray(pk)) {
-        const dbVals = pk.map((col: string) =>
-          record._dirty?.attributeChanged(col)
-            ? record._dirty.attributeWas(col)
-            : record.readAttribute(col),
-        );
-        relation = relation.whereNot(pk, [dbVals]);
-      } else {
-        const dbVal = record._dirty?.attributeChanged(pk)
-          ? record._dirty.attributeWas(pk)
-          : record.readAttribute(pk);
-        relation = relation.whereNot({ [pk]: [dbVal] });
-      }
-    }
-
     const opts = this.options as any;
-
-    relation = scopeRelation(record, relation, this.options as Record<string, unknown>);
-
-    if (opts?.conditions && typeof opts.conditions === "function") {
-      const conditioned =
-        opts.conditions.length === 0
-          ? opts.conditions.call(relation)
-          : opts.conditions.call(relation, record);
-      if (conditioned != null) relation = conditioned;
-    }
 
     let asyncValidations = (record as any)._asyncValidationPromises as
       | Promise<unknown>[]
@@ -148,11 +114,46 @@ export class UniquenessValidator extends EachValidator {
     const errorOpts: Record<string, unknown> = { value };
     if (opts?.message != null) errorOpts.message = opts.message;
 
-    const validationPromise = relation.exists().then((exists: boolean) => {
+    const validationPromise = (async () => {
+      let [relation] = await buildRelation(
+        modelClass,
+        attribute,
+        mapped,
+        this.options as Record<string, unknown>,
+      );
+
+      if (record.isPersisted?.()) {
+        const pk = modelClass.primaryKey ?? "id";
+        if (Array.isArray(pk)) {
+          const dbVals = pk.map((col: string) =>
+            record._dirty?.attributeChanged(col)
+              ? record._dirty.attributeWas(col)
+              : record.readAttribute(col),
+          );
+          relation = relation.whereNot(pk, [dbVals]);
+        } else {
+          const dbVal = record._dirty?.attributeChanged(pk)
+            ? record._dirty.attributeWas(pk)
+            : record.readAttribute(pk);
+          relation = relation.whereNot({ [pk]: [dbVal] });
+        }
+      }
+
+      relation = scopeRelation(record, relation, this.options as Record<string, unknown>);
+
+      if (opts?.conditions && typeof opts.conditions === "function") {
+        const conditioned =
+          opts.conditions.length === 0
+            ? opts.conditions.call(relation)
+            : opts.conditions.call(relation, record);
+        if (conditioned != null) relation = conditioned;
+      }
+
+      const exists = await relation.exists();
       if (exists) {
         record.errors.add(attribute, "taken", errorOpts);
       }
-    });
+    })();
     asyncValidations.push(validationPromise);
   }
 }
@@ -287,12 +288,14 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
  *
  * @internal
  */
-function buildRelation(
+async function buildRelation(
   klass: any,
   attribute: string,
   value: unknown,
   options: Record<string, unknown>,
-): any {
+): Promise<[any]> {
+  // Wrapped in a tuple because Relation is thenable — a bare `await` would
+  // execute the query and resolve to the row array.
   const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
   const arel = klass.arelTable as { get?: (n: string) => any } | null;
   const pb = (base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } })
@@ -325,7 +328,7 @@ function buildRelation(
             ? (typeObj as any).type()
             : (typeObj as any).type;
       if (colType !== "uuid") {
-        comparison = adapter?.caseInsensitiveComparison?.(attr, bind) ?? null;
+        comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
         if (comparison == null && typeof value === "string") {
           // No native CI form — fall back to LOWER() with a lowercased bind.
           // Keeps the bind parameterized so the prepared-statement cache
@@ -336,10 +339,10 @@ function buildRelation(
       }
     }
     if (comparison != null && typeof base.where === "function") {
-      return base.where(comparison);
+      return [base.where(comparison)];
     }
   }
-  return base.where({ [attribute]: value });
+  return [base.where({ [attribute]: value })];
 }
 
 /**
