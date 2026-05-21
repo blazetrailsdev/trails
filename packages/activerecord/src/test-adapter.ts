@@ -20,6 +20,7 @@ import { getAsyncContext, type AsyncContext } from "@blazetrails/activesupport";
 import { inspectExplainOption } from "./adapter.js";
 import type { AdapterName, DatabaseAdapter, ExplainOption } from "./adapter.js";
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
+import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { SidecarFixtures } from "./test-helpers/sidecar-fixtures.js";
 import {
@@ -171,6 +172,11 @@ export async function resetTestAdapterState(): Promise<void> {
     await dropAllTables(_sharedAdapter);
     _sharedAdapter.schemaCache?.clear();
   }
+  // Drop every adapter's signature cache, not just `_sharedAdapter`'s. Tests
+  // that construct raw adapters directly (e.g. adapter-cluster tests under
+  // `connection-adapters/**`) also accumulate entries; under the sidecar
+  // shape the wrapper isolation that used to mask this is gone.
+  clearAppliedSchemaSignatures();
   clearDdlTrackers();
   Base._modelsByName.clear();
 }

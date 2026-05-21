@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, createTestAdapter } from "../test-adapter.js";
 import { getUseTransactionalTests } from "./use-transactional-tests.js";
 import type { DatabaseAdapter } from "../adapter.js";
-import { defineSchema, type ColumnSpec } from "./define-schema.js";
+import { clearAppliedSchemaSignatures, defineSchema, type ColumnSpec } from "./define-schema.js";
+import { dropAllTables } from "./drop-all-tables.js";
 
 let adapter: DatabaseAdapter;
 
@@ -371,6 +372,44 @@ describe("defineSchema", () => {
     it("defaults to true for an adapter that never called defineSchema", () => {
       const fresh = createTestAdapter();
       expect(getUseTransactionalTests(fresh)).toBe(true);
+    });
+  });
+
+  describe("clearAppliedSchemaSignatures", () => {
+    // Regression: under the sidecar shape a single shared raw adapter
+    // survives across tests, so the signature cache must be invalidated
+    // alongside dropAllTables — otherwise defineSchema(sameSpec) no-ops
+    // over a now-missing table.
+    //
+    // Use the raw sidecar adapter (no `tables: Set`) so this exercises the
+    // cache-only path. The wrapper's `tables` Set would let
+    // `adapterKnownTables` detect the drop and force DDL re-execution
+    // without the explicit clear, masking the bug.
+    it("re-runs DDL after the table is dropped underneath the cache (per-adapter clear)", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      const spec = { widgets: { name: "string" as ColumnSpec } };
+      await defineSchema(raw, spec);
+      await dropAllTables(raw);
+      clearAppliedSchemaSignatures(raw);
+
+      await defineSchema(raw, spec);
+
+      await expect(
+        raw.executeMutation(`INSERT INTO widgets (name) VALUES ('ok')`),
+      ).resolves.toBeDefined();
+    });
+
+    it("no-arg form rebinds the WeakMap so the next defineSchema re-runs DDL", async () => {
+      const { adapter: raw } = createSidecarTestAdapter();
+      const spec = { gizmos: { name: "string" as ColumnSpec } };
+      await defineSchema(raw, spec);
+      await dropAllTables(raw);
+      clearAppliedSchemaSignatures();
+
+      await defineSchema(raw, spec);
+      await expect(
+        raw.executeMutation(`INSERT INTO gizmos (name) VALUES ('ok')`),
+      ).resolves.toBeDefined();
     });
   });
 });

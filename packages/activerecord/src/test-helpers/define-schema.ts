@@ -229,7 +229,13 @@ const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
  *
  * @internal
  */
-const _appliedSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>();
+// WeakMap so short-lived adapter wrappers (createTestAdapter() returns a
+// fresh wrapper per call, and withTransactionalFixtures skips the global
+// reset between tests) don't accumulate. The no-arg clear below rebinds
+// the WeakMap rather than enumerating — outstanding snapshots from
+// `_snapshotAppliedSchemaSignaturesForAdapter` are independent Map copies
+// so callers holding a snapshot can still restore.
+let _appliedSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>();
 
 /**
  * Snapshot the per-adapter signature cache. Paired with
@@ -258,6 +264,24 @@ export function _restoreAppliedSchemaSignaturesForAdapter(
   snapshot: Map<string, string>,
 ): void {
   _appliedSchemaSignatures.set(adapter, new Map(snapshot));
+}
+
+/**
+ * Drop the cached signature(s) for one adapter (or all adapters when no
+ * argument is given). Paired with `resetTestAdapterState` so the signature
+ * cache stays synchronized with `dropAllTables`: a shared adapter — which
+ * survives across tests under the sidecar shape — would otherwise hold
+ * signatures for tables that no longer exist, making a subsequent
+ * `defineSchema(sameSpec)` no-op over a missing table.
+ *
+ * @internal
+ */
+export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
+  if (adapter) {
+    _appliedSchemaSignatures.delete(adapter);
+  } else {
+    _appliedSchemaSignatures = new WeakMap();
+  }
 }
 
 /** @internal */
