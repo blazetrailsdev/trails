@@ -92,6 +92,7 @@ think one is wrong.
 | User code STI subclass / `Concern.included` registration | User app maintains a central index file (e.g. `app/models/index.ts`). Future tooling in `trails-tsc` will auto-manage these.                                      |
 | `Engine` namespacing replacement                         | Explicit `tableNamePrefix` config option. Module/helper namespacing handled by where the user imports from.                                                       |
 | `Rails.logger` before init                               | `NullLogger` in activesupport (shipped). Wiring into a `Trails` global is PR 2.6.                                                                                 |
+| `Trails.version` source                                  | Trailties `package.json` (via `packages/trailties/src/version.ts`). Trails versions independently from upstream Rails. Resolved in PR 2.6.                        |
 | Activesupport `Trailtie` file location                   | Likely **inside trailties** (`packages/trailties/src/trailties/active-support.ts`) to avoid inverting the trailties → activesupport dependency. PR 2.7a confirms. |
 | Application root-flag file                               | `config.ts` (trails analog of Rails' `config.ru`). `Application.findRoot` walks parents looking for it. See `app-generator.ts:177`.                               |
 
@@ -109,7 +110,6 @@ Every PR must pass:
 | #   | Question                                                                                                                                   | Decide before |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
 | 2   | Where does the activesupport `Trailtie` live (in trailties subdir vs activesupport itself)?                                                | PR 2.7a       |
-| 3   | What does `Rails.version` return — trailties `package.json` version or tracked Rails upstream version?                                     | PR 2.6        |
 | 5   | Convert remaining sync `readdir`/`readFile`/`writeFile` callers to async; promote optional `FsAdapter` async surface to required?          | PR 1.12c      |
 | 6   | Should `Engine#paths()` THROW (Rails-faithful) when `calledFrom` is unset? (Currently returns `Root(null)` per 2.2a/b deviation.)          | PR 2.5c       |
 | 7   | Migration filename separator: align `MigrationGenerator` to Rails `_` (preferred) or broaden helper regexes to accept `_` and `-`?         | PR 1.12c      |

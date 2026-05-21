@@ -3,6 +3,7 @@
 // defaults only — `loadDefaults(version)` version-dispatch + credentials +
 // `databaseConfiguration` are 2.5c or later.
 import { EngineConfiguration } from "../engine/configuration.js";
+import type { Root } from "../paths.js";
 
 export interface PublicFileServer {
   enabled: boolean;
@@ -72,5 +73,18 @@ export class Configuration extends EngineConfiguration {
   }
   reloadingEnabled(): boolean {
     return this.enableReloading;
+  }
+
+  /**
+   * Mirrors `Rails::Application::Configuration#paths`: appends the app-only
+   * path entries (`public`, `tmp`, `log`, …) on top of `EngineConfiguration#paths`.
+   * Only `public` is added today; the remaining Rails entries land with their
+   * respective consumers (PR 2.7-followups). See
+   * `vendor/rails/railties/lib/rails/application/configuration.rb:396`.
+   */
+  override paths(): Root {
+    const paths = super.paths();
+    if (!paths.get("public")) paths.add("public");
+    return paths;
   }
 }
