@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ControllerGenerator emit > matches snapshot for namespaced controller with parent 1`] = `
+"import { AdminController } from "../admin-controller.js";
+
+export class AdminDashboardController extends AdminController {
+  async index(): Promise<void> {
+    // TODO: implement
+  }
+}
+"
+`;
+
+exports[`ControllerGenerator emit > matches snapshot for simple controller 1`] = `
+"import { ActionController } from "@blazetrails/actionpack";
+
+export class AccountController extends ActionController.Base {
+  async index(): Promise<void> {
+    // TODO: implement
+  }
+
+  async show(): Promise<void> {
+    // TODO: implement
+  }
+}
+"
+`;

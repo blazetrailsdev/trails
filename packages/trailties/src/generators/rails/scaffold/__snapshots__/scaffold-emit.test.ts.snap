@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ScaffoldGenerator emit > matches snapshot for the controller and validates as TS without Ruby 1`] = `
+"import { ActionController } from "@blazetrails/actionpack";
+
+export class PostsController extends ActionController.Base {
+  async index(): Promise<void> {
+    // const posts = await Post.all();
+    const posts: any[] = [];
+    this.render({ action: "index", locals: { posts } });
+  }
+
+  async show(): Promise<void> {
+    // const post = await Post.find(this.params.get("id"));
+    const post = { id: this.params.get("id") };
+    this.render({ action: "show", locals: { post } });
+  }
+
+  async new_(): Promise<void> {
+    const post = {};
+    this.render({ action: "new", locals: { post } });
+  }
+
+  async create(): Promise<void> {
+    // const post = await Post.create(this.params.get("post"));
+    this.redirectTo("/posts");
+  }
+
+  async edit(): Promise<void> {
+    // const post = await Post.find(this.params.get("id"));
+    const post = { id: this.params.get("id") };
+    this.render({ action: "edit", locals: { post } });
+  }
+
+  async update(): Promise<void> {
+    // const post = await Post.find(this.params.get("id"));
+    // await post.update(this.params.get("post"));
+    this.redirectTo("/posts/" + this.params.get("id"));
+  }
+
+  async destroy(): Promise<void> {
+    // const post = await Post.find(this.params.get("id"));
+    // await post.destroy();
+    this.redirectTo("/posts");
+  }
+}
+"
+`;
