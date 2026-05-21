@@ -30,17 +30,20 @@ export function generate(
 
 export function git(this: ActionsHost, commands: string | Record<string, string>): void {
   if (typeof commands === "string") {
-    runGitCommand(this, commands, "");
+    // String form is the whole subcommand line: `git("checkout -b foo")`
+    // must spawn ["checkout", "-b", "foo"], not [<the whole string>].
+    const parts = splitArgs(commands);
+    runGitCommand(this, parts[0] ?? "", parts.slice(1));
   } else {
     for (const [cmd, options] of Object.entries(commands)) {
-      runGitCommand(this, cmd, options);
+      runGitCommand(this, cmd, splitArgs(options));
     }
   }
 }
 
-function runGitCommand(host: ActionsHost, cmd: string, options: string): void {
-  const args = [cmd, ...splitArgs(options)];
-  host.output(`           git  ${[cmd, options].filter(Boolean).join(" ")}`);
+function runGitCommand(host: ActionsHost, cmd: string, optionArgs: string[]): void {
+  const args = [cmd, ...optionArgs];
+  host.output(`           git  ${[cmd, ...optionArgs].join(" ").trim()}`);
   getChildProcess().spawnSync("git", args, { cwd: host.cwd });
 }
 

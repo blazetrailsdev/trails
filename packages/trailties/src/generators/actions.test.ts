@@ -59,6 +59,20 @@ describe("ActionsTest", () => {
     expect(calls).toEqual([{ cmd: "git", args: ["init"], options: { cwd: "/tmp" } }]);
   });
 
+  it("git with multi-arg string should split into argv", () => {
+    makeGen().git("checkout -b feature/new");
+    expect(calls).toEqual([
+      { cmd: "git", args: ["checkout", "-b", "feature/new"], options: { cwd: "/tmp" } },
+    ]);
+  });
+
+  it("git with hash containing multi-arg options should split each", () => {
+    makeGen().git({ commit: "-m initial" });
+    expect(calls).toEqual([
+      { cmd: "git", args: ["commit", "-m", "initial"], options: { cwd: "/tmp" } },
+    ]);
+  });
+
   it("git with hash should run each command using git scm", () => {
     makeGen().git({ rm: "README", add: "." });
     expect(calls.map((c) => [c.cmd, ...c.args].join(" "))).toEqual(["git rm README", "git add ."]);
