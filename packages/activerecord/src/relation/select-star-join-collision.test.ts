@@ -23,6 +23,7 @@ import { Associations, loadHasMany } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 describe("SELECT * column collision in joined relations", () => {
   let adapter: TestDatabaseAdapter;
@@ -88,20 +89,21 @@ describe("SELECT * column collision in joined relations", () => {
     ]);
   });
 
-  it.skip("default projection is `<target>.*` always (matches Rails — never bare `*`)", async () => {
+  it("default projection is `<target>.*` always (matches Rails — never bare `*`)", async () => {
     // Always-qualified projection matches Rails'
     // `klass.arel_table[Arel.star]`. Holds with or without joins
     // so the no-joins case isn't a special case the user has to
     // know about.
+    const qUsers = escapeRegExp(quoteTableName("ssj_users"));
     const noJoins = (SsjUser as any).all().toSql();
-    expect(noJoins).toMatch(/SELECT\s+"ssj_users"\.\*/i);
+    expect(noJoins).toMatch(new RegExp(`SELECT\\s+${qUsers}\\.\\*`, "i"));
     expect(noJoins).not.toMatch(/SELECT\s+\*/i);
 
     const withJoins = (SsjUser as any).all().joins("INNER JOIN ssj_friendships ON 1 = 1").toSql();
-    expect(withJoins).toMatch(/SELECT\s+"ssj_users"\.\*/i);
+    expect(withJoins).toMatch(new RegExp(`SELECT\\s+${qUsers}\\.\\*`, "i"));
   });
 
-  it.skip("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", async () => {
+  it("keeps qualified projection even when from() replaces the FROM source (Rails behavior)", async () => {
     // Rails' `Relation#build_select` (query_methods.rb:1909)
     // projects `table[Arel.star]` unconditionally — it doesn't
     // special-case `from()`. The resulting SQL is the caller's
@@ -110,6 +112,8 @@ describe("SELECT * column collision in joined relations", () => {
     // `.select("*")`. We match Rails here rather than silently
     // downgrading to bare `*`.
     const sql = (SsjUser as any).all().from("(SELECT * FROM ssj_users) AS sub").toSql();
-    expect(sql).toMatch(/SELECT\s+"ssj_users"\.\*/i);
+    expect(sql).toMatch(
+      new RegExp(`SELECT\\s+${escapeRegExp(quoteTableName("ssj_users"))}\\.\\*`, "i"),
+    );
   });
 });

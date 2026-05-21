@@ -7,6 +7,7 @@ import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
@@ -70,14 +71,14 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("author_id");
     expect(sql).toMatch(/!=\s*NULL|IS NOT NULL/);
   });
-  it.skip("associated merged with scope on association", () => {
+  it("associated merged with scope on association", () => {
     const sql = Post.all()
       .whereAssociated("author")
       .merge(Author.where({ id: 1 }))
       .toSql();
     expect(sql).toContain("INNER JOIN");
     expect(sql).not.toMatch(/IS NOT NULL/);
-    expect(sql).toContain('"authors"');
+    expect(sql).toContain(quoteTableName("authors"));
   });
 
   it("associated unscoped merged with scope on association", () => {
@@ -334,14 +335,14 @@ describe("WhereChainTest", () => {
     expect(sql).toContain("author_id");
     expect(sql).toContain("IS NULL");
   });
-  it.skip("missing merged with scope on association", () => {
+  it("missing merged with scope on association", () => {
     const sql = Post.all()
       .whereMissing("author")
       .merge(Author.where({ id: 1 }))
       .toSql();
     expect(sql).toMatch(/LEFT.*JOIN/);
     expect(sql).not.toMatch(/IS NULL/);
-    expect(sql).toContain('"authors"');
+    expect(sql).toContain(quoteTableName("authors"));
   });
 
   it("missing unscoped merged with scope on association", () => {

@@ -28,6 +28,7 @@ import { Associations, resolveAssocClass } from "./associations.js";
 import { Table } from "@blazetrails/arel";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
@@ -1132,7 +1133,7 @@ describe("ReflectionTest", () => {
     expect(() => bad.joinPrimaryKey).toThrow(/source association/i);
     expect(() => bad.joinForeignKey).toThrow(/source association/i);
   });
-  it.skip("join scope builds arel predicate for has many", () => {
+  it("join scope builds arel predicate for has many", () => {
     const { Author } = makeModels();
     const ref = reflectOnAssociation(Author, "books") as AssociationReflection;
     const booksTable = new Table("books");
@@ -1140,9 +1141,13 @@ describe("ReflectionTest", () => {
     const scope = ref.joinScope(booksTable, authorsTable, Author);
     const sql = scope.toSql();
     // has_many: books.author_id = authors.id
-    expect(sql).toMatch(/"books"\."author_id" = "authors"\."id"/);
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("books.author_id"))} = ${escapeRegExp(quoteTableName("authors.id"))}`,
+      ),
+    );
   });
-  it.skip("join scope builds arel predicate for belongs to", () => {
+  it("join scope builds arel predicate for belongs to", () => {
     const { Book, Author } = makeModels();
     const ref = reflectOnAssociation(Book, "author") as AssociationReflection;
     const authorsTable = new Table("authors");
@@ -1150,7 +1155,11 @@ describe("ReflectionTest", () => {
     const scope = ref.joinScope(authorsTable, booksTable, Book);
     const sql = scope.toSql();
     // belongs_to: authors.id = books.author_id
-    expect(sql).toMatch(/"authors"\."id" = "books"\."author_id"/);
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("authors.id"))} = ${escapeRegExp(quoteTableName("books.author_id"))}`,
+      ),
+    );
   });
   it.skip("scope chain", () => {
     // BLOCKED: associations — reflection feature gap (macros / options inspection)

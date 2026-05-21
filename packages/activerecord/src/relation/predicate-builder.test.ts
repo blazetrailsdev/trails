@@ -9,6 +9,7 @@ import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js"
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { dropAllTables } from "../test-helpers/drop-all-tables.js";
+import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
@@ -33,7 +34,7 @@ describe("PredicateBuilderTest", () => {
     await dropAllTables(adapter);
   });
 
-  it.skip("registering new handlers", () => {
+  it("registering new handlers", () => {
     class PbTopic extends Base {
       static {
         this.tableName = "topics";
@@ -50,13 +51,15 @@ describe("PredicateBuilderTest", () => {
     });
     try {
       const sql = PbTopic.where({ title: new RegexFilter("rails") }).toSql();
-      expect(sql).toMatch(/"topics"."title" ~ 'rails'/i);
+      expect(sql).toMatch(
+        new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
+      );
     } finally {
       (PbTopic as any)._predicateBuilder = null;
     }
   });
 
-  it.skip("registering new handlers for association", () => {
+  it("registering new handlers for association", () => {
     class PbTopic2 extends Base {
       static {
         this.tableName = "topics";
@@ -84,7 +87,9 @@ describe("PredicateBuilderTest", () => {
     try {
       const sql = PbReply2.where({ pbTopic2: { title: new RegexFilter2("rails") } }).toSql();
       // Handler propagates to associated table — column uses association-resolved table name.
-      expect(sql).toMatch(/"pbTopic2"."title" ~ 'rails'/i);
+      expect(sql).toMatch(
+        new RegExp(`${escapeRegExp(quoteTableName("pbTopic2.title"))} ~ 'rails'`, "i"),
+      );
     } finally {
       modelRegistry.delete("PbTopic2");
       modelRegistry.delete("PbReply2");

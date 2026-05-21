@@ -16,6 +16,7 @@ import { SubclassNotFound, NameError } from "./errors.js";
 import { quoteSqlValue } from "./base.js";
 
 import { createTestAdapter, adapterType, type TestDatabaseAdapter } from "./test-adapter.js";
+import { quoteColumnName } from "./test-helpers/quote-regex.js";
 import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -2424,7 +2425,7 @@ describe("BasicsTest", () => {
   it.skip("connection in utc time", () => {
     // BLOCKED: connection-pool — establish_connection: same as "connection in local time"
   });
-  it.skip("column name properly quoted", () => {
+  it("column name properly quoted", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -2432,7 +2433,7 @@ describe("BasicsTest", () => {
       }
     }
     const sql = User.where({ name: "test" }).toSql();
-    expect(sql).toContain('"name"');
+    expect(sql).toContain(quoteColumnName("name"));
   });
   it("quoting arrays", async () => {
     class Reply extends Base {

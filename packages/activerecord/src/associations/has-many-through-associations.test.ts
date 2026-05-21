@@ -14,6 +14,7 @@ import {
 } from "../associations.js";
 import { CollectionProxy } from "./collection-proxy.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
+import { quoteTableName } from "../test-helpers/quote-regex.js";
 
 const TEST_SCHEMA: Schema = {
   acc_posts: { title: "string" },
@@ -3688,7 +3689,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(count).toBe(2);
   });
 
-  it.skip("inner join with quoted table name", async () => {
+  it("inner join with quoted table name", async () => {
     class IjqPerson extends Base {
       static {
         this.attribute("first_name", "string");
@@ -3730,8 +3731,8 @@ describe("HasManyThroughAssociationsTest", () => {
 
     // Verify through join SQL properly quotes table names
     const sql = IjqPerson.joins("ijqJobs").toSql();
-    expect(sql).toContain('"ijq_references"');
-    expect(sql).toContain('"ijq_jobs"');
+    expect(sql).toContain(quoteTableName("ijq_references"));
+    expect(sql).toContain(quoteTableName("ijq_jobs"));
 
     const jobs = await loadHasManyThrough(person, "ijqJobs", {
       through: "ijqReferences",

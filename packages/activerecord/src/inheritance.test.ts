@@ -7,6 +7,7 @@ import { Base, registerModel, enableSti, registerSubclass, SubclassNotFound } fr
 import { getStiBase, isStiSubclass, setBaseClass } from "./inheritance.js";
 
 import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
+import { quoteTableName } from "./test-helpers/quote-regex.js";
 import { defineSchema, type Schema } from "./test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "./adapter.js";
@@ -253,10 +254,10 @@ describe("InheritanceTest", () => {
     expect(cars.length).toBe(1);
   });
 
-  it.skip("eager load belongs to primary key quoting", async () => {
+  it("eager load belongs to primary key quoting", async () => {
     const { Vehicle } = makeHierarchy();
     const sql = Vehicle.all().toSql();
-    expect(sql).toContain('"vehicles"');
+    expect(sql).toContain(quoteTableName("vehicles"));
   });
 
   // -------------------------------------------------------------------------

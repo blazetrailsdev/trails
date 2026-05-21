@@ -9,6 +9,7 @@ import { Associations } from "../associations.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 // -- Helpers --
@@ -251,7 +252,7 @@ describe("WhereTest", () => {
     expect(sql2).toContain("hello");
     expect(sql2).toContain("world");
   });
-  it.skip("where with table name and target table", () => {
+  it("where with table name and target table", () => {
     class Post extends Base {
       static {
         this._tableName = "posts";
@@ -260,7 +261,7 @@ describe("WhereTest", () => {
       }
     }
     const sql = Post.where({ title: "hello" }).toSql();
-    expect(sql).toContain('"posts"');
+    expect(sql).toContain(quoteTableName("posts"));
     expect(sql).toContain("title");
   });
   it.skip("where with table name and target table joined", () => {
@@ -557,7 +558,7 @@ describe("WhereTest", () => {
     expect(result).toHaveLength(1);
     expect(result[0].author_id).toBe(author.id);
   });
-  it.skip("where with numeric comparison", () => {
+  it("where with numeric comparison", () => {
     class Post extends Base {
       static {
         this.attribute("views", "integer");
@@ -565,7 +566,7 @@ describe("WhereTest", () => {
       }
     }
     const sql = Post.where({ views: 5 }).toSql();
-    expect(sql).toContain('"views"');
+    expect(sql).toContain(quoteColumnName("views"));
     expect(sql).toContain("5");
   });
   it("where with multiple numeric comparisons", () => {

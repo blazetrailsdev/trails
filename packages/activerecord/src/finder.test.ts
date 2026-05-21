@@ -795,15 +795,18 @@ describe("FinderTest", () => {
     expect(Array.isArray(results)).toBe(true);
   });
 
-  it.skip("hash condition find with escaped characters", async () => {
+  it("hash condition find with escaped characters", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
         this.adapter = adapter;
       }
     }
-    const sql = Topic.where({ title: "it's" }).toSql();
-    expect(sql).toContain("it''s");
+    const value = "Ain't noth'n like' #stuff";
+    await Topic.create({ title: value });
+    const found = await Topic.where({ title: value }).first();
+    expect(found).not.toBeNull();
+    expect((found as Topic).title).toBe(value);
   });
 
   it("model class responds to second bang", async () => {

@@ -8,6 +8,7 @@ import { Base } from "../index.js";
 import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
+import { quoteColumnName } from "../test-helpers/quote-regex.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 let _adapter: TestDatabaseAdapter;
@@ -48,7 +49,7 @@ describe("SelectTest", () => {
     expect(sql).toContain("title");
   });
 
-  it.skip("reselect replaces previous select", () => {
+  it("reselect replaces previous select", () => {
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -227,11 +228,11 @@ describe("SelectTest", () => {
     /* needs default_scope with select */
   });
 
-  it.skip("enumerate columns in select statements", () => {
+  it("enumerate columns in select statements", () => {
     const { Developer } = makeModel();
     const sql = Developer.select("name", "salary").toSql();
-    expect(sql).toContain('"name"');
-    expect(sql).toContain('"salary"');
+    expect(sql).toContain(quoteColumnName("name"));
+    expect(sql).toContain(quoteColumnName("salary"));
   });
 
   it.skip("select with block without any arguments", () => {
@@ -348,7 +349,7 @@ describe("Relation Select (Rails-guided)", () => {
     adapter = freshAdapter();
   });
 
-  it.skip("select specific columns in SQL", () => {
+  it("select specific columns in SQL", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -357,7 +358,7 @@ describe("Relation Select (Rails-guided)", () => {
       }
     }
     const sql = User.all().select("name").toSql();
-    expect(sql).toContain('"name"');
+    expect(sql).toContain(quoteColumnName("name"));
     expect(sql).not.toContain("*");
   });
 
@@ -375,7 +376,7 @@ describe("Relation Select (Rails-guided)", () => {
     expect(result).toHaveLength(2);
   });
 
-  it.skip("reselect replaces previous select", () => {
+  it("reselect replaces previous select", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
@@ -384,8 +385,8 @@ describe("Relation Select (Rails-guided)", () => {
       }
     }
     const sql = User.all().select("name").reselect("email").toSql();
-    expect(sql).toContain('"email"');
-    expect(sql).not.toContain('"name"');
+    expect(sql).toContain(quoteColumnName("email"));
+    expect(sql).not.toContain(quoteColumnName("name"));
   });
 
   it("distinct generates DISTINCT SQL", () => {
