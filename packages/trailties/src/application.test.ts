@@ -13,6 +13,22 @@ import {
   type PathAdapter,
 } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
+import { Configuration } from "./application/configuration.js";
+import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
+import {
+  ActionableExceptions,
+  AssumeSSL,
+  Callbacks,
+  ContentSecurityPolicyMiddleware,
+  Cookies,
+  DebugExceptions,
+  HostAuthorization,
+  RequestId,
+  ServerTiming,
+  ShowExceptions,
+  SSL,
+  Static,
+} from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 
@@ -186,5 +202,111 @@ describe("Application", () => {
       expect(names).toContain("initialize_cache");
       expect(names).toContain("bootstrap_hook");
     });
+  });
+});
+
+describe("Application::Configuration", () => {
+  it("defaults match Rails::Application::Configuration#initialize", () => {
+    const c = new Configuration();
+    expect(c.considerAllRequestsLocal).toBe(false);
+    expect(c.apiOnly).toBe(false);
+    expect(c.timeZone).toBe("UTC");
+    expect(c.beginningOfWeek).toBe("monday");
+    expect(c.logLevel).toBe("debug");
+    expect(c.publicFileServer).toEqual({ enabled: true, indexName: "index", headers: null });
+    expect(c.assumeSsl).toBe(false);
+    expect(c.forceSsl).toBe(false);
+    expect(c.hosts).toEqual([]);
+    expect(c.filterParameters).toEqual([]);
+    expect(c.helpersPaths).toEqual([]);
+    expect(c.reloadClassesOnlyOnChange).toBe(true);
+    expect(c.autoflushLog).toBe(true);
+    expect(c.railtiesOrder).toEqual(["all"]);
+    expect(c.rakeEagerLoad).toBe(false);
+    expect(c.serverTiming).toBe(false);
+    expect(c.yjit).toBe(false);
+    expect(c.disableSandbox).toBe(false);
+    expect(c.sandboxByDefault).toBe(false);
+    expect(c.addAutoloadPathsToLoadPath).toBe(true);
+    expect(c.encoding).toBe("utf-8");
+    expect(c.requireMasterKey).toBe(false);
+  });
+
+  it("config.enable_reloading is !config.cache_classes", () => {
+    const c = new Configuration();
+    c.cacheClasses = true;
+    expect(c.enableReloading).toBe(false);
+    c.enableReloading = true;
+    expect(c.cacheClasses).toBe(false);
+    expect(c.reloadingEnabled()).toBe(true);
+  });
+});
+
+describe("Application::DefaultMiddlewareStack", () => {
+  const paths = { public: () => "/public" };
+  const buildApp = () => ({ config: new Configuration() });
+
+  const build = (mutate: (c: Configuration) => void = () => {}) => {
+    const app = buildApp();
+    mutate(app.config);
+    return new DefaultMiddlewareStack(app, app.config, paths)
+      .buildStack()
+      .middlewares.map((m) => m.klass);
+  };
+
+  it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {
+    const k = build();
+    expect(k).toEqual(
+      expect.arrayContaining([RequestId, ShowExceptions, DebugExceptions, Callbacks, Static]),
+    );
+  });
+
+  it("includes HostAuthorization only when config.hosts is non-empty", () => {
+    expect(build()).not.toContain(HostAuthorization);
+    expect(build((c) => (c.hosts = ["example.com"]))).toContain(HostAuthorization);
+  });
+
+  it("includes AssumeSSL when config.assume_ssl is true", () => {
+    expect(build((c) => (c.assumeSsl = true))).toContain(AssumeSSL);
+  });
+
+  it("includes SSL middleware when config.force_ssl is true", () => {
+    expect(build((c) => (c.forceSsl = true))).toContain(SSL);
+  });
+
+  it("excludes Static when public_file_server.enabled is false", () => {
+    expect(build((c) => (c.publicFileServer.enabled = false))).not.toContain(Static);
+  });
+
+  it("includes ServerTiming only when config.server_timing is true", () => {
+    expect(build()).not.toContain(ServerTiming);
+    expect(build((c) => (c.serverTiming = true))).toContain(ServerTiming);
+  });
+
+  it("includes ActionableExceptions only when consider_all_requests_local is true", () => {
+    expect(build()).not.toContain(ActionableExceptions);
+    expect(build((c) => (c.considerAllRequestsLocal = true))).toContain(ActionableExceptions);
+  });
+
+  it("includes Cookies + ContentSecurityPolicyMiddleware unless api_only", () => {
+    expect(build()).toEqual(expect.arrayContaining([Cookies, ContentSecurityPolicyMiddleware]));
+    const apiOnly = build((c) => (c.apiOnly = true));
+    expect(apiOnly).not.toContain(Cookies);
+    expect(apiOnly).not.toContain(ContentSecurityPolicyMiddleware);
+  });
+
+  it("show_exceptions_app falls back to a PublicExceptions instance when exceptions_app is unset", () => {
+    const app = buildApp();
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(stack.middlewares.find((m) => m.klass === ShowExceptions)?.args[0]).toBeTruthy();
+  });
+
+  it("forces session_options.secure when force_ssl + session_store and secure not explicit", () => {
+    const app = buildApp();
+    class FakeSessionStore {}
+    app.config.forceSsl = true;
+    app.config.sessionStore = FakeSessionStore;
+    new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(app.config.sessionOptions.secure).toBe(true);
   });
 });

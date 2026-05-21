@@ -39,6 +39,7 @@ export {
 } from "../action-controller/metal/strong-parameters.js";
 export { urlFor, type UrlOptions } from "./url-for.js";
 export {
+  Cookies,
   CookieJar,
   SignedCookieJar,
   EncryptedCookieJar,
@@ -113,6 +114,8 @@ export {
   type DigestAuthParams,
 } from "./http-authentication.js";
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
+export { ShowExceptions } from "./middleware/show-exceptions.js";
+export { DebugExceptions } from "./middleware/debug-exceptions.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
 export { ActionableExceptions } from "./middleware/actionable-exceptions.js";
 export { Callbacks } from "./middleware/callbacks.js";
