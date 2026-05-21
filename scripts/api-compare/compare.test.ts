@@ -205,6 +205,12 @@ describe("resolveTsClassForRuby", () => {
     expect(resolveTsClassForRuby("Railtie", "trailtie.ts", map)).toBe(trailtie);
   });
 
+  it("resolves Rails → Trails (global trails convention)", () => {
+    const trails = cls("rails.ts", "Trails");
+    const map = new Map([["rails.ts::Trails", trails]]);
+    expect(resolveTsClassForRuby("Rails", "rails.ts", map)).toBe(trails);
+  });
+
   it("returns undefined when nothing resolves", () => {
     expect(resolveTsClassForRuby("Nothing", "nowhere.ts", new Map())).toBeUndefined();
   });

@@ -205,6 +205,23 @@ describe("Application", () => {
   });
 });
 
+describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
+  it("initializes a registered Application subclass and serves a route through actionpack", async () => {
+    const { HelloWorldApp, buildRoutes } = await import("./__fixtures__/hello-world/app.js");
+    const { Trails } = await import("./rails.js");
+    Application.register(HelloWorldApp);
+    expect(Trails.application).toBeInstanceOf(HelloWorldApp);
+    await Trails.application!.initialize();
+    expect(Trails.application!.initialized()).toBe(true);
+    const routes = buildRoutes();
+    const { bodyToString } = await import("@blazetrails/rack");
+    const [status, , body] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/hello" });
+    expect(status).toBe(200);
+    expect(await bodyToString(body)).toBe("hello world");
+    Trails.application = null;
+  });
+});
+
 describe("Application::Configuration", () => {
   it("defaults match Rails::Application::Configuration#initialize", () => {
     const c = new Configuration();

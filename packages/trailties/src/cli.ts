@@ -13,6 +13,11 @@ import { statsCommand } from "./commands/stats.js";
 import { credentialsCommand } from "./commands/credentials.js";
 import { encryptedCommand } from "./commands/encrypted.js";
 
+export { Trails } from "./rails.js";
+export { Application } from "./application.js";
+export { Engine } from "./engine.js";
+export { Trailtie } from "./trailtie.js";
+
 export {
   registerPackageManagerAdapter,
   packageManagerAdapterConfig,
