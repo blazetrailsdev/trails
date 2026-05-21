@@ -25,11 +25,14 @@ export async function discoverMigrations(migrationsDir: string): Promise<Migrati
 
   const rawFiles = fs.readdirSync(migrationsDir).filter((f) => MIGRATION_FILE_PATTERN.test(f));
 
-  // Deduplicate by basename (version-name), preferring .ts over .js
+  // Deduplicate by canonical version_name (underscore form), preferring
+  // .ts over .js. The hyphen alias is transitional; we collapse `-` and
+  // `_` variants of the same migration so a rename doesn't double-load.
   const byBasename = new Map<string, string>();
   for (const file of rawFiles) {
     const ext = path.extname(file);
-    const basename = file.slice(0, -ext.length);
+    const m = file.match(MIGRATION_FILE_PATTERN)!;
+    const basename = `${m[1]}_${m[2]}`;
     const existing = byBasename.get(basename);
 
     if (!existing) {

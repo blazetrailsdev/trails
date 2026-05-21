@@ -100,7 +100,7 @@ const mariaDBService: DockerService = {
 export class MySQL2 extends Database {
   readonly name: string = "mysql";
   readonly template: string = "config/databases/mysql.yml";
-  readonly pkgDependency: PkgDependency = { name: "mysql2", version: "^3.18.0" };
+  readonly pkgDependency: PkgDependency = { name: "mysql2", version: "^3.18.2" };
   override readonly basePackage: string | undefined = "default-mysql-client";
   override readonly buildPackage: string | undefined = "default-libmysqlclient-dev";
   override readonly featureName: string | undefined =
@@ -138,7 +138,7 @@ export class Trilogy extends MySQL2 {
 export class SQLite3 extends Database {
   readonly name = "sqlite3";
   readonly template = "config/databases/sqlite3.yml";
-  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^12.6.0" };
+  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^12.6.2" };
   override readonly basePackage = "sqlite3";
   override readonly featureName = "ghcr.io/rails/devcontainer/features/sqlite3";
 }
