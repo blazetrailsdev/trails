@@ -80,17 +80,16 @@ jobs:
           AR_PKGS_RE='^packages/(activerecord|arel|activemodel|activesupport|globalid)/'
           # actionpack_affected gates actionpack-tests. True for actionpack +
           # its runtime deps (actionview/activemodel/activesupport/rack).
-          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack)/'
-          # actionview_affected gates actionview-tests. True for actionview +
-          # its runtime deps (activemodel/activesupport/rack/html-sanitizer).
-          AV_PKGS_RE='^packages/(actionview|activemodel|activesupport|rack|html-sanitizer)/'
+          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|activesupport|rack|did-you-mean)/'
+          # actionview_affected gates actionview-tests. ActionView's only
+          # workspace dependency is activesupport (see actionview/package.json).
+          AV_PKGS_RE='^packages/(actionview|activesupport)/'
           # trailties_affected gates trailties-tests. Trailties consumes
-          # actionpack/actionview/activerecord, so any of their upstreams
-          # also flips this on.
-          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activemodel|activesupport|globalid|rack|html-sanitizer)/'
-          # trails_tsc_affected gates the trails-tsc build/type check and the
-          # virtualized DX type tests (activerecord consumes trails-tsc as a
-          # dev/build dep for those tests).
+          # actionpack/actionview/activerecord/rack/activesupport, so any of
+          # their workspace upstreams also flips this on.
+          TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activemodel|activesupport|globalid|rack|did-you-mean)/'
+          # trails_tsc_affected gates the virtualized DX type tests, which
+          # are activerecord's only consumer of @blazetrails/trails-tsc.
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           # tse_compiler_affected gates tse-compiler-tests. Only depends on
           # activesupport today. The package may not exist on the base ref
