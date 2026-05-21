@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
-import { Railtie } from "./railtie.js";
+import { Trailtie } from "./trailtie.js";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
 const { deprecators } = BaseRailtie;
 import { SecurePassword } from "./secure-password.js";
@@ -18,10 +18,10 @@ describe("RailtieTest", () => {
     try {
       savedConfig =
         typeof structuredClone === "function"
-          ? structuredClone(Railtie.config)
-          : { ...Railtie.config };
+          ? structuredClone(Trailtie.config)
+          : { ...Trailtie.config };
     } catch {
-      savedConfig = { ...Railtie.config };
+      savedConfig = { ...Trailtie.config };
     }
   });
 
@@ -31,10 +31,10 @@ describe("RailtieTest", () => {
     (BaseRailtie.subclasses as (typeof BaseRailtie)[]).length = 0;
     (BaseRailtie.subclasses as (typeof BaseRailtie)[]).push(...savedSubclasses);
     // Reset per-class config to saved snapshot
-    for (const key of Object.keys(Railtie.config)) {
-      delete (Railtie.config as Record<string, unknown>)[key];
+    for (const key of Object.keys(Trailtie.config)) {
+      delete (Trailtie.config as Record<string, unknown>)[key];
     }
-    Object.assign(Railtie.config, savedConfig);
+    Object.assign(Trailtie.config, savedConfig);
     // Clear deprecators registry
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
@@ -42,39 +42,39 @@ describe("RailtieTest", () => {
   });
 
   it("secure password min_cost is false in the development environment", () => {
-    Railtie.initialize({ env: "development" });
+    Trailtie.initialize({ env: "development" });
     expect(SecurePassword.minCost).toBe(false);
   });
 
   it("secure password min_cost is true in the test environment", () => {
-    Railtie.initialize({ env: "test" });
+    Trailtie.initialize({ env: "test" });
     expect(SecurePassword.minCost).toBe(true);
   });
 
   it("i18n customize full message defaults to false", () => {
-    Railtie.initialize();
+    Trailtie.initialize();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
   });
 
   it("i18n customize full message can be disabled", () => {
     ActiveModelError.i18nCustomizeFullMessage = true;
-    Railtie.initialize();
+    Trailtie.initialize();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
   });
 
   it("i18n customize full message can be enabled", () => {
-    Railtie.initialize({ i18nCustomizeFullMessage: true });
+    Trailtie.initialize({ i18nCustomizeFullMessage: true });
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("i18n customize full message can be enabled via nested activeModel config", () => {
-    Railtie.initialize({ activeModel: { i18nCustomizeFullMessage: true } });
+    Trailtie.initialize({ activeModel: { i18nCustomizeFullMessage: true } });
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("ActiveModel::Railtie is registered in the global subclasses list", () => {
     // Mirrors Rails::Railtie.subclasses which auto-populates via `inherited`.
-    expect(BaseRailtie.subclasses).toContain(Railtie);
+    expect(BaseRailtie.subclasses).toContain(Trailtie);
   });
 
   it("runInitializers applies the active_model.secure_password setting", () => {
@@ -85,7 +85,7 @@ describe("RailtieTest", () => {
     const prev = processEnv.TRAILS_ENV;
     setEnv("TRAILS_ENV", "test");
     try {
-      Railtie.runInitializers();
+      Trailtie.runInitializers();
       expect(SecurePassword.minCost).toBe(true);
     } finally {
       setEnv("TRAILS_ENV", prev);
@@ -93,26 +93,26 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers registers the ActiveModel deprecator", () => {
-    Railtie.runInitializers();
+    Trailtie.runInitializers();
     expect(deprecators["activeModel"]).toBe(deprecator());
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from Railtie.config.activeModel", () => {
-    (Railtie.config as Record<string, unknown>)["activeModel"] = {
+    (Trailtie.config as Record<string, unknown>)["activeModel"] = {
       i18nCustomizeFullMessage: true,
     };
-    Railtie.runInitializers();
+    Trailtie.runInitializers();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from flat Railtie.config (backwards-compat)", () => {
-    (Railtie.config as Record<string, unknown>)["i18nCustomizeFullMessage"] = true;
-    Railtie.runInitializers();
+    (Trailtie.config as Record<string, unknown>)["i18nCustomizeFullMessage"] = true;
+    Trailtie.runInitializers();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("runInitializers defaults i18nCustomizeFullMessage to false when config is absent", () => {
-    Railtie.runInitializers();
+    Trailtie.runInitializers();
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
   });
 });

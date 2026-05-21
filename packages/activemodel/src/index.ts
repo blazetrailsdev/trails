@@ -47,7 +47,7 @@ export { LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js"
 export { AttributeSetCoder, AttributeSetCoderError } from "./attribute-set/coder.js";
 export type { AttributeSetCodec, AttributeSetEnvelope } from "./attribute-set/coder.js";
 export { jsonCodec } from "./attribute-set/codecs/json.js";
-export { Railtie } from "./railtie.js";
+export { Trailtie } from "./trailtie.js";
 export { WithValidator } from "./validations/with.js";
 export { AbsenceValidator } from "./validations/absence.js";
 export { PresenceValidator } from "./validations/presence.js";

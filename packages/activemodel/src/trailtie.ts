@@ -8,7 +8,7 @@ export interface ActiveModelConfig {
   i18nCustomizeFullMessage?: boolean;
 }
 
-export interface RailtieConfig {
+export interface TrailtieConfig {
   env?: string;
   /** @deprecated Use `activeModel.i18nCustomizeFullMessage` instead. Kept for backwards compat. */
   i18nCustomizeFullMessage?: boolean;
@@ -16,7 +16,7 @@ export interface RailtieConfig {
 }
 
 /**
- * Railtie — initialization hooks for ActiveModel.
+ * Trailtie — initialization hooks for ActiveModel.
  *
  * Mirrors: ActiveModel::Railtie < ::Rails::Railtie
  * (activemodel/lib/active_model/railtie.rb)
@@ -25,7 +25,7 @@ export interface RailtieConfig {
  * matching the Rails inheritance pattern, and registers itself so it
  * participates in the global initialization pipeline.
  */
-export class Railtie extends BaseRailtie {
+export class Trailtie extends BaseRailtie {
   static {
     registerRailtie(this);
 
@@ -34,12 +34,12 @@ export class Railtie extends BaseRailtie {
     });
 
     this.initializer("active_model.secure_password", () => {
-      SecurePassword.minCost = Railtie.detectEnv() === "test";
+      SecurePassword.minCost = Trailtie.detectEnv() === "test";
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
-      ActiveModelError.i18nCustomizeFullMessage = Railtie.resolveI18nCustomizeFullMessage(
-        Railtie.config as RailtieConfig,
+      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage(
+        Trailtie.config as TrailtieConfig,
       );
     });
   }
@@ -48,13 +48,13 @@ export class Railtie extends BaseRailtie {
    * One-shot configuration helper (non-Rails convenience kept for
    * backwards-compat with existing callers).
    */
-  static initialize(config?: RailtieConfig): void {
-    const env = config?.env ?? Railtie.detectEnv();
+  static initialize(config?: TrailtieConfig): void {
+    const env = config?.env ?? Trailtie.detectEnv();
     SecurePassword.minCost = env === "test";
-    ActiveModelError.i18nCustomizeFullMessage = Railtie.resolveI18nCustomizeFullMessage(config);
+    ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage(config);
   }
 
-  private static resolveI18nCustomizeFullMessage(cfg?: RailtieConfig): boolean {
+  private static resolveI18nCustomizeFullMessage(cfg?: TrailtieConfig): boolean {
     return cfg?.activeModel?.i18nCustomizeFullMessage ?? cfg?.i18nCustomizeFullMessage ?? false;
   }
 
@@ -63,7 +63,7 @@ export class Railtie extends BaseRailtie {
     // populated at module load on Node, empty on browser hosts. Either
     // way, no `typeof process !== "undefined"` guard needed. Aliased to
     // avoid shadowing the local `env` variable in `initialize()` and
-    // the `RailtieConfig.env` property.
+    // the `TrailtieConfig.env` property.
     //
     // Mirrors Rails' RAILS_ENV: TRAILS_ENV only. We deliberately do
     // NOT fall back to NODE_ENV — the JS ecosystem treats NODE_ENV as
