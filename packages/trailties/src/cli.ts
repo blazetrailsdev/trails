@@ -9,6 +9,7 @@ import { consoleCommand } from "./commands/console.js";
 import { destroyCommand } from "./commands/destroy.js";
 import { appTemplateCommand } from "./commands/app.js";
 import { notesCommand } from "./commands/notes.js";
+import { statsCommand } from "./commands/stats.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -28,6 +29,7 @@ export function createProgram(): Command {
   program.addCommand(destroyCommand());
   program.addCommand(appTemplateCommand());
   program.addCommand(notesCommand());
+  program.addCommand(statsCommand());
 
   return program;
 }
