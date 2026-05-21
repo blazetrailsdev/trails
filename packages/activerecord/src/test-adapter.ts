@@ -2,9 +2,9 @@
  * Shared test adapter factory.
  *
  * Returns the appropriate adapter based on environment variables:
- *   - PG_TEST_URL    → PostgreSQLAdapter (wrapped in SchemaAdapter)
- *   - MYSQL_TEST_URL → Mysql2Adapter (wrapped in SchemaAdapter)
- *   - (default)      → SQLite3Adapter (:memory:)
+ *   - PG_TEST_URL    → PostgreSQLAdapter (wrapped in TestAdapterFixtures)
+ *   - MYSQL_TEST_URL → Mysql2Adapter (wrapped in TestAdapterFixtures)
+ *   - (default)      → SQLite3Adapter (:memory:) (wrapped in TestAdapterFixtures)
  *
  * For real database adapters, a single shared connection pool is reused
  * across all test adapters to avoid exhausting database connections.
@@ -287,7 +287,7 @@ function recordDdlTracking(
   }
 }
 
-let _factory: () => SchemaAdapter;
+let _factory: () => TestAdapterFixtures;
 
 if (PG_TEST_URL) {
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
@@ -300,7 +300,7 @@ if (PG_TEST_URL) {
       await _sharedAdapter.exec(`DROP TABLE IF EXISTS "${(r as any).tablename}" CASCADE`);
     } catch {}
   }
-  _factory = () => new SchemaAdapter(_sharedAdapter);
+  _factory = () => new TestAdapterFixtures(_sharedAdapter);
 } else if (MYSQL_TEST_URL) {
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   _sharedAdapter = new Mysql2Adapter(MYSQL_TEST_URL);
@@ -311,11 +311,11 @@ if (PG_TEST_URL) {
       await _sharedAdapter.exec(`DROP TABLE IF EXISTS \`${table}\``);
     } catch {}
   }
-  _factory = () => new SchemaAdapter(_sharedAdapter);
+  _factory = () => new TestAdapterFixtures(_sharedAdapter);
 } else {
   const { SQLite3Adapter } = await import("./connection-adapters/sqlite3-adapter.js");
   _sharedAdapter = new SQLite3Adapter(":memory:");
-  _factory = () => new SchemaAdapter(_sharedAdapter);
+  _factory = () => new TestAdapterFixtures(_sharedAdapter);
 }
 
 /** DatabaseAdapter wrapper returned by {@link createTestAdapter}, with test-only accessors. */
@@ -389,7 +389,7 @@ type BooleanCapability =
   | "supportsInsertConflictTarget";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-interface SchemaAdapter {
+interface TestAdapterFixtures {
   selectAll(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   selectOne(
     sql: string,
@@ -413,7 +413,7 @@ interface SchemaAdapter {
   ): [unknown, unknown[]];
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-class SchemaAdapter implements DatabaseAdapter {
+class TestAdapterFixtures implements DatabaseAdapter {
   get adapterName(): AdapterName {
     return this.inner?.adapterName ?? "sqlite";
   }
@@ -454,7 +454,7 @@ class SchemaAdapter implements DatabaseAdapter {
   schemaStatements() {
     if (!this.inner.schemaStatements) {
       throw new Error(
-        `SchemaAdapter.schemaStatements: wrapped ${this.inner.adapterName} does not implement schemaStatements()`,
+        `TestAdapterFixtures.schemaStatements: wrapped ${this.inner.adapterName} does not implement schemaStatements()`,
       );
     }
     // Pass `this` so the inner adapter constructs its SchemaStatements
@@ -468,7 +468,7 @@ class SchemaAdapter implements DatabaseAdapter {
     };
     if (typeof inner.createTableDefinition !== "function") {
       throw new Error(
-        `SchemaAdapter.createTableDefinition: wrapped ${this.inner.adapterName} does not implement createTableDefinition()`,
+        `TestAdapterFixtures.createTableDefinition: wrapped ${this.inner.adapterName} does not implement createTableDefinition()`,
       );
     }
     return inner.createTableDefinition(name, options);
@@ -549,7 +549,7 @@ class SchemaAdapter implements DatabaseAdapter {
   async commit(): Promise<void> {
     // Only decrement on success — failed COMMIT can leave PG/MySQL in an
     // unresolved transaction (driver clears `inTransaction` only when COMMIT
-    // succeeds). If we decremented in finally, SchemaAdapter would report
+    // succeeds). If we decremented in finally, TestAdapterFixtures would report
     // no tx while inner is still mid-transaction, sending the next
     // transaction() call down the wrong path.
     await this.inner.commit();
@@ -639,7 +639,7 @@ class SchemaAdapter implements DatabaseAdapter {
     // loudly so the gap surfaces — every adapter we wrap in practice
     // implements `quote()`.
     throw new Error(
-      `SchemaAdapter.quote: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quote()`,
+      `TestAdapterFixtures.quote: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quote()`,
     );
   }
 
@@ -647,7 +647,7 @@ class SchemaAdapter implements DatabaseAdapter {
     const inner = this.inner as { typeCast?: (v: unknown) => unknown };
     if (typeof inner.typeCast === "function") return inner.typeCast(value);
     throw new Error(
-      `SchemaAdapter.typeCast: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement typeCast()`,
+      `TestAdapterFixtures.typeCast: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement typeCast()`,
     );
   }
 
@@ -655,7 +655,7 @@ class SchemaAdapter implements DatabaseAdapter {
     const inner = this.inner as { quoteIdentifier?: (n: string) => string };
     if (typeof inner.quoteIdentifier === "function") return inner.quoteIdentifier(name);
     throw new Error(
-      `SchemaAdapter.quoteIdentifier: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteIdentifier()`,
+      `TestAdapterFixtures.quoteIdentifier: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteIdentifier()`,
     );
   }
 
@@ -663,7 +663,7 @@ class SchemaAdapter implements DatabaseAdapter {
     const inner = this.inner as { quoteTableName?: (n: string) => string };
     if (typeof inner.quoteTableName === "function") return inner.quoteTableName(name);
     throw new Error(
-      `SchemaAdapter.quoteTableName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteTableName()`,
+      `TestAdapterFixtures.quoteTableName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteTableName()`,
     );
   }
 
@@ -671,7 +671,7 @@ class SchemaAdapter implements DatabaseAdapter {
     const inner = this.inner as { quoteColumnName?: (n: string) => string };
     if (typeof inner.quoteColumnName === "function") return inner.quoteColumnName(name);
     throw new Error(
-      `SchemaAdapter.quoteColumnName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteColumnName()`,
+      `TestAdapterFixtures.quoteColumnName: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteColumnName()`,
     );
   }
 
@@ -680,7 +680,7 @@ class SchemaAdapter implements DatabaseAdapter {
     if (typeof inner.quoteDefaultExpression === "function")
       return inner.quoteDefaultExpression(value);
     throw new Error(
-      `SchemaAdapter.quoteDefaultExpression: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteDefaultExpression()`,
+      `TestAdapterFixtures.quoteDefaultExpression: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quoteDefaultExpression()`,
     );
   }
 
@@ -694,7 +694,7 @@ class SchemaAdapter implements DatabaseAdapter {
     const inner = this.inner as { quotedBinary?: (v: unknown) => string };
     if (typeof inner.quotedBinary === "function") return inner.quotedBinary(value);
     throw new Error(
-      `SchemaAdapter.quotedBinary: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quotedBinary()`,
+      `TestAdapterFixtures.quotedBinary: wrapped ${(this.inner as { adapterName?: string }).adapterName ?? "adapter"} does not implement quotedBinary()`,
     );
   }
 
@@ -766,4 +766,4 @@ class SchemaAdapter implements DatabaseAdapter {
     await dropAllTables(this.inner);
   }
 }
-include(SchemaAdapter, DatabaseStatements);
+include(TestAdapterFixtures, DatabaseStatements);
