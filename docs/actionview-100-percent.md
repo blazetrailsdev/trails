@@ -1,8 +1,8 @@
 # actionview — Road to 100%
 
-Current (2026-05-21): actionview 208/2530 methods (8.2%), files 24/109,
-test:compare 206/2492 (8.3%). Existing package is a skeletal EJS-based
-renderer at flat layout — most of the work is ahead of us.
+Current (2026-05-18): actionview 32/2530 methods (1.3%), files 6/109. Existing
+package is a skeletal EJS-based renderer at flat layout — most of the work is
+ahead of us.
 
 Refresh counts:
 
