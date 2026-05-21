@@ -31,6 +31,7 @@ import {
   stripHeredoc,
   downcaseFirst,
   upcaseFirst,
+  chomp,
 } from "../index.js";
 import { StringInquirer } from "../string-inquirer.js";
 
@@ -770,5 +771,38 @@ describe("OutputSafetyTest", () => {
   it("ERB::Util.xml_name_escape should escape unsafe characters for XML names", () => {
     const result = xmlNameEscape("hello world");
     expect(result).not.toContain(" ");
+  });
+});
+
+describe("String#chomp", () => {
+  it("removes a single trailing newline", () => {
+    expect(chomp("hello\n")).toBe("hello");
+  });
+  it("removes a trailing CRLF", () => {
+    expect(chomp("hello\r\n")).toBe("hello");
+  });
+  it("removes a lone trailing CR", () => {
+    expect(chomp("hello\r")).toBe("hello");
+  });
+  it("removes only one record separator", () => {
+    expect(chomp("hello\n\n")).toBe("hello\n");
+  });
+  it("returns the string unchanged when it has no trailing newline", () => {
+    expect(chomp("hello")).toBe("hello");
+  });
+  it("removes the given suffix when present", () => {
+    expect(chomp("hello world", " world")).toBe("hello");
+  });
+  it("returns the string unchanged when the suffix is absent", () => {
+    expect(chomp("hello", "x")).toBe("hello");
+  });
+  it("with separator '\\n', also eats a preceding CR (Ruby quirk)", () => {
+    expect(chomp("hello\r\n", "\n")).toBe("hello");
+    expect(chomp("hello\n", "\n")).toBe("hello");
+    expect(chomp("hello\r", "\n")).toBe("hello\r");
+  });
+  it("with an empty separator, removes all trailing newline characters", () => {
+    expect(chomp("hello\r\n\r\n", "")).toBe("hello");
+    expect(chomp("hello\n\n\n", "")).toBe("hello");
   });
 });
