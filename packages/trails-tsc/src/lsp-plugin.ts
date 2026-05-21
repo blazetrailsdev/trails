@@ -91,11 +91,19 @@ export function init(modules: { typescript: typeof ts }): {
         }
       };
 
-      host.readFile = (p, enc) => {
-        if (!p.endsWith(".tse")) return origReadFile?.(p, enc);
-        const raw = readTseSource(p, enc);
-        return raw === undefined ? undefined : virtualize(raw);
-      };
+      // Only install the wrapper if the host had an original — otherwise
+      // we'd shadow tsserver's internal filesystem fallback for plain
+      // `.ts`/`.d.ts` reads by returning `undefined` for everything
+      // non-`.tse`. `getScriptSnapshot` is the path that actually feeds
+      // virtualized `.tse` content to the checker; `readFile` is only an
+      // alternate entrypoint used by some host implementations.
+      if (origReadFile) {
+        host.readFile = (p, enc) => {
+          if (!p.endsWith(".tse")) return origReadFile(p, enc);
+          const raw = readTseSource(p, enc);
+          return raw === undefined ? undefined : virtualize(raw);
+        };
+      }
 
       host.getScriptSnapshot = (p) => {
         if (!p.endsWith(".tse")) return origGetSnapshot(p);
