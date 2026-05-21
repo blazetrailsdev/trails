@@ -10,6 +10,8 @@ import { destroyCommand } from "./commands/destroy.js";
 import { appTemplateCommand } from "./commands/app.js";
 import { notesCommand } from "./commands/notes.js";
 import { statsCommand } from "./commands/stats.js";
+import { credentialsCommand } from "./commands/credentials.js";
+import { encryptedCommand } from "./commands/encrypted.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -30,6 +32,8 @@ export function createProgram(): Command {
   program.addCommand(appTemplateCommand());
   program.addCommand(notesCommand());
   program.addCommand(statsCommand());
+  program.addCommand(credentialsCommand());
+  program.addCommand(encryptedCommand());
 
   return program;
 }
