@@ -3,7 +3,7 @@ import {
   ModelGenerator,
   MigrationGenerator,
 } from "@blazetrails/trailties/generators";
-import type { AppOptions } from "@blazetrails/trailties/generators";
+import type { AppDatabase } from "@blazetrails/trailties/generators";
 import {
   registerFsAdapter,
   ActiveSupport,
@@ -140,22 +140,21 @@ export class VfsModelGenerator extends ModelGenerator {
   }
 }
 
-export class VfsAppGenerator extends AppGenerator {
-  constructor(options: VfsGeneratorOptions) {
-    ensureVfsAdapter(options.vfs);
-    super({ cwd: "/", output: options.output });
-    applyVfsOverrides(this, options.vfs);
-  }
+export interface VfsAppGeneratorOptions extends VfsGeneratorOptions {
+  appPath: string;
+  database?: AppDatabase;
+}
 
-  override async run(name: string, options: AppOptions): Promise<string[]> {
-    const originalCwd = this.cwd;
-    try {
-      return await super.run(name, {
-        ...options,
-        skipDocker: true,
-      });
-    } finally {
-      this.cwd = originalCwd;
-    }
+export class VfsAppGenerator extends AppGenerator {
+  constructor(options: VfsAppGeneratorOptions) {
+    ensureVfsAdapter(options.vfs);
+    super({
+      cwd: "/",
+      output: options.output,
+      appPath: options.appPath,
+      database: options.database,
+      skipDocker: true,
+    });
+    applyVfsOverrides(this, options.vfs);
   }
 }

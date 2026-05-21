@@ -1,45 +1,47 @@
-import { GeneratorBase, GeneratorOptions } from "./base.js";
-import { Database, type DatabaseName } from "./database.js";
+import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { type DatabaseName } from "./database.js";
 
-// AppGenerator currently scaffolds dbConfig templates only for the three
-// CLI-exposed adapters. The MariaDB-via-mysql2 variant exists in
-// `database.ts` but rendering a template for it is deferred to PR 1.14d
-// alongside the AppBase rewrite. Keeping the surface narrow here
-// prevents producing an app scaffold whose `package.json` and
-// `database.ts` disagree.
+// CLI-friendly DB aliases — `trails new -d sqlite|postgres|mysql` maps
+// onto the canonical Rails `DatabaseName`. MariaDB is exposed via the
+// canonical `mariadb-mysql` adapter id only (no short alias).
 const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
   postgres: "postgresql",
 };
 
-export interface AppOptions {
-  database: "sqlite" | "postgres" | "mysql";
+export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
+
+export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
+  appPath?: string;
+  database?: AppDatabase;
   skipDocker?: boolean;
 }
 
-export class AppGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
+export class AppGenerator extends AppBase {
+  constructor(options: AppGeneratorOptions) {
+    const database = options.database
+      ? ((DB_ALIAS[options.database] ?? options.database) as DatabaseName)
+      : undefined;
+    super({ ...options, appPath: options.appPath ?? options.cwd, database });
   }
 
-  async run(name: string, options: AppOptions): Promise<string[]> {
-    const appDir = this.path.join(this.cwd, name);
-    this.cwd = appDir;
+  async run(): Promise<string[]> {
+    const name = this.path.basename(this.appPath);
 
     this.output(`Creating new trails application: ${name}`);
     this.output("");
 
-    this.createRootFiles(name, options);
-    this.createBinFiles(name);
-    this.createConfigFiles(name, options);
+    this.createRootFiles(name);
+    this.createBinFiles();
+    this.createConfigFiles(name);
     this.createAppFiles(name);
-    this.createDbFiles(name);
+    this.createDbFiles();
     this.createTestFiles();
     this.createPublicFiles(name);
     this.createDirectoryPlaceholders();
 
-    if (!options.skipDocker) {
-      this.createDockerFiles(name);
+    if (!this.options.skipDocker) {
+      this.createDockerFiles();
     }
 
     this.output("");
@@ -47,8 +49,8 @@ export class AppGenerator extends GeneratorBase {
     return this.getCreatedFiles();
   }
 
-  private createRootFiles(name: string, options: AppOptions): void {
-    // package.json
+  private createRootFiles(name: string): void {
+    const dep = this.database.pkgDependency;
     this.createFile(
       "package.json",
       JSON.stringify(
@@ -74,7 +76,7 @@ export class AppGenerator extends GeneratorBase {
             "@blazetrails/rack": "*",
             "@blazetrails/actionpack": "*",
             "@blazetrails/trailties": "*",
-            ...this.dbDependency(options.database),
+            [dep.name]: dep.version,
           },
           devDependencies: {
             typescript: "^5.7.0",
@@ -87,7 +89,6 @@ export class AppGenerator extends GeneratorBase {
       ) + "\n",
     );
 
-    // tsconfig.json
     this.createFile(
       "tsconfig.json",
       JSON.stringify(
@@ -110,7 +111,6 @@ export class AppGenerator extends GeneratorBase {
       ) + "\n",
     );
 
-    // .gitignore
     this.createFile(
       ".gitignore",
       `/node_modules/
@@ -139,7 +139,6 @@ export class AppGenerator extends GeneratorBase {
 `,
     );
 
-    // .gitattributes
     this.createFile(
       ".gitattributes",
       `# Mark the database schema as having been generated.
@@ -149,10 +148,8 @@ db/schema.ts linguist-generated
 `,
     );
 
-    // .node-version
     this.createFile(".node-version", "22.0.0\n");
 
-    // README.md
     this.createFile(
       "README.md",
       `# ${name}
@@ -186,7 +183,6 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
 `,
     );
 
-    // config.ts — equivalent to config.ru (rackup file)
     this.createFile(
       "config.ts",
       `import { app } from "./src/config/application.js";
@@ -195,7 +191,6 @@ export default app;
 `,
     );
 
-    // vite.config.ts — Vite dev server with trails Rack adapter
     this.createFile(
       "vite.config.ts",
       `import { defineConfig } from "vite";
@@ -220,8 +215,7 @@ export default defineConfig({
     );
   }
 
-  private createBinFiles(name: string): void {
-    // bin/trails — binstub
+  private createBinFiles(): void {
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
@@ -233,7 +227,6 @@ program.parse(process.argv);
       { mode: 0o755 },
     );
 
-    // bin/setup
     this.createFile(
       "bin/setup",
       `#!/usr/bin/env node
@@ -263,7 +256,6 @@ console.log("\\n== Done! ==");
       { mode: 0o755 },
     );
 
-    // bin/dev
     this.createFile(
       "bin/dev",
       `#!/usr/bin/env node
@@ -275,8 +267,7 @@ execSync("trails server", { stdio: "inherit" });
     );
   }
 
-  private createConfigFiles(name: string, options: AppOptions): void {
-    // src/config/application.ts — equivalent to config/application.rb
+  private createConfigFiles(name: string): void {
     this.createFile(
       "src/config/application.ts",
       `import { ActiveRecord } from "@blazetrails/activerecord";
@@ -294,7 +285,6 @@ export const app = {
 `,
     );
 
-    // src/config/environment.ts — equivalent to config/environment.rb
     this.createFile(
       "src/config/environment.ts",
       `import { app } from "./application.js";
@@ -303,7 +293,6 @@ export default app;
 `,
     );
 
-    // src/config/routes.ts
     this.createFile(
       "src/config/routes.ts",
       `// Define your application routes here.
@@ -317,10 +306,8 @@ export function drawRoutes(router: any): void {
 `,
     );
 
-    // src/config/database.ts
-    this.createFile("src/config/database.ts", this.dbConfig(name, options.database));
+    this.createFile("src/config/database.ts", this.dbConfig(name));
 
-    // src/config/puma.ts — equivalent to config/puma.rb
     this.createFile(
       "src/config/puma.ts",
       `const port = parseInt(process.env.PORT || "3000", 10);
@@ -337,7 +324,6 @@ export default {
 `,
     );
 
-    // src/config/cable.ts — equivalent to config/cable.yml
     this.createFile(
       "src/config/cable.ts",
       `export default {
@@ -355,7 +341,6 @@ export default {
 `,
     );
 
-    // src/config/storage.ts — equivalent to config/storage.yml
     this.createFile(
       "src/config/storage.ts",
       `export default {
@@ -371,7 +356,6 @@ export default {
 `,
     );
 
-    // Environment configs
     this.createFile(
       "src/config/environments/development.ts",
       `export default {
@@ -408,7 +392,6 @@ export default {
 `,
     );
 
-    // Initializers
     this.createFile(
       "src/config/initializers/content-security-policy.ts",
       `// Define an application-wide content security policy.
@@ -466,7 +449,6 @@ export const filterParameters = [
 `,
     );
 
-    // Locales
     this.createFile(
       "src/config/locales/en.json",
       JSON.stringify(
@@ -482,7 +464,6 @@ export const filterParameters = [
   }
 
   private createAppFiles(name: string): void {
-    // Application controller
     this.createFile(
       "src/app/controllers/application-controller.ts",
       `import { ActionController } from "@blazetrails/actionpack";
@@ -494,7 +475,6 @@ export class ApplicationController extends ActionController.Base {
 
     this.createFile("src/app/controllers/concerns/.gitkeep", "");
 
-    // Application record — equivalent to application_record.rb
     this.createFile(
       "src/app/models/application-record.ts",
       `import { ActiveRecord } from "@blazetrails/activerecord";
@@ -506,7 +486,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 
     this.createFile("src/app/models/concerns/.gitkeep", "");
 
-    // Application helper
     this.createFile(
       "src/app/helpers/application-helper.ts",
       `export const ApplicationHelper = {
@@ -514,7 +493,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 `,
     );
 
-    // Application job — equivalent to application_job.rb
     this.createFile(
       "src/app/jobs/application-job.ts",
       `export class ApplicationJob {
@@ -523,7 +501,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 `,
     );
 
-    // Application mailer — equivalent to application_mailer.rb
     this.createFile(
       "src/app/mailers/application-mailer.ts",
       `export class ApplicationMailer {
@@ -533,7 +510,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 `,
     );
 
-    // Channels
     this.createFile(
       "src/app/channels/application-cable/connection.ts",
       `export class Connection {
@@ -548,7 +524,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 `,
     );
 
-    // Views — layouts
     this.createFile(
       "src/app/views/layouts/application.html.tse",
       `<!DOCTYPE html>
@@ -589,7 +564,6 @@ export class ApplicationRecord extends ActiveRecord.Base {
 `,
     );
 
-    // Assets
     this.createFile(
       "src/app/assets/stylesheets/application.css",
       `/*
@@ -605,7 +579,7 @@ export class ApplicationRecord extends ActiveRecord.Base {
     this.createFile("src/app/assets/images/.gitkeep", "");
   }
 
-  private createDbFiles(name: string): void {
+  private createDbFiles(): void {
     this.createFile("db/migrations/.gitkeep", "");
 
     this.createFile(
@@ -645,7 +619,6 @@ export async function setupTestDatabase(): Promise<void> {
   }
 
   private createPublicFiles(name: string): void {
-    // Welcome page — equivalent to Rails' "Yay! You're on Rails!" page
     this.createFile(
       "public/index.html",
       `<!DOCTYPE html>
@@ -874,7 +847,7 @@ export async function setupTestDatabase(): Promise<void> {
     this.createFile("vendor/.gitkeep", "");
   }
 
-  private createDockerFiles(name: string): void {
+  private createDockerFiles(): void {
     this.createFile(
       "Dockerfile",
       `# syntax=docker/dockerfile:1
@@ -920,14 +893,9 @@ dist
     );
   }
 
-  private dbDependency(db: string): Record<string, string> {
-    const dep = Database.build(DB_ALIAS[db] ?? db).pkgDependency;
-    return { [dep.name]: dep.version };
-  }
-
-  private dbConfig(appName: string, db: string): string {
-    switch (DB_ALIAS[db] ?? db) {
-      case "postgresql":
+  private dbConfig(appName: string): string {
+    switch (this.database.name) {
+      case "postgres":
         return `export default {
   development: {
     adapter: "postgresql",
@@ -948,6 +916,7 @@ dist
 };
 `;
       case "mysql":
+      case "mariadb":
         return `export default {
   development: {
     adapter: "mysql2",

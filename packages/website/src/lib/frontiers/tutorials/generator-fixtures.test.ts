@@ -16,8 +16,13 @@ beforeAll(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-fixtures-"));
   output = [];
 
-  const appGen = new AppGenerator({ cwd: tmpDir, output: (m) => output.push(m) });
-  await appGen.run("docs", { database: "sqlite" });
+  const appGen = new AppGenerator({
+    cwd: tmpDir,
+    output: (m) => output.push(m),
+    appPath: "docs",
+    database: "sqlite",
+  });
+  await appGen.run();
 });
 
 afterAll(() => {

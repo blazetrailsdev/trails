@@ -20,11 +20,11 @@ export function newCommand(): Command {
       const gen = new AppGenerator({
         cwd,
         output: console.log,
-      });
-      await gen.run(name, {
+        appPath: name,
         database: options.database,
         skipDocker: options.skipDocker,
       });
+      await gen.run();
 
       const appDir = path.join(cwd, name);
 

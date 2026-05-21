@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { AppGenerator } from "./app-generator.js";
+import { AppGenerator, type AppDatabase } from "./app-generator.js";
 
 let tmpDir: string;
 let lines: string[];
@@ -16,8 +16,14 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen() {
-  return new AppGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+function makeGen(database: AppDatabase = "sqlite", opts: { skipDocker?: boolean } = {}) {
+  return new AppGenerator({
+    cwd: tmpDir,
+    output: (m) => lines.push(m),
+    appPath: "my-app",
+    database,
+    ...opts,
+  });
 }
 
 function appPath(...segments: string[]) {
@@ -30,10 +36,8 @@ function exists(...segments: string[]) {
 
 describe("AppGenerator", () => {
   it("creates application directory structure", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite" });
+    await makeGen().run();
 
-    // Root files
     expect(exists("package.json")).toBe(true);
     expect(exists("tsconfig.json")).toBe(true);
     expect(exists(".gitignore")).toBe(true);
@@ -44,12 +48,10 @@ describe("AppGenerator", () => {
     expect(exists("Dockerfile")).toBe(true);
     expect(exists(".dockerignore")).toBe(true);
 
-    // Bin
     expect(exists("bin/trails")).toBe(true);
     expect(exists("bin/setup")).toBe(true);
     expect(exists("bin/dev")).toBe(true);
 
-    // Config
     expect(exists("src/config/application.ts")).toBe(true);
     expect(exists("src/config/environment.ts")).toBe(true);
     expect(exists("src/config/routes.ts")).toBe(true);
@@ -66,7 +68,6 @@ describe("AppGenerator", () => {
     expect(exists("src/config/initializers/permissions-policy.ts")).toBe(true);
     expect(exists("src/config/locales/en.json")).toBe(true);
 
-    // App
     expect(exists("src/app/controllers/application-controller.ts")).toBe(true);
     expect(exists("src/app/controllers/concerns/.gitkeep")).toBe(true);
     expect(exists("src/app/models/application-record.ts")).toBe(true);
@@ -83,12 +84,10 @@ describe("AppGenerator", () => {
     expect(exists("src/app/assets/images/.gitkeep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
 
-    // Database
     expect(exists("db/migrations/.gitkeep")).toBe(true);
     expect(exists("db/seeds.ts")).toBe(true);
     expect(exists("db/schema.ts")).toBe(true);
 
-    // Test
     expect(exists("test/test-helper.ts")).toBe(true);
     expect(exists("test/models/.gitkeep")).toBe(true);
     expect(exists("test/controllers/.gitkeep")).toBe(true);
@@ -96,14 +95,12 @@ describe("AppGenerator", () => {
     expect(exists("test/integration/.gitkeep")).toBe(true);
     expect(exists("test/fixtures/files/.gitkeep")).toBe(true);
 
-    // Public
     expect(exists("public/404.html")).toBe(true);
     expect(exists("public/422.html")).toBe(true);
     expect(exists("public/500.html")).toBe(true);
     expect(exists("public/robots.txt")).toBe(true);
     expect(exists("public/favicon.ico")).toBe(true);
 
-    // Directories
     expect(exists("lib/tasks/.gitkeep")).toBe(true);
     expect(exists("log/.gitkeep")).toBe(true);
     expect(exists("storage/.gitkeep")).toBe(true);
@@ -113,8 +110,7 @@ describe("AppGenerator", () => {
   });
 
   it("generates valid package.json", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite" });
+    await makeGen().run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.name).toBe("my-app");
     expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
@@ -127,8 +123,7 @@ describe("AppGenerator", () => {
   });
 
   it("configures postgres database", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "postgres" });
+    await makeGen("postgres").run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.pg).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
@@ -136,8 +131,7 @@ describe("AppGenerator", () => {
   });
 
   it("configures mysql database", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "mysql" });
+    await makeGen("mysql").run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
     expect(pkg.dependencies.mysql2).toBeDefined();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
@@ -145,26 +139,19 @@ describe("AppGenerator", () => {
   });
 
   it("configures sqlite database by default", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite" });
+    await makeGen("sqlite").run();
     const dbConfig = fs.readFileSync(appPath("src/config/database.ts"), "utf-8");
     expect(dbConfig).toContain("sqlite3");
   });
 
   it("skips docker files when --skip-docker", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", {
-      database: "sqlite",
-
-      skipDocker: true,
-    });
+    await makeGen("sqlite", { skipDocker: true }).run();
     expect(exists("Dockerfile")).toBe(false);
     expect(exists(".dockerignore")).toBe(false);
   });
 
   it("includes app name in generated files", async () => {
-    const gen = makeGen();
-    await gen.run("my-app", { database: "sqlite" });
+    await makeGen().run();
 
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).toContain("my-app");

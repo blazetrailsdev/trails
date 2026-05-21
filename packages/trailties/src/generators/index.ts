@@ -1,5 +1,5 @@
 export { AppGenerator } from "./app-generator.js";
-export type { AppOptions } from "./app-generator.js";
+export type { AppGeneratorOptions, AppDatabase } from "./app-generator.js";
 export { ModelGenerator } from "./model-generator.js";
 export { MigrationGenerator } from "./migration-generator.js";
 export type { MigrationRunOptions } from "./migration-generator.js";

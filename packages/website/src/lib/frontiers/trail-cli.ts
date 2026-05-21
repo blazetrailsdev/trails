@@ -164,8 +164,8 @@ export function createTrailCLI(deps: TrailCliDeps) {
         dropUserTables(adapter, deps.getTables);
         deps.clearMigrations();
 
-        const gen = new VfsAppGenerator({ vfs, output: log });
-        await gen.run(name, { database: "sqlite" });
+        const gen = new VfsAppGenerator({ vfs, output: log, appPath: name, database: "sqlite" });
+        await gen.run();
       },
 
       generate: async (args) => {
