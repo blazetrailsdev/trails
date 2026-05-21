@@ -6,14 +6,14 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 describe("AssociationValidationTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: SidecarAdapter;
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    ({ adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, {
       posts: { title: "string" },
       comments: { body: "string", post_id: "integer" },

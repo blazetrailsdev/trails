@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("StringTypeTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: SidecarAdapter;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    ({ adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, { authors: { name: "string" } });
   });
   withTransactionalFixtures(() => adapter);

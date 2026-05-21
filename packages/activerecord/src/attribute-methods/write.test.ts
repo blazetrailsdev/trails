@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("WriteTest", () => {
   it("_write_attribute writes value to attribute", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -16,7 +16,7 @@ describe("WriteTest", () => {
   });
 
   it("_write_attribute writes directly without alias resolution", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("body", "string");
@@ -33,7 +33,7 @@ describe("WriteTest", () => {
   });
 
   it("_write_attribute bypasses readonly check", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Item extends Base {
       static {
         this.attribute("code", "string");

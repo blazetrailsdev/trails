@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("QueryTest", () => {
   beforeEach(() => {
-    createTestAdapter();
+    createSidecarTestAdapter();
   });
 
   it("query attribute returns false for nil", () => {

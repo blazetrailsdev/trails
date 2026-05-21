@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 
 describe("ReadTest", () => {
   it.skip("define attribute methods", () => {
@@ -15,7 +15,7 @@ describe("ReadTest", () => {
   });
 
   it("_read_attribute returns value for existing attribute", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -26,7 +26,7 @@ describe("ReadTest", () => {
   });
 
   it("_read_attribute returns null for unset attribute", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("title", "string");
@@ -37,7 +37,7 @@ describe("ReadTest", () => {
   });
 
   it("_read_attribute does not apply alias resolution", () => {
-    createTestAdapter();
+    createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.attribute("body", "string");

@@ -17,7 +17,7 @@ import { quoteTableName as mysqlQuoteTableName } from "../connection-adapters/my
 import { quoteTableName as abstractQuoteTableName } from "../connection-adapters/abstract/quoting.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 import { NoDatabaseError } from "../errors.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
@@ -555,7 +555,7 @@ describe("DatabaseTasksMigrateTest", () => {
   });
 
   it("migrate set and unset empty values for verbose and version env vars", async () => {
-    const adapter = createTestAdapter();
+    const { adapter } = createSidecarTestAdapter();
     DatabaseTasks.setAdapter(adapter);
     DatabaseTasks.registerTask("sqlite", { create: async () => {} });
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
@@ -1077,7 +1077,7 @@ describe("DatabaseTasksLoadSchemaTsFormatTest", () => {
         `}\n`,
     );
 
-    const adapter = createTestAdapter();
+    const { adapter } = createSidecarTestAdapter();
     DatabaseTasks.setAdapter(adapter);
     DatabaseTasks.schemaFormat = "ts";
 
