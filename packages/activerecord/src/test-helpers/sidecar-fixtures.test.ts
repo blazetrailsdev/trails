@@ -35,11 +35,26 @@ describe("createSidecarTestAdapter (path 2 sidecar)", () => {
   it("hides transaction state from foreign async chains", async () => {
     const { fixtures } = createSidecarTestAdapter();
     expect(fixtures.currentTransaction()).toBeNull();
-    let insideTx: unknown = null;
-    await fixtures.withinNewTransaction({ joinable: false }, async () => {
-      insideTx = fixtures.currentTransaction();
+
+    let foreignSawTx: unknown = "unset";
+    let releaseForeign!: () => void;
+    const foreignReady = new Promise<void>((resolve) => {
+      releaseForeign = resolve;
     });
-    expect(insideTx).not.toBeNull();
+    const foreignChain = (async () => {
+      await foreignReady;
+      foreignSawTx = fixtures.currentTransaction();
+    })();
+
+    let ownChainSawTx: unknown = null;
+    await fixtures.withinNewTransaction({ joinable: false }, async () => {
+      ownChainSawTx = fixtures.currentTransaction();
+      releaseForeign();
+      await foreignChain;
+    });
+
+    expect(ownChainSawTx).not.toBeNull();
+    expect(foreignSawTx).toBeNull();
     expect(fixtures.currentTransaction()).toBeNull();
   });
 
