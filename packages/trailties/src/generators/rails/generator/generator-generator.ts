@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 
 export interface GeneratorRunOptions {
@@ -13,13 +14,13 @@ export class GeneratorGenerator extends NamedBase {
     const namespace = options.namespace !== false;
     const dir = this.generatorDir(namespace);
     const ext = this.ext();
-    const className = this.className();
+    const className = camelize(this.fileName);
 
     this.createFile(`${dir}/USAGE`, `Description:\n    Explain the generator\n`);
     this.createFile(`${dir}/templates/.keep`, "");
     this.createFile(
       `${dir}/${this.fileName}-generator${ext}`,
-      `import { NamedBase } from "@blazetrails/trailties";
+      `import { NamedBase } from "@blazetrails/trailties/generators";
 
 export class ${className}Generator extends NamedBase {
   run(): string[] {

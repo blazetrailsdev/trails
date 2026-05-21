@@ -13,16 +13,11 @@ export class TaskGenerator extends NamedBase {
     const actions = options.actions ?? [];
     const ext = this.ext();
     const filename = `lib/tasks/${this.fileName}${ext}`;
-    const actionLines = actions.map((a) => `  // TODO\n  ${a}() {\n  },\n`).join("\n");
+    const actionLines = actions
+      .map((a) => `// TODO\nexport async function ${a}(): Promise<void> {}\n`)
+      .join("\n");
 
-    this.createFile(
-      filename,
-      `import { namespace } from "@blazetrails/trailties";
-
-export default namespace("${this.fileName}", {
-${actionLines}});
-`,
-    );
+    this.createFile(filename, `// namespace: ${this.fileName}\n\n${actionLines}`);
     return this.getCreatedFiles();
   }
 }

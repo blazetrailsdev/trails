@@ -40,6 +40,12 @@ describe("GeneratorGeneratorTest", () => {
       path.join(tmpDir, "lib/generators/rails/awesome/awesome-generator.ts"),
       "utf-8",
     );
-    expect(src).toMatch(/class Rails::AwesomeGenerator extends NamedBase/);
+    expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
+  });
+
+  it("generator_skeleton_is_created_without_file_name_namespace", () => {
+    const gen = new GeneratorGenerator({ cwd: tmpDir, output: () => {}, name: "awesome" });
+    gen.run({ namespace: false });
+    expect(fs.existsSync(path.join(tmpDir, "lib/generators/awesome-generator.ts"))).toBe(true);
   });
 });

@@ -26,8 +26,8 @@ describe("TaskGeneratorTest", () => {
     const taskPath = "lib/tasks/feeds.ts";
     expect(files).toContain(taskPath);
     const content = fs.readFileSync(path.join(tmpDir, taskPath), "utf-8");
-    expect(content).toMatch(/namespace\("feeds"/);
-    expect(content).toMatch(/foo\(\)/);
-    expect(content).toMatch(/bar\(\)/);
+    expect(content).toMatch(/namespace: feeds/);
+    expect(content).toMatch(/export async function foo\(\)/);
+    expect(content).toMatch(/export async function bar\(\)/);
   });
 });

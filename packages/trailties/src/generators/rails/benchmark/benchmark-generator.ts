@@ -13,19 +13,21 @@ export class BenchmarkGenerator extends NamedBase {
     const reports = options.reports ?? ["before", "after"];
     const ext = this.ext();
     const filename = `script/benchmarks/${this.fileName}${ext}`;
-    const reportLines = reports.map((r) => `  x.report("${r}", () => {});`).join("\n");
+    const reportLines = reports.map((r) => `  ${r}: () => {},`).join("\n");
 
     this.createFile(
       filename,
       `// Any benchmarking setup goes here...
 
-import { Benchmark } from "benchmark-ips";
-
-Benchmark.ips((x) => {
+const reports: Record<string, () => void> = {
 ${reportLines}
+};
 
-  x.compare();
-});
+for (const [name, fn] of Object.entries(reports)) {
+  const start = performance.now();
+  fn();
+  console.log(\`\${name}: \${(performance.now() - start).toFixed(3)}ms\`);
+}
 `,
     );
     return this.getCreatedFiles();

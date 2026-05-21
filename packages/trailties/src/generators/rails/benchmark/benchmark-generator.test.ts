@@ -27,8 +27,8 @@ describe("BenchmarkGeneratorTest", () => {
     const files = gen.run();
     expect(files).toContain("script/benchmarks/my_benchmark.ts");
     const content = fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-    expect(content).toContain('x.report("before"');
-    expect(content).toContain('x.report("after"');
-    expect(content).toContain("x.compare();");
+    expect(content).toContain("before: () => {}");
+    expect(content).toContain("after: () => {}");
+    expect(content).toContain("performance.now()");
   });
 });
