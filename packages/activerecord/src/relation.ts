@@ -3783,7 +3783,7 @@ export class Relation<T extends Base> {
             if (rawCol.includes(".")) {
               manager.order(new Nodes.SqlLiteral(trimmed));
             } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
-              const lit = new Nodes.SqlLiteral(this._quoteBareColumn(rawCol));
+              const lit = new Nodes.SqlLiteral(this._quoteBareColumn(rawCol), { retryable: true });
               manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
             } else {
               const node = table.get(rawCol);
@@ -3797,7 +3797,9 @@ export class Relation<T extends Base> {
             if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
               if (!this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)) {
                 manager.order(
-                  new Nodes.Ascending(new Nodes.SqlLiteral(this._quoteBareColumn(trimmed))),
+                  new Nodes.Ascending(
+                    new Nodes.SqlLiteral(this._quoteBareColumn(trimmed), { retryable: true }),
+                  ),
                 );
               } else {
                 manager.order(new Nodes.Ascending(table.get(trimmed)));
@@ -3815,7 +3817,7 @@ export class Relation<T extends Base> {
           const lit = new Nodes.SqlLiteral(col);
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(col)) {
-          const lit = new Nodes.SqlLiteral(this._quoteBareColumn(col));
+          const lit = new Nodes.SqlLiteral(this._quoteBareColumn(col), { retryable: true });
           manager.order(dir === "desc" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
         } else {
           manager.order(dir === "desc" ? table.get(col).desc() : table.get(col).asc());
