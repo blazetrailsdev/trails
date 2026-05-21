@@ -1,0 +1,27 @@
+// activerecord/test/fixtures/clothing_items.yml
+export const clothingItemFixtureData = {
+  green_pants: {
+    color: "green",
+    clothing_type: "pants",
+    description: "Cool green pants",
+    type: "ClothingItem",
+  },
+  green_t_shirt: {
+    color: "green",
+    clothing_type: "t-shirt",
+    description: "Cool green t-shirt",
+    type: "ClothingItem",
+  },
+  red_t_shirt: {
+    color: "red",
+    clothing_type: "t-shirt",
+    description: "Cool red t-shirt",
+    type: "ClothingItem",
+  },
+  used_blue_jeans: {
+    color: "blue",
+    clothing_type: "pants",
+    description: "Cool blue jeans",
+    type: "ClothingItem::Used",
+  },
+};

@@ -1,0 +1,26 @@
+import { ref } from "../define-fixtures.js";
+
+// activerecord/test/fixtures/vegetables.yml
+export const vegetableFixtureData = {
+  first_cucumber: {
+    id: 1,
+    custom_type: "Cucumber",
+    name: "my cucumber",
+  },
+  first_cabbage: {
+    id: 2,
+    custom_type: "Cabbage",
+    name: "my cabbage",
+  },
+  second_cabbage: {
+    id: 3,
+    custom_type: "Cabbage",
+    name: "his cabbage",
+  },
+  red_cabbage: {
+    id: 4,
+    custom_type: "RedCabbage",
+    name: "red cabbage",
+    seller_id: ref("vegetables", "second_cabbage"),
+  },
+};
