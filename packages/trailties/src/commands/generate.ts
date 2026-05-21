@@ -2,8 +2,8 @@ import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
-import { ControllerGenerator } from "../generators/controller-generator.js";
-import { ScaffoldGenerator } from "../generators/scaffold-generator.js";
+import { ControllerGenerator } from "../generators/rails/controller/controller-generator.js";
+import { ScaffoldGenerator } from "../generators/rails/scaffold/scaffold-generator.js";
 
 export function generateCommand(): Command {
   const cmd = new Command("generate");
