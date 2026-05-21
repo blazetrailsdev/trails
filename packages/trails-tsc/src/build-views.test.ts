@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -125,5 +125,19 @@ describe("runCli", () => {
 
   it("prints usage for --help and exits 0", () => {
     expect(runCli(["--help"])).toBe(0);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("`dev` starts the watcher synchronously and runs an initial build", () => {
+    // Stub `process.exit` so the `dev` SIGINT handler can call it
+    // during teardown without actually killing the vitest process.
+    vi.spyOn(process, "exit").mockImplementation(((_c?: number) => undefined) as never);
+    const cwd = mkScratch();
+    write(cwd, "app/views/home.html.tse", "hi");
+    const rc = runCli(["dev", "--cwd", cwd]);
+    expect(rc).toBe(0);
+    expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.js"))).toBe(true);
+    process.emit("SIGINT");
   });
 });
