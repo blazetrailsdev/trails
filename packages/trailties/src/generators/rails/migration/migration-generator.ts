@@ -13,6 +13,9 @@ export class MigrationGenerator extends NamedBase {
   }
 
   run(): string[] {
+    if (!/^\w+$/.test(this.name)) {
+      throw new Error(`Illegal name for a migration: ${this.name}`);
+    }
     let timestamp = migrationTimestamp();
     if (lastTimestamp && timestamp <= lastTimestamp) {
       timestamp = (parseInt(lastTimestamp, 10) + 1).toString();

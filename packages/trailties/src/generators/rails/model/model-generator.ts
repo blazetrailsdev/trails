@@ -3,8 +3,7 @@ import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { normalizeModelName, type ModelHelpersOptions } from "../../model-helpers.js";
 
 // Mirrors railties/lib/rails/generators/rails/model/model_generator.rb.
-// Rails' `hook_for :orm, required: true` is replaced with a direct emit;
-// `Base` is @blazetrails/activerecord's public model base.
+// hook_for :orm → direct Base emit; Admin::User flattens to AdminUser for TS.
 export interface ModelGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {}
 
 // prettier-ignore
@@ -21,7 +20,6 @@ export class ModelGenerator extends NamedBase {
 
   run(): string[] {
     const filename = `app/models/${this.filePath()}${this.ext()}`;
-    // Flatten Rails Admin::User namespace nesting to AdminUser for TS.
     const className = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
     const attrs = this.attributes
       .filter((a) => !a.virtual())

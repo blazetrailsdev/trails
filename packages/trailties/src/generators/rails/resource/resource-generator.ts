@@ -14,8 +14,7 @@ export class ResourceGenerator extends ModelGenerator {
 
   constructor(options: ResourceGeneratorOptions) {
     super(options);
-    // ModelGenerator's super-chain already normalized the name; reuse it so
-    // ResourceHelpers doesn't re-walk the pluralize-warn path.
+    // super already normalized — pass this.name to skip the warn path.
     this.resource = applyResourceHelpers(this.name, options, options.output);
     this.actions = options.actions ?? [];
   }

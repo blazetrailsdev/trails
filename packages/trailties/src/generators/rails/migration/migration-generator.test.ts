@@ -30,6 +30,12 @@ describe("MigrationGeneratorTest", () => {
     expect(a[0]).not.toBe(b[0]);
   });
 
+  it("migration with invalid file name", () => {
+    expect(() =>
+      new MigrationGenerator({ cwd: tmpDir, output: () => {}, name: "x:y" }).run(),
+    ).toThrow(/Illegal name/);
+  });
+
   it("exit on failure", () => {
     expect(MigrationGenerator.exitOnFailure()).toBe(true);
   });

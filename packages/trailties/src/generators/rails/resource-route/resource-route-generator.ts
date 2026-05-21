@@ -2,9 +2,8 @@ import { pluralize } from "@blazetrails/activesupport";
 import { NamedBase } from "../../named-base.js";
 
 // Mirrors railties/lib/rails/generators/rails/resource_route/resource_route_generator.rb.
-// Rails emits Ruby DSL via Thor's `route` action; trailties routes are TS,
-// so this inserts `router.resources()` at the `// routes` marker in
-// src/config/routes.{ts,js}. Nesting: admin/users/product → namespaced calls.
+// Inserts router.resources() at the `// routes` marker in src/config/routes.{ts,js}
+// (trails uses TS routes, not Ruby DSL); see generators/actions.ts.
 export interface ResourceRouteOptions {
   actions?: string[];
 }
