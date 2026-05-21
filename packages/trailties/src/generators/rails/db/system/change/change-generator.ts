@@ -58,7 +58,7 @@ export class ChangeGenerator extends GeneratorBase {
         "src/config/database.ts",
         "src/config/database.js",
       ].find((p) => this.fileExists(p)) ?? `src/config/database${this.ext()}`;
-    this.writeOrUpdate(target, databaseConfigTs(this.database, this.appName));
+    this.writeOrUpdate(target, databaseConfigTs(this.to, this.database, this.appName));
   }
 
   editPackageJson(): void {
@@ -140,8 +140,8 @@ export class ChangeGenerator extends GeneratorBase {
   }
 }
 
-function databaseConfigTs(database: Database, appName: string): string {
-  if (database.name === "sqlite3") {
+function databaseConfigTs(to: DatabaseName, database: Database, appName: string): string {
+  if (to === "sqlite3") {
     return [
       `export default {`,
       ...["development", "test", "production"].map(
@@ -151,7 +151,9 @@ function databaseConfigTs(database: Database, appName: string): string {
       ``,
     ].join("\n");
   }
-  const adapter = database.name === "postgres" ? "postgresql" : "mysql2";
+  // `to` is the adapter id (`postgresql` | `mysql` | `mariadb-mysql`);
+  // `Database#name` is a service/volume identifier and not safe to switch on.
+  const adapter = to === "postgresql" ? "postgresql" : "mysql2";
   const port = database.port!;
   const block = (env: string) =>
     `  ${env}: { adapter: "${adapter}", database: "${appName}_${env}", host: "localhost", port: ${port} },`;
