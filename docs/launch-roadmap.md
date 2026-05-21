@@ -53,9 +53,10 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
 - [ ] **actiondispatch** — routing, request/response, session basics. At 30.9%
       real tests / 6.1% API. Already has a foundation — needs the routes that
       scaffold generates (`resources`) to actually dispatch to controllers.
-- [ ] **CLI** (`packages/cli`) — `trails new`, `trails generate`, `trails server`,
-      `trails db:migrate`. The Frontiers sandbox already implements these commands
-      in-browser; the real CLI needs to match.
+- [ ] **CLI** (`packages/trailties`) — `trails new`, `trails generate`,
+      `trails server`, `trails db:migrate`. Lives in trailties (mirroring Rails'
+      railties package). See [docs/trailties-thor-port.md](trailties-thor-port.md)
+      for the commander → Thor-port plan.
 
 ### Nice to have
 
