@@ -3621,12 +3621,13 @@ export class Relation<T extends Base> {
   /**
    * Returns the adapter's SELECT visitor when one is defined, or null.
    *
-   * Real adapters (PG, SQLite, MySQL) expose `arelVisitor` — use it to get
-   * dialect-correct quoting. `TestAdapterFixtures` delegates `arelVisitor`
-   * to its inner adapter, so wrapped real adapters resolve through here
-   * the same as a bare adapter. The `?? null` fallback covers callers
-   * with no adapter at all (e.g. HABTM join models whose `_adapter` is
-   * null), which fall back to manager.toSql() / node.toSql() (global
+   * Real adapters (PG, SQLite, MySQL) expose `arelVisitor` — use it to
+   * get dialect-correct quoting. `TestAdapterFixtures` delegates
+   * `arelVisitor` to its inner adapter, so wrapped real adapters resolve
+   * through here the same as a bare adapter. Returns null when no
+   * adapter is set (e.g. HABTM join models whose `_adapter` is null) or
+   * when the adapter is a mock/partial that doesn't define `arelVisitor`;
+   * callers then fall back to `manager.toSql()` / `node.toSql()` (global
    * registry visitor = ANSI double-quotes).
    */
   private _selectVisitor(): Visitors.ToSql | null {
