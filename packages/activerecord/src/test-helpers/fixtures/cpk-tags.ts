@@ -1,0 +1,12 @@
+// activerecord/test/fixtures/cpk_tags.yml
+export const cpkTagFixtureData = {
+  cpk_tag_loyal_customer: {
+    name: "Loyal customer",
+  },
+  cpk_tag_digital_product: {
+    name: "Digital product",
+  },
+  cpk_tag_ruby_on_rails: {
+    name: "Ruby on Rails",
+  },
+};

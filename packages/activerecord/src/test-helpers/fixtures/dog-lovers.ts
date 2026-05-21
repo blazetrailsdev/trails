@@ -1,0 +1,12 @@
+// activerecord/test/fixtures/dog_lovers.yml
+export const dogLoverFixtureData = {
+  david: {
+    id: 1,
+    bred_dogs_count: 0,
+    trained_dogs_count: 1,
+  },
+  joanna: {
+    id: 2,
+    dogs_count: 1,
+  },
+};
