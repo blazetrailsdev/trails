@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseCreateTableColumns } from "./test-adapter.js";
+import { parseCreateTableColumns } from "./ddl-tracker.js";
 
 describe("parseCreateTableColumns", () => {
   it("extracts simple columns from a MySQL CREATE TABLE", () => {

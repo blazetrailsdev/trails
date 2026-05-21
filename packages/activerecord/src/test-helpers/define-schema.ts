@@ -1,6 +1,6 @@
 import type { DatabaseAdapter } from "../adapter.js";
 import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
-import { setUseTransactionalTests } from "../test-adapter.js";
+import { setUseTransactionalTests } from "./use-transactional-tests.js";
 
 export type PrimitiveColumnSpec =
   | "string"

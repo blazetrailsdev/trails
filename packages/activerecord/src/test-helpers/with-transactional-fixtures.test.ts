@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  _snapshotDdlTrackers,
-  adapterType,
-  createTestAdapter,
-  shouldSkipGlobalReset,
-  type TestDatabaseAdapter,
-} from "../test-adapter.js";
+import { adapterType, createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { snapshotDdlTrackers } from "./ddl-tracker.js";
+import { shouldSkipGlobalReset } from "./skip-global-reset.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { defineSchema } from "./define-schema.js";
 import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
@@ -278,7 +274,7 @@ describe.skipIf(adapterType === "mysql")(
       // entry to preserve across rollback — without this, the
       // preservation assertion below would be vacuous.
       await defineSchema(adapter, { ddl_tracker_outer: { name: "string" } });
-      outerTables = _snapshotDdlTrackers().tables;
+      outerTables = snapshotDdlTrackers().tables;
       expect(outerTables.has("ddl_tracker_outer")).toBe(true);
     });
 
@@ -288,13 +284,13 @@ describe.skipIf(adapterType === "mysql")(
       await (adapter as unknown as AdapterWithExec).exec(
         `CREATE TABLE ddl_tracker_inner (id INTEGER PRIMARY KEY)`,
       );
-      const tables = _snapshotDdlTrackers().tables;
+      const tables = snapshotDdlTrackers().tables;
       expect(tables.has("ddl_tracker_inner")).toBe(true);
       expect(tables.has("ddl_tracker_outer")).toBe(true);
     });
 
     it("next test sees the inner tracker reset but outer entries preserved", () => {
-      const tables = _snapshotDdlTrackers().tables;
+      const tables = snapshotDdlTrackers().tables;
       expect(tables.has("ddl_tracker_inner")).toBe(false);
       expect(tables.has("ddl_tracker_outer")).toBe(true);
       for (const t of outerTables) expect(tables.has(t)).toBe(true);
