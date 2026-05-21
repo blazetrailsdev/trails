@@ -1,0 +1,8 @@
+// activerecord/test/fixtures/friendships.yml
+export const friendshipFixtureData = {
+  "Connection 1": {
+    id: 1,
+    friend_id: 1,
+    follower_id: 2,
+  },
+};
