@@ -43,16 +43,30 @@ export class CreateMigration {
     return typeof this.data === "function" ? await this.data() : this.data;
   }
 
+  private _existingMigration?: string;
+
+  // Mirrors Rails' `@existing_migration ||= ...` memoization in
+  // create_migration.rb. Ruby's `||=` only caches truthy values, so an
+  // "absent" lookup re-scans on the next call (the destination may now
+  // exist after a successful invoke!).
   async existingMigration(): Promise<string | undefined> {
+    if (this._existingMigration) return this._existingMigration;
     const found = await migrationExists(
       this.base.fs,
       this.base.path,
       this.migrationDir,
       this.migrationFileName,
     );
-    if (found) return found;
-    if (await this.base.fs.exists(this.destination)) return this.destination;
-    return undefined;
+    const value =
+      found ?? ((await this.base.fs.exists(this.destination)) ? this.destination : undefined);
+    if (value) this._existingMigration = value;
+    return value;
+  }
+
+  // Force-path / revoke remove the cached file; reset so subsequent reads
+  // see the new filesystem state.
+  private invalidateExistingMigration(): void {
+    this._existingMigration = undefined;
   }
 
   async exists(): Promise<boolean> {
@@ -103,6 +117,7 @@ export class CreateMigration {
     if (!this.pretend()) {
       if (!this.base.fs.unlink) throw new Error("FsAdapter.unlink is required");
       await this.base.fs.unlink(e);
+      this.invalidateExistingMigration();
     }
     return e;
   }
@@ -121,6 +136,7 @@ export class CreateMigration {
         if (e) {
           if (!this.base.fs.unlink) throw new Error("FsAdapter.unlink is required");
           await this.base.fs.unlink(e);
+          this.invalidateExistingMigration();
         }
         await this.writeRendered();
       }
@@ -140,9 +156,8 @@ export class CreateMigration {
 
   private async writeRendered(): Promise<void> {
     if (!this.base.fs.writeFile) throw new Error("FsAdapter.writeFile is required");
-    if (this.base.fs.mkdir) {
-      await this.base.fs.mkdir(this.base.path.dirname(this.destination), { recursive: true });
-    }
+    if (!this.base.fs.mkdir) throw new Error("FsAdapter.mkdir is required");
+    await this.base.fs.mkdir(this.base.path.dirname(this.destination), { recursive: true });
     await this.base.fs.writeFile(this.destination, await this.render());
   }
 
