@@ -1,28 +1,15 @@
 import { Command } from "commander";
-import {
-  EncryptedFile,
-  MissingContentError,
-  MissingKeyError,
-} from "@blazetrails/activesupport/encrypted-file";
-import { stdout, setExitCode } from "@blazetrails/activesupport/process-adapter";
-import { editEncryptedFile } from "../encrypted-file-editor.js";
+import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
+import { editEncryptedFile, showEncryptedFile } from "../encrypted-file-editor.js";
 
-interface CredentialsOptions {
+interface Opts {
   environment?: string;
 }
 
-function pathsFor(opts: CredentialsOptions): { contentPath: string; keyPath: string } {
-  if (opts.environment && opts.environment.length > 0) {
-    return {
-      contentPath: `config/credentials/${opts.environment}.yml.enc`,
-      keyPath: `config/credentials/${opts.environment}.key`,
-    };
-  }
-  return { contentPath: "config/credentials.yml.enc", keyPath: "config/master.key" };
-}
-
-function buildFile(opts: CredentialsOptions): EncryptedFile {
-  const { contentPath, keyPath } = pathsFor(opts);
+function buildFile(opts: Opts): EncryptedFile {
+  const env = opts.environment;
+  const contentPath = env ? `config/credentials/${env}.yml.enc` : "config/credentials.yml.enc";
+  const keyPath = env ? `config/credentials/${env}.key` : "config/master.key";
   return new EncryptedFile({
     contentPath,
     keyPath,
@@ -39,35 +26,25 @@ async function missingMessage(file: EncryptedFile): Promise<string> {
 }
 
 export function credentialsCommand(): Command {
-  const cmd = new Command("credentials");
-  cmd.description("Edit and show encrypted credentials");
+  const cmd = new Command("credentials").description("Edit and show encrypted credentials");
+  const envOpt: [string, string] = [
+    "-e, --environment <env>",
+    "Use config/credentials/<env>.yml.enc and .key",
+  ];
 
   cmd
     .command("edit")
     .description("Open the decrypted credentials in `$VISUAL` or `$EDITOR` for editing")
-    .option("-e, --environment <env>", "Use config/credentials/<env>.yml.enc and .key")
-    .action(async (opts: CredentialsOptions) => {
-      const file = buildFile(opts);
-      await editEncryptedFile(file, { generateKeyIfMissing: true });
-    });
+    .option(...envOpt)
+    .action(async (opts: Opts) => editEncryptedFile(buildFile(opts)));
 
   cmd
     .command("show")
     .description("Show the decrypted credentials")
-    .option("-e, --environment <env>", "Use config/credentials/<env>.yml.enc and .key")
-    .action(async (opts: CredentialsOptions) => {
+    .option(...envOpt)
+    .action(async (opts: Opts) => {
       const file = buildFile(opts);
-      try {
-        const contents = await file.read();
-        stdout.write(`${contents.length > 0 ? contents : await missingMessage(file)}\n`);
-      } catch (e) {
-        if (e instanceof MissingKeyError || e instanceof MissingContentError) {
-          stdout.write(`${await missingMessage(file)}\n`);
-        } else {
-          stdout.write(`Couldn't decrypt ${file.contentPath}. Perhaps you passed the wrong key?\n`);
-        }
-        setExitCode(1);
-      }
+      await showEncryptedFile(file, await missingMessage(file));
     });
 
   return cmd;

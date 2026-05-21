@@ -1,17 +1,12 @@
 import { Command } from "commander";
-import {
-  EncryptedFile,
-  MissingContentError,
-  MissingKeyError,
-} from "@blazetrails/activesupport/encrypted-file";
-import { stdout, setExitCode } from "@blazetrails/activesupport/process-adapter";
-import { editEncryptedFile } from "../encrypted-file-editor.js";
+import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
+import { editEncryptedFile, showEncryptedFile } from "../encrypted-file-editor.js";
 
-interface EncryptedOptions {
+interface Opts {
   key: string;
 }
 
-function buildFile(contentPath: string, opts: EncryptedOptions): EncryptedFile {
+function buildFile(contentPath: string, opts: Opts): EncryptedFile {
   return new EncryptedFile({
     contentPath,
     keyPath: opts.key,
@@ -28,43 +23,26 @@ async function missingMessage(file: EncryptedFile): Promise<string> {
 }
 
 export function encryptedCommand(): Command {
-  const cmd = new Command("encrypted");
-  cmd.description("Edit and show encrypted files");
+  const cmd = new Command("encrypted").description("Edit and show encrypted files");
+  const keyOpt: [string, string, string] = [
+    "-k, --key <path>",
+    "Path to the encryption key (Rails.root-relative)",
+    "config/master.key",
+  ];
 
   cmd
     .command("edit <file>")
     .description("Open the decrypted file in `$VISUAL` or `$EDITOR` for editing")
-    .option(
-      "-k, --key <path>",
-      "Path to the encryption key (Rails.root-relative)",
-      "config/master.key",
-    )
-    .action(async (file: string, opts: EncryptedOptions) => {
-      const encFile = buildFile(file, opts);
-      await editEncryptedFile(encFile, { generateKeyIfMissing: true });
-    });
+    .option(...keyOpt)
+    .action(async (file: string, opts: Opts) => editEncryptedFile(buildFile(file, opts)));
 
   cmd
     .command("show <file>")
     .description("Show the decrypted contents of the file")
-    .option(
-      "-k, --key <path>",
-      "Path to the encryption key (Rails.root-relative)",
-      "config/master.key",
-    )
-    .action(async (file: string, opts: EncryptedOptions) => {
-      const encFile = buildFile(file, opts);
-      try {
-        const contents = await encFile.read();
-        stdout.write(`${contents.length > 0 ? contents : await missingMessage(encFile)}\n`);
-      } catch (e) {
-        if (e instanceof MissingKeyError || e instanceof MissingContentError) {
-          stdout.write(`${await missingMessage(encFile)}\n`);
-        } else {
-          stdout.write(`Couldn't decrypt ${file}. Perhaps you passed the wrong key?\n`);
-        }
-        setExitCode(1);
-      }
+    .option(...keyOpt)
+    .action(async (file: string, opts: Opts) => {
+      const enc = buildFile(file, opts);
+      await showEncryptedFile(enc, await missingMessage(enc));
     });
 
   return cmd;
