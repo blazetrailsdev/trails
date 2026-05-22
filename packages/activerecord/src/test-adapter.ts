@@ -23,7 +23,7 @@ import type { TransactionManager } from "./connection-adapters/abstract/transact
 import type { SchemaCache } from "./connection-adapters/schema-cache.js";
 import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import { SidecarFixtures } from "./test-helpers/sidecar-fixtures.js";
+import { TestFixtures } from "./test-helpers/test-fixtures.js";
 import {
   clearDdlTrackers,
   getCreatedTables,
@@ -41,7 +41,7 @@ import type { Result } from "./result.js";
 const PG_TEST_URL = process.env.PG_TEST_URL;
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
 
-export { SidecarFixtures };
+export { TestFixtures };
 
 /** Which adapter backend is active. */
 export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
@@ -130,7 +130,7 @@ export type SidecarAdapter = DatabaseAdapter & { transactionManager: Transaction
 
 /**
  * Path 2 sidecar factory: returns the shared real {@link DatabaseAdapter}
- * directly alongside a fresh {@link SidecarFixtures} handle. Use this
+ * directly alongside a fresh {@link TestFixtures} handle. Use this
  * when migrating off the `TestAdapterFixtures` wrapper — callers can
  * issue DB ops on `adapter` directly (no delegation overhead) and use
  * `fixtures` for the test-only TX visibility / DDL tracking concerns.
@@ -142,9 +142,9 @@ export type SidecarAdapter = DatabaseAdapter & { transactionManager: Transaction
  */
 export function createSidecarTestAdapter(): {
   adapter: SidecarAdapter;
-  fixtures: SidecarFixtures;
+  fixtures: TestFixtures;
 } {
-  return { adapter: _sharedAdapter, fixtures: new SidecarFixtures(_sharedAdapter) };
+  return { adapter: _sharedAdapter, fixtures: new TestFixtures(_sharedAdapter) };
 }
 
 /**

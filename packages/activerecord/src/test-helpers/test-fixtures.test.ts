@@ -6,7 +6,7 @@ describe("createSidecarTestAdapter (path 2 sidecar)", () => {
     await resetTestAdapterState();
   });
 
-  it("returns the real adapter and a fresh SidecarFixtures handle", () => {
+  it("returns the real adapter and a fresh TestFixtures handle", () => {
     const { adapter, fixtures } = createSidecarTestAdapter();
     expect(typeof adapter.adapterName).toBe("string");
     expect(fixtures.adapter).toBe(adapter);
