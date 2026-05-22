@@ -1,5 +1,7 @@
 import ts from "typescript";
 
+export { assertNoRubySource } from "./no-ruby-source.js";
+
 export function parseTs(source: string): { diagnostics: readonly ts.Diagnostic[] } {
   // `transpileModule` with `reportDiagnostics: true` exposes syntactic
   // diagnostics through the public API — unlike the internal
@@ -14,13 +16,4 @@ export function parseTs(source: string): { diagnostics: readonly ts.Diagnostic[]
     },
   });
   return { diagnostics: result.diagnostics ?? [] };
-}
-
-const RUBY_RE = /^\s*(class|module|def)\s+\w+($|\s+<)/m;
-
-export function assertNoRubySource(text: string): void {
-  const m = text.match(RUBY_RE);
-  if (m) {
-    throw new Error(`Ruby-like source detected: ${JSON.stringify(m[0])}`);
-  }
 }

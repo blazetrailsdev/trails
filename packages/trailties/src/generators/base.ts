@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
+import * as TrailsActions from "./trails-actions.js";
 
 export interface GeneratorOptions {
   cwd: string;
@@ -27,6 +28,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   git = Actions.git;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+
+  pkg = TrailsActions.pkg;
+  route = TrailsActions.route;
+  environment = TrailsActions.environment;
+  initializer = TrailsActions.initializer;
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;

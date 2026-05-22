@@ -282,6 +282,7 @@ export const app = {
   name: "${name}",
   config: {
     database: databaseConfig,
+    // config
   },
   routes: drawRoutes,
 };
@@ -367,6 +368,7 @@ export default {
   considerAllRequestsLocal: true,
   serverTiming: true,
   cacheStore: "memory",
+  // config
 };
 `,
     );
@@ -378,6 +380,7 @@ export default {
   eagerLoad: false,
   considerAllRequestsLocal: true,
   cacheStore: "null",
+  // config
 };
 `,
     );
@@ -391,6 +394,7 @@ export default {
   forceSSL: true,
   logLevel: "info",
   cacheStore: "memory",
+  // config
 };
 `,
     );
