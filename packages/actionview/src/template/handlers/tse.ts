@@ -1,6 +1,17 @@
 import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import type { RenderContext, TemplateHandler } from "../handlers.js";
+import {
+  translateLocation as translateLocationImpl,
+  type BacktraceLocation,
+  type Spot,
+} from "./tse-translate-location.js";
+
+export {
+  LocationParsingError,
+  type BacktraceLocation,
+  type Spot,
+} from "./tse-translate-location.js";
 
 /**
  * Minimal shape `Tse#call` needs from a template. Mirrors the subset of
@@ -71,22 +82,38 @@ export class Tse implements TemplateHandler {
     return new this().call(template, source);
   }
 
-  /**
-   * Streaming render protocol marker. Mirrors
-   * `Template::Handlers::ERB#supports_streaming?`.
-   */
+  /** Mirrors `Template::Handlers::ERB#supports_streaming?` — instance
+   *  method, per Rails. */
   supportsStreaming(): boolean {
     return true;
   }
 
-  /** Mirrors `Template::Handlers::ERB#handles_encoding?`. */
+  /** Mirrors `Template::Handlers::ERB#handles_encoding?` — instance method. */
   handlesEncoding(): boolean {
     return true;
   }
 
   /**
+   * Translate a `ErrorHighlight`-shaped spot back to a source-line/column
+   * inside the `.tse` template. Mirrors
+   * `Template::Handlers::ERB#translate_location(spot, backtrace_location, source)`
+   * 1:1 — the algorithm is delegated to {@link translateLocationImpl}, which
+   * ports `find_offset` / `offset_source_tokens` from `erb.rb`. Returns the
+   * mutated spot on success, `null` if the line is past EOF or the snippet
+   * can't be anchored.
+   */
+  translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
+    return translateLocationImpl(spot, backtraceLocation, source);
+  }
+
+  /**
    * Compile a template source to a JS module string. Rails:
    * `Handlers::ERB#call(template, source) → ruby_code_string`.
+   *
+   * Encoding-tag handling: Rails strips a leading magic `# encoding:` line
+   * before passing source to Erubi. `.tse` source is JavaScript/TypeScript,
+   * which has no encoding pragma (files are always UTF-8 by spec), so this
+   * step is a documented no-op — there is nothing to strip.
    */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;

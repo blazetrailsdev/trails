@@ -121,6 +121,48 @@ describe("Template::Handlers::Tse", () => {
     expect(code).toMatch(/_ob\.append\(name\)/);
   });
 
+  describe("translateLocation", () => {
+    it("anchors a compiled spot to the source-line column (Rails parity)", () => {
+      // Snippet matches what @blazetrails/tse-compiler actually emits for
+      // `<%= name %>` (see emit-js.ts + parser.ts trim) so the test exercises
+      // the real anchoring path, not a fabricated one.
+      const source = "<h1>hi</h1>\n<%= name %>\n";
+      const spot = {
+        snippet: "_ob.append(name);",
+        firstLineno: 2,
+        lastLineno: 2,
+        firstColumn: 11,
+        lastColumn: 15,
+      };
+      const out = new Tse().translateLocation(spot, { lineno: 2 }, source);
+      expect(out).not.toBeNull();
+      expect(out!.scriptLines).toEqual(["<h1>hi</h1>\n", "<%= name %>\n"]);
+      expect(out!.firstLineno).toBe(2);
+    });
+
+    it("returns null when backtrace lineno is past EOF", () => {
+      const spot = {
+        snippet: "_ob.append(x);",
+        firstLineno: 1,
+        lastLineno: 1,
+        firstColumn: 0,
+        lastColumn: 1,
+      };
+      expect(new Tse().translateLocation(spot, { lineno: 99 }, "a\nb\n")).toBeNull();
+    });
+
+    it("returns null when the snippet can't be anchored against source tokens", () => {
+      const spot = {
+        snippet: "totally-unrelated",
+        firstLineno: 1,
+        lastLineno: 1,
+        firstColumn: 0,
+        lastColumn: 1,
+      };
+      expect(new Tse().translateLocation(spot, { lineno: 1 }, "<%= name %>")).toBeNull();
+    });
+  });
+
   it("registers against the .tse extension via Template::Handlers", () => {
     const tse = new Tse();
     TemplateHandlers.registerTemplateHandler("tse", tse);

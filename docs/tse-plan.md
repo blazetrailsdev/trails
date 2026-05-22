@@ -1153,147 +1153,196 @@ of each other and can land in parallel from sibling branches.
 
 ---
 
-## 5. Fidelity checklist
+## 5. Remaining work — stories
 
-Each implementation PR landing TSE pieces must check the box for every
-item it claims to cover. The checklist is split into two parts:
+What was on the §5A/§5B fidelity checklist is now either landed (audited
+against `vendor/rails/actionview/` in PR #2241) or pulled out into one
+of the stories below. Each story is a self-contained slot; pick one,
+ship it as a single PR. Stories are ordered roughly bottom-up
+(substrate → emitter → handler → renderer → packaging), but they are
+not strictly stacked — anything not marked **blocks** can move in
+parallel.
 
-- **5A — Rails fidelity.** Items verified against
-  `vendor/rails/actionview/`. These are non-negotiable: deviation
-  requires a documented rationale and approval.
-- **5B — TS hygiene.** TSE-specific design decisions. Not present in
-  Rails; defensible to revisit per implementation needs as long as
-  the decision is recorded in this doc.
+A story is mergeable when:
+
+1. Behavior matches Rails (or, for TS-hygiene items, the §6 resolved
+   decision) — verified against the Rails file cited in the story.
+2. No stubs in landed code; if the upstream method is unimplemented in
+   Rails, leave it out rather than ship a no-op.
+3. `api:compare` and `test:compare` deltas are non-negative for the
+   touched packages.
 
 ---
 
-### 5A. Rails fidelity
+### Story 5.1 — Handler: annotate-rendered-view-with-filenames
 
-**Handler protocol** (`lib/action_view/template/handlers/erb.rb`):
+Rails ref: `actionview/lib/action_view/template/handlers/erb.rb` lines
+86–89.
 
-- [ ] `Tse.call(template, source)` strips encoding tag (TSE: no-op,
-      documented).
-- [ ] `Tse.call` reads `escape_ignore_list` and passes `escape:` option.
-- [ ] `Tse.call` reads `strip_trailing_newlines` and `chomp!`s source.
-- [ ] `Tse.call` reads `annotateRenderedViewWithFilenames` + format and
-      emits BEGIN/END comments for html format.
-- [ ] `Tse.supportsStreaming === true`.
-- [ ] `Tse.handlesEncoding === true`.
-- [ ] `Tse.translateLocation(spot, frame, source)` implemented (can be
-      a stub returning frame as-is until ErrorHighlight equivalent lands).
-- [ ] `Tse.trimMode`, `Tse.escapeIgnoreList`, `Tse.stripTrailingNewlines`,
-      `Tse.emitter` all class-attribute-settable.
+- [ ] `Tse#call` reads `ActionView::Base.annotateRenderedViewWithFilenames`
+      (currently absent from the actionview surface — wire it as a
+      class-level boolean on `Base`, default `false`, settable via
+      `config.actionView.annotateRenderedViewWithFilenames`).
+- [ ] When the boolean is on AND `template.format === "html"`, prepend
+      `_ob.safeAppend('<!-- BEGIN ${template.shortIdentifier} -->');`
+      and append the matching END line to the emitted module. Rails
+      threads this through Erubi via `:preamble` / `:postamble`
+      options; `compileJs` needs equivalent options or a wrapping
+      pass.
 
-**Emitter** (`lib/action_view/template/handlers/erb/erubi.rb`):
+### Story 5.2 — Compiler: BLOCK_EXPR no-paren-wrap
 
-- [ ] bufvar resolves to `context.outputBuffer`, not a local.
-- [ ] `<%= %>` dispatches to `.append()` (escape) or `.safeExprAppend()`
-      (no escape) based on `escape:` option — verified with paired
-      `.html.tse` + `.text.tse` fixtures rendering the same expression.
-- [ ] `<%== %>` always dispatches to `.safeExprAppend()`.
-- [ ] Static text dispatches to `.safeAppend()` with backslash-escape of
-      `'` and `\` in the emitted string literal.
-- [ ] `BLOCK_EXPR` equivalent: `<%= helper do |...| %>...<% end %>` and
-      `<%= helper { %>...<% } %>` emit without paren-wrap.
-- [ ] Newline coalescing: consecutive `\n`-only chunks collapse into one
-      `.safeAppend("\n\n\n")` call.
-- [ ] `<%# %>` comments dropped entirely (no AST node, no emit).
-- [ ] `<%% %>` / `%%>` produce literal `<%` / `%>` in output.
-- [ ] Trim `-`: `<%- ... -%>` strips line, `<%= ... -%>` strips trailing
-      newline only.
+Rails ref: `actionview/lib/action_view/template/handlers/erb/erubi.rb`
+(BLOCK_EXPR constant) — detects expression tags that end in `do …` or
+`{ …` and emits without paren-wrap so the trailing block parses.
 
-**Strict locals** (`lib/action_view/template.rb`, `strict_locals!`):
+- [ ] Detect the TS analogue: `<%= … (… ) => { %>` or trailing
+      `=> {` / `(…) => {` / `function(…) {` immediately before `%>`.
+      Track these as `blockExpr` token kind in the lexer.
+- [ ] Emit `_ob.append(<expr>` without the closing `);` until the
+      matching `<% } %>` / `<% }) %>` closer; emit `);` then.
+- [ ] Verify with `<%= forEach(items, (item) => { %>…<% }) %>`
+      fixtures that the block body re-enters template mode and the
+      outer append closes correctly.
 
-- [ ] Rails-style `<%# locals: (name:, count: 0) %>` matched via the
-      same regex Rails uses (`/\#\s+locals:\s+\((.*)\)/`) and stripped
-      from source before lex.
-- [ ] Optional `<%! types: { ... } !%>` block parsed separately,
-      sharpens the locals param type, coexists with the names line.
-- [ ] Empty `<%# locals: () %>` enforces "no extra keys" — locals param
-      typed `Record<never, never>` and runtime check rejects any keys.
-- [ ] Defaults from the names line (`count: 0`) emit as TS default
-      params in the compiled function signature.
-- [ ] `NoExtraKeys<T>` helper applied to `locals` parameter so excess
-      properties are rejected even for variable-typed argument values
-      (not just object literals — see §2.5 caveat).
-- [ ] Runtime `StrictLocalsMismatch` thrown when
-      `raiseOnStrictLocalsMismatch` is on and `Object.keys(locals)`
-      doesn't match declared set.
+### Story 5.3 — Strict locals: emit + enforce signature
 
-**Runtime substrate** (`active_support/safe_buffer.rb`, `lib/action_view/buffers.rb`):
+Rails ref: `actionview/lib/action_view/template.rb` (`strict_locals!`).
 
-- [ ] `SafeString` instance check; `safe()` wrapper; `escape()` HTML
-      escape for `<`, `>`, `&`, `"`, `'`.
-- [ ] `OutputBuffer extends SafeString` — itself html-safe.
-- [ ] `OutputBuffer#append` html-escapes when arg is plain string,
-      passes through when `SafeString`.
-- [ ] `OutputBuffer#safeAppend` and `#safeExprAppend` never escape.
-- [ ] Concatenating two `SafeString`s yields a `SafeString`.
+- [ ] Empty `<%# locals: () %>` → emitted render signature uses
+      `locals: Record<never, never>` so any keys are a type error.
+- [ ] Names line with defaults (`count: 0`) emits as TS default
+      parameter values in the compiled render function (and falls
+      through to runtime — needs the locals object destructured).
+- [ ] `NoExtraKeys<T>` helper exported from
+      `@blazetrails/actionview/strict-locals` and applied to the
+      `locals` parameter so excess properties are rejected even for
+      variable-typed argument values. See §2.5 caveat.
+- [ ] Runtime `StrictLocalsMismatch` thrown by the compiled module
+      when `raiseOnStrictLocalsMismatch` is on (config flag, default
+      true in dev) and `Object.keys(locals)` doesn't match the
+      declared set.
 
-**Filename parsing** (`lib/action_view/template/resolver.rb` +
-`Mime::Type` registry):
+### Story 5.4 — OutputBuffer: Rails-faithful shape + method names
 
-- [ ] Filename `<name>.<locale?>.<format>.<variant?>.tse` parsed via
-      registered token lists (see §2.10.4).
-- [ ] Missing format defaults to `html`.
-- [ ] `<%! format: "..." !%>` override honored when present.
-- [ ] `escapeIgnoreList` consulted via parsed format, not filename string
-      match.
+Rails ref: `actionview/lib/action_view/buffers.rb`,
+`activesupport/lib/active_support/core_ext/string/output_safety.rb`.
 
-**Helpers and capture** (`lib/action_view/helpers/capture_helper.rb`,
-`lib/action_view/helpers/output_safety_helper.rb`):
+- [ ] `OutputBuffer extends SafeBuffer` (currently a plain class
+      wrapping a raw string). Required so `outputBuffer.toString()`
+      satisfies `isHtmlSafe()` without the bespoke override.
+- [ ] Rename `concat` / `safeConcat` → `append` / `safeAppend` to
+      match what the emitter actually calls. Keep the old names as
+      `@deprecated` aliases for one release. Today `compileJs` emits
+      `_ob.append(…)` / `_ob.safeAppend(…)` which would `TypeError` at
+      runtime against the current `OutputBuffer`.
+- [ ] Verify `safeBuffer.concat(safeBuffer) instanceof SafeBuffer`
+      under the activesupport implementation — Rails preserves
+      html-safety across `<<` of two safe strings.
 
-- [ ] `RenderContext#capture(callback)` redirects `outputBuffer`,
-      restores on finally, returns captured `SafeString`.
-- [ ] `RenderContext#concat(value)` writes to currently-active buffer.
-- [ ] `RenderContext#raw(value)` ≡ `safe(value)`.
-- [ ] Block-form `<%= helper do %>...<% end %>` emits with `capture()`
-      wrapper — no double-write (see §2.10.3).
-- [ ] Nested partial renders inherit parent context's `outputBuffer`.
+### Story 5.5 — Filename parsing: token lists + format default + override
 
-**Layouts and yield** (`lib/action_view/layouts.rb`):
+Rails ref: `actionview/lib/action_view/template/resolver.rb` +
+`actionpack/lib/action_dispatch/http/mime_type.rb`.
 
-- [ ] `<%= yield %>` returns inner template output via
+- [ ] `parseFilename` consumes a `MimeType` registry instead of
+      blind dot-splitting — `show.en.html+phone.tse` resolves
+      `{ name: "show", locale: "en", format: "html", variant: "phone",
+handler: "tse" }`. Blocked on a `Mime::Type` port.
+- [ ] Missing format in the filename defaults to `"html"` (per Rails'
+      `Template#format` fallback).
+- [ ] `<%! format: "json" !%>` magic block overrides the filename-
+      derived format when present. Today the parser only handles
+      `types: …`; extend it to the `format: …` directive.
+
+### Story 5.6 — RenderContext: capture / concat / raw + block-form helpers
+
+Rails ref: `actionview/lib/action_view/helpers/capture_helper.rb`,
+`output_safety_helper.rb`.
+
+- [ ] `RenderContext#capture(callback)` redirects the active
+      `outputBuffer` for the duration of `callback`, returns the
+      captured `SafeBuffer`, restores via `finally`.
+- [ ] `RenderContext#concat(value)` writes to the currently-active
+      buffer.
+- [ ] `RenderContext#raw(value)` is exactly `safe(value)`.
+- [ ] Block-form `<%= helper(() => { %> … <% }) %>` emits with a
+      `capture()` wrapper so the inner block writes don't double-
+      append (see §2.10.3). Depends on Story 5.2.
+- [ ] Nested partial renders inherit the parent context's
+      `outputBuffer` rather than constructing a fresh one.
+
+### Story 5.7 — Layouts and yield
+
+Rails ref: `actionview/lib/action_view/layouts.rb`.
+
+- [ ] `<%= yield %>` returns the inner template output via
       `RenderContext#yield()`.
-- [ ] `<% contentFor("name", () => ...) %>` captures and stores by name.
-- [ ] `<%= yield("name") %>` returns named capture or empty SafeString.
+- [ ] `<% contentFor("name", () => …) %>` captures by callback and
+      stores under the given name on the context.
+- [ ] `<%= yield("name") %>` returns the named capture or an empty
+      `SafeBuffer`.
 
-**Partials** (`lib/action_view/renderer/partial_renderer.rb`):
+### Story 5.8 — Partials
 
-- [ ] Static partial name → typed locals via `TemplateRegistry`.
-- [ ] Dynamic partial name → string form with `Record<string, unknown>`.
-- [ ] `collection`, `as`, `counter`, `spacer_template` options match
+Rails ref: `actionview/lib/action_view/renderer/partial_renderer.rb`.
+
+- [ ] Static partial name → typed locals via the `TemplateRegistry`
+      augmentation manifest. Depends on Story 5.12.
+- [ ] Dynamic partial name → string form falls back to
+      `Record<string, unknown>` for the locals parameter.
+- [ ] `collection`, `as`, `counter`, `spacerTemplate` options match
       Rails 1:1.
 
----
+### Story 5.9 — Artifact emission
 
-### 5B. TS hygiene (TSE-specific decisions)
+Plan ref: §2.8, §2.9.
 
-**TypeScript artifacts** (see §2.9):
+- [ ] `trails-tsc build` emits `.tse.ts`, `.tse.js`, `.tse.js.map`,
+      `.tse.d.ts`, `.tse.d.ts.map` for every `.tse` source. The
+      `.tse.ts` shim is already produced; verify the rest.
+- [ ] `.d.ts.map` composes through the `.tse.ts → .tse` source map so
+      Go-to-Definition lands on the `.tse` source, not the shim.
+- [ ] `.tse.js.map` makes runtime stack traces report
+      `<file>.tse:line:col` after Node consumes the map.
 
-- [ ] `.tse.ts`, `.tse.js`, `.tse.js.map`, `.tse.d.ts`, `.tse.d.ts.map`
-      all emitted for every `.tse` source.
-- [ ] `.d.ts.map` makes Go-to-Definition jump to `.tse` (not `.tse.ts`).
-- [ ] `.tse.js.map` makes runtime stack traces report `.tse:line:col`.
-- [ ] Ambient `declare module "*.tse"` shipped in
-      `@blazetrails/actionview` so imports typecheck before first build.
-- [ ] Emitted `.tse.ts` clean under `strict`,
-      `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
+### Story 5.10 — Ambient `declare module "*.tse"`
+
+- [ ] Ship `packages/actionview/types/tse-modules.d.ts` (or
+      equivalent) with a default-export signature so `import View
+from "./show.html.tse"` typechecks before any `.tse.d.ts` is
+      generated. Re-exported from the actionview package types entry.
+
+### Story 5.11 — Emitter hygiene
+
+- [ ] Emitted `.tse.ts` passes `tsc --strict
+--noUncheckedIndexedAccess --exactOptionalPropertyTypes`
+      cleanly. Add a CI guard that compiles a fixture set with these
+      flags.
 - [ ] Emitted `.tse.ts` uses only erasable syntax (passes
-      `verbatimModuleSyntax`).
-- [ ] `RenderContext` declared as an `interface` (augmentable), not a
-      `type` alias.
-- [ ] `TemplateRegistry` interface in `@blazetrails/actionview`;
-      generated manifest augments it via `declare module`.
-- [ ] `package.json#exports` for `*.tse` lists `"types"` before
-      `"default"` so tsc picks the `.d.ts`.
-- [ ] `tsconfig` template enables `allowArbitraryExtensions` and the
-      `@blazetrails/trails-tsc/ts-plugin` plugin.
-- [ ] `trails-tsc build` is a `pnpm prepare` dependency so fresh clones
-      typecheck without manual steps.
+      `verbatimModuleSyntax`). No enum, no `import =`, no namespace.
 
-When all boxes are checked and `api:compare` / `test:compare` show
-non-negative deltas, the corresponding implementation PR is mergeable.
+### Story 5.12 — TemplateRegistry
+
+- [ ] `TemplateRegistry` empty interface exported from
+      `@blazetrails/actionview`.
+- [ ] `trails-tsc build` writes a manifest module that augments it
+      via `declare module "@blazetrails/actionview" { interface
+TemplateRegistry { … } }` keyed by partial name → locals type.
+- [ ] `RenderContext#render({ partial: keyof TemplateRegistry, locals
+})` resolves typed locals. Unblocks Story 5.8 typed partials.
+
+### Story 5.13 — Package wiring
+
+- [ ] `package.json#exports` entry for `*.tse` lists `"types"` before
+      `"default"` so tsc resolves the `.tse.d.ts` ahead of the
+      runtime shim.
+- [ ] `tsconfig` starter template enables
+      `allowArbitraryExtensions` and lists
+      `@blazetrails/trails-tsc/ts-plugin` under `compilerOptions.plugins`.
+- [ ] `trails-tsc build` runs from `pnpm prepare` (and the equivalent
+      lifecycle for npm/yarn) so a fresh clone typechecks without a
+      manual build step.
 
 ---
 
