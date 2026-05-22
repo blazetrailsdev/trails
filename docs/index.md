@@ -1,6 +1,6 @@
 # Docs index
 
-Snapshot 2026-05-21. Every plan/tracker doc in `docs/`, grouped by what
+Snapshot 2026-05-22. Every plan/tracker doc in `docs/`, grouped by what
 it's for, with current priority and rough remaining-work size.
 
 Priority legend:

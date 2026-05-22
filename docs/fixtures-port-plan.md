@@ -187,7 +187,12 @@ For every `vendor/rails/activerecord/test/fixtures/<name>.yml`:
 - Has a `--package activerecord` flag for future generalization but only
   AR is in scope now.
 
-## Rollout
+## Rollout (historical)
+
+> Historical narrative of the port rollout — preserved for PR archaeology.
+> Live status is at the top of the doc; PRs 0–6b and 0.5a–h have all
+> merged. The "in flight" / no-status markers below were accurate at
+> authoring time and are not refreshed.
 
 PR-sized batches targeting ~250 LOC each. Small clusters bundle
 together; the two over-ceiling clusters (C1, C8) split into `a`/`b`
@@ -202,7 +207,7 @@ below: the schema port (split into ~6–8 sibling PRs, each under
 ceiling) and PR 7 (granted ceiling waiver — see entry).
 
 1. **PR 0 closed (#2122)** — fixtures-compare script + CI wiring.
-2. **PR 0.5a-g closed** (#2124 A, #2128 C, #2130 D-G, #2131 N-R, #2133 H-M, #2134 S-W, #2140 wire-up).
+2. **PR 0.5a–h closed** (#2124 A, #2128 C, #2130 D-G, #2131 N-R, #2133 H-M, #2134 S-W, #2140 wire-up; final h-tier sibling).
 3. **PR 0.75 closed (#2125)** — id backfill + ref() resolver + adapterName helper.
 4. **PR 1a closed (#2143)** — Cluster 1 first half (categories/categorizations/categories_posts/categories_ordered/taggings/tags/essays/readers).
 5. **PR 1b in flight (#2205)** — Cluster 1 second half (author_favorites, bad_posts, other_posts, other_comments, other_topics, other_books, subscribers, subscriptions, references).
