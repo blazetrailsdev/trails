@@ -13,35 +13,41 @@ import type { DatabaseAdapter } from "../adapter.js";
 let _adapter: SidecarAdapter;
 beforeAll(async () => {
   ({ adapter: _adapter } = await createPooledTestAdapter());
-  await defineSchema(_adapter, {
-    posts: {
-      title: "string",
-      published: "boolean",
-      body: "string",
-      status: "string",
-      category: "string",
-      order_val: "integer",
-      postId: "integer",
-      views: "integer",
-      visible: "boolean",
-      blog_id: "integer",
-      mentor_id: "integer",
-      active: "boolean",
+  // dropExisting: true is a workaround for cross-file pooled-adapter collision.
+  // Once D-W (IF NOT EXISTS in defineSchema) lands, remove this.
+  await defineSchema(
+    _adapter,
+    {
+      posts: {
+        title: "string",
+        published: "boolean",
+        body: "string",
+        status: "string",
+        category: "string",
+        order_val: "integer",
+        postId: "integer",
+        views: "integer",
+        visible: "boolean",
+        blog_id: "integer",
+        mentor_id: "integer",
+        active: "boolean",
+      },
+      animals: { name: "string", type: "string", active: "boolean" },
+      dogs: { name: "string", type: "string", active: "boolean" },
+      articles: {
+        title: "string",
+        visible: "boolean",
+        order_val: "integer",
+        blog_id: "integer",
+        published: "boolean",
+        category: "string",
+      },
+      comments: { body: "string" },
+      devs: { name: "string", salary: "integer", mentor_id: "integer" },
+      dev2s: { name: "string", salary: "integer", mentor_id: "integer" },
     },
-    animals: { name: "string", type: "string", active: "boolean" },
-    dogs: { name: "string", type: "string", active: "boolean" },
-    articles: {
-      title: "string",
-      visible: "boolean",
-      order_val: "integer",
-      blog_id: "integer",
-      published: "boolean",
-      category: "string",
-    },
-    comments: { body: "string" },
-    devs: { name: "string", salary: "integer", mentor_id: "integer" },
-    dev2s: { name: "string", salary: "integer", mentor_id: "integer" },
-  });
+    { dropExisting: true },
+  );
 });
 withTransactionalFixtures(() => _adapter);
 function freshAdapter(): DatabaseAdapter {
