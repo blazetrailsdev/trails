@@ -73,9 +73,10 @@ function adapterAndInner(
 }
 
 /**
- * Detect a pooled adapter (returned by `createPooledTestAdapter()`). The pool
- * reference is set by `ConnectionPool#_acquireConnection` when the connection
- * is leased; non-pooled adapters keep `AbstractAdapter#pool === null`.
+ * Detect a pooled adapter (returned by `createPooledTestAdapter()`). The
+ * pool back-reference is set by `ConnectionPool#newConnection` (via
+ * `adoptConnection`) when a connection is adopted into the pool;
+ * non-pooled adapters keep `AbstractAdapter#pool === null`.
  */
 function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPool | null {
   const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
@@ -201,10 +202,16 @@ export function withTransactionalFixtures(
     ddlSnapshot = snapshotDdlTrackers();
     const pool = pooledAdapterPool(getAdapter());
     if (pool) {
-      // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle.
+      // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
+      //   pool.pin_connection!(lock_threads)
+      //   pool.lease_connection
       // pinConnectionBang opens `joinable: false, _lazy: false` on the
-      // pinned connection's transactionManager directly.
+      // pinned connection's transactionManager directly; the follow-up
+      // leaseConnection ensures the pinned connection is also the
+      // execution-context's leased connection so production code that
+      // calls `pool.leaseConnection()` resolves to it.
       await pool.pinConnectionBang(false);
+      pool.leaseConnection();
     } else {
       // Non-pooled (wrapper/sidecar) path — preserved verbatim. Mirrors
       // Rails ConnectionPool#pin_connection! body.
