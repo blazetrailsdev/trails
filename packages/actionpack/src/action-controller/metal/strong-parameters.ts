@@ -844,7 +844,7 @@ export class Parameters {
     const result = new Parameters();
     for (const [k, v] of Object.entries(this._data)) {
       if (Parameters.nestedAttribute(k, v)) {
-        result._data[k] = fn(v);
+        result._data[k] = fn(this._convertHashesToParameters(k, v));
       }
     }
     return result;
