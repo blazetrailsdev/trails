@@ -77,6 +77,20 @@ export class Events {
 
     return [response[0], response[1], wrappedBody];
   }
+
+  /** @internal */
+  private makeRequest(env: RackEnv): Request {
+    return new Request(env as Record<string, unknown>);
+  }
+
+  /** @internal */
+  private makeResponse(
+    status: number,
+    headers: Record<string, string>,
+    _body: RackBody,
+  ): EventResponse {
+    return new EventResponse(status, headers);
+  }
 }
 
 interface EventBody extends RackBody {

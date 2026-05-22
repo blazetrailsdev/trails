@@ -37,43 +37,15 @@ export class Sendfile {
     const headerName = variation.toLowerCase();
 
     if (variation.toLowerCase() === "x-accel-redirect") {
-      // Need mappings for X-Accel-Redirect
-      let accelMappings = this.mappings;
-      if (accelMappings.length === 0) {
-        // Fall back to HTTP_X_ACCEL_MAPPING header
-        const headerMapping = env["HTTP_X_ACCEL_MAPPING"];
-        if (headerMapping) {
-          accelMappings = headerMapping.split(",").map((m: string) => {
-            const [from, to] = m.trim().split("=");
-            return [from, to];
-          });
-        }
-      }
-
-      if (accelMappings.length === 0) {
+      const mappedPath = this.mapAccelPath(env, path);
+      if (mappedPath == null) {
         const errors = env["rack.errors"];
         if (errors && typeof errors.write === "function") {
           errors.write("x-accel-mapping header missing\n");
         }
         return response;
       }
-
-      for (const [from, to] of accelMappings) {
-        if (path.startsWith(from)) {
-          const rest = path.substring(from.length);
-          // Percent-encode the mapped path
-          const encodedTo = to.replace(/%/g, "%25");
-          const encodedRest = rest.replace(/%/g, "%25").replace(/\?/g, "%3F");
-          headers[headerName] = encodedTo + encodedRest;
-          headers["content-length"] = "0";
-          if (body && typeof body.close === "function") body.close();
-          response[2] = [];
-          return response;
-        }
-      }
-
-      // No mapping matched - use path directly
-      headers[headerName] = path;
+      headers[headerName] = mappedPath.replace(/%/g, "%25").replace(/\?/g, "%3F");
       headers["content-length"] = "0";
       if (body && typeof body.close === "function") body.close();
       response[2] = [];
@@ -85,5 +57,35 @@ export class Sendfile {
     }
 
     return response;
+  }
+
+  /** @internal */
+  private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const literal = (replacement: string) => () => replacement;
+    if (this.mappings.length > 0) {
+      const internalMapping = this.mappings.find(([internal]) =>
+        new RegExp("^" + escape(internal)).test(path),
+      );
+      if (internalMapping) {
+        return path.replace(
+          new RegExp("^" + escape(internalMapping[0])),
+          literal(internalMapping[1]),
+        );
+      }
+      return undefined;
+    }
+    const headerMapping = env["HTTP_X_ACCEL_MAPPING"];
+    if (headerMapping) {
+      for (const m of String(headerMapping)
+        .split(",")
+        .map((s: string) => s.trim())) {
+        const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
+        const newPath = path.replace(new RegExp("^" + escape(internal), "i"), literal(external));
+        if (newPath !== path) return newPath;
+      }
+      return path;
+    }
+    return undefined;
   }
 }

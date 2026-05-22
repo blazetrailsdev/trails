@@ -35,38 +35,7 @@ export class Deflater {
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
     const [status, headers, body] = await this.app(env);
 
-    // Skip if no entity body
-    if (status === 204 || status === 304 || (status >= 100 && status < 200)) {
-      return [status, headers, body];
-    }
-
-    // Skip if no-transform
-    const cc = headers["cache-control"];
-    if (cc && cc.includes("no-transform")) {
-      return [status, headers, body];
-    }
-
-    // Skip if content-encoding already present (unless identity)
-    const existing = headers["content-encoding"];
-    if (existing && existing !== "identity") {
-      return [status, headers, body];
-    }
-
-    // Skip if content-length is 0
-    if (headers[CONTENT_LENGTH] === "0") {
-      return [status, headers, body];
-    }
-
-    // Check :include
-    if (this.include) {
-      const ct = headers[CONTENT_TYPE];
-      if (!ct || !this.include.some((t) => ct.includes(t))) {
-        return [status, headers, body];
-      }
-    }
-
-    // Check :if condition
-    if (this.condition && !this.condition(env, status, headers, body)) {
+    if (!this.shouldDeflate(env, status, headers, body)) {
       return [status, headers, body];
     }
 
@@ -95,6 +64,27 @@ export class Deflater {
     headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed));
 
     return [status, headers, [compressed]];
+  }
+
+  private shouldDeflate(
+    env: Record<string, any>,
+    status: number,
+    headers: Record<string, any>,
+    body: any,
+  ): boolean {
+    if ((status >= 100 && status < 200) || status === 204 || status === 304) return false;
+    const cc = headers["cache-control"] || "";
+    if (/\bno-transform\b/.test(cc)) return false;
+    const ce = headers["content-encoding"];
+    if (ce && !/\bidentity\b/.test(ce)) return false;
+    if (this.include) {
+      if (!Object.prototype.hasOwnProperty.call(headers, CONTENT_TYPE)) return false;
+      const mediaType = (headers[CONTENT_TYPE] || "").split(";")[0].trim();
+      if (!this.include.includes(mediaType)) return false;
+    }
+    if (this.condition && !this.condition(env, status, headers, body)) return false;
+    if (headers[CONTENT_LENGTH] === "0") return false;
+    return true;
   }
 
   private preferredEncoding(accept: string): string | null {

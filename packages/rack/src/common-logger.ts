@@ -61,8 +61,7 @@ export class CommonLogger {
     const path = (env[SCRIPT_NAME] || "") + (env[PATH_INFO] || "");
     const qs = env[QUERY_STRING] && env[QUERY_STRING].length > 0 ? `?${env[QUERY_STRING]}` : "";
     const protocol = env[SERVER_PROTOCOL];
-    const cl = headers[CONTENT_LENGTH];
-    const length = cl && cl !== "0" ? cl : "-";
+    const length = this.extractContentLength(headers);
     const time = elapsed.toFixed(4);
 
     // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
@@ -99,5 +98,10 @@ export class CommonLogger {
     } else if (logger && typeof logger.info === "function") {
       logger.info(msg.trimEnd());
     }
+  }
+
+  private extractContentLength(headers: Record<string, string>): string {
+    const value = headers[CONTENT_LENGTH];
+    return !value || value === "0" ? "-" : value;
   }
 }

@@ -115,6 +115,15 @@ export class MockRequest {
     }
   }
 
+  /** @internal */
+  static parseUriRfc2396(uri: string): URL {
+    try {
+      return new URL(uri);
+    } catch {
+      return new URL(uri, "http://example.org");
+    }
+  }
+
   static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
     let parsedUrl: URL;
     try {

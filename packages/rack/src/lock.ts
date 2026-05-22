@@ -63,4 +63,9 @@ export class Lock {
 
     return [status, headers, proxy];
   }
+
+  /** @internal */
+  private unlock(): void {
+    this.mutex.unlock();
+  }
 }

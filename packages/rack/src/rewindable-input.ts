@@ -1,4 +1,5 @@
 import { RACK_INPUT } from "./constants.js";
+import { platform } from "@blazetrails/activesupport/process-adapter";
 
 export class RewindableInput {
   private _io: any;
@@ -90,6 +91,16 @@ export class RewindableInput {
     }
 
     this._buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  }
+
+  /** @internal */
+  private makeRewindable(): void {
+    this._bufferData();
+  }
+
+  /** @internal */
+  private isFilesystemHasPosixSemantics(): boolean {
+    return platform() !== "win32";
   }
 }
 

@@ -1,9 +1,5 @@
-export const VERSION = "3.2.0";
-export const RELEASE = VERSION;
-
-export function release(): string {
-  return VERSION;
-}
+export { RELEASE, release } from "./version.js";
+export { RELEASE as VERSION } from "./version.js";
 
 /** The Rack environment — a Record of CGI-like headers plus rack.* keys. */
 export type RackEnv = Record<string, unknown>;

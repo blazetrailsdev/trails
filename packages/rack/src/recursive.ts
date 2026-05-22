@@ -1,4 +1,4 @@
-import { PATH_INFO, QUERY_STRING, RACK_RECURSIVE_INCLUDE } from "./constants.js";
+import { PATH_INFO, QUERY_STRING, SCRIPT_NAME, RACK_RECURSIVE_INCLUDE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ForwardRequest extends Error {
@@ -20,19 +20,25 @@ export class Recursive {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
-    env[RACK_RECURSIVE_INCLUDE] = (newEnv: Record<string, any>, path: string) => {
-      return this.includeRequest(newEnv, path);
-    };
+    return this._call(env);
+  }
 
+  /** @internal */
+  async _call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
+    let currentEnv = env;
     while (true) {
+      const scriptName: string = currentEnv[SCRIPT_NAME] || "";
+      const include = (newEnv: Record<string, any>, path: string) =>
+        this.include(newEnv, path, scriptName);
       try {
-        return await this.app(env);
+        return await this.app({ ...currentEnv, [RACK_RECURSIVE_INCLUDE]: include });
       } catch (e) {
         if (e instanceof ForwardRequest) {
-          const url = new URL(e.url, "http://localhost");
-          env = e.env || { ...env };
-          env[PATH_INFO] = url.pathname;
-          env[QUERY_STRING] = url.search ? url.search.substring(1) : "";
+          const fwd = new URL(e.url, "http://localhost");
+          const merged: Record<string, any> = { ...currentEnv, ...(e.env || {}) };
+          merged[PATH_INFO] = fwd.pathname;
+          merged[QUERY_STRING] = fwd.search ? fwd.search.substring(1) : "";
+          currentEnv = merged;
         } else {
           throw e;
         }
@@ -40,15 +46,21 @@ export class Recursive {
     }
   }
 
-  private async includeRequest(
+  /** @internal */
+  async include(
     env: Record<string, any>,
     path: string,
+    scriptName = "",
   ): Promise<[number, Record<string, string>, any]> {
+    if (scriptName !== "" && !(path.startsWith(scriptName + "/") || path === scriptName)) {
+      throw new Error(`can only include below ${scriptName}, not ${path}`);
+    }
     const url = new URL(path, "http://localhost");
     const newEnv = {
       ...env,
       [PATH_INFO]: url.pathname,
       [QUERY_STRING]: url.search ? url.search.substring(1) : "",
+      [SCRIPT_NAME]: scriptName,
     };
     return this.app(newEnv);
   }
