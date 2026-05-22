@@ -62,13 +62,23 @@ export function sourceLines(source: string): string[] {
   return source.split(/(?<=\n)/);
 }
 
-const LINE_TAG_RE = /<%%|%%>|<%(?:-)?(?:==|=|#)?([\s\S]*?)(?:-)?%>/g;
+const LINE_TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(?:-)?(==|=|#)?([\s\S]*?)(?:-)?%>/g;
 
-/** `ERB::Util.tokenize` parity for a single source line: CODE for `<% … %>`
- *  contents, TEXT for everything else. Recognizes Rails' `<%%` / `%%>` escapes
- *  (the literal-`<%` / literal-`%>` forms) and folds them into the
- *  surrounding TEXT — matching the main TSE lexer in
- *  `@blazetrails/tse-compiler/src/lexer.ts`. Empty TEXT segments are skipped. */
+/** `ERB::Util.tokenize` parity for a single source line. Token kinds emitted:
+ *
+ * - CODE for `<% … %>`, `<%= … %>`, `<%== … %>` — their contents appear in
+ *   the compiled JS, so `findOffset` can anchor on them.
+ * - TEXT for static spans, plus Rails' `<%%` / `%%>` escapes (literal `<%` /
+ *   `%>`).
+ *
+ * Skipped entirely (no token emitted) — these source spans are dropped by
+ * `@blazetrails/tse-compiler`'s emitter, so emitting them as CODE would
+ * break `findOffset` (the substring never appears in compiled output) and
+ * emitting them as TEXT would do the same.
+ *
+ * - `<%# … %>` comment tags.
+ * - `<%! … !%>` typesMagic blocks.
+ */
 export function tokenizeLine(line: string): SourceToken[] {
   const tokens: SourceToken[] = [];
   let textBuf = "";
@@ -84,9 +94,15 @@ export function tokenizeLine(line: string): SourceToken[] {
       textBuf += "<%";
     } else if (m[0] === "%%>") {
       textBuf += "%>";
+    } else if (m[1] !== undefined) {
+      // `<%! ... !%>` typesMagic — compiler drops it, so do we.
+      flushText();
+    } else if (m[2] === "#") {
+      // `<%# ... %>` comment — compiler drops it, so do we.
+      flushText();
     } else {
       flushText();
-      tokens.push({ kind: "CODE", value: m[1] });
+      tokens.push({ kind: "CODE", value: m[3] });
     }
   }
   textBuf += line.slice(last);

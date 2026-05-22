@@ -32,6 +32,22 @@ describe("tokenizeLine", () => {
     expect(tokenizeLine("")).toEqual([]);
   });
 
+  it("drops `<%# ... %>` comments — they're absent from compiled output", () => {
+    expect(tokenizeLine("a <%# note %> <%= x %>")).toEqual([
+      { kind: "TEXT", value: "a " },
+      { kind: "TEXT", value: " " },
+      { kind: "CODE", value: " x " },
+    ]);
+  });
+
+  it("drops `<%! types: ... !%>` typesMagic blocks", () => {
+    expect(tokenizeLine("pre <%! types: T !%> <%= x %>")).toEqual([
+      { kind: "TEXT", value: "pre " },
+      { kind: "TEXT", value: " " },
+      { kind: "CODE", value: " x " },
+    ]);
+  });
+
   it("treats `<%%` / `%%>` as literal TEXT, not as code-tag delimiters", () => {
     expect(tokenizeLine("a <%% b %%> c")).toEqual([{ kind: "TEXT", value: "a <% b %> c" }]);
     expect(tokenizeLine("<%% <%= x %> %%>")).toEqual([
