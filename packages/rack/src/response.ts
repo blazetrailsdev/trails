@@ -26,7 +26,7 @@ export class Response {
     for (const [k, v] of Object.entries(headers)) {
       this.headers[k.toLowerCase()] = v;
     }
-    this._writer = this._append.bind(this);
+    this._writer = this.append.bind(this);
     this._block = null;
 
     if (body === null || body === undefined) {
@@ -220,6 +220,13 @@ export class Response {
   get isUnprocessable(): boolean {
     return this.status === 422;
   }
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
+
+  isInclude(header: string): boolean {
+    return this.hasHeader(header);
+  }
 
   get contentType(): string | undefined {
     return this.getHeader(CONTENT_TYPE);
@@ -245,10 +252,10 @@ export class Response {
     return MediaTypeModule.params(this.contentType ?? null);
   }
 
-  get setCookieHeaderValue(): any {
+  get setCookieHeader(): any {
     return this.getHeader(SET_COOKIE);
   }
-  set setCookieHeaderValue(v: any) {
+  set setCookieHeader(v: any) {
     this.setHeader(SET_COOKIE, v);
   }
 
@@ -293,6 +300,18 @@ export class Response {
     this.setHeader(SET_COOKIE, deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE), key, value));
   }
 
+  cacheBang(duration: number = 3600, directive: string = "public"): void {
+    if (!/no-cache/.test(this.getHeader(CACHE_CONTROL) ?? "")) {
+      this.setHeader(CACHE_CONTROL, `${directive}, max-age=${duration}`);
+      this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString()); // boundary: HTTP-date header
+    }
+  }
+
+  doNotCacheBang(): void {
+    this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
+    this.setHeader(EXPIRES, new Date().toUTCString()); // boundary: HTTP-date header
+  }
+
   cache(duration: number): void {
     if (this.getHeader(CACHE_CONTROL) === "no-cache, must-revalidate") return;
     this.setHeader(CACHE_CONTROL, `public, max-age=${duration}`);
@@ -304,6 +323,10 @@ export class Response {
     this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
     // boundary: epoch-zero Date is the canonical "already expired" sentinel.
     this.setHeader(EXPIRES, new Date(0).toUTCString());
+  }
+
+  bufferedBodyBang(): boolean {
+    return this.bufferedBody();
   }
 
   bufferedBody(): boolean {
@@ -320,13 +343,13 @@ export class Response {
         this.body = [];
         this._buffered = true;
         this.length = 0;
-        oldBody.each((part: string) => this._append(String(part)));
+        oldBody.each((part: string) => this.append(String(part)));
       } else if (this.body && typeof this.body[Symbol.iterator] === "function") {
         const oldBody = this.body;
         this.body = [];
         this._buffered = true;
         this.length = 0;
-        for (const part of oldBody) this._append(String(part));
+        for (const part of oldBody) this.append(String(part));
       } else {
         this._buffered = false;
       }
@@ -334,7 +357,7 @@ export class Response {
     return this._buffered!;
   }
 
-  private _append(chunk: string): string {
+  append(chunk: string): string {
     this.body.push(chunk);
     if (this.length !== null) {
       this.length += Buffer.byteLength(chunk);
