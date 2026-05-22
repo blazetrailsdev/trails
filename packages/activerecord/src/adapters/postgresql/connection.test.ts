@@ -257,34 +257,24 @@ describeIfPg("PostgresqlConnectionTest", () => {
     }
   });
 
-  it("disconnectBang closes pool", async () => {
+  it("disconnectBang closes the persistent connection", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
-    const pool = a._driverPoolForTest();
-    try {
-      expect(a.active).toBe(true);
-      a.disconnectBang();
-      expect(a.active).toBe(false);
-      expect(a.isConnected()).toBe(false);
-    } finally {
-      // disconnectBang fires pool.end() internally; await here so the
-      // handle is drained before the test exits.
-      await pool?.end().catch(() => {});
-    }
+    // Force lazy connect so we exercise the close path.
+    await a.execute("SELECT 1");
+    expect(a.active).toBe(true);
+    expect(a.isConnected()).toBe(true);
+    a.disconnectBang();
+    expect(a.active).toBe(false);
+    expect(a.isConnected()).toBe(false);
   });
 
-  it("discardBang fires async pool cleanup", async () => {
+  it("discardBang fires async connection cleanup", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
-    const pool = a._driverPoolForTest();
-    try {
-      expect(a.active).toBe(true);
-      a.discardBang();
-      expect(a.active).toBe(false);
-      expect(a.isConnected()).toBe(false);
-    } finally {
-      // discardBang fires pool.end() internally; await the same handle
-      // here so the test doesn't exit with open sockets.
-      await pool?.end().catch(() => {});
-    }
+    await a.execute("SELECT 1");
+    expect(a.active).toBe(true);
+    a.discardBang();
+    expect(a.active).toBe(false);
+    expect(a.isConnected()).toBe(false);
   });
 
   it("reconnect resets connection so queries work again", async () => {
