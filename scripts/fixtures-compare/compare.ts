@@ -807,11 +807,12 @@ export function compareModelClass(
     notes: [],
   };
   // Check associations by (kind, name) set equality. Options diff deferred to later PRs.
+  // Accept both the raw Ruby snake_case name and the camelCase equivalent used in TS.
   for (const a of ruby.associations) {
-    const pattern = new RegExp(
-      `this\\.${a.kind.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}\\s*\\(\\s*["']${a.name}["']`,
-      "i",
-    );
+    const tsMacro = a.kind.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    const camelName = a.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    const nameAlts = a.name === camelName ? a.name : `(?:${a.name}|${camelName})`;
+    const pattern = new RegExp(`this\\.${tsMacro}\\s*\\(\\s*["']${nameAlts}["']`, "i");
     if (pattern.test(tsContent)) r.assocMatched++;
     else r.notes.push(`assoc-missing: ${a.kind} :${a.name}`);
   }
@@ -828,7 +829,9 @@ export function compareModelClass(
     else r.notes.push(`val-missing: ${v.kind} ${v.attributes.join(",")}`);
   }
   for (const s of ruby.scopes) {
-    const spat = new RegExp(`this\\.scope\\s*\\(\\s*["']${s.name}["']`, "i");
+    const sCamel = s.name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    const sAlts = s.name === sCamel ? s.name : `(?:${s.name}|${sCamel})`;
+    const spat = new RegExp(`this\\.scope\\s*\\(\\s*["']${sAlts}["']`, "i");
     if (spat.test(tsContent)) r.scopesMatched++;
     else r.notes.push(`scope-missing: ${s.name}`);
   }

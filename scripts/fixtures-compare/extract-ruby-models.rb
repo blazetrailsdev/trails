@@ -110,7 +110,7 @@ files = Dir.glob(File.join(MODELS_DIR, "**", "*.rb")).sort
 abort "extract-ruby-models: no .rb files found under #{MODELS_DIR}" if files.empty?
 result = []
 files.each do |f|
-  rel = f.delete_prefix(File.join(ROOT, "vendor/rails/activerecord/") + "/")
+  rel = f.delete_prefix(File.join(ROOT, "vendor/rails/activerecord") + "/")
   classes = parse_file(f)
   result << { file: rel, classes: classes } unless classes.empty?
 end
