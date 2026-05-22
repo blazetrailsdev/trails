@@ -661,15 +661,13 @@ export class Request {
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: () => any): any;
   fetchHeader(name: string, block?: () => any): any {
-    if (name in this.env) return this.env[name];
+    if (Object.hasOwn(this.env, name)) return this.env[name];
     if (block) return block();
     throw new Error(`KeyError: key not found: ${name}`);
   }
 
   eachHeader(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) {
-      callback(k, v);
-    }
+    this.each(callback);
   }
 
   get hostAuthority(): string | null {
