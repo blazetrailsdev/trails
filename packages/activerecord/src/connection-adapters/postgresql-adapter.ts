@@ -269,6 +269,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
   // postgresql_adapter.rb:349, abstract_adapter.rb:984).
   private _acquiring: Promise<pg.Client> | null = null;
+  // In-flight reset promise (ROLLBACK + DISCARD ALL). Query paths await
+  // this before proceeding so no query can interleave between the two
+  // SQL commands that resetBang fires asynchronously.
+  private _inFlightReset: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -885,6 +889,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
+    // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
+    // query can interleave between the two commands resetBang fires.
+    if (this._inFlightReset) await this._inFlightReset;
     // Fast path: connection already opened and configured, no drain pending.
     if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
       return this._rawConnection;
@@ -2057,7 +2064,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._client = null;
       this._inTransaction = false;
     }
-    work.then(() => live.query("DISCARD ALL")).catch(() => {});
+    // Gate all query paths behind this promise so no query can interleave
+    // between ROLLBACK and DISCARD ALL. _acquireFreshClient awaits it.
+    this._inFlightReset = work
+      .then(() => live.query("DISCARD ALL"))
+      .then(() => {})
+      .catch(() => {})
+      .finally(() => {
+        this._inFlightReset = null;
+      });
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();

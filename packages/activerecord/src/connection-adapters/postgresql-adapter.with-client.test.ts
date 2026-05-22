@@ -14,8 +14,10 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
+  _inFlightReset: Promise<void> | null;
   withClient: <T>(fn: (client: unknown) => Promise<T>) => Promise<T>;
   _acquireFreshClient: () => Promise<unknown>;
+  resetBang: () => void;
   close: () => Promise<void>;
 }
 
@@ -68,6 +70,56 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
     adapter._client = persistentClient;
     observed = await adapter.withClient(async (client) => client);
     expect(observed).toBe(persistentClient);
+  });
+
+  it("resetBang barrier: concurrent _acquireFreshClient waits until DISCARD ALL resolves", async () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    const order: string[] = [];
+    let resolveDiscard!: () => void;
+    const discardGate = new Promise<void>((r) => {
+      resolveDiscard = r;
+    });
+
+    const fakeClient = {
+      query: vi.fn(async (sql: string) => {
+        if (sql === "DISCARD ALL") {
+          order.push("discard-start");
+          await discardGate;
+          order.push("discard-end");
+        }
+        return { rows: [], fields: [] };
+      }),
+    };
+    adapter._rawConnection = fakeClient;
+
+    // Bypass acquire/configure — queries should go straight to the mock.
+    vi.spyOn(adapter, "_acquireFreshClient").mockImplementation(async () => {
+      // Honour the barrier, then return the fake client.
+      if (adapter._inFlightReset) await adapter._inFlightReset;
+      order.push("acquire-done");
+      return fakeClient;
+    });
+
+    // Fire resetBang (sync) — sets _inFlightReset before returning.
+    adapter.resetBang();
+    expect(adapter._inFlightReset).not.toBeNull();
+
+    // Concurrent acquire — must queue behind the in-flight reset.
+    const acquirePromise = adapter._acquireFreshClient();
+
+    // Nothing should be acquired yet while DISCARD ALL is pending.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(["discard-start"]);
+
+    // Release DISCARD ALL — the acquire should now proceed.
+    resolveDiscard();
+    await acquirePromise;
+
+    expect(order).toEqual(["discard-start", "discard-end", "acquire-done"]);
+    // Barrier is cleared after reset completes.
+    expect(adapter._inFlightReset).toBeNull();
   });
 
   it("serializes the initial connect so concurrent callers share one pg.Client", async () => {
