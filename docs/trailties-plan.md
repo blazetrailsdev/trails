@@ -232,44 +232,9 @@ JSON; Docker Compose parses it fine). No YAML emitter, no new infra.
 
 **Open:** call file `trails-actions.ts` (new) or keep on `GeneratorBase` alongside the existing `generate` queue. Recommend a separate file to keep `actions.ts` as the Rails-shape mirror, so `api:compare` stays clean.
 
-### PR 1.12b-2 — `actions/create_migration.rb` port (~80–100 LOC)
+### PR 1.12b-2 closed (#2185 — CreateMigration action + migrationTemplate dispatch)
 
-**Blocked by:** none. Sibling off main. Split off from 1.12b to stay under the ceiling.
-
-**Node/TS fit:** trivial — `Rails::Generators::Actions::CreateMigration` is 75 LOC of Thor `Thor::Actions::CreateFile` subclass with collision detection by glob. The port is a thin wrapper over async `FsAdapter.readdir` + `writeFile` with the same collision regex (`/^\d+_<basename>(\.[^.]+)?$/`). Honors open question #7 (separator).
-
-**Dependencies:** async `readdir` on `FsAdapter` (shipped).
-
-**Note:** ship together with `migration.rb#migration_template` (~40–60 LOC) — the dispatch is coupled. Best a single ~150 LOC PR that lands both, opened from main.
-
-### PR 1.12c — app_base + database + generator refactor (~250 LOC)
-
-**Blocked by:** PR 1.12b-2.
-
-**Node/TS fit:** `app_base.rb` is 814 LOC in Rails; ours is shaping into ~200 LOC because we skip Gemfile/bundler/RVM/spring-style code. `database.rb` is 287 LOC and ports cleanly via the existing `database.ts` (already 492 LOC for adapter resolution).
-
-**Dependencies:**
-
-- PR 1.12b-2 (`CreateMigration` action — needed for `migration_template`).
-- Existing `generators/database.ts` (already shipped — covers `Database` registry).
-- `AppGenerator` (already shipped).
-
-**Scope (bundled into one PR at ceiling):**
-
-- **`AppBase` extraction** (~80 LOC): port `source_root`, `base_name`/`generator_name`, `indent`, `wrap_with_namespace`, `namespaced?`, `class_collisions`, `hook_for`. These were dropped from PR 1.12 to fit the ceiling. Sized correctly here.
-- **`parseColumns*` consolidation** (~40 LOC): migrate `model-generator.ts` (`parseColumnsDefaultString`), `migration-generator.ts` (`parseColumnsWithModifiers`), `scaffold-generator.ts` (`parseColumns` from `base.ts`) all to `GeneratedAttribute.parse`. Delete dead `parseColumns` / `ColumnType` / `tsType` from `generators/base.ts`.
-- **Sync-fs async conversion** (~30 LOC + ripple): `generators/base.ts` `createFile`/`appendToFile`/`insertIntoFile`/`fileExists`/`removeFile` → async. Ripples through every generator subclass — count the ripple in the LOC budget; may force a 1.12c / 1.12c-b split. Also resolves the Copilot concern (PR 2170 #3) about sync `getFs()` in ESM CLI contexts.
-- **Migration filename separator** (open question #7): align `MigrationGenerator` to `_` (preferred — behavior change for any pre-1.12c-generated apps), or broaden helper regexes to accept both.
-- **Template pipeline + `migration.rb#migration_template`** ERB-driven dispatch (~40–60 LOC).
-- **Scaffold-route helpers on NamedBase** (`indexHelper`/`showHelper`/`editHelper`/`newHelper`/`singularRouteName`/`pluralRouteName`) once `resource_helpers` lands, plus Rails-verbatim `test_index_helper*` / `test_scaffold_plural_names_with_model_name_option` (~30 LOC).
-- **Re-narrow `AttrOptions`** from `Record<string, unknown>` to a typed shape (`size`/`limit`/`precision`/`scale`/`polymorphic`/`null`/`index`) once more consumers land (~20 LOC).
-- **`insertIntoFile` marker-indent fix** (Copilot PR 2178 #3, ~10 LOC): the bare `"// routes"` marker pattern can shift the marker line's indent in three call sites — `controller-generator.ts:148`, `scaffold-generator.ts:80`, `generators/rails/resource-route/`. Either match the full `"  // routes"` marker or make `insertIntoFile` line-aware.
-
-**Proposed split if over ceiling:**
-
-- **1.12c-a**: `AppBase` extraction + `parseColumns` consolidation (~120 LOC).
-- **1.12c-b**: sync-fs → async migration alone (~60 LOC + ripple) — high-blast-radius; isolate it.
-- **1.12c-c**: template pipeline + `migration_template` + scaffold-route helpers (~120 LOC).
+### PR 1.12c closed (#2176 — AppBase + Database + migration filename underscore)
 
 ### PR 1.14b-cont — helper / controller / scaffold_controller generators (~250 LOC)
 
@@ -347,91 +312,21 @@ it; if not, this PR inlines via T1 primitives.
 - (d) `Configuration.appMiddleware` / `appGenerators` stubs once `actionpack` `MiddlewareStackProxy` lands.
 - (e) Factor `_perClassState<K>(key)` helper out of `trailtie.ts` + `engine.ts` (third call site triggers extraction).
 
-### PR 2.5c — `Application` routes-reloader + config_for + credentials wiring (~200 LOC)
+### PR 2.5c closed (#2184 — Application routes-reloader + config_for + credentials wiring)
 
-**Blocked by:** PR 2.5b (shipped — Configuration defaults + default middleware stack landed in #2177).
+### PR 2.6 closed (#2195 — Trails global + Rails→Trails api-compare rename)
 
-**Source:** `vendor/rails/railties/lib/rails/application/routes_reloader.rb` (83 LOC), parts of `application.rb` (config_for, credentials, key_generator, message_verifier).
+**Wiring followups** (not done in #2195; each ~5 LOC unless noted):
 
-**Node/TS fit:** `routes_reloader.rb` is a thin wrapper around route file reloading. In trailties, "reload" maps to re-importing the route module via dynamic `import()` with a cache-bust query (`?t=${Date.now()}`) — Vite's HMR handles dev; production no-ops. `config_for` is dynamic `import()` of `config/<name>.ts` reading the env key. Because `Trails` (PR 2.6) is downstream of 2.5c, this PR's `config_for` resolves the env via the `processAdapter` snapshot (`processAdapter.env.TRAILS_ENV ?? processAdapter.env.NODE_ENV ?? "development"`); when 2.6 lands it swaps to `Trails.env`.
+- `BacktraceCleaner.setRoot()` → lazy `Trails.root` read
+- `Rack::Logger` / `SilenceRequest` constructor logger default → `Trails.logger`
+- Welcome template locals (`railsVersion` / `rackVersion` / `runtimeVersion`) → globals
+- `Info.property("Environment")` reads `Trails.env`, not `env.TRAILS_ENV ?? env.NODE_ENV`
+- `LazyRouteSet.setReloadRoutesHook(() => Trails.application?.reloadRoutesUnlessLoaded())` (per #2175 findings)
+- `Application._appClass` write-side: confirm `Trails.application` tracks `Application.appClass` reassignment (per #2173 findings)
+- `editEncryptedFile` constructed directly from CLI flags in 2.5c; wire through `Trails.application.encrypted(...)` (2.5c followup)
 
-**Dependencies:**
-
-- `Application::Configuration` extended via `ApplicationConfiguration` (shipped in 2.5b).
-- `EncryptedConfiguration` in activesupport — STILL NOT SHIPPED (12 `it.skip` stubs in `packages/activesupport/src/encrypted-configuration.test.ts`). **This is a real blocker** — either implement `EncryptedConfiguration` as a 2.5c-prereq mini-PR (~150 LOC) or scope it out of 2.5c.
-- `MessageVerifier` / `MessageEncryptor` (shipped — `packages/activesupport/src/message-{verifier,encryptor}.ts`).
-- `EncryptedFile` (shipped).
-
-**Scope:**
-
-- `routes-reloader.ts` (dynamic-import-based reload).
-- `Application#configFor(name)` reading `config/<name>.ts` per `Trails.env`.
-- `Application#credentials()` returning `EncryptedConfiguration` instance.
-- `keyGenerator()` + `messageVerifier()` using `secretKeyBase` from credentials.
-- Re-add `implements BootstrapHost` on `Application` class (dropped in 2.5a — see #2173 findings).
-- Splice `Finisher.initializersFor(this)` into `Application#initializers`. Supply host methods Finisher needs: `routes.prepend`, `routes.defineMountedHelper`, `reloader.toPrepare`, `reloader.prepareBang`, `env.isDevelopment`, `ensureGeneratorTemplatesAdded`, `buildMiddlewareStack`, `appendInternalRoute`.
-- Restore config fields trimmed from 2.5b: `precompileFilterParameters`, `filterRedirect`, `contentSecurityPolicyNonceGenerator`, `contentSecurityPolicyNonceDirectives`, `domTestingDefaultHtmlVersion`.
-- `editEncryptedFile` (in `encrypted-file-editor.ts`) stays constructed directly from CLI flags in 2.5c; wiring through `Trails.application.encrypted(...)` is a small 2.6-followup since `Trails` is downstream.
-
-**Proposed re-ordering:** if `EncryptedConfiguration` is not shipped before 2.5c, split into:
-
-- **2.5c-a (~100 LOC)**: `EncryptedConfiguration` port in activesupport (revives the 12 skipped tests).
-- **2.5c-b (~200 LOC)**: routes-reloader + config_for + credentials wiring proper.
-
-### PR 2.6 — `Trails` global (~150 LOC)
-
-> Trails-mapped rename: `Rails` → `Trails`. This PR must add
-> `Rails: "Trails"` to `scripts/api-compare/compare.ts` `TS_CLASS_RENAMES`
-> (mirroring the `Railtie: "Trailtie"` entry from PR 2.1) and verify
-> `test:compare` continues to match Rails test names through the rename.
-
-**Blocks:** PR 2.7a.
-**Blocked by:** PR 2.5c.
-
-**Source:** `vendor/rails/railties/lib/rails.rb` (130 LOC).
-
-**Node/TS fit:** Rails uses `module Rails; class << self`. TS has no module-singleton pattern; ship as a frozen object literal `export const Trails = { application, configuration, backtraceCleaner, root, env, error, groups, publicPath, ... }`. Mutation done through explicit setters (`Trails.application = app`); read-only properties via getter.
-
-`Trails.env` returns activesupport's `EnvironmentInquirer` so `Trails.env.development?` works (shipped).
-
-**New files:**
-
-- `packages/trailties/src/rails.ts`
-- `packages/trailties/src/rails.test.ts`
-- `packages/trailties/__fixtures__/hello-world/` — integration test fixture
-
-**Files changed:**
-
-- `packages/trailties/src/index.ts` — re-export `Trails`, `Application`, `Engine`, `Trailtie`.
-- `scripts/api-compare/compare.ts` — add `Rails: "Trails"` to `TS_CLASS_RENAMES`.
-- `scripts/api-compare/compare.test.ts` — coverage for the alias.
-
-**Resolve open question #3 in this PR**: pick `Trails.version` source (trailties `package.json` vs tracked Rails upstream).
-
-**Wiring this PR drives:** when `Trails` lands, also rewire (count toward LOC budget or follow-up immediately):
-
-- `BacktraceCleaner.setRoot()` → lazy `Trails.root` read (`~5 LOC`).
-- `Rack::Logger` / `SilenceRequest` constructor logger default → `Trails.logger`.
-- Welcome template locals (`railsVersion` / `rackVersion` / `runtimeVersion`) → globals.
-- `Info.property("Environment")` reads `Trails.env`, not `env.TRAILS_ENV ?? env.NODE_ENV`.
-- `LazyRouteSet.setReloadRoutesHook(() => Trails.application?.reloadRoutesUnlessLoaded())` (`~5 LOC`, per #2175 findings).
-- `Application._appClass` write-side: confirm `Trails.application` tracks `Application.appClass` reassignment, since `_appClass` is module-scoped mutable state (per #2173 findings).
-
-**Acceptance:**
-
-- Integration test fixture defines an `Application` subclass, calls `await Trails.application.initialize()`, and serves a route through `actionpack`. Lives in `application.test.ts`.
-- `pnpm tsx scripts/api-compare/compare.ts --package trailties` matches `Trails` to `Rails` Ruby class via the rename map.
-- `pnpm test:compare` continues to match Rails test names through the rename.
-
-### PR 2.7a — Activesupport Trailtie (~50–100 LOC)
-
-**Blocked by:** PR 2.6 + open question #2.
-
-**Source:** `vendor/rails/activesupport/lib/active_support/railtie.rb`.
-
-**Node/TS fit:** would invert the trailties → activesupport dependency if filed in `packages/activesupport/`. Default position: file lives at `packages/trailties/src/trailties/active-support.ts` (in trailties, importing from activesupport). Resolve in this PR.
-
-**Dependencies:** `Trails` global (PR 2.6); `Application::Configuration`'s `activeSupport` slot.
+### PR 2.7a closed (#2187 — Activesupport Trailtie at `packages/trailties/src/trailties/active-support.ts`)
 
 ### PR 2.7-followups — Activerecord + Actionpack railtie full wiring
 

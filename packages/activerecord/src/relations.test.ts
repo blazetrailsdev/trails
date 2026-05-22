@@ -140,7 +140,11 @@ describe("RelationTest", () => {
 
     it("where with raw SQL string", async () => {
       const sql = Post.where("views > ?", 50).toSql();
-      expect(sql).toContain("views > 50");
+      const a = Post.adapter as unknown as {
+        castBoundValue(v: unknown): unknown;
+        quote(v: unknown): string;
+      };
+      expect(sql).toContain(`views > ${a.quote(a.castBoundValue(50))}`);
     });
 
     it("where with named binds", async () => {
@@ -1346,7 +1350,11 @@ describe("RelationTest", () => {
 
   it("finding with subquery", () => {
     const sql = Item.where("price > ?", 1).toSql();
-    expect(sql).toContain("price > 1");
+    const a = Item.adapter as unknown as {
+      castBoundValue(v: unknown): unknown;
+      quote(v: unknown): string;
+    };
+    expect(sql).toContain(`price > ${a.quote(a.castBoundValue(1))}`);
   });
 
   it("excluding array of records returns records not in array", async () => {
@@ -1674,8 +1682,12 @@ describe("RelationTest", () => {
 
   it("finding with subquery with binds", () => {
     const sql = Item.where("price > ? AND price < ?", 0, 5).toSql();
-    expect(sql).toContain("price > 0");
-    expect(sql).toContain("price < 5");
+    const a = Item.adapter as unknown as {
+      castBoundValue(v: unknown): unknown;
+      quote(v: unknown): string;
+    };
+    expect(sql).toContain(`price > ${a.quote(a.castBoundValue(0))}`);
+    expect(sql).toContain(`price < ${a.quote(a.castBoundValue(5))}`);
   });
 
   it("pluck with from includes original table name", () => {

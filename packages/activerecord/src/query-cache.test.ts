@@ -692,6 +692,21 @@ describe("QueryCache executor hooks", () => {
         "foo",
       ),
     );
+    expect(adapter.quoteTableNameForAssignment("posts", "title")).toBe(
+      (
+        inner as unknown as {
+          quoteTableNameForAssignment(t: string, a: string): string;
+        }
+      ).quoteTableNameForAssignment("posts", "title"),
+    );
+    expect(adapter.castBoundValue(42)).toBe(
+      (inner as unknown as { castBoundValue(v: unknown): unknown }).castBoundValue(42),
+    );
+    expect(adapter.sanitizeAsSqlComment("/* hello */")).toBe(
+      (inner as unknown as { sanitizeAsSqlComment(v: unknown): string }).sanitizeAsSqlComment(
+        "/* hello */",
+      ),
+    );
   });
 
   it("Quoting forwarders throw a descriptive error when inner does not implement them", () => {
@@ -703,6 +718,26 @@ describe("QueryCache executor hooks", () => {
     expect(() => adapter.quoteTableName("x")).toThrow(/quoteTableName/);
     expect(() => adapter.quoteColumnName("x")).toThrow(/quoteColumnName/);
     expect(() => adapter.quoteDefaultExpression("x")).toThrow(/quoteDefaultExpression/);
+  });
+
+  it("new Quoting forwarders use Rails-default fallbacks when inner lacks them", () => {
+    const stub = {
+      adapterName: "stub",
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
+    } as unknown as ConstructorParameters<typeof QueryCacheAdapter>[0];
+    const adapter = new QueryCacheAdapter(stub);
+    // castBoundValue: abstract Rails default is identity
+    expect(adapter.castBoundValue(99)).toBe(99);
+    expect(adapter.castBoundValue("hello")).toBe("hello");
+    expect(adapter.castBoundValue(null)).toBeNull();
+    // quoteTableNameForAssignment: abstract Rails default is quoteTableName("table.attr")
+    // The stub's quoteTableName wraps the full string, yielding "posts.title"
+    expect(adapter.quoteTableNameForAssignment("posts", "title")).toBe('"posts.title"');
+    // sanitizeAsSqlComment: strips surrounding comment markers, escapes internal ones
+    expect(adapter.sanitizeAsSqlComment("/* hint */")).toBe("hint");
+    expect(adapter.sanitizeAsSqlComment("safe comment")).toBe("safe comment");
+    expect(adapter.sanitizeAsSqlComment("a */ b")).toBe("a * / b");
   });
 
   it("installExecutorHooks wires run/complete to executor", () => {
