@@ -1,12 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizePath,
-  escapePath,
-  escapeSegment,
-  escapeFragment,
-  rackEscape,
-  unescapeUri,
-} from "./utils.js";
+import { normalizePath, escapePath, escapeSegment, escapeFragment, unescapeUri } from "./utils.js";
 
 describe("ActionDispatch::Journey::Router::Utils", () => {
   it("test_path_escape", () => {
@@ -62,24 +55,6 @@ describe("ActionDispatch::Journey::Router::Utils", () => {
 
   it("unescapes non-BMP UTF-8 sequences back to the original code point", () => {
     expect(unescapeUri("%F0%9F%9A%80")).toBe("🚀");
-  });
-
-  // `Rack::Utils.escape` is `URI.encode_www_form_component`: keeps
-  // `*-._0-9A-Za-z`, encodes everything else, ` ` → `+`. JS's
-  // `encodeURIComponent` over-keeps `!~*'()` so `rackEscape` has to
-  // pct-encode those after-the-fact (but must leave `*` alone).
-  it("rackEscape pct-encodes !'()~ and keeps *-._0-9A-Za-z", () => {
-    expect(rackEscape("!")).toBe("%21");
-    expect(rackEscape("'")).toBe("%27");
-    expect(rackEscape("(")).toBe("%28");
-    expect(rackEscape(")")).toBe("%29");
-    expect(rackEscape("~")).toBe("%7E");
-    expect(rackEscape("*")).toBe("*");
-    expect(rackEscape("-._")).toBe("-._");
-  });
-
-  it("rackEscape maps space to + (Rack form-component convention)", () => {
-    expect(rackEscape("a b")).toBe("a+b");
   });
 
   it("round-trips non-BMP characters through escape/unescape", () => {

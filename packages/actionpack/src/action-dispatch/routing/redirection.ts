@@ -6,6 +6,7 @@
  * redirect() factory for building redirect endpoints in route definitions.
  */
 
+import { Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
@@ -114,9 +115,15 @@ export class Redirect extends Endpoint {
   }
 
   call(env: RackEnv): [number, Record<string, string>, unknown] {
-    const request = new Request(env);
-    const response = this.buildResponse(request);
-    return response.toRack();
+    const payload: { status?: number; location?: string; request?: Request } = {};
+    return Notifications.instrument("redirect.action_dispatch", payload, () => {
+      const request = new Request(env);
+      const response = this.buildResponse(request);
+      payload.status = this.status;
+      payload.location = response.headers["Location"];
+      payload.request = request;
+      return response.toRack();
+    }) as [number, Record<string, string>, unknown];
   }
 
   buildResponse(req: Request): Response {
@@ -134,10 +141,12 @@ export class Redirect extends Endpoint {
     uri.host ??= req.host;
     if (uri.port === null && !req.isStandardPort) uri.port = req.port;
 
+    req.commitFlash();
+
     const body = "";
     const headers = {
       Location: uriToString(uri),
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": `text/html; charset=${Response.defaultCharset}`,
       "Content-Length": String(body.length),
     };
     return new Response(this.status, headers, [body]);
