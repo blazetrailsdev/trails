@@ -13,11 +13,64 @@ export class NullLogger {
     return this.app(env);
   }
 
-  info(_msg?: string): void {}
-  debug(_msg?: string): void {}
-  warn(_msg?: string): void {}
-  error(_msg?: string): void {}
-  fatal(_msg?: string): void {}
-  unknown(_msg?: string): void {}
+  info(_progname?: any, _block?: () => any): void {}
+  debug(_progname?: any, _block?: () => any): void {}
+  warn(_progname?: any, _block?: () => any): void {}
+  error(_progname?: any, _block?: () => any): void {}
+  fatal(_progname?: any, _block?: () => any): void {}
+  unknown(_progname?: any, _block?: () => any): void {}
+
+  infoQ(): undefined {
+    return undefined;
+  }
+  debugQ(): undefined {
+    return undefined;
+  }
+  warnQ(): undefined {
+    return undefined;
+  }
+  errorQ(): undefined {
+    return undefined;
+  }
+  fatalQ(): undefined {
+    return undefined;
+  }
+
+  debugBang(): void {}
+  errorBang(): void {}
+  fatalBang(): void {}
+  infoBang(): void {}
+  warnBang(): void {}
+
+  get level(): undefined {
+    return undefined;
+  }
+  set level(_level: any) {}
+
+  get progname(): undefined {
+    return undefined;
+  }
+  set progname(_progname: any) {}
+
+  get datetimeFormat(): undefined {
+    return undefined;
+  }
+  set datetimeFormat(_datetimeFormat: any) {}
+
+  get formatter(): undefined {
+    return undefined;
+  }
+  set formatter(_formatter: any) {}
+
+  get sevThreshold(): undefined {
+    return undefined;
+  }
+  set sevThreshold(_sevThreshold: any) {}
+
   close(): void {}
+
+  add(_severity: any, _message?: any, _progname?: any, _block?: () => any): void {}
+  log(_severity: any, _message?: any, _progname?: any, _block?: () => any): void {}
+  append(_msg: any): void {}
+  reopen(_logdev?: any): void {}
 }
