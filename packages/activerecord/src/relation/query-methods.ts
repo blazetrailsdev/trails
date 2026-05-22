@@ -15,7 +15,7 @@ import {
 } from "../errors.js";
 import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
-import { sanitizeSqlArray, disallowRawSqlBang } from "../sanitization.js";
+import { disallowRawSqlBang } from "../sanitization.js";
 import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
@@ -370,7 +370,8 @@ function orderBang(
         // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
         // Store as { raw } so _applyOrderToManager emits it verbatim.
         const rawSql = (first as any).value ?? (first as Nodes.Node).toSql();
-        const interpolated = rest.length > 0 ? sanitizeSqlArray(rawSql, ...rest) : rawSql;
+        const interpolated =
+          rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
       } else {
         // Plain string array: all elements must be strings; validate each immediately.
@@ -438,7 +439,8 @@ function reorderBang(
       const [first, ...rest] = arg as unknown[];
       if (first instanceof Nodes.Node) {
         const rawSql = (first as any).value ?? (first as Nodes.Node).toSql();
-        const interpolated = rest.length > 0 ? sanitizeSqlArray(rawSql, ...rest) : rawSql;
+        const interpolated =
+          rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
       } else {
         if (!(arg as unknown[]).every((e) => typeof e === "string")) {
@@ -688,7 +690,7 @@ export function buildWhereClause(
         sql = sql.replace(new RegExp(`(?<!:):${escaped}\\b`, "g"), () => replacement);
       }
     } else if (rest.length > 0) {
-      sql = sanitizeSqlArray(opts, ...rest);
+      sql = this._modelClass.sanitizeSqlArray(opts, ...rest);
     } else {
       sql = opts;
     }
@@ -935,7 +937,7 @@ function havingBang(
   if (opts == null || (typeof opts === "string" && opts.trim() === "")) return this;
 
   if (typeof opts === "string") {
-    const sql = rest.length > 0 ? sanitizeSqlArray(opts, ...rest) : opts;
+    const sql = rest.length > 0 ? this._modelClass.sanitizeSqlArray(opts, ...rest) : opts;
     this._havingClause.predicates.push(new Nodes.SqlLiteral(sql));
     return this;
   }
