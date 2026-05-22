@@ -10,6 +10,7 @@ import {
   RACK_INPUT,
   RACK_SESSION,
   RACK_SESSION_OPTIONS,
+  RACK_LOGGER,
   HTTP_HOST,
   HTTP_PORT,
   HTTPS,
@@ -23,6 +24,9 @@ import {
   DELETE,
   HEAD,
   OPTIONS,
+  LINK,
+  TRACE,
+  UNLINK,
   RACK_REQUEST_QUERY_HASH,
   RACK_REQUEST_QUERY_STRING,
   RACK_REQUEST_FORM_HASH,
@@ -270,8 +274,12 @@ export class Request {
     return `${this.scriptName}${this.pathInfo}${qs ? "?" + qs : ""}`;
   }
 
+  get referer(): string | null {
+    return this.env["HTTP_REFERER"] ?? null;
+  }
+
   get referrer(): string | null {
-    return this.env["HTTP_REFERER"] || null;
+    return this.referer;
   }
 
   get userAgent(): string | null {
@@ -646,5 +654,30 @@ export class Request {
   }
   isOptions(): boolean {
     return this.requestMethod === OPTIONS;
+  }
+  isLink(): boolean {
+    return this.requestMethod === LINK;
+  }
+  isTrace(): boolean {
+    return this.requestMethod === TRACE;
+  }
+  isUnlink(): boolean {
+    return this.requestMethod === UNLINK;
+  }
+
+  get logger(): any {
+    return this.env[RACK_LOGGER] ?? null;
+  }
+
+  get contentCharset(): string | null {
+    return this.mediaTypeParams["charset"] ?? null;
+  }
+
+  get hostname(): string | null {
+    return splitAuthority(this.authority)[1];
+  }
+
+  get serverName(): string | null {
+    return this.env[SERVER_NAME] ?? null;
   }
 }
