@@ -1,4 +1,6 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { UploadedFile } from "./multipart/uploaded-file.js";
+
+export { UploadedFile } from "./multipart/uploaded-file.js";
 
 export class MultipartPartLimitError extends Error {
   constructor(message = "exceeded multipart part limit") {
@@ -529,51 +531,6 @@ function findNextBoundary(body: Buffer, delimiter: Buffer, fromIndex: number): n
 }
 
 // --- Generator / Builder API ---
-
-export class UploadedFile {
-  path: string | null;
-  private _io: any;
-  filename: string;
-  contentType: string;
-  private _binary: boolean;
-
-  constructor(
-    pathOrOpts: string | { io: any; filename: string; content_type?: string },
-    opts: { binary?: boolean; content_type?: string } = {},
-  ) {
-    if (typeof pathOrOpts === "string") {
-      if (!getFs().existsSync(pathOrOpts)) {
-        throw new Error(`no such file to load -- ${pathOrOpts}`);
-      }
-      this.path = pathOrOpts;
-      this._io = null;
-      this.filename = getPath().basename(pathOrOpts);
-      this.contentType = opts.content_type || "text/plain";
-      this._binary = opts.binary || false;
-    } else {
-      this.path = null;
-      this._io = pathOrOpts.io;
-      this.filename = pathOrOpts.filename;
-      this.contentType = pathOrOpts.content_type || "text/plain";
-      this._binary = false;
-    }
-  }
-
-  read(): string {
-    if (this._io) {
-      if (typeof this._io.read === "function") return this._io.read();
-      return String(this._io);
-    }
-    if (this.path) {
-      return getFs().readFileSync(this.path, this._binary ? "latin1" : "utf-8");
-    }
-    return "";
-  }
-
-  get binmode(): boolean {
-    return this._binary;
-  }
-}
 
 export class MultipartParser {
   static parse(
