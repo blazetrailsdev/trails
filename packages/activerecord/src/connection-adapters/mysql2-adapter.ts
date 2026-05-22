@@ -1349,6 +1349,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `Mysql2Adapter#reconnect!` (disconnect! + connect). Connection is
    * re-established lazily on the next query.
    */
+  /**
+   * No-op: connection is established lazily in `_ensureClient` on the first
+   * query. Exists for lifecycle API parity with Rails' `connect` method.
+   * @internal
+   */
+  connect(): void {
+    // intentionally empty — single connection is established lazily
+  }
+
   override reconnectBang(): void {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
     this.disconnectBang();
