@@ -10,6 +10,7 @@ export class Comment extends Base {
     this.scope("forFirstAuthor", (q: any) => q.joins("post").where({ "posts.author_id": 1 }));
     this.scope("created", (q: any) => q.all());
     this.scope("orderedByPostId", (q: any) => q.order("comments.post_id DESC"));
+    this.scope("allAsScope", (q: any) => q.all());
 
     this.belongsTo("post", { counterCache: true });
     this.belongsTo("author", { polymorphic: true });
