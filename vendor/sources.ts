@@ -28,10 +28,9 @@ export interface PackageEntry {
   /**
    * Default true. Set to false to vendor the source (so test-compare or other
    * tooling can read it) without including it in the api-compare PACKAGES
-   * derivation. rack and globalid are vendored today but not yet api-compared
-   * — extract-ruby-api.rb's PACKAGE_DIRS doesn't have entries for them. A
-   * future wave wires them in and removes this flag (see post-merge findings
-   * on PRs #1561 / #1578).
+   * derivation. Reserved for cases where the extractor can't yet handle a
+   * gem's idioms. Today no source sets this flag; rack and globalid were
+   * wired into api-compare in wave 6 (#1589).
    */
   compareApi?: boolean;
   /**
