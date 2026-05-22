@@ -110,14 +110,210 @@ describe("RackRequestTest", () => {
   });
 
   it("have forwarded_* methods respect forwarded_priority", () => {
-    // In Ruby Rack, forwarded_priority controls whether X-Forwarded-* or Forwarded header is preferred.
-    // Our implementation uses X-Forwarded-For directly in the ip getter.
-    // This test verifies that X-Forwarded-For is respected.
-    const req = makeReq("/", {
-      REMOTE_ADDR: "127.0.0.1",
-      HTTP_X_FORWARDED_FOR: "1.2.3.4",
-    });
-    expect(req.ip).toBe("1.2.3.4");
+    const defaultPriority = Request.forwardedPriority;
+    const defaultProtoPriority = Request.xForwardedProtoPriority;
+
+    function req(headers: Record<string, string>): Request {
+      return new Request(MockRequest.envFor("/", headers));
+    }
+
+    try {
+      // default priority: [:forwarded, :x_forwarded]
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_FOR: "2.3.4.5" }).forwardedFor,
+      ).toEqual(["1.2.3.4"]);
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4:1234", HTTP_X_FORWARDED_PORT: "2345" }).forwardedPort,
+      ).toEqual([1234]);
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_PORT: "2345" }).forwardedPort,
+      ).toEqual([]);
+
+      expect(
+        req({
+          HTTP_FORWARDED: "host=1.2.3.4, host=3.4.5.6",
+          HTTP_X_FORWARDED_HOST: "2.3.4.5,4.5.6.7",
+        }).forwardedAuthority,
+      ).toBe("3.4.5.6");
+
+      expect(
+        req({ HTTP_X_FORWARDED_PROTO: "ws", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBe("ws");
+
+      expect(req({ HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme).toBe("http");
+
+      // priority: [nil, :x_forwarded, :forwarded]
+      Request.forwardedPriority = [null, "x_forwarded", "forwarded"];
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_FOR: "2.3.4.5" }).forwardedFor,
+      ).toEqual(["2.3.4.5"]);
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_PORT: "2345" }).forwardedPort,
+      ).toEqual([2345]);
+
+      expect(
+        req({
+          HTTP_FORWARDED: "host=1.2.3.4, host=3.4.5.6",
+          HTTP_X_FORWARDED_HOST: "2.3.4.5,4.5.6.7",
+        }).forwardedAuthority,
+      ).toBe("4.5.6.7");
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("ws");
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBe("http");
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBe("https");
+
+      // x_forwarded_proto_priority: [nil, :scheme, :proto]
+      Request.xForwardedProtoPriority = [null, "scheme", "proto"];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("http");
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_PROTO: "ws" }).forwardedScheme,
+      ).toBe("ws");
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBe("https");
+
+      // forwarded_priority: [:x_forwarded]
+      Request.forwardedPriority = ["x_forwarded"];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("http");
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_PROTO: "ws" }).forwardedScheme,
+      ).toBe("ws");
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
+
+      // x_forwarded_proto_priority: [:scheme]
+      Request.xForwardedProtoPriority = ["scheme"];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("http");
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_PROTO: "ws" }).forwardedScheme,
+      ).toBeNull();
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
+
+      // x_forwarded_proto_priority: [:proto]
+      Request.xForwardedProtoPriority = ["proto"];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("ws");
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBeNull();
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
+
+      // x_forwarded_proto_priority: []
+      Request.xForwardedProtoPriority = [];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBeNull();
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBeNull();
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
+
+      // forwarded_priority: [:forwarded], x_forwarded_proto_priority: default
+      Request.xForwardedProtoPriority = defaultProtoPriority;
+      Request.forwardedPriority = ["forwarded"];
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBe("https");
+
+      expect(
+        req({ HTTP_X_FORWARDED_PROTO: "ws", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBeNull();
+
+      expect(req({ HTTP_X_FORWARDED_PROTO: "ws" }).forwardedScheme).toBeNull();
+
+      // forwarded_priority: []
+      Request.forwardedPriority = [];
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_FOR: "2.3.4.5" }).forwardedFor,
+      ).toBeNull();
+
+      expect(
+        req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_PORT: "2345" }).forwardedPort,
+      ).toBeNull();
+
+      expect(
+        req({
+          HTTP_FORWARDED: "host=1.2.3.4, host=3.4.5.6",
+          HTTP_X_FORWARDED_HOST: "2.3.4.5,4.5.6.7",
+        }).forwardedAuthority,
+      ).toBeNull();
+
+      expect(
+        req({
+          HTTP_FORWARDED: "proto=https",
+          HTTP_X_FORWARDED_PROTO: "ws",
+          HTTP_X_FORWARDED_SCHEME: "http",
+        }).forwardedScheme,
+      ).toBeNull();
+
+      expect(
+        req({ HTTP_FORWARDED: "proto=https", HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme,
+      ).toBeNull();
+
+      expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
+    } finally {
+      Request.forwardedPriority = defaultPriority;
+      Request.xForwardedProtoPriority = defaultProtoPriority;
+    }
   });
 
   it("figure out the correct host with port", () => {

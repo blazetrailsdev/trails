@@ -31,8 +31,14 @@ import {
   RACK_REQUEST_FORM_PAIRS,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
+  HTTP_FORWARDED,
+  HTTP_X_FORWARDED_FOR,
+  HTTP_X_FORWARDED_PORT,
+  HTTP_X_FORWARDED_HOST,
+  HTTP_X_FORWARDED_PROTO,
+  HTTP_X_FORWARDED_SCHEME,
 } from "./constants.js";
-import { parseNestedQuery } from "./utils.js";
+import { parseNestedQuery, forwardedValues } from "./utils.js";
 import * as MediaTypeModule from "./media-type.js";
 import { parseMultipart } from "./multipart.js";
 
@@ -51,6 +57,54 @@ function parseCookies(cookieStr: string): Record<string, string> {
     }
   }
   return cookies;
+}
+
+const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
+const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
+  proto: HTTP_X_FORWARDED_PROTO,
+  scheme: HTTP_X_FORWARDED_SCHEME,
+};
+
+function splitHeader(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .trim()
+    .split(/[,\s]+/)
+    .filter(Boolean);
+}
+
+function wrapIpv6(address: string): string {
+  // Rails: only wrap if not already bracketed and has >1 colon (IPv6 has multiple colons;
+  // host:port has exactly one and must not be wrapped).
+  if (address && !address.startsWith("[") && address.split(":").length - 1 > 1) {
+    return `[${address}]`;
+  }
+  return address;
+}
+
+function splitAuthority(
+  authority: string | null | undefined,
+): [string | null, string | null, number | null] {
+  if (!authority) return [null, null, null];
+  const ipv6Match = authority.match(/^\[([^\]]+)\](?::(\d+))?$/);
+  if (ipv6Match) {
+    const addr = ipv6Match[1];
+    const port = ipv6Match[2] ? parseInt(ipv6Match[2]) : null;
+    return [`[${addr}]`, addr, port];
+  }
+  const idx = authority.lastIndexOf(":");
+  if (idx !== -1) {
+    const portStr = authority.substring(idx + 1);
+    if (/^\d+$/.test(portStr)) {
+      return [authority.substring(0, idx), authority.substring(0, idx), parseInt(portStr)];
+    }
+  }
+  return [authority, authority, null];
+}
+
+function allowedScheme(header: string | null | undefined): string | null {
+  if (!header) return null;
+  return (ALLOWED_SCHEMES as readonly string[]).includes(header) ? header : null;
 }
 
 function isTrustedProxy(ip: string): boolean {
@@ -458,6 +512,11 @@ export class Request {
   }
 
   static ipFilter: ((ip: string) => boolean) | null = null;
+  static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
+    "forwarded",
+    "x_forwarded",
+  ];
+  static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
   get acceptEncoding(): Array<[string, number]> {
     const header = this.env["HTTP_ACCEPT_ENCODING"] || "";
@@ -489,6 +548,82 @@ export class Request {
         return [lang.trim(), q] as [string, number];
       })
       .filter(([lang]: [string, number]) => lang !== "");
+  }
+
+  getHttpForwarded(token: string): string[] | null {
+    return forwardedValues(this.env[HTTP_FORWARDED])?.[token] ?? null;
+  }
+
+  get forwardedFor(): string[] | null {
+    const priority = (this.constructor as typeof Request).forwardedPriority;
+    for (const type of priority) {
+      if (type === "forwarded") {
+        const fwd = this.getHttpForwarded("for");
+        if (fwd) return fwd.map((a) => splitAuthority(a)[1]!);
+      } else if (type === "x_forwarded") {
+        const value = this.env[HTTP_X_FORWARDED_FOR];
+        if (value) return splitHeader(value).map((a) => splitAuthority(wrapIpv6(a))[1]!);
+      }
+    }
+    return null;
+  }
+
+  get forwardedPort(): number[] | null {
+    const priority = (this.constructor as typeof Request).forwardedPriority;
+    for (const type of priority) {
+      if (type === "forwarded") {
+        const fwd = this.getHttpForwarded("for");
+        if (fwd) return fwd.map((a) => splitAuthority(a)[2]).filter((p): p is number => p !== null);
+      } else if (type === "x_forwarded") {
+        const value = this.env[HTTP_X_FORWARDED_PORT];
+        if (value) return splitHeader(value).map((v) => parseInt(v) || 0);
+      }
+    }
+    return null;
+  }
+
+  get forwardedAuthority(): string | null {
+    const priority = (this.constructor as typeof Request).forwardedPriority;
+    for (const type of priority) {
+      if (type === "forwarded") {
+        const fwd = this.getHttpForwarded("host");
+        if (fwd) return fwd[fwd.length - 1];
+      } else if (type === "x_forwarded") {
+        const value = this.env[HTTP_X_FORWARDED_HOST];
+        if (value) {
+          const parts = splitHeader(value);
+          return parts.length ? wrapIpv6(parts[parts.length - 1]) : null;
+        }
+      }
+    }
+    return null;
+  }
+
+  get forwardedScheme(): string | null {
+    const priority = (this.constructor as typeof Request).forwardedPriority;
+    for (const type of priority) {
+      if (type === "forwarded") {
+        const fwdProto = this.getHttpForwarded("proto");
+        if (fwdProto) {
+          const scheme = allowedScheme(fwdProto[fwdProto.length - 1]);
+          if (scheme) return scheme;
+        }
+      } else if (type === "x_forwarded") {
+        const xPriority = (this.constructor as typeof Request).xForwardedProtoPriority;
+        for (const xType of xPriority) {
+          if (!xType) continue;
+          const header = FORWARDED_SCHEME_HEADERS[xType];
+          if (header) {
+            const parts = splitHeader(this.env[header]);
+            for (let i = parts.length - 1; i >= 0; i--) {
+              const scheme = allowedScheme(parts[i]);
+              if (scheme) return scheme;
+            }
+          }
+        }
+      }
+    }
+    return null;
   }
 
   isGet(): boolean {
