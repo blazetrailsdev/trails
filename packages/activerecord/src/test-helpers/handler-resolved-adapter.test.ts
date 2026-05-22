@@ -15,8 +15,7 @@ import { Base } from "../base.js";
 import { defineSchema } from "./define-schema.js";
 import { dropAllTables } from "./drop-all-tables.js";
 import { clearAppliedSchemaSignatures } from "./define-schema.js";
-import { bootstrapTestHandler } from "./bootstrap-test-handler.js";
-import { pushSkipGlobalReset, popSkipGlobalReset } from "./skip-global-reset.js";
+import { setupHandlerSuite } from "./setup-handler-suite.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -29,23 +28,17 @@ class HandlerResolvedPost extends Base {
 }
 
 describe("handler-resolved adapter (Phase D-0)", () => {
+  // Bootstraps Base.connectionHandler and skips the global resetTestAdapterState()
+  // for this suite. D-1..N test files use the same one-liner.
+  setupHandlerSuite();
+
+  // No adapter arg — resolves via Base.connectionHandler. This is the
+  // new Rails-shape call pattern that D-1..N test files will use.
   beforeAll(async () => {
-    // Bootstrap the handler for this test file. Opt-in (not global) so that
-    // tests expecting "no adapter configured" aren't affected.
-    await bootstrapTestHandler();
-    // Skip the global resetTestAdapterState() beforeEach for this suite.
-    // On PG/MySQL the shared adapter and Base.adapter share the same DB,
-    // so the global reset would drop handler_resolved_posts between tests.
-    // withTransactionalFixtures can't be used here because on SQLite the
-    // handler pool uses size=1 and pinConnectionBang would deadlock.
-    pushSkipGlobalReset();
-    // No adapter arg — resolves via Base.connectionHandler. This is the
-    // new Rails-shape call pattern that D-1..N test files will use.
     await defineSchema({ handler_resolved_posts: { title: "string" } });
   });
 
   afterAll(async () => {
-    popSkipGlobalReset();
     const adapter = Base.adapter;
     await dropAllTables(adapter);
     clearAppliedSchemaSignatures(adapter);
