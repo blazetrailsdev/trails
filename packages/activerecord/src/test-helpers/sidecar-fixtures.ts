@@ -1,18 +1,19 @@
 /**
- * Test-only fixtures handle for path 2 of the test-adapter cleanup.
+ * Sidecar fixtures handle for path 2 of the test-adapter cleanup.
  *
- * Named after `ActiveRecord::TestFixtures` in Rails — same role (test-only
- * connection state paired with a real adapter), different mechanics. Rails
- * mixes it into test cases as a module; trails carries it as a class until
- * the connection-pool epic lets each test pin its own connection. At that
- * point the three concerns this class holds (async-chain TX visibility,
- * manual TX depth tracking, DDL tracking for `defineSchema` cache
- * invalidation) all retire and this wrapper deletes.
+ * Path 2 splits the historical `TestAdapterFixtures` wrapper into two pieces:
+ *   - The real {@link DatabaseAdapter} (used directly by callers for DB ops)
+ *   - A {@link SidecarFixtures} handle holding the three load-bearing
+ *     test-only concerns: async-chain TX visibility, manual TX depth
+ *     tracking, and CREATE/DROP TABLE recording for `defineSchema` cache
+ *     invalidation.
  *
- * Unlike the legacy `TestAdapterFixtures` Proxy, this is NOT a delegating
- * wrapper over the full {@link DatabaseAdapter} surface. Production DB
- * operations go straight to the real adapter; only fixture-aware code
- * touches this handle.
+ * This file is additive — the existing wrapper in `test-adapter.ts` is
+ * untouched. Sub-PR (b) migrates callers; sub-PR (c) deletes the wrapper.
+ *
+ * Unlike the wrapper, this is NOT a Proxy and does not delegate the full
+ * {@link DatabaseAdapter} surface. Production DB operations go straight to
+ * the real adapter; only fixture-aware code touches this handle.
  *
  * @internal
  */
@@ -62,7 +63,7 @@ const DROP_TABLE_RE = /DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(?:["`](\w+)["`]|(\w+))
  *
  * @internal
  */
-export class TestFixtures {
+export class SidecarFixtures {
   /** The real database adapter this handle is tracking. */
   readonly adapter: DatabaseAdapter;
   private _manualTxDepth = 0;
@@ -73,11 +74,11 @@ export class TestFixtures {
 
   /**
    * True when this caller should see the inner adapter's transaction state.
-   * Either *some* TestFixtures' `withinNewTransaction` set the flag on
+   * Either *some* SidecarFixtures' `withinNewTransaction` set the flag on
    * this async chain, or the caller manually opened a transaction on this
    * specific handle.
    *
-   * The async-chain flag is shared across all TestFixtures instances
+   * The async-chain flag is shared across all SidecarFixtures instances
    * by design — matches the wrapper in `test-adapter.ts` (sub-PR (a) is
    * additive-only). Because `createSidecarTestAdapter()` returns a fresh
    * handle wrapping the *same* shared inner adapter, the underlying
