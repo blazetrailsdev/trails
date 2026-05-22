@@ -9,8 +9,8 @@ import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
-import { OptionRedirect, PathRedirect, Redirect, type RedirectBlock } from "./redirection.js";
-import type { Request } from "../http/request.js";
+import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
+import { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const PATHFOR_SEPARATORS = "/.?";
@@ -41,6 +41,16 @@ export interface RouteOptions {
   except?: ResourceAction | ResourceAction[];
   ip?: string | RegExp;
   redirect?: string | RedirectOptions | RedirectFunction;
+  /**
+   * Preconstructed redirect endpoint, supplied by {@link Mapper.redirect}
+   * when the DSL builds a `Redirect`/`PathRedirect`/`OptionRedirect` via
+   * the {@link redirect} factory. When present this primes
+   * {@link Route.redirectEndpoint} so `RouteSet#call` dispatches through
+   * the same instance the mapper constructed, and a representative
+   * {@link Route.redirectTarget} is derived from it so the legacy
+   * {@link Route.resolveRedirect} helper stays consistent.
+   */
+  redirectEndpoint?: Redirect;
   pathNames?: { new?: string; edit?: string };
   anchor?: boolean;
   shallow?: boolean;
@@ -54,10 +64,13 @@ export interface RouteOptions {
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
 
-export type RedirectFunction = (
-  params: Record<string, string>,
-  request: { method: string; path: string },
-) => string;
+/**
+ * Block shape accepted by {@link Mapper.redirect}. Mirrors Rails'
+ * `block.call params, request` in `Redirect#path` — the second argument is
+ * the full `ActionDispatch::Request` so user blocks can read `req.host`,
+ * `req.queryParameters`, etc., not just `method` / `path`.
+ */
+export type RedirectFunction = (params: Record<string, string>, request: Request) => string;
 
 export interface RedirectOptions {
   path?: string;
@@ -121,7 +134,13 @@ export class Route {
     this.defaults = options.defaults ?? {};
     this.constraints = options.constraints ?? {};
     this.ip = options.ip ?? /(?:)/;
-    this.redirectTarget = options.redirect;
+    if (options.redirect !== undefined && options.redirectEndpoint !== undefined) {
+      throw new Error(
+        "Route: pass either `redirect` (legacy target) or `redirectEndpoint` (preconstructed Redirect), not both",
+      );
+    }
+    this.redirectTarget = options.redirect ?? deriveRedirectTarget(options.redirectEndpoint);
+    if (options.redirectEndpoint) this._redirectEndpoint = options.redirectEndpoint;
     this.anchor = options.anchor !== false;
     this.internal = options.internal === true;
     this.app = options.app;
@@ -153,10 +172,7 @@ export class Route {
     }
     let endpoint: Redirect;
     if (typeof target === "function") {
-      const fn = target;
-      const block: RedirectBlock = (params, request: Request) =>
-        fn(params, { method: request.method, path: request.path });
-      endpoint = new Redirect(301, block);
+      endpoint = new Redirect(301, target);
     } else if (typeof target === "string") {
       endpoint = new PathRedirect(301, target);
     } else {
@@ -419,7 +435,17 @@ export class Route {
     if (!target) throw new Error("Route is not a redirect");
 
     if (typeof target === "function") {
-      return { url: target(params, request), status: 301 };
+      // Synthesize a real Request from the legacy {method, path, host?} shape
+      // so user blocks reading `req.host`, `req.queryParameters`, `req.protocol`,
+      // etc. don't crash on a bare object.
+      const syntheticReq = new Request({
+        REQUEST_METHOD: request.method,
+        PATH_INFO: request.path,
+        SERVER_NAME: request.host ?? "www.example.com",
+        SERVER_PORT: "80",
+        "rack.url_scheme": "http",
+      });
+      return { url: target(params, syntheticReq), status: 301 };
     }
 
     if (typeof target === "string") {
@@ -446,6 +472,25 @@ export class Route {
     const url = `http://${host}${path}`;
     return { url, status };
   }
+}
+
+/**
+ * Recover a {@link Route.redirectTarget}-shaped value from a preconstructed
+ * {@link Redirect} endpoint so {@link Route.isRedirect} and
+ * {@link Route.resolveRedirect} keep working when {@link Mapper.redirect}
+ * threads the instance through `redirectEndpoint:` instead of the raw target.
+ *
+ * @internal
+ */
+function deriveRedirectTarget(
+  endpoint: Redirect | undefined,
+): string | RedirectOptions | RedirectFunction | undefined {
+  if (!endpoint) return undefined;
+  if (endpoint instanceof PathRedirect) return endpoint.template;
+  if (endpoint instanceof OptionRedirect) {
+    return { ...endpoint.options, status: endpoint.status } as RedirectOptions;
+  }
+  return endpoint.block;
 }
 
 /**

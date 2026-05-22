@@ -21,6 +21,7 @@ import {
   type RedirectOptions,
   type MountableApp,
 } from "./route.js";
+import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Scope, type ScopeLevel } from "./scope.js";
 import { underscore } from "@blazetrails/activesupport";
 
@@ -60,7 +61,15 @@ export class Mapper {
   readonly routes: Route[] = [];
   private scopeStack: ScopeFrame[] = [];
   private concerns: Map<string, ConcernCallback> = new Map();
-  private redirectFns: Map<string, RedirectFunction> = new Map();
+  /**
+   * Stores {@link Redirect} endpoints built by {@link Mapper.redirect}, keyed
+   * by an opaque token returned to the DSL as the `to:` value. {@link addRoute}
+   * resolves the token back to the instance and threads it onto the
+   * {@link Route} via `redirectEndpoint:`.
+   * @internal
+   */
+  private redirectInstances: Map<string, Redirect> = new Map();
+  /** @internal */
   private redirectCounter = 0;
   /** @internal */
   _set: RouteSetLike | undefined;
@@ -550,13 +559,27 @@ export class Mapper {
 
   // --- redirect ---
 
+  /**
+   * Mirrors `ActionDispatch::Routing::Mapper::Redirection#redirect` — builds
+   * a {@link Redirect}/{@link PathRedirect}/{@link OptionRedirect} endpoint
+   * via the {@link redirectFactory} factory and stashes it under an opaque
+   * token returned for use as the route's `to:` value. {@link addRoute}
+   * resolves the token back to the instance so dispatch goes through the
+   * same `Redirect` endpoint Rails uses.
+   */
   redirect(target: string | RedirectOptions | RedirectFunction): string {
-    if (typeof target === "function") {
-      const id = `__redirect_fn__:${this.redirectCounter++}`;
-      this.redirectFns.set(id, target);
-      return id;
+    let endpoint: Redirect;
+    if (typeof target === "string") {
+      endpoint = redirectFactory(target);
+    } else if (typeof target === "function") {
+      endpoint = redirectFactory(target);
+    } else {
+      const { status, ...opts } = target;
+      endpoint = redirectFactory({ ...opts, status });
     }
-    return `__redirect__:${typeof target === "string" ? target : JSON.stringify(target)}`;
+    const id = `__redirect__:${this.redirectCounter++}`;
+    this.redirectInstances.set(id, endpoint);
+    return id;
   }
 
   // --- match (low-level) ---
@@ -889,23 +912,27 @@ export class Mapper {
     // Prepend controller module from scope stack (namespace support)
     const scopeModulePrefix = this.currentControllerPrefix();
 
-    // Check if endpoint is a redirect
+    // Check if endpoint is a redirect: tokens minted by Mapper#redirect map
+    // back to a real Redirect endpoint, mirroring Rails' `to: redirect(...)`
+    // where the DSL stashes a Redirect instance directly on the route.
+    let redirectEndpoint: Redirect | undefined;
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
-    if (typeof endpoint === "string" && endpoint.startsWith("__redirect_fn__:")) {
-      redirectTarget = this.redirectFns.get(endpoint);
-    } else if (typeof endpoint === "string" && endpoint.startsWith("__redirect__:")) {
-      const redirectStr = endpoint.slice("__redirect__:".length);
-      try {
-        redirectTarget = JSON.parse(redirectStr);
-      } catch {
-        redirectTarget = redirectStr;
+    if (typeof endpoint === "string" && endpoint.startsWith("__redirect__:")) {
+      redirectEndpoint = this.redirectInstances.get(endpoint);
+      if (!redirectEndpoint) {
+        throw new Error(`Mapper#redirect token ${endpoint} has no registered Redirect endpoint`);
       }
+      // Keep the entry: Rails' `redirect(...)` returns a Redirect instance
+      // the caller can reuse across multiple route definitions, so the token
+      // has to stay resolvable for subsequent addRoute calls. Route sets are
+      // built once at boot, so the working-set is bounded by the DSL.
     }
     if (options.redirect) {
       redirectTarget = options.redirect;
     }
 
-    const [parsedController, action] = redirectTarget ? ["", ""] : parseEndpoint(endpoint);
+    const isRedirect = redirectEndpoint !== undefined || redirectTarget !== undefined;
+    const [parsedController, action] = isRedirect ? ["", ""] : parseEndpoint(endpoint);
     let controller = parsedController;
     if (scopeModulePrefix && controller && !controller.includes("/")) {
       controller = scopeModulePrefix + "/" + controller;
@@ -926,6 +953,7 @@ export class Mapper {
         ...options,
         name: fullName,
         redirect: redirectTarget,
+        redirectEndpoint,
         defaults: mergedDefaults,
       }),
     );
