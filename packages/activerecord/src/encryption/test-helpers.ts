@@ -154,11 +154,12 @@ const ENCRYPTION_SCHEMA: Schema = {
     title: { type: "string", limit: 1024 },
     body: { type: "string", limit: 1024 },
   },
-  encrypted_books: { name: { type: "string", limit: 1024, default: "<untitled>" } },
-  encrypted_book_with_downcase_names: { name: { type: "string", limit: 1024 } },
-  encrypted_book_ignore_cases: {
-    name: { type: "string", limit: 1024 },
+  // Rails consolidates EncryptedBook, EncryptedBookThatIgnoresCase, and the
+  // other EncryptedBook* variants onto a single `encrypted_books` table.
+  encrypted_books: {
+    name: { type: "string", limit: 1024, default: "<untitled>" },
     original_name: { type: "string", limit: 1024 },
+    logo: "binary",
   },
   // EncryptedAuthor enforces AUTHOR_NAME_LIMIT at the AR attribute layer
   // (plaintext); the column itself needs room for ciphertext.
@@ -166,11 +167,10 @@ const ENCRYPTION_SCHEMA: Schema = {
   encrypted_book_with_custom_compressors: { name: { type: "string", limit: 1024 } },
   book_that_will_fail_to_encrypt_names: { name: { type: "string", limit: 1024 } },
   encrypted_traffic_light_with_store_states: { state: "text" },
-  // Mirrors Rails' `t.binary :logo` on `encrypted_books`. Maps to BYTEA on
-  // PG and BLOB on MySQL/SQLite via defineSchema's `binary` mapping. A TEXT
-  // column does not round-trip on PG: BinaryData-wrapped ciphertext binds
-  // as bytea and pg stores the `\x{hex}` literal in the TEXT column.
-  encrypted_book_with_binaries: { logo: "binary" },
+  // Per-class tables remain for variants whose castType for `logo` diverges
+  // from BLOB on SQLite (the serialized variants store JSON text; the
+  // message-pack variant stores raw binary like Rails but isolates its
+  // serializer assertions from the shared table).
   encrypted_book_with_serialized_first_binaries: { logo: "text" },
   encrypted_book_with_serialized_second_binaries: { logo: "text" },
   encrypted_book_with_binary_message_pack_serializeds: { logo: "binary" },
@@ -281,19 +281,21 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
 export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
   return class EncryptedBookWithDowncaseName extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
-      this.attribute("name", "string");
+      this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
       this.encrypts("name", { deterministic: true, downcase: true });
     }
   } as any;
 }
 
-export function makeEncryptedBookIgnoreCase(adapter: DatabaseAdapter) {
-  return class EncryptedBookIgnoreCase extends Base {
+export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
+  return class EncryptedBookThatIgnoresCase extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
-      this.attribute("name", "string");
+      this.attribute("name", "string", { default: "<untitled>" });
       this.attribute("original_name", "string");
       this.adapter = adapter;
       this.encrypts("name", { deterministic: true, ignoreCase: true });
@@ -384,6 +386,7 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
 export function makeEncryptedBookWithBinary(adapter: DatabaseAdapter) {
   return class EncryptedBookWithBinary extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("logo", "binary");
       this.adapter = adapter;
@@ -456,9 +459,119 @@ export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
     static {
       this._tableName = "encrypted_books";
       this.attribute("id", "integer");
-      this.attribute("name", "string");
+      this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
       this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
+    }
+  } as any;
+}
+
+/**
+ * UnencryptedBook: shares the encrypted_books table but declares no encryption.
+ * Mirrors Rails' book_encrypted.rb / UnencryptedBook.
+ */
+export function makeUnencryptedBook(adapter: DatabaseAdapter) {
+  return class UnencryptedBook extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string", { default: "<untitled>" });
+      this.adapter = adapter;
+    }
+  } as any;
+}
+
+/**
+ * EncryptedBookWithUniquenessValidation: name is encrypted deterministically
+ * and validates uniqueness. Mirrors Rails' EncryptedBookWithUniquenessValidation.
+ */
+export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapter) {
+  return class EncryptedBookWithUniquenessValidation extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string", { default: "<untitled>" });
+      this.adapter = adapter;
+      this.validatesUniqueness("name");
+      this.encrypts("name", { deterministic: true });
+    }
+  } as any;
+}
+
+/**
+ * EncryptedBookAttribute: declares `name` as a `:date` attribute, then encrypts it.
+ * Mirrors Rails' EncryptedBookAttribute (attribute :name, :date + encrypts :name).
+ */
+export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
+  return class EncryptedBookAttribute extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "date");
+      this.adapter = adapter;
+      this.encrypts("name");
+    }
+  } as any;
+}
+
+// Mirrors Ruby's `value.to_s.downcase` on an ASCII-8BIT string: only ASCII
+// A–Z bytes are lowercased; bytes > 0x7F are preserved bit-for-bit (Ruby's
+// downcase on a binary string does not perform Unicode case folding).
+// For our `logo: binary` attribute the cast type yields a Uint8Array,
+// so we lowercase bytes directly and return a Uint8Array to preserve the
+// binary cast type through normalization (which writes back via
+// writeCastValue after casting).
+function _downcaseLikeRails(v: unknown): unknown {
+  if (v == null) return v;
+  if (v instanceof Uint8Array) {
+    const out = new Uint8Array(v.length);
+    for (let i = 0; i < v.length; i++) {
+      const b = v[i]!;
+      out[i] = b >= 0x41 && b <= 0x5a ? b + 0x20 : b;
+    }
+    return out;
+  }
+  return String(v).toLowerCase();
+}
+
+/**
+ * EncryptedBookNormalizedFirst: declares normalizes before encrypts on both
+ * `name` and `logo`. Mirrors Rails' EncryptedBookNormalizedFirst — exercises
+ * normalize-then-encrypt order.
+ */
+export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
+  return class EncryptedBookNormalizedFirst extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string", { default: "<untitled>" });
+      this.attribute("logo", "binary");
+      this.adapter = adapter;
+      this.normalizes("name", _downcaseLikeRails);
+      this.encrypts("name");
+      this.normalizes("logo", _downcaseLikeRails);
+      this.encrypts("logo");
+    }
+  } as any;
+}
+
+/**
+ * EncryptedBookNormalizedSecond: declares encrypts before normalizes on both
+ * `name` and `logo`. Mirrors Rails' EncryptedBookNormalizedSecond — exercises
+ * encrypt-then-normalize order.
+ */
+export function makeEncryptedBookNormalizedSecond(adapter: DatabaseAdapter) {
+  return class EncryptedBookNormalizedSecond extends Base {
+    static {
+      this._tableName = "encrypted_books";
+      this.attribute("id", "integer");
+      this.attribute("name", "string", { default: "<untitled>" });
+      this.attribute("logo", "binary");
+      this.adapter = adapter;
+      this.encrypts("name");
+      this.normalizes("name", _downcaseLikeRails);
+      this.encrypts("logo");
+      this.normalizes("logo", _downcaseLikeRails);
     }
   } as any;
 }

@@ -8,7 +8,7 @@ import {
   makeEncryptedPost,
   makeEncryptedBook,
   makeEncryptedBookWithDowncaseName,
-  makeEncryptedBookIgnoreCase,
+  makeEncryptedBookThatIgnoresCase,
   makeEncryptedAuthor,
   makeBookThatWillFailToEncryptName,
   makeEncryptedBookWithBinary,
@@ -270,7 +270,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when ignore_case: true, it ignores case in queries but keep it when reading the attribute", async () => {
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     await Book.create({ name: "Dune" });
     const book = await Book.findBy({ name: "dune" });
@@ -279,7 +279,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when ignore_case: true, it lets you update attributes normally", async () => {
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     const book = await Book.create({ name: "Dune" });
     await book.update({ name: "Dune II" });
     expect(book.name).toBe("Dune II");
@@ -550,7 +550,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(posts.map((p: any) => p.title)).toContain("Post 1");
   });
   it("when ignore_case: true, it keeps both the attribute and the _original counterpart encrypted", async () => {
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     const book = await Book.create({ name: "Dune" });
     await assertEncryptedAttribute(book, "name", "Dune");
@@ -565,14 +565,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("when ignore_case: true, it returns the actual value when not encrypted", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     const book = await withoutEncryption(async () => Book.create({ name: "Dune" }));
     expect(book.name).toBe("Dune");
   });
 
   it("when ignore_case: true, users can override accessors and call super", async () => {
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     const OverridingBook = class extends Book {
       get name() {
         return `${super.name}-overridden`;

@@ -6,7 +6,7 @@ import {
   restoreEncryptionConfig,
   makeEncryptedPost,
   makeEncryptedBook,
-  makeEncryptedBookIgnoreCase,
+  makeEncryptedBookThatIgnoresCase,
   makeFreshModel,
   makeKeyProvider,
   assertEncryptedAttribute,
@@ -233,7 +233,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("encrypt will preserve case when :ignore_case option is used", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     // Before encryption, reads back the plaintext original case.
@@ -246,7 +246,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
   it("re-encrypting will preserve case when :ignore_case option is used", async () => {
     Configurable.config.supportUnencryptedData = true;
-    const Book = makeEncryptedBookIgnoreCase(await freshAdapter());
+    const Book = makeEncryptedBookThatIgnoresCase(await freshAdapter());
     new Book();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
     expect(await withoutEncryption(async () => (await Book.find(book.id)).name)).toBe("Dune");
