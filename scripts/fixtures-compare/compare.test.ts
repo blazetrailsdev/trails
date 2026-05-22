@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass } from "./compare.js";
+import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/test-helpers/define-schema.js";
 
@@ -250,7 +250,6 @@ describe("canonicalizeRailsRow", () => {
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadRailsYamlForTest } from "./compare.js";
 describe("loadRailsYaml (parsing fidelity)", () => {
   const tmp = mkdtempSync(join(tmpdir(), "fixtures-compare-"));
   const write = (basename: string, contents: string): string => {
@@ -342,6 +341,157 @@ describe("compareFile", () => {
     expect((await compareFile("authors.yml", empty, empty, "YAML-PARSE-ERR")).status).toBe(
       "YAML-PARSE-ERR",
     );
+  });
+  it("promotes allow-listed ERB-UNSUPPORTED to ERB-ALLOWED so the strict flip ignores them", async () => {
+    // mixins/paragraphs/citations are documented stragglers — their TS side
+    // is the source of truth, the Rails YAML never reduces. Allow-list lets
+    // PR 7b flip strict without re-classifying these as failures.
+    const r = await compareFile("paragraphs.yml", empty, empty, "ERB-UNSUPPORTED");
+    expect(r.status).toBe("ERB-ALLOWED");
+    // Non-allow-listed files keep the original status.
+    const other = await compareFile("not_on_the_list.yml", empty, empty, "ERB-UNSUPPORTED");
+    expect(other.status).toBe("ERB-UNSUPPORTED");
+  });
+  it("records `tsBase` on the ERB-ALLOWED result so a deleted TS counterpart can be caught", async () => {
+    // ERB-ALLOWED files are the TS-as-source-of-truth bucket; the
+    // promotion in compareFile only succeeds when the TS counterpart
+    // exists (else falls back to MISSING). Asserting on `tsBase` makes
+    // that contract visible: if mixins.ts is removed from the tree, this
+    // resolves to null and the status branch flips to MISSING.
+    const r = await compareFile("mixins.yml", empty, empty, "ERB-UNSUPPORTED");
+    expect(r.status).toBe("ERB-ALLOWED");
+    expect(r.tsBase).toBe("mixins.ts");
+  });
+});
+
+describe("datetime / serialized-YAML tolerance", () => {
+  // Rails fixtures store sub-second precision the TS side often trims; both
+  // halves of `compareValue`'s datetime path round to whole-second equality.
+  it("treats identical instants written with `T`/space and fractional seconds as equal", () => {
+    expect(cmp("2003-07-16 14:28:11", "2003-07-16T15:28:11.2233+01:00")[0]).toBe(true);
+  });
+  it("forces UTC when the bare datetime string has no timezone marker", () => {
+    // No tz on either side → both interpreted UTC; otherwise this assertion
+    // would be host-tz dependent (failure mode the regression guards against).
+    expect(cmp("2003-07-16 14:28:11", "2003-07-16T14:28:11")[0]).toBe(true);
+  });
+  it("compares time-of-day against a Rails datetime by UTC hour/min/sec", () => {
+    // TIME columns (`bonus_time`) carry `HH:MM:SS` on the TS side but Rails
+    // YAML often holds a full datetime; compare the UTC time-of-day only.
+    expect(cmp("14:28:00", "2005-01-30T15:28:00.00+01:00")[0]).toBe(true);
+    expect(cmp("14:28:00", "2005-01-30T16:28:00.00+01:00")[0]).toBe(false);
+  });
+  it("flags datetime values that disagree by more than a second", () => {
+    const [ok, notes] = cmp("2003-07-16 14:28:11", "2003-07-16T14:28:30Z");
+    expect(ok).toBe(false);
+    expect(notes[0]).toMatch(/^value-differs:/);
+  });
+  it("peels Rails' `--- … \\n…\\n` YAML wrapper used for serialize columns", () => {
+    expect(cmp("Have a nice day", "--- Have a nice day\n...\n")[0]).toBe(true);
+  });
+  it("matches an `instanceof Date` Rails value against an ISO string TS value", () => {
+    // YAML promotes `!!timestamp`-tagged scalars to Date; the TS side
+    // typically still carries the string form.
+    expect(cmp("2003-07-16 14:28:11", new Date("2003-07-16T14:28:11Z"))[0]).toBe(true);
+  });
+  it("normalizes yaml-lib's lowercase `t`/`z` separators to uppercase (spec ISO 8601)", () => {
+    // V8 tolerates `2003-07-16t14:28:11z` today, but Date.parse for
+    // non-standard variants is engine-defined and stricter runtimes
+    // (deno/spec'd) can return NaN. Pin the normalization.
+    expect(cmp("2003-07-16 14:28:11", "2003-07-16t14:28:11Z")[0]).toBe(true);
+    expect(cmp("2003-07-16 14:28:11", "2003-07-16T14:28:11z")[0]).toBe(true);
+  });
+  it("handles bare date-only scalars (YYYY-MM-DD) as midnight UTC, not as NaN", () => {
+    // Regression: appending `Z` to a date-only string produces invalid ISO
+    // (`2024-01-01Z` → Date.parse NaN). Normalize to midnight UTC first.
+    expect(cmp("2024-01-01", "2024-01-01")[0]).toBe(true);
+    expect(cmp("2024-01-01", new Date("2024-01-01T00:00:00Z"))[0]).toBe(true);
+  });
+});
+
+describe("enum-symbol comparator", () => {
+  it("counts unmapped `:symbol` ↔ integer pairs as a soft skip, not a DIFF", () => {
+    // The ENUM_MAPS registry is empty by default; an unregistered enum-shaped
+    // pair should bump the per-row attrsSkipped counter and return true so
+    // unported enum metadata doesn't gate the strict flip.
+    const notes: string[] = [];
+    const skip = { n: 0 };
+    const ok = compareValue(2, ":published", "row.status", idIndex, notes, "books", skip);
+    expect(ok).toBe(true);
+    expect(skip.n).toBe(1);
+    expect(notes[0]).toMatch(/^enum-unmapped: row\.status/);
+  });
+  it("ignores enum shape when the rails string isn't a bare identifier", () => {
+    // A multi-word string like `"hello world"` isn't a symbol candidate;
+    // fall through to value-differs so we don't paper over a real mismatch.
+    const [ok, notes] = cmp(1, "hello world");
+    expect(ok).toBe(false);
+    expect(notes[0]).toMatch(/^value-differs:/);
+  });
+  it("requires the `:` prefix to soft-skip — bare string ↔ number falls through to value-differs", () => {
+    // Critical contract: without an ENUM_MAPS entry, `name: 5` vs `name: "five"`
+    // is a real mismatch, not an unmapped enum. Only the explicit `:foo`
+    // Ruby-symbol form should trigger the unmapped soft-skip; otherwise we'd
+    // mask data drift on any number/word column pair.
+    const notes: string[] = [];
+    const skip = { n: 0 };
+    const ok = compareValue(5, "five", "row.count", idIndex, notes, "things", skip);
+    expect(ok).toBe(false);
+    expect(skip.n).toBe(0);
+    expect(notes[0]).toMatch(/^value-differs:/);
+  });
+});
+
+describe("buildIdIndex (implicit-id fallback)", () => {
+  // Mirrors Rails' `ActiveRecord::FixtureSet.identify(label)` so numeric FK
+  // references in *other* fixtures resolve to label-only rows. Highest-impact
+  // change in this PR — without it 7+ HABTM/join fixtures soft-failed because
+  // their FK targets weren't in the index.
+  it("indexes rows with explicit `id:` by that id", () => {
+    const idx = buildIdIndexForTest(new Map([["t", { a: { id: 100 }, b: { id: 200 } }]]));
+    expect(idx.get("t")?.get(100)).toEqual(["a"]);
+    expect(idx.get("t")?.get(200)).toEqual(["b"]);
+  });
+  it("falls back to CRC32(label) for rows without explicit `id:`", () => {
+    // fixtureIdValue("blackbeard") = 959118195 (stable; pinned in stripErb tests).
+    const idx = buildIdIndexForTest(new Map([["pirates", { blackbeard: { name: "BB" } }]]));
+    expect(idx.get("pirates")?.get(959118195)).toEqual(["blackbeard"]);
+  });
+  it("keeps explicit id taking precedence over the CRC32 fallback", () => {
+    // If a row carries `id: 1`, it must be indexed at 1 — never at CRC32("a").
+    const idx = buildIdIndexForTest(new Map([["t", { a: { id: 1, name: "x" } }]]));
+    expect(idx.get("t")?.get(1)).toEqual(["a"]);
+    expect([...(idx.get("t")?.keys() ?? [])]).toEqual([1]);
+  });
+  it("skips rows whose explicit `id:` isn't numeric (string PKs, CPK tables)", () => {
+    // A row with `id: "abc"` lives in a non-numeric PK space — it must NOT
+    // fall through to the CRC32 fallback (would mis-index FK lookups) and
+    // can't go into the numeric Map either. Skip cleanly.
+    const idx = buildIdIndexForTest(new Map([["t", { a: { id: "abc", name: "x" } }]]));
+    expect([...(idx.get("t")?.keys() ?? [])]).toEqual([]);
+  });
+});
+
+describe("canonicalizeRailsRow + FK_OVERRIDES", () => {
+  // The override path is a scaffold for fixtures whose Rails shorthand
+  // (`assoc: label`) doesn't follow the `<assoc>_id` column convention.
+  // Today no overrides are populated — the contract is that callers can
+  // pass a `table` name and an entry in FK_OVERRIDES will redirect the
+  // shorthand to the declared column. Tested via a direct call shape.
+  it("threads the `table` arg without changing default behavior when no override is registered", () => {
+    expect(canonicalizeRailsRow({ pirate: "x" }, { pirate_id: 1 }, null, "some_table")).toEqual({
+      pirate_id: "x",
+    });
+  });
+  it("preserves polymorphic `name (Type)` split on the convention path", () => {
+    // Rails fixtures.rb#replace_belongs_to_keys emits both <col> and
+    // <assoc>_type for polymorphic associations. The shared parser keeps
+    // that behavior on the standard `<assoc>_id` path.
+    const cols = new Set(["pirate_id", "pirate_type"]);
+    expect(canonicalizeRailsRow({ pirate: "blackbeard (Pirate)" }, {}, cols)).toEqual({
+      pirate_id: "blackbeard",
+      pirate_type: "Pirate",
+    });
   });
 });
 

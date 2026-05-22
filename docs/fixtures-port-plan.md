@@ -1,22 +1,30 @@
 # Fixtures port plan
 
-> **Status (2026-05-22):** ~90% complete. All 122 Rails fixtures
+> **Status (2026-05-22):** ~92% complete. All 122 Rails fixtures
 > translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21).
-> `pnpm fixtures:compare` reports match=94 diff=8 missing=0
-> erb-unsupported=20 (soft mode). Schema port shipped (#2124/#2128/
-> #2130/#2131/#2133/#2134/#2140). ERB `identify`/`composite_identify` +
-> loop expander shipped (#2247). Fixture-side DIFF reconcile #2228.
-> Loader (`defineFixtures`/`useFixtures`/`ref`/`fixtureId`) live.
+> Schema port shipped (#2124/#2128/#2130/#2131/#2133/#2134/#2140).
+> ERB `identify`/`composite_identify` + loop expander shipped (#2247).
+> Fixture-side DIFF reconcile #2228. Loader
+> (`defineFixtures`/`useFixtures`/`ref`/`fixtureId`) live.
+> Compare-script hardening shipped in **this PR**: enum-symbol
+> comparator, HABTM implicit-id index, FK override scaffold,
+> datetime/YAML/time-of-day tolerance, and the
+> mixins/paragraphs/citations ERB allow-list.
+> `pnpm fixtures:compare` reports match=109 diff=10 missing=0
+> erb-unsupported=0 erb-allowed=3 (soft mode).
 >
 > **Remaining (blocks PR 7 strict-fail flip):**
 >
-> - Compare-script enhancements (~150 LOC): enum-symbol comparator (~40),
->   HABTM key handling (~30), custom FK override map (~30),
->   datetime/YAML tolerance (~50).
-> - 3 ERB-UNSUPPORTED stragglers post-#2247: `mixins.yml`,
->   `paragraphs.yml`, `citations.yml` — add to allow-list.
-> - 2 newly comparable DIFFs from #2247:
->   `developers.shared_computers` column, `binaries.flowers.data` row.
+> - 10 DIFFs to reconcile fixture-side (follow-up PR): `books.yml`
+>   (populate `ENUM_MAPS["books"]` for status/last_read/language/etc.),
+>   `topics.yml` / `other_topics.yml` (extra `type` column on STI rows
+>   the TS side carries but Rails YAML omits), `binaries.yml`
+>   (`flowers.data` blob), `cpk_order_tags.yml` + `cpk_reviews.yml`
+>   (CPK FK + extra `number`), `dead_parrots.yml` / `live_parrots.yml`
+>   (HABTM `treasures`), `developers.yml` (`shared_computers` HABTM),
+>   `sponsors.yml` (extra `club_id`), `peoples_treasures.yml`
+>   (TS row's `michael` label doesn't match the row CRC32 the Rails YAML
+>   resolves `rich_person_id` to — fixture-side label or id reconcile).
 > - **PR 7a** — ~1.9k LOC waiver port of `fixtures_test.rb` (1847 LOC),
 >   `test_fixtures_test.rb`, `encryption/encrypted_fixtures_test.rb`.
 > - **PR 7b** — ~30 LOC strict-fail flip + remove 4 exclusions from
