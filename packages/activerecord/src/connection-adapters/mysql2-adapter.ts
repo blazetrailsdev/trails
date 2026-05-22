@@ -194,12 +194,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // Single persistent connection — mirrors Rails' @raw_connection.
   private _client: mysql.Connection | null = null;
   // Serializes concurrent lazy-connect calls so only one createConnection
-  // is in flight at a time.
+  // is in flight at a time. NOT nulled by disconnectBang() so close() can
+  // still await it for clean teardown.
   private _connectingPromise: Promise<mysql.Connection> | null = null;
-  // Incremented by disconnectBang()/close() so an in-flight _connectingPromise
-  // can detect that the disconnect happened before it resolved and discard the
-  // new connection instead of installing it.
+  // Generation of the current _connectingPromise. Incremented by
+  // disconnectBang()/close(); _ensureClient() starts a fresh attempt when the
+  // stored generation no longer matches, without dropping the old promise
+  // reference so close() can await it.
   private _connectGeneration = 0;
+  private _connectingPromiseGen = -1;
   // Set by close() to distinguish permanent teardown from disconnectBang(),
   // which is reconnectable. _ensureClient() refuses to lazy-reconnect after close().
   private _permanentlyClosed = false;
@@ -521,16 +524,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   private async _ensureClient(): Promise<mysql.Connection> {
     if (this._client) return this._client;
-    if (this._connectingPromise) return this._connectingPromise;
+    // Return the in-flight promise only if it belongs to the current generation.
+    // After disconnectBang() the generation advances, so stale in-flight
+    // promises are bypassed and a fresh attempt is started — without nulling
+    // the old promise so close() can still await it for clean teardown.
+    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
+      return this._connectingPromise;
+    }
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: connection is closed");
     if (this._isFakeConnection) throw new Error("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
+    this._connectingPromiseGen = gen;
     this._connectingPromise = Mysql2Adapter._createClient(
       this._poolConfig,
       this._buildInitSql(),
     ).then(
       (conn) => {
-        this._connectingPromise = null;
+        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
         if (this._connectGeneration !== gen) {
           // disconnectBang()/close() happened while we were connecting — discard.
           conn.end().catch(() => {});
@@ -542,7 +552,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         return conn;
       },
       (err) => {
-        this._connectingPromise = null;
+        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
         this._activeState = false;
         throw translateConnectError(err, this._database, this._poolConfig);
       },
@@ -1404,12 +1414,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override disconnectBang(): void {
     this._activeState = false;
+    // Advance generation — _ensureClient() will bypass the stale
+    // _connectingPromise (gen mismatch) and start a fresh attempt, while
+    // close() can still await the old promise for clean teardown.
     this._connectGeneration++;
-    // Null out _connectingPromise so the next _ensureClient() starts a fresh
-    // attempt rather than returning the now-stale in-flight promise. The
-    // fulfillment handler for any in-flight promise will observe the generation
-    // mismatch and discard the connection.
-    this._connectingPromise = null;
     super.disconnectBang();
     this._inTransaction = false;
     this._stmtPool?.detach();
@@ -1470,7 +1478,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Escape hatch for advanced usage.
    */
   get raw(): mysql.Connection {
-    if (!this._client) throw new Error("Mysql2Adapter: connection is closed");
+    if (!this._client) {
+      throw new Error(
+        this._permanentlyClosed
+          ? "Mysql2Adapter: connection is permanently closed"
+          : "Mysql2Adapter: connection not yet established — call execute() or await activeAsync() first",
+      );
+    }
     return this._client;
   }
 
@@ -1851,18 +1865,34 @@ function translateConnectError(
   if (!(err instanceof Error)) return new Error(String(err));
   const errno = (err as { errno?: number }).errno;
   switch (errno) {
-    case 1049: // ER_BAD_DB_ERROR
-      return NoDatabaseError.dbError(database ?? "unknown");
+    case 1049: {
+      // ER_BAD_DB_ERROR
+      const db = database ?? "unknown";
+      return new NoDatabaseError(
+        `We could not find your database: ${db}. Available database configurations can be found in config/database.yml.`,
+        { cause: err },
+      );
+    }
     case 1044: // ER_DBACCESS_DENIED_ERROR
-    case 1045: // ER_ACCESS_DENIED_ERROR
-      return DatabaseConnectionError.usernameError(
-        (config.user as string | undefined) ?? parseUriField(config, "username") ?? "unknown",
+    case 1045: {
+      // ER_ACCESS_DENIED_ERROR
+      const user =
+        (config.user as string | undefined) ?? parseUriField(config, "username") ?? "unknown";
+      return new DatabaseConnectionError(
+        `There is an issue connecting to your database with your username/password, username: ${user}.\n\nPlease check your database configuration to ensure the username/password are valid.`,
+        { cause: err },
       );
+    }
     case 2003: // ER_CONN_HOST_ERROR
-    case 2005: // ER_UNKNOWN_HOST_ERROR
-      return DatabaseConnectionError.hostnameError(
-        (config.host as string | undefined) ?? parseUriField(config, "hostname") ?? "unknown",
+    case 2005: {
+      // ER_UNKNOWN_HOST_ERROR
+      const host =
+        (config.host as string | undefined) ?? parseUriField(config, "hostname") ?? "unknown";
+      return new DatabaseConnectionError(
+        `There is an issue connecting with your hostname: ${host}.\n\nPlease check your database configuration and ensure there is a valid connection to your database.`,
+        { cause: err },
       );
+    }
     default:
       return new ConnectionNotEstablished(err.message, { cause: err });
   }
