@@ -237,6 +237,7 @@ function loadRailsYaml(file: string, basename: string): { ok: true; data: Fixtur
   return { ok: true, data: out };
 }
 
+export { buildIdIndex as buildIdIndexForTest };
 function buildIdIndex(yamls: Map<string, FixtureMap>): Map<string, Map<number, string[]>> {
   const idx = new Map<string, Map<number, string[]>>();
   for (const [table, rows] of yamls) {
@@ -353,20 +354,26 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   // peel that off before retrying equality.
   const railsUnwrapped = unwrapSerializedYaml(railsVal);
   if (railsUnwrapped !== railsVal && tsVal === railsUnwrapped) return true;
-  // Enum: Rails `enum :status, [:proposed, …]` columns appear as `:foo`
-  // (YAML symbol) or plain string on the Rails side, integer on the TS side.
-  // With a registered mapping we resolve the symbol; without, treat as a
-  // soft skip so unregistered enums don't gate the strict flip.
+  // Enum: Rails `enum :status, [:proposed, …]` columns appear as either
+  // `:foo` (Ruby symbol literal) or a bare string on the Rails side, integer
+  // on the TS side. Resolution order:
+  //   1. Registered ENUM_MAPS entry — exact symbol↔int lookup either way.
+  //   2. Unambiguous `:foo` symbol form with no registry entry — soft-skip
+  //      as `enum-unmapped` so unported enums don't gate the strict flip.
+  //   3. Bare-string ↔ number — fall through to value-differs. Without the
+  //      leading `:` we can't tell an unmapped enum from a real mismatch
+  //      (e.g. `count: 5` vs `count: "five"`), and silent-passing would
+  //      mask data drift.
   if (typeof tsVal === "number" && typeof railsVal === "string") {
-    const sym = SYMBOL_RE.exec(railsVal)?.[1] ?? railsVal;
-    if (/^\w+$/.test(sym)) {
-      const mapped = resolveEnumSymbol(table, attr.split(".").pop() ?? attr, sym);
-      if (mapped === tsVal) return true;
-      if (mapped === undefined) {
-        notes.push(`enum-unmapped: ${attr}: ts=${tsVal} rails=${JSON.stringify(railsVal)} (add ENUM_MAPS["${table}"].${attr.split(".").pop()})`); // prettier-ignore
-        if (attrsSkipped) attrsSkipped.n++;
-        return true; // soft skip: don't fail the file on unmapped enums
-      }
+    const col = attr.split(".").pop() ?? attr;
+    const symMatch = SYMBOL_RE.exec(railsVal);
+    const sym = symMatch ? symMatch[1] : railsVal;
+    const mapped = /^\w+$/.test(sym) ? resolveEnumSymbol(table, col, sym) : undefined;
+    if (mapped === tsVal) return true;
+    if (symMatch && mapped === undefined) {
+      notes.push(`enum-unmapped: ${attr}: ts=${tsVal} rails=${JSON.stringify(railsVal)} (add ENUM_MAPS["${table}"].${col})`); // prettier-ignore
+      if (attrsSkipped) attrsSkipped.n++;
+      return true;
     }
   }
   notes.push(`value-differs: ${attr}: ts=${JSON.stringify(tsVal)} rails=${JSON.stringify(railsVal)}`); // prettier-ignore

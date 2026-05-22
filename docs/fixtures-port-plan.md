@@ -1,11 +1,17 @@
 # Fixtures port plan
 
 > **Status (2026-05-22):** ~92% complete. All 122 Rails fixtures
-> translated. `pnpm fixtures:compare` reports match=109 diff=10
-> missing=0 erb-unsupported=0 erb-allowed=3 (soft mode). Compare-script
-> hardening shipped in this PR: enum-symbol comparator, HABTM
-> implicit-id index, FK override scaffold, datetime/YAML/time-of-day
-> tolerance, and the mixins/paragraphs/citations ERB allow-list.
+> translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21).
+> Schema port shipped (#2124/#2128/#2130/#2131/#2133/#2134/#2140).
+> ERB `identify`/`composite_identify` + loop expander shipped (#2247).
+> Fixture-side DIFF reconcile #2228. Loader
+> (`defineFixtures`/`useFixtures`/`ref`/`fixtureId`) live.
+> Compare-script hardening shipped in **this PR**: enum-symbol
+> comparator, HABTM implicit-id index, FK override scaffold,
+> datetime/YAML/time-of-day tolerance, and the
+> mixins/paragraphs/citations ERB allow-list.
+> `pnpm fixtures:compare` reports match=109 diff=10 missing=0
+> erb-unsupported=0 erb-allowed=3 (soft mode).
 >
 > **Remaining (blocks PR 7 strict-fail flip):**
 >

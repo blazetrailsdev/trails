@@ -406,6 +406,42 @@ describe("enum-symbol comparator", () => {
     expect(ok).toBe(false);
     expect(notes[0]).toMatch(/^value-differs:/);
   });
+  it("requires the `:` prefix to soft-skip — bare string ↔ number falls through to value-differs", () => {
+    // Critical contract: without an ENUM_MAPS entry, `name: 5` vs `name: "five"`
+    // is a real mismatch, not an unmapped enum. Only the explicit `:foo`
+    // Ruby-symbol form should trigger the unmapped soft-skip; otherwise we'd
+    // mask data drift on any number/word column pair.
+    const notes: string[] = [];
+    const skip = { n: 0 };
+    const ok = compareValue(5, "five", "row.count", idIndex, notes, "things", skip);
+    expect(ok).toBe(false);
+    expect(skip.n).toBe(0);
+    expect(notes[0]).toMatch(/^value-differs:/);
+  });
+});
+
+import { buildIdIndexForTest } from "./compare.js";
+describe("buildIdIndex (implicit-id fallback)", () => {
+  // Mirrors Rails' `ActiveRecord::FixtureSet.identify(label)` so numeric FK
+  // references in *other* fixtures resolve to label-only rows. Highest-impact
+  // change in this PR — without it 7+ HABTM/join fixtures soft-failed because
+  // their FK targets weren't in the index.
+  it("indexes rows with explicit `id:` by that id", () => {
+    const idx = buildIdIndexForTest(new Map([["t", { a: { id: 100 }, b: { id: 200 } }]]));
+    expect(idx.get("t")?.get(100)).toEqual(["a"]);
+    expect(idx.get("t")?.get(200)).toEqual(["b"]);
+  });
+  it("falls back to CRC32(label) for rows without explicit `id:`", () => {
+    // fixtureIdValue("blackbeard") = 959118195 (stable; pinned in stripErb tests).
+    const idx = buildIdIndexForTest(new Map([["pirates", { blackbeard: { name: "BB" } }]]));
+    expect(idx.get("pirates")?.get(959118195)).toEqual(["blackbeard"]);
+  });
+  it("keeps explicit id taking precedence over the CRC32 fallback", () => {
+    // If a row carries `id: 1`, it must be indexed at 1 — never at CRC32("a").
+    const idx = buildIdIndexForTest(new Map([["t", { a: { id: 1, name: "x" } }]]));
+    expect(idx.get("t")?.get(1)).toEqual(["a"]);
+    expect([...(idx.get("t")?.keys() ?? [])]).toEqual([1]);
+  });
 });
 
 describe("canonicalizeRailsRow + FK_OVERRIDES", () => {
