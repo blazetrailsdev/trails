@@ -20,8 +20,19 @@ export class ActionableError extends Error {
     this.name = "ActionableError";
   }
 
-  /** Register an actionable error class so it can be resolved by name. */
+  /**
+   * Register an actionable error class so it can be resolved by name. Mirrors
+   * Rails' implicit registration via `safe_constantize`; emits a console
+   * warning if a different class is already registered under the same name so
+   * silent shadowing doesn't mask a typo or duplicate definition.
+   */
   static register(cls: typeof ActionableError): void {
+    const existing = ActionableError._registry.get(cls.name);
+    if (existing && existing !== cls) {
+      console.warn(
+        `ActionableError._registry collision: a different class is already registered as "${cls.name}"; the previous entry will be replaced.`,
+      );
+    }
     ActionableError._registry.set(cls.name, cls);
   }
 

@@ -54,4 +54,27 @@ describe("ActionableErrorTest", () => {
     TestError.action("Only on test", () => {});
     expect(Object.keys(ActionableError.actions(new SiblingError()))).toHaveLength(0);
   });
+
+  it("warns when two distinct classes register under the same name", () => {
+    class Dup1 extends ActionableError {}
+    Object.defineProperty(Dup1, "name", { value: "DupCollision" });
+    class Dup2 extends ActionableError {}
+    Object.defineProperty(Dup2, "name", { value: "DupCollision" });
+
+    const calls: unknown[][] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => {
+      calls.push(args);
+    };
+    try {
+      ActionableError.register(Dup1);
+      ActionableError.register(Dup1);
+      ActionableError.register(Dup2);
+    } finally {
+      console.warn = original;
+      ActionableError._registry.delete("DupCollision");
+    }
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0][0])).toContain("DupCollision");
+  });
 });

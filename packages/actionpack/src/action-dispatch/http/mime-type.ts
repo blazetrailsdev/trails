@@ -138,7 +138,7 @@ export class AcceptList {
     const seen = new Set<string>();
     const out: MimeType[] = [];
     for (const item of list) {
-      const looked = MimeType.lookup(item.name) ?? new MimeType(item.name, item.name);
+      const looked = lookupForParse(item.name);
       if (!seen.has(looked.toString())) {
         seen.add(looked.toString());
         out.push(looked);
@@ -154,6 +154,22 @@ export class AcceptList {
 }
 
 const TRAILING_STAR_REGEXP = /^(text|application)\/\*/;
+const PARAMETER_SEPARATOR_REGEXP = /;\s*q="?/;
+const ACCEPT_HEADER_REGEXP = /[^,\s"](?:[^,"]|"[^"]*")*/g;
+
+/**
+ * Mirrors Rails' `Mime::Type.lookup` fallback: if the exact string is not
+ * registered, drop any media-type parameters (`;level=2`) and try again,
+ * otherwise return a fresh ad-hoc type whose `string` is the stripped form.
+ * @internal
+ */
+function lookupForParse(s: string): MimeType {
+  const direct = MimeType.lookup(s);
+  if (direct) return direct;
+  const stripped = s.split(";")[0].trimEnd();
+  const fallback = MimeType.lookup(stripped);
+  return fallback ?? new MimeType(stripped, stripped);
+}
 
 export class MimeType {
   /** @internal */
@@ -316,36 +332,40 @@ export class MimeType {
   // --- Parsing ---
 
   static parse(acceptHeader: string): MimeType[] {
-    if (!acceptHeader || acceptHeader.trim() === "") return [];
+    if (!acceptHeader) return [];
 
-    const entries = acceptHeader.split(",").map((part) => {
-      const trimmed = part.trim();
-      const [mediaRange, ...params] = trimmed.split(";").map((s) => s.trim());
-      let q = 1.0;
-      for (const p of params) {
-        const match = p.match(/^q=([\d.]+)/);
-        if (match) q = parseFloat(match[1]);
-      }
-      return {
-        mediaRange: mediaRange || "*/*",
-        q,
-        params: params.filter((p) => !p.startsWith("q=")),
-      };
-    });
+    if (!acceptHeader.includes(",")) {
+      const sepMatch = acceptHeader.match(PARAMETER_SEPARATOR_REGEXP);
+      const header = sepMatch ? acceptHeader.slice(0, sepMatch.index!).trim() : acceptHeader.trim();
+      if (header === "") return [];
+      const trailing = MimeType.parseTrailingStar(header);
+      if (trailing) return trailing;
+      return [lookupForParse(header)];
+    }
 
-    entries.sort((a, b) => b.q - a.q);
-
-    const results: MimeType[] = [];
-    for (const entry of entries) {
-      const found = MimeType.registry.get(entry.mediaRange);
-      if (found) {
-        results.push(found);
+    const list: AcceptItem[] = [];
+    let index = 0;
+    const headers = acceptHeader.match(ACCEPT_HEADER_REGEXP) ?? [];
+    for (const raw of headers) {
+      const sep = raw.match(PARAMETER_SEPARATOR_REGEXP);
+      let params: string;
+      let q: string | null = null;
+      if (sep) {
+        params = raw.slice(0, sep.index!);
+        q = raw.slice(sep.index! + sep[0].length).replace(/"$/, "");
       } else {
-        // Create an ad-hoc type
-        results.push(new MimeType(entry.mediaRange, entry.mediaRange));
+        params = raw;
+      }
+      params = params.trim();
+      if (params === "") continue;
+      const expanded = MimeType.parseTrailingStar(params);
+      const items: string[] = expanded ? expanded.map((m) => m.toString()) : [params];
+      for (const name of items) {
+        list.push(new AcceptItem(index, name, q));
+        index += 1;
       }
     }
-    return results;
+    return AcceptList.sortBang(list);
   }
 
   // --- Built-in types ---

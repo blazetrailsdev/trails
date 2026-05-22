@@ -16,24 +16,35 @@ describe("MimeTypeTest", () => {
   });
 
   it("parse text with trailing star at the beginning", () => {
-    const types = MimeType.parse("text/*");
-    expect(types.length).toBe(1);
-    expect(types[0].string).toBe("text/*");
+    const parsed = MimeType.parse("text/*, text/html, application/json, multipart/form-data").map(
+      (m) => m.string,
+    );
+    expect(parsed).toContain("text/html");
+    expect(parsed).toContain("application/json");
+    expect(parsed.length).toBeGreaterThan(2);
+    expect(parsed).not.toContain("text/*");
   });
 
   it("parse text with trailing star in the end", () => {
-    const types = MimeType.parse("text/*");
-    expect(types[0].string).toBe("text/*");
+    const parsed = MimeType.parse("text/html, application/json, multipart/form-data, text/*").map(
+      (m) => m.string,
+    );
+    expect(parsed).toContain("text/html");
+    expect(parsed).not.toContain("text/*");
   });
 
   it("parse text with trailing star", () => {
-    const types = MimeType.parse("text/*");
-    expect(types.length).toBeGreaterThan(0);
+    const parsed = MimeType.parse("text/*").map((m) => m.string);
+    expect(parsed).toContain("text/html");
+    expect(parsed).toContain("text/plain");
+    expect(parsed).not.toContain("text/*");
   });
 
   it("parse application with trailing star", () => {
-    const types = MimeType.parse("application/*");
-    expect(types.length).toBeGreaterThan(0);
+    const parsed = MimeType.parse("application/*").map((m) => m.string);
+    expect(parsed).toContain("application/json");
+    expect(parsed).toContain("application/xml");
+    expect(parsed).not.toContain("application/*");
   });
 
   it("parse without q", () => {
