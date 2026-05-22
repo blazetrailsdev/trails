@@ -8,9 +8,9 @@ export const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 /**
  * Derived from vendor/sources.ts (single source of truth). Package entries
- * with `compareApi: false` (rack, globalid today) are filtered out — they're
- * vendored for test-compare but not yet wired into extract-ruby-api.rb.
- * A future wave wires them in and the filter naturally goes away.
+ * with `compareApi: false` are filtered out — they're vendored for
+ * test-compare but not yet wired into extract-ruby-api.rb. Currently no
+ * sources set the flag; rack and globalid are both api-compared.
  */
 export const PACKAGES = apiComparePackages();
 
