@@ -57,13 +57,13 @@ describe("RackRequestTest", () => {
 
   it("yields to the block if no value has been set", () => {
     const req = makeReq();
-    let yielded = false;
-    req.fetchHeader("FOO", () => {
-      yielded = true;
+    let capturedKey: string | undefined;
+    req.fetchHeader("FOO", (k) => {
+      capturedKey = k;
       req.set("FOO", "bar");
       return "bar";
     });
-    expect(yielded).toBe(true);
+    expect(capturedKey).toBe("FOO");
     expect(req.get("FOO")).toBe("bar");
     // raises when key is absent and no block given (mirrors Hash#fetch / env.fetch)
     const err = (() => {
@@ -1400,6 +1400,25 @@ describe("RackRequestTest", () => {
     expect(req.valuesAt("foo")).toEqual(["baz"]);
     expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
     expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
+  });
+
+  it("expose the HTTP_HOST as hostAuthority", () => {
+    const req = makeReq("/", { HTTP_HOST: "example.com:8080" });
+    expect(req.hostAuthority).toBe("example.com:8080");
+    expect(makeReq("/").hostAuthority).toBeNull();
+  });
+
+  it("detect parseable data media types", () => {
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/related" }).isParseableData()).toBe(true);
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/mixed" }).isParseableData()).toBe(true);
+    expect(makeReq("/", { CONTENT_TYPE: "multipart/form-data" }).isParseableData()).toBe(false);
+    expect(makeReq("/", { CONTENT_TYPE: "application/json" }).isParseableData()).toBe(false);
+  });
+
+  it("restore the path as scriptName + pathInfo", () => {
+    const req = makeReq("http://example.com/foo/bar?q=1");
+    req.env["SCRIPT_NAME"] = "/app";
+    expect(req.path).toBe("/app/foo/bar");
   });
 
   it("respond to isLink, isTrace, isUnlink", () => {
