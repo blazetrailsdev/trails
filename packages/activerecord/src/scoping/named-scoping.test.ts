@@ -5,14 +5,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Relation } from "../index.js";
 
-import { createSidecarTestAdapter, adapterType, type SidecarAdapter } from "../test-adapter.js";
+import { createPooledTestAdapter, adapterType, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
 let _adapter: SidecarAdapter;
 beforeAll(async () => {
-  ({ adapter: _adapter } = createSidecarTestAdapter());
+  ({ adapter: _adapter } = await createPooledTestAdapter());
   await defineSchema(_adapter, {
     posts: {
       title: "string",
