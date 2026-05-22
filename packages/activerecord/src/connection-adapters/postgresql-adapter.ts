@@ -1992,12 +1992,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Test-only accessor for the statement pool attached to the
-   * currently-held transaction client. Returns undefined outside a
-   * transaction, because without a held client every adapter call
-   * grabs a fresh pool. Mirrors Rails' `raw_connection
-   * .instance_variable_get(:@statement_pool)` escape hatch used by
-   * `PostgreSQL::StatementPoolTest`.
+   * Test-only accessor for the single session-scoped StatementPool
+   * attached to `_rawConnection`. After the Phase D-X collapse there
+   * is one pool per adapter for the connection's full lifetime — it
+   * survives commit/rollback and is only torn down on disconnect /
+   * close / reconnect. Returns undefined before the first acquire (no
+   * pool built yet) or after teardown. Mirrors Rails'
+   * `raw_connection.instance_variable_get(:@statement_pool)` escape
+   * hatch used by `PostgreSQL::StatementPoolTest`.
    *
    * @internal
    */
@@ -2047,13 +2049,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /**
    * Get the underlying persistent pg.Client.
    * Escape hatch for advanced usage — mirrors mysql2/sqlite3 adapter
-   * conventions (`get raw()`). Throws when the connection hasn't been
-   * opened yet (use a query method first to lazy-connect) or after
-   * close/disconnect.
+   * conventions (`get raw()`). Throws with a precise reason when the
+   * connection is unavailable: either not yet lazy-opened (call any
+   * query method first), or torn down by disconnect/discard/close.
    */
   get raw(): pg.Client {
-    if (!this._rawConnection) throw new Error("PostgreSQLAdapter: connection is closed");
-    return this._rawConnection;
+    if (this._rawConnection) return this._rawConnection;
+    if (this._closed || this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
+    throw new Error(
+      "PostgreSQLAdapter: connection has not been opened yet — run a query first to lazy-connect",
+    );
   }
 
   // ---------------------------------------------------------------------------
