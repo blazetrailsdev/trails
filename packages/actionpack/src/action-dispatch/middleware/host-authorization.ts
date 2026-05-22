@@ -7,6 +7,12 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import { Request } from "../http/request.js";
+
+/** @internal Minimal logger surface used by {@link DefaultResponseApp}. */
+export interface HostAuthorizationLogger {
+  error(message: string): void;
+}
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -232,64 +238,152 @@ export class HostAuthorization {
   private app: RackApp;
   private permissions: Permissions;
   private exclude?: (env: RackEnv) => boolean;
-  private responseApp?: (env: RackEnv) => Promise<RackResponse>;
+  private responseApp: (env: RackEnv) => Promise<RackResponse>;
 
   constructor(app: RackApp, options: HostAuthorizationOptions) {
     this.app = app;
     this.permissions = new Permissions(options.hosts);
     this.exclude = options.exclude;
-    this.responseApp = options.responseApp;
+    const defaultApp = new DefaultResponseApp();
+    this.responseApp = options.responseApp ?? ((env) => defaultApp.call(env));
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
     if (this.permissions.empty()) return this.app(env);
 
-    const originHost = this.originHost(env);
-    const blocked = this.blockedHosts(env, originHost);
+    const request = new Request(env);
+    const blocked = this.blockedHosts(request);
 
-    if (blocked.length === 0 || this.isExcluded(env)) {
-      this.markAsAuthorized(env, originHost);
+    if (blocked.length === 0 || this.isExcluded(request)) {
+      this.markAsAuthorized(env, request);
       return this.app(env);
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;
-    if (this.responseApp) return this.responseApp(env);
-    return this.blockedResponse(originHost);
-  }
-
-  private originHost(env: RackEnv): string {
-    const httpHost = env["HTTP_HOST"] as string | undefined;
-    if (httpHost) return httpHost;
-    return (env["SERVER_NAME"] as string) || "localhost";
+    return this.responseApp(env);
   }
 
   /** @internal */
-  private blockedHosts(env: RackEnv, originHost: string): string[] {
+  private blockedHosts(request: Request): string[] {
     const out: string[] = [];
+    const env = request.env;
+    const originHost =
+      (env["HTTP_HOST"] as string | undefined) ??
+      (env["SERVER_NAME"] as string | undefined) ??
+      "localhost";
     if (!this.permissions.allows(originHost)) out.push(originHost);
-    const forwarded = (env["HTTP_X_FORWARDED_HOST"] as string | undefined)
-      ?.split(/,\s?/)
-      .pop()
-      ?.trim();
+
+    const forwardedHeader = env["HTTP_X_FORWARDED_HOST"] as string | undefined;
+    const forwarded = forwardedHeader?.split(/,\s?/).pop()?.trim();
     if (forwarded && !this.permissions.allows(forwarded)) out.push(forwarded);
     return out;
   }
 
   /** @internal */
-  private isExcluded(env: RackEnv): boolean {
-    return Boolean(this.exclude?.(env));
+  private isExcluded(request: Request): boolean {
+    return Boolean(this.exclude?.(request.env));
+  }
+
+  /** @internal Sets `action_dispatch.authorized_host` from `Request#rawHostWithPort` (port stripped). */
+  private markAsAuthorized(env: RackEnv, request: Request): void {
+    const raw = request.rawHostWithPort;
+    const authorized = raw.startsWith("[") ? raw.replace(/\]:\d+$/, "]") : raw.replace(/:\d+$/, "");
+    env["action_dispatch.authorized_host"] = authorized;
+  }
+}
+
+/**
+ * Default Rack app invoked when {@link HostAuthorization} blocks a request.
+ *
+ * Mirrors Rails `ActionDispatch::HostAuthorization::DefaultResponseApp`:
+ * picks `text/plain` for XHR requests and `text/html` otherwise, logs the
+ * blocked hosts via the request's logger, and renders a DebugView-style
+ * body when `action_dispatch.show_detailed_exceptions` is set.
+ */
+export class DefaultResponseApp {
+  static readonly RESPONSE_STATUS = 403;
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    const request = new Request(env);
+    const format = request.xhr ? "text/plain" : "text/html";
+    this.logError(request);
+    return this.response(format, this.responseBody(request));
   }
 
   /** @internal */
-  private markAsAuthorized(env: RackEnv, host: string): void {
-    env["action_dispatch.authorized_host"] = host.replace(/:\d+$/, "");
+  private responseBody(request: Request): string {
+    if (!request.env["action_dispatch.show_detailed_exceptions"]) return "";
+    const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
+    return renderBlockedHostBody(blocked);
   }
 
-  private blockedResponse(host: string): RackResponse {
+  /** @internal */
+  private response(format: string, body: string): RackResponse {
+    const bytes = Buffer.byteLength(body, "utf8");
     return [
-      403,
-      { "content-type": "text/plain; charset=utf-8" },
-      bodyFromString(`Blocked host: ${host}`),
+      DefaultResponseApp.RESPONSE_STATUS,
+      {
+        "content-type": `${format}; charset=utf-8`,
+        "content-length": String(bytes),
+      },
+      bodyFromString(body),
     ];
   }
+
+  /** @internal */
+  private logError(request: Request): void {
+    const logger = this.availableLogger(request);
+    if (!logger) return;
+    const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
+    logger.error(
+      `[ActionDispatch::HostAuthorization::DefaultResponseApp] Blocked hosts: ${blocked.join(", ")}`,
+    );
+  }
+
+  /** @internal */
+  private availableLogger(request: Request): HostAuthorizationLogger | null {
+    const explicit = request.logger as HostAuthorizationLogger | undefined;
+    if (explicit && typeof explicit.error === "function") return explicit;
+    const rack = request.env["rack.logger"] as HostAuthorizationLogger | undefined;
+    if (rack && typeof rack.error === "function") return rack;
+    return null;
+  }
+}
+
+/**
+ * Render a minimal HTML body listing the blocked hosts. In Rails this is
+ * rendered through `DebugView` + the `rescues/blocked_host` template; the
+ * ActionView template stack isn't ported yet, so we emit equivalent
+ * structural HTML inline.
+ *
+ * @internal
+ */
+function renderBlockedHostBody(hosts: string[]): string {
+  const items = hosts.map((h) => `    <li>${escapeHtml(h)}</li>`).join("\n");
+  return [
+    "<!DOCTYPE html>",
+    '<html lang="en">',
+    "<head>",
+    '  <meta charset="utf-8" />',
+    "  <title>Blocked Host</title>",
+    "</head>",
+    "<body>",
+    "  <h1>Blocked host</h1>",
+    "  <p>To allow requests to these hosts, add them to <code>config.hosts</code>.</p>",
+    "  <ul>",
+    items,
+    "  </ul>",
+    "</body>",
+    "</html>",
+  ].join("\n");
+}
+
+/** @internal */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

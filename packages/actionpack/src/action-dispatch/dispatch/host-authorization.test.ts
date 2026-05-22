@@ -22,13 +22,56 @@ describe("HostAuthorizationTest", () => {
 
   it("blocks request when host does not match", async () => {
     const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
-    const [status, _, body] = await mw.call({
+    const [status, headers, body] = await mw.call({
       HTTP_HOST: "evil.com",
       REQUEST_METHOD: "GET",
       PATH_INFO: "/",
     });
     expect(status).toBe(403);
-    expect(await bodyToString(body)).toContain("Blocked host: evil.com");
+    expect((headers as Record<string, string>)["content-type"]).toContain("text/html");
+    expect(await bodyToString(body)).toBe("");
+  });
+
+  it("default response renders DebugView body when show_detailed_exceptions is set", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const [status, headers, body] = await mw.call({
+      HTTP_HOST: "evil.com",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      "action_dispatch.show_detailed_exceptions": true,
+    });
+    expect(status).toBe(403);
+    expect((headers as Record<string, string>)["content-type"]).toContain("text/html");
+    const rendered = await bodyToString(body);
+    expect(rendered).toContain("Blocked host");
+    expect(rendered).toContain("evil.com");
+  });
+
+  it("default response uses text/plain for XHR requests", async () => {
+    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const [status, headers] = await mw.call({
+      HTTP_HOST: "evil.com",
+      HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(403);
+    expect((headers as Record<string, string>)["content-type"]).toContain("text/plain");
+  });
+
+  it("default response logs blocked hosts via request logger", async () => {
+    const messages: string[] = [];
+    const logger = { error: (msg: string) => messages.push(msg) };
+    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    await mw.call({
+      HTTP_HOST: "evil.com",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      "action_dispatch.logger": logger,
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Blocked hosts: evil.com");
+    expect(messages[0]).toContain("DefaultResponseApp");
   });
 
   it("allows wildcard subdomain matching", async () => {
