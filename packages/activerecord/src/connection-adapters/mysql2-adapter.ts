@@ -539,13 +539,26 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._poolConfig,
       this._buildInitSql(),
     ).then(
-      (conn) => {
-        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
+      (conn): mysql.Connection | Promise<mysql.Connection> => {
         if (this._connectGeneration !== gen) {
-          // disconnectBang()/close() happened while we were connecting — discard.
-          conn.end().catch(() => {});
-          throw new ConnectionNotEstablished("Mysql2Adapter: connection was closed during connect");
+          // disconnectBang()/close() happened while we were connecting. Clear
+          // the promise ref then end the socket as part of this chain so
+          // close() awaiting _connectingPromise can drain the socket cleanly
+          // (rather than a fire-and-forget that close() can't wait on).
+          if (this._connectingPromiseGen === gen) this._connectingPromise = null;
+          const discardErr = new ConnectionNotEstablished(
+            "Mysql2Adapter: connection was closed during connect",
+          );
+          return conn.end().then(
+            () => {
+              throw discardErr;
+            },
+            () => {
+              throw discardErr;
+            },
+          );
         }
+        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
         this._client = conn;
         this._stmtPool = null;
         this._activeState = true;
