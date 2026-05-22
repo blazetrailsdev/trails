@@ -1,7 +1,6 @@
 import type { DatabaseAdapter } from "../adapter.js";
 import { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { setUseTransactionalTests } from "./use-transactional-tests.js";
-import { Base } from "../base.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -463,6 +462,7 @@ export async function defineSchema(
     schema = schemaOrOpts as Schema;
     resolvedOpts = opts;
   } else {
+    const { Base } = await import("../base.js");
     adapter = Base.adapter;
     schema = adapterOrSchema as Schema;
     resolvedOpts = schemaOrOpts as DefineSchemaOpts | undefined;
