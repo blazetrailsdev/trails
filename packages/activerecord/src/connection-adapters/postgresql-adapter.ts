@@ -890,15 +890,24 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // configure/drain calls or the final return.
     let client = this._rawConnection;
     if (client == null) {
-      client = new pg.Client(this._pgClientOptions!);
-      await client.connect();
+      const newClient = new pg.Client(this._pgClientOptions!);
+      try {
+        await newClient.connect();
+      } catch (error) {
+        // Failed connect: ensure the partially-initialized client is
+        // closed so it doesn't leak file descriptors or pending
+        // notifications. end() on an unconnected client may itself
+        // throw — swallow that and surface the original connect error.
+        newClient.end().catch(() => {});
+        throw error;
+      }
       // Guard against a close / disconnect / discard / reconnect
       // that raced with the in-flight connect(). If the adapter was
       // torn down between the await above and this point, do NOT
-      // publish `client` — tear it down instead so we don't leak a
-      // live socket onto a closed adapter.
+      // publish `newClient` — tear it down instead so we don't leak
+      // a live socket onto a closed adapter.
       if (this._closed || this._pgClientOptions == null || this._rawConnection != null) {
-        client.end().catch(() => {});
+        newClient.end().catch(() => {});
         if (this._closed || this._pgClientOptions == null) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }
@@ -909,8 +918,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         // Suppress unhandled error events from the idle connection
         // (e.g. server-side FATAL from pg_terminate_backend). Without
         // this listener node emits an uncaughtException.
-        client.on("error", () => {});
-        this._rawConnection = client;
+        newClient.on("error", () => {});
+        this._rawConnection = newClient;
+        client = newClient;
       }
     }
     try {
@@ -1363,6 +1373,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     } catch (error) {
       this._client = null;
       this._inTransaction = false;
+      // Connection-level error on BEGIN poisons the single pg.Client.
+      // Tear down so the next caller gets a fresh connection — mirrors
+      // the pre-collapse PoolClient.release(err) discard.
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
       throw error;
     }
   }
@@ -1534,6 +1548,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     } catch (error) {
       this._client = null;
       this._inTransaction = false;
+      // See beginDbTransaction — discard the poisoned client on
+      // connection-level failure so callers can recover.
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
       throw error;
     }
   }
