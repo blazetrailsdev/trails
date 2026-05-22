@@ -182,10 +182,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  // Mirrors Rails' Mysql2Adapter#connected? — null raw connection means
-  // disconnected.
+  // Mirrors Rails' Mysql2Adapter#connected? — false only after a known
+  // disconnect/close or for fake adapters. A freshly-constructed adapter
+  // with no _client yet is still "connected" in the sense that it will
+  // connect on the next query (matching Rails, which always has @raw_connection
+  // non-nil before the adapter reaches callers).
   override isConnected(): boolean {
-    return this._client != null;
+    return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
   }
 
   // Single persistent connection — mirrors Rails' @raw_connection.
@@ -1399,6 +1402,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override disconnectBang(): void {
     this._activeState = false;
     this._connectGeneration++;
+    // Null out _connectingPromise so the next _ensureClient() starts a fresh
+    // attempt rather than returning the now-stale in-flight promise. The
+    // fulfillment handler for any in-flight promise will observe the generation
+    // mismatch and discard the connection.
+    this._connectingPromise = null;
     super.disconnectBang();
     this._inTransaction = false;
     this._stmtPool?.detach();
