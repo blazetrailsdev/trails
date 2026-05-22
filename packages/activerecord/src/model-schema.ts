@@ -840,7 +840,18 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
   const table = schemaHost.tableName;
-  const pool = startingAdapter.pool ?? startingAdapter;
+  // Resolve a target for schemaCache lookups. Prefer `.pool` because some
+  // wrapper adapters (e.g. TestAdapterFixtures) expose their unwrapped inner
+  // adapter through this getter. But if `.pool` is an actual ConnectionPool
+  // (has `withConnection`), skip it and use the adapter directly: on
+  // lone-connection pools (SQLite :memory: + size 1) the connection is
+  // already permanently checked out to startingAdapter, so asking the pool
+  // for another connection would deadlock.
+  const candidate = startingAdapter.pool ?? startingAdapter;
+  const pool =
+    candidate && typeof (candidate as { withConnection?: unknown }).withConnection === "function"
+      ? startingAdapter
+      : candidate;
 
   if (typeof cache.dataSourceExists === "function") {
     const exists = await cache.dataSourceExists(pool, table);
