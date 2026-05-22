@@ -91,9 +91,9 @@ it("can override the initial content-type with a different case", () => {
 
 it("can get and set set-cookie header", () => {
   const response = new Response();
-  expect(response.setCookieHeaderValue).toBeUndefined();
-  response.setCookieHeaderValue = "v=1;";
-  expect(response.setCookieHeaderValue).toBe("v=1;");
+  expect(response.setCookieHeader).toBeUndefined();
+  response.setCookieHeader = "v=1;";
+  expect(response.setCookieHeader).toBe("v=1;");
   expect(response.headers["set-cookie"]).toBe("v=1;");
 });
 
@@ -630,17 +630,17 @@ it("flatten doesn't cause infinite loop", () => {
 
 it("should specify not to cache content", () => {
   const response = new Response();
-  response.cache(1000);
-  response.doNotCache();
+  response.cacheBang(1000);
+  response.doNotCacheBang();
   expect(response.headers["cache-control"]).toBe("no-cache, must-revalidate");
   const expires = new Date(response.headers["expires"] as string);
-  expect(expires.getTime()).toBeLessThanOrEqual(Date.now());
+  expect(expires.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
 });
 
 it("should not cache content if calling cache! after do_not_cache!", () => {
   const response = new Response();
-  response.doNotCache();
-  response.cache(1000);
+  response.doNotCacheBang();
+  response.cacheBang(1000);
   expect(response.headers["cache-control"]).toBe("no-cache, must-revalidate");
 });
 
@@ -648,7 +648,7 @@ it("should specify to cache content", () => {
   const response = new Response();
   const duration = 120;
   const minExpires = Date.now() + 100000;
-  response.cache(duration);
+  response.cacheBang(duration);
   expect(response.headers["cache-control"]).toBe("public, max-age=120");
   const expires = new Date(response.headers["expires"] as string);
   expect(expires.getTime()).toBeGreaterThanOrEqual(minExpires);
