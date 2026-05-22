@@ -665,6 +665,11 @@ describe("RackRequestTest", () => {
   it("extract referrer correctly", () => {
     const req = makeReq("/", { HTTP_REFERER: "http://example.com/page" });
     expect(req.referrer).toBe("http://example.com/page");
+    expect(req.referer).toBe("http://example.com/page");
+
+    const req2 = makeReq("/");
+    expect(req2.referer).toBeNull();
+    expect(req2.referrer).toBeNull();
   });
 
   it("extract user agent correctly", () => {
@@ -1378,5 +1383,48 @@ describe("RackRequestTest", () => {
     expect([params["foo"]]).toEqual(["baz"]);
     expect([params["foo"], params["wun"]]).toEqual(["baz", "der"]);
     expect([params["bar"], params["foo"], params["wun"]]).toEqual(["ful", "baz", "der"]);
+  });
+
+  it("respond to isLink, isTrace, isUnlink", () => {
+    expect(new Request({ REQUEST_METHOD: "LINK" }).isLink()).toBe(true);
+    expect(new Request({ REQUEST_METHOD: "LINK" }).isTrace()).toBe(false);
+    expect(new Request({ REQUEST_METHOD: "TRACE" }).isTrace()).toBe(true);
+    expect(new Request({ REQUEST_METHOD: "TRACE" }).isLink()).toBe(false);
+    expect(new Request({ REQUEST_METHOD: "UNLINK" }).isUnlink()).toBe(true);
+    expect(new Request({ REQUEST_METHOD: "UNLINK" }).isLink()).toBe(false);
+  });
+
+  it("return the logger from the env", () => {
+    const fakeLogger = { info: () => {} };
+    const req = new Request({ "rack.logger": fakeLogger });
+    expect(req.logger).toBe(fakeLogger);
+
+    const req2 = new Request({});
+    expect(req2.logger).toBeNull();
+  });
+
+  it("return content_charset from media type params", () => {
+    const req = new Request({
+      REQUEST_METHOD: "POST",
+      CONTENT_TYPE: "text/plain;charset=utf-8",
+    });
+    expect(req.contentCharset).toBe("utf-8");
+
+    const req2 = new Request({ REQUEST_METHOD: "GET" });
+    expect(req2.contentCharset).toBeNull();
+  });
+
+  it("return server_name from the env", () => {
+    const req = new Request({ SERVER_NAME: "example.org", SERVER_PORT: "9292" });
+    expect(req.serverName).toBe("example.org");
+
+    const req2 = new Request({});
+    expect(req2.serverName).toBeNull();
+  });
+
+  it("return hostname from authority", () => {
+    expect(makeReq("/", { HTTP_HOST: "example.org" }).hostname).toBe("example.org");
+    expect(makeReq("/", { HTTP_HOST: "example.org:8080" }).hostname).toBe("example.org");
+    expect(makeReq("/", { SERVER_NAME: "myserver", SERVER_PORT: "80" }).hostname).toBe("myserver");
   });
 });
