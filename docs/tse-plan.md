@@ -1171,43 +1171,48 @@ item it claims to cover. The checklist is split into two parts:
 
 **Handler protocol** (`lib/action_view/template/handlers/erb.rb`):
 
-- [ ] `Tse.call(template, source)` strips encoding tag (TSE: no-op,
+- [x] `Tse.call(template, source)` strips encoding tag (TSE: no-op,
       documented).
-- [ ] `Tse.call` reads `escape_ignore_list` and passes `escape:` option.
-- [ ] `Tse.call` reads `strip_trailing_newlines` and `chomp!`s source.
+- [x] `Tse.call` reads `escape_ignore_list` and passes `escape:` option.
+- [x] `Tse.call` reads `strip_trailing_newlines` and `chomp!`s source.
 - [ ] `Tse.call` reads `annotateRenderedViewWithFilenames` + format and
       emits BEGIN/END comments for html format.
-- [ ] `Tse.supportsStreaming === true`.
-- [ ] `Tse.handlesEncoding === true`.
-- [ ] `Tse.translateLocation(spot, frame, source)` implemented (can be
+- [x] `Tse.supportsStreaming === true`.
+- [x] `Tse.handlesEncoding === true`.
+- [x] `Tse.translateLocation(spot, frame, source)` implemented (can be
       a stub returning frame as-is until ErrorHighlight equivalent lands).
-- [ ] `Tse.trimMode`, `Tse.escapeIgnoreList`, `Tse.stripTrailingNewlines`,
-      `Tse.emitter` all class-attribute-settable.
+- [x] `Tse.trimMode`, `Tse.escapeIgnoreList`, `Tse.stripTrailingNewlines`,
+      `Tse.emitter` all class-attribute-settable. (`emitter` ships as
+      `Tse.implementation`, matching Rails' `erb_implementation` name.)
 
 **Emitter** (`lib/action_view/template/handlers/erb/erubi.rb`):
 
-- [ ] bufvar resolves to `context.outputBuffer`, not a local.
-- [ ] `<%= %>` dispatches to `.append()` (escape) or `.safeExprAppend()`
+- [x] bufvar resolves to `context.outputBuffer`, not a local.
+- [x] `<%= %>` dispatches to `.append()` (escape) or `.safeExprAppend()`
       (no escape) based on `escape:` option — verified with paired
       `.html.tse` + `.text.tse` fixtures rendering the same expression.
-- [ ] `<%== %>` always dispatches to `.safeExprAppend()`.
-- [ ] Static text dispatches to `.safeAppend()` with backslash-escape of
-      `'` and `\` in the emitted string literal.
+- [x] `<%== %>` always dispatches to `.safeExprAppend()`.
+- [x] Static text dispatches to `.safeAppend()` with backslash-escape of
+      `'` and `\` in the emitted string literal. (TSE uses
+      `JSON.stringify` — emits a double-quoted JS string literal with
+      `\` and `"` escaped; functionally equivalent to Rails' single-
+      quoted form.)
 - [ ] `BLOCK_EXPR` equivalent: `<%= helper do |...| %>...<% end %>` and
       `<%= helper { %>...<% } %>` emit without paren-wrap.
-- [ ] Newline coalescing: consecutive `\n`-only chunks collapse into one
-      `.safeAppend("\n\n\n")` call.
-- [ ] `<%# %>` comments dropped entirely (no AST node, no emit).
-- [ ] `<%% %>` / `%%>` produce literal `<%` / `%>` in output.
-- [ ] Trim `-`: `<%- ... -%>` strips line, `<%= ... -%>` strips trailing
+- [x] Newline coalescing: consecutive `\n`-only chunks collapse into one
+      `.safeAppend("\n\n\n")` call. (Lexer emits a single `text` token
+      between tags, so consecutive newlines are already merged.)
+- [x] `<%# %>` comments dropped entirely (no AST node, no emit).
+- [x] `<%% %>` / `%%>` produce literal `<%` / `%>` in output.
+- [x] Trim `-`: `<%- ... -%>` strips line, `<%= ... -%>` strips trailing
       newline only.
 
 **Strict locals** (`lib/action_view/template.rb`, `strict_locals!`):
 
-- [ ] Rails-style `<%# locals: (name:, count: 0) %>` matched via the
+- [x] Rails-style `<%# locals: (name:, count: 0) %>` matched via the
       same regex Rails uses (`/\#\s+locals:\s+\((.*)\)/`) and stripped
       from source before lex.
-- [ ] Optional `<%! types: { ... } !%>` block parsed separately,
+- [x] Optional `<%! types: { ... } !%>` block parsed separately,
       sharpens the locals param type, coexists with the names line.
 - [ ] Empty `<%# locals: () %>` enforces "no extra keys" — locals param
       typed `Record<never, never>` and runtime check rejects any keys.
@@ -1222,8 +1227,10 @@ item it claims to cover. The checklist is split into two parts:
 
 **Runtime substrate** (`active_support/safe_buffer.rb`, `lib/action_view/buffers.rb`):
 
-- [ ] `SafeString` instance check; `safe()` wrapper; `escape()` HTML
-      escape for `<`, `>`, `&`, `"`, `'`.
+- [x] `SafeString` instance check; `safe()` wrapper; `escape()` HTML
+      escape for `<`, `>`, `&`, `"`, `'`. (Ships as `SafeBuffer` /
+      `htmlSafe()` / `htmlEscape()` / `isHtmlSafe()` in
+      `@blazetrails/activesupport`.)
 - [ ] `OutputBuffer extends SafeString` — itself html-safe.
 - [ ] `OutputBuffer#append` html-escapes when arg is plain string,
       passes through when `SafeString`.
@@ -1237,8 +1244,10 @@ item it claims to cover. The checklist is split into two parts:
       registered token lists (see §2.10.4).
 - [ ] Missing format defaults to `html`.
 - [ ] `<%! format: "..." !%>` override honored when present.
-- [ ] `escapeIgnoreList` consulted via parsed format, not filename string
-      match.
+- [x] `escapeIgnoreList` consulted via parsed format, not filename string
+      match. (Handler reads `template.type`; `formatToMimeType()`
+      normalizes a format token like `"html"` to its MIME before the
+      list check, so no filename-string substring matching occurs.)
 
 **Helpers and capture** (`lib/action_view/helpers/capture_helper.rb`,
 `lib/action_view/helpers/output_safety_helper.rb`):
@@ -1281,8 +1290,8 @@ item it claims to cover. The checklist is split into two parts:
       `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
 - [ ] Emitted `.tse.ts` uses only erasable syntax (passes
       `verbatimModuleSyntax`).
-- [ ] `RenderContext` declared as an `interface` (augmentable), not a
-      `type` alias.
+- [x] `RenderContext` declared as an `interface` (augmentable), not a
+      `type` alias. (See `packages/actionview/src/template/handlers.ts`.)
 - [ ] `TemplateRegistry` interface in `@blazetrails/actionview`;
       generated manifest augments it via `declare module`.
 - [ ] `package.json#exports` for `*.tse` lists `"types"` before

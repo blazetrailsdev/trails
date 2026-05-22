@@ -121,6 +121,19 @@ describe("Template::Handlers::Tse", () => {
     expect(code).toMatch(/_ob\.append\(name\)/);
   });
 
+  it("exposes supportsStreaming as a class-level boolean", () => {
+    expect(Tse.supportsStreaming).toBe(true);
+  });
+
+  it("exposes handlesEncoding as a class-level boolean", () => {
+    expect(Tse.handlesEncoding).toBe(true);
+  });
+
+  it("translateLocation returns the frame unchanged (stub)", () => {
+    const frame = { file: "show.html.tse", line: 4, column: 2 };
+    expect(Tse.translateLocation(null, frame, "<%= 1 %>")).toBe(frame);
+  });
+
   it("registers against the .tse extension via Template::Handlers", () => {
     const tse = new Tse();
     TemplateHandlers.registerTemplateHandler("tse", tse);

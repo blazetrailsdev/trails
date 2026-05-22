@@ -73,20 +73,44 @@ export class Tse implements TemplateHandler {
 
   /**
    * Streaming render protocol marker. Mirrors
-   * `Template::Handlers::ERB#supports_streaming?`.
+   * `Template::Handlers::ERB.supports_streaming?` — Rails defines this on the
+   * class. Trails exposes both forms: the static boolean for class-level
+   * checks and the instance method for prototype-dispatch callers.
    */
+  static readonly supportsStreaming = true as const;
+
+  /** Mirrors `Template::Handlers::ERB.handles_encoding?` (class-level). */
+  static readonly handlesEncoding = true as const;
+
   supportsStreaming(): boolean {
     return true;
   }
 
-  /** Mirrors `Template::Handlers::ERB#handles_encoding?`. */
   handlesEncoding(): boolean {
     return true;
   }
 
   /**
+   * Translate a stack-frame spot in compiled JS back to a source location in
+   * the `.tse` template. Rails uses this with `ErrorHighlight` to point the
+   * developer at the failing expression. Trails' source-map infrastructure
+   * (Phase 2c) already produces `.tse.js.map`; until a structured
+   * ErrorHighlight equivalent lands, this is a pass-through stub returning
+   * `frame` unchanged. Mirrors
+   * `Template::Handlers::ERB.translate_location(spot, backtrace_location, source)`.
+   */
+  static translateLocation<T>(_spot: unknown, frame: T, _source: string): T {
+    return frame;
+  }
+
+  /**
    * Compile a template source to a JS module string. Rails:
    * `Handlers::ERB#call(template, source) → ruby_code_string`.
+   *
+   * Encoding-tag handling: Rails strips a leading magic `# encoding:` line
+   * before passing source to Erubi. `.tse` source is JavaScript/TypeScript,
+   * which has no encoding pragma (files are always UTF-8 by spec), so this
+   * step is a documented no-op — there is nothing to strip.
    */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;
