@@ -50,6 +50,7 @@ export {
 export { SSL, type SSLOptions, type HSTSOptions } from "./middleware/ssl.js";
 export {
   HostAuthorization,
+  DefaultResponseApp,
   type HostAuthorizationOptions,
 } from "./middleware/host-authorization.js";
 export { MiddlewareStack } from "./middleware/stack.js";
