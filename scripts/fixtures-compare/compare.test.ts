@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL } from "./compare.js";
+import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass } from "./compare.js";
+import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/test-helpers/define-schema.js";
 
 // prettier-ignore
@@ -341,5 +342,124 @@ describe("compareFile", () => {
     expect((await compareFile("authors.yml", empty, empty, "YAML-PARSE-ERR")).status).toBe(
       "YAML-PARSE-ERR",
     );
+  });
+});
+
+// ---- models pass unit tests ----
+
+const emptyClass = (): RubyClass => ({
+  name: "Foo",
+  parent: "ActiveRecord::Base",
+  tableName: null,
+  associations: [],
+  validations: [],
+  scopes: [],
+  callbacks: [],
+  attributes: [],
+});
+
+describe("tsModelPath", () => {
+  it("converts underscores to hyphens and maps to models dir", () => {
+    expect(tsModelPath("test/models/book_destroy_async.rb")).toMatch(/book-destroy-async\.ts$/);
+  });
+  it("preserves subdirectory structure", () => {
+    expect(tsModelPath("test/models/admin/account.rb")).toMatch(/admin[/\\]account\.ts$/);
+  });
+});
+
+describe("compareModelClass", () => {
+  it("returns MATCH when all associations are found", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      associations: [{ kind: "has_many", name: "comments", options: {} }],
+    };
+    const ts = `static { this.hasMany("comments", {}); }`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.status).toBe("MATCH");
+    expect(r.assocMatched).toBe(1);
+    expect(r.notes).toHaveLength(0);
+  });
+
+  it("returns DIFF and notes when an association is absent", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      associations: [{ kind: "belongs_to", name: "author", options: {} }],
+    };
+    const r = compareModelClass(ruby, "// empty", "test/models/foo.rb", "foo.ts");
+    expect(r.status).toBe("DIFF");
+    expect(r.assocMatched).toBe(0);
+    expect(r.notes[0]).toMatch(/assoc-missing/);
+  });
+
+  it("does not false-positive on bare string containing scope name", () => {
+    // "open" appears in a comment; should NOT count as a matched scope
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      scopes: [{ name: "open" }],
+    };
+    const ts = `// we leave connections open`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.status).toBe("DIFF");
+    expect(r.scopesMatched).toBe(0);
+  });
+
+  it("matches scope when this.scope call is present", () => {
+    const ruby: RubyClass = { ...emptyClass(), scopes: [{ name: "published" }] };
+    const ts = `this.scope("published", () => this.where({ published: true }));`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.scopesMatched).toBe(1);
+  });
+
+  it("matches validates but not validate (no false positive)", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      validations: [{ kind: "validates", attributes: ["name"], options: {} }],
+    };
+    // validate( without s — should NOT match validates check
+    const ts = `this.validate("name is too short");`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.valsMatched).toBe(0);
+    expect(r.status).toBe("DIFF");
+  });
+
+  it("matches validates_presence_of to validatesPresenceOf shorthand", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      validations: [{ kind: "validates_presence_of", attributes: ["title"], options: {} }],
+    };
+    const ts = `this.validatesPresenceOf("title");`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.valsMatched).toBe(1);
+    expect(r.status).toBe("MATCH");
+  });
+
+  it("also accepts generic validates() for validates_presence_of (fallback)", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      validations: [{ kind: "validates_presence_of", attributes: ["title"], options: {} }],
+    };
+    const ts = `this.validates("title", { presence: true });`;
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
+    expect(r.valsMatched).toBe(1);
+  });
+
+  it("matches validates_uniqueness_of to validatesUniqueness (no 'Of')", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      validations: [{ kind: "validates_uniqueness_of", attributes: ["email"], options: {} }],
+    };
+    expect(
+      compareModelClass(ruby, `this.validatesUniqueness("email");`, "test/models/foo.rb", "foo.ts")
+        .valsMatched,
+    ).toBe(1);
+    // Must NOT match the wrong name
+    expect(
+      compareModelClass(
+        ruby,
+        `this.validatesUniquenessOf("email");`,
+        "test/models/foo.rb",
+        "foo.ts",
+      ).valsMatched,
+    ).toBe(0);
   });
 });

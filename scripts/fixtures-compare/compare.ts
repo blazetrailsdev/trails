@@ -3,6 +3,7 @@
 // failure only per docs/fixtures-port-plan.md (Decision 4); PR 7 flips
 // to hard-fail. ERB stubs adapter_name to "SQLite"; other ERB → skipped.
 import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -31,9 +32,10 @@ interface FileResult { yamlBase: string; tsBase: string | null; status: Status; 
 // the rest of the file comparable instead of dropping it as ERB-UNSUPPORTED.
 export const ERB_SKIP_SENTINEL = "__ERB_SKIP__";
 
-function parseArgs(argv: string[]): { pkg: string; filter: string | null } {
+function parseArgs(argv: string[]): { pkg: string; filter: string | null; models: boolean } {
   let pkg = "activerecord";
   let filter: string | null = null;
+  let models = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--package") {
@@ -42,9 +44,11 @@ function parseArgs(argv: string[]): { pkg: string; filter: string | null } {
     } else if (a.startsWith("--package=")) {
       pkg = a.slice(10);
       if (!pkg) throw new Error("--package= requires a value");
+    } else if (a === "--models") {
+      models = true;
     } else if (!a.startsWith("--") && filter === null) filter = a;
   }
-  return { pkg, filter };
+  return { pkg, filter, models };
 }
 
 const kebab = (s: string): string => s.replace(/_/g, "-");
@@ -471,7 +475,7 @@ function formatLine(r: FileResult): string {
 }
 
 async function main(): Promise<void> {
-  const { pkg, filter } = parseArgs(process.argv.slice(2));
+  const { pkg, filter, models } = parseArgs(process.argv.slice(2));
   if (pkg !== "activerecord") {
     console.error(`fixtures:compare: --package ${pkg} not supported yet`);
     process.exit(2);
@@ -515,9 +519,230 @@ async function main(): Promise<void> {
     `schema — ported=${ported}/${evaluated.length} extras-flagged=${withExtras} (skipped ${results.length - evaluated.length})`,
   );
   console.log("(MISSING/DIFF soft per Decision 4 until PR 7; runtime errors hard-fail)");
+
+  if (models) runModelsPass(filter);
+
   // Decision 4 names DIFF/MISSING as soft; YAML/TS load errors are script-runtime, hard-fail.
   const hard: readonly Status[] = ["YAML-PARSE-ERR", "TS-IMPORT-ERR", "TS-EXPORT-MISSING"];
   if (results.some((r) => hard.includes(r.status))) process.exit(1);
+}
+
+// ---- Models pass ----
+
+// Rails shorthand validation macros that map to named TS helpers rather than
+// the generic this.validates(). Helpers are implemented in:
+//   packages/activemodel/src/model.ts       — all *Of helpers + acceptance/confirmation/comparison
+//   packages/activerecord/src/validations.ts — uniqueness (validatesUniqueness, no "Of")
+//                                              + validatesAssociated
+const VALIDATION_KIND_TO_TS: Record<string, string> = {
+  validates_presence_of: "validatesPresenceOf",
+  validates_absence_of: "validatesAbsenceOf",
+  validates_length_of: "validatesLengthOf",
+  validates_size_of: "validatesSizeOf",
+  validates_numericality_of: "validatesNumericalityOf",
+  validates_inclusion_of: "validatesInclusionOf",
+  validates_exclusion_of: "validatesExclusionOf",
+  validates_format_of: "validatesFormatOf",
+  validates_acceptance_of: "validatesAcceptanceOf",
+  validates_confirmation_of: "validatesConfirmationOf",
+  validates_comparison_of: "validatesComparisonOf",
+  validates_uniqueness_of: "validatesUniqueness", // exported as validatesUniqueness (no "Of")
+  validates_associated: "validatesAssociated",
+};
+
+const MODELS_TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/models");
+const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
+
+export interface RubyAssoc {
+  kind: string;
+  name: string;
+  options: Record<string, string>;
+}
+interface RubyValidation {
+  kind: string;
+  attributes: string[];
+  options: Record<string, string>;
+}
+interface RubyScope {
+  name: string;
+}
+interface RubyCallback {
+  kind: string;
+  target: string | null;
+}
+interface RubyAttr {
+  name: string;
+  type: string;
+}
+export interface RubyClass {
+  name: string;
+  parent: string | null;
+  tableName: string | null;
+  associations: RubyAssoc[];
+  validations: RubyValidation[];
+  scopes: RubyScope[];
+  callbacks: RubyCallback[];
+  attributes: RubyAttr[];
+}
+interface RubyFileEntry {
+  file: string;
+  classes: RubyClass[];
+}
+
+type ModelStatus = "MATCH" | "MISSING" | "DIFF";
+
+interface ModelResult {
+  rubyFile: string;
+  tsFile: string | null;
+  status: ModelStatus;
+  assocMatched: number;
+  assocTotal: number;
+  valsMatched: number;
+  valsTotal: number;
+  scopesMatched: number;
+  scopesTotal: number;
+  notes: string[];
+}
+
+function loadRubyModelsManifest(): RubyFileEntry[] {
+  const out = execFileSync("ruby", [RUBY_EXTRACTOR], { encoding: "utf8" });
+  return JSON.parse(out) as RubyFileEntry[];
+}
+
+// Infer TS filename from Ruby file path. `test/models/post.rb` → `post.ts`;
+// `test/models/admin/account.rb` → `admin/account.ts` (preserving subdir).
+export function tsModelPath(rubyFile: string): string {
+  const rel = rubyFile.replace(/^test\/models\//, "").replace(/\.rb$/, ".ts");
+  return path.join(MODELS_TS_DIR, rel.replace(/_/g, "-"));
+}
+
+export function compareModelClass(
+  ruby: RubyClass,
+  tsContent: string,
+  rubyFile: string,
+  tsFile: string,
+): ModelResult {
+  const r: ModelResult = {
+    rubyFile,
+    tsFile,
+    status: "MATCH",
+    assocMatched: 0,
+    assocTotal: ruby.associations.length,
+    valsMatched: 0,
+    valsTotal: ruby.validations.length,
+    scopesMatched: 0,
+    scopesTotal: ruby.scopes.length,
+    notes: [],
+  };
+  // Check associations by (kind, name) set equality. Options diff deferred to later PRs.
+  for (const a of ruby.associations) {
+    const pattern = new RegExp(
+      `this\\.${a.kind.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}\\s*\\(\\s*["']${a.name}["']`,
+      "i",
+    );
+    if (pattern.test(tsContent)) r.assocMatched++;
+    else r.notes.push(`assoc-missing: ${a.kind} :${a.name}`);
+  }
+  for (const v of ruby.validations) {
+    const attr = v.attributes[0];
+    // Check both the named shorthand helper (if implemented) and the generic validates().
+    const tsMethod = VALIDATION_KIND_TO_TS[v.kind] ?? "validates";
+    const vpat = attr ? new RegExp(`this\\.${tsMethod}\\s*\\(\\s*["']${attr}["']`, "i") : null;
+    const genericPat =
+      attr && tsMethod !== "validates"
+        ? new RegExp(`this\\.validates\\s*\\(\\s*["']${attr}["']`, "i")
+        : null;
+    if (vpat && (vpat.test(tsContent) || genericPat?.test(tsContent))) r.valsMatched++;
+    else r.notes.push(`val-missing: ${v.kind} ${v.attributes.join(",")}`);
+  }
+  for (const s of ruby.scopes) {
+    const spat = new RegExp(`this\\.scope\\s*\\(\\s*["']${s.name}["']`, "i");
+    if (spat.test(tsContent)) r.scopesMatched++;
+    else r.notes.push(`scope-missing: ${s.name}`);
+  }
+  const anyDiff =
+    r.assocMatched < r.assocTotal || r.valsMatched < r.valsTotal || r.scopesMatched < r.scopesTotal;
+  r.status = anyDiff ? "DIFF" : "MATCH";
+  return r;
+}
+
+function formatModelLine(r: ModelResult): string {
+  const ruby = path.basename(r.rubyFile).padEnd(36);
+  const ts = (r.tsFile ? path.relative(MODELS_TS_DIR, r.tsFile) : "(missing)").padEnd(32);
+  if (r.status === "MISSING") {
+    return `${ruby}${ts}${r.status}`;
+  }
+  const pct =
+    r.assocTotal + r.valsTotal + r.scopesTotal === 0
+      ? "100%"
+      : `${Math.round(((r.assocMatched + r.valsMatched + r.scopesMatched) / (r.assocTotal + r.valsTotal + r.scopesTotal)) * 100)}%`;
+  return (
+    ruby +
+    ts +
+    `assoc: ${r.assocMatched}/${r.assocTotal}  `.padEnd(14) +
+    `vals: ${r.valsMatched}/${r.valsTotal}  `.padEnd(12) +
+    `scopes: ${r.scopesMatched}/${r.scopesTotal}  `.padEnd(12) +
+    pct.padEnd(6) +
+    r.status
+  );
+}
+
+function runModelsPass(filter: string | null): void {
+  console.log("\n=== models:compare ===");
+  let manifest: RubyFileEntry[];
+  try {
+    manifest = loadRubyModelsManifest();
+  } catch (e) {
+    const err = e as Error & { stderr?: Buffer };
+    const detail = err.stderr?.toString().trim() || err.message;
+    console.error("models:compare: failed to run Ruby extractor:", detail);
+    process.exit(1);
+  }
+
+  const entries = filter ? manifest.filter((e) => e.file.includes(filter)) : manifest;
+
+  const results: ModelResult[] = [];
+  for (const entry of entries) {
+    const tsPath = tsModelPath(entry.file);
+    const tsExists = existsSync(tsPath);
+    const tsContent = tsExists ? readFileSync(tsPath, "utf8") : null;
+    // One result per primary class (first AR::Base descendant or first class).
+    const primaryClass =
+      entry.classes.find((c) => c.parent === "ActiveRecord::Base") ?? entry.classes[0];
+    if (!primaryClass) continue;
+
+    if (!tsExists) {
+      results.push({
+        rubyFile: entry.file,
+        tsFile: null,
+        status: "MISSING",
+        assocMatched: 0,
+        assocTotal: primaryClass.associations.length,
+        valsMatched: 0,
+        valsTotal: primaryClass.validations.length,
+        scopesMatched: 0,
+        scopesTotal: primaryClass.scopes.length,
+        notes: [],
+      });
+      continue;
+    }
+
+    const r = compareModelClass(primaryClass, tsContent!, entry.file, tsPath);
+    results.push(r);
+  }
+
+  for (const r of results) {
+    console.log(formatModelLine(r));
+    if (process.env.FIXTURES_COMPARE_VERBOSE === "1") {
+      for (const n of r.notes) console.log(`    ${n}`);
+    }
+  }
+
+  const missing = results.filter((r) => r.status === "MISSING").length;
+  const matched = results.filter((r) => r.status === "MATCH").length;
+  const diff = results.filter((r) => r.status === "DIFF").length;
+  console.log(`\n${results.length} files — match=${matched} diff=${diff} missing=${missing}`);
+  console.log("(MISSING/DIFF soft until final models-port PR flips to hard-fail)");
 }
 
 // Run as a script when invoked directly, but stay importable from tests.
