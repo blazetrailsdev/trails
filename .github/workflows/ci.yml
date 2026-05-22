@@ -5,10 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    # Per-adapter parity labels opt in specific suites without a new commit:
+    # Labels opt in specific suites without needing a new commit:
     #   run-parity-sqlite   — schema + query parity (SQLite fixtures)
     #   run-parity-postgres — Postgres-specific parity (future)
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
+    #   website             — force the Website build on a PR that doesn't
+    #                         touch packages/website/
+    #   release             — implies `website` (release PRs need the site
+    #                         built); reserve other release-only suites here
     types: [opened, synchronize, reopened, labeled]
   schedule:
     # Weekly post-merge sweep so slow regressions can't hide between
@@ -39,9 +43,14 @@ jobs:
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
       actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
       actionview_affected: ${{ steps.filter.outputs.actionview_affected }}
+      rack_affected: ${{ steps.filter.outputs.rack_affected }}
       trailties_affected: ${{ steps.filter.outputs.trailties_affected }}
       trails_tsc_affected: ${{ steps.filter.outputs.trails_tsc_affected }}
       tse_compiler_affected: ${{ steps.filter.outputs.tse_compiler_affected }}
+      unit_tests_affected: ${{ steps.filter.outputs.unit_tests_affected }}
+      guides_affected: ${{ steps.filter.outputs.guides_affected }}
+      website_affected: ${{ steps.filter.outputs.website_affected }}
+      website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
       parity_mysql: ${{ steps.filter.outputs.parity_mysql }}
@@ -103,14 +112,42 @@ jobs:
           # no workspace dependencies today (no activesupport import), so
           # the gate matches the package path only.
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
+          # rack_affected gates rack-tests (split out of unit-tests so a
+          # rack-only PR doesn't drag in arel/activemodel/activesupport
+          # tests). Rack's only workspace dependency is activesupport.
+          RACK_PKGS_RE='^packages/(rack|activesupport)/'
+          # unit_tests_affected gates the bundled vitest run for the small
+          # leaf packages (arel/activemodel/activesupport) and the
+          # scripts/guides-typecheck self-test. Rack is excluded here — it
+          # has its own job above.
+          UNIT_TESTS_PKGS_RE='^packages/(arel|activemodel|activesupport)/'
+          # guides_affected gates the Guides Code Type Check job, which
+          # compiles fenced TS blocks in packages/website/docs/guides/**.
+          # Today guides only import @blazetrails/activerecord,
+          # @blazetrails/activemodel, and @blazetrails/activesupport — plus
+          # AR's transitive type deps. Confirmed via:
+          #   grep -rhE "from ['\"]@blazetrails/[a-z-]+" packages/website/docs/guides
+          GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/)'
+          # website_affected gates the Website build (SvelteKit + typedoc +
+          # VitePress). Scoped narrowly to packages/website/ — package-source
+          # changes alone don't trigger it. To run the site build on a PR
+          # that touches package sources, apply the `website` label (or the
+          # `release` label, which always runs it). The job is also
+          # exercised post-merge by push-to-main.
+          WEBSITE_PKGS_RE='^packages/website/'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
             echo "actionview_affected=true"   >> "$GITHUB_OUTPUT"
+            echo "rack_affected=true"         >> "$GITHUB_OUTPUT"
             echo "trailties_affected=true"    >> "$GITHUB_OUTPUT"
             echo "trails_tsc_affected=true"   >> "$GITHUB_OUTPUT"
             echo "tse_compiler_affected=true" >> "$GITHUB_OUTPUT"
+            echo "unit_tests_affected=true"   >> "$GITHUB_OUTPUT"
+            echo "guides_affected=true"       >> "$GITHUB_OUTPUT"
+            echo "website_affected=true"      >> "$GITHUB_OUTPUT"
           }
+
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             force_all_affected
@@ -149,9 +186,13 @@ jobs:
                   echo "activerecord_affected=false" >> "$GITHUB_OUTPUT"
                   echo "actionpack_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "actionview_affected=false"   >> "$GITHUB_OUTPUT"
+                  echo "rack_affected=false"         >> "$GITHUB_OUTPUT"
                   echo "trailties_affected=false"    >> "$GITHUB_OUTPUT"
                   echo "trails_tsc_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "tse_compiler_affected=false" >> "$GITHUB_OUTPUT"
+                  echo "unit_tests_affected=false"   >> "$GITHUB_OUTPUT"
+                  echo "guides_affected=false"       >> "$GITHUB_OUTPUT"
+                  echo "website_affected=false"      >> "$GITHUB_OUTPUT"
                 else
                   set_gate() {
                     local name="$1" re="$2"
@@ -164,13 +205,33 @@ jobs:
                   set_gate activerecord_affected "$AR_PKGS_RE"
                   set_gate actionpack_affected   "$AP_PKGS_RE"
                   set_gate actionview_affected   "$AV_PKGS_RE"
+                  set_gate rack_affected         "$RACK_PKGS_RE"
                   set_gate trailties_affected    "$TRAILTIES_PKGS_RE"
                   set_gate trails_tsc_affected   "$TRAILS_TSC_PKGS_RE"
                   set_gate tse_compiler_affected "$TSE_COMPILER_PKGS_RE"
+                  set_gate unit_tests_affected   "$UNIT_TESTS_PKGS_RE"
+                  set_gate guides_affected       "$GUIDES_PKGS_RE"
+                  set_gate website_affected      "$WEBSITE_PKGS_RE"
                 fi
                 ;;
             esac
           fi
+          # Website label opt-in. The Website job otherwise gates only on
+          # packages/website/ paths, so PRs that need a site preview (or
+          # release PRs that must build the production site) can apply the
+          # `website` or `release` label to force the job on.
+          case "${{ github.event_name }}" in
+            pull_request)
+              if echo "$PR_LABELS" | jq -e 'any(.[]; .name == "website" or .name == "release")' >/dev/null; then
+                echo "website_label=true"  >> "$GITHUB_OUTPUT"
+              else
+                echo "website_label=false" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            *)
+              echo "website_label=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
           # Per-adapter parity gates. Each suite is expensive (~15-20 CI
           # minutes across 7 jobs), so plain PRs skip all parity. Run on:
           #   - push to main / schedule / workflow_dispatch → all adapters
@@ -232,18 +293,26 @@ jobs:
   prettier:
     name: Prettier
     needs: changes
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    # Prettier doesn't need the workspace installed. Skip `pnpm install`
+    # entirely and run prettier directly via `npx`. The version below MUST
+    # equal the exact pin in root `package.json` devDependencies; the
+    # `prettier` entry there is intentionally pinned (no `^`) so CI and
+    # local `pnpm format` can never drift.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes prettier@3.8.1 --check .
 
   guides-typecheck:
     name: Guides Code Type Check
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.guides_affected == 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
@@ -256,7 +325,12 @@ jobs:
   dx-type-tests:
     name: DX Type Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    # vitest.dx-tests.config.ts only declares activerecord and trailties
+    # projects, so skip when neither is affected.
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.activerecord_affected == 'true' ||
+       needs.changes.outputs.trailties_affected == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
@@ -289,7 +363,9 @@ jobs:
   unit-tests:
     name: Unit Tests
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.unit_tests_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -307,8 +383,21 @@ jobs:
           packages/arel
           packages/activemodel
           packages/activesupport
-          packages/rack
           scripts/guides-typecheck
+
+  rack-tests:
+    name: Rack Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.rack_affected == 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run packages/rack
 
   actionpack-tests:
     name: Action Pack Tests
@@ -470,7 +559,10 @@ jobs:
   website:
     name: Website
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.website_affected == 'true' ||
+       needs.changes.outputs.website_label == 'true')
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
@@ -806,6 +898,7 @@ jobs:
       - dx-type-tests
       - virtualized-dx-type-tests
       - unit-tests
+      - rack-tests
       - actionpack-tests
       - actionview-tests
       - trailties-tests
@@ -833,9 +926,14 @@ jobs:
           AR_AFFECTED: ${{ needs.changes.outputs.activerecord_affected }}
           AP_AFFECTED: ${{ needs.changes.outputs.actionpack_affected }}
           AV_AFFECTED: ${{ needs.changes.outputs.actionview_affected }}
+          RACK_AFFECTED: ${{ needs.changes.outputs.rack_affected }}
           TRAILTIES_AFFECTED: ${{ needs.changes.outputs.trailties_affected }}
           TRAILS_TSC_AFFECTED: ${{ needs.changes.outputs.trails_tsc_affected }}
           TSE_COMPILER_AFFECTED: ${{ needs.changes.outputs.tse_compiler_affected }}
+          UNIT_TESTS_AFFECTED: ${{ needs.changes.outputs.unit_tests_affected }}
+          GUIDES_AFFECTED: ${{ needs.changes.outputs.guides_affected }}
+          WEBSITE_AFFECTED: ${{ needs.changes.outputs.website_affected }}
+          WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
@@ -876,11 +974,33 @@ jobs:
                 actionview-tests)
                   [ "$AV_AFFECTED" = "false" ] && continue
                   ;;
+                rack-tests)
+                  [ "$RACK_AFFECTED" = "false" ] && continue
+                  ;;
                 trailties-tests)
                   [ "$TRAILTIES_AFFECTED" = "false" ] && continue
                   ;;
                 tse-compiler-tests)
                   [ "$TSE_COMPILER_AFFECTED" = "false" ] && continue
+                  ;;
+                unit-tests)
+                  [ "$UNIT_TESTS_AFFECTED" = "false" ] && continue
+                  ;;
+                guides-typecheck)
+                  [ "$GUIDES_AFFECTED" = "false" ] && continue
+                  ;;
+                website)
+                  # Legitimate skip when website_affected is false AND no
+                  # website/release label opted the job in.
+                  if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
+                    continue
+                  fi
+                  ;;
+                dx-type-tests)
+                  # Legitimate skip when neither activerecord nor trailties paths changed.
+                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                    continue
+                  fi
                   ;;
                 virtualized-dx-type-tests)
                   # Legitimate skip when neither activerecord nor trails-tsc paths changed.
@@ -894,7 +1014,7 @@ jobs:
                   [ "$any_parity" = "false" ] && continue
                   ;;
               esac
-              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
+              echo "Unexpectedly skipped job: $job (docs_only=$DOCS_ONLY ar_affected=$AR_AFFECTED ap_affected=$AP_AFFECTED av_affected=$AV_AFFECTED rack_affected=$RACK_AFFECTED trailties_affected=$TRAILTIES_AFFECTED trails_tsc_affected=$TRAILS_TSC_AFFECTED tse_compiler_affected=$TSE_COMPILER_AFFECTED unit_tests_affected=$UNIT_TESTS_AFFECTED guides_affected=$GUIDES_AFFECTED website_affected=$WEBSITE_AFFECTED website_label=$WEBSITE_LABEL parity_sqlite=$PARITY_SQLITE parity_postgres=$PARITY_POSTGRES parity_mysql=$PARITY_MYSQL)"
               unexpected=1
             done < <(echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
           fi
