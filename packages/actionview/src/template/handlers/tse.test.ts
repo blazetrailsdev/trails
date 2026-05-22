@@ -123,13 +123,16 @@ describe("Template::Handlers::Tse", () => {
 
   describe("translateLocation", () => {
     it("anchors a compiled spot to the source-line column (Rails parity)", () => {
+      // Snippet matches what @blazetrails/tse-compiler actually emits for
+      // `<%= name %>` (see emit-js.ts + parser.ts trim) so the test exercises
+      // the real anchoring path, not a fabricated one.
       const source = "<h1>hi</h1>\n<%= name %>\n";
       const spot = {
-        snippet: "_ob.append( name );",
+        snippet: "_ob.append(name);",
         firstLineno: 2,
         lastLineno: 2,
-        firstColumn: 12,
-        lastColumn: 16,
+        firstColumn: 11,
+        lastColumn: 15,
       };
       const out = new Tse().translateLocation(spot, { lineno: 2 }, source);
       expect(out).not.toBeNull();

@@ -62,7 +62,7 @@ export function sourceLines(source: string): string[] {
   return source.split(/(?<=\n)/);
 }
 
-const LINE_TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(?:-)?(==|=|#)?([\s\S]*?)(?:-)?%>/g;
+const LINE_TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(-)?(==|=|#)?([\s\S]*?)(-)?%>/g;
 
 /** `ERB::Util.tokenize` parity for a single source line. Token kinds emitted:
  *
@@ -92,17 +92,33 @@ export function tokenizeLine(line: string): SourceToken[] {
     last = m.index! + m[0].length;
     if (m[0] === "<%%") {
       textBuf += "<%";
-    } else if (m[0] === "%%>") {
+      continue;
+    }
+    if (m[0] === "%%>") {
       textBuf += "%>";
-    } else if (m[1] !== undefined) {
+      continue;
+    }
+    // `<%- ... %>`: strip preceding `[ \t]*` from the TEXT buffer, matching
+    // the lexer in @blazetrails/tse-compiler/src/lexer.ts.
+    if (m[2] === "-") textBuf = textBuf.replace(/[ \t]*$/, "");
+    // `<% ... -%>`: the lexer's full semantics also consume a following
+    // `\r?\n`, but `translate_location` only sees one source line at a time,
+    // so the cross-line case isn't reachable here.
+    if (m[1] !== undefined) {
       // `<%! ... !%>` typesMagic — compiler drops it, so do we.
       flushText();
-    } else if (m[2] === "#") {
+    } else if (m[3] === "#") {
       // `<%# ... %>` comment — compiler drops it, so do we.
       flushText();
     } else {
       flushText();
-      tokens.push({ kind: "CODE", value: m[3] });
+      // Trim CODE contents to match what `@blazetrails/tse-compiler`'s parser
+      // emits (`tok.value.trim()` in parser.ts) — `<%= name %>` becomes the
+      // emitted JS `_ob.append(name);`, so the anchor string is `"name"`,
+      // not `" name "`. This is a TSE-specific divergence from Ruby's
+      // `ERB::Util.tokenize`, which preserves whitespace; Erubi keeps it on
+      // both sides, so Rails' anchoring lines up without trimming.
+      tokens.push({ kind: "CODE", value: m[4].trim() });
     }
   }
   textBuf += line.slice(last);

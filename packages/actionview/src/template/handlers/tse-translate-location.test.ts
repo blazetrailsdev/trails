@@ -16,16 +16,24 @@ describe("sourceLines", () => {
 });
 
 describe("tokenizeLine", () => {
-  it("yields CODE for tag contents and TEXT for static spans", () => {
+  it("yields CODE for tag contents (trimmed, matching the compiler) and TEXT for static spans", () => {
     expect(tokenizeLine("hi <%= name %>!")).toEqual([
       { kind: "TEXT", value: "hi " },
-      { kind: "CODE", value: " name " },
+      { kind: "CODE", value: "name" },
       { kind: "TEXT", value: "!" },
     ]);
   });
 
   it("strips the trim `-` markers from CODE bounds", () => {
-    expect(tokenizeLine("<%- x -%>")).toEqual([{ kind: "CODE", value: " x " }]);
+    expect(tokenizeLine("<%- x -%>")).toEqual([{ kind: "CODE", value: "x" }]);
+  });
+
+  it("strips trailing `[ \\t]*` from preceding TEXT when a `<%-` tag opens", () => {
+    expect(tokenizeLine("hi   \t<%- x %> after")).toEqual([
+      { kind: "TEXT", value: "hi" },
+      { kind: "CODE", value: "x" },
+      { kind: "TEXT", value: " after" },
+    ]);
   });
 
   it("returns an empty token list for a line with no tags and no text", () => {
@@ -36,7 +44,7 @@ describe("tokenizeLine", () => {
     expect(tokenizeLine("a <%# note %> <%= x %>")).toEqual([
       { kind: "TEXT", value: "a " },
       { kind: "TEXT", value: " " },
-      { kind: "CODE", value: " x " },
+      { kind: "CODE", value: "x" },
     ]);
   });
 
@@ -44,7 +52,7 @@ describe("tokenizeLine", () => {
     expect(tokenizeLine("pre <%! types: T !%> <%= x %>")).toEqual([
       { kind: "TEXT", value: "pre " },
       { kind: "TEXT", value: " " },
-      { kind: "CODE", value: " x " },
+      { kind: "CODE", value: "x" },
     ]);
   });
 
@@ -52,7 +60,7 @@ describe("tokenizeLine", () => {
     expect(tokenizeLine("a <%% b %%> c")).toEqual([{ kind: "TEXT", value: "a <% b %> c" }]);
     expect(tokenizeLine("<%% <%= x %> %%>")).toEqual([
       { kind: "TEXT", value: "<% " },
-      { kind: "CODE", value: " x " },
+      { kind: "CODE", value: "x" },
       { kind: "TEXT", value: " %>" },
     ]);
   });
@@ -60,15 +68,14 @@ describe("tokenizeLine", () => {
 
 describe("findOffset", () => {
   it("returns the source-line column for a CODE token matched in compiled output", () => {
-    // Rails' offset_source_tokens accumulates byte lengths of CODE/TEXT
-    // contents only — so the returned column is relative to the concatenated
-    // visible token content, not to the original source line (delimiters like
-    // `<%=` / `%>` are excluded from the accounting). Here the single CODE
-    // token has value " name "; column 1 points at the 'n'.
+    // The compiler trims tag bodies (parser.ts), so `<%= name %>` emits
+    // `_ob.append(name);` and the CODE anchor string is `"name"`. The
+    // returned column is relative to the concatenated source-token content
+    // (delimiters excluded from the accounting), so column 0 = 'n'.
     const tokens = tokenizeLine("<%= name %>");
-    const compiled = "_ob.append( name );";
+    const compiled = "_ob.append(name);";
     const errorColumn = compiled.indexOf("name");
-    expect(findOffset(compiled, tokens, errorColumn)).toBe(1);
+    expect(findOffset(compiled, tokens, errorColumn)).toBe(0);
   });
 
   it("throws LocationParsingError when no anchor is found", () => {
@@ -82,10 +89,10 @@ describe("translateLocation", () => {
   it("mutates and returns the spot on success", () => {
     const source = "line1\n<%= value %>\n";
     const spot = {
-      snippet: "_ob.append( value );",
+      snippet: "_ob.append(value);",
       firstLineno: 2,
       lastLineno: 2,
-      firstColumn: 12,
+      firstColumn: 11,
       lastColumn: 16,
     };
     const out = translateLocation(spot, { lineno: 2 }, source);
