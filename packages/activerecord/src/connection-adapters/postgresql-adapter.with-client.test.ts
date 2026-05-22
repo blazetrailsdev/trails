@@ -1,26 +1,25 @@
 /**
- * PostgreSQLAdapter#withClient — pinned-TX concurrency.
+ * PostgreSQLAdapter#withClient — single persistent connection.
  *
- * Reproduces the race that fanned a single logical TX across multiple
- * pg.PoolClient sockets under `Promise.all` writes. The prior shape
- * snapshotted `txClient = this._client` and then `await this.getClient()`;
- * a concurrent caller could yield while `_client` was null mid-begin and
- * checkout a fresh pool client, producing PG `08P01` / `25P02` in live
- * traffic. The fix: read `_client` synchronously and dispatch without
- * yielding — under a pinned TX every caller reuses the TX-pinned client.
+ * After the dual-pool collapse the adapter owns one pg.Client for its
+ * lifetime. Every withClient caller — inside or outside a transaction,
+ * sequential or under Promise.all — uses the same connection; pg.Client
+ * serializes concurrent query() calls on its socket, so a logical TX
+ * can no longer fan across multiple sockets (root cause of #2253).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 interface PrivatePgAdapter {
+  _rawConnection: unknown;
   _client: unknown;
   withClient: <T>(fn: (client: unknown) => Promise<T>) => Promise<T>;
-  getClient: () => Promise<unknown>;
+  _acquireFreshClient: () => Promise<unknown>;
   close: () => Promise<void>;
 }
 
-describe("PostgreSQLAdapter#withClient under pinned TX", () => {
+describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
   let adapter: PrivatePgAdapter;
 
   afterEach(async () => {
@@ -28,29 +27,20 @@ describe("PostgreSQLAdapter#withClient under pinned TX", () => {
     if (adapter) await adapter.close().catch(() => undefined);
   });
 
-  it("routes every concurrent caller to the TX-pinned client and never releases it", async () => {
+  it("routes every concurrent caller to the same persistent client", async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
 
-    let txReleaseCount = 0;
-    const txClient = {
+    const persistentClient = {
       query: async () => ({ rows: [], fields: [] }),
-      release: () => {
-        txReleaseCount++;
-      },
     };
-    // Simulate an active pinned transaction.
-    adapter._client = txClient;
-
-    // If withClient ever falls through to getClient, fail the test: under
-    // a pinned TX the synchronous _client read must short-circuit.
-    const getClientSpy = vi.spyOn(adapter, "getClient").mockImplementation(async () => {
-      throw new Error("getClient must not be called when _client is set");
-    });
+    // Pretend the lazy acquire has already opened the connection so the
+    // test exercises withClient without touching the real network.
+    adapter._rawConnection = persistentClient;
+    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
 
     const seen: unknown[] = [];
     const work = Array.from({ length: 11 }, (_, i) =>
       adapter.withClient(async (client) => {
-        // Yield once to interleave with siblings.
         await Promise.resolve();
         seen.push(client);
         return i;
@@ -60,30 +50,65 @@ describe("PostgreSQLAdapter#withClient under pinned TX", () => {
 
     expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(seen).toHaveLength(11);
-    for (const c of seen) expect(c).toBe(txClient);
-    expect(txReleaseCount).toBe(0);
-    expect(getClientSpy).not.toHaveBeenCalled();
+    for (const c of seen) expect(c).toBe(persistentClient);
   });
 
-  it("acquires and releases a fresh client when no TX is active", async () => {
+  it("reuses the persistent client whether or not a TX is active", async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
+    adapter._rawConnection = persistentClient;
+    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
+
+    // No TX active.
     adapter._client = null;
+    let observed = await adapter.withClient(async (client) => client);
+    expect(observed).toBe(persistentClient);
 
-    let releaseCount = 0;
-    const freshClient = {
-      query: async () => ({ rows: [], fields: [] }),
-      release: () => {
-        releaseCount++;
-      },
-    };
-    vi.spyOn(adapter, "getClient").mockResolvedValue(freshClient);
+    // TX active — _client points at the same persistent client.
+    adapter._client = persistentClient;
+    observed = await adapter.withClient(async (client) => client);
+    expect(observed).toBe(persistentClient);
+  });
 
-    const result = await adapter.withClient(async (client) => {
-      expect(client).toBe(freshClient);
-      return "ok";
+  it("serializes the initial connect so concurrent callers share one pg.Client", async () => {
+    // Repro for the race Copilot flagged: two concurrent _acquireFreshClient
+    // callers can both see _rawConnection == null and each open a pg.Client.
+    // The shared `_acquiring` promise must converge them on a single open.
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    let openCount = 0;
+    let resolveConnect: (() => void) | null = null;
+    const connectGate = new Promise<void>((r) => {
+      resolveConnect = r;
     });
+    const fakeClient = {
+      query: async () => ({ rows: [], fields: [] }),
+      connect: async () => {
+        openCount++;
+        await connectGate;
+      },
+      end: async () => {},
+      on: () => fakeClient,
+    };
+    // Stub pg.Client so each `new pg.Client()` returns our fake and
+    // we count how many times connect() runs. Cast through `unknown` —
+    // vi.spyOn doesn't infer constructor signatures, and we want a
+    // plain factory here, not a class.
+    const pgModule = (await import("pg")).default;
+    vi.spyOn(pgModule, "Client" as never).mockImplementation((() => fakeClient) as never);
+    // Bypass _maybeConfigureConnection's SET queries.
+    vi.spyOn(
+      adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
+      "_maybeConfigureConnection",
+    ).mockResolvedValue(undefined);
 
-    expect(result).toBe("ok");
-    expect(releaseCount).toBe(1);
+    const calls = Array.from({ length: 5 }, () => adapter._acquireFreshClient());
+    // Release the gate after all 5 callers are queued behind _acquiring.
+    await Promise.resolve();
+    resolveConnect!();
+    const clients = await Promise.all(calls);
+
+    expect(openCount).toBe(1);
+    for (const c of clients) expect(c).toBe(fakeClient);
   });
 });

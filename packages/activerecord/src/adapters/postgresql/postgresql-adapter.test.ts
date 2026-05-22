@@ -719,33 +719,32 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reconnection_error", async () => {
       // Mirrors Rails: test_reconnection_error — adapter raises ConnectionNotEstablished
-      // when the underlying pool returns an error instead of a connection.
-      const fakePool = {
+      // when the underlying connect() returns an error. After the Phase D-X collapse
+      // there is no inner pg.Pool to inject; instead stub pg.Client.connect to reject.
+      const pgModule = (await import("pg")).default;
+      const fakeClient = {
         connect: () =>
           Promise.reject(Object.assign(new Error("connection lost"), { code: "57P01" })),
         end: () => Promise.resolve(),
-        on: () => {},
-        totalCount: 0,
-        idleCount: 0,
-        waitingCount: 0,
+        on: () => fakeClient,
+        query: () => Promise.reject(new Error("not connected")),
       };
+      const clientSpy = vi
+        .spyOn(pgModule, "Client" as never)
+        .mockImplementation((() => fakeClient) as never);
       const a = new PostgreSQLAdapter(PG_TEST_URL);
-      // Save original pool so it can be closed after injection — the constructor
-      // creates a real pg.Pool immediately and close() would call end() on the fake.
-      const originalPool = (a as any)._driverPool as pg.Pool | null;
-      (a as any)._driverPool = fakePool;
       try {
         await expect(a.execute("SELECT 1")).rejects.toThrow(ConnectionNotEstablished);
       } finally {
-        await originalPool?.end().catch(() => {});
+        clientSpy.mockRestore();
+        await a.close().catch(() => {});
       }
     });
 
     it.skip("reconnect after bad connection on check version", async () => {
       // BLOCKED: Rails stubs raw_connection.server_version=0 on the PG::Connection to
-      // simulate a bad version check during reconnect!. Our adapter uses a pg.Pool
-      // (accessible via _driverPoolForTest()) rather than a single PG::Connection, so
-      // there is no equivalent low-level server_version stub point.
+      // simulate a bad version check during reconnect!. Our adapter wraps pg.Client
+      // and exposes no equivalent low-level server_version stub point.
     });
 
     it("primary key works tables containing capital letters", async () => {

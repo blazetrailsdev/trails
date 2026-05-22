@@ -2241,10 +2241,12 @@ describe("MigrationTest", () => {
 
   it.skipIf(adapterType !== "postgres")("with advisory lock closes connection", async () => {
     // PG-specific: mirrors Rails test_with_advisory_lock_closes_connection.
-    // Rails queries pg_stat_activity for lingering lock queries; in JS we check:
-    //   (1) acquire/release are called symmetrically, and
-    //   (2) _advisoryLockClient is null after migration — the pinned pool client
-    //       was actually returned (not just nulled without release).
+    // Rails queries pg_stat_activity for lingering lock queries; in JS we
+    // check that acquire/release are called symmetrically with the same
+    // lock id. After the Phase D-X collapse the advisory lock lives on
+    // the adapter's single persistent pg.Client (no separate pinned
+    // pool client), so releaseAdvisoryLock firing pg_advisory_unlock on
+    // the same session is the closure proof.
     const { adapter: realAdapter } = createSidecarTestAdapter();
     const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
     const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
@@ -2258,10 +2260,6 @@ describe("MigrationTest", () => {
       await migrator.migrate();
       expect(getSpy).toHaveBeenCalledTimes(1);
       expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
-      // The pinned advisory-lock client must be released back to the pool.
-      // A null _advisoryLockClient after migration means the pool client was
-      // not leaked — the connection was closed as Rails expects.
-      expect((realAdapter as any)._advisoryLockClient).toBeNull();
       expect(await migrator.getAllVersions()).toContain("200");
     } finally {
       getSpy.mockRestore();

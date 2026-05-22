@@ -154,13 +154,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   override get active(): boolean {
-    return this._driverPool != null;
+    return !this._closed && this._pgClientOptions != null;
   }
 
   // Mirrors Rails' PostgreSQLAdapter#connected? — checks that the raw
-  // connection (pool in our case) exists and hasn't been finished.
+  // connection has been opened and not torn down.
   override isConnected(): boolean {
-    return this._driverPool != null;
+    return this._rawConnection != null;
   }
 
   // Mirrors: PostgreSQLAdapter::NATIVE_DATABASE_TYPES (postgresql_adapter.rb:134)
@@ -231,9 +231,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   static decodeDates = true;
 
   private static _spCounter = 0;
-  private _driverPool: pg.Pool | null;
-  private _pgPoolOptions: pg.PoolConfig | null = null;
-  private _client: pg.PoolClient | null = null;
+  // Mirrors Rails' `@raw_connection` on PostgreSQLAdapter — one persistent
+  // pg.Client owned by the adapter for its lifetime. The trails outer
+  // ConnectionPool is the only pooling layer; concurrent callers under a
+  // pinned context all share this single client and queue on its socket.
+  private _rawConnection: pg.Client | null = null;
+  private _pgClientOptions: pg.ClientConfig | null = null;
+  // Non-null when a transaction is open on _rawConnection. Always equals
+  // _rawConnection while set — kept as a field for legibility of the
+  // "in TX?" check at call sites that mirror the prior shape.
+  private _client: pg.Client | null = null;
   private _inTransaction = false;
   private _databaseVersion: number | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
@@ -243,41 +250,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _warnedOids = new Set<number>();
   private _caseInsensitiveCache: Map<string, boolean> = new Map([["citext", false]]);
   private _sessionVariables: Record<string, string | number | boolean | null | "default"> = {};
-  private _configuredClients = new WeakSet<pg.PoolClient>();
-  // Per-pg.Client statement pool. PG's prepared statements are
-  // session-scoped, so each physical client gets its own pool with
-  // its own counter (matching Rails' `PostgreSQL::StatementPool`).
-  // The WeakMap lets pg.Pool reap clients without us leaking entries.
-  private _statementPools = new WeakMap<pg.PoolClient, StatementPool>();
-  // The most recently released txn client. Held via WeakRef so that
-  // pg.Pool reaping an idle client can still GC it — strong-holding
-  // would defeat the WeakMap design above. Used by `clearCacheBang`
-  // to reach the released client's StatementPool when the
-  // TransactionManager's `after_failure_actions` hook fires AFTER
-  // `rollback()` has nulled `_client`. Lifecycle: set on every
-  // `rollback()` (overwriting the previous WeakRef); cleared inside
-  // `clearCacheBang` after `reset()` runs. NOT cleared on
-  // `beginTransaction` — after-rollback callbacks can open a new
-  // transaction before `after_failure_actions` reaches the hook, and
-  // nulling the ref there would lose the pointer to the failed client.
-  private _lastReleasedTxnClientRef: WeakRef<pg.PoolClient> | null = null;
-
-  private get _lastReleasedTxnClient(): pg.PoolClient | null {
-    return this._lastReleasedTxnClientRef?.deref() ?? null;
-  }
-  private set _lastReleasedTxnClient(client: pg.PoolClient | null) {
-    this._lastReleasedTxnClientRef = client == null ? null : new WeakRef(client);
-  }
-  // Clients tagged for `DEALLOCATE ALL` on the next fresh checkout.
-  // Set by the released-client `reset()` branch of `clearCacheBang` —
-  // that path drops the local sql→name map but can't fire DEALLOCATE
-  // on a released session, so server-side PREPAREs leak. When pg.Pool
-  // hands the same physical client back later, `_acquireFreshClient`
-  // checks this set and runs `DEALLOCATE ALL` before user code, so
-  // any fresh checkout path (e.g. `getClient`, `getAdvisoryLock`,
-  // `beginTransaction`) drains those orphans. WeakSet so pg.Pool
-  // reaping the client GCs the entry.
-  private _clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+  // Whether _maybeConfigureConnection has run for the current _rawConnection.
+  // Reset on reconnect.
+  private _connectionConfigured = false;
+  // The single StatementPool attached to _rawConnection. PG prepared
+  // statements are session-scoped; lifetime tracks _rawConnection.
+  private _statementPool: StatementPool | null = null;
+  // True when the next checkout should run DEALLOCATE ALL to drain
+  // orphaned server-side prepared statements (set by clearCacheBang's
+  // reset branch after a rollback).
+  private _needsDeallocateAll = false;
+  // True after disconnectBang/discardBang/close until the next reconnect.
+  // Backs the `active` getter so a torn-down adapter reports inactive
+  // even before the next lazy acquire would notice the missing connection.
+  private _closed = false;
+  // In-flight connect/configure promise. Concurrent _acquireFreshClient
+  // callers converge on this so we never open two pg.Clients in
+  // parallel — mirrors Rails' @lock.synchronize around connect (Rails
+  // postgresql_adapter.rb:349, abstract_adapter.rb:984).
+  private _acquiring: Promise<pg.Client> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -306,16 +297,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       );
     }
     this._statementLimit = value;
-    // Resize the active transaction client's pool immediately so a
-    // mid-session change is visible. Other per-client pools keep the
-    // size they were built with (Rails reads `statement_limit` once
-    // at pool construction). We can't iterate a WeakMap to retrofit
-    // them, and dropping entries would orphan their counter /
-    // sql→name mapping while server-side PREPAREd statements still
-    // exist on the reusable pg.PoolClient, risking name collisions.
-    if (this._client) {
-      this._statementPools.get(this._client)?.setMaxSize(value);
-    }
+    // Resize the single StatementPool immediately so a mid-session
+    // change is visible. Rails reads `statement_limit` once at pool
+    // construction; we mirror that for new pools and propagate setter
+    // changes to the live pool.
+    this._statementPool?.setMaxSize(value);
   }
 
   constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions)) {
@@ -326,7 +312,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
-      this._pgPoolOptions = {
+      this._pgClientOptions = {
         connectionString: config,
         types: {
           getTypeParser: (oid: number, format?: string) => {
@@ -357,8 +343,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           },
         },
       };
-      this._driverPool = new pg.Pool(this._pgPoolOptions);
-      this._driverPool.on("error", () => {});
+      // pg.Client connects lazily on the first acquisition path
+      // (_acquireFreshClient); the constructor only stores config so
+      // that adapter construction stays synchronous to match Rails.
       return;
     }
     // Rails' database.yml merges driver connection params + adapter
@@ -366,9 +353,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // `config[:statement_limit]` / `config[:prepared_statements]`
     // and hands the rest to the driver. Validate & apply the
     // adapter-level keys FIRST so an invalid value fails before
-    // `pg.Pool` is constructed — otherwise a throw here would leave
-    // a live driver pool with no cleanup path on the half-built
-    // adapter.
+    // the pg.Client is opened.
     const {
       statementLimit,
       preparedStatements,
@@ -414,7 +399,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
     )?.getTypeParser;
-    this._pgPoolOptions = {
+    this._pgClientOptions = {
       ...pgConfig,
       types: {
         getTypeParser(oid: number, format?: string): unknown {
@@ -459,25 +444,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         },
       },
     };
-    this._driverPool = new pg.Pool(this._pgPoolOptions);
-    // Suppress unhandled error events from idle pool clients (e.g. a
-    // server-side FATAL from idle_in_transaction_session_timeout or
-    // pg_terminate_backend). Without this listener Node emits an
-    // uncaughtException; with it the pool quietly removes the dead client.
-    this._driverPool.on("error", () => {});
+    // pg.Client connects lazily on first acquisition (see
+    // _acquireFreshClient). The error listener is attached after
+    // connect() so a server-side FATAL on the live connection doesn't
+    // surface as an uncaughtException.
   }
 
   /**
    * Mirrors: PostgreSQLAdapter#configure_connection. Runs once per new
-   * physical connection, tracked by WeakSet so it runs exactly once per
-   * client regardless of how many times the client is checked out from
-   * the pool. Called (and awaited) inside _acquireFreshClient so errors
-   * propagate and misconfigured clients are never handed to user code.
+   * physical connection — tracked by a boolean flag that resets on
+   * reconnect. Called (and awaited) inside _acquireFreshClient so errors
+   * propagate and misconfigured connections are never handed to user code.
+   *
+   * Note: the notice listener is NOT attached here. node-pg's
+   * client.on("notice", ...) accumulates listeners, whereas Rails uses
+   * libpq's set_notice_receiver which is a single-slot replacement.
+   * resetBang flips _connectionConfigured back to false to re-run the
+   * SET queries after DISCARD ALL; re-attaching the notice listener
+   * here would compound on every reset. The listener is attached once
+   * per pg.Client lifecycle in _doAcquire instead.
    */
-  private async _maybeConfigureConnection(client: pg.PoolClient): Promise<void> {
-    if (this._configuredClients.has(client)) return;
-    // Mark only after all queries succeed so a partial failure doesn't
-    // leave the client flagged as configured on its next checkout.
+  private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
+    if (this._connectionConfigured) return;
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
     await client.query("SET standard_conforming_strings = on");
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
@@ -492,19 +480,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         await client.query(`SET SESSION ${key} TO ${this.quoteLiteral(pgVal)}`);
       }
     }
-    this._configuredClients.add(client);
-    // Attach after successful configuration — avoids duplicate listeners if a
-    // SET query fails and the client is re-checked-out before being discarded.
-    // Mirrors Rails: postgresql_adapter.rb `unless ActiveRecord.db_warnings_action.nil?`.
-    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction !== "ignore") {
-      client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
-        this._noticeReceiverSqlWarnings.push({
-          level: msg.severity,
-          message: msg.message,
-          code: msg.code,
-        });
+    this._connectionConfigured = true;
+  }
+
+  /**
+   * Attach the per-connection notice listener that feeds
+   * `_noticeReceiverSqlWarnings`. Called once per pg.Client lifecycle
+   * from _doAcquire (matches Rails' single-slot set_notice_receiver).
+   */
+  private _attachNoticeListener(client: pg.Client): void {
+    if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction === "ignore") return;
+    client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
+      this._noticeReceiverSqlWarnings.push({
+        level: msg.severity,
+        message: msg.message,
+        code: msg.code,
       });
-    }
+    });
   }
 
   /**
@@ -869,129 +861,168 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Get the active client — either the transaction client or a fresh one from
-   * the pool. Prefer `withClient` for query paths so ownership is tracked
-   * per-acquisition and can't drift when a commit nulls `_client` between
-   * acquire and release.
+   * Return the persistent connection, opening it lazily on first call.
+   * After the dual-pool collapse there is one connection per adapter, so
+   * `getClient()` and the in-TX `_client` always reference the same
+   * `pg.Client` — every caller queues on its socket.
    */
-  private async getClient(): Promise<pg.PoolClient> {
-    if (this._client) return this._client;
+  private async getClient(): Promise<pg.Client> {
     return this._acquireFreshClient();
   }
 
   /**
-   * Acquire a fresh client from the pool and drain any orphaned
-   * server-side prepared statements left by a prior PSCE event. All
-   * direct pool checkouts MUST go through this helper so the drain
-   * guarantee holds for every code path (getClient, beginTransaction,
-   * getAdvisoryLock, etc.).
+   * Open (or return) the single persistent pg.Client. Configures the
+   * session once and drains any orphaned server-side prepared
+   * statements left by a prior PSCE event. All checkouts go through
+   * here so configure/drain guarantees hold for every code path.
    *
-   * On drain failure, the client is released with the error so node-
-   * postgres discards it, then the error propagates — callers don't
-   * have a client to release on this path.
+   * Concurrent callers that hit the slow path (uncached connect, or
+   * pre-configure window) converge on a shared `_acquiring` promise
+   * so only one pg.Client is ever opened per adapter lifecycle.
+   * Mirrors Rails' @lock.synchronize around connect.
    */
-  private async _acquireFreshClient(): Promise<pg.PoolClient> {
-    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
-    const client = await this._driverPool.connect();
+  private async _acquireFreshClient(): Promise<pg.Client> {
+    if (this._closed || this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
+    // Fast path: connection already opened and configured, no drain pending.
+    if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
+      return this._rawConnection;
+    }
+    if (!this._acquiring) {
+      this._acquiring = this._doAcquire().finally(() => {
+        this._acquiring = null;
+      });
+    }
+    return this._acquiring;
+  }
+
+  private async _doAcquire(): Promise<pg.Client> {
+    // Snapshot the connection into a local so a concurrent
+    // disconnectBang / discardBang / reconnect that nulls
+    // _rawConnection between awaits can't smuggle null into the
+    // configure/drain calls or the final return.
+    let client = this._rawConnection;
+    if (client == null) {
+      const newClient = new pg.Client(this._pgClientOptions!);
+      try {
+        await newClient.connect();
+      } catch (error) {
+        // Failed connect: ensure the partially-initialized client is
+        // closed so it doesn't leak file descriptors or pending
+        // notifications. end() on an unconnected client may itself
+        // throw — swallow that and surface the original connect error.
+        newClient.end().catch(() => {});
+        throw error;
+      }
+      // Guard against a close / disconnect / discard / reconnect
+      // that raced with the in-flight connect(). If the adapter was
+      // torn down between the await above and this point, do NOT
+      // publish `newClient` — tear it down instead so we don't leak
+      // a live socket onto a closed adapter.
+      if (this._closed || this._pgClientOptions == null || this._rawConnection != null) {
+        newClient.end().catch(() => {});
+        if (this._closed || this._pgClientOptions == null) {
+          throw new Error("PostgreSQLAdapter: connection is closed");
+        }
+        // Another caller raced ahead and already published a
+        // connection — use theirs instead of ours.
+        client = this._rawConnection!;
+      } else {
+        // Suppress unhandled error events from the idle connection
+        // (e.g. server-side FATAL from pg_terminate_backend). Without
+        // this listener node emits an uncaughtException.
+        newClient.on("error", () => {});
+        // Attach the notice listener exactly once per pg.Client. We
+        // can't do this inside _maybeConfigureConnection because
+        // resetBang resets _connectionConfigured to re-run the SET
+        // queries after DISCARD ALL; re-running configure on the same
+        // client would otherwise accumulate notice listeners on every
+        // reset (node-pg's EventEmitter, unlike libpq's
+        // set_notice_receiver, doesn't replace).
+        this._attachNoticeListener(newClient);
+        this._rawConnection = newClient;
+        client = newClient;
+      }
+    }
     try {
       await this._maybeConfigureConnection(client);
+      // Re-check teardown after every await: a concurrent reconnect
+      // can null _rawConnection while configure is in flight.
+      if (this._closed || this._rawConnection !== client) {
+        throw new Error("PostgreSQLAdapter: connection is closed");
+      }
       await this._maybeDrainOrphanedPreparedStatements(client);
+      if (this._closed || this._rawConnection !== client) {
+        throw new Error("PostgreSQLAdapter: connection is closed");
+      }
     } catch (error) {
-      client.release(toError(error));
+      // Configure/drain failure (or mid-flight teardown) leaves the
+      // connection in an unknown state — tear it down so the next
+      // caller reconnects cleanly. Only touch shared state if this
+      // local snapshot is still the published connection; otherwise
+      // a concurrent reconnect already swapped in a new one.
+      if (this._rawConnection === client) {
+        this._rawConnection = null;
+        this._connectionConfigured = false;
+        this._statementPool?.detach();
+        this._statementPool = null;
+      }
+      client.end().catch(() => {});
       throw error;
     }
     return client;
   }
 
   /**
-   * If `client` was tagged for `DEALLOCATE ALL` (by the released-client
-   * `reset()` branch in `clearCacheBang`), drain its server-side
-   * prepared statements before handing it to user code. Centralized
-   * here so EVERY checkout path benefits, by routing all direct
-   * `pool.connect()` callers through `_acquireFreshClient` (which
-   * calls this).
-   *
-   * Failure of `DEALLOCATE ALL` propagates: the caller's existing
-   * error path will release the (broken) client with the error so
-   * node-postgres discards it.
+   * If the connection was tagged for `DEALLOCATE ALL` (by the
+   * `clearCacheBang` reset branch on the prior session), drain its
+   * server-side prepared statements before handing it to user code.
    */
-  private async _maybeDrainOrphanedPreparedStatements(client: pg.PoolClient): Promise<void> {
-    if (!this._clientsNeedingDeallocateAll.has(client)) return;
-    this._clientsNeedingDeallocateAll.delete(client);
+  private async _maybeDrainOrphanedPreparedStatements(client: pg.Client): Promise<void> {
+    if (!this._needsDeallocateAll) return;
+    this._needsDeallocateAll = false;
     await client.query("DEALLOCATE ALL");
   }
 
   /**
-   * Execute `fn` with a client acquired from the adapter, then return it
-   * to the pool on exit. Mirrors Rails' `with_connection do |c| ... end` —
-   * the key property is that ownership is decided **at acquisition**
-   * (`ownedByTransaction`) and captured in a closure, so a mid-query
-   * commit that nulls `this._client` can't flip the release decision.
-   * Without this, the earlier symptom — "Release called on client which
-   * has already been released to the pool" — surfaced whenever a
-   * commit's `this._client.release()` raced with a pending finally in
-   * an instrumented query path; both ran `.release()` on the same
-   * `pg.PoolClient` reference.
+   * Execute `fn` with the persistent connection. After the dual-pool
+   * collapse there is no per-call checkout/release: every caller —
+   * inside or outside a transaction, sequential or under Promise.all —
+   * uses the single `_rawConnection`. pg.Client serializes concurrent
+   * `query()` calls on its socket, so a Promise.all of writes under a
+   * pinned trails context cannot fan across sockets the way the old
+   * pg.Pool-backed path could (the root cause of #2253).
    */
-  private async withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
-    // Decide ownership SYNCHRONOUSLY from `this._client` — no yield between
-    // the read and the use. Under a pinned TX (Promise.all of concurrent
-    // writes), this guarantees every caller reuses the TX-pinned client.
-    // The prior shape — `txClient = this._client; await this.getClient()` —
-    // raced with begin/commit, letting a concurrent caller's snapshot go
-    // stale across the yield and either (a) checkout a fresh pool client
-    // mid-TX (causing PG `08P01 invalid frontend message type 0` /
-    // `25P02 transaction-aborted` when one logical TX fans across multiple
-    // sockets) or (b) release the TX client from a query's finally.
-    const txClient = this._client;
-    if (txClient) return await fn(txClient);
-    // No TX active at decision time: acquire a fresh client and own its
-    // release. Route through `getClient()` so unit tests can stub the
-    // checkout (see postgresql-adapter.exec-query.test.ts).
+  private async withClient<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
+    // Route through `getClient()` so unit tests can stub the
+    // acquisition (see postgresql-adapter.exec-query.test.ts).
     const client = await this.getClient();
-    try {
-      return await fn(client);
-    } finally {
-      client.release();
-    }
+    return await fn(client);
   }
 
   /**
-   * Look up the statement pool for `client`, lazily creating it.
-   * Kept per-client because PG prepared statements are session-
-   * scoped — once the client is released back to pg.Pool and
-   * re-acquired, the server state may differ.
+   * Return the single StatementPool for the persistent connection,
+   * lazily creating it. PG prepared statements are session-scoped;
+   * with one persistent client there is exactly one pool per adapter.
    */
-  private _poolFor(client: pg.PoolClient): StatementPool {
-    let pool = this._statementPools.get(client);
-    if (!pool) {
-      pool = new StatementPool(client, this._statementLimit);
-      this._statementPools.set(client, pool);
+  private _poolFor(client: pg.Client): StatementPool {
+    if (!this._statementPool) {
+      this._statementPool = new StatementPool(client, this._statementLimit);
     }
-    // Matches Rails: statement_limit is read at pool construction
-    // time. A mid-session change to `adapter.statementLimit` is
-    // applied to the currently-active pool by the setter; other
-    // per-client pools keep the limit they were built with. Syncing
-    // them here would stomp on direct setMaxSize calls from tests or
-    // callers that want a tighter bound than the adapter default.
-    return pool;
+    return this._statementPool;
   }
 
   /**
-   * Tear down the statement pool attached to `client`. Called from
-   * `close()` only — commit / rollback intentionally keep the pool
-   * attached because PG prepared statements are session-scoped, not
-   * transaction-scoped (see Rails' PG::StatementPool, which only
-   * clears on disconnect). Detaching here stops late DEALLOCATE
-   * calls from racing with a released client, AND we drop the
-   * WeakMap entry so a later checkout that hands back the same
-   * pg.PoolClient wrapper gets a fresh pool.
+   * Tear down the single StatementPool. Called from `close()` /
+   * `reconnect()` only — commit/rollback keep the pool attached
+   * because PG prepared statements are session-scoped, not
+   * transaction-scoped (mirrors Rails' PG::StatementPool, which only
+   * clears on disconnect).
    */
-  private _releaseStatementPool(client: pg.PoolClient): void {
-    const pool = this._statementPools.get(client);
-    if (!pool) return;
-    pool.detach();
-    this._statementPools.delete(client);
+  private _releaseStatementPool(): void {
+    this._statementPool?.detach();
+    this._statementPool = null;
   }
 
   /**
@@ -1007,7 +1038,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * backs both exec_query and exec_delete / exec_update / exec_insert.
    */
   private async _runQuery<R = pg.QueryResult>(
-    client: pg.PoolClient,
+    client: pg.Client,
     sql: string,
     binds: unknown[],
     extra: {
@@ -1018,7 +1049,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<R> {
     const { prepareOverride, onPrepared, ...queryExtra } = extra;
     const prepare =
-      prepareOverride === false ? false : (prepareOverride ?? this._shouldPrepare(binds, client));
+      prepareOverride === false ? false : (prepareOverride ?? this._shouldPrepare(binds));
     const attempt = async (): Promise<R> => {
       if (prepare) {
         const stmtName = this._preparedNameFor(client, sql);
@@ -1059,7 +1090,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Rails' `PostgreSQL::StatementPool#[]` / `#[]=` — present key →
    * cached name, absent → `next_key` + store.
    */
-  private _preparedNameFor(client: pg.PoolClient, sql: string): string {
+  private _preparedNameFor(client: pg.Client, sql: string): string {
     const pool = this._poolFor(client);
     const existing = pool.get(sql);
     if (existing) return existing.name;
@@ -1075,17 +1106,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * parse cost is the same either way and the name never gets
    * reused without binds).
    */
-  private _shouldPrepare(binds: unknown[], client?: pg.PoolClient): boolean {
+  private _shouldPrepare(binds: unknown[]): boolean {
     if (!this.preparedStatements || binds.length === 0) return false;
-    // Gate on the actual pool's maxSize (or the adapter default if
-    // no pool exists yet). A direct `pool.setMaxSize(0)` — by a test
-    // or an operator shrinking one specific session — must reliably
-    // disable preparation for that client, because `StatementPool#set`
-    // is a no-op at maxSize=0 and we'd otherwise keep allocating a
-    // fresh `a<n>` name per execution and leak server-side PREPAREs.
-    const poolLimit = client
-      ? (this._statementPools.get(client)?.maxSize ?? this._statementLimit)
-      : this._statementLimit;
+    // Gate on the live pool's maxSize (or the adapter default if not yet
+    // constructed). A direct `pool.setMaxSize(0)` — by a test or an
+    // operator shrinking the session — must reliably disable preparation,
+    // because `StatementPool#set` is a no-op at maxSize=0 and we'd
+    // otherwise keep allocating a fresh `a<n>` name per execution and
+    // leak server-side PREPAREs.
+    const poolLimit = this._statementPool?.maxSize ?? this._statementLimit;
     return poolLimit > 0;
   }
 
@@ -1118,7 +1147,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   private async _instrumentedQueryOnClient(
-    client: pg.PoolClient,
+    client: pg.Client,
     sql: string,
     name: string,
     binds: unknown[],
@@ -1364,10 +1393,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this._client.query("BEGIN");
       this._inTransaction = true;
     } catch (error) {
-      const client = this._client;
       this._client = null;
       this._inTransaction = false;
-      client?.release(toError(error));
+      // Connection-level error on BEGIN poisons the single pg.Client.
+      // Tear down so the next caller gets a fresh connection — mirrors
+      // the pre-collapse PoolClient.release(err) discard.
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
       throw error;
     }
   }
@@ -1377,7 +1408,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Commit the current transaction and release the client.
+   * Commit the current transaction. With the single persistent
+   * connection there is no checkout/release cycle — the same
+   * `_rawConnection` continues to serve subsequent queries.
    *
    * Routes through TransactionManager when the TM has an open transaction
    * (e.g. started by beginTransaction()) so the stack stays in sync.
@@ -1390,17 +1423,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       return this._transactionManager.commitTransaction();
     }
     if (!this._client) throw new Error("No active transaction");
-    await this._client.query("COMMIT");
-    // Keep the per-client StatementPool attached through the pg.Pool
-    // checkin/checkout cycle. PG prepared statements are session-
-    // scoped, not transaction-scoped (COMMIT/ROLLBACK don't drop
-    // them), so detaching here and rebuilding on next checkout would
-    // reset the counter → `a1` collides with the still-prepared `a1`
-    // on the server. Matches Rails, which only clears its
-    // StatementPool on disconnect, not on commit.
-    this._client.release();
-    this._client = null;
-    this._inTransaction = false;
+    try {
+      await this._client.query("COMMIT");
+    } catch (e) {
+      // Connection-level error (08P01, broken socket, etc.) leaves the
+      // single pg.Client unusable. Tear down so the next caller gets a
+      // fresh connection — mirrors the pool-discard safety net the
+      // pre-collapse design got for free via PoolClient.release(err).
+      if (PostgreSQLAdapter._isConnectionError(e)) this.reconnect();
+      throw e;
+    } finally {
+      // PG prepared statements are session-scoped, not transaction-scoped
+      // (COMMIT/ROLLBACK don't drop them) — keep the StatementPool
+      // attached. Mirrors Rails: clear only on disconnect.
+      this._client = null;
+      this._inTransaction = false;
+    }
   }
 
   async commitDbTransaction(): Promise<void> {
@@ -1408,7 +1446,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Rollback the current transaction and release the client.
+   * Rollback the current transaction. With the single persistent
+   * connection there is no checkout/release — the same `_rawConnection`
+   * continues to serve subsequent queries.
    *
    * Routes through TransactionManager when the TM has an open transaction.
    * Falls through to the direct DB path when openTransactions == 0 (e.g.
@@ -1423,25 +1463,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       return this._transactionManager.rollbackTransaction();
     }
     if (!this._client) throw new Error("No active transaction");
-    const releasedClient = this._client;
-    let rollbackError: unknown;
     try {
       await this._client.query("ROLLBACK");
     } catch (e) {
-      rollbackError = e;
+      // Connection-level error — closing the socket implicitly aborts
+      // the server-side TX. Swallow and reconnect so the next caller
+      // gets a fresh client. Mirrors the pre-collapse pool-discard
+      // safety net (PoolClient.release(err) discarded broken sockets).
+      if (PostgreSQLAdapter._isConnectionError(e)) {
+        this.reconnect();
+        return;
+      }
+      throw e;
     } finally {
       this._client = null;
       this._inTransaction = false;
-      releasedClient.release(
-        rollbackError === undefined
-          ? undefined
-          : rollbackError instanceof Error
-            ? rollbackError
-            : new Error(String(rollbackError)),
-      );
-      this._lastReleasedTxnClient = releasedClient;
     }
-    if (rollbackError !== undefined) throw rollbackError;
   }
 
   async rollbackDbTransaction(): Promise<void> {
@@ -1452,44 +1489,45 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async execRollbackDbTransaction(): Promise<void> {
     this._cancelAnyRunningQuery();
     if (!this._client) throw new Error("No active transaction");
-    const releasedClient = this._client;
-    let rollbackError: unknown;
     try {
       await this._client.query("ROLLBACK");
     } catch (e) {
-      // If ROLLBACK itself throws (e.g. network drop mid-txn), we still
-      // have to release the client or the pool leaks. Rethrow after
-      // cleanup. Pass the error to release() so pg.Pool discards the
-      // (potentially damaged) client instead of returning a bad
-      // socket to the idle set.
-      rollbackError = e;
+      // ROLLBACK on a poisoned socket (e.g. 08P01 after the cancel
+      // race) — tear down and reconnect; closing the socket implicitly
+      // aborts the server-side TX. Mirrors the pool-discard safety net
+      // the pre-collapse design got via PoolClient.release(err).
+      if (PostgreSQLAdapter._isConnectionError(e)) {
+        this.reconnect();
+        return;
+      }
+      throw e;
     } finally {
       // See commit() — ROLLBACK doesn't drop server-side prepared
-      // statements, so we keep the pool attached to the pg.PoolClient
-      // for the duration of the connection's life.
+      // statements, so we keep the StatementPool attached for the
+      // duration of the connection's life.
       this._client = null;
       this._inTransaction = false;
-      // Normalize to Error before passing to release() — node-postgres
-      // expects an Error to discard the client, and downstream code
-      // (and our own rethrow path) may read `.message`. Matches the
-      // pattern in beginDbTransaction's catch.
-      releasedClient.release(
-        rollbackError === undefined
-          ? undefined
-          : rollbackError instanceof Error
-            ? rollbackError
-            : new Error(String(rollbackError)),
-      );
-      // Retain a reference to the just-released client so a
-      // post-rollback `clearCacheBang` (Rails' `after_failure_actions`)
-      // can still reach the StatementPool. This reference is dropped
-      // by `clearCacheBang` after the cache reset runs; it's NOT
-      // cleared by `beginDbTransaction` (after-rollback callbacks can
-      // open a new txn before the failure hook fires, and nulling
-      // the ref there would lose the pointer to the failed client).
-      this._lastReleasedTxnClient = releasedClient;
     }
-    if (rollbackError !== undefined) throw rollbackError;
+  }
+
+  /**
+   * True when an error indicates the pg.Client's socket is no longer
+   * usable for further queries — covers node-postgres' "Client has
+   * encountered a connection error and is not queryable", PG protocol
+   * desync (SQLSTATE 08P01), and connection-class SQLSTATEs (08xxx).
+   */
+  private static _isConnectionError(err: unknown): boolean {
+    const e = err as { code?: string; message?: string } | null | undefined;
+    if (!e) return false;
+    if (typeof e.code === "string" && e.code.startsWith("08")) return true;
+    const msg = typeof e.message === "string" ? e.message : "";
+    if (!msg) return false;
+    return (
+      msg.includes("Client has encountered a connection error") ||
+      msg.includes("invalid frontend message type") ||
+      msg.includes("Connection terminated") ||
+      msg.includes("client has already ended")
+    );
   }
 
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
@@ -1508,7 +1546,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       processID?: number | null;
       cancel: (target: PgClientInternals, query: unknown) => void;
     };
-    const txClient = this._client as (pg.PoolClient & PgClientInternals) | null;
+    const txClient = this._client as (pg.Client & PgClientInternals) | null;
     if (!txClient?.activeQuery || txClient.processID == null) return;
     try {
       // pg.Client.cancel(target, query) opens a fresh raw TCP connection to send
@@ -1530,10 +1568,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       await this._client.query(`BEGIN ISOLATION LEVEL ${level}`);
       this._inTransaction = true;
     } catch (error) {
-      const client = this._client;
       this._client = null;
       this._inTransaction = false;
-      client?.release(toError(error));
+      // See beginDbTransaction — discard the poisoned client on
+      // connection-level failure so callers can recover.
+      if (PostgreSQLAdapter._isConnectionError(error)) this.reconnect();
       throw error;
     }
   }
@@ -1895,77 +1934,61 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Close the connection pool.
+   * Close the persistent connection. After this call the adapter is
+   * unusable; `_pgClientOptions` is nulled so `active` returns false
+   * and `_acquireFreshClient` throws.
    */
   async close(): Promise<void> {
-    if (this._advisoryLockClient) {
-      this._advisoryLockClient.release();
-      this._advisoryLockClient = null;
-    }
-    if (this._client) {
-      this._releaseStatementPool(this._client);
-      this._client.release();
-      this._client = null;
-    }
-    // Drop adapter-held references to any remaining pools so late
-    // errors can't fire DEALLOCATE against a pool.end()-ed client.
-    // The pool objects become unreachable once pg releases the
-    // corresponding clients anyway — this is about breaking our
-    // own reference, not an explicit detach step per pool.
-    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
-    if (this._driverPool) {
-      await this._driverPool.end();
-      this._driverPool = null;
-    }
+    this._releaseStatementPool();
+    this._client = null;
+    this._inTransaction = false;
+    this._connectionConfigured = false;
+    this._closed = true;
+    const conn = this._rawConnection;
+    this._rawConnection = null;
+    this._pgClientOptions = null;
+    if (conn) await conn.end();
   }
 
   /**
-   * Mirrors Rails' private `PostgreSQLAdapter#connect`. Creates a fresh
-   * pg.Pool using the stored connection options. Called by `reconnect`
-   * after the old pool has been torn down.
+   * Mirrors Rails' private `PostgreSQLAdapter#connect`. With the
+   * single-client design the actual `pg.Client.connect()` happens
+   * lazily inside `_acquireFreshClient`; this method is preserved for
+   * `reconnect()` to call but performs no eager I/O.
    *
    * @internal
    */
   connect(): void {
-    if (!this._pgPoolOptions || this._driverPool) return;
-    this._driverPool = new pg.Pool(this._pgPoolOptions);
-    this._driverPool.on("error", () => {});
+    // Lazy: `_acquireFreshClient` opens the connection on first use.
   }
 
   /**
    * Mirrors Rails' private `PostgreSQLAdapter#reconnect`. Fires a
-   * non-blocking `pool.end()` on the old pool (fire-and-forget), resets
-   * all per-connection state, and immediately creates a fresh pool via
-   * `connect()`. Rails resets the single raw PG connection; here the
-   * old pool drains asynchronously while the new pool is already live.
+   * non-blocking `client.end()` on the old connection (fire-and-forget),
+   * resets all per-connection state, and leaves the new connection to
+   * be opened lazily on next use.
    *
    * @internal
    */
   reconnect(): void {
-    if (this._advisoryLockClient) {
-      this._advisoryLockClient.release();
-      this._advisoryLockClient = null;
-    }
-    if (this._client) {
-      this._releaseStatementPool(this._client);
-      this._client.release();
-      this._client = null;
-    }
-    this._driverPool?.end().catch(() => {});
-    this._driverPool = null;
+    const conn = this._rawConnection;
+    this._rawConnection = null;
+    this._client = null;
+    this._connectionConfigured = false;
+    this._statementPool?.detach();
+    this._statementPool = null;
+    this._needsDeallocateAll = false;
     this._inTransaction = false;
-    this._lastReleasedTxnClient = null;
-    this._configuredClients = new WeakSet<pg.PoolClient>();
-    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
-    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this._closed = false;
+    conn?.end().catch(() => {});
     this.resetTransaction();
     this.connect();
   }
 
   /**
    * Public override so `AbstractAdapter#verifyBang()` (called by
-   * `ConnectionPool` on checkout) actually reconnects the PG pool
-   * rather than just clearing the statement cache.
+   * `ConnectionPool` on checkout) actually reconnects the PG
+   * connection rather than just clearing the statement cache.
    *
    * @internal
    */
@@ -1976,58 +1999,74 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   /**
    * Mirrors Rails' `PostgreSQLAdapter#active?` + `AbstractAdapter#verify!`.
    * Pings the server with a lightweight query; on PG::Error (server-side
-   * disconnect, timeout, pg_terminate_backend) tears down the pool and
-   * reconnects so the next checkout gets a fresh connection.
+   * disconnect, timeout, pg_terminate_backend) tears down the connection
+   * and reconnects so the next acquire gets a fresh `pg.Client`.
    *
    * @internal
    */
   override async verifyBang(): Promise<void> {
-    if (!this._driverPool) {
+    // Mirrors Rails' verify! → reconnect! when active? returns false
+    // (abstract_adapter.rb:759-776). The ConnectionPool calls this on
+    // checkout, so a prior disconnectBang/discardBang doesn't leave
+    // the adapter permanently unusable — the pool flow reopens it.
+    //
+    // A terminal close() nulls _pgClientOptions; in that state there
+    // is nothing to reconnect to, so refuse to mark the adapter
+    // verified rather than silently returning a usable-looking handle.
+    if (this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
+    if (this._closed || !this._rawConnection) {
       this.reconnect();
       this.verifiedBang();
       return;
     }
-    // Use _driverPool.connect() directly rather than _acquireFreshClient():
-    // _acquireFreshClient releases the client internally on drain failure,
-    // which would cause a double-release in the finally block here. A plain
-    // pool checkout + query(";") is sufficient for a liveness ping.
-    let client: pg.PoolClient | null = null;
     try {
-      client = await this._driverPool.connect();
-      await client.query(";");
+      await this._rawConnection.query(";");
     } catch {
       this.reconnect();
-    } finally {
-      if (client) client.release();
     }
     this.verifiedBang();
   }
 
   /**
-   * Mirrors Rails' `PostgreSQLAdapter#reset!`. Rails issues ROLLBACK (if in
-   * a transaction), DISCARD ALL, then re-runs configure_connection on the
-   * single raw connection. pg doesn't expose PQreset; the pool equivalent is
-   * to fire a best-effort ROLLBACK on the held client (if any), then tear
-   * down the entire pool — discarding all physical connections and their
-   * session state. The rollback is fire-and-forget so reconnect() always runs
-   * even if the connection is already broken, matching Rails' error-tolerant
-   * reset semantics. New checkouts are configured on first use via
-   * `_maybeConfigureConnection`, matching Rails' `super` call.
+   * Mirrors Rails' `PostgreSQLAdapter#reset!` (postgresql_adapter.rb:371).
+   * If there's no connection yet, lazy-connect on next use. Otherwise
+   * fire ROLLBACK (best-effort, only if in TX) followed by DISCARD ALL
+   * on the SAME persistent connection — preserves the socket and only
+   * scrubs session state, exactly as Rails does.
    *
    * @internal
    */
   override resetBang(): void {
+    if (!this._rawConnection) {
+      super.resetBang();
+      return;
+    }
+    // Capture the live connection so subsequent DISCARD ALL chains
+    // onto it even if a concurrent reconnect later nulls
+    // _rawConnection. resetBang is sync per AbstractAdapter, so we
+    // can't truly await — chain via .then so DISCARD ALL is sent
+    // only AFTER ROLLBACK's response is processed (matching the
+    // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
+    const live = this._rawConnection;
+    let work: Promise<unknown> = Promise.resolve();
     if (this._client) {
       this._cancelAnyRunningQuery();
-      const client = this._client;
-      this._releaseStatementPool(client);
+      work = live.query("ROLLBACK").catch(() => {});
       this._client = null;
-      client.query("ROLLBACK").then(
-        () => client.release(),
-        (err) => client.release(toError(err)),
-      );
+      this._inTransaction = false;
     }
-    this.reconnect();
+    work.then(() => live.query("DISCARD ALL")).catch(() => {});
+    // DISCARD ALL drops server-side prepared statements — reset the
+    // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
+    this._statementPool?.reset();
+    // DISCARD ALL also resets session-level GUCs (standard_conforming_
+    // strings, intervalstyle, client_min_messages, custom variables) —
+    // mark the connection unconfigured so the next acquire re-runs
+    // _maybeConfigureConnection. Matches Rails' reset!, which calls
+    // attempt_configure_connection via super (abstract_adapter.rb:729).
+    this._connectionConfigured = false;
     super.resetBang();
   }
 
@@ -2035,175 +2074,102 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors Rails' `PostgreSQLAdapter#configure_connection`. Applies
    * per-connection settings (standard_conforming_strings, intervalstyle,
    * client_min_messages, session variables). Delegates to the internal
-   * `_maybeConfigureConnection` which gates on a WeakSet so each physical
-   * client is configured exactly once.
+   * `_maybeConfigureConnection` which gates on a boolean so the
+   * persistent client is configured exactly once per connection.
    *
    * @internal
    */
-  async configureConnection(client: pg.PoolClient): Promise<void> {
+  async configureConnection(client: pg.Client): Promise<void> {
     return this._maybeConfigureConnection(client);
   }
 
   /**
-   * Mirrors Rails' `PostgreSQLAdapter#disconnect!`. Closes the
-   * connection pool and releases any advisory-lock client. Pool teardown
-   * is fire-and-forget (we nullify `_driverPool` immediately so no new
-   * queries can start; the underlying pg.Pool drains asynchronously).
+   * Mirrors Rails' `PostgreSQLAdapter#disconnect!`. Tears down the
+   * persistent connection asynchronously so no new queries can start;
+   * the underlying socket drains in the background.
    */
   override disconnectBang(): void {
-    if (this._advisoryLockClient) {
-      this._advisoryLockClient.release();
-      this._advisoryLockClient = null;
-    }
-    if (this._client) {
-      this._releaseStatementPool(this._client);
-      this._client.release();
-      this._client = null;
-    }
-    this._driverPool?.end().catch(() => {});
-    this._driverPool = null;
-    // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
+    const conn = this._rawConnection;
+    this._rawConnection = null;
+    this._client = null;
+    this._connectionConfigured = false;
+    this._statementPool?.detach();
+    this._statementPool = null;
+    this._needsDeallocateAll = false;
     this._inTransaction = false;
-    this._lastReleasedTxnClient = null;
-    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this._closed = true;
+    conn?.end().catch(() => {});
+    // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
     this.resetTransaction();
     super.disconnectBang();
   }
 
   /**
    * Mirrors Rails' `PostgreSQLAdapter#discard!`. Used when the process
-   * is about to fork or the connection is unrecoverably broken. Rails
-   * reopens the raw socket to /dev/null; here we fire a non-blocking
-   * `pool.end()` (fire-and-forget) so server-side resources are
-   * eventually released, then immediately null all references so no
-   * further queries can start.
+   * is about to fork or the connection is unrecoverably broken. We
+   * fire a non-blocking `client.end()` and immediately null all
+   * references so no further queries can start.
    */
   override discardBang(): void {
-    if (this._advisoryLockClient) {
-      this._advisoryLockClient.release();
-      this._advisoryLockClient = null;
-    }
-    if (this._client) {
-      this._releaseStatementPool(this._client);
-      this._client.release();
-      this._client = null;
-    }
-    this._driverPool?.end().catch(() => {});
-    this._driverPool = null;
+    const conn = this._rawConnection;
+    this._rawConnection = null;
+    this._client = null;
+    this._connectionConfigured = false;
+    this._statementPool?.detach();
+    this._statementPool = null;
+    this._needsDeallocateAll = false;
     this._inTransaction = false;
-    this._lastReleasedTxnClient = null;
-    this._configuredClients = new WeakSet<pg.PoolClient>();
-    this._statementPools = new WeakMap<pg.PoolClient, StatementPool>();
-    this._clientsNeedingDeallocateAll = new WeakSet<pg.PoolClient>();
+    this._closed = true;
+    conn?.end().catch(() => {});
     // Rails' discard! calls reset_transaction; super.discardBang() does not.
     this.resetTransaction();
     super.discardBang();
   }
 
   /**
-   * Test-only accessor for the statement pool attached to the
-   * currently-held transaction client. Returns undefined outside a
-   * transaction, because without a held client every adapter call
-   * grabs a fresh pool. Mirrors Rails' `raw_connection
-   * .instance_variable_get(:@statement_pool)` escape hatch used by
-   * `PostgreSQL::StatementPoolTest`.
+   * Test-only accessor for the single session-scoped StatementPool
+   * attached to `_rawConnection`. After the Phase D-X collapse there
+   * is one pool per adapter for the connection's full lifetime — it
+   * survives commit/rollback and is only torn down on disconnect /
+   * close / reconnect. Returns undefined before the first acquire (no
+   * pool built yet) or after teardown. Mirrors Rails'
+   * `raw_connection.instance_variable_get(:@statement_pool)` escape
+   * hatch used by `PostgreSQL::StatementPoolTest`.
    *
    * @internal
    */
   _statementPoolForTest(): StatementPool | undefined {
-    return this._client ? this._statementPools.get(this._client) : undefined;
+    return this._statementPool ?? undefined;
   }
 
-  /** @internal — pool for the most recently released txn client. */
-  _lastReleasedStatementPoolForTest(): StatementPool | undefined {
-    // Deref once: the WeakRef behind `_lastReleasedTxnClient` can flip
-    // to null between two getter calls if the GC runs between them,
-    // and `WeakMap.get(null)` throws (keys must be objects).
-    const client = this._lastReleasedTxnClient;
-    return client ? this._statementPools.get(client) : undefined;
-  }
-
-  /** @internal — the most recently released txn client (deref'd once). */
-  _lastReleasedClientForTest(): pg.PoolClient | null {
-    return this._lastReleasedTxnClient;
-  }
-
-  /** @internal — the currently-held txn client. */
-  _currentClientForTest(): pg.PoolClient | null {
+  /** @internal — the currently-held txn client (always _rawConnection while in TX). */
+  _currentClientForTest(): pg.Client | null {
     return this._client;
   }
 
-  /** @internal — whether a client is tagged for DEALLOCATE ALL on next checkout. */
-  _needsDeallocateAllForTest(client: pg.PoolClient): boolean {
-    return this._clientsNeedingDeallocateAll.has(client);
+  /** @internal — whether the next acquire will run DEALLOCATE ALL. */
+  _needsDeallocateAllForTest(): boolean {
+    return this._needsDeallocateAll;
   }
 
   /**
-   * Clear cached prepared statements on the currently-held transaction
-   * client. Mirrors Rails' `PostgreSQLAdapter#clear_cache!` which
-   * sends DEALLOCATE for each cached entry on the adapter's sole
-   * PG::Connection. Rails has exactly one connection per adapter
-   * instance; we back multiple via pg.Pool, so "the connection" is
-   * ambiguous outside a transaction. Non-active per-client pools are
-   * intentionally left attached: resetting the WeakMap would orphan
-   * our counter + sql→name map while the server-side PREPAREs still
-   * exist, and a later checkout of that same pg.PoolClient would
-   * restart the counter at `a1` — colliding with the statement
-   * already PREPAREd on that session.
+   * Clear cached prepared statements. Mirrors Rails'
+   * `PostgreSQLAdapter#clear_cache!` which sends DEALLOCATE for each
+   * cached entry on the adapter's sole PG::Connection. With the
+   * single-client design we always own the session, so a full
+   * `clear()` always applies (it fires DEALLOCATE per entry via the
+   * PG-specific dealloc override). If the connection has been torn
+   * down (post-disconnect/reconnect failure window) we mark
+   * `_needsDeallocateAll` so the next acquire drains the server side.
    */
   override clearCacheBang(): void {
     super.clearCacheBang();
-    // Always handle the just-released txn client first when set —
-    // this is the failure-hook target. After-rollback callbacks may
-    // have opened a new transaction (so `_client` is non-null) before
-    // `after_failure_actions` reached us; without this branch we'd
-    // clear the WRONG pool (the new txn's) and leave the failed
-    // session's stale entries behind. Bounded to the failure-hook
-    // window: we drop the ref immediately after.
-    const lastReleased = this._lastReleasedTxnClient;
-    const currentClient = this._client;
-    if (lastReleased) {
-      try {
-        if (lastReleased === currentClient) {
-          // pg.Pool handed back the same physical client to the new
-          // txn — we own the session again, so prefer full `clear()`
-          // which fires DEALLOCATE per entry (cleans up the orphaned
-          // server-side PREPAREs that `reset()` would have left).
-          this._statementPools.get(lastReleased)?.clear();
-        } else {
-          // Released client (different from any current txn): we
-          // can't fire DEALLOCATE on a session we don't own. We also
-          // can't SKIP the reset: the WeakMap-stored pool persists
-          // across pg.Pool checkouts of the same physical client. If
-          // we left the stale entries in place, a future checkout of
-          // this same pg.PoolClient would find the invalidated name
-          // in the pool and call `exec_prepared(staleName)`, hitting
-          // the same PSCE error again. `reset()` forces re-PREPARE
-          // with a fresh name (counter never resets, so no collision
-          // with the orphaned server-side statement). Tag the client
-          // so the next checkout through `_acquireFreshClient` runs
-          // `DEALLOCATE ALL` to drain the orphaned server-side
-          // statements left behind by the local-only reset.
-          this._statementPools.get(lastReleased)?.reset();
-          this._clientsNeedingDeallocateAll.add(lastReleased);
-        }
-      } finally {
-        this._lastReleasedTxnClient = null;
-      }
+    if (this._rawConnection && this._statementPool) {
+      this._statementPool.clear();
+    } else if (this._statementPool) {
+      this._statementPool.reset();
+      this._needsDeallocateAll = true;
     }
-    if (currentClient && currentClient !== lastReleased) {
-      // Live txn client (distinct from the failed one we already
-      // handled above): full clear() — fires DEALLOCATE per entry
-      // (via StatementPool's pg-specific dealloc override).
-      this._statementPools.get(currentClient)?.clear();
-    }
-    // Server-side accumulation note: the released-client `reset()`
-    // path above only drops the local sql→name map. Server-side
-    // PREPAREs are drained by `_clientsNeedingDeallocateAll` +
-    // `DEALLOCATE ALL` on next checkout (any path that goes through
-    // `_acquireFreshClient` — getClient / beginTransaction /
-    // getAdvisoryLock / etc.). Until that checkout happens, the
-    // orphans live on the idle pg.PoolClient.
   }
 
   /**
@@ -2216,12 +2182,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Get the underlying pg.Pool instance.
-   * Escape hatch for advanced usage.
+   * Get the underlying persistent pg.Client.
+   * Escape hatch for advanced usage — mirrors mysql2/sqlite3 adapter
+   * conventions (`get raw()`). Throws with a precise reason when the
+   * connection is unavailable: either not yet lazy-opened (call any
+   * query method first), or torn down by disconnect/discard/close.
    */
-  get raw(): pg.Pool {
-    if (!this._driverPool) throw new Error("PostgreSQLAdapter: connection is closed");
-    return this._driverPool;
+  get raw(): pg.Client {
+    if (this._rawConnection) return this._rawConnection;
+    if (this._closed || this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
+    throw new Error(
+      "PostgreSQLAdapter: connection has not been opened yet — run a query first to lazy-connect",
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -2374,39 +2348,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Advisory locks are session-scoped — acquire and release must use the
-  // same connection. We pin a dedicated client from the pool for the
-  // duration of the lock.
-  private _advisoryLockClient: pg.PoolClient | null = null;
-
+  // same connection. With the dual-pool collapse the adapter owns one
+  // persistent pg.Client, so the lock naturally lives on `_rawConnection`
+  // for its duration with no separate checkout.
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const client = await this._acquireFreshClient();
-    try {
-      const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
-      const result = await client.query(sql, [param]);
-      const locked = result.rows[0]?.locked === true;
-      if (locked) {
-        this._advisoryLockClient = client;
-      } else {
-        client.release();
-      }
-      return locked;
-    } catch (error) {
-      client.release();
-      throw error;
-    }
+    const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
+    const result = await client.query(sql, [param]);
+    return result.rows[0]?.locked === true;
   }
 
   async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    const client = this._advisoryLockClient;
-    if (!client) return false;
-    try {
-      const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
-      const result = await client.query(sql, [param]);
-      return result.rows[0]?.unlocked === true;
-    } finally {
-      this._advisoryLockClient = null;
-      client.release();
-    }
+    if (!this._rawConnection) return false;
+    const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
+    const result = await this._rawConnection.query(sql, [param]);
+    return result.rows[0]?.unlocked === true;
   }
 
   supportsExplain(): boolean {
@@ -5073,7 +5029,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: PostgreSQLAdapter#prepare_statement
    * @internal
    */
-  async prepareStatement(sql: string, _binds: unknown[], client: pg.PoolClient): Promise<string> {
+  async prepareStatement(sql: string, _binds: unknown[], client: pg.Client): Promise<string> {
     const pool = this._poolFor(client);
     // Use same cache key as _preparedNameFor so prepared statements created here
     // are visible to / deduped with the internal query path.
@@ -5161,7 +5117,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors: PostgreSQLAdapter#build_statement_pool
    * @internal
    */
-  buildStatementPool(client: pg.PoolClient): StatementPool {
+  buildStatementPool(client: pg.Client): StatementPool {
     return new StatementPool(client, this._statementLimit);
   }
 
@@ -5210,9 +5166,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return { oid: Number(row.oid), name: row.typname, coderClass };
   }
 
-  /** @internal */
-  _driverPoolForTest(): pg.Pool | null {
-    return this._driverPool;
+  /** @internal — exposed for tests inspecting the persistent connection. */
+  _rawConnectionForTest(): pg.Client | null {
+    return this._rawConnection;
   }
 }
 
@@ -5230,22 +5186,23 @@ export interface PreparedStatement {
 }
 
 /**
- * PG-flavored StatementPool. Backs the per-client statement cache;
+ * PG-flavored StatementPool. Backs the per-connection statement cache;
  * `dealloc` sends `DEALLOCATE` for the evicted name. PG prepared
- * statements are session-scoped, so an instance of this pool is
- * attached per-pg.PoolClient via a WeakMap on the adapter.
+ * statements are session-scoped, and after the dual-pool collapse the
+ * adapter owns exactly one persistent `pg.Client`, so a single
+ * StatementPool lives for the connection's lifetime.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::StatementPool
  */
 export class StatementPool extends GenericStatementPool<PreparedStatement> {
-  private _client: pg.PoolClient | null;
+  private _client: pg.Client | null;
   // Per-pool counter. Rails' PG StatementPool uses `@counter` on the
   // pool instance so names are scoped to the session — matches the
   // session-scoped nature of PG prepared statements and lets the
   // adapter own zero state about naming.
   private _counter = 0;
 
-  constructor(client: pg.PoolClient, maxSize = 1000) {
+  constructor(client: pg.Client, maxSize = 1000) {
     super(maxSize);
     this._client = client;
   }

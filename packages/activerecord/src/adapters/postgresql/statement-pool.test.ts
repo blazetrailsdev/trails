@@ -2,7 +2,6 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/statement_pool_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect, vi } from "vitest";
-import type pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -219,107 +218,68 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("clearCacheBang clears the just-released txn pool when called post-rollback", async () => {
       // TransactionManager calls `clearCacheBang` AFTER `rollback()`
-      // (Rails' after_failure_actions ordering, abstract/transaction.rb
-      // :627-631). Our PG `rollback()` releases `_client`, so the hook
-      // needs to reach the pool of the just-released client. Exercises
-      // the `_lastReleasedTxnClient` fallback path in `clearCacheBang`.
+      // (Rails' after_failure_actions ordering). With the single
+      // persistent connection, the StatementPool stays attached
+      // through commit/rollback — clearCacheBang issues DEALLOCATE
+      // per cached entry on the live connection.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       await adapter.execute("SELECT $1::text", ["a"]);
       const pool = adapter._statementPoolForTest()!;
       expect(pool.length).toBe(2);
       await adapter.rollback();
-      // After rollback, _client is null but the released-client pool
-      // is still reachable.
-      const releasedPool = adapter._lastReleasedStatementPoolForTest()!;
-      expect(releasedPool).toBe(pool);
-      // clearCacheBang falls back to the released pool and `reset()`s
-      // it (local-only — can't fire DEALLOCATE on a released client),
-      // then drops the WeakRef so we don't pin longer than needed.
+      // Same pool object survives the rollback (session-scoped lifetime).
+      expect(adapter._statementPoolForTest()).toBe(pool);
       adapter.clearCacheBang();
       expect(pool.length).toBe(0);
-      expect(adapter._lastReleasedStatementPoolForTest()).toBeUndefined();
     });
 
     it("tags the released client and runs DEALLOCATE ALL on its next checkout", async () => {
-      // Released-client `reset()` path can't fire DEALLOCATE on a
-      // session it doesn't own, so server-side PREPAREs leak. The
-      // deferred half: tag the client; on next checkout, drain via
-      // `DEALLOCATE ALL` before user code.
-      //
-      // Use a dedicated pool-size-1 adapter so pg.Pool always hands
-      // back the same physical client on re-checkout — makes the
-      // DEALLOCATE-before-BEGIN assertion deterministic. The shared
-      // `adapter` from beforeEach uses pg.Pool's default max (10) and
-      // could hand back a different client, weakening the assertion.
-      const max1 = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, max: 1 });
-      max1.preparedStatements = true;
-      try {
-        await max1.beginDbTransaction();
-        await max1.execute("SELECT $1::int", [1]);
-        await max1.execute("SELECT $1::text", ["a"]);
-        await max1.rollback();
-        // Capture the released client BEFORE clearCacheBang — its
-        // finally block nulls _lastReleasedTxnClient (so a post-clear
-        // _lastReleasedClientForTest() would return null and the
-        // tag check would silently fail with `WeakSet.has(null)` → false).
-        const taggedClient = max1._lastReleasedClientForTest();
-        expect(taggedClient).not.toBeNull();
-        max1.clearCacheBang();
-        expect(max1._needsDeallocateAllForTest(taggedClient!)).toBe(true);
-
-        // vi.spyOn both pool.connect AND the returned client's query
-        // so vi.restoreAllMocks() handles cleanup for both.
-        const observed: string[] = [];
-        const pool = max1._driverPoolForTest()!;
-        const originalConnect = pool.connect.bind(pool);
-        vi.spyOn(pool, "connect").mockImplementation((async (...args: unknown[]) => {
-          const client = await (originalConnect as (...a: unknown[]) => Promise<pg.PoolClient>)(
-            ...args,
-          );
-          const origQuery = client.query.bind(client);
-          vi.spyOn(client, "query").mockImplementation(((sql: unknown, ...rest: unknown[]) => {
-            if (typeof sql === "string") observed.push(sql);
-            return (origQuery as (...a: unknown[]) => unknown)(sql, ...rest);
-          }) as typeof client.query);
-          return client;
-        }) as unknown as typeof pool.connect);
-
-        await max1.beginDbTransaction();
-        try {
-          // max:1 guarantees pg.Pool returned the same physical client.
-          const newClient = max1._currentClientForTest();
-          expect(newClient).toBe(taggedClient);
-          // Drain ran → no longer tagged.
-          expect(max1._needsDeallocateAllForTest(newClient!)).toBe(false);
-          // DEALLOCATE ALL fired BEFORE BEGIN.
-          expect(observed).toContain("DEALLOCATE ALL");
-          const deallocIdx = observed.indexOf("DEALLOCATE ALL");
-          const beginIdx = observed.indexOf("BEGIN");
-          expect(deallocIdx).toBeGreaterThanOrEqual(0);
-          expect(beginIdx).toBeGreaterThan(deallocIdx);
-        } finally {
-          await max1.rollback();
-        }
-      } finally {
-        await max1.close();
-      }
+      // With the dual-pool collapse there is no per-txn "release" —
+      // the same persistent connection survives commit/rollback, so
+      // the WeakMap-based DEALLOCATE-ALL drain path is no longer
+      // exercised. Tag/drain still applies across reconnect: after
+      // clearCacheBang runs with the connection torn down, the next
+      // _acquireFreshClient runs DEALLOCATE ALL before user code.
+      await adapter.beginDbTransaction();
+      await adapter.execute("SELECT $1::int", [1]);
+      await adapter.rollback();
+      adapter.reconnect();
+      // Re-pop a statement into the pool's history, then tear down
+      // the live connection and trigger the reset-branch of
+      // clearCacheBang so the drain flag is set.
+      await adapter.beginDbTransaction();
+      await adapter.execute("SELECT $1::int", [2]);
+      await adapter.rollback();
+      // Simulate the failed-session window by detaching the live
+      // connection before clearCacheBang.
+      const conn = adapter._rawConnectionForTest();
+      // @ts-expect-error — driving the reset path by force-clearing _rawConnection.
+      adapter._rawConnection = null;
+      adapter.clearCacheBang();
+      expect(adapter._needsDeallocateAllForTest()).toBe(true);
+      // Restore so the afterEach close() doesn't double-end.
+      // @ts-expect-error — restoring _rawConnection for cleanup.
+      adapter._rawConnection = conn;
+      // The next acquire runs DEALLOCATE ALL before any user query.
+      expect(conn).not.toBeNull();
+      const observed: string[] = [];
+      const live = conn!;
+      const origQuery = live.query.bind(live);
+      vi.spyOn(live, "query").mockImplementation(((sql: unknown, ...rest: unknown[]) => {
+        if (typeof sql === "string") observed.push(sql);
+        return (origQuery as (...a: unknown[]) => unknown)(sql, ...rest);
+      }) as typeof live.query);
+      await adapter.execute("SELECT 1");
+      expect(observed[0]).toBe("DEALLOCATE ALL");
+      expect(adapter._needsDeallocateAllForTest()).toBe(false);
     });
 
     it("clearCacheBang resets the released-client pool even when a new txn is in progress", async () => {
-      // Repro for the after_rollback-callback-opens-new-txn race: if
-      // an after_rollback callback begins a new transaction before
-      // TransactionManager calls clearCacheBang, _client points at the
-      // NEW client while _lastReleasedTxnClient still points at the
-      // failed one. The hook must reset the failed pool AND clear the
-      // new-txn pool (both branches fire in clearCacheBang).
-      //
-      // pg.Pool can either re-checkout the same physical client
-      // (pool size 1, no concurrency) or hand back a different one;
-      // the test has to work with both. When same-client, `failedPool`
-      // and `newTxnPool` are the same pool object; when different,
-      // they are distinct. Both paths still have to end with all
-      // relevant pools empty after clearCacheBang.
+      // Original repro covered the dual-client after_rollback race
+      // (failed client vs new-txn client). With one persistent
+      // connection there is only one pool: clearCacheBang clears it
+      // regardless of whether a new txn has been opened.
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       const failedPool = adapter._statementPoolForTest()!;
@@ -329,17 +289,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await adapter.execute("SELECT $1::int", [2]);
         const newTxnPool = adapter._statementPoolForTest()!;
-        // Precondition: at least one entry exists to be cleared.
+        // Same pool object — session-scoped lifetime.
+        expect(newTxnPool).toBe(failedPool);
         expect(newTxnPool.length).toBeGreaterThan(0);
         adapter.clearCacheBang();
-        // Hook behavior: the failed pool (via _lastReleasedTxnClient)
-        // gets reset(), and the current txn pool (via _client) gets
-        // clear()'d. Whether the pools are the same object or not, both
-        // end up empty.
-        expect(failedPool.length).toBe(0);
         expect(newTxnPool.length).toBe(0);
-        // Released-client ref dropped regardless.
-        expect(adapter._lastReleasedStatementPoolForTest()).toBeUndefined();
       } finally {
         await adapter.rollback();
       }
