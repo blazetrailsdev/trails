@@ -1,29 +1,36 @@
 import { it, expect } from "vitest";
-import { parseNestedQuery } from "./utils.js";
+import { QueryParser, QueryLimitError } from "./query-parser.js";
 
 it("can normalize values with missing values", () => {
-  const result = parseNestedQuery("a=1&b&c=3");
-  expect(result["a"]).toBe("1");
-  expect(result["b"]).toBeNull();
-  expect(result["c"]).toBe("3");
+  const queryParser = QueryParser.makeDefault(8);
+  expect(queryParser.parseNestedQuery("a=a")).toEqual({ a: "a" });
+  expect(queryParser.parseNestedQuery("a=")).toEqual({ a: "" });
+  expect(queryParser.parseNestedQuery("a")).toEqual({ a: null });
 });
 
 it("accepts bytesize_limit to specify maximum size of query string to parse", () => {
-  // Very large query strings should still parse (we don't currently enforce a byte limit)
-  const large = "a=1&" + "b=2&".repeat(1000);
-  const result = parseNestedQuery(large);
-  expect(result["a"]).toBe("1");
+  const queryParser = QueryParser.makeDefault(32, { bytesizeLimit: 3 });
+  expect(queryParser.parseQuery("a=a")).toEqual({ a: "a" });
+  expect(queryParser.parseNestedQuery("a=a")).toEqual({ a: "a" });
+  expect(queryParser.parseNestedQuery("a=a", "&")).toEqual({ a: "a" });
+  expect(() => queryParser.parseQuery("a=aa")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseNestedQuery("a=aa")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseNestedQuery("a=aa", "&")).toThrowError(QueryLimitError);
+});
+
+it("handles separator strings containing regex metacharacters without throwing", () => {
+  const queryParser = QueryParser.makeDefault(32);
+  // "|" is a regex metacharacter; must be escaped before embedding in a character class
+  expect(queryParser.parseQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
+  expect(queryParser.parseNestedQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
 });
 
 it("accepts params_limit to specify maximum number of query parameters to parse", () => {
-  // Many params should still parse
-  const parts = Array.from({ length: 100 }, (_, i) => `k${i}=v${i}`);
-  const result = parseNestedQuery(parts.join("&"));
-  expect(result["k0"]).toBe("v0");
-  expect(result["k99"]).toBe("v99");
-});
-
-it("raises when normalizing params with incompatible encoding such as UTF-16LE", () => {
-  // In JS, strings are always UTF-16 internally. Invalid percent-encoding throws.
-  expect(() => parseNestedQuery("foo=%FF%FE")).toThrow();
+  const queryParser = QueryParser.makeDefault(32, { paramsLimit: 2 });
+  expect(queryParser.parseQuery("a=a&b=b")).toEqual({ a: "a", b: "b" });
+  expect(queryParser.parseNestedQuery("a=a&b=b")).toEqual({ a: "a", b: "b" });
+  expect(queryParser.parseNestedQuery("a=a&b=b", "&")).toEqual({ a: "a", b: "b" });
+  expect(() => queryParser.parseQuery("a=a&b=b&c=c")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseNestedQuery("a=a&b=b&c=c", "&")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseQuery("b[]=a&b[]=b&b[]=c")).toThrowError(QueryLimitError);
 });

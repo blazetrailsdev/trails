@@ -609,3 +609,40 @@ it("run different apps", () => {
 it("raises for invalid context", () => {
   expect(() => new Utils.Context(null as any, testTarget1)).toThrow();
 });
+
+it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQueryParser", () => {
+  const original = Utils.getParamDepthLimit();
+  try {
+    Utils.setParamDepthLimit(2);
+    expect(Utils.getParamDepthLimit()).toBe(2);
+    expect(() => Utils.parseNestedQuery("a[b][c]=1")).toThrow(Utils.ParamsTooDeepError);
+    expect(Utils.parseNestedQuery("a[b]=1")).toEqual({ a: { b: "1" } });
+  } finally {
+    Utils.setParamDepthLimit(original);
+  }
+});
+
+it("setDefaultQueryParser replaces the active parser", () => {
+  const original = Utils.getDefaultQueryParser();
+  try {
+    const tight = Utils.QueryParser.makeDefault(2, { paramsLimit: 1 });
+    Utils.setDefaultQueryParser(tight);
+    expect(() => Utils.parseQuery("a=1&b=2")).toThrow(Utils.QueryLimitError);
+  } finally {
+    Utils.setDefaultQueryParser(original);
+  }
+});
+
+it("multipart limit accessors round-trip", () => {
+  const origFile = Utils.getMultipartFileLimit();
+  const origTotal = Utils.getMultipartTotalPartLimit();
+  try {
+    Utils.setMultipartFileLimit(64);
+    Utils.setMultipartTotalPartLimit(512);
+    expect(Utils.getMultipartFileLimit()).toBe(64);
+    expect(Utils.getMultipartTotalPartLimit()).toBe(512);
+  } finally {
+    Utils.setMultipartFileLimit(origFile);
+    Utils.setMultipartTotalPartLimit(origTotal);
+  }
+});
