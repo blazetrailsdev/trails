@@ -93,20 +93,17 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
       end: async () => {},
       on: () => fakeClient,
     };
-    // Pre-seed the connection so _acquireFreshClient takes the fast path
-    // after the barrier (avoids real network I/O).
+    // Pre-seed the connection so _doAcquire reuses it rather than
+    // opening a new socket (avoids real network I/O).
     adapter._rawConnection = fakeClient;
 
-    // Stub the configure/drain helpers so the slow path doesn't hit the
-    // network if the fast path guard is re-evaluated after the await.
+    // resetBang() clears _connectionConfigured, so _acquireFreshClient
+    // will call _maybeConfigureConnection via _doAcquire after the
+    // barrier clears. Stub it to avoid real SET queries on the fake client.
     vi.spyOn(
       adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
       "_maybeConfigureConnection",
     ).mockResolvedValue(undefined);
-
-    // Pre-mark configured so the fast path (no configure, no drain) is
-    // taken once the barrier clears.
-    (adapter as unknown as { _connectionConfigured: boolean })._connectionConfigured = true;
 
     // Fire resetBang (sync) — sets _inFlightReset before returning.
     adapter.resetBang();

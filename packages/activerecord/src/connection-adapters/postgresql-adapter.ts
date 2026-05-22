@@ -892,6 +892,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
     // query can interleave between the two commands resetBang fires.
     if (this._inFlightReset) await this._inFlightReset;
+    // Re-check after the yield: a concurrent close/disconnect/discard
+    // may have run while we were waiting for the reset to complete.
+    if (this._closed || this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
     // Fast path: connection already opened and configured, no drain pending.
     if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
       return this._rawConnection;
@@ -2029,8 +2034,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       return;
     }
     if (this._inFlightReset) await this._inFlightReset;
+    // Re-check after the yield: a concurrent disconnect/close/discard
+    // may have nulled _rawConnection while we were waiting.
+    const conn = this._rawConnection;
+    if (this._closed || !conn) {
+      this.reconnect();
+      this.verifiedBang();
+      return;
+    }
     try {
-      await this._rawConnection.query(";");
+      await conn.query(";");
     } catch {
       this.reconnect();
     }
