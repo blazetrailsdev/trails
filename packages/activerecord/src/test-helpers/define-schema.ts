@@ -417,5 +417,36 @@ export async function defineSchema(
       }
     });
     cache.set(table, newSig);
+    invalidateSchemaCacheFor(adapter, table);
   }
+}
+
+/**
+ * Drop any cached schema entries for `table` so the next
+ * `columnForAttribute()` / `columnsHash()` lazy-loads against the freshly
+ * created table. Without this, a prior `defineSchema` (or any earlier
+ * introspection of a same-named table) can leave `_columns` /
+ * `_columnsHash` populated; the cache then returns stale data when callers
+ * read it — and on PG, `caseInsensitiveComparison` silently drops the
+ * `LOWER()` wrap when `columnsHash` returns a column it can't recognize.
+ *
+ * Mirrors Rails' `clear_data_source_cache!(connection, name)` shape
+ * (SchemaCache#clear_data_source_cache! in `schema_cache.rb`), used here
+ * for the same reason: when DDL changes a table out from under the cache.
+ *
+ * Skips quietly when the adapter doesn't expose a schema cache (raw
+ * connections in low-level adapter tests).
+ *
+ * @internal
+ */
+function invalidateSchemaCacheFor(adapter: DatabaseAdapter, table: string): void {
+  const sc = (
+    adapter as {
+      schemaCache?: {
+        clearDataSourceCacheBang?(connection: unknown, name: string): void;
+      };
+    }
+  ).schemaCache;
+  const pool = (adapter as { pool?: unknown }).pool ?? adapter;
+  sc?.clearDataSourceCacheBang?.(pool, table);
 }

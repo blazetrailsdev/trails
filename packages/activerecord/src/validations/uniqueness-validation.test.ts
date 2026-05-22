@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 
-import { createTestAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
@@ -32,7 +32,7 @@ const CLUSTER_A_SCHEMA = {
 } as const;
 
 async function freshAdapterA(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, CLUSTER_A_SCHEMA);
   return adapter;
 }
@@ -643,7 +643,7 @@ describe("UniquenessValidationTest", () => {
 });
 
 async function freshAdapterIndex(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, {
     posts: {
       title: "string",
@@ -870,7 +870,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 });
 
 async function freshAdapterCompositeOrders(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, {
     orders: {
       shop_id: "integer",
@@ -896,7 +896,7 @@ async function freshAdapterCompositeOrders(): Promise<DatabaseAdapter> {
 }
 
 async function freshAdapterCompositeOrders2(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, {
     orders: { shop_id: "string", code: "string" },
   });
@@ -1539,7 +1539,7 @@ describe("UniquenessWithCompositeKey", () => {
 
 describe("UniquenessWithCompositeKey", () => {
   it("uniqueness validation for model with composite key duplicate check", async () => {
-    const adp = createTestAdapter();
+    const { adapter: adp } = createSidecarTestAdapter();
     await defineSchema(adp, { entries: { group_id: "integer", seq: "integer" } });
     class Entry extends Base {
       static {
@@ -1556,7 +1556,7 @@ describe("UniquenessWithCompositeKey", () => {
 });
 
 async function freshAdapterBindParams(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, {
     tokens: {
       columns: { token: "string", label: "string" },
@@ -1636,7 +1636,7 @@ describe("UniquenessBindParamsTest", () => {
 });
 
 async function freshAdapterValidation2(): Promise<DatabaseAdapter> {
-  const adapter = createTestAdapter();
+  const { adapter } = createSidecarTestAdapter();
   await defineSchema(adapter, {
     emails: { address: "string" },
     usernames: { name: "string" },
