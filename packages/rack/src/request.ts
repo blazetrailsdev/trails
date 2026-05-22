@@ -42,11 +42,12 @@ import {
   HTTP_X_FORWARDED_PROTO,
   HTTP_X_FORWARDED_SCHEME,
 } from "./constants.js";
-import { parseNestedQuery, forwardedValues } from "./utils.js";
+import { parseNestedQuery, forwardedValues, getDefaultQueryParser, QueryParser } from "./utils.js";
 import * as MediaTypeModule from "./media-type.js";
-import { parseMultipart } from "./multipart.js";
+import { parseMultipart as multipartExtract } from "./multipart.js";
 
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
+const PARSEABLE_DATA_MEDIA_TYPES = ["multipart/related", "multipart/mixed"];
 
 function parseCookies(cookieStr: string): Record<string, string> {
   const cookies: Record<string, string> = {};
@@ -338,7 +339,7 @@ export class Request {
 
     // Multipart data (form-data, related, mixed, etc.)
     if (mt.startsWith("multipart/")) {
-      const parsed = parseMultipart(this.env) || {};
+      const parsed = multipartExtract(this.env) || {};
       this.env[RACK_REQUEST_FORM_HASH] = parsed;
       this.env[RACK_REQUEST_FORM_INPUT] = input;
       return parsed;
@@ -527,35 +528,11 @@ export class Request {
   static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
   get acceptEncoding(): Array<[string, number]> {
-    const header = this.env["HTTP_ACCEPT_ENCODING"] || "";
-    return header
-      .split(",")
-      .map((part: string) => {
-        const [enc, ...rest] = part.trim().split(";");
-        let q = 1.0;
-        for (const r of rest) {
-          const m = r.trim().match(/^q=(.+)/);
-          if (m) q = parseFloat(m[1]);
-        }
-        return [enc.trim(), q] as [string, number];
-      })
-      .filter(([enc]: [string, number]) => enc !== "");
+    return this.parseHttpAcceptHeader(this.env["HTTP_ACCEPT_ENCODING"]);
   }
 
   get acceptLanguage(): Array<[string, number]> {
-    const header = this.env["HTTP_ACCEPT_LANGUAGE"] || "";
-    return header
-      .split(",")
-      .map((part: string) => {
-        const [lang, ...rest] = part.trim().split(";");
-        let q = 1.0;
-        for (const r of rest) {
-          const m = r.trim().match(/^q=(.+)/);
-          if (m) q = parseFloat(m[1]);
-        }
-        return [lang.trim(), q] as [string, number];
-      })
-      .filter(([lang]: [string, number]) => lang !== "");
+    return this.parseHttpAcceptHeader(this.env["HTTP_ACCEPT_LANGUAGE"]);
   }
 
   getHttpForwarded(token: string): string[] | null {
@@ -679,5 +656,99 @@ export class Request {
 
   get serverName(): string | null {
     return this.env[SERVER_NAME] ?? null;
+  }
+
+  /** @internal */
+  fetchHeader(name: string): any;
+  /** @internal */
+  fetchHeader(name: string, block: () => any): any;
+  /** @internal */
+  fetchHeader(name: string, block?: () => any): any {
+    if (name in this.env) return this.env[name];
+    if (block) return block();
+    return undefined;
+  }
+
+  /** @internal */
+  eachHeader(callback: (key: string, value: any) => void): void {
+    for (const [k, v] of Object.entries(this.env)) {
+      callback(k, v);
+    }
+  }
+
+  /** @internal */
+  get hostAuthority(): string | null {
+    return this.env[HTTP_HOST] ?? null;
+  }
+
+  /** @internal */
+  isParseableData(): boolean {
+    const mt = this.mediaType;
+    return mt !== null && PARSEABLE_DATA_MEDIA_TYPES.includes(mt);
+  }
+
+  /** @internal */
+  get path(): string {
+    return this.scriptName + this.pathInfo;
+  }
+
+  /** @internal */
+  valuesAt(...keys: string[]): any[] {
+    const p = this.params;
+    return keys.map((k) => p[k]);
+  }
+
+  /** @internal */
+  protected defaultSession(): Record<string, any> {
+    return {};
+  }
+
+  /** @internal */
+  protected parseHttpAcceptHeader(header: string | null | undefined): Array<[string, number]> {
+    const parts = (header ?? "").split(",");
+    const result: Array<[string, number]> = [];
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const [attr, params] = trimmed.split(";", 2);
+      const attribute = attr.trim();
+      let quality = 1.0;
+      if (params) {
+        const m = params.trim().match(/^q=([\d.]+)/);
+        if (m) quality = parseFloat(m[1]);
+      }
+      result.push([attribute, quality]);
+    }
+    return result;
+  }
+
+  /** @internal */
+  protected queryParser(): QueryParser {
+    return getDefaultQueryParser();
+  }
+
+  /** @internal */
+  protected parseQuery(qs: string, separator = "&"): Record<string, any> {
+    return parseNestedQuery(qs, separator);
+  }
+
+  /** @internal */
+  protected parseMultipart(): Record<string, any> {
+    return multipartExtract(this.env) || {};
+  }
+
+  /** @internal */
+  protected expandParamPairs(pairs: Array<[string, any]>): Record<string, any> {
+    const parser = this.queryParser();
+    const params = parser.makeParams();
+    for (const [k, v] of pairs) {
+      parser.normalizeParams(params, k, v);
+    }
+    return params.toParamsHash();
+  }
+
+  /** @internal */
+  protected rejectTrustedIpAddresses(ipAddresses: string[]): string[] {
+    return ipAddresses.filter((ip) => !this.trustedProxy(ip));
   }
 }

@@ -57,16 +57,24 @@ describe("RackRequestTest", () => {
 
   it("yields to the block if no value has been set", () => {
     const req = makeReq();
-    const val = req.get("NONEXISTENT", () => "default");
-    expect(val).toBe("default");
+    let yielded = false;
+    req.fetchHeader("FOO", () => {
+      yielded = true;
+      req.set("FOO", "bar");
+      return "bar";
+    });
+    expect(yielded).toBe(true);
+    expect(req.get("FOO")).toBe("bar");
   });
 
   it("can iterate over values", () => {
     const req = makeReq();
-    const keys: string[] = [];
-    req.each((k) => keys.push(k));
-    expect(keys.length).toBeGreaterThan(0);
-    expect(keys).toContain("REQUEST_METHOD");
+    req.set("foo", "bar");
+    const hash: Record<string, any> = {};
+    req.eachHeader((k, v) => {
+      hash[k] = v;
+    });
+    expect(hash["foo"]).toBe("bar");
   });
 
   it("can set values in the env", () => {
@@ -348,7 +356,10 @@ describe("RackRequestTest", () => {
 
   it("should use the query_parser for query parsing", () => {
     const req = makeReq("/?foo=bar&baz=qux");
+    // queryParser() drives GET parsing
     expect(req.GET).toEqual({ foo: "bar", baz: "qux" });
+    // parseQuery delegates to queryParser
+    expect((req as any).parseQuery("a=1&b=2")).toEqual({ a: "1", b: "2" });
   });
 
   it("does not use semi-colons as separators for query strings in GET", () => {
@@ -1378,11 +1389,9 @@ describe("RackRequestTest", () => {
 
   it("return values for the keys in the order given from values_at", () => {
     const req = makeReq("/?foo=baz&wun=der&bar=ful");
-    const params = req.params;
-    // values_at returns param values in the order of the given keys
-    expect([params["foo"]]).toEqual(["baz"]);
-    expect([params["foo"], params["wun"]]).toEqual(["baz", "der"]);
-    expect([params["bar"], params["foo"], params["wun"]]).toEqual(["ful", "baz", "der"]);
+    expect(req.valuesAt("foo")).toEqual(["baz"]);
+    expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
+    expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
   });
 
   it("respond to isLink, isTrace, isUnlink", () => {
