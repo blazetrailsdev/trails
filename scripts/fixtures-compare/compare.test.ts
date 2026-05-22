@@ -374,7 +374,7 @@ describe("compareModelClass", () => {
       associations: [{ kind: "has_many", name: "comments", options: {} }],
     };
     const ts = `static { this.hasMany("comments", {}); }`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.status).toBe("MATCH");
     expect(r.assocMatched).toBe(1);
     expect(r.notes).toHaveLength(0);
@@ -385,7 +385,7 @@ describe("compareModelClass", () => {
       ...emptyClass(),
       associations: [{ kind: "belongs_to", name: "author", options: {} }],
     };
-    const r = compareModelClass(ruby, "// empty");
+    const r = compareModelClass(ruby, "// empty", "test/models/foo.rb", "foo.ts");
     expect(r.status).toBe("DIFF");
     expect(r.assocMatched).toBe(0);
     expect(r.notes[0]).toMatch(/assoc-missing/);
@@ -398,7 +398,7 @@ describe("compareModelClass", () => {
       scopes: [{ name: "open" }],
     };
     const ts = `// we leave connections open`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.status).toBe("DIFF");
     expect(r.scopesMatched).toBe(0);
   });
@@ -406,7 +406,7 @@ describe("compareModelClass", () => {
   it("matches scope when this.scope call is present", () => {
     const ruby: RubyClass = { ...emptyClass(), scopes: [{ name: "published" }] };
     const ts = `this.scope("published", () => this.where({ published: true }));`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.scopesMatched).toBe(1);
   });
 
@@ -417,7 +417,7 @@ describe("compareModelClass", () => {
     };
     // validate( without s — should NOT match validates check
     const ts = `this.validate("name is too short");`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.valsMatched).toBe(0);
     expect(r.status).toBe("DIFF");
   });
@@ -428,7 +428,7 @@ describe("compareModelClass", () => {
       validations: [{ kind: "validates_presence_of", attributes: ["title"], options: {} }],
     };
     const ts = `this.validatesPresenceOf("title");`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.valsMatched).toBe(1);
     expect(r.status).toBe("MATCH");
   });
@@ -439,7 +439,7 @@ describe("compareModelClass", () => {
       validations: [{ kind: "validates_presence_of", attributes: ["title"], options: {} }],
     };
     const ts = `this.validates("title", { presence: true });`;
-    const r = compareModelClass(ruby, ts);
+    const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
     expect(r.valsMatched).toBe(1);
   });
 
@@ -448,8 +448,18 @@ describe("compareModelClass", () => {
       ...emptyClass(),
       validations: [{ kind: "validates_uniqueness_of", attributes: ["email"], options: {} }],
     };
-    expect(compareModelClass(ruby, `this.validatesUniqueness("email");`).valsMatched).toBe(1);
+    expect(
+      compareModelClass(ruby, `this.validatesUniqueness("email");`, "test/models/foo.rb", "foo.ts")
+        .valsMatched,
+    ).toBe(1);
     // Must NOT match the wrong name
-    expect(compareModelClass(ruby, `this.validatesUniquenessOf("email");`).valsMatched).toBe(0);
+    expect(
+      compareModelClass(
+        ruby,
+        `this.validatesUniquenessOf("email");`,
+        "test/models/foo.rb",
+        "foo.ts",
+      ).valsMatched,
+    ).toBe(0);
   });
 });

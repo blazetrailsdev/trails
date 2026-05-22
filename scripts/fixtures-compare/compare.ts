@@ -616,10 +616,15 @@ export function tsModelPath(rubyFile: string): string {
   return path.join(MODELS_TS_DIR, rel.replace(/_/g, "-"));
 }
 
-export function compareModelClass(ruby: RubyClass, tsContent: string): ModelResult {
+export function compareModelClass(
+  ruby: RubyClass,
+  tsContent: string,
+  rubyFile: string,
+  tsFile: string,
+): ModelResult {
   const r: ModelResult = {
-    rubyFile: "",
-    tsFile: null,
+    rubyFile,
+    tsFile,
     status: "MATCH",
     assocMatched: 0,
     assocTotal: ruby.associations.length,
@@ -722,9 +727,7 @@ function runModelsPass(filter: string | null): void {
       continue;
     }
 
-    const r = compareModelClass(primaryClass, tsContent!);
-    r.rubyFile = entry.file;
-    r.tsFile = tsPath;
+    const r = compareModelClass(primaryClass, tsContent!, entry.file, tsPath);
     results.push(r);
   }
 
