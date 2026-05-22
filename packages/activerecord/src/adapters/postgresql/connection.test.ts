@@ -261,20 +261,32 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     // Force lazy connect so we exercise the close path.
     await a.execute("SELECT 1");
-    expect(a.active).toBe(true);
-    expect(a.isConnected()).toBe(true);
-    a.disconnectBang();
-    expect(a.active).toBe(false);
-    expect(a.isConnected()).toBe(false);
+    const conn = a._rawConnectionForTest();
+    try {
+      expect(a.active).toBe(true);
+      expect(a.isConnected()).toBe(true);
+      a.disconnectBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      // disconnectBang fires conn.end() fire-and-forget; await it here
+      // so the test exits cleanly without leaving an open socket.
+      await conn?.end().catch(() => {});
+    }
   });
 
   it("discardBang fires async connection cleanup", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     await a.execute("SELECT 1");
-    expect(a.active).toBe(true);
-    a.discardBang();
-    expect(a.active).toBe(false);
-    expect(a.isConnected()).toBe(false);
+    const conn = a._rawConnectionForTest();
+    try {
+      expect(a.active).toBe(true);
+      a.discardBang();
+      expect(a.active).toBe(false);
+      expect(a.isConnected()).toBe(false);
+    } finally {
+      await conn?.end().catch(() => {});
+    }
   });
 
   it("reconnect resets connection so queries work again", async () => {

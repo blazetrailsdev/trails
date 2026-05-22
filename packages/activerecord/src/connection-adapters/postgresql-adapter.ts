@@ -1861,10 +1861,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   override async verifyBang(): Promise<void> {
-    if (!this._rawConnection) {
-      // Lazy reconnect: a subsequent _acquireFreshClient call will
-      // open the connection. Just confirm config exists.
-      if (this._pgClientOptions) this.verifiedBang();
+    // Mirrors Rails' verify! → reconnect! when active? returns false
+    // (abstract_adapter.rb:759-776). The ConnectionPool calls this on
+    // checkout, so a prior disconnectBang/discardBang doesn't leave
+    // the adapter permanently unusable — the pool flow reopens it.
+    if (this._closed || !this._rawConnection) {
+      this.reconnect();
+      this.verifiedBang();
       return;
     }
     try {
@@ -2014,11 +2017,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   /**
    * Get the underlying persistent pg.Client.
-   * Escape hatch for advanced usage. Lazily opens the connection if
-   * it hasn't been used yet.
+   * Escape hatch for advanced usage — mirrors mysql2/sqlite3 adapter
+   * conventions (`get raw()`). Throws when the connection hasn't been
+   * opened yet (use a query method first to lazy-connect) or after
+   * close/disconnect.
    */
-  async getRawConnection(): Promise<pg.Client> {
-    return this._acquireFreshClient();
+  get raw(): pg.Client {
+    if (!this._rawConnection) throw new Error("PostgreSQLAdapter: connection is closed");
+    return this._rawConnection;
   }
 
   // ---------------------------------------------------------------------------
