@@ -259,13 +259,6 @@ export class Response {
     this.setHeader(SET_COOKIE, v);
   }
 
-  get setCookieHeaderValue(): any {
-    return this.getHeader(SET_COOKIE);
-  }
-  set setCookieHeaderValue(v: any) {
-    this.setHeader(SET_COOKIE, v);
-  }
-
   get cacheControl(): string | undefined {
     return this.getHeader(CACHE_CONTROL);
   }

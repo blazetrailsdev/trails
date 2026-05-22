@@ -475,6 +475,10 @@ it("provide access to the HTTP status", () => {
   expect(res.isClientError).toBe(true);
   expect(res.isUnauthorized).toBe(true);
 
+  res.status = 403;
+  expect(res.isClientError).toBe(true);
+  expect(res.isForbidden).toBe(true);
+
   res.status = 404;
   expect(res.isClientError).toBe(true);
   expect(res.isNotFound).toBe(true);
@@ -501,7 +505,7 @@ it("provide access to the HTTP status", () => {
 it("provide access to the HTTP headers", () => {
   const res = new Response();
   res.headers["content-type"] = "text/yaml; charset=UTF-8";
-  expect(res.includes("content-type")).toBe(true);
+  expect(res.isInclude("content-type")).toBe(true);
   expect(res.headers["content-type"]).toBe("text/yaml; charset=UTF-8");
   expect(res.contentType).toBe("text/yaml; charset=UTF-8");
   expect(res.mediaType).toBe("text/yaml");
