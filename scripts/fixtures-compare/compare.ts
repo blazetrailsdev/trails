@@ -3,7 +3,7 @@
 // failure only per docs/fixtures-port-plan.md (Decision 4); PR 7 flips
 // to hard-fail. ERB stubs adapter_name to "SQLite"; other ERB → skipped.
 import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -532,7 +532,7 @@ async function main(): Promise<void> {
 const MODELS_TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/models");
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
 
-interface RubyAssoc {
+export interface RubyAssoc {
   kind: string;
   name: string;
   options: Record<string, string>;
@@ -553,7 +553,7 @@ interface RubyAttr {
   name: string;
   type: string;
 }
-interface RubyClass {
+export interface RubyClass {
   name: string;
   parent: string | null;
   tableName: string | null;
@@ -584,18 +584,18 @@ interface ModelResult {
 }
 
 function loadRubyModelsManifest(): RubyFileEntry[] {
-  const out = execSync(`ruby "${RUBY_EXTRACTOR}"`, { encoding: "utf8" });
+  const out = execFileSync("ruby", [RUBY_EXTRACTOR], { encoding: "utf8" });
   return JSON.parse(out) as RubyFileEntry[];
 }
 
 // Infer TS filename from Ruby file path. `test/models/post.rb` → `post.ts`;
 // `test/models/admin/account.rb` → `admin/account.ts` (preserving subdir).
-function tsModelPath(rubyFile: string): string {
+export function tsModelPath(rubyFile: string): string {
   const rel = rubyFile.replace(/^test\/models\//, "").replace(/\.rb$/, ".ts");
   return path.join(MODELS_TS_DIR, rel.replace(/_/g, "-"));
 }
 
-function compareModelClass(ruby: RubyClass, tsContent: string): ModelResult {
+export function compareModelClass(ruby: RubyClass, tsContent: string): ModelResult {
   const r: ModelResult = {
     rubyFile: "",
     tsFile: null,
@@ -619,7 +619,7 @@ function compareModelClass(ruby: RubyClass, tsContent: string): ModelResult {
   }
   for (const v of ruby.validations) {
     const attr = v.attributes[0];
-    const vpat = attr ? new RegExp(`this\\.validates?\\s*\\(\\s*["']${attr}["']`, "i") : null;
+    const vpat = attr ? new RegExp(`this\\.validates\\s*\\(\\s*["']${attr}["']`, "i") : null;
     if (vpat && vpat.test(tsContent)) r.valsMatched++;
     else r.notes.push(`val-missing: ${v.kind} ${v.attributes.join(",")}`);
   }

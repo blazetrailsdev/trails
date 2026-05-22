@@ -60,15 +60,16 @@ def parse_file(path)
     closes -= 1 if line =~ /^\s*def\s+\w+\s*=/ && !line.include?(" end")
 
     if (m = line.match(/^class\s+(\w+(?:::\w+)*)(?:\s*<\s*([\w:]+))?/))
-      # Apply the net delta from this line (class keyword already counted in opens).
-      # Clamp to at least depth+1 so `class Foo; end` (opens==closes==1) still
-      # records a unique depth for the class before popping it.
-      net = opens - closes
-      depth += net >= 1 ? net : 1
+      # Enter the class body at depth+1, then apply remaining tokens on this line.
+      # `class` itself counted in opens; remaining opens = opens-1, closes = closes.
+      # e.g. `class Foo; end` → depth+1, then -1 → back to parent depth, stack popped.
+      depth += 1
       cls = { name: m[1], parent: m[2], tableName: nil,
               associations: [], validations: [], scopes: [], callbacks: [], attributes: [] }
       stack << { cls: cls, depth: depth }
       classes << cls
+      depth += (opens - 1) - closes
+      stack.pop while stack.last && depth < stack.last[:depth]
       next
     end
 
