@@ -44,7 +44,7 @@ export class MockResponse extends Response {
       if (typeof errors.string === "function") this.errors = errors.string();
       else if (typeof errors === "string") this.errors = errors;
     }
-    this.cookies = this._parseCookiesFromHeader();
+    this.cookies = this.parseCookiesFromHeader();
     this.bufferedBody();
   }
 
@@ -95,11 +95,6 @@ export class MockResponse extends Response {
       });
     }
     return cookies;
-  }
-
-  /** @internal */
-  private _parseCookiesFromHeader(): Record<string, MockCookie> {
-    return this.parseCookiesFromHeader();
   }
 
   /** @internal */

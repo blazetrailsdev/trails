@@ -102,7 +102,6 @@ export class Builder {
     return this;
   }
 
-  /** @internal */
   static loadFile(path: string, ..._options: any[]): RackApp {
     return Builder.parseFile(path);
   }
@@ -138,7 +137,6 @@ export class Builder {
     return result;
   }
 
-  /** @internal */
   private generateMap(defaultApp: RackApp | null, mapping: Record<string, RackApp>): RackApp {
     const mapped: Record<string, RackApp> = defaultApp ? { "/": defaultApp } : {};
     for (const [r, b] of Object.entries(mapping)) {
