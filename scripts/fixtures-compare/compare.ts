@@ -288,7 +288,10 @@ function normalizeDatetime(v: unknown): number | null {
   // and the comparison would be host-dependent. Date-only scalars
   // (`YYYY-MM-DD`) get midnight-UTC so `Date.parse` doesn't choke on the
   // bare `YYYY-MM-DDZ` shape it considers invalid.
-  let iso = v.replace(" ", "T");
+  // ISO 8601 mandates an uppercase `T`, but yaml-lib's !!timestamp output
+  // uses lowercase `t`. V8 accepts both today; spec'd JS engines and
+  // stricter runtimes can return NaN. Normalize both space and `t` here.
+  let iso = v.replace(" ", "T").replace(/(\d)t(\d)/, "$1T$2");
   // Date-only check is strict (must be exactly `YYYY-MM-DD`) so lowercase
   // `t` separators from `yaml` lib's !!timestamp output aren't mistaken
   // for date-only and double-appended.
