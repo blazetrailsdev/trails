@@ -74,7 +74,9 @@ function splitHeader(value: string | null | undefined): string[] {
 }
 
 function wrapIpv6(address: string): string {
-  if (address && address.includes(":") && !address.startsWith("[")) {
+  // Rails: only wrap if not already bracketed and has >1 colon (IPv6 has multiple colons;
+  // host:port has exactly one and must not be wrapped).
+  if (address && !address.startsWith("[") && address.split(":").length - 1 > 1) {
     return `[${address}]`;
   }
   return address;
@@ -574,7 +576,7 @@ export class Request {
         if (fwd) return fwd.map((a) => splitAuthority(a)[2]).filter((p): p is number => p !== null);
       } else if (type === "x_forwarded") {
         const value = this.env[HTTP_X_FORWARDED_PORT];
-        if (value) return splitHeader(value).map((v) => parseInt(v));
+        if (value) return splitHeader(value).map((v) => parseInt(v) || 0);
       }
     }
     return null;
