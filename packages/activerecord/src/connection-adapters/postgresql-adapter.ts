@@ -1876,22 +1876,30 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails' `PostgreSQLAdapter#reset!`. Rails issues ROLLBACK (if
-   * in a transaction), DISCARD ALL, then re-runs configure_connection on
-   * the single raw connection. We fire a best-effort ROLLBACK on the
-   * held connection (if any), then tear down so the next acquire opens
-   * a fresh client and reconfigures it.
+   * Mirrors Rails' `PostgreSQLAdapter#reset!` (postgresql_adapter.rb:371).
+   * If there's no connection yet, lazy-connect on next use. Otherwise
+   * fire ROLLBACK (best-effort, only if in TX) followed by DISCARD ALL
+   * on the SAME persistent connection — preserves the socket and only
+   * scrubs session state, exactly as Rails does.
    *
    * @internal
    */
   override resetBang(): void {
+    if (!this._rawConnection) {
+      super.resetBang();
+      return;
+    }
     if (this._client) {
       this._cancelAnyRunningQuery();
-      const client = this._client;
+      const live = this._rawConnection;
+      live.query("ROLLBACK").catch(() => {});
       this._client = null;
-      client.query("ROLLBACK").catch(() => {});
+      this._inTransaction = false;
     }
-    this.reconnect();
+    this._rawConnection.query("DISCARD ALL").catch(() => {});
+    // DISCARD ALL drops server-side prepared statements — reset the
+    // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
+    this._statementPool?.reset();
     super.resetBang();
   }
 
