@@ -76,6 +76,12 @@ describe("TrailsActions", () => {
       expect(json.dependencies["left-pad"]).toBe("*");
     });
 
+    it("rejects empty or whitespace-only package names", async () => {
+      files.set("/app/package.json", JSON.stringify({ name: "app" }, null, 2) + "\n");
+      await expect(makeGen().pkg("")).rejects.toThrow(/non-empty/);
+      await expect(makeGen().pkg("   ")).rejects.toThrow(/non-empty/);
+    });
+
     it("rejects prototype-pollution package names", async () => {
       files.set("/app/package.json", JSON.stringify({ name: "app" }, null, 2) + "\n");
       await expect(makeGen().pkg("__proto__")).rejects.toThrow(/invalid package name/);

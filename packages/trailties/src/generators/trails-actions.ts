@@ -5,8 +5,27 @@
 // stays clean. These actions mutate `package.json` and `src/config/*.ts`
 // files in a trails app; they have no Ruby counterpart.
 
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/activesupport";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
+
+type AsyncFs = FsAdapter & {
+  readFile: NonNullable<FsAdapter["readFile"]>;
+  writeFile: NonNullable<FsAdapter["writeFile"]>;
+  mkdir: NonNullable<FsAdapter["mkdir"]>;
+};
+
+async function requireAsyncFs(needs: ReadonlyArray<keyof AsyncFs>): Promise<AsyncFs> {
+  const fs = await getFsAsync();
+  for (const m of needs) {
+    if (typeof (fs as unknown as Record<string, unknown>)[m] !== "function") {
+      throw new Error(
+        `FsAdapter is missing required async method ${JSON.stringify(m)}; ` +
+          `trails-actions needs async readFile/writeFile/mkdir`,
+      );
+    }
+  }
+  return fs as AsyncFs;
+}
 
 export interface TrailsActionsHost {
   cwd: string;
@@ -29,10 +48,13 @@ export async function pkg(
   version: string = "*",
   opts: PkgOptions = {},
 ): Promise<void> {
-  const fs = await getFsAsync();
+  if (name.trim() === "") {
+    throw new Error(`package name must be non-empty, got ${JSON.stringify(name)}`);
+  }
+  const fs = await requireAsyncFs(["readFile", "writeFile"]);
   const path = await getPathAsync();
   const pkgPath = path.join(this.cwd, "package.json");
-  const raw = await fs.readFile!(pkgPath, "utf-8");
+  const raw = await fs.readFile(pkgPath, "utf-8");
   const parsed: unknown = JSON.parse(raw);
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     const actual = parsed === null ? "null" : Array.isArray(parsed) ? "array" : typeof parsed;
@@ -59,7 +81,7 @@ export async function pkg(
   );
   deps[name] = version;
   json[key] = deps;
-  await fs.writeFile!(pkgPath, JSON.stringify(json, null, 2) + "\n");
+  await fs.writeFile(pkgPath, JSON.stringify(json, null, 2) + "\n");
   this.output(`         pkg  ${name}`);
 }
 
@@ -124,12 +146,12 @@ export async function initializer(
     throw new Error(`initializer filename must be a leaf name, got ${JSON.stringify(filename)}`);
   }
   assertNoRubySource(content);
-  const fs = await getFsAsync();
+  const fs = await requireAsyncFs(["mkdir", "writeFile"]);
   const path = await getPathAsync();
   const dir = path.join(this.cwd, "src/config/initializers");
-  await fs.mkdir!(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
   const dest = path.join(dir, filename);
-  await fs.writeFile!(dest, content.endsWith("\n") ? content : content + "\n");
+  await fs.writeFile(dest, content.endsWith("\n") ? content : content + "\n");
   this.output(`      create  src/config/initializers/${filename}`);
 }
 
@@ -139,10 +161,10 @@ async function insertAtMarker(
   marker: string,
   insertion: string,
 ): Promise<void> {
-  const fs = await getFsAsync();
+  const fs = await requireAsyncFs(["readFile", "writeFile"]);
   const path = await getPathAsync();
   const full = path.join(host.cwd, relPath);
-  const existing = await fs.readFile!(full, "utf-8");
+  const existing = await fs.readFile(full, "utf-8");
   // Match the marker as a full line (`^<indent><marker>$`, multiline) so a
   // user-supplied block containing the marker substring inside other code
   // can't shadow the real marker line. Take the LAST match — every
@@ -163,7 +185,7 @@ async function insertAtMarker(
     .join("\n");
   const text = block.endsWith("\n") ? block : block + "\n";
   const updated = existing.slice(0, lineStart) + text + existing.slice(lineStart);
-  await fs.writeFile!(full, updated);
+  await fs.writeFile(full, updated);
 }
 
 function escapeRegExp(s: string): string {
