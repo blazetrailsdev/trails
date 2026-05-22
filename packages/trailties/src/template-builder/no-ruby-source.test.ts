@@ -18,6 +18,14 @@ describe("assertNoRubySource", () => {
     expect(() => assertNoRubySource("class Foo::Bar\nend")).toThrow(/Ruby-like source/);
   });
 
+  it("flags Ruby class inheriting from top-level constant", () => {
+    expect(() => assertNoRubySource("class Foo < ::Bar\nend")).toThrow(/Ruby-like source/);
+  });
+
+  it("flags Ruby class inheriting from a namespaced parent", () => {
+    expect(() => assertNoRubySource("class Foo < A::B::C\nend")).toThrow(/Ruby-like source/);
+  });
+
   it("flags bare Ruby module declaration", () => {
     expect(() => assertNoRubySource("module Foo\nend")).toThrow(/Ruby-like source/);
   });

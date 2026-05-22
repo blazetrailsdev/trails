@@ -20,7 +20,7 @@ async function requireAsyncFs(needs: ReadonlyArray<keyof AsyncFs>): Promise<Asyn
     if (typeof (fs as unknown as Record<string, unknown>)[m] !== "function") {
       throw new Error(
         `FsAdapter is missing required async method ${JSON.stringify(m)}; ` +
-          `trails-actions needs async readFile/writeFile/mkdir`,
+          `this action needs ${needs.map((n) => `async ${n}`).join(" + ")}`,
       );
     }
   }

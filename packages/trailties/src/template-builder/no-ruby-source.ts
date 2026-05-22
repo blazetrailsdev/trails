@@ -8,7 +8,10 @@
 // Foo<T> {`, Ruby uses `class Foo`, `class Foo < Bar`, or `class Foo::Bar`.
 // Match the Ruby trailers (`< Parent`, `::Ns`, or EOL) explicitly so TS's
 // `{`/`<T>` openers don't trip the check.
-const RUBY_RE = /^\s*(?:def\s+\w+|(?:class|module)\s+[A-Z]\w*(?:::\w+)*\s*(?:$|<\s+\w))/m;
+// The parent in `class Foo < Bar` can be a plain const (`Bar`), a top-level
+// `::Bar`, or a namespaced `A::B::C`. Match the `<` trailer accordingly.
+const RUBY_RE =
+  /^\s*(?:def\s+\w+|(?:class|module)\s+[A-Z]\w*(?:::\w+)*\s*(?:$|<\s+(?:::)?[A-Z]\w*(?:::\w+)*))/m;
 
 export function assertNoRubySource(text: string): void {
   const m = text.match(RUBY_RE);
