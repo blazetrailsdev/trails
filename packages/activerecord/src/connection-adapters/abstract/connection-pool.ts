@@ -571,16 +571,16 @@ export class ConnectionPool implements ReapablePool {
   // --- Checkout / Checkin ---
 
   checkout(): DatabaseAdapter {
-    const pin = this._pinnedConnections.get(executionContextId());
-    if (pin) {
-      if (isTransactionAware(pin.connection)) {
-        pin.connection.verifyBang();
+    const pinned = this._resolvePinnedConnection();
+    if (pinned) {
+      if (isTransactionAware(pinned)) {
+        pinned.verifyBang();
       }
-      if (this._connections && !this._connections.includes(pin.connection)) {
-        this._connections.push(pin.connection);
+      if (this._connections && !this._connections.includes(pinned)) {
+        this._connections.push(pinned);
       }
-      this._cacheConfig.checkoutAndVerify(pin.connection as unknown as QueryCacheHost);
-      return pin.connection;
+      this._cacheConfig.checkoutAndVerify(pinned as unknown as QueryCacheHost);
+      return pinned;
     }
     const conn = this._acquireConnection();
     this._cacheConfig.checkoutAndVerify(conn as unknown as QueryCacheHost);
@@ -588,16 +588,16 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async checkoutAsync(timeout?: number): Promise<DatabaseAdapter> {
-    const pin = this._pinnedConnections.get(executionContextId());
-    if (pin) {
-      if (isTransactionAware(pin.connection)) {
-        pin.connection.verifyBang();
+    const pinned = this._resolvePinnedConnection();
+    if (pinned) {
+      if (isTransactionAware(pinned)) {
+        pinned.verifyBang();
       }
-      if (this._connections && !this._connections.includes(pin.connection)) {
-        this._connections.push(pin.connection);
+      if (this._connections && !this._connections.includes(pinned)) {
+        this._connections.push(pinned);
       }
-      this._cacheConfig.checkoutAndVerify(pin.connection as unknown as QueryCacheHost);
-      return pin.connection;
+      this._cacheConfig.checkoutAndVerify(pinned as unknown as QueryCacheHost);
+      return pinned;
     }
     const conn = this._tryAcquire();
     if (conn) {
@@ -628,6 +628,8 @@ export class ConnectionPool implements ReapablePool {
   }
 
   private _acquireConnection(): DatabaseAdapter {
+    const pinned = this._resolvePinnedConnection();
+    if (pinned) return pinned;
     const conn = this._tryAcquire();
     if (conn) return conn;
     throw new ConnectionTimeoutError(
@@ -993,6 +995,21 @@ export class ConnectionPool implements ReapablePool {
       if (pin.connection === conn) return true;
     }
     return false;
+  }
+
+  /**
+   * Resolve the connection that all checkouts in the current execution
+   * context should route to while a pin is active. Centralizes the lookup
+   * used by `checkout`, `checkoutAsync`, and `_acquireConnection` so every
+   * lease entry point honors `pinConnectionBang` consistently — mirrors
+   * Rails' `@pinned_connection` short-circuit in
+   * `ConnectionPool#checkout` (connection_pool.rb:547).
+   *
+   * @internal
+   */
+  private _resolvePinnedConnection(): DatabaseAdapter | undefined {
+    if (this._pinnedConnections.size === 0) return undefined;
+    return this._pinnedConnections.get(executionContextId())?.connection;
   }
 
   private _connectionLease(): Lease {
