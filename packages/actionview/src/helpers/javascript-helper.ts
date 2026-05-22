@@ -1,12 +1,13 @@
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
-import { contentTag } from "./tag-helper.js";
-import { cdataSection } from "./tag-helper.js";
+
+import { capture, type CaptureHelperHost } from "./capture-helper.js";
+import { cdataSection, contentTag } from "./tag-helper.js";
 
 /**
  * ActionView::Helpers::JavaScriptHelper
  */
 
-const JS_ESCAPE_MAP: Record<string, string> = {
+export const JS_ESCAPE_MAP: Record<string, string> = {
   "\\": "\\\\",
   "</": "<\\/",
   "\r\n": "\\n",
@@ -23,34 +24,64 @@ const JS_ESCAPE_MAP: Record<string, string> = {
 const JS_ESCAPE_PATTERN = /(\\|<\/|\r\n|\u2028|\u2029|[\n\r"']|[`]|[$])/g;
 
 /**
- * escapeJavascript — escapes carriage returns, quotes, and other characters
- * for safe embedding in JavaScript strings.
+ * Escapes carriage returns and single and double quotes for JavaScript
+ * segments. Also available through the alias {@link j}.
  */
 export function escapeJavascript(javascript: unknown): string | SafeBuffer {
-  const str = String(javascript ?? "");
-  if (str === "") {
-    const wasSafe = javascript instanceof SafeBuffer && javascript.htmlSafe;
-    return wasSafe ? htmlSafe("") : "";
-  }
-  const result = str.replace(JS_ESCAPE_PATTERN, (match) => JS_ESCAPE_MAP[match] ?? match);
+  const str = javascript == null ? "" : String(javascript);
+  const result =
+    str === "" ? "" : str.replace(JS_ESCAPE_PATTERN, (match) => JS_ESCAPE_MAP[match] ?? match);
   const wasSafe = javascript instanceof SafeBuffer && javascript.htmlSafe;
   return wasSafe ? htmlSafe(result) : result;
 }
 
 export const j = escapeJavascript;
 
-/**
- * javascriptCdataSection — wraps content in a JavaScript CDATA section.
- */
-export function javascriptCdataSection(content: string): SafeBuffer {
-  return htmlSafe(`\n//${cdataSection(`\n${content}\n//`).toString()}\n`);
+/** @internal */
+export function javascriptCdataSection(content: unknown): SafeBuffer {
+  return htmlSafe(`\n//${cdataSection(`\n${String(content ?? "")}\n//`).toString()}\n`);
 }
 
 /**
- * javascriptTag — returns a <script> tag wrapping the content.
+ * Returns a JavaScript `<script>` tag wrapping `content` in a CDATA section.
+ * Mirrors `ActionView::Helpers::JavaScriptHelper#javascript_tag`. Pass a
+ * block (with optional leading `htmlOptions`) to capture from the output
+ * buffer instead.
  */
-export function javascriptTag(content: string, htmlOptions?: Record<string, unknown>): SafeBuffer {
-  const opts = htmlOptions ? { ...htmlOptions } : {};
-  const cdataContent = javascriptCdataSection(content);
-  return contentTag("script", cdataContent, opts, true) as SafeBuffer;
+export function javascriptTag(
+  this: CaptureHelperHost | void,
+  contentOrOptions?: unknown,
+  htmlOptions?: Record<string, unknown> | (() => unknown),
+  block?: () => unknown,
+): SafeBuffer {
+  const resolvedBlock =
+    typeof htmlOptions === "function"
+      ? htmlOptions
+      : typeof block === "function"
+        ? block
+        : undefined;
+
+  let opts: Record<string, unknown>;
+  let content: unknown;
+
+  if (resolvedBlock) {
+    const isHash =
+      contentOrOptions != null &&
+      typeof contentOrOptions === "object" &&
+      Object.getPrototypeOf(contentOrOptions) === Object.prototype;
+    opts = isHash
+      ? { ...(contentOrOptions as Record<string, unknown>) }
+      : typeof htmlOptions === "object" && htmlOptions !== null
+        ? { ...(htmlOptions as Record<string, unknown>) }
+        : {};
+    content = capture.call(this as CaptureHelperHost, resolvedBlock);
+  } else {
+    content = contentOrOptions;
+    opts =
+      typeof htmlOptions === "object" && htmlOptions !== null
+        ? { ...(htmlOptions as Record<string, unknown>) }
+        : {};
+  }
+
+  return contentTag("script", javascriptCdataSection(content), opts, true) as SafeBuffer;
 }
