@@ -259,9 +259,8 @@ export class QueryParser {
       if (!Object.hasOwn(params, prefix)) params[prefix] = [];
       const arr = params[prefix];
       if (!Array.isArray(arr)) {
-        throw new ParameterTypeError(
-          `expected Array (got ${arr?.constructor?.name ?? typeof arr}) for param \`${prefix}'`,
-        );
+        const got = arr === null ? "Nil" : (arr?.constructor?.name ?? typeof arr);
+        throw new ParameterTypeError(`expected Array (got ${got}) for param \`${prefix}'`);
       }
       if (restKeys.length === 0) {
         arr.push(v);
@@ -276,13 +275,14 @@ export class QueryParser {
 
     if (!Object.hasOwn(params, prefix)) params[prefix] = Object.create(null);
     const container = params[prefix];
-    if (typeof container === "string" || container === null) {
+    if (typeof container === "string") {
       throw new ParameterTypeError(`expected Hash (got String) for param \`${prefix}'`);
     }
+    if (container === null) {
+      throw new ParameterTypeError(`expected Hash (got Nil) for param \`${prefix}'`);
+    }
     if (Array.isArray(container)) {
-      throw new ParameterTypeError(
-        `expected Array (got ${container.constructor.name}) for param \`${prefix}'`,
-      );
+      throw new ParameterTypeError(`expected Hash (got Array) for param \`${prefix}'`);
     }
     this._setNestedValue(container, firstKey, restKeys, v, depth + 1);
   }
