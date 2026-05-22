@@ -6,6 +6,7 @@ import {
   Notifications,
   getCrypto,
   getErrorReporter,
+  runLoadHooks,
 } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { Result } from "../result.js";
@@ -5401,3 +5402,8 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
   "time with time zone": "timetz",
   boolean: "bool",
 };
+
+// Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
+// at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
+// gate behavior on the postgresql adapter being loaded.
+runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);

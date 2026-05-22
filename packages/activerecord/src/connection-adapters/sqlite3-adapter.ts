@@ -44,7 +44,7 @@ import {
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import { getFs, Notifications } from "@blazetrails/activesupport";
+import { getFs, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { typeCastedBinds } from "./abstract/database-statements.js";
 import { isWriteQuerySql } from "./sql-classification.js";
 import {
@@ -2320,3 +2320,8 @@ function translateException(
   }
   return new StatementInvalid(message, { sql, binds, cause: exception });
 }
+
+// Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
+// at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
+// gate behavior on the sqlite3 adapter being loaded.
+runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);

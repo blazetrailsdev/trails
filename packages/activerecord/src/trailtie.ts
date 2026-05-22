@@ -28,8 +28,8 @@ import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/ac
 import { Base } from "./base.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
-import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
-import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
+import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
+import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import { deprecator } from "./deprecator.js";
 import {
   processAction,
@@ -55,9 +55,16 @@ export interface ActiveRecordConfig {
   checkSchemaCacheDumpVersion: boolean;
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
-  postgresqlTimeZoneAwareTypes: boolean;
-  sqlite3AdapterStrictStringsByDefault: boolean;
-  postgresqlAdapterDecodeDates: boolean;
+  /**
+   * Rails 8 opt-in flag (`config.active_record.sqlite3_adapter_strict_strings_by_default`).
+   * Defaults to nil in Rails — only assigned to the adapter when truthy.
+   */
+  sqlite3AdapterStrictStringsByDefault?: boolean;
+  /**
+   * Rails opt-in flag (`config.active_record.postgresql_adapter_decode_dates`).
+   * Defaults to nil in Rails — only assigned to the adapter when truthy.
+   */
+  postgresqlAdapterDecodeDates?: boolean;
   queryLogTagsEnabled: boolean;
   queryLogTags: string[];
   queryLogTagsFormat: "legacy" | "sqlcommenter";
@@ -75,9 +82,6 @@ function defaultActiveRecordConfig(): ActiveRecordConfig {
     checkSchemaCacheDumpVersion: true,
     maintainTestSchema: true,
     hasManyInversing: false,
-    postgresqlTimeZoneAwareTypes: true,
-    sqlite3AdapterStrictStringsByDefault: false,
-    postgresqlAdapterDecodeDates: false,
     queryLogTagsEnabled: false,
     queryLogTags: ["application"],
     queryLogTagsFormat: "legacy",
@@ -107,12 +111,19 @@ export class Trailtie extends BaseRailtie {
     });
 
     this.initializer("active_record.postgresql_time_zone_aware_types", () => {
-      // Rails: removes then conditionally re-adds `:timestamptz` so the
-      // initializer is idempotent under repeated `runInitializers` calls.
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
-      onLoad("active_record", (base: typeof Base) => {
-        base.timeZoneAwareTypes = base.timeZoneAwareTypes.filter((t) => t !== "timestamptz");
-        if (cfg.postgresqlTimeZoneAwareTypes) base.timeZoneAwareTypes.push("timestamptz");
+      // Rails (railtie.rb:89-95):
+      //   on_load(:active_record_postgresqladapter) do
+      //     on_load(:active_record) { Base.time_zone_aware_types << :timestamptz }
+      //   end
+      // No config gate — Rails pushes unconditionally when the PG adapter is
+      // loaded. We add an `includes` check so multiple `runInitializers`
+      // calls in tests stay idempotent (Rails' `<<` would duplicate).
+      onLoad("active_record_postgresqladapter", () => {
+        onLoad("active_record", (base: typeof Base) => {
+          if (!base.timeZoneAwareTypes.includes("timestamptz")) {
+            base.timeZoneAwareTypes.push("timestamptz");
+          }
+        });
       });
     });
 
@@ -123,16 +134,36 @@ export class Trailtie extends BaseRailtie {
     });
 
     this.initializer("active_record.sqlite3_adapter_strict_strings_by_default", () => {
+      // Rails: only sets to `true` when the flag is true (no-op otherwise),
+      // gated on `on_load(:active_record_sqlite3adapter)`.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
-      SQLite3Adapter.strictStringsByDefault = cfg.sqlite3AdapterStrictStringsByDefault;
+      if (cfg.sqlite3AdapterStrictStringsByDefault) {
+        onLoad("active_record_sqlite3adapter", (adapter: typeof SQLite3Adapter) => {
+          adapter.strictStringsByDefault = true;
+        });
+      }
     });
 
     this.initializer("active_record.postgresql_adapter_decode_dates", () => {
+      // Rails: only sets to `true` when the flag is true (no-op otherwise),
+      // gated on `on_load(:active_record_postgresqladapter)`.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
-      PostgreSQLAdapter.decodeDates = cfg.postgresqlAdapterDecodeDates;
+      if (cfg.postgresqlAdapterDecodeDates) {
+        onLoad("active_record_postgresqladapter", (adapter: typeof PostgreSQLAdapter) => {
+          adapter.decodeDates = true;
+        });
+      }
     });
 
     this.initializer("active_record_encryption.configuration", () => {
+      // Rails (railtie.rb:336-363) also reads app.credentials and registers
+      // AutoFilteredParameters / ExtendedDeterministicQueries / EncryptedFixtures.
+      // Credentials wiring needs the Application instance (deferred), and
+      // the load events `:active_record_encryption` / `:active_record_fixture_set`
+      // aren't yet emitted by their respective modules. For now we forward
+      // `config.activeRecord.encryption` to Encryption.Configurable.configure
+      // which is the single behavior-load-bearing piece (Encryption.config
+      // is what runtime callsites read).
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       const enc = cfg.encryption;
       if (enc && Object.keys(enc).length > 0) {
