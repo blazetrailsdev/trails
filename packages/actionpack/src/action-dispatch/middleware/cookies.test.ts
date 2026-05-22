@@ -242,6 +242,108 @@ describe("SerializedCookieJars", () => {
   });
 });
 
+describe("CookieJar.signedOrEncrypted", () => {
+  it("prefers encrypted when secret_key_base is present on the request", () => {
+    const jar = CookieJar.build(
+      {
+        env: { "action_dispatch.secret_key_base": "skb" },
+        cookies: {},
+        cookiesAppOptions: { secret: "s" },
+      },
+      {},
+    );
+    expect(jar.signedOrEncrypted).toBeInstanceOf((jar.encrypted as object).constructor);
+  });
+
+  it("falls back to signed when secret_key_base is absent", () => {
+    const jar = CookieJar.build({ env: {}, cookies: {}, cookiesAppOptions: { secret: "s" } }, {});
+    expect(jar.signedOrEncrypted).toBeInstanceOf((jar.signed as object).constructor);
+  });
+});
+
+describe("SignedCookieJar serialized API", () => {
+  it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
+    const jar = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      {},
+    );
+    jar.signed.set("user", { id: 45, name: "Aaron" });
+    expect(jar.signed.get("user")).toEqual({ id: 45, name: "Aaron" });
+  });
+
+  it("accepts a hash carrying value alongside cookie options", () => {
+    const jar = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      {},
+    );
+    jar.signed.set("user_id", { value: 45, httpOnly: true });
+    expect(jar.signed.get("user_id")).toBe(45);
+  });
+
+  it("honors a custom serializer from request env for round-trip", () => {
+    const custom: CookieSerializer = {
+      dump: (v) => `!${String(v)}!`,
+      load: (s) => s.slice(1, -1),
+      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+    };
+    const jar = CookieJar.build(
+      {
+        env: { "action_dispatch.cookies_serializer": custom },
+        cookies: {},
+        cookiesAppOptions: { secret: "x".repeat(32) },
+      },
+      {},
+    );
+    jar.signed.set("k", "abc");
+    expect(jar.signed.get("k")).toBe("abc");
+  });
+
+  it("returns undefined when verification fails", () => {
+    const seeded = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      { user_id: "tampered--badmac" },
+    );
+    expect(seeded.signed.get("user_id")).toBeUndefined();
+  });
+});
+
+describe("EncryptedCookieJar serialized API", () => {
+  it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
+    const jar = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      {},
+    );
+    jar.encrypted.set("session", { uid: 7, role: "admin" });
+    expect(jar.encrypted.get("session")).toEqual({ uid: 7, role: "admin" });
+  });
+
+  it("returns undefined when decryption fails", () => {
+    const seeded = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      { session: "ffff--ffff" },
+    );
+    expect(seeded.encrypted.get("session")).toBeUndefined();
+  });
+
+  it("honors a custom serializer from request env for round-trip", () => {
+    const custom: CookieSerializer = {
+      dump: (v) => `!${String(v)}!`,
+      load: (s) => s.slice(1, -1),
+      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+    };
+    const jar = CookieJar.build(
+      {
+        env: { "action_dispatch.cookies_serializer": custom },
+        cookies: {},
+        cookiesAppOptions: { secret: "x".repeat(32) },
+      },
+      {},
+    );
+    jar.encrypted.set("k", "abc");
+    expect(jar.encrypted.get("k")).toBe("abc");
+  });
+});
+
 describe("checkForOverflowBang", () => {
   it("raises CookieOverflow once a value exceeds 4096 bytes", () => {
     const big = "x".repeat(4097);
