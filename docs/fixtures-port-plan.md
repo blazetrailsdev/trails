@@ -1,7 +1,7 @@
 # Fixtures port plan
 
 > **Status (2026-05-22):** ~90% complete. All 122 Rails fixtures
-> translated (PRs 0–6b + 0.5a–g + 0.75 + 4-late, merged 2026-05-20…21).
+> translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21).
 > `pnpm fixtures:compare` reports match=94 diff=8 missing=0
 > erb-unsupported=20 (soft mode). Schema port shipped (#2124/#2128/
 > #2130/#2131/#2133/#2134/#2140). ERB `identify`/`composite_identify` +
@@ -31,10 +31,10 @@
 > declared PK (~20), `ref()` key-path for composite FK (~50), registry
 > rollback widening (~5).
 
-Port the remaining Rails `activerecord/test/fixtures/*.yml` files to TS so
-that ported AR tests can call `useFixtures([...])` instead of inlining
-`defineSchema()` / row inserts in `beforeAll`. Currently 12 of 122
-translated.
+Port Rails `activerecord/test/fixtures/*.yml` files to TS so that ported
+AR tests can call `useFixtures([...])` instead of inlining `defineSchema()`
+/ row inserts in `beforeAll`. See the status block above for current
+counts; the sections below capture the original motivation and design.
 
 ## Why
 
@@ -58,17 +58,13 @@ translated.
 
 ## Current state
 
-- 12 translated under `packages/activerecord/src/test-helpers/fixtures/`:
-  `accounts`, `author-addresses`, `authors`, `books`, `comments`,
-  `companies`, `developers`, `developers-projects`, `posts`, `projects`,
-  `topics` (+ `fixtures.test.ts`). These were written under the
-  pre-decision CRC32 model and need an id backfill (PR 0.75).
-- 110 missing. Categorized below by usage cluster.
-- Loader is already in place: `defineFixtures()`, `useFixtures()`,
-  `fixtureId()`, `ref()`, `fixture-set.ts`. `useFixtures([...])` returns
-  typed accessors of the form `result.authors("david")` — that's the
-  callsite shape ported tests will use; no new `fixtureRow()` helper is
-  needed.
+See the status block at the top of the doc. All 122 fixtures translated;
+loader (`defineFixtures()`, `useFixtures()`, `fixtureId()`, `ref()`,
+`fixture-set.ts`) live. `useFixtures([...])` returns typed accessors of
+the form `result.authors("david")`.
+
+The cluster sections below are historical scoping notes from the
+original port plan — kept for reference, not as live work-tracking.
 
 ## Gap, by cluster
 

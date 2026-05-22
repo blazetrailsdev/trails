@@ -26,13 +26,12 @@ Owner: [`connection-pooled-test-adapter-plan.md`](connection-pooled-test-adapter
 - **Pool Phase D sweep** — migrate all `createTestAdapter()` consumers
   to `createPooledTestAdapter()`. 1 batch in flight (#2250 / #2253);
   expect 4–8 batches total at ~200–300 LOC each. **Main gate.**
+- **TM Phase 6 savepoint-tolerance fix** (~50–100 LOC) — unlocks the
+  `dependent:` cluster on MariaDB.
 
-* **TM Phase 9b-1** — PG `arelVisitor` activation (~200–300 LOC).
-  Runs in parallel with pool Phase D (visitor layer, not adapter-factory).
-* **TM Phase 9b-2** — MySQL `arelVisitor` activation (~150–250 LOC).
-  Blocked on Arel `Table.star` (see memory `project_tm_phase9b2_blocked_on_table_star`).
-* **TM Phase 6 savepoint-tolerance fix** (~50–100 LOC) — unlocks the
-  `dependent:` cluster.
+TM Phase 9b-1 (PG visitor) and 9b-2a–e (MySQL visitor incl. Arel
+`Table.star`) already merged 2026-05-20→21. 9b-3 is closed
+(see Phase 2). 9b-4 is bundled with Pool Phase F (see Phase 2).
 
 ### Phase 2 — Test-infra collapse (after Phase 1)
 

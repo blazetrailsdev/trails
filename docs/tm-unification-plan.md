@@ -112,8 +112,8 @@ logic:
 
 - `SchemaAdapter.arelVisitor` flipped from hard-coded `undefined` to
   delegating to the inner adapter, **gated on `sqlite`**. PG/MySQL
-  remained on the dormant fallback (PG was added in 9b-1; MySQL
-  pending in 9b-2).
+  remained on the dormant fallback (PG landed in 9b-1; MySQL landed in
+  9b-2a–e).
 - `fixSqliteCompat` and `unwrapCompoundSelect` deleted
 - `Relation#_toSql` set-op path simplified to plain
   `${left} ${op} ${right}` concatenation
