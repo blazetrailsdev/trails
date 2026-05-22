@@ -161,17 +161,16 @@ const ENCRYPTION_SCHEMA: Schema = {
     original_name: { type: "string", limit: 1024 },
     logo: "binary",
   },
-  encrypted_book_with_downcase_names: { name: { type: "string", limit: 1024 } },
   // EncryptedAuthor enforces AUTHOR_NAME_LIMIT at the AR attribute layer
   // (plaintext); the column itself needs room for ciphertext.
   encrypted_authors: { name: { type: "string", limit: 1024 } },
   encrypted_book_with_custom_compressors: { name: { type: "string", limit: 1024 } },
   book_that_will_fail_to_encrypt_names: { name: { type: "string", limit: 1024 } },
   encrypted_traffic_light_with_store_states: { state: "text" },
-  // Mirrors Rails' `t.binary :logo` on `encrypted_books`. Maps to BYTEA on
-  // PG and BLOB on MySQL/SQLite via defineSchema's `binary` mapping. A TEXT
-  // column does not round-trip on PG: BinaryData-wrapped ciphertext binds
-  // as bytea and pg stores the `\x{hex}` literal in the TEXT column.
+  // Rails maps EncryptedBookWithBinary onto `encrypted_books` (`t.binary :logo`).
+  // The single shared table now consolidates these too; per-class tables
+  // below stay for variants whose attribute set diverges (serialized JSON,
+  // message-pack) or that we haven't yet rebased onto `encrypted_books`.
   encrypted_book_with_binaries: { logo: "binary" },
   encrypted_book_with_serialized_first_binaries: { logo: "text" },
   encrypted_book_with_serialized_second_binaries: { logo: "text" },
@@ -283,6 +282,7 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
 export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
   return class EncryptedBookWithDowncaseName extends Base {
     static {
+      this._tableName = "encrypted_books";
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
@@ -520,7 +520,14 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
  * normalize-then-encrypt order.
  */
 export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
-  const toLower = (v: unknown) => (v == null ? v : String(v).toLowerCase());
+  // Mirrors Rails' `->(value) { value.to_s.downcase }`. In Ruby, a binary
+  // string responds to .to_s as itself; for our `logo: binary` attribute the
+  // cast type yields a Uint8Array/Buffer, which we decode as UTF-8 to match.
+  const toLower = (v: unknown) => {
+    if (v == null) return v;
+    if (v instanceof Uint8Array) return new TextDecoder().decode(v).toLowerCase();
+    return String(v).toLowerCase();
+  };
   return class EncryptedBookNormalizedFirst extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -542,7 +549,14 @@ export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
  * encrypt-then-normalize order.
  */
 export function makeEncryptedBookNormalizedSecond(adapter: DatabaseAdapter) {
-  const toLower = (v: unknown) => (v == null ? v : String(v).toLowerCase());
+  // Mirrors Rails' `->(value) { value.to_s.downcase }`. In Ruby, a binary
+  // string responds to .to_s as itself; for our `logo: binary` attribute the
+  // cast type yields a Uint8Array/Buffer, which we decode as UTF-8 to match.
+  const toLower = (v: unknown) => {
+    if (v == null) return v;
+    if (v instanceof Uint8Array) return new TextDecoder().decode(v).toLowerCase();
+    return String(v).toLowerCase();
+  };
   return class EncryptedBookNormalizedSecond extends Base {
     static {
       this._tableName = "encrypted_books";
