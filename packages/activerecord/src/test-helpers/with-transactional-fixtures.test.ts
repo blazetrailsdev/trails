@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   adapterType,
+  createPooledTestAdapter,
   createSidecarTestAdapter,
   createTestAdapter,
+  _resetPooledTestAdapterForTests,
+  type SidecarAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 import { snapshotDdlTrackers } from "./ddl-tracker.js";
@@ -328,5 +331,45 @@ describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
 
   it("next test still sees the cached columns because the opt-out skipped clear()", () => {
     expect(adapter.schemaCache.isColumnsHashCached(adapter.pool, "opt_out_cache_users")).toBe(true);
+  });
+});
+
+// Phase C: when the adapter was leased from a real ConnectionPool (i.e.
+// produced by `createPooledTestAdapter()`), the helper detects the `.pool`
+// back-reference and routes setup/teardown through `pinConnectionBang(false)`
+// / `unpinConnectionBang()` rather than the wrapper-direct TM begin/rollback.
+// This mirrors Rails test_fixtures.rb:177-184's pin/lease lifecycle exactly.
+describe("withTransactionalFixtures (pooled adapter)", () => {
+  let adapter: SidecarAdapter;
+  const exec = (sql: string) =>
+    (adapter as unknown as { exec(s: string): Promise<void> }).exec(sql);
+  const query = (sql: string) => adapter.execute(sql);
+
+  beforeAll(async () => {
+    const handle = await createPooledTestAdapter();
+    adapter = handle.adapter;
+    await exec(`DROP TABLE IF EXISTS pooled_fixture_users`);
+    await exec(`CREATE TABLE pooled_fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
+  });
+
+  afterAll(async () => {
+    try {
+      await exec(`DROP TABLE IF EXISTS pooled_fixture_users`);
+    } finally {
+      _resetPooledTestAdapterForTests();
+    }
+  });
+
+  withTransactionalFixtures(() => adapter);
+
+  it("inserts a row inside the pinned transaction (first run)", async () => {
+    await exec(`INSERT INTO pooled_fixture_users (id, name) VALUES (1, 'alice')`);
+    const rows = await query(`SELECT * FROM pooled_fixture_users`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("sees zero rows because unpinConnectionBang rolled back the previous insert", async () => {
+    const rows = await query(`SELECT * FROM pooled_fixture_users`);
+    expect(rows).toHaveLength(0);
   });
 });

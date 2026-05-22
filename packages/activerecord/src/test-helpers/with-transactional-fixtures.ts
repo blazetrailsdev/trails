@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import type { DatabaseAdapter } from "../adapter.js";
 import { resetTestAdapterState, type TestDatabaseAdapter } from "../test-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { restoreDdlTrackers, snapshotDdlTrackers } from "./ddl-tracker.js";
 import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
 import { getUseTransactionalTests } from "./use-transactional-tests.js";
@@ -69,6 +70,22 @@ function adapterAndInner(
 ): readonly [DatabaseAdapter, DatabaseAdapter | null] {
   const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter ?? null;
   return [adapter as DatabaseAdapter, wrapped];
+}
+
+/**
+ * Detect a pooled adapter (returned by `createPooledTestAdapter()`). The
+ * pool back-reference is set by `ConnectionPool#newConnection` (via
+ * `adoptConnection`) when a connection is adopted into the pool;
+ * non-pooled adapters keep `AbstractAdapter#pool === null`.
+ */
+function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPool | null {
+  const wrapped = (adapter as Partial<TestDatabaseAdapter>).innerAdapter;
+  const host = (wrapped ?? adapter) as { pool?: unknown };
+  const pool = host.pool;
+  if (pool && typeof (pool as ConnectionPool).pinConnectionBang === "function") {
+    return pool as ConnectionPool;
+  }
+  return null;
 }
 
 /**
@@ -183,15 +200,36 @@ export function withTransactionalFixtures(
     outerSig = _snapshotAppliedSchemaSignaturesForAdapter(outer);
     innerSig = inner ? _snapshotAppliedSchemaSignaturesForAdapter(inner) : null;
     ddlSnapshot = snapshotDdlTrackers();
-    // Mirrors Rails ConnectionPool#pin_connection!:
-    //   @pinned_connection.begin_transaction joinable: false, _lazy: false
-    await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
+    const pool = pooledAdapterPool(getAdapter());
+    if (pool) {
+      // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
+      //   pool.pin_connection!(lock_threads)
+      //   pool.lease_connection
+      // pinConnectionBang opens `joinable: false, _lazy: false` on the
+      // pinned connection's transactionManager directly; the follow-up
+      // leaseConnection ensures the pinned connection is also the
+      // execution-context's leased connection so production code that
+      // calls `pool.leaseConnection()` resolves to it.
+      await pool.pinConnectionBang(false);
+      pool.leaseConnection();
+    } else {
+      // Non-pooled (wrapper/sidecar) path — preserved verbatim. Mirrors
+      // Rails ConnectionPool#pin_connection! body.
+      await tm(getAdapter()).beginTransaction({ joinable: false, _lazy: false });
+    }
   });
 
   afterEach(async () => {
     if (!active) return;
-    const t = tm(getAdapter());
-    while (t.openTransactions > 0) await t.rollbackTransaction();
+    const pool = pooledAdapterPool(getAdapter());
+    if (pool) {
+      // Mirrors Rails test_fixtures.rb teardown:
+      //   @fixture_connection_pools.map(&:unpin_connection!)
+      await pool.unpinConnectionBang();
+    } else {
+      const t = tm(getAdapter());
+      while (t.openTransactions > 0) await t.rollbackTransaction();
+    }
     if (invalidateSchemaCache) clearSchemaCache(getAdapter());
     const [outer, inner] = adapterAndInner(getAdapter());
     if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(outer, outerSig);
