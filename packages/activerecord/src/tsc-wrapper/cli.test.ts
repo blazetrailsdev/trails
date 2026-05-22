@@ -14,6 +14,10 @@ const createBuilderWithArPlugin = createArSolutionBuilder;
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
+const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
+// CLI-binary tests skip when dist isn't built (CI jobs that skip
+// `pnpm build`). Probed at module load so test bodies stay conditional-free.
+const itIfCliBin = fs.existsSync(CLI_BIN_PATH) ? it : it.skip;
 
 describe("trails-tsc CLI — Phase 1b.1", () => {
   it("virtualizes a single-file model: post.title types as string with no declares", () => {
@@ -65,24 +69,23 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
     expect(allDiags).toHaveLength(0);
   });
 
-  it("CLI binary exits 0 on clean fixture", async () => {
-    const binPath = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
-    // Skip if dist hasn't been built (CI test jobs that skip `pnpm build`).
-    // The programmatic API tests above cover the same behavior; this test
-    // exercises the real binary entry path as an extra integration check.
-    if (!fs.existsSync(binPath)) return;
-    const { execFileSync } = await import("node:child_process");
-    const result = execFileSync(
-      "node",
-      [binPath, "-p", path.join(FIXTURES_DIR, "tsconfig.json"), "--noEmit"],
-      {
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
-    // Clean exit — no output expected on success.
-    expect(result).toBe("");
-  }, 30_000);
+  itIfCliBin(
+    "CLI binary exits 0 on clean fixture",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      const result = execFileSync(
+        "node",
+        [CLI_BIN_PATH, "-p", path.join(FIXTURES_DIR, "tsconfig.json"), "--noEmit"],
+        {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+        },
+      );
+      // Clean exit — no output expected on success.
+      expect(result).toBe("");
+    },
+    30_000,
+  );
 });
 
 describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
@@ -299,22 +302,26 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
   // routinely takes ~3–5s on warm machines and longer under load; the
   // Vitest default 5000ms timeout makes this flaky. Bump the per-test
   // timeout rather than leaving false-negatives in CI.
-  it("CLI binary --build exits 0 on the composite fixture", async () => {
-    const binPath = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
-    // Same pattern as the Phase 1b.1 binary test: skip when dist
-    // isn't built (e.g., CI jobs that don't run `pnpm build`).
-    if (!fs.existsSync(binPath)) return;
-    const { execFileSync } = await import("node:child_process");
-    withTempComposite((dir) => {
-      const result = execFileSync("node", [binPath, "--build", path.join(dir, "tsconfig.json")], {
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
+  itIfCliBin(
+    "CLI binary --build exits 0 on the composite fixture",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      withTempComposite((dir) => {
+        const result = execFileSync(
+          "node",
+          [CLI_BIN_PATH, "--build", path.join(dir, "tsconfig.json")],
+          {
+            encoding: "utf8",
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        );
+        // Solution builder prints no output on a clean build.
+        expect(result).toBe("");
+        expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
       });
-      // Solution builder prints no output on a clean build.
-      expect(result).toBe("");
-      expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
-    });
-  }, 30_000);
+    },
+    30_000,
+  );
 
   it("re-build after editing a model reflects the new declares in dependents", () => {
     withTempComposite((dir) => {

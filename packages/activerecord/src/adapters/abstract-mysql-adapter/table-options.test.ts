@@ -5,7 +5,20 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
-import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import {
+  describeIfMysql,
+  isMariaDb,
+  mysqlVersion,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
+
+// Rails: `skip "..." if @connection.database_version >= "5.7.22"`. We add
+// MariaDB to the skip list since MariaDB never supported NO_TABLE_OPTIONS.
+// Probed at module load so the conditional can sit on it.skipIf instead of
+// inside the test body (which the lint rule forbids).
+const skipNoTableOptions =
+  isMariaDb || mysqlVersion === "" || new Version(mysqlVersion.replace(/-.*$/, "")).gte("5.7.22");
 
 const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
   SchemaDumper.dumpTableSchema(adapter as unknown as SchemaSource, tableName);
@@ -92,20 +105,10 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(output).toMatch(/PARTITION BY HASH/);
     });
 
-    it("schema dump works with NO_TABLE_OPTIONS sql mode", async () => {
-      // As of MySQL 5.7.22, NO_TABLE_OPTIONS is deprecated and removed in MySQL 8+
-      // Skip on MariaDB and newer MySQL where the mode doesn't exist
-      if (!isMariaDb) {
-        const versionStr = await adapter.showVariable("version");
-        if (!versionStr) return;
-        if (new Version(versionStr.replace(/-.*$/, "")).gte("5.7.22")) return;
-      } else {
-        return; // MariaDB doesn't support NO_TABLE_OPTIONS
-      }
-
+    it.skipIf(skipNoTableOptions)("schema dump works with NO_TABLE_OPTIONS sql mode", async () => {
       const oldMode = await adapter.showVariable("sql_mode");
-      if (!oldMode) return;
-      await adapter.execute(`SET @@SESSION.sql_mode='${oldMode},NO_TABLE_OPTIONS'`);
+      expect(oldMode).not.toBeNull();
+      await adapter.execute(`SET @@SESSION.sql_mode='${oldMode!},NO_TABLE_OPTIONS'`);
       try {
         await adapter.createTable("mysql_table_options", { force: true });
         const output = await dumpTable(adapter, "mysql_table_options");

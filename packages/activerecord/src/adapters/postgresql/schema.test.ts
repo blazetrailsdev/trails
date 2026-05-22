@@ -2,7 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/schema_test.rb
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import {
+  describeIfPg,
+  pgSupportsNativePartitioning,
+  PostgreSQLAdapter,
+  PG_TEST_URL,
+} from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
 import { defineSchema } from "../../test-helpers/define-schema.js";
@@ -956,9 +961,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`DROP TABLE IF EXISTS vehicles`);
     });
 
-    it("list partition options is dumped", async () => {
-      await adapter.getDatabaseVersion();
-      if (!adapter.supportsNativePartitioning()) return;
+    it.skipIf(!pgSupportsNativePartitioning)("list partition options is dumped", async () => {
       const options = "PARTITION BY LIST (kind)";
       await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
         t.string("name");
@@ -969,9 +972,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(lines.join("\n")).toContain(`options: "${options}"`);
     });
 
-    it("range partition options is dumped", async () => {
-      await adapter.getDatabaseVersion();
-      if (!adapter.supportsNativePartitioning()) return;
+    it.skipIf(!pgSupportsNativePartitioning)("range partition options is dumped", async () => {
       const options = "PARTITION BY RANGE (created_at)";
       await adapter.schemaStatements().createTable("trains", { id: false, options }, (t) => {
         t.string("name");

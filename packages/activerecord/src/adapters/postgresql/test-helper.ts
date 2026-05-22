@@ -8,22 +8,30 @@ import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/act
 export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
 
 let pgAvailable = false;
+let pgServerVersionNum = 0;
 
-async function checkPg(): Promise<boolean> {
+async function checkPg(): Promise<{ available: boolean; serverVersionNum: number }> {
+  const client = new pg.Client({ connectionString: PG_TEST_URL });
   try {
-    const client = new pg.Client({ connectionString: PG_TEST_URL });
     await client.connect();
-    await client.query("SELECT 1");
-    await client.end();
-    return true;
+    const res = await client.query<{ v: string }>(
+      "SELECT current_setting('server_version_num') AS v",
+    );
+    return { available: true, serverVersionNum: Number(res.rows[0]?.v ?? 0) };
   } catch {
-    return false;
+    return { available: false, serverVersionNum: 0 };
+  } finally {
+    await client.end().catch(() => {});
   }
 }
 
-pgAvailable = await checkPg();
+({ available: pgAvailable, serverVersionNum: pgServerVersionNum } = await checkPg());
 
 export const describeIfPg = pgAvailable ? describe : (describe.skip as typeof describe);
+/** PG server_version_num at module load (0 when unavailable). */
+export const pgServerVersion = pgServerVersionNum;
+/** Mirrors PostgreSQLAdapter#supportsNativePartitioning — PG 10+ (100000). */
+export const pgSupportsNativePartitioning = pgServerVersionNum >= 100000;
 
 /** Mirrors Rails' with_postgresql_datetime_type — temporarily changes the adapter's datetimeType. */
 export async function withPostgresqlDatetimeType<T>(

@@ -35,24 +35,27 @@ export const MYSQL_TEST_URL =
 
 let mysqlAvailable = false;
 let mariaDb = false;
+let mysqlVersionStr = "";
 
-async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean }> {
+async function checkMysql(): Promise<{ available: boolean; isMariaDb: boolean; version: string }> {
   let conn: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
   try {
     conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
     const [rows] = await conn.query("SELECT VERSION() AS v");
     const ver = (rows as Array<{ v: string }>)[0]?.v ?? "";
-    return { available: true, isMariaDb: /mariadb/i.test(ver) };
+    return { available: true, isMariaDb: /mariadb/i.test(ver), version: ver };
   } catch {
-    return { available: false, isMariaDb: false };
+    return { available: false, isMariaDb: false, version: "" };
   } finally {
     await conn?.end().catch(() => {});
   }
 }
 
-({ available: mysqlAvailable, isMariaDb: mariaDb } = await checkMysql());
+({ available: mysqlAvailable, isMariaDb: mariaDb, version: mysqlVersionStr } = await checkMysql());
 
 export const describeIfMysql = mysqlAvailable ? describe : (describe.skip as typeof describe);
 /** true when the connected server is MariaDB; false on MySQL or when MySQL is unavailable. */
 export const isMariaDb = mariaDb;
+/** Raw VERSION() string from the connected MySQL/MariaDB server (empty when unavailable). */
+export const mysqlVersion = mysqlVersionStr;
 export { Mysql2Adapter };

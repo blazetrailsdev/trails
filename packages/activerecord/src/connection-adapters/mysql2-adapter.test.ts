@@ -18,21 +18,48 @@ import { NoDatabaseError } from "../errors.js";
 const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
 
 let mysqlAvailable = false;
+let mysqlHasExprIndexes = false;
+let mysqlRejectsZeroDate = false;
 
-async function checkMysql(): Promise<boolean> {
+async function checkMysql(): Promise<void> {
+  let conn: Awaited<ReturnType<typeof mysql.createConnection>> | undefined;
   try {
-    const conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
+    conn = await mysql.createConnection({ uri: MYSQL_TEST_URL });
     await conn.query("SELECT 1");
-    await conn.end();
-    return true;
+    mysqlAvailable = true;
+    // Capability probes are best-effort; a failure here (e.g. restricted
+    // information_schema) leaves the defaults (false) without forcing
+    // the whole suite to skip.
+    try {
+      const [exprRows] = await conn.query(
+        `SELECT 1 FROM information_schema.columns WHERE table_schema='information_schema' AND table_name='STATISTICS' AND column_name='EXPRESSION' LIMIT 1`,
+      );
+      mysqlHasExprIndexes = (exprRows as Array<unknown>).length > 0;
+    } catch {
+      /* leave mysqlHasExprIndexes = false */
+    }
+    try {
+      const [modeRows] = await conn.query("SELECT @@SESSION.sql_mode AS m");
+      const mode = String((modeRows as Array<{ m: string }>)[0]?.m ?? "");
+      mysqlRejectsZeroDate = mode.includes("NO_ZERO_DATE") || mode.includes("TRADITIONAL");
+    } catch {
+      /* leave mysqlRejectsZeroDate = false */
+    }
   } catch {
-    return false;
+    /* MySQL unavailable — describeIfMysql will skip everything. */
+  } finally {
+    await conn?.end().catch(() => {});
   }
 }
 
-mysqlAvailable = await checkMysql();
+await checkMysql();
 
 const describeIfMysql = mysqlAvailable ? describe : describe.skip;
+// STATISTICS.EXPRESSION column gates MySQL 8.0.13+ functional indexes;
+// default sql_mode containing NO_ZERO_DATE/TRADITIONAL rejects zero
+// datetimes. Both probed at module load so test bodies stay conditional-free.
+const itIfExprIndexes = mysqlHasExprIndexes ? it : it.skip;
+const itUnlessRejectsZeroDate = mysqlRejectsZeroDate ? it.skip : it;
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -611,38 +638,24 @@ describeIfMysql("Mysql2Adapter", () => {
       ]);
     });
 
-    it("indexes() represents MySQL 8+ functional indexes via their expression", async () => {
-      // MySQL 8+ supports `CREATE INDEX ... ON t((expr))`; those rows
-      // have NULL column_name in information_schema.statistics and the
-      // expression in `expression`. Surfacing "null" as a column name
-      // would poison SchemaCache; wrapping the expression in parens
-      // matches Rails' IndexDefinition display.
-      //
-      // Gate on a DB-side probe rather than try/catching CREATE (a
-      // blanket catch would also swallow permissions errors or a
-      // genuine syntax regression) and rather than reaching into a
-      // private adapter helper (couples the test to implementation
-      // details). Query information_schema.columns for
-      // STATISTICS.EXPRESSION directly — the column exists on MySQL
-      // 8.0.13+, absent on older MySQL and on MariaDB.
-      const capabilityRows = (await adapter.execute(
-        `SELECT 1 AS one FROM information_schema.columns
-           WHERE table_schema = 'information_schema'
-           AND table_name = 'STATISTICS'
-           AND column_name = 'EXPRESSION'
-           LIMIT 1`,
-      )) as Array<unknown>;
-      if (capabilityRows.length === 0) return;
-
-      await adapter.exec("CREATE INDEX `widgets_on_lower_name` ON `widgets` ((LOWER(`name`)))");
-      const idx = await adapter.indexes("widgets");
-      const functional = idx.find((i) => i.name === "widgets_on_lower_name");
-      expect(functional).toBeDefined();
-      // Either `(lower(`name`))` or similar — just assert it's parenthesized.
-      expect(functional!.columns).toHaveLength(1);
-      expect(functional!.columns[0].startsWith("(")).toBe(true);
-      expect(functional!.columns[0]).not.toBe("null");
-    });
+    itIfExprIndexes(
+      "indexes() represents MySQL 8+ functional indexes via their expression",
+      async () => {
+        // MySQL 8.0.13+ supports `CREATE INDEX ... ON t((expr))`; those
+        // rows have NULL column_name in information_schema.statistics
+        // and the expression in `expression`. Surfacing "null" as a
+        // column name would poison SchemaCache; wrapping the expression
+        // in parens matches Rails' IndexDefinition display.
+        await adapter.exec("CREATE INDEX `widgets_on_lower_name` ON `widgets` ((LOWER(`name`)))");
+        const idx = await adapter.indexes("widgets");
+        const functional = idx.find((i) => i.name === "widgets_on_lower_name");
+        expect(functional).toBeDefined();
+        // Either `(lower(`name`))` or similar — just assert it's parenthesized.
+        expect(functional!.columns).toHaveLength(1);
+        expect(functional!.columns[0].startsWith("(")).toBe(true);
+        expect(functional!.columns[0]).not.toBe("null");
+      },
+    );
 
     describe("foreignKeys", () => {
       beforeEach(async () => {
@@ -740,11 +753,7 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(zdt.microsecond).toBe(456);
     });
 
-    it("returns null for zero DATETIME '0000-00-00 00:00:00'", async () => {
-      // NO_ZERO_DATE in sql_mode rejects the insert. Check first and skip if set.
-      const modeRows = await adapter.execute("SELECT @@SESSION.sql_mode AS m");
-      const sqlMode = String(modeRows[0].m ?? "");
-      if (sqlMode.includes("NO_ZERO_DATE") || sqlMode.includes("TRADITIONAL")) return;
+    itUnlessRejectsZeroDate("returns null for zero DATETIME '0000-00-00 00:00:00'", async () => {
       await adapter.exec("INSERT INTO `temporal_test` (`dt`) VALUES ('0000-00-00 00:00:00')");
       const rows = await adapter.execute("SELECT `dt` FROM `temporal_test`");
       expect(rows[0].dt).toBeNull();

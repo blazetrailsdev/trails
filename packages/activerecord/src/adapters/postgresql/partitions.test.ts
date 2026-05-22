@@ -2,7 +2,12 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/partitions_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import {
+  describeIfPg,
+  pgSupportsNativePartitioning,
+  PostgreSQLAdapter,
+  PG_TEST_URL,
+} from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -15,9 +20,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlPartitionsTest", () => {
-    it("partitions table exists", async () => {
-      await adapter.getDatabaseVersion();
-      if (!adapter.supportsNativePartitioning()) return;
+    it.skipIf(!pgSupportsNativePartitioning)("partitions table exists", async () => {
       await adapter.createTable(
         "partitioned_events",
         {
