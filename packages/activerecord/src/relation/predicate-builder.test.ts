@@ -5,7 +5,7 @@ import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { dropAllTables } from "../test-helpers/drop-all-tables.js";
@@ -16,10 +16,10 @@ describe("PredicateBuilderTest", () => {
   // Teardown: Topic.class_eval { @predicate_builder = nil }
   // We use a local custom class instead of Regexp to keep the test self-contained.
 
-  let adapter: TestDatabaseAdapter;
+  let adapter: SidecarAdapter;
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    ({ adapter: adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, {
       topics: { title: "string" },
       replies: { parent_id: "integer" },

@@ -6,15 +6,14 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-let _adapter: TestDatabaseAdapter = createTestAdapter();
+const _adapter: SidecarAdapter = createSidecarTestAdapter().adapter;
 beforeAll(async () => {
-  _adapter = createTestAdapter();
   const authorCols = { name: "string" as const };
   const postCols = {
     title: "string" as const,

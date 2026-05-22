@@ -14,14 +14,14 @@ function epochMs(v: unknown): number {
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany, processDependentAssociations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-let _adapter: TestDatabaseAdapter;
+let _adapter: SidecarAdapter;
 beforeAll(async () => {
-  _adapter = createTestAdapter();
+  ({ adapter: _adapter } = createSidecarTestAdapter());
   await defineSchema(_adapter, {
     posts: {
       title: "string",

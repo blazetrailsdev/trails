@@ -20,13 +20,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 
 describe("SELECT * column collision in joined relations", () => {
-  let adapter: TestDatabaseAdapter;
+  let adapter: SidecarAdapter;
 
   class SsjUser extends Base {
     static {
@@ -43,7 +43,7 @@ describe("SELECT * column collision in joined relations", () => {
   }
 
   beforeAll(async () => {
-    adapter = createTestAdapter();
+    ({ adapter: adapter } = createSidecarTestAdapter());
     await defineSchema(adapter, {
       ssj_users: { name: "string" },
       ssj_friendships: { ssj_user_id: "integer", ssj_friend_id: "integer" },

@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, defineEnum, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createSidecarTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
@@ -117,9 +117,9 @@ const SCHEMA: Schema = {
   },
 };
 
-let _adapter: TestDatabaseAdapter;
+let _adapter: SidecarAdapter;
 beforeAll(async () => {
-  _adapter = createTestAdapter();
+  ({ adapter: _adapter } = createSidecarTestAdapter());
   await defineSchema(_adapter, SCHEMA);
 });
 withTransactionalFixtures(() => _adapter);
