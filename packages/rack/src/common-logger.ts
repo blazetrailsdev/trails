@@ -100,4 +100,9 @@ export class CommonLogger {
       logger.info(msg.trimEnd());
     }
   }
+
+  private extractContentLength(headers: Record<string, string>): string {
+    const value = headers[CONTENT_LENGTH];
+    return !value || value === "0" ? "-" : value;
+  }
 }

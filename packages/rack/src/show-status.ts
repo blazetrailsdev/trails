@@ -32,4 +32,10 @@ export class ShowStatus {
 
     return response;
   }
+
+  /** @internal */
+  private h(obj: unknown): string {
+    if (typeof obj === "string") return escapeHtml(obj);
+    return escapeHtml(String(obj));
+  }
 }

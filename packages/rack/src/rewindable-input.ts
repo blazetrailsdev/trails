@@ -91,6 +91,19 @@ export class RewindableInput {
 
     this._buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
   }
+
+  /** @internal */
+  private makeRewindable(): void {
+    this._bufferData();
+  }
+
+  /** @internal */
+  private isFilesystemHasPosixSemantics(): boolean {
+    // In Node.js, non-Windows platforms have POSIX unlink semantics.
+    // We use a runtime check via globalThis to avoid direct process.platform reference.
+    const g = globalThis as any;
+    return typeof g.process !== "undefined" && g.process.platform !== "win32";
+  }
 }
 
 export class RewindableInputMiddleware {

@@ -11,7 +11,12 @@ interface Mapping {
 export class URLMap {
   private mappings: Mapping[];
 
-  constructor(map: Record<string, RackApp>) {
+  constructor(map: Record<string, RackApp> = {}) {
+    this.mappings = [];
+    this.remap(map);
+  }
+
+  remap(map: Record<string, RackApp>): void {
     this.mappings = [];
     for (const [location, app] of Object.entries(map)) {
       let host: string | null = null;
@@ -28,7 +33,6 @@ export class URLMap {
       path = path.replace(/\/+$/, "");
       this.mappings.push({ host, location: path, matchPrefix: path.toLowerCase(), app });
     }
-    // Sort by specificity (longest host first, then longest path first)
     this.mappings.sort((a, b) => {
       const hostDiff = (b.host?.length || 0) - (a.host?.length || 0);
       if (hostDiff !== 0) return hostDiff;
@@ -70,5 +74,12 @@ export class URLMap {
       { "content-type": "text/plain", "content-length": "9", "x-cascade": "pass" },
       ["Not Found"],
     ];
+  }
+
+  /** @internal */
+  private isCasecmp(v1: string | null | undefined, v2: string | null | undefined): boolean {
+    if (v1 === v2) return true;
+    if (v1 == null || v2 == null) return false;
+    return v1.toLowerCase() === v2.toLowerCase();
   }
 }

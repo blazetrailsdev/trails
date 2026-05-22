@@ -51,6 +51,10 @@ export class ConditionalGet {
     return false;
   }
 
+  private isEtagMatches(noneMatch: string, headers: Record<string, string>): boolean {
+    return headers[ETAG] === noneMatch;
+  }
+
   private modifiedSince(modifiedSince: Date, headers: Record<string, string>): boolean {
     const lastModified = this.toRfc2822(headers["last-modified"]);
     return lastModified != null && modifiedSince >= lastModified;

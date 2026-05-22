@@ -86,4 +86,25 @@ export class Sendfile {
 
     return response;
   }
+
+  /** @internal */
+  private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
+    const internalMapping = this.mappings.find(([internal]) =>
+      new RegExp(internal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(path),
+    );
+    if (internalMapping) {
+      return path.replace(new RegExp(internalMapping[0]), internalMapping[1]);
+    }
+    const headerMapping = env["HTTP_X_ACCEL_MAPPING"];
+    if (headerMapping) {
+      for (const m of String(headerMapping)
+        .split(",")
+        .map((s: string) => s.trim())) {
+        const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
+        const newPath = path.replace(new RegExp("^" + internal, "i"), external);
+        if (newPath !== path) return newPath;
+      }
+    }
+    return undefined;
+  }
 }

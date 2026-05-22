@@ -32,3 +32,8 @@ function stripDoubleQuotes(str: string | undefined): string {
   }
   return str || "";
 }
+
+/** @internal */
+export function stripDoublequotes(str: string | undefined): string {
+  return stripDoubleQuotes(str);
+}

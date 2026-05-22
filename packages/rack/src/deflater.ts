@@ -97,6 +97,35 @@ export class Deflater {
     return [status, headers, [compressed]];
   }
 
+  private shouldDeflate(
+    env: Record<string, any>,
+    status: number,
+    headers: Record<string, any>,
+    body: any,
+  ): boolean {
+    const STATUS_WITH_NO_ENTITY_BODY: Record<number, true> = {
+      100: true,
+      101: true,
+      102: true,
+      103: true,
+      204: true,
+      304: true,
+    };
+    if (STATUS_WITH_NO_ENTITY_BODY[status]) return false;
+    const cc = headers["cache-control"] || "";
+    if (/\bno-transform\b/.test(cc)) return false;
+    const ce = headers["content-encoding"];
+    if (ce && !/\bidentity\b/.test(ce)) return false;
+    if (this.include) {
+      const ct = headers[CONTENT_TYPE] || "";
+      const mediaType = ct.split(";")[0].trim();
+      if (!this.include.includes(mediaType)) return false;
+    }
+    if (this.condition && !this.condition(env, status, headers, body)) return false;
+    if (headers[CONTENT_LENGTH] === "0") return false;
+    return true;
+  }
+
   private preferredEncoding(accept: string): string | null {
     const encodings = accept.split(",").map((s) => s.trim().split(";")[0].trim().toLowerCase());
     if (encodings.includes("gzip") || encodings.includes("x-gzip")) return "gzip";
