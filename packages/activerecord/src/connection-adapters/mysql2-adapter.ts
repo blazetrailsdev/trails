@@ -543,6 +543,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       },
       (err) => {
         this._connectingPromise = null;
+        this._activeState = false;
         throw translateConnectError(err, this._database, this._poolConfig);
       },
     );
@@ -594,9 +595,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Translate a driver exception and, if it's a MismatchedForeignKey,
    * enrich it with the referenced column's type via an async columns() call.
    *
-   * Returns the translated (and possibly enriched) error plus a flag
-   * indicating whether the caller's `conn` was "released" during enrichment
-   * (always false with a single connection — kept for API symmetry).
+   * Returns the translated (and possibly enriched) error plus a `connReleased`
+   * flag. When true, the caller should skip its `finally { releaseConn(conn) }`
+   * path. With a single persistent connection `releaseConn` is a no-op, so the
+   * flag only prevents the caller from making a redundant no-op call — it is
+   * still set to true for MismatchedForeignKey to match the pool-era contract.
    */
   private async _translateAndEnrich(
     e: unknown,
@@ -1853,15 +1856,34 @@ function translateConnectError(
     case 1044: // ER_DBACCESS_DENIED_ERROR
     case 1045: // ER_ACCESS_DENIED_ERROR
       return DatabaseConnectionError.usernameError(
-        (config.user as string | undefined) ?? "unknown",
+        (config.user as string | undefined) ?? parseUriField(config, "username") ?? "unknown",
       );
     case 2003: // ER_CONN_HOST_ERROR
     case 2005: // ER_UNKNOWN_HOST_ERROR
       return DatabaseConnectionError.hostnameError(
-        (config.host as string | undefined) ?? "unknown",
+        (config.host as string | undefined) ?? parseUriField(config, "hostname") ?? "unknown",
       );
     default:
       return new ConnectionNotEstablished(err.message, { cause: err });
+  }
+}
+
+/**
+ * Extract a single URL field from a URI-based config (e.g. `{ uri: "mysql://..." }`).
+ * Returns undefined if the config has no `uri` or if parsing fails.
+ * @internal
+ */
+function parseUriField(
+  config: mysql.PoolOptions & MysqlAdapterOptions,
+  field: "username" | "hostname",
+): string | undefined {
+  const uri = (config as { uri?: string }).uri;
+  if (!uri) return undefined;
+  try {
+    const val = new URL(uri)[field];
+    return val || undefined;
+  } catch {
+    return undefined;
   }
 }
 

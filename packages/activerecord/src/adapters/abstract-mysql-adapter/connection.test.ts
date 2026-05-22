@@ -5,7 +5,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
-import { NoDatabaseError, DatabaseVersionError } from "../../errors.js";
+import {
+  NoDatabaseError,
+  DatabaseVersionError,
+  DatabaseConnectionError,
+  ConnectionNotEstablished,
+} from "../../errors.js";
+import mysql from "mysql2/promise";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -345,6 +351,77 @@ describeIfMysql("Mysql2Adapter", () => {
       const lockName = "fake lock'n'name";
       const released = await adapter.releaseAdvisoryLock(lockName);
       expect(released).toBe(false);
+    });
+  });
+
+  describe("connect error translation", () => {
+    function makeDriverError(errno: number, message = "driver error"): Error {
+      const e = new Error(message) as Error & { errno: number; code: string };
+      e.errno = errno;
+      e.code = `ER_${errno}`;
+      return e;
+    }
+
+    function stubCreateConnection(err: Error): void {
+      vi.spyOn(mysql, "createConnection").mockRejectedValue(err);
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it("maps ER_BAD_DB_ERROR (1049) to NoDatabaseError", async () => {
+      const a = new Mysql2Adapter("mysql://root@localhost/no_such_db");
+      stubCreateConnection(makeDriverError(1049));
+      try {
+        await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("maps ER_ACCESS_DENIED_ERROR (1045) to DatabaseConnectionError", async () => {
+      const a = new Mysql2Adapter({ host: "localhost", user: "baduser", database: "test" });
+      stubCreateConnection(makeDriverError(1045));
+      try {
+        const err = await a.execute("SELECT 1").catch((e) => e);
+        expect(err).toBeInstanceOf(DatabaseConnectionError);
+        expect(err.message).toContain("baduser");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("maps ER_ACCESS_DENIED_ERROR via URI to DatabaseConnectionError with parsed username", async () => {
+      const a = new Mysql2Adapter("mysql://myuser:pw@localhost/test");
+      stubCreateConnection(makeDriverError(1045));
+      try {
+        const err = await a.execute("SELECT 1").catch((e) => e);
+        expect(err).toBeInstanceOf(DatabaseConnectionError);
+        expect(err.message).toContain("myuser");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("maps ER_CONN_HOST_ERROR (2003) to DatabaseConnectionError with hostname", async () => {
+      const a = new Mysql2Adapter("mysql://root@myhost.example.com/test");
+      stubCreateConnection(makeDriverError(2003));
+      try {
+        const err = await a.execute("SELECT 1").catch((e) => e);
+        expect(err).toBeInstanceOf(DatabaseConnectionError);
+        expect(err.message).toContain("myhost.example.com");
+      } finally {
+        await a.close();
+      }
+    });
+
+    it("maps unknown errno to ConnectionNotEstablished", async () => {
+      const a = new Mysql2Adapter(MYSQL_TEST_URL);
+      stubCreateConnection(makeDriverError(9999, "something went wrong"));
+      try {
+        await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
+      } finally {
+        await a.close();
+      }
     });
   });
 });
