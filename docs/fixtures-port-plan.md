@@ -60,30 +60,41 @@ These are skipped entirely under soft mode; strict mode needs each
 either parseable by the compare script or covered by an explicit
 allow-list. From #2208, #2214, #2227 findings:
 
-6. **~30 LOC — `stripErb` `FixtureSet.identify` reverse-resolution.**
-   Affects `pirates.yml`, `mateys.yml`, `parrots_pirates.yml`,
-   `peoples_treasures.yml`, `memberships.yml`, `sharded_blog_posts.yml`,
-   `sharded_blog_posts_tags.yml`, `sharded_comments.yml`,
-   `sharded_tags.yml`, `cpk_order_agreements.yml`, `cpk_order_tags.yml`,
-   `cpk_reviews.yml`. These use
-   `<%= FixtureSet.identify(:label) %>` or
-   `<%= composite_identify(...) %>`; the TS port already stores the
-   CRC32-equivalent via `fixtureId()`. Teach `stripErb` to reverse
-   `identify(:label)` → `fixtureId("label")` and to recognize
-   `composite_identify`.
-7. **~30 LOC — `stripErb` simple-loop expander + attr-level skip.**
-   Affects `developers.yml`, `paragraphs.yml`, `mixins.yml`,
-   `binaries.yml`, `categories_ordered.yml`, `citations.yml`,
-   `edges.yml`, `vertices.yml`. These use loop ERB
-   (`<% (1..N).each %>`, `<%= binary(...) %>`,
-   `<%= 2.weeks.ago.to_fs(:db) %>`). Add a loop expander for the
-   common `<% N.times do |i| %>` / `<% (1..N).each %>` shapes, plus
-   an attr-level skip (rather than file-level) for residual
-   non-resolvable ERB (#2208 item 3).
-8. **Fallback (~10 LOC):** if (6)+(7) don't fully clear the 20 in
-   one PR cycle, PR 7b ships with an explicit allow-list
-   (e.g. `scripts/fixtures-compare/erb-allowlist.txt`) so the listed
-   files stay soft while every other status hard-fails.
+6. **Closed by #2247.** `stripErb` now reverses
+   `<%= ActiveRecord::FixtureSet.identify(:label) %>` and the literal-
+   array form of
+   `<%= ActiveRecord::FixtureSet.composite_identify(:label, [:a, :b])[:key] %>`
+   to the
+   `fixtureId()`-equivalent integer (`CRC32 % MAX_ID` and
+   `(crc32(label) << index) % MAX_ID` respectively, mirroring
+   `fixtures.rb#identify` / `#composite_identify`). All 12
+   identify-using fixtures (`pirates`, `mateys`, `parrots_pirates`,
+   `peoples_treasures`, `memberships`, the `sharded_*` cluster, the
+   `cpk_order_*` pair, `cpk_reviews`) now compare.
+7. **Closed by #2247.** Loop expander handles
+   `<% (lo..hi).each do |v| %>` and `<% N.times do |v| %>` (with
+   `<%= expr %>` / `#{expr}` body interpolation via a constrained
+   integer-arithmetic evaluator, 200-row cap). Residual opaque
+   `<%= ... %>` (`2.weeks.ago.to_fs(:db)`, `binary(...)`,
+   `Cpk::Order.primary_key` lookups) collapses to a sentinel and the
+   per-attr diff increments `attrsSkipped` instead of dropping the
+   file. Clears developers, edges, vertices, categories_ordered, plus
+   per-attr skips on binaries, pirates, memberships, cpk_order_agreements.
+8. **PR 7b allow-list (3 ERB-UNSUPPORTED stragglers remain after #2247):**
+   - `mixins.yml` — second ERB block is a Ruby array-of-arrays each
+     (`<% [[4001,0,1,20], ...].each do |s| %>`). TS already encodes
+     the rows; would need an array-literal-iteration grammar in
+     `stripErb` or an explicit allow-list entry.
+   - `paragraphs.yml` — 1001-row loop, above the expander cap.
+   - `citations.yml` — 65536-row loop. Expanding would parse-stall the
+     script; cap stays in place.
+
+   **DIFF follow-ups surfaced by #2247** (newly comparable, real port
+   gaps unrelated to ERB):
+   - `developers.yml` `david.shared_computers` column not declared in
+     `TEST_SCHEMA`/`developers.ts`.
+   - `binaries.yml` `flowers.data` (the `!binary` blob row) missing
+     from `binaries.ts`.
 
 ### Schema-side residuals (informational column, not a hard-fail blocker)
 
