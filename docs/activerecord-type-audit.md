@@ -1,5 +1,27 @@
 # activerecord — type audit
 
+> **Status (2026-05-22):** Waves 1–3 shipped:
+>
+> - W1a #1500, W1c #1519/#1522 (deferred remainder)
+> - W2a #1502, W2b, W2c #1506, W2d+e #1507
+> - W3a #1518, W3b+c #1524
+>
+> **Remaining (~250 LOC total, bundleable):**
+>
+> - W1b — variadic rest overloads (~100 LOC, low risk; relation.ts:822, 941 still `as any`)
+> - Small follow-ups bundle (~150 LOC): `Errors<TBase>` PR D
+>   (nested-error.ts), Validations mixin tightening, BiasableQueue module
+>   shape, `_canRouteThroughViaAssociationScope`, `collection-proxy.ts`
+>   `_reflectOnAssociation` cast drop, HABTM `Reflection.create` overload,
+>   `processDependentAssociations` errors cast,
+>   `CollectionAssociation.defineReaders` `this: any` (circular import),
+>   ~5 LOC of redundant `as typeof Base` in attributes.ts + persistence.ts.
+> - W4 — Reflection discriminated union (deferred indefinitely; ~96 sites
+>   in reflection.ts; 22 `this as any` sites confirmed; high risk, multi-PR).
+>
+> **Stale below:** the "Suggested targets" table claims `this: any` ~5
+> after Wave 2; actual count is 43. Refresh the table before using it.
+
 Status as of 2026-05-13, after upstream cleanup (arel, activemodel, activesupport, `Errors<TBase>` arc).
 
 Upstream packages are now type-clean; activerecord's remaining numbers reflect its own debt rather than inherited noise.

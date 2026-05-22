@@ -1,10 +1,16 @@
 # activerecord — Road to 100% test:compare
 
+> **Status (2026-05-22):** Headline 7863/7872 (84.1%) below is from
+> 2026-05-18; ~50 AR PRs have landed since (#2202–#2253). Refresh with
+> `pnpm test:compare --cached --json --package activerecord` before
+> triaging. Top-10 rows = ~430 of 1244 skipped tests — drive those first.
+> Phase ordering lives in
+> [`activerecord-index.md`](activerecord-index.md) Phase 4.
+
 Per-file backlog tracker for closing the `test:compare` delta. Companion to
 [`activerecord-100-plan.md`](activerecord-100-plan.md) (post-100% fidelity
-work) and [`test-compare-100-plan.md`](test-compare-100-plan.md) (BLOCKED
-vocab + workflow reference). This doc owns batches; the other two own
-strategy.
+work; strategy + BLOCKED vocab + workflow live there too). This doc owns
+the per-file table; `activerecord-100-plan.md` owns batches + strategy.
 
 ## Refresh
 
@@ -31,7 +37,7 @@ addresses whichever applies:
    applies: never rename, never re-word).
 3. **Implementation work to unblock** — when a BLOCKED tag points at real
    missing source-code behavior, port that first. Reference the
-   `BLOCKED:*` taxonomy in `test-compare-100-plan.md`.
+   `BLOCKED:*` taxonomy in `activerecord-100-plan.md` (BLOCKED vocabulary section).
 
 Out of scope for this doc: name-drift reconcile (relocate / rename) — those
 are mostly mechanical and live as misplaced counts, not pending work.
