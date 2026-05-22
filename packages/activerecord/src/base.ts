@@ -131,6 +131,7 @@ import {
   include,
   extend,
   benchmark as benchmarkable,
+  runLoadHooks,
   type Included,
   type ParameterFilter,
   type BenchmarkLogger,
@@ -3657,3 +3658,9 @@ _setGlobalIdModelFinder((name: string) => {
   }
   return undefined;
 });
+
+// Mirrors `ActiveSupport.run_load_hooks(:active_record, Base)` at the
+// bottom of `activerecord/lib/active_record/base.rb`. Lets railtie
+// initializers register `on_load(:active_record)` consumers that need a
+// fully-defined `Base` class (timezone, filter attributes, ...).
+runLoadHooks("active_record", Base);
