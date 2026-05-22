@@ -21,23 +21,11 @@ export class ETag {
 
     let digest: string | null = null;
 
-    if (
-      (status === 200 || status === 201) &&
-      Array.isArray(body) &&
-      !headers[ETAG] &&
-      !headers["last-modified"]
-    ) {
-      const sha = getCrypto().createHash("sha256");
-      let hasContent = false;
-      for (const part of body) {
-        if (part.length > 0) {
-          sha.update(part);
-          hasContent = true;
-        }
-      }
-      if (hasContent) {
-        digest = sha.digest("hex").substring(0, 32);
+    if (this.etagStatus(status) && Array.isArray(body) && !this.skipCaching(headers)) {
+      digest = this.digestBody(body);
+      if (digest) {
         headers[ETAG] = `W/"${digest}"`;
+        response[2] = body;
       }
     }
 
@@ -50,5 +38,28 @@ export class ETag {
     }
 
     return response;
+  }
+
+  /** @internal */
+  private etagStatus(status: number): boolean {
+    return status === 200 || status === 201;
+  }
+
+  /** @internal */
+  private skipCaching(headers: Record<string, string>): boolean {
+    return ETAG in headers || "last-modified" in headers;
+  }
+
+  /** @internal */
+  private digestBody(body: string[]): string | null {
+    const sha = getCrypto().createHash("sha256");
+    let hasContent = false;
+    for (const part of body) {
+      if (part.length > 0) {
+        sha.update(part);
+        hasContent = true;
+      }
+    }
+    return hasContent ? sha.digest("hex").substring(0, 32) : null;
   }
 }

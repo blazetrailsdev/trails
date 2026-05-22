@@ -42,8 +42,13 @@ export class Headers {
     return h;
   }
 
-  private _key(key: string): string {
+  /** @internal */
+  private downcaseKey(key: string): string {
     return typeof key === "string" ? key.toLowerCase() : String(key);
+  }
+
+  private _key(key: string): string {
+    return this.downcaseKey(key);
   }
 
   // --- Core accessors ---
@@ -67,6 +72,10 @@ export class Headers {
 
   has(key: string): boolean {
     return this._data.has(this._key(key));
+  }
+
+  hasKey(key: string): boolean {
+    return this.has(key);
   }
 
   delete(key: string): string | undefined {
@@ -397,6 +406,10 @@ export class Headers {
       this._data.set(this._key(fn(k)), v);
     }
     return this;
+  }
+
+  transformKeysBang(fn: (key: string) => string): Headers {
+    return this.transformKeysInPlace(fn);
   }
 
   invert(): Headers {

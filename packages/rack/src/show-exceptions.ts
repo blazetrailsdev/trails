@@ -10,52 +10,81 @@ export class ShowExceptions {
   }
 
   prefersPlaintext(env: Record<string, any>): boolean {
-    const accept = env["HTTP_ACCEPT"] || "";
-    if (accept.includes("text/html") || accept.includes("*/*")) return false;
-    return true;
+    return !this.acceptsHtml(env);
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
     try {
       return await this.app(env);
     } catch (e: any) {
-      const message = (e.detailedMessage ? e.detailedMessage() : e.message) || "";
-      const name = e.constructor?.name || e.name || "Error";
+      const exceptionString = this.dumpException(e);
 
-      if (this.prefersPlaintext(env)) {
-        const body = this.renderPlaintext(e, name, message, env);
-        return [
-          500,
-          { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: String(Buffer.byteLength(body)) },
-          [body],
-        ];
+      let contentType: string;
+      let body: string;
+      if (this.acceptsHtml(env)) {
+        contentType = "text/html";
+        body = this.pretty(env, e);
+      } else {
+        contentType = "text/plain";
+        body = exceptionString;
       }
 
-      const body = this.template(e, name, message, env);
       return [
         500,
-        { [CONTENT_TYPE]: "text/html", [CONTENT_LENGTH]: String(Buffer.byteLength(body)) },
+        { [CONTENT_TYPE]: contentType, [CONTENT_LENGTH]: String(Buffer.byteLength(body)) },
         [body],
       ];
     }
   }
 
-  protected template(e: Error, name: string, message: string, env: Record<string, any>): string {
-    const stack = this.formatBacktrace(e);
+  dumpException(exception: Error): string {
+    const message = (exception as any).detailedMessage
+      ? (exception as any).detailedMessage()
+      : exception.message || "";
+    const name = exception.constructor?.name || (exception as any).name || "Error";
+    const backtrace = exception.stack
+      ? exception.stack
+          .split("\n")
+          .slice(1)
+          .map((l) => `\t${l}`)
+          .join("\n")
+      : "";
+    return `${name}: ${message}\n${backtrace}`;
+  }
+
+  pretty(env: Record<string, any>, exception: Error): string {
+    return this.template(env, exception);
+  }
+
+  protected template(env: Record<string, any>, exception: Error): string {
+    const name = exception.constructor?.name || (exception as any).name || "Error";
+    const message = (exception as any).detailedMessage
+      ? (exception as any).detailedMessage()
+      : exception.message || "";
+    const stack = this.formatBacktrace(exception);
     const getData = this.formatGetData(env);
     const postData = this.formatPostData(env);
-    const escapedMessage = escapeHtml(message);
-    const escapedName = escapeHtml(name);
 
     return (
-      `<!DOCTYPE html><html><head><title>${escapedName}: ${escapedMessage}</title></head>` +
-      `<body><h1>${escapedName}: ${escapedMessage}</h1>` +
-      `<h2>Rack::ShowExceptions</h2>` +
+      `<!DOCTYPE html><html><head><title>${this.h(name)} at ${this.h(env["PATH_INFO"] || "/")}</title></head>` +
+      `<body><h1>${this.h(name)}: ${this.h(message)}</h1>` +
+      `<p>You're seeing this error because you use <code>Rack::ShowExceptions</code>.</p>` +
       `<h3>Backtrace</h3><pre>${stack}</pre>` +
       `<h3>GET Data</h3><p>${getData}</p>` +
       `<h3>POST Data</h3><p>${postData}</p>` +
       `</body></html>`
     );
+  }
+
+  h(obj: any): string {
+    const str = typeof obj === "string" ? obj : String(obj);
+    return escapeHtml(str);
+  }
+
+  /** @internal */
+  private acceptsHtml(env: Record<string, any>): boolean {
+    const accept = env["HTTP_ACCEPT"] || "";
+    return accept.includes("text/html") || accept.includes("*/*");
   }
 
   private renderPlaintext(

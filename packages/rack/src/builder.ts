@@ -102,42 +102,46 @@ export class Builder {
     return this;
   }
 
-  toApp(): RackApp {
-    const app = this._generateApp();
-    if (this._warmupBlock) {
-      this._warmupBlock(app);
-    }
-    return app;
+  static loadFile(path: string, ..._options: any[]): RackApp {
+    return Builder.parseFile(path);
   }
 
-  private _generateApp(): RackApp {
-    let app: RackApp;
+  static app(defaultApp?: RackApp | null, block?: (b: Builder) => void): RackApp {
+    const builder = new Builder();
+    if (defaultApp) builder.run(defaultApp);
+    if (block) block(builder);
+    return builder.toApp();
+  }
 
-    if (Object.keys(this._map).length > 0) {
-      const mapping: Record<string, RackApp> = { ...this._map };
-      if (this._run) {
-        mapping["/"] = this._run;
-      }
-      app = (env) => new URLMap(mapping).call(env);
-    } else if (this._run) {
-      app = this._run;
-    } else {
-      throw new Error("missing run or map statement");
-    }
+  async call(env: Record<string, any>): Promise<any> {
+    return this.toApp()(env);
+  }
 
-    // Apply middleware in reverse order (last use = outermost)
+  toApp(): RackApp {
+    const app =
+      Object.keys(this._map).length > 0 ? this.generateMap(this._run, this._map) : this._run;
+    if (!app) throw new Error("missing run or map statement");
+    let result = app;
     for (let i = this._middlewares.length - 1; i >= 0; i--) {
       const { klass, args } = this._middlewares[i];
-      const inner = app;
+      const inner = result;
       if (typeof klass === "function" && klass.prototype && klass.prototype.call) {
         const mw = new (klass as MiddlewareFactory)(inner, ...args);
-        app = (env) => mw.call(env);
+        result = (e) => mw.call(e);
       } else {
         const mw = (klass as any)(inner, ...args);
-        app = (env) => mw.call(env);
+        result = (e) => mw.call(e);
       }
     }
+    if (this._warmupBlock) this._warmupBlock(result);
+    return result;
+  }
 
-    return app;
+  private generateMap(defaultApp: RackApp | null, mapping: Record<string, RackApp>): RackApp {
+    const mapped: Record<string, RackApp> = defaultApp ? { "/": defaultApp } : {};
+    for (const [r, b] of Object.entries(mapping)) {
+      mapped[r] = b;
+    }
+    return (env) => new URLMap(mapped).call(env);
   }
 }

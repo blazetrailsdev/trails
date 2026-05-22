@@ -44,7 +44,7 @@ export class MockResponse extends Response {
       if (typeof errors.string === "function") this.errors = errors.string();
       else if (typeof errors === "string") this.errors = errors;
     }
-    this.cookies = this._parseCookiesFromHeader();
+    this.cookies = this.parseCookiesFromHeader();
     this.bufferedBody();
   }
 
@@ -67,7 +67,12 @@ export class MockResponse extends Response {
     return this.cookies[name];
   }
 
-  private _parseCookiesFromHeader(): Record<string, MockCookie> {
+  match(other: RegExp): RegExpMatchArray | null {
+    return this.bodyString.match(other);
+  }
+
+  /** @internal */
+  private parseCookiesFromHeader(): Record<string, MockCookie> {
     const cookies: Record<string, MockCookie> = {};
     const setCookie = this.headers[SET_COOKIE];
     if (!setCookie) return cookies;
@@ -78,30 +83,11 @@ export class MockResponse extends Response {
       if (eqIdx === -1) continue;
       const name = cookie.substring(0, eqIdx);
       const filling = cookie.substring(eqIdx + 1);
-      const bits = filling.split(";");
-      const value = [bits[0].trim()];
-      const attrs: Record<string, any> = { value };
-
-      for (let i = 1; i < bits.length; i++) {
-        const bit = bits[i].trim();
-        if (bit.includes("=")) {
-          const [k, v] = bit.split("=", 2);
-          attrs[k.trim().toLowerCase()] = v.trim();
-        }
-        if (bit.toLowerCase().includes("secure")) {
-          attrs.secure = true;
-        }
-      }
-
-      if (attrs["max-age"]) {
-        attrs.expires = new Date(Date.now() + parseInt(attrs["max-age"]) * 1000);
-      } else if (attrs.expires) {
-        attrs.expires = new Date(attrs.expires);
-      }
+      const attrs = this.identifyCookieAttributes(filling);
 
       cookies[name.trim()] = new MockCookie({
         name: name.trim(),
-        value,
+        value: attrs.value,
         path: attrs.path,
         domain: attrs.domain,
         expires: attrs.expires,
@@ -109,5 +95,30 @@ export class MockResponse extends Response {
       });
     }
     return cookies;
+  }
+
+  /** @internal */
+  private identifyCookieAttributes(cookieFilling: string): Record<string, any> {
+    const bits = cookieFilling.split(";");
+    const attrs: Record<string, any> = { value: [bits[0].trim()] };
+
+    for (let i = 1; i < bits.length; i++) {
+      const bit = bits[i].trim();
+      if (bit.includes("=")) {
+        const [k, v] = bit.split("=", 2);
+        attrs[k.trim().toLowerCase()] = v.trim();
+      }
+      if (bit.toLowerCase().includes("secure")) {
+        attrs.secure = true;
+      }
+    }
+
+    if (attrs["max-age"]) {
+      attrs.expires = new Date(Date.now() + parseInt(attrs["max-age"], 10) * 1000);
+    } else if (attrs.expires) {
+      attrs.expires = new Date(attrs.expires);
+    }
+
+    return attrs;
   }
 }
