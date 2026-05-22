@@ -1248,7 +1248,7 @@ Rails ref: `actionview/lib/action_view/template/resolver.rb` +
 - [ ] `parseFilename` consumes a `MimeType` registry instead of
       blind dot-splitting — `show.en.html+phone.tse` resolves
       `{ name: "show", locale: "en", format: "html", variant: "phone",
-    handler: "tse" }`. Blocked on a `Mime::Type` port.
+handler: "tse" }`. Blocked on a `Mime::Type` port.
 - [ ] Missing format in the filename defaults to `"html"` (per Rails'
       `Template#format` fallback).
 - [ ] `<%! format: "json" !%>` magic block overrides the filename-
@@ -1310,13 +1310,13 @@ Plan ref: §2.8, §2.9.
 
 - [ ] Ship `packages/actionview/types/tse-modules.d.ts` (or
       equivalent) with a default-export signature so `import View
-    from "./show.html.tse"` typechecks before any `.tse.d.ts` is
+from "./show.html.tse"` typechecks before any `.tse.d.ts` is
       generated. Re-exported from the actionview package types entry.
 
 ### Story 5.11 — Emitter hygiene
 
 - [ ] Emitted `.tse.ts` passes `tsc --strict
-    --noUncheckedIndexedAccess --exactOptionalPropertyTypes`
+--noUncheckedIndexedAccess --exactOptionalPropertyTypes`
       cleanly. Add a CI guard that compiles a fixture set with these
       flags.
 - [ ] Emitted `.tse.ts` uses only erasable syntax (passes
@@ -1328,9 +1328,9 @@ Plan ref: §2.8, §2.9.
       `@blazetrails/actionview`.
 - [ ] `trails-tsc build` writes a manifest module that augments it
       via `declare module "@blazetrails/actionview" { interface
-    TemplateRegistry { … } }` keyed by partial name → locals type.
+TemplateRegistry { … } }` keyed by partial name → locals type.
 - [ ] `RenderContext#render({ partial: keyof TemplateRegistry, locals
-    })` resolves typed locals. Unblocks Story 5.8 typed partials.
+})` resolves typed locals. Unblocks Story 5.8 typed partials.
 
 ### Story 5.13 — Package wiring
 
