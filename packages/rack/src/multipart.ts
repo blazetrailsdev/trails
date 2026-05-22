@@ -1,34 +1,19 @@
 import { UploadedFile } from "./multipart/uploaded-file.js";
 
 export { UploadedFile } from "./multipart/uploaded-file.js";
+import {
+  MultipartPartLimitError,
+  MultipartTotalPartLimitError,
+  BoundaryTooLongError,
+  EmptyContentError,
+} from "./multipart/parser.js";
 
-export class MultipartPartLimitError extends Error {
-  constructor(message = "exceeded multipart part limit") {
-    super(message);
-    this.name = "MultipartPartLimitError";
-  }
-}
-
-export class MultipartTotalPartLimitError extends Error {
-  constructor(message = "exceeded multipart total part limit") {
-    super(message);
-    this.name = "MultipartTotalPartLimitError";
-  }
-}
-
-export class BoundaryTooLongError extends Error {
-  constructor(message = "multipart boundary is too long") {
-    super(message);
-    this.name = "BoundaryTooLongError";
-  }
-}
-
-export class EmptyContentError extends Error {
-  constructor(message = "bad content body") {
-    super(message);
-    this.name = "EmptyContentError";
-  }
-}
+export {
+  MultipartPartLimitError,
+  MultipartTotalPartLimitError,
+  BoundaryTooLongError,
+  EmptyContentError,
+} from "./multipart/parser.js";
 
 export class MultipartBufferedMimeDataError extends Error {
   constructor(message = "exceeded buffered MIME data size limit") {
