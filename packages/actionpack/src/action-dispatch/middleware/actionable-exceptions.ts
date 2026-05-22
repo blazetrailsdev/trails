@@ -16,9 +16,13 @@ import { Request } from "../http/request.js";
 export class ActionableExceptions {
   /**
    * Endpoint that actionable-exception forms POST back to. Declared via
-   * {@link cattrAccessor} so apps can override it per-class through the
-   * Rails-shaped `cattr_accessor :endpoint` setter without disturbing the
-   * parent (Rails: `ActionDispatch::ActionableExceptions.endpoint = "..."`).
+   * {@link cattrAccessor} to mirror Rails'
+   * `cattr_accessor :endpoint, default: "/rails/actions"`: assignment goes
+   * through a getter/setter pair so apps can swap it via
+   * `ActionableExceptions.endpoint = "..."` (or via Railtie config) instead of
+   * shadowing a plain class field. Rails' `cattr_accessor` stores the value in
+   * a single class variable shared across the hierarchy, so subclass writes
+   * mutate the same slot — `cattrAccessor` matches that semantics.
    */
   static endpoint: string;
 
@@ -29,13 +33,7 @@ export class ActionableExceptions {
   }
 
   static {
-    cattrAccessor(
-      ActionableExceptions as unknown as Record<string, unknown> & { new (): unknown },
-      "endpoint",
-      {
-        default: "/rails/actions",
-      },
-    );
+    cattrAccessor(ActionableExceptions, "endpoint", { default: "/rails/actions" });
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
