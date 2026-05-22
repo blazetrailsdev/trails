@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow } from "./compare.js";
+import { stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/test-helpers/define-schema.js";
 
 // prettier-ignore
@@ -11,8 +11,61 @@ const cmp = (ts: unknown, rails: unknown, notes: string[] = []) =>
 
 it("stripErb stubs adapter_name; flags other tags as unsupported", () => {
   expect(stripErb("a <%= ActiveRecord::Base.connection.adapter_name %> b")).toEqual({ rendered: "a SQLite b", unsupported: false }); // prettier-ignore
-  expect(stripErb("<% 3.times do %>x<% end %>").unsupported).toBe(true);
+  expect(stripErb("<% 3.times do |z| %>x<% end %>").unsupported).toBe(false);
+  expect(stripErb("<% [[1,2],[3,4]].each do |s| %>x<% end %>").unsupported).toBe(true);
   expect(stripErb("id: 1").unsupported).toBe(false);
+});
+
+describe("stripErb ERB expanders", () => {
+  it("expands `<%= FixtureSet.identify(:label) %>` to its CRC32 value (mirrors fixtureId)", () => {
+    const out = stripErb("pirate_id: <%= ActiveRecord::FixtureSet.identify(:blackbeard) %>");
+    // Stable, deterministic — pin the actual computed value.
+    expect(out.rendered).toBe("pirate_id: 959118195");
+    expect(out.unsupported).toBe(false);
+  });
+  it("expands `composite_identify(:l, [:a, :b])[:b]` per (identify<<index) % MAX_ID", () => {
+    const out = stripErb("k: <%= ActiveRecord::FixtureSet.composite_identify(:order_1, [:shop_id, :id])[:id] %>"); // prettier-ignore
+    expect(out.rendered).toBe("k: 997509437");
+    expect(out.unsupported).toBe(false);
+  });
+  it("sentinelizes `composite_identify` when the accessor key isn't in the literal key list", () => {
+    // Defensive: if a Rails fixture ever asked for an accessor not in the
+    // declared `[:a, :b]` array, the file should still parse — that single
+    // attr becomes an erb-skip rather than blowing up the whole file.
+    const out = stripErb("k: <%= ActiveRecord::FixtureSet.composite_identify(:order_1, [:shop_id, :id])[:ghost] %>"); // prettier-ignore
+    expect(out.rendered).toBe(`k: ${ERB_SKIP_SENTINEL}`);
+    expect(out.unsupported).toBe(false);
+  });
+  it("expands `(lo..hi).each do |v|` loops with <%= v %> body interpolation", () => {
+    const { rendered, unsupported } = stripErb("<% (1..3).each do |i| %>row_<%= i %>: { id: <%= i %> }\n<% end %>"); // prettier-ignore
+    expect(rendered.trim()).toBe("row_1: { id: 1 }\nrow_2: { id: 2 }\nrow_3: { id: 3 }");
+    expect(unsupported).toBe(false);
+  });
+  it("expands `N.times do |v|` loops; evaluates simple arithmetic in body", () => {
+    const { rendered } = stripErb("<% 2.times do |i| %>x<%= i+10 %>=<%= i*i %>;<% end %>");
+    expect(rendered).toBe("x10=0;x11=1;");
+  });
+  it("interpolates `#{v}` inside loop bodies", () => {
+    const { rendered } = stripErb("<% 2.times do |i| %>n=#{i+1};<% end %>");
+    expect(rendered).toBe("n=1;n=2;");
+  });
+  it("skips loops above the row-count cap so YAML parsing doesn't stall", () => {
+    // citations.yml expands 65536 rows in Rails. We leave it as
+    // ERB-UNSUPPORTED rather than spend seconds parsing megabytes.
+    const out = stripErb("<% 65536.times do |i| %>r_<%= i %>:\n  id: <%= i %>\n<% end %>");
+    expect(out.unsupported).toBe(true);
+  });
+  it("falls back to sentinel on `/` (Ruby integer-div vs JS float-div mismatch)", () => {
+    // Ruby `5/2 = 2` (truncate toward -∞); JS `5/2 = 2.5`. Silently producing
+    // 2.5 in a fixture id would diverge from Rails — fall through to sentinel.
+    const { rendered } = stripErb("<% 1.times do |i| %>k: <%= 5/2 %>;<% end %>");
+    expect(rendered).toBe(`k: ${ERB_SKIP_SENTINEL};`);
+  });
+  it("sentinelizes residual opaque `<%= ... %>` (e.g. 2.weeks.ago.to_fs)", () => {
+    const out = stripErb("c: <%= 2.weeks.ago.to_fs(:db) %>");
+    expect(out.unsupported).toBe(false);
+    expect(out.rendered).toBe(`c: ${ERB_SKIP_SENTINEL}`);
+  });
 });
 
 it("isRefLike only accepts shapes with both string fields", () => {
@@ -114,6 +167,40 @@ describe("compareFile + schema integration", () => {
     const r = await compareFile("authors.yml", rows(), new Map(), undefined, {});
     expect(r.schemaPorted).toBe(false);
     expect(r.schemaExtras).toBe(0);
+  });
+
+  it("counts attrs whose Rails value is the ERB skip sentinel without flagging DIFF", async () => {
+    // Mirrors what stripErb does for `<%= 2.weeks.ago... %>`: the Rails
+    // value parses as the sentinel string; the per-attr diff skips it
+    // (and excludes it from attrsTotal so the % stays accurate).
+    // authors.ts:david doesn't carry `name` — pick `author_address_id`,
+    // which it does have, so the presence check passes and the sentinel
+    // skip path runs. Without the presence check, this would have
+    // matched as 0===0 noise; with it, attrsSkipped is the right signal.
+    const rowsWithSentinel = new Map([
+      ["authors", { david: { id: 1, author_address_id: ERB_SKIP_SENTINEL } }],
+    ]);
+    const r = await compareFile("authors.yml", rowsWithSentinel, new Map(), undefined, {
+      authors: { author_address_id: "integer" },
+    });
+    expect(r.attrsSkipped).toBe(1);
+    expect(r.notes.some((n) => /missing-in-ts: david\.author_address_id/.test(n))).toBe(false);
+  });
+
+  it("still flags missing-in-ts when the TS row drops a sentinel-valued attr", async () => {
+    // Sentinel skip must not mask real fixture drift: if Rails carries the
+    // attribute (even as opaque ERB) and TS dropped it, that's a port gap.
+    // `bogus_only` is a column in the supplied schema so canonicalizeRailsRow
+    // preserves it; TS authors.ts doesn't have it → must surface as
+    // missing-in-ts rather than silently incrementing attrsSkipped.
+    const rowsSentinelMissingInTs = new Map([
+      ["authors", { david: { id: 1, bogus_only: ERB_SKIP_SENTINEL } }],
+    ]);
+    const r = await compareFile("authors.yml", rowsSentinelMissingInTs, new Map(), undefined, {
+      authors: { bogus_only: "string" },
+    });
+    expect(r.attrsSkipped).toBe(0);
+    expect(r.notes.some((n) => /missing-in-ts: david\.bogus_only/.test(n))).toBe(true);
   });
 
   it("flips status to DIFF and counts extras when the TS row uses an undeclared column", async () => {
