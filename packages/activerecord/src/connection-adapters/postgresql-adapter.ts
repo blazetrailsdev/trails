@@ -934,17 +934,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `pg.PoolClient` reference.
    */
   private async withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+    // Decide ownership SYNCHRONOUSLY from `this._client` — no yield between
+    // the read and the use. Under a pinned TX (Promise.all of concurrent
+    // writes), this guarantees every caller reuses the TX-pinned client.
+    // The prior shape — `txClient = this._client; await this.getClient()` —
+    // raced with begin/commit, letting a concurrent caller's snapshot go
+    // stale across the yield and either (a) checkout a fresh pool client
+    // mid-TX (causing PG `08P01 invalid frontend message type 0` /
+    // `25P02 transaction-aborted` when one logical TX fans across multiple
+    // sockets) or (b) release the TX client from a query's finally.
     const txClient = this._client;
-    // Route through getClient() so tests that stub it (see
-    // postgresql-adapter.exec-query.test.ts) keep working. getClient's
-    // own behavior matches our snapshot: returns `this._client` when
-    // set, otherwise a fresh pool connection.
+    if (txClient) return await fn(txClient);
+    // No TX active at decision time: acquire a fresh client and own its
+    // release. Route through `getClient()` so unit tests can stub the
+    // checkout (see postgresql-adapter.exec-query.test.ts).
     const client = await this.getClient();
-    const ownedByTransaction = client === txClient;
     try {
       return await fn(client);
     } finally {
-      if (!ownedByTransaction) client.release();
+      client.release();
     }
   }
 
