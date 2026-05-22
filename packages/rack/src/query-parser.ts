@@ -121,8 +121,8 @@ export class QueryParser {
   }
 
   parseNestedQuery(qs: string | null | undefined, separator?: string | null): Record<string, any> {
-    const params = this.makeParams();
     if (!qs) return Object.create(null);
+    const params = this.makeParams();
 
     try {
       const str = this.checkQueryString(qs, separator);
@@ -142,9 +142,9 @@ export class QueryParser {
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
-      // Mirror Rails' `rescue ArgumentError`: wrap decoding errors (URIError from
-      // decodeURIComponent) and unexpected TypeErrors as InvalidParameterError.
-      if ((e instanceof URIError || e instanceof TypeError) && !(e instanceof ParameterTypeError)) {
+      // Mirror Rails' `rescue ArgumentError`: wrap URIError from decodeURIComponent
+      // (invalid percent-encoding) as InvalidParameterError.
+      if (e instanceof URIError) {
         throw new InvalidParameterError((e as Error).message);
       }
       throw e;
@@ -192,7 +192,6 @@ export class QueryParser {
     if (DANGEROUS_KEYS.has(name)) return;
 
     if (!name.includes("[")) {
-      if (name === "") return;
       params[name] = v;
       return;
     }
