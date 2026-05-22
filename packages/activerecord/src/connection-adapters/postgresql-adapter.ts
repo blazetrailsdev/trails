@@ -269,6 +269,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
   // postgresql_adapter.rb:349, abstract_adapter.rb:984).
   private _acquiring: Promise<pg.Client> | null = null;
+  // In-flight reset promise (ROLLBACK + DISCARD ALL). Query paths await
+  // this before proceeding so no query can interleave between the two
+  // SQL commands that resetBang fires asynchronously.
+  private _inFlightReset: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
   private _noticeReceiverSqlWarnings: Array<{
@@ -882,6 +886,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Mirrors Rails' @lock.synchronize around connect.
    */
   private async _acquireFreshClient(): Promise<pg.Client> {
+    if (this._closed || this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
+    // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
+    // query can interleave between the two commands resetBang fires.
+    while (this._inFlightReset) await this._inFlightReset;
+    // Re-check after the yield: a concurrent close/disconnect/discard
+    // may have run while we were waiting for the reset to complete.
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
@@ -2021,8 +2033,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this.verifiedBang();
       return;
     }
+    while (this._inFlightReset) await this._inFlightReset;
+    // Re-check after the yield: a concurrent disconnect/close/discard
+    // may have nulled _rawConnection while we were waiting.
+    const conn = this._rawConnection;
+    if (this._closed || !conn) {
+      this.reconnect();
+      this.verifiedBang();
+      return;
+    }
     try {
-      await this._rawConnection.query(";");
+      await conn.query(";");
     } catch {
       this.reconnect();
     }
@@ -2057,7 +2078,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._client = null;
       this._inTransaction = false;
     }
-    work.then(() => live.query("DISCARD ALL")).catch(() => {});
+    // Gate all query paths behind this promise so no query can interleave
+    // between ROLLBACK and DISCARD ALL. _acquireFreshClient awaits it.
+    // Capture in a local so the .finally() only clears the barrier when
+    // this specific reset is still the active one — prevents a second
+    // concurrent resetBang() from having its barrier cleared prematurely
+    // by the first reset's .finally().
+    const reset: Promise<void> = work
+      .then(() => live.query("DISCARD ALL"))
+      .then(() => {})
+      .catch(() => {})
+      .finally(() => {
+        if (this._inFlightReset === reset) this._inFlightReset = null;
+      });
+    this._inFlightReset = reset;
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();
@@ -2360,8 +2394,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
 
   async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     if (!this._rawConnection) return false;
+    const client = await this._acquireFreshClient();
     const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
-    const result = await this._rawConnection.query(sql, [param]);
+    const result = await client.query(sql, [param]);
     return result.rows[0]?.unlocked === true;
   }
 

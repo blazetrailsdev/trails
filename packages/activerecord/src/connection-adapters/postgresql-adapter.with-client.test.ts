@@ -14,8 +14,10 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
+  _inFlightReset: Promise<void> | null;
   withClient: <T>(fn: (client: unknown) => Promise<T>) => Promise<T>;
   _acquireFreshClient: () => Promise<unknown>;
+  resetBang: () => void;
   close: () => Promise<void>;
 }
 
@@ -68,6 +70,63 @@ describe("PostgreSQLAdapter#withClient (single persistent connection)", () => {
     adapter._client = persistentClient;
     observed = await adapter.withClient(async (client) => client);
     expect(observed).toBe(persistentClient);
+  });
+
+  it("resetBang barrier: real _acquireFreshClient waits until DISCARD ALL resolves", async () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
+
+    const order: string[] = [];
+    let resolveDiscard!: () => void;
+    const discardGate = new Promise<void>((r) => {
+      resolveDiscard = r;
+    });
+
+    const fakeClient = {
+      query: vi.fn(async (sql: string) => {
+        if (sql === "DISCARD ALL") {
+          order.push("discard-start");
+          await discardGate;
+          order.push("discard-end");
+        }
+        return { rows: [], fields: [] };
+      }),
+      end: async () => {},
+      on: () => fakeClient,
+    };
+    // Pre-seed the connection so _doAcquire reuses it rather than
+    // opening a new socket (avoids real network I/O).
+    adapter._rawConnection = fakeClient;
+
+    // resetBang() clears _connectionConfigured, so _acquireFreshClient
+    // will call _maybeConfigureConnection via _doAcquire after the
+    // barrier clears. Stub it to avoid real SET queries on the fake client.
+    vi.spyOn(
+      adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
+      "_maybeConfigureConnection",
+    ).mockResolvedValue(undefined);
+
+    // Fire resetBang (sync) — sets _inFlightReset before returning.
+    adapter.resetBang();
+    expect(adapter._inFlightReset).not.toBeNull();
+
+    // Concurrent acquire using the REAL _acquireFreshClient — must queue
+    // behind the in-flight reset.
+    const acquirePromise = adapter._acquireFreshClient().then((c) => {
+      order.push("acquire-done");
+      return c;
+    });
+
+    // Yield several microtask ticks; DISCARD ALL gate holds everything up.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(order).toEqual(["discard-start"]);
+
+    // Release DISCARD ALL — the acquire should now proceed.
+    resolveDiscard();
+    await acquirePromise;
+
+    expect(order).toEqual(["discard-start", "discard-end", "acquire-done"]);
+    // Barrier is cleared after reset completes.
+    expect(adapter._inFlightReset).toBeNull();
   });
 
   it("serializes the initial connect so concurrent callers share one pg.Client", async () => {
