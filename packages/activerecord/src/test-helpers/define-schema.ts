@@ -294,7 +294,8 @@ export function databaseIdentity(adapter: DatabaseAdapter): string {
 }
 
 /**
- * Snapshot the per-adapter signature cache. Paired with
+ * Snapshot the signature cache for the database the adapter targets
+ * (resolved via {@link databaseIdentity}). Paired with
  * {@link _restoreAppliedSchemaSignaturesForAdapter} so
  * `withTransactionalFixtures` can preserve entries created in a `beforeAll`
  * (outside any rolled-back test transaction) while discarding entries
@@ -323,8 +324,10 @@ export function _restoreAppliedSchemaSignaturesForAdapter(
 }
 
 /**
- * Drop the cached signature(s) for one adapter (or all adapters when no
- * argument is given). Paired with `resetTestAdapterState` so the signature
+ * Drop the cached signatures for the database the given adapter targets
+ * (resolved via {@link databaseIdentity}, so this also clears entries for
+ * any sibling adapter pointing at the same DB), or for every database
+ * when no argument is given. Paired with `resetTestAdapterState` so the signature
  * cache stays synchronized with `dropAllTables`: a shared adapter — which
  * survives across tests under the sidecar shape — would otherwise hold
  * signatures for tables that no longer exist, making a subsequent
