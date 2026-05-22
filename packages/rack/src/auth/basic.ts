@@ -3,15 +3,19 @@ import { AbstractRequest } from "./abstract/request.js";
 import type { RackApp } from "../mock-request.js";
 
 export class BasicRequest extends AbstractRequest {
+  private _credentials?: string[];
+
   basic(): boolean {
     return this.scheme() === "basic" && this.credentials().length === 2;
   }
 
   credentials(): string[] {
-    const decoded = Buffer.from(this.params(), "base64").toString("utf-8");
-    const idx = decoded.indexOf(":");
-    if (idx === -1) return [decoded];
-    return [decoded.slice(0, idx), decoded.slice(idx + 1)];
+    if (!this._credentials) {
+      const decoded = Buffer.from(this.params(), "base64").toString("utf-8");
+      const idx = decoded.indexOf(":");
+      this._credentials = idx === -1 ? [decoded] : [decoded.slice(0, idx), decoded.slice(idx + 1)];
+    }
+    return this._credentials;
   }
 
   username(): string {
