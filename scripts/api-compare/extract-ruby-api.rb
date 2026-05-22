@@ -161,6 +161,14 @@ class ApiExtractor
     @modules = {}
     @namespace_stack = []
     @visibility_stack = [:public]
+    # Tracks whether the current module-scope is under a bare `module_function`
+    # directive. Methods defined after such a directive become Ruby module
+    # methods (callable as `Mod.foo`) and *private* instance methods on
+    # includers. For api-compare purposes we record them as classMethods only:
+    # the TS port exposes them as module-level exports, and propagating them
+    # as instance methods of every `include`r drowns hosts like
+    # `Rack::ContentLength` in 30+ phantom misses.
+    @module_function_stack = [false]
   end
 
   def process_file(filepath, package_root)
@@ -326,12 +334,14 @@ class ApiExtractor
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
+    @module_function_stack.push(false)
 
     fqn = current_fqn
     @modules[fqn] ||= new_class_info(name, fqn)
 
     walk_body(node[2])
 
+    @module_function_stack.pop
     @visibility_stack.pop
     @namespace_stack.pop
   end
@@ -344,6 +354,7 @@ class ApiExtractor
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
+    @module_function_stack.push(false)
 
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
@@ -351,6 +362,7 @@ class ApiExtractor
 
     walk_body(node[3] || node[2])
 
+    @module_function_stack.pop
     @visibility_stack.pop
     @namespace_stack.pop
   end
@@ -394,6 +406,12 @@ class ApiExtractor
     method_info[:calls] = calls unless calls.empty?
 
     if @in_sclass
+      target[:classMethods] << method_info
+    elsif @module_function_stack.last && @modules[fqn]
+      # Inside a module under `module_function`: record as a module method
+      # (Mod.foo). The "private instance method on includer" half of Ruby
+      # module_function semantics is intentionally not modelled — see
+      # @module_function_stack init comment.
       target[:classMethods] << method_info
     else
       target[:instanceMethods] << method_info
@@ -483,6 +501,8 @@ class ApiExtractor
       process_scope(args)
     when "delegate"
       process_delegate(args)
+    when "module_function"
+      process_module_function(args)
     end
   end
 
@@ -491,6 +511,8 @@ class ApiExtractor
     case cmd_name
     when "private", "protected", "public"
       @visibility_stack[-1] = cmd_name.to_sym
+    when "module_function"
+      @module_function_stack[-1] = true
     end
   end
 
@@ -499,6 +521,8 @@ class ApiExtractor
     case cmd_name
     when "private", "protected", "public"
       @visibility_stack[-1] = cmd_name.to_sym
+    when "module_function"
+      @module_function_stack[-1] = true
     end
   end
 
@@ -529,11 +553,32 @@ class ApiExtractor
         process_extend_from_arg_paren(node[2])
       when "scope"
         process_scope_from_arg_paren(node[2])
+      when "module_function"
+        process_module_function(node[2])
       end
     else
       walk(node[1]) if node[1].is_a?(Array)
       walk(node[2]) if node[2].is_a?(Array)
     end
+  end
+
+  # Handle `module_function` with arguments: `module_function :foo, :bar`
+  # retroactively moves named instance methods to classMethods. Bare
+  # `module_function` (no args) is handled in process_fcall/process_vcall
+  # via @module_function_stack.
+  def process_module_function(args)
+    if args.nil? || (args.is_a?(Array) && args[0] == :args_new)
+      @module_function_stack[-1] = true
+      return
+    end
+    names = extract_symbol_args(args)
+    return if names.empty?
+    fqn = current_fqn
+    target = @modules[fqn]
+    return unless target
+    moved, kept = target[:instanceMethods].partition { |m| names.include?(m[:name]) }
+    target[:instanceMethods] = kept
+    target[:classMethods].concat(moved)
   end
 
   def apply_visibility_to_named(names, vis)
@@ -594,9 +639,13 @@ class ApiExtractor
 
     vis = current_visibility
     names = extract_symbol_args(args)
+    # `class << self; attr_accessor :foo; end` declares singleton accessors;
+    # without bucketing into classMethods these would leak as instance methods
+    # of every includer.
+    bucket = @in_sclass ? :classMethods : :instanceMethods
     names.each do |name|
       if kind == :reader || kind == :accessor
-        target[:instanceMethods] << {
+        target[bucket] << {
           name: name,
           visibility: vis.to_s,
           params: [],
@@ -604,7 +653,7 @@ class ApiExtractor
         }
       end
       if kind == :writer || kind == :accessor
-        target[:instanceMethods] << {
+        target[bucket] << {
           name: "#{name}=",
           visibility: vis.to_s,
           params: [{ name: "value", kind: "required" }],
@@ -627,9 +676,10 @@ class ApiExtractor
 
     vis = current_visibility
     names = extract_symbol_args_from_paren(args)
+    bucket = @in_sclass ? :classMethods : :instanceMethods
     names.each do |name|
       if kind == :reader || kind == :accessor
-        target[:instanceMethods] << {
+        target[bucket] << {
           name: name,
           visibility: vis.to_s,
           params: [],
@@ -637,7 +687,7 @@ class ApiExtractor
         }
       end
       if kind == :writer || kind == :accessor
-        target[:instanceMethods] << {
+        target[bucket] << {
           name: "#{name}=",
           visibility: vis.to_s,
           params: [{ name: "value", kind: "required" }],
