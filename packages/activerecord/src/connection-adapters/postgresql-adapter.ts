@@ -1987,6 +1987,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // (abstract_adapter.rb:759-776). The ConnectionPool calls this on
     // checkout, so a prior disconnectBang/discardBang doesn't leave
     // the adapter permanently unusable — the pool flow reopens it.
+    //
+    // A terminal close() nulls _pgClientOptions; in that state there
+    // is nothing to reconnect to, so refuse to mark the adapter
+    // verified rather than silently returning a usable-looking handle.
+    if (this._pgClientOptions == null) {
+      throw new Error("PostgreSQLAdapter: connection is closed");
+    }
     if (this._closed || !this._rawConnection) {
       this.reconnect();
       this.verifiedBang();
@@ -2014,14 +2021,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       super.resetBang();
       return;
     }
+    // Capture the live connection so subsequent DISCARD ALL chains
+    // onto it even if a concurrent reconnect later nulls
+    // _rawConnection. resetBang is sync per AbstractAdapter, so we
+    // can't truly await — chain via .then so DISCARD ALL is sent
+    // only AFTER ROLLBACK's response is processed (matching the
+    // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
+    const live = this._rawConnection;
+    let work: Promise<unknown> = Promise.resolve();
     if (this._client) {
       this._cancelAnyRunningQuery();
-      const live = this._rawConnection;
-      live.query("ROLLBACK").catch(() => {});
+      work = live.query("ROLLBACK").catch(() => {});
       this._client = null;
       this._inTransaction = false;
     }
-    this._rawConnection.query("DISCARD ALL").catch(() => {});
+    work.then(() => live.query("DISCARD ALL")).catch(() => {});
     // DISCARD ALL drops server-side prepared statements — reset the
     // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
     this._statementPool?.reset();
