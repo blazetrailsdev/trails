@@ -6,9 +6,7 @@ import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
-
-type EngineHost = { _calledFrom?: string; _isolated?: boolean };
-const host = (k: typeof Engine): EngineHost => k as unknown as EngineHost;
+import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
   private _railtiesCollection?: Trailties;
@@ -16,12 +14,12 @@ export class Engine extends Trailtie {
   private _routes?: unknown;
 
   static calledFrom(value?: string): string | undefined {
-    if (value !== undefined) host(this)._calledFrom = value;
-    return host(this)._calledFrom;
+    if (value !== undefined) writeOwnState(this, "_calledFrom", value);
+    return readOwnState<string>(this, "_calledFrom");
   }
   static isolated(value?: boolean): boolean {
-    if (value !== undefined) host(this)._isolated = value;
-    return host(this)._isolated === true;
+    if (value !== undefined) writeOwnState(this, "_isolated", value);
+    return readOwnState<boolean>(this, "_isolated") === true;
   }
 
   /** Mirrors Rails' `alias :engine_name :railtie_name`. */

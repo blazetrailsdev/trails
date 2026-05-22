@@ -1,21 +1,20 @@
 /**
- * Port of `Rails::Railtie` from `railties/lib/rails/railtie.rb`.
- * Subclasses opt in to the registry explicitly via `Trailtie.register(...)`
- * — there is no `inherited` hook in TS. The block runners
- * (rakeTasks/console/runner/generators/server) and the `Configurable`
- * mixin land in PR 2.1b.
+ * Port of `Rails::Railtie` from `railties/lib/rails/railtie.rb`. Subclasses
+ * opt in to the registry via `Trailtie.register(...)` — no `inherited`
+ * hook. Block runners (`rakeTasks`/`console`/`runner`/`generators`/
+ * `server`) walk ancestors like Rails' `each_registered_block`.
  */
 import { underscore } from "@blazetrails/activesupport";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
+import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
+import { assertNotSealed } from "./trailtie/configurable.js";
 
 export const ABSTRACT_RAILTIES = ["Trailtie", "Engine", "Application"] as const;
-
-type Host = { _loadIndex?: number; _railtieName?: string; _instance?: Trailtie };
-
-/** @internal Module-wide load counter shared across subclasses. */
 let loadCounter = 0;
-const host = (k: typeof Trailtie): Host => k as unknown as Host;
+
+export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
+export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
 
 export class Trailtie extends Initializable {
   /** @internal */
@@ -35,14 +34,19 @@ export class Trailtie extends Initializable {
   static subclasses(): Array<typeof Trailtie> {
     return [...Trailtie._registry]
       .filter((s) => !s.isAbstractRailtie())
-      .sort((a, b) => (host(a)._loadIndex ?? 0) - (host(b)._loadIndex ?? 0));
+      .sort(
+        (a, b) =>
+          (readOwnState<number>(a, "_loadIndex") ?? 0) -
+          (readOwnState<number>(b, "_loadIndex") ?? 0),
+      );
   }
 
   /** Explicit subclass registration — replaces Rails' `inherited` hook. */
   static register(subclass: typeof Trailtie): void {
     if (Trailtie._registry.includes(subclass)) return;
-    if (!Object.prototype.hasOwnProperty.call(subclass, "_loadIndex")) {
-      host(subclass)._loadIndex = ++loadCounter;
+    assertNotSealed(subclass);
+    if (readOwnState<number>(subclass, "_loadIndex") === undefined) {
+      writeOwnState(subclass, "_loadIndex", ++loadCounter);
     }
     Trailtie._registry.push(subclass);
   }
@@ -53,21 +57,18 @@ export class Trailtie extends Initializable {
 
   /** Set or get the short railtie name (defaults to underscored class name). */
   static railtieName(name?: string): string {
-    const h = host(this);
-    if (name !== undefined) h._railtieName = name;
-    if (!Object.prototype.hasOwnProperty.call(this, "_railtieName") || !h._railtieName) {
-      h._railtieName = underscore(this.name).replace(/\//g, "_");
+    if (name !== undefined) writeOwnState(this, "_railtieName", name);
+    let existing = readOwnState<string>(this, "_railtieName");
+    if (!existing) {
+      existing = underscore(this.name).replace(/\//g, "_");
+      writeOwnState(this, "_railtieName", existing);
     }
-    return h._railtieName;
+    return existing;
   }
 
   /** Lazily-created per-class singleton. */
   static instance<T extends typeof Trailtie>(this: T): InstanceType<T> {
-    const h = host(this) as { _instance?: InstanceType<T> };
-    if (!Object.prototype.hasOwnProperty.call(this, "_instance") || !h._instance) {
-      h._instance = new (this as unknown as new () => InstanceType<T>)();
-    }
-    return h._instance;
+    return ownState(this, "_instance", () => new (this as unknown as new () => InstanceType<T>)());
   }
 
   static get config(): Configuration {
@@ -76,6 +77,27 @@ export class Trailtie extends Initializable {
 
   static configure(block: (this: Trailtie) => void): void {
     (this as typeof Trailtie).instance().configure(block);
+  }
+
+  static rakeTasks(block: TrailtieBlock): void {
+    registerBlockFor(this, "rakeTasks", block);
+  }
+  static console(block: TrailtieBlock): void {
+    registerBlockFor(this, "console", block);
+  }
+  static runner(block: TrailtieBlock): void {
+    registerBlockFor(this, "runner", block);
+  }
+  static generators(block: TrailtieBlock): void {
+    registerBlockFor(this, "generators", block);
+  }
+  static server(block: TrailtieBlock): void {
+    registerBlockFor(this, "server", block);
+  }
+
+  /** @internal Read the blocks registered directly on `klass` for `kind`. */
+  static registeredBlocksFor(kind: BlockRunnerKind): TrailtieBlock[] {
+    return readOwnState<TrailtieBlock[]>(this, blockKey(kind)) ?? [];
   }
 
   get config(): Configuration {
@@ -93,5 +115,45 @@ export class Trailtie extends Initializable {
 
   inspect(): string {
     return `#<${this.constructor.name}>`;
+  }
+
+  runConsoleBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "console", (b) => b.call(this, app));
+  }
+  runGeneratorsBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "generators", (b) => b.call(this, app));
+  }
+  runRunnerBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "runner", (b) => b.call(this, app));
+  }
+  runTasksBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
+  }
+  runServerBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "server", (b) => b.call(this, app));
+  }
+}
+
+function blockKey(kind: BlockRunnerKind): string {
+  return `_blocks_${kind}`;
+}
+
+function registerBlockFor(
+  klass: typeof Trailtie,
+  kind: BlockRunnerKind,
+  block: TrailtieBlock,
+): void {
+  ownState(klass, blockKey(kind), () => [] as TrailtieBlock[]).push(block);
+}
+
+function eachRegisteredBlock(
+  instance: Trailtie,
+  kind: BlockRunnerKind,
+  fn: (b: TrailtieBlock) => void,
+): void {
+  let klass: typeof Trailtie | null = instance.constructor as typeof Trailtie;
+  while (klass && "registeredBlocksFor" in klass) {
+    for (const block of klass.registeredBlocksFor(kind)) fn(block);
+    klass = Object.getPrototypeOf(klass) as typeof Trailtie | null;
   }
 }
