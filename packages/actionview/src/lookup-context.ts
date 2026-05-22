@@ -18,7 +18,7 @@
 
 import type { RenderContext } from "./template/handlers.js";
 import { TemplateHandlerRegistry } from "./template/handlers.js";
-import type { TemplateResolver } from "./template-resolver.js";
+import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";

@@ -15,11 +15,10 @@ export {
 // exposing the Rails-spelled `Template.Error` class.
 export { Template } from "./template.js";
 
-export {
-  type TemplateResolver,
-  FileSystemResolver,
-  InMemoryResolver,
-} from "./template-resolver.js";
+export { type TemplateResolver, Resolver } from "./resolver/resolver.js";
+export { FileSystemResolver } from "./resolver/file-system-resolver.js";
+export { OptimizedFileSystemResolver } from "./resolver/optimized-file-system-resolver.js";
+export { InMemoryResolver } from "./resolver/in-memory-resolver.js";
 
 export { LookupContext, MissingTemplate, DetailsKey } from "./lookup-context.js";
 

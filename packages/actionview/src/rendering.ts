@@ -7,7 +7,7 @@
  */
 
 import type { LookupContext } from "./lookup-context.js";
-import type { TemplateResolver } from "./template-resolver.js";
+import type { TemplateResolver } from "./resolver/resolver.js";
 
 export interface RenderOptions {
   template?: string;
