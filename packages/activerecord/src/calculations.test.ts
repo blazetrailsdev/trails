@@ -5948,8 +5948,13 @@ describe("CalculationsTest", () => {
       }
     }
 
+    const adapterAny = User.adapter as unknown as { castBoundValue?(v: unknown): unknown };
+    const cast = (v: unknown) =>
+      typeof adapterAny.castBoundValue === "function" ? adapterAny.castBoundValue(v) : v;
+    const quotedName = User.adapter.quote(cast("O'Brien"));
+    const quoted25 = User.adapter.quote(cast(25));
     expect(User.sanitizeSqlArray("name = ? AND age > ?", "O'Brien", 25)).toBe(
-      `name = '${User.adapter.quoteString("O'Brien")}' AND age > 25`,
+      `name = ${quotedName} AND age > ${quoted25}`,
     );
   });
 

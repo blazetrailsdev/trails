@@ -110,6 +110,7 @@ export function unquoteIdentifier(identifier: string | null | undefined): string
 
 /** @internal */
 export function castBoundValue(value: unknown): unknown {
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (value === true) return "1";
   if (value === false) return "0";
   return value;
