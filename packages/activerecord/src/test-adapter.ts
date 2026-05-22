@@ -32,6 +32,7 @@ import {
 import { Base } from "./base.js";
 import { Visitors } from "@blazetrails/arel";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
+import { sanitizeAsSqlComment as abstractSanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import { include } from "@blazetrails/activesupport";
 import { isWriteQuerySql } from "./connection-adapters/sql-classification.js";
 import type { Result } from "./result.js";
@@ -655,6 +656,25 @@ class TestAdapterFixtures implements DatabaseAdapter {
 
   quotedFalse(): string {
     return this.inner.quotedFalse();
+  }
+
+  quoteTableNameForAssignment(table: string, attr: string): string {
+    const inner = this.inner as { quoteTableNameForAssignment?: (t: string, a: string) => string };
+    if (typeof inner.quoteTableNameForAssignment === "function")
+      return inner.quoteTableNameForAssignment(table, attr);
+    return this.quoteTableName(`${table}.${attr}`);
+  }
+
+  castBoundValue(value: unknown): unknown {
+    const inner = this.inner as { castBoundValue?: (v: unknown) => unknown };
+    if (typeof inner.castBoundValue === "function") return inner.castBoundValue(value);
+    return value;
+  }
+
+  sanitizeAsSqlComment(value: unknown): string {
+    const inner = this.inner as { sanitizeAsSqlComment?: (v: unknown) => string };
+    if (typeof inner.sanitizeAsSqlComment === "function") return inner.sanitizeAsSqlComment(value);
+    return abstractSanitizeAsSqlComment(value);
   }
 
   get arelVisitor(): Visitors.ToSql | undefined {

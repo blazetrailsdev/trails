@@ -259,7 +259,13 @@ describe("SanitizeTest", () => {
       }
     }
     const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
-    expect(sql).toBe("title = 'hello' AND id = 1");
+    const a = Post.adapter as unknown as {
+      castBoundValue(v: unknown): unknown;
+      quote(v: unknown): string;
+    };
+    expect(sql).toBe(
+      `title = ${a.quote(a.castBoundValue("hello"))} AND id = ${a.quote(a.castBoundValue(1))}`,
+    );
   });
 
   it.skip("sanitize sql array handles relations", () => {
@@ -537,7 +543,11 @@ describe("sanitizeSql", () => {
       }
       Post.adapter = freshAdapter();
       const sql = Post.sanitizeSqlArray("active = ?", true);
-      expect(sql).toBe(`active = ${Post.adapter.quotedTrue()}`);
+      const a = Post.adapter as unknown as {
+        castBoundValue(v: unknown): unknown;
+        quote(v: unknown): string;
+      };
+      expect(sql).toBe(`active = ${a.quote(a.castBoundValue(true))}`);
     });
   });
 });

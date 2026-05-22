@@ -1138,18 +1138,17 @@ each phase has a fidelity bar to hit.
 
 ### Package ownership per phase
 
-| Phase | New package or file?                                                  | Owning package             | Depends on              |
-| ----- | --------------------------------------------------------------------- | -------------------------- | ----------------------- |
-| 0a    | extract trails-tsc                                                    | `@blazetrails/trails-tsc`  | activerecord (existing) |
-| 0b    | SafeString / OutputBuffer                                             | activesupport / actionview | —                       |
-| 2a-0  | **new** `@blazetrails/tse-compiler` (lexer, AST, JS/TS/d.ts emitters) | `tse-compiler`             | activesupport           |
-| 2a-1  | `Tse` handler class                                                   | `actionview`               | tse-compiler            |
-| 2b    | `tse` plugin (file I/O + manifest writes)                             | `trails-tsc`               | tse-compiler            |
-| 2c    | build CLI + watch + TS language service plugin                        | `trails-tsc`               | tse-compiler            |
+| Phase | Status                    | New package or file?                                                  | Owning package             | Depends on              |
+| ----- | ------------------------- | --------------------------------------------------------------------- | -------------------------- | ----------------------- |
+| 0a    | open                      | extract trails-tsc                                                    | `@blazetrails/trails-tsc`  | activerecord (existing) |
+| 0b    | closed (#1941 + existing) | SafeString / OutputBuffer                                             | activesupport / actionview | —                       |
+| 2a-0  | closed (#2190)            | **new** `@blazetrails/tse-compiler` (lexer, AST, JS/TS/d.ts emitters) | `tse-compiler`             | activesupport           |
+| 2a-1  | in flight (#2200)         | `Tse` handler class                                                   | `actionview`               | tse-compiler            |
+| 2b    | in flight (#2201)         | `tse` plugin (file I/O + manifest writes)                             | `trails-tsc`               | tse-compiler            |
+| 2c    | blocked on 2a-1 + 2b      | build CLI + watch + TS language service plugin                        | `trails-tsc`               | tse-compiler            |
 
-Phase 2a-0 (the new tse-compiler package) is the largest single piece
-and must land first; both 2a-1 and 2b depend on it but are independent
-of each other and can land in parallel from sibling branches.
+Phase 2a-0 LANDED in #2190. 2a-1 + 2b are now in flight (#2200, #2201)
+and can land in either order. 2c follows both.
 
 ---
 

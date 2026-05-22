@@ -237,51 +237,23 @@ interface QuoterHost {
  * propagate to avoid a silent dialect downgrade. @internal
  */
 function quoterFor(host: QuoterHost): Quoter {
-  let conn: Partial<Quoter> | null | undefined;
+  let conn: Quoter | null | undefined;
   if (typeof host.connection === "function") {
     try {
-      conn = host.connection() as Partial<Quoter> | null | undefined;
+      conn = host.connection() as Quoter | null | undefined;
     } catch (err) {
       if (!(err instanceof ConnectionNotDefined)) throw err;
     }
   }
   if (!conn) {
     try {
-      conn = host.adapter as Partial<Quoter> | null | undefined;
+      conn = host.adapter as Quoter | null | undefined;
     } catch (err) {
       if (!(err instanceof ConnectionNotDefined)) throw err;
     }
   }
   if (!conn || typeof conn.quote !== "function") return ABSTRACT_QUOTER;
-  if (
-    typeof conn.quoteIdentifier === "function" &&
-    typeof conn.quoteTableNameForAssignment === "function" &&
-    typeof conn.quoteString === "function" &&
-    typeof conn.castBoundValue === "function"
-  ) {
-    return conn as Quoter;
-  }
-  // Partial quoter (e.g. adapter set directly): delegate quote(); use ABSTRACT_QUOTER defaults.
-  const partialQuote = conn.quote.bind(conn);
-  return {
-    quote: partialQuote,
-    quoteIdentifier:
-      typeof conn.quoteIdentifier === "function"
-        ? conn.quoteIdentifier.bind(conn)
-        : ABSTRACT_QUOTER.quoteIdentifier,
-    quoteTableNameForAssignment:
-      typeof conn.quoteTableNameForAssignment === "function"
-        ? conn.quoteTableNameForAssignment.bind(conn)
-        : ABSTRACT_QUOTER.quoteTableNameForAssignment,
-    quoteString:
-      typeof conn.quoteString === "function"
-        ? conn.quoteString.bind(conn)
-        : ABSTRACT_QUOTER.quoteString,
-    castBoundValue:
-      typeof conn.castBoundValue === "function"
-        ? conn.castBoundValue.bind(conn)
-        : ABSTRACT_QUOTER.castBoundValue,
-  };
+  return conn;
 }
 
 /**
