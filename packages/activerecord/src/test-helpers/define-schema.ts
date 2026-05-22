@@ -519,7 +519,13 @@ async function _defineSchemaImpl(
     }
     const columns = columnsOf(raw);
     const pk = primaryKeyOf(raw);
-    const createOpts: { id?: boolean; primaryKey?: string[] } = {};
+    // Use IF NOT EXISTS when neither branch above ran (no drop, no stale-cache
+    // delete): the cache has no entry and the table may or may not exist in the
+    // DB. Under a shared pooled adapter, another file may have already created
+    // it. When stillExists was true we just dropped it; when cachedSig was set
+    // we cleared it — both cases guarantee the table is absent.
+    const createOpts: { id?: boolean; primaryKey?: string[]; ifNotExists?: boolean } = {};
+    if (!stillExists && cachedSig === undefined) createOpts.ifNotExists = true;
     if (pk === false) createOpts.id = false;
     else if (Array.isArray(pk)) {
       createOpts.primaryKey = pk;
