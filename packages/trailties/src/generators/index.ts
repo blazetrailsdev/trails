@@ -15,6 +15,7 @@ export type { BenchmarkRunOptions } from "./rails/benchmark/benchmark-generator.
 export { TaskGenerator } from "./rails/task/task-generator.js";
 export type { TaskRunOptions } from "./rails/task/task-generator.js";
 export { ScriptGenerator } from "./rails/script/script-generator.js";
+export { AuthenticationGenerator } from "./rails/authentication/authentication-generator.js";
 export { GeneratorGenerator } from "./rails/generator/generator-generator.js";
 export type { GeneratorRunOptions } from "./rails/generator/generator-generator.js";
 export { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";

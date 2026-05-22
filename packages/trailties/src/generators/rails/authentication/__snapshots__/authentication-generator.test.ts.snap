@@ -1,0 +1,140 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AuthenticationGenerator > emits the full file set; each .ts file parses + carries no Ruby source 1`] = `
+"=== src/app/models/session.ts ===
+import { ApplicationRecord } from "./application-record.js";
+
+export class Session extends ApplicationRecord {
+  static associations() {
+    // belongsTo: User
+  }
+}
+
+=== src/app/models/user.ts ===
+import { ApplicationRecord } from "./application-record.js";
+
+export class User extends ApplicationRecord {
+  static associations() {
+    // hasSecurePassword; hasMany sessions, dependent: destroy
+  }
+
+  static normalizes() {
+    // emailAddress → e.strip().toLowerCase()
+  }
+}
+
+=== src/app/models/current.ts ===
+import { CurrentAttributes } from "@blazetrails/activesupport";
+
+export class Current extends CurrentAttributes {
+  static attributes() {
+    // attribute :session
+  }
+}
+
+=== src/app/controllers/sessions-controller.ts ===
+import { ApplicationController } from "./application-controller.js";
+
+export class SessionsController extends ApplicationController {
+  async new_(): Promise<void> {
+    // allowUnauthenticatedAccess only: [new_, create]
+  }
+
+  async create(): Promise<void> {
+    // User.authenticateBy → startNewSessionFor → redirect
+  }
+
+  async destroy(): Promise<void> {
+    // terminateSession → redirect to /session/new
+  }
+}
+
+=== src/app/controllers/concerns/authentication.ts ===
+export class Authentication {
+  static includeInto(klass: any) {
+    klass.beforeAction?.((c: any) => c.requireAuthentication());
+    klass.helperMethod?.("authenticated");
+  }
+
+  async authenticated(): Promise<void> {
+    // resumeSession
+  }
+
+  async requireAuthentication(): Promise<void> {
+    // resumeSession || requestAuthentication
+  }
+
+  private async resumeSession(): Promise<void> {
+    // Current.session ||= findSessionByCookie
+  }
+
+  private async findSessionByCookie(): Promise<void> {
+    // Session.findBy(cookies.signed.sessionId)
+  }
+
+  private async startNewSessionFor(user: any): Promise<void> {
+    // user.sessions.createBang + cookie
+  }
+
+  private async terminateSession(): Promise<void> {
+    // Current.session.destroy + cookies.delete
+  }
+}
+
+=== src/app/controllers/passwords-controller.ts ===
+import { ApplicationController } from "./application-controller.js";
+
+export class PasswordsController extends ApplicationController {
+  async new_(): Promise<void> {
+    // allowUnauthenticatedAccess
+  }
+
+  async create(): Promise<void> {
+    // PasswordsMailer.reset(user).deliverLater
+  }
+
+  async edit(): Promise<void> {
+    // setUserByToken
+  }
+
+  async update(): Promise<void> {
+    // user.update(password, passwordConfirmation)
+  }
+
+  private async setUserByToken(): Promise<void> {
+    // User.findByPasswordResetTokenBang
+  }
+}
+
+=== src/app/channels/application-cable/connection.ts ===
+export class Connection {
+  static identifiedBy() {
+    // currentUser
+  }
+
+  async connect(): Promise<void> {
+    // setCurrentUser || rejectUnauthorizedConnection
+  }
+
+  private async setCurrentUser(): Promise<void> {
+    // Session.findBy(cookies.signed.sessionId)
+  }
+}
+
+=== src/app/mailers/passwords-mailer.ts ===
+import { ApplicationMailer } from "./application-mailer.js";
+
+export class PasswordsMailer extends ApplicationMailer {
+  async reset(user: any): Promise<void> {
+    // mail subject: "Reset your password", to: user.emailAddress
+  }
+}
+
+=== test/mailers/previews/passwords-mailer-preview.ts ===
+export class PasswordsMailerPreview {
+  reset() {
+    // TODO: preview PasswordsMailer.reset
+  }
+}
+"
+`;
