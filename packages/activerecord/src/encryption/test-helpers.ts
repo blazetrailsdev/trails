@@ -514,23 +514,30 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
   } as any;
 }
 
+// Mirrors Rails' `->(value) { value.to_s.downcase }` lambda used by both
+// EncryptedBookNormalizedFirst/Second. Binary inputs are decoded as
+// Latin-1 (byte-preserving 1:1 mapping for bytes 128–255), lowercased,
+// then re-encoded back to Uint8Array so the cast type of a `:binary`
+// attribute is preserved through normalization (normalizes runs after
+// type casting and writes back via writeCastValue).
+const _latin1Decoder = new TextDecoder("latin1");
+function _downcaseLikeRails(v: unknown): unknown {
+  if (v == null) return v;
+  if (v instanceof Uint8Array) {
+    const lower = _latin1Decoder.decode(v).toLowerCase();
+    const out = new Uint8Array(lower.length);
+    for (let i = 0; i < lower.length; i++) out[i] = lower.charCodeAt(i) & 0xff;
+    return out;
+  }
+  return String(v).toLowerCase();
+}
+
 /**
  * EncryptedBookNormalizedFirst: declares normalizes before encrypts on both
  * `name` and `logo`. Mirrors Rails' EncryptedBookNormalizedFirst — exercises
  * normalize-then-encrypt order.
  */
 export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
-  // Mirrors Rails' `->(value) { value.to_s.downcase }`. In Ruby, a binary
-  // (ASCII-8BIT) string responds to .to_s as itself. For our `logo: binary`
-  // attribute the cast type yields a Uint8Array/Buffer; decode it as
-  // Latin-1 (byte-preserving 1:1 mapping) so arbitrary bytes 128–255 round
-  // through `.toLowerCase()` intact — matches the codebase's Latin-1
-  // binary round-tripping (EncryptedAttributeType.databaseTypeToText).
-  const toLower = (v: unknown) => {
-    if (v == null) return v;
-    if (v instanceof Uint8Array) return new TextDecoder("latin1").decode(v).toLowerCase();
-    return String(v).toLowerCase();
-  };
   return class EncryptedBookNormalizedFirst extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -538,9 +545,9 @@ export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
       this.attribute("name", "string");
       this.attribute("logo", "binary");
       this.adapter = adapter;
-      this.normalizes("name", toLower);
+      this.normalizes("name", _downcaseLikeRails);
       this.encrypts("name");
-      this.normalizes("logo", toLower);
+      this.normalizes("logo", _downcaseLikeRails);
       this.encrypts("logo");
     }
   } as any;
@@ -552,17 +559,6 @@ export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
  * encrypt-then-normalize order.
  */
 export function makeEncryptedBookNormalizedSecond(adapter: DatabaseAdapter) {
-  // Mirrors Rails' `->(value) { value.to_s.downcase }`. In Ruby, a binary
-  // (ASCII-8BIT) string responds to .to_s as itself. For our `logo: binary`
-  // attribute the cast type yields a Uint8Array/Buffer; decode it as
-  // Latin-1 (byte-preserving 1:1 mapping) so arbitrary bytes 128–255 round
-  // through `.toLowerCase()` intact — matches the codebase's Latin-1
-  // binary round-tripping (EncryptedAttributeType.databaseTypeToText).
-  const toLower = (v: unknown) => {
-    if (v == null) return v;
-    if (v instanceof Uint8Array) return new TextDecoder("latin1").decode(v).toLowerCase();
-    return String(v).toLowerCase();
-  };
   return class EncryptedBookNormalizedSecond extends Base {
     static {
       this._tableName = "encrypted_books";
@@ -571,9 +567,9 @@ export function makeEncryptedBookNormalizedSecond(adapter: DatabaseAdapter) {
       this.attribute("logo", "binary");
       this.adapter = adapter;
       this.encrypts("name");
-      this.normalizes("name", toLower);
+      this.normalizes("name", _downcaseLikeRails);
       this.encrypts("logo");
-      this.normalizes("logo", toLower);
+      this.normalizes("logo", _downcaseLikeRails);
     }
   } as any;
 }
