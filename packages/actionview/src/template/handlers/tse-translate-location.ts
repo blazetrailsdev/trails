@@ -78,8 +78,10 @@ export function tokenizeLine(line: string): SourceToken[] {
   return tokens;
 }
 
-/** Annotate each CODE/TEXT token with its byte offset within the source line,
- *  appending an EOS sentinel. Mirrors `offset_source_tokens` in `erb.rb`. */
+/** Annotate each CODE/TEXT token with its offset (UTF-16 code units, not
+ *  bytes — see the file-level note) within the source line, appending an
+ *  EOS sentinel. Mirrors `offset_source_tokens` in `erb.rb`, which uses
+ *  `bytesize`. */
 function offsetSourceTokens(tokens: SourceToken[]): OffsetToken[] {
   const result: OffsetToken[] = [];
   let offset = 0;
