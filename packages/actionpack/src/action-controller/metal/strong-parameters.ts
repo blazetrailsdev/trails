@@ -1,11 +1,4 @@
-/**
- * ActionController::StrongParameters
- *
- * Provides ActionController::Parameters, a hash-like object that controls
- * which parameters are permitted for mass assignment.
- *
- * @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html
- */
+/** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
@@ -690,6 +683,18 @@ export class Parameters {
     if (key in this._data && isPermittedScalar(this._data[key])) {
       params._data[key] = this._data[key];
     }
+    // Rails also walks every existing key to copy multi-parameter keys
+    // — e.g. `zipcode(90210i)` permitted under the bare `zipcode`. The
+    // regex matches the suffix and the prefix must equal the bare key.
+    const re = /\(\d+[if]?\)$/;
+    for (const k of Object.keys(this._data)) {
+      const m = re.exec(k);
+      if (!m) continue;
+      const prefix = k.slice(0, m.index);
+      if (prefix === key && isPermittedScalar(this._data[k])) {
+        params._data[k] = this._data[k];
+      }
+    }
   }
 
   private _hashFilter(
@@ -822,6 +827,237 @@ export class Parameters {
       return this._newWithInheritedPermitted(value as Record<string, unknown>);
     }
     return value;
+  }
+
+  /** Rails-private `attr_reader :parameters` — the underlying hash. Trails stores it on `_data`; exposed under the Rails name for parity with the strong-parameters private surface. @internal */
+  get parameters(): Record<string, unknown> {
+    return this._data;
+  }
+
+  /** Rails `nested_attributes?` — true when any key/value pair looks like a nested-attribute index (`/\A-?\d+\z/`). @internal */
+  isNestedAttributes(): boolean {
+    return Object.entries(this._data).some(([k, v]) => Parameters.nestedAttribute(k, v));
+  }
+
+  /** Rails `each_nested_attribute` — yields each nested-attribute pair, returning a new Parameters with the block result. @internal */
+  eachNestedAttribute(fn: (value: unknown) => unknown): Parameters {
+    const result = new Parameters();
+    for (const [k, v] of Object.entries(this._data)) {
+      if (Parameters.nestedAttribute(k, v)) {
+        result._data[k] = fn(this._convertHashesToParameters(k, v));
+      }
+    }
+    return result;
+  }
+
+  /** Rails `permit_filters(filters, on_unpermitted:, explicit_arrays:)` — Rails-named entry point. Delegates to the existing internal `_permitFilters` (the option shape differs slightly; `onUnpermitted` is honoured only when `actionOnUnpermittedParameters` is set on the class — trails has no per-call override yet). @internal */
+  permitFilters(
+    filters: (string | Record<string, unknown>)[],
+    _options: { onUnpermitted?: "raise" | "log" | null; explicitArrays?: boolean } = {},
+  ): Parameters {
+    return this._permitFilters(filters);
+  }
+
+  /** Rails `new_instance_with_inherited_permitted_status(hash)` — wraps a raw hash in a new Parameters that inherits this instance's permitted flag. @internal */
+  newInstanceWithInheritedPermittedStatus(hash: Record<string, unknown>): Parameters {
+    return this._newWithInheritedPermitted(hash);
+  }
+
+  /** Rails `convert_parameters_to_hashes(value, using)` — recursively converts nested Parameters into plain hashes using the given method. @internal */
+  convertParametersToHashes(value: unknown, using: string): unknown {
+    return this._convertParametersToHashes(value, using);
+  }
+
+  /** Rails `convert_hashes_to_parameters(key, value)` — converts a single raw-hash entry to a Parameters, replacing the slot when the underlying value actually changed (Rails' `equal?` identity check). @internal */
+  convertHashesToParameters(key: string, value: unknown): unknown {
+    return this._convertHashesToParameters(key, value);
+  }
+
+  /** Rails `convert_value_to_parameters(value)` — recursively wraps plain hashes/arrays in Parameters instances. @internal */
+  convertValueToParameters(value: unknown): unknown {
+    return this._convertValueToParameters(value);
+  }
+
+  /** Rails `_deep_transform_keys_in_object!(object, &block)` — in-place variant of `_deep_transform_keys_in_object`. Mutates the input. @internal */
+  _deepTransformKeysInObjectBang(object: unknown, fn: (key: string) => string): unknown {
+    if (object instanceof Parameters) {
+      const keys = Object.keys(object._data);
+      for (const k of keys) {
+        const value = object._data[k];
+        delete object._data[k];
+        object._data[fn(k)] = this._deepTransformKeysInObjectBang(value, fn);
+      }
+      return object;
+    }
+    if (isPlainObject(object)) {
+      const target = object as Record<string, unknown>;
+      const keys = Object.keys(target);
+      for (const k of keys) {
+        const value = target[k];
+        delete target[k];
+        target[fn(k)] = this._deepTransformKeysInObjectBang(value, fn);
+      }
+      return target;
+    }
+    if (Array.isArray(object)) {
+      for (let i = 0; i < object.length; i++) {
+        object[i] = this._deepTransformKeysInObjectBang(object[i], fn);
+      }
+      return object;
+    }
+    return object;
+  }
+
+  /** Rails `specify_numeric_keys?(filter)` — true when the filter is a hash whose top-level keys include numeric strings (nested-attribute style). @internal */
+  isSpecifyNumericKeys(filter: unknown): boolean {
+    if (filter && typeof filter === "object" && !Array.isArray(filter)) {
+      return Object.keys(filter as Record<string, unknown>).some((k) => /^-?\d+$/.test(k));
+    }
+    return false;
+  }
+
+  /** Rails `array_filter?(filter)` — recognises the `[[:flavor]]` shape used by `params.expect` for explicit-array declarations. @internal */
+  isArrayFilter(filter: unknown): boolean {
+    return Array.isArray(filter) && filter.length === 1 && Array.isArray(filter[0]);
+  }
+
+  /** Rails `each_array_element(object, filter, &block)` — applies the block to each element of an array, or each nested-attribute pair when the input is a Parameters with non-numeric keys. @internal */
+  eachArrayElement(object: unknown, filter: unknown, fn: (el: Parameters) => unknown): unknown {
+    if (Array.isArray(object)) {
+      const out: unknown[] = [];
+      for (const el of object) {
+        if (el instanceof Parameters) {
+          const r = fn(el);
+          if (r != null) out.push(r);
+        }
+      }
+      return out;
+    }
+    if (object instanceof Parameters) {
+      if (object.isNestedAttributes() && !this.isSpecifyNumericKeys(filter)) {
+        return object.eachNestedAttribute(fn as (v: unknown) => unknown);
+      }
+    }
+    return undefined;
+  }
+
+  /** Rails `unpermitted_parameters!(params, on_unpermitted:)` — explicit Rails-named entry point. Delegates to `_unpermittedParameters`. @internal */
+  unpermittedParametersBang(params: Parameters): void {
+    this._unpermittedParameters(params);
+  }
+
+  /** Rails `unpermitted_keys(params)` — keys present on self but absent from the permitted projection, minus the always-permitted list. @internal */
+  unpermittedKeys(params: Parameters): string[] {
+    const allowed = new Set([
+      ...Object.keys(params._data),
+      ...Parameters.alwaysPermittedParameters,
+    ]);
+    return Object.keys(this._data).filter((k) => !allowed.has(k));
+  }
+
+  /** Rails `permitted_scalar_filter(params, key)` — copies a scalar value across into `params` when it passes the scalar-type check. @internal */
+  permittedScalarFilter(params: Parameters, key: string): void {
+    this._permittedScalarFilter(params, key);
+  }
+
+  /** Rails `non_scalar?(value)` — true for arrays and Parameters. @internal */
+  isNonScalar(value: unknown): boolean {
+    return Array.isArray(value) || value instanceof Parameters;
+  }
+
+  /** Rails `hash_filter(params, filter, on_unpermitted:, explicit_arrays:)`. @internal */
+  hashFilter(
+    params: Parameters,
+    filter: Record<string, unknown>,
+    options: { suppressUnpermitted?: boolean } = {},
+  ): void {
+    this._hashFilter(params, filter, options);
+  }
+
+  /** Rails `permit_value(value, filter, on_unpermitted:, explicit_arrays:)`. Dispatches by filter shape. @internal */
+  permitValue(value: unknown, filter: unknown): unknown {
+    if (Array.isArray(filter) && filter.length === 0) {
+      return this.permitArrayOfScalars(value);
+    }
+    if (
+      filter !== null &&
+      typeof filter === "object" &&
+      !Array.isArray(filter) &&
+      Object.keys(filter as Record<string, unknown>).length === 0
+    ) {
+      return this.permitHash(value, filter as Record<string, unknown>);
+    }
+    if (this.isArrayFilter(filter)) {
+      return this.permitArrayOfHashes(value, (filter as unknown[])[0]);
+    }
+    if (this.isNonScalar(value)) {
+      return this.permitHashOrArray(value, filter);
+    }
+    return undefined;
+  }
+
+  /** Rails `permit_array_of_scalars(value)`. @internal */
+  permitArrayOfScalars(value: unknown): unknown {
+    if (Array.isArray(value) && value.every((el) => isPermittedScalar(el))) return value;
+    return undefined;
+  }
+
+  /** Rails `permit_array_of_hashes(value, filter, ...)`. @internal */
+  permitArrayOfHashes(value: unknown, filter: unknown): unknown {
+    return this.eachArrayElement(value, filter, (el) =>
+      el.permitFilters(
+        (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
+      ),
+    );
+  }
+
+  /** Rails `permit_hash(value, filter, ...)`. @internal */
+  permitHash(value: unknown, filter: Record<string, unknown> | unknown): unknown {
+    if (!(value instanceof Parameters)) return undefined;
+    if (
+      filter !== null &&
+      typeof filter === "object" &&
+      !Array.isArray(filter) &&
+      Object.keys(filter as Record<string, unknown>).length === 0
+    ) {
+      return this.permitAnyInParameters(value);
+    }
+    return value.permitFilters(
+      (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
+    );
+  }
+
+  /** Rails `permit_hash_or_array(value, filter, ...)`. @internal */
+  permitHashOrArray(value: unknown, filter: unknown): unknown {
+    const arr = this.permitArrayOfHashes(value, filter);
+    if (arr != null) return arr;
+    return this.permitHash(value, filter);
+  }
+
+  /** Rails `permit_any_in_parameters(params)`. @internal */
+  permitAnyInParameters(params: Parameters): Parameters {
+    const sanitized = new Parameters();
+    params.each((k, v) => {
+      if (isPermittedScalar(v)) {
+        sanitized._data[k] = v;
+      } else if (Array.isArray(v)) {
+        sanitized._data[k] = this.permitAnyInArray(v);
+      } else if (v instanceof Parameters) {
+        sanitized._data[k] = this.permitAnyInParameters(v);
+      }
+    });
+    return sanitized;
+  }
+
+  /** Rails `permit_any_in_array(array)`. @internal */
+  permitAnyInArray(array: unknown[]): unknown[] {
+    const sanitized: unknown[] = [];
+    for (const el of array) {
+      if (isPermittedScalar(el)) sanitized.push(el);
+      else if (Array.isArray(el)) sanitized.push(this.permitAnyInArray(el));
+      else if (el instanceof Parameters) sanitized.push(this.permitAnyInParameters(el));
+    }
+    return sanitized;
   }
 
   private _deepTransformKeysInObject(object: unknown, fn: (key: string) => string): unknown {
