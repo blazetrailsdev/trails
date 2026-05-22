@@ -65,6 +65,8 @@ describe("RackRequestTest", () => {
     });
     expect(yielded).toBe(true);
     expect(req.get("FOO")).toBe("bar");
+    // raises when key is absent and no block given (mirrors Hash#fetch / env.fetch)
+    expect(() => req.fetchHeader("MISSING")).toThrow("KeyError");
   });
 
   it("can iterate over values", () => {

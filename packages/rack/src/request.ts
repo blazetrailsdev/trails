@@ -663,7 +663,7 @@ export class Request {
   fetchHeader(name: string, block?: () => any): any {
     if (name in this.env) return this.env[name];
     if (block) return block();
-    return undefined;
+    throw new Error(`KeyError: key not found: ${name}`);
   }
 
   eachHeader(callback: (key: string, value: any) => void): void {
