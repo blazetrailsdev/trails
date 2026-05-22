@@ -9,7 +9,7 @@ import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
-import { OptionRedirect, PathRedirect, Redirect, type RedirectBlock } from "./redirection.js";
+import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
 import type { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -64,10 +64,13 @@ export interface RouteOptions {
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
 
-export type RedirectFunction = (
-  params: Record<string, string>,
-  request: { method: string; path: string },
-) => string;
+/**
+ * Block shape accepted by {@link Mapper.redirect}. Mirrors Rails'
+ * `block.call params, request` in `Redirect#path` — the second argument is
+ * the full `ActionDispatch::Request` so user blocks can read `req.host`,
+ * `req.queryParameters`, etc., not just `method` / `path`.
+ */
+export type RedirectFunction = (params: Record<string, string>, request: Request) => string;
 
 export interface RedirectOptions {
   path?: string;
@@ -131,6 +134,11 @@ export class Route {
     this.defaults = options.defaults ?? {};
     this.constraints = options.constraints ?? {};
     this.ip = options.ip ?? /(?:)/;
+    if (options.redirect !== undefined && options.redirectEndpoint !== undefined) {
+      throw new Error(
+        "Route: pass either `redirect` (legacy target) or `redirectEndpoint` (preconstructed Redirect), not both",
+      );
+    }
     this.redirectTarget = options.redirect ?? deriveRedirectTarget(options.redirectEndpoint);
     if (options.redirectEndpoint) this._redirectEndpoint = options.redirectEndpoint;
     this.anchor = options.anchor !== false;
@@ -164,10 +172,7 @@ export class Route {
     }
     let endpoint: Redirect;
     if (typeof target === "function") {
-      const fn = target;
-      const block: RedirectBlock = (params, request: Request) =>
-        fn(params, { method: request.method, path: request.path });
-      endpoint = new Redirect(301, block);
+      endpoint = new Redirect(301, target);
     } else if (typeof target === "string") {
       endpoint = new PathRedirect(301, target);
     } else {
@@ -430,7 +435,7 @@ export class Route {
     if (!target) throw new Error("Route is not a redirect");
 
     if (typeof target === "function") {
-      return { url: target(params, request), status: 301 };
+      return { url: target(params, request as unknown as Request), status: 301 };
     }
 
     if (typeof target === "string") {
@@ -475,8 +480,7 @@ function deriveRedirectTarget(
   if (endpoint instanceof OptionRedirect) {
     return { ...endpoint.options, status: endpoint.status } as RedirectOptions;
   }
-  const block = endpoint.block;
-  return (params, request) => block(params, request as unknown as Request);
+  return endpoint.block;
 }
 
 /**
