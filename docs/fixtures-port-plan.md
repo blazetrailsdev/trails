@@ -1,190 +1,40 @@
 # Fixtures port plan
 
-Tracks the port of Rails `activerecord/test/fixtures/*.yml` to TS so that
-ported AR tests can call `useFixtures([...])` instead of inlining
-`defineSchema()` / row inserts in `beforeAll`. **All 122 fixtures
-translated** (PRs 0–6b + 0.5a–g + 0.75 + 4-late merged 2026-05-20…21).
-`pnpm fixtures:compare` reports **match=94 diff=8 missing=0
-erb-unsupported=20** under soft mode. PR 7's strict-fail flip is blocked
-on the 8 DIFF + 20 ERB-UNSUPPORTED + the test-body port; see "Loose ends"
-below.
+> **Status (2026-05-22):** ~90% complete. All 122 Rails fixtures
+> translated (PRs 0–6b + 0.5a–h + 0.75 + 4-late, merged 2026-05-20…21).
+> `pnpm fixtures:compare` reports match=94 diff=8 missing=0
+> erb-unsupported=20 (soft mode). Schema port shipped (#2124/#2128/
+> #2130/#2131/#2133/#2134/#2140). ERB `identify`/`composite_identify` +
+> loop expander shipped (#2247). Fixture-side DIFF reconcile #2228.
+> Loader (`defineFixtures`/`useFixtures`/`ref`/`fixtureId`) live.
+>
+> **Remaining (blocks PR 7 strict-fail flip):**
+>
+> - Compare-script enhancements (~150 LOC): enum-symbol comparator (~40),
+>   HABTM key handling (~30), custom FK override map (~30),
+>   datetime/YAML tolerance (~50).
+> - 3 ERB-UNSUPPORTED stragglers post-#2247: `mixins.yml`,
+>   `paragraphs.yml`, `citations.yml` — add to allow-list.
+> - 2 newly comparable DIFFs from #2247:
+>   `developers.shared_computers` column, `binaries.flowers.data` row.
+> - **PR 7a** — ~1.9k LOC waiver port of `fixtures_test.rb` (1847 LOC),
+>   `test_fixtures_test.rb`, `encryption/encrypted_fixtures_test.rb`.
+> - **PR 7b** — ~30 LOC strict-fail flip + remove 4 exclusions from
+>   `unported-files.ts`.
+> - **PR 8** — proof-of-concept conversion of one test file to
+>   `useFixtures(...)`.
+>
+> **Loader gaps (don't block strict, do block PR 8 candidate selection):**
+> `resolveDeclaredPk` string-PK support (~20), `defineFixtures` NOT NULL
+> timestamp auto-stamp (~30–50), enum-aware insert (~40),
+> belongs_to-reflection → FK-column resolver (~80–150), `id`-index by
+> declared PK (~20), `ref()` key-path for composite FK (~50), registry
+> rollback widening (~5).
 
-## Loose ends before PR 7 can ship
-
-PR 7 flips `fixtures:compare` MISSING/DIFF to hard-fail and removes the
-four fixtures-related entries from `scripts/api-compare/unported-files.ts`.
-**Strict-mode blockers** (must close or move to an explicit allow-list
-before PR 7b can ship): the compare-script DIFF enhancements, the
-ERB-UNSUPPORTED handling, and the PR 7a test-body port. The remaining
-subsections — loader gaps and schema-side residuals — are _informational
-follow-ups_ recorded here so PR 8 (PoC conversion) doesn't pick a
-non-loadable fixture and so future schema-column policy changes have a
-sized list ready; neither blocks strict mode under current behavior.
-Cross-referenced to merged PRs; the source finding files this
-section was distilled from are available in each PR's GitHub review
-thread and (for local runs of btwhooks) under
-`~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/`.
-
-### Compare-script enhancements blocking strict mode (~150 LOC total)
-
-The 8 remaining DIFFs are all `scripts/fixtures-compare/compare.ts`
-gaps, not fixture-data bugs. Per #2228 post-merge findings:
-
-1. **~40 LOC — enum-symbol comparator.** `books` / `other_books` use
-   Rails enum symbols (`:published`, `:english`) in YAML; TS stores
-   the mapped integer. Needs a per-column enum resolver (model metadata
-   lookup or configurable map) in `canonicalizeRailsRow` /
-   `compareValue`.
-2. **~30 LOC — HABTM key handling.**
-   `dead_parrots.deadbird.treasures: [ruby, sapphire]` and
-   `live_parrots.dusty.treasures` are HABTM list-form.
-   `canonicalizeRailsRow` keeps the key when `columns === null` (STI
-   subclasses report
-   `schema:not-ported`); either look up the STI parent's schema or
-   drop array-valued association keys.
-3. **~30 LOC — custom `foreign_key:` override map.** `sponsors`:
-   `belongs_to :sponsor_club, class_name: "Club", foreign_key: "club_id"`,
-   so YAML `sponsor_club: moustache_club` maps to column `club_id`.
-   `canonicalizeRailsRow` only handles default `<assoc> → <assoc>_id`.
-4. **~50 LOC — datetime + YAML-coder serialization tolerance.**
-   `topics` / `other_topics` `written_on` / `bonus_time` diff because
-   Rails Time-with-tz format vs TS string; `content` is YAML-serialized.
-   Needs serialization-aware normalization in `compareValue`.
-5. **deps** — `developers_projects` DIFF is a numeric FK pointing into
-   `developers.yml` which is ERB-UNSUPPORTED. Resolves once item (8)
-   below lands or via an id-index fallback for ERB-skipped tables.
-
-### ERB-UNSUPPORTED files (20 — all 0 rows compared)
-
-These are skipped entirely under soft mode; strict mode needs each
-either parseable by the compare script or covered by an explicit
-allow-list. From #2208, #2214, #2227 findings:
-
-6. **Closed by #2247.** `stripErb` now reverses
-   `<%= ActiveRecord::FixtureSet.identify(:label) %>` and the literal-
-   array form of
-   `<%= ActiveRecord::FixtureSet.composite_identify(:label, [:a, :b])[:key] %>`
-   to the
-   `fixtureId()`-equivalent integer (`CRC32 % MAX_ID` and
-   `(crc32(label) << index) % MAX_ID` respectively, mirroring
-   `fixtures.rb#identify` / `#composite_identify`). All 12
-   identify-using fixtures (`pirates`, `mateys`, `parrots_pirates`,
-   `peoples_treasures`, `memberships`, the `sharded_*` cluster, the
-   `cpk_order_*` pair, `cpk_reviews`) now compare.
-7. **Closed by #2247.** Loop expander handles
-   `<% (lo..hi).each do |v| %>` and `<% N.times do |v| %>` (with
-   `<%= expr %>` / `#{expr}` body interpolation via a constrained
-   integer-arithmetic evaluator, 200-row cap). Residual opaque
-   `<%= ... %>` (`2.weeks.ago.to_fs(:db)`, `binary(...)`,
-   `Cpk::Order.primary_key` lookups) collapses to a sentinel and the
-   per-attr diff increments `attrsSkipped` instead of dropping the
-   file. Clears developers, edges, vertices, categories_ordered, plus
-   per-attr skips on binaries, pirates, memberships, cpk_order_agreements.
-8. **PR 7b allow-list (3 ERB-UNSUPPORTED stragglers remain after #2247):**
-   - `mixins.yml` — second ERB block is a Ruby array-of-arrays each
-     (`<% [[4001,0,1,20], ...].each do |s| %>`). TS already encodes
-     the rows; would need an array-literal-iteration grammar in
-     `stripErb` or an explicit allow-list entry.
-   - `paragraphs.yml` — 1001-row loop, above the expander cap.
-   - `citations.yml` — 65536-row loop. Expanding would parse-stall the
-     script; cap stays in place.
-
-   **DIFF follow-ups surfaced by #2247** (newly comparable, real port
-   gaps unrelated to ERB):
-   - `developers.yml` `david.shared_computers` column not declared in
-     `TEST_SCHEMA`/`developers.ts`.
-   - `binaries.yml` `flowers.data` (the `!binary` blob row) missing
-     from `binaries.ts`.
-
-### Schema-side residuals (informational column, not a hard-fail blocker)
-
-`pnpm fixtures:compare` reports a `schema:…` token per file independent
-of the MATCH/DIFF status. Today: **`schema — ported=87/102
-extras-flagged=0 (skipped 20)`**. 15 fixtures still report
-`schema:not-ported` — most are STI subclasses sharing a parent table
-(`dead_parrots`, `live_parrots`, `other_*`, `bad_posts`,
-`encrypted_book_that_ignores_cases`) or a singular/plural mismatch
-(`aircrafts.yml` vs `:aircraft`). These are comparator lookup
-quirks, not real schema gaps, and current behavior doesn't hard-fail
-on the schema column. If PR 7b promotes `schema:not-ported` to
-hard-fail, address with:
-
-9. **~15 LOC — STI parent-table lookup + fixture-file → table alias
-   map** in `scripts/fixtures-compare/compare.ts` so STI children
-   pick up the parent's column list and `aircrafts.yml` validates
-   against `TEST_SCHEMA.aircraft`. (#2213.) Otherwise skip and keep
-   the schema column informational.
-
-### Test-body port (PR 7a — ceiling waiver section, ~1.9k LOC of Ruby)
-
-Per #2227 findings, the test bodies named in the existing PR 7 entry
-break out cleanly as `7a`:
-
-- `vendor/rails/activerecord/test/cases/fixtures_test.rb` — 1847 LOC,
-  153 tests.
-- `vendor/rails/activerecord/test/cases/test_fixtures_test.rb` — 74 LOC.
-- `vendor/rails/activerecord/test/cases/encryption/encrypted_fixtures_test.rb`
-  — 22 LOC.
-
-Once these land (with the 4 entries still in
-`scripts/api-compare/unported-files.ts`), the
-**~30 LOC PR 7b** flips compare to hard-fail + removes those exclusions.
-
-### Loader gaps required by ported-but-not-yet-loadable fixtures
-
-These don't block compare strictness, but they block tests from actually
-calling `useFixtures([...])` against the ported data. Recorded here so
-PR 8 (PoC conversion) doesn't accidentally pick a fixture that can't
-load:
-
-- **~20 LOC — `resolveDeclaredPk` string-PK support** in
-  `packages/activerecord/src/test-helpers/define-fixtures.ts`. Blocks
-  `subscribers.ts` (Rails `Subscriber.primary_key = "nick"`) and
-  `string-key-objects.ts`. From #2205 + #2214 findings.
-- **~30–50 LOC — `defineFixtures` NOT NULL `created_at`/`updated_at`
-  auto-stamp.** Unblocks `people.ts` (Rails schema has
-  `t.timestamps null: false`; YAML omits both — Rails' loader stamps
-  them). From #2209.
-- **~40 LOC — enum-aware insert.** `parrots.breed: "australian"` and
-  `memberships.type: "CurrentMembership"` are model enums; loader
-  needs to route through the attribute layer (or a small enum-lookup
-  helper) before insert. From #2208, #2209.
-- **~80–150 LOC — `defineFixtures` belongs_to-reflection → FK-column
-  resolver.** Lets future fixture `.ts` stay byte-closer to YAML
-  (write `club: foo` instead of `club_id: ref("clubs", "foo")`).
-  From #2209.
-- **~20 LOC — `fixtures:compare` id-index keyed by the schema's
-  declared PK column, not hard-coded `id`.** Clears soft-fail noise
-  for non-`id`-PK tables (owners/pets/toys/keyboards). From #2209.
-- **~50 LOC — `ref()` accepts a key-path**
-  (`ref("cpk_orders", "label", "id")`) so composite-FK fixtures can
-  address a specific PK component. Required before strict mode for
-  the CPK cluster. From #2212.
-- **~5 LOC — `defineFixtures` registry rollback widening.** Commit
-  `adapterIds.set(tableName, tableIds)` after the row-building loop,
-  or widen the existing try/catch. Pre-existing #2125 finding,
-  unchanged.
-
-### Plan / doc clean-ups (small)
-
-- **~1–2 lines, Translation Rules.** Add: "when a fixture uses Rails
-  `_fixture: model_class:`, `ref()` arguments use the destination
-  model's `tableName`, not the fixture-file name." (#2205 finding #3,
-  bit `other-topics` and `other-comments`.)
-- Note in this doc that `pnpm fixtures:compare` requires
-  `@blazetrails/activesupport` + `@blazetrails/globalid` to be built
-  locally (`pnpm -r --filter '!website' build`); CI builds deps first
-  but a cold local run reports spurious `TS-IMPORT-ERR`. (#2227.)
-
-### Out of scope (recorded so they don't drift back in)
-
-- `aircrafts.yml` `schema:not-ported` because Rails table is
-  `:aircraft` (singular) — comparator-side alias map, ~10 LOC,
-  optional polish. (#2213.)
-- `_fixture.ignore` anchor-row support so `other_books` can promote
-  from "rows: 2/2 with anchors expanded" to anchor-aware MATCH —
-  cosmetic. (#2205.)
-- Local-only TS-IMPORT-ERR before a build — diagnostic message only.
+Port Rails `activerecord/test/fixtures/*.yml` files to TS so that ported
+AR tests can call `useFixtures([...])` instead of inlining `defineSchema()`
+/ row inserts in `beforeAll`. See the status block above for current
+counts; the sections below capture the original motivation and design.
 
 ## Why
 
@@ -208,21 +58,13 @@ load:
 
 ## Current state
 
-- **All 122 Rails fixtures translated** under
-  `packages/activerecord/src/test-helpers/fixtures/`. Latest
-  `pnpm fixtures:compare`: match=94, diff=8, missing=0,
-  erb-unsupported=20. The 8 DIFFs and 20 ERB-UNSUPPORTED are
-  compare-script gaps (not fixture-data drift) — see "Loose ends
-  before PR 7 can ship" at the top of this doc.
-- Loader (`defineFixtures()`, `useFixtures()`, `fixtureId()`, `ref()`,
-  `fixture-set.ts`) is in place. `useFixtures([...])` returns typed
-  accessors of the form `result.authors("david")` — that's the
-  callsite shape ported tests will use; no new `fixtureRow()` helper
-  is needed. A handful of ported fixtures are not yet loadable at
-  runtime (string-PK, enum-bridge, NOT-NULL timestamp auto-stamp);
-  see "Loose ends → Loader gaps."
-- The gap table below remains as the rollout-time cluster map; cluster
-  rollout PRs are all closed (see Rollout section).
+See the status block at the top of the doc. All 122 fixtures translated;
+loader (`defineFixtures()`, `useFixtures()`, `fixtureId()`, `ref()`,
+`fixture-set.ts`) live. `useFixtures([...])` returns typed accessors of
+the form `result.authors("david")`.
+
+The cluster sections below are historical scoping notes from the
+original port plan — kept for reference, not as live work-tracking.
 
 ## Gap, by cluster
 
@@ -345,7 +187,12 @@ For every `vendor/rails/activerecord/test/fixtures/<name>.yml`:
 - Has a `--package activerecord` flag for future generalization but only
   AR is in scope now.
 
-## Rollout
+## Rollout (historical)
+
+> Historical narrative of the port rollout — preserved for PR archaeology.
+> Live status is at the top of the doc; PRs 0–6b and 0.5a–h have all
+> merged. The "in flight" / no-status markers below were accurate at
+> authoring time and are not refreshed.
 
 PR-sized batches targeting ~250 LOC each. Small clusters bundle
 together; the two over-ceiling clusters (C1, C8) split into `a`/`b`
@@ -359,60 +206,47 @@ The two exceptions to the 300-LOC ceiling are called out explicitly
 below: the schema port (split into ~6–8 sibling PRs, each under
 ceiling) and PR 7 (granted ceiling waiver — see entry).
 
-1. **PR 0 closed (#2122)** — `scripts/fixtures-compare/` + CI wiring.
-   Schema-diff pass landed as **#2135**. Subsequent compare-script
-   fidelity work landed as **#2220** (metadata strip, assoc shorthand,
-   `$LABEL`, list-form, array deep-equal, merge keys); remaining
-   compare gaps are listed under "Loose ends" above.
-2. **PR 0.5a–g closed (#2124 #2128 #2130 #2131 #2133 #2134 #2140)** —
-   `vendor/rails/activerecord/test/schema/schema.rb` ported into
-   `packages/activerecord/src/test-helpers/test-schema.ts` across 7
-   sibling PRs; #2140 wired the schema into `setup-adapter-suite.ts`.
-   Final schema-port count came in under the planned 8 slots.
-3. **PR 0.75 closed (#2125)** — id backfill on the 12 originals;
-   `ref()` resolver reads declared `id`; `adapterName(adapter)` helper
-   landed in the same PR. One follow-up (registry rollback widening,
-   ~5 LOC) is in "Loose ends → Loader gaps" above.
-4. **PR 1a closed (#2143)** — cluster 1 first half. Surfaced the
-   `_fixture` metadata-row noise and the `set_fixture_class` ref()
-   tableName trap — both addressed in #2220 / "Loose ends → Plan
-   clean-ups."
-5. **PR 1b closed (#2205)** — cluster 1 second half. `subscribers.ts`
-   shipped but is non-loadable until string-PK loader support lands
-   (see Loose ends).
-6. **PR 2 closed (#2208)** — pirates/ships + encryption + fk\_\*. Most
-   ERB-UNSUPPORTED gaps remaining today live in this cluster.
-7. **PR 3 closed (#2209)** — cluster 3 (people/clubs). The C4 tail
-   (`pets`, `toys`, `owners`, `humans`, `faces`) was deferred over
-   ceiling; shipped separately as **PR 4-late closed (#2227)** out of
-   the original `<base>` / `<base>b` plan.
-8. **PR 4 closed (#2210)** — cluster 5 (STI), 17 fixtures.
-9. **PR 5 closed (#2212)** — CPK + sharded + C4 spillover
-   (`dogs`, `other_dogs`, `dog_lovers`).
-10. **PR 6a closed (#2213)** — cluster 8 first half.
-11. **PR 6b closed (#2214)** — cluster 8 second half.
-12. **DIFF reconcile closed (#2228)** — 3 fixture-side corrections
-    (`authors.owned_essay_id`, `randomly_named_a9` int vs string,
-    `comments.recursive_association_comment.company`). DIFF count
-    11 → 8; the residual 8 are compare-script gaps and now live in
-    "Loose ends."
-13. **PR 7 — split into 7a + 7b** (sub-split path chosen per the
-    original ceiling-waiver entry; see "Loose ends" above for the full
-    blocker list):
-    - **PR 7a (~1.9k LOC, ceiling waiver retained)** — port
-      `fixtures_test.rb` (1847 LOC / 153 tests),
-      `test_fixtures_test.rb` (74 LOC), and
-      `encryption/encrypted_fixtures_test.rb` (22 LOC). Exclusions in
-      `scripts/api-compare/unported-files.ts` stay in place until 7b.
-    - **PR 7b (~30 LOC, gated)** — flip `fixtures:compare` MISSING/DIFF
-      to hard-fail; remove `fixtures.rb` / `fixture_set/` /
-      `test_fixtures.rb` / `encryption/encrypted_fixtures.rb` from
-      `scripts/api-compare/unported-files.ts`. Gated on (a) the 8
-      remaining DIFFs flipping to MATCH or moving to an explicit
-      allow-list, (b) the 20 ERB-UNSUPPORTED clearing or being
-      allow-listed, and (c) 7a landed.
+1. **PR 0 closed (#2122)** — fixtures-compare script + CI wiring.
+2. **PR 0.5a–h closed** (#2124 A, #2128 C, #2130 D-G, #2131 N-R, #2133 H-M, #2134 S-W, #2140 wire-up; final h-tier sibling).
+3. **PR 0.75 closed (#2125)** — id backfill + ref() resolver + adapterName helper.
+4. **PR 1a closed (#2143)** — Cluster 1 first half (categories/categorizations/categories_posts/categories_ordered/taggings/tags/essays/readers).
+5. **PR 1b closed (#2205)** — Cluster 1 second half (author_favorites, bad_posts, other_posts, other_comments, other_topics, other_books, subscribers, subscriptions, references).
+6. **PR 2** — Cluster 2 (pirates/ships) + Cluster 9 (encryption) +
+   Cluster 10 (misc fk\_\*). Three small clusters bundled. (~190 LOC)
+7. **PR 3** — Cluster 3 (people/clubs) + the C4 tail (`pets`, `toys`,
+   `owners`, `humans`, `faces`). Leaves `dogs` / `other_dogs` /
+   `dog_lovers` for PR 5 to stay under ceiling. (~280 LOC)
+8. **PR 4** — Cluster 5 (STI). (~260 LOC standalone)
+9. **PR 5** — Cluster 6 (CPK) + Cluster 7 (sharded) + C4 spillover
+   (`dogs`, `other_dogs`, `dog_lovers`). (~300 LOC)
+10. **PR 6a** — Cluster 8 first half: `uuid_parents`, `uuid_children`,
+    `binaries`, `aircrafts`, `bulbs`, `cars`, `computers`, `minivans`,
+    `speedometers`, `dashboards`, `movies`, `traffic_lights`,
+    `virtual_columns`. (~250 LOC)
+11. **PR 6b** — Cluster 8 second half: `mixed_case_monkeys`,
+    `legacy_things`, `minimalistics`, `funny_jokes`, `randomly_named_a9`,
+    `1_need_quoting`, `string_key_objects`, `warehouse-things`, `nodes`,
+    `trees`, `edges`, `vertices`, `citations`, `ratings`,
+    `price_estimates`. (~250 LOC)
+12. **PR 7 (300-LOC ceiling waived)** — Three coupled changes that must
+    land together so CI parity holds:
+    - flip `fixtures:compare` to hard-fail;
+    - remove `fixtures.rb` / `fixture_set/` / `test_fixtures.rb` /
+      `encryption/encrypted_fixtures.rb` from
+      `scripts/api-compare/unported-files.ts`;
+    - port the corresponding Rails test files
+      (`fixtures_test.rb` is 1847 LOC of Ruby tests;
+      `test_fixtures_test.rb` 74 LOC; plus the
+      `encryption/encrypted_fixtures_test.rb` body).
 
-14. **PR 8 — proof-of-concept conversion.** Pick one existing AR test
+    Splitting these breaks the `test:compare` counter mid-flight — once
+    the exclusions are removed but the tests aren't ported, CI shows a
+    regression. Ceiling waiver is explicit per user direction. Sub-split
+    only if a clean way emerges (e.g. translating `fixtures_test.rb` in
+    a `7a` that lands the file but leaves the exclusion in place, then
+    `7b` removes the exclusion + flips compare).
+
+13. **PR 8 — proof-of-concept conversion.** Pick one existing AR test
     file that currently inlines `defineSchema()` and whose data needs
     are met by the translated fixtures (candidates:
     `relations.test.ts`, `serialization.test.ts`,
@@ -447,7 +281,7 @@ ceiling) and PR 7 (granted ceiling waiver — see entry).
 2. **Schema port lands as PR 0.5 (split into sibling PRs).**
    `vendor/rails/activerecord/test/schema/schema.rb` is 1462 LOC; the TS
    port is ~2200 LOC, well past the 300-LOC ceiling. Splits as
-   `0.5a` … `0.5g` (came in at 7 slots; original estimate was 6–8), sibling branches from `main` with
+   `0.5a` … `0.5h` (rough), sibling branches from `main` with
    non-overlapping table groups, merged in any order. The final
    split-suffix PR wires `test-schema.ts` into
    `setup-adapter-suite.ts`. Every fixture PR after that assumes the

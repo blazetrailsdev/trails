@@ -1,7 +1,19 @@
 # Plan: Auto-Typed Models via Virtual Source Files
 
-Status: **Phase 1b shipped; Phase 2 (tsserver plugin) planning.**
-Last updated: 2026-04-16.
+Status: **Phase 1b + Phase R.1/R.2/R.3 shipped; Phase 2 (tsserver plugin)
+entirely greenfield; Phase 3 docs cutover open.**
+Last updated: 2026-05-22.
+
+Verified shipped: 1b.3 #553, 1b.4 #557, 1b.5 #561, 1b.6 #563, #596
+(schema-only declares), #919 (Temporal types from virtualizer); R.1 #532,
+R.2 #536, R.3 #543. `packages/activerecord/src/type-virtualization/` is
+populated with `virtualize.ts`, `walker.ts`, `synthesize.ts`,
+`type-registry.ts`, `transitive-extends-walker.ts`, `resolve-target.ts`.
+
+Open: entire Phase 2.1–2.6 tsserver-plugin track (~1400 LOC across 6 PRs;
+`packages/activerecord/src/tsserver-plugin/` does not exist yet). Phase 3
+docs + consumer cutover (~150 LOC). Follow-ups: association-option
+`scope:` narrowing, enum value-label unions, adoption metrics.
 
 Related:
 

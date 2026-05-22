@@ -18,7 +18,7 @@ const SHARED_EXCLUDE = [
 // Shared tests that route through `createTestAdapter` + `SchemaAdapter` will
 // drop tables that adapter-specific files (which construct their own adapter
 // directly) assume stick around for the duration of a describe. See
-// docs/shared-adapter-test-suite-plan.md Phase 1.
+// docs/activerecord-index.md (TEST_ADAPTER excludes shipped #1630).
 const TEST_ADAPTER = process.env.TEST_ADAPTER ?? "sqlite3";
 const ADAPTER_SPECIFIC_EXCLUDE = [
   ...(TEST_ADAPTER !== "postgresql"

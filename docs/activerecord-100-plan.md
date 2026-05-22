@@ -1,12 +1,147 @@
 # ActiveRecord post-100% — fidelity tracker
 
-**Snapshot 2026-05-16:** `activerecord 4956/4958 methods (100% rounded) | files: 275/275 | inheritance: 210/210 (100%) | activemodel 621/621 (100%)`. Public surface is closed; the 2 outstanding methods are residual privates. test:compare currently at **6568/7885 tests (83.3%)**, 1296 skipped.
+> **Status update 2026-05-22** — Inline batch list below is dated
+> 2026-05-16; the pool epic (#2202/#2206/#2211/#2219/#2230/#2242/#2245)
+> and recent un-skip work (#2229 batch 63 caseInsensitiveComparison,
+> #2240 EncryptedBook variants) are not yet reflected in the body.
+>
+> Phase ordering / cross-doc dependencies live in
+> [`activerecord-index.md`](activerecord-index.md). This doc owns the
+> batch list; the index owns the sequencing.
+>
+> **Known to strip on next refresh:**
+>
+> - Batch 63 caseInsensitiveComparison async fix — closed by #2229.
+> - Batch 28b (AliasTracker) — partially shipped (#670/#1869/#1850);
+>   remaining is ~80 LOC for 2 BLOCKED tests + Rails-canonical alias
+>   naming, not ~280 LOC.
+> - Batch 45 `Base.adapter` permanent-checkout — superseded by pool epic
+>   (`createPooledTestAdapter` + `pool.pinConnectionBang` in #2242/#2245).
+> - Batch 138 connectsTo / Person fixture — may be partially superseded
+>   by fixture-port PRs #2208/#2227/#2228.
+
+**Snapshot 2026-05-22:** `activerecord 4969/4969 methods (100%)`. Public surface closed. test:compare at **6669/7870 (84.7%)**, 1193 skipped.
 
 The api:compare scoreboard is **closed**. Everything below is post-100% Rails-fidelity work — test:compare un-skips driven by audit clusters plus accumulated fidelity polish. PRs target ~250 LOC (CLAUDE.md hard ceiling 300; range 220–280).
 
 Closed work lives in `git log` — `git log --grep "audit Slot\|fidelity\|un-skip" origin/main`.
 
-For workflow + BLOCKED-annotation vocab + audit conventions, see [`test-compare-100-plan.md`](test-compare-100-plan.md).
+---
+
+## Strategy + workflow
+
+**Audit first, work second, integrated last.**
+
+For each `BLOCKED:` category, the plan has two phases:
+
+1. **Audit (read-only research; no PR).** Read Rails feature source + test file end-to-end; identify obvious impl gaps without writing un-skip code. Capture findings via the `/audit-report` skill — the deliverable is a markdown report, not a GitHub PR. The parent session triages the inventory into sized slots.
+2. **Work PRs.** Triage from the audit produces a list of specific gaps. Each gap becomes a sized slot. Tests un-skip naturally as gaps close.
+
+**Within categories, isolated → integrated:**
+
+- Tier 1 (do first): isolated behaviors with bounded code surface — `type`, `i18n`, `validation`, `query-cache`, `load-async`, `serialization`, `encryption`.
+- Tier 2: adapter-level — `adapter-pg`, `adapter-mysql`, `adapter-sqlite`, `schema`, `connection-pool`.
+- Tier 3: mid-layer features — `transactions`, `migration`.
+- Tier 4 (do last): highly-integrated — `relation`, `STI`, `associations`. These touch everything; closing them earlier means re-opening them every time a Tier 1–3 fix lands.
+
+**PR sizing target: ~250 LOC** (range 220–280 within the 300-LOC hard ceiling from CLAUDE.md). No small PRs (review-cycle overhead per PR is fixed; 50-LOC PRs aren't worth it). No huge PRs (anything ≥300 needs to split). Bundle small adjacent gaps into ~250-LOC slots; split anything that overflows along a natural seam.
+
+Use the **test:compare prompt template** (`$HOME/github/blazetrailsdev/test-compare-prompt-template.md`) when spawning un-skip agents.
+
+### Audit (read-only research, no GitHub PR)
+
+**Goal:** read the Rails feature + test surface end-to-end, identify obvious impl gaps in our codebase, file specific work slots.
+
+**Hard rule:** no source/test code changes, no PR. Deliverable is a single `/audit-report <slug> <markdown>` invocation. See `$HOME/github/blazetrailsdev/audit-prompt-template.md` for the dispatch template.
+
+**Audit body structure:** Coverage (what was read) → Gap inventory (each gap typed `missing` / `partial-impl` / `signature-drift` / `test-helper-gap` / `fixture-gap` / `annotation-drift`, with file+symbol, Rails reference, estimated LOC, tests it would unblock) → Suggested work-PR slots (each ~220–280 LOC).
+
+**Step 0 — unported-files gate.** Before proposing any implementation slot, check `scripts/api-compare/unported-files.ts`. If any Rails source in scope is in `UNPORTED_FILES` (by `pattern` or `testFile`), propose **exclusion**, not implementation.
+
+### Work PRs (after audit)
+
+Use the standard test:compare prompt template at `$HOME/github/blazetrailsdev/test-compare-prompt-template.md`. Substitute `<TARGET FILE>`, `<RAILS REFERENCE>`, `<BUCKET>`, `<EXPECTED COUNT>`. The template enforces: 1:1 Rails-port for test names + variables + function calls; `BLOCKED:` / `ROOT-CAUSE:` / `SCOPE:` annotation format; "workarounds = bugs" rule; per-test loop (pass / surgical fix ≤20 LOC / sharpen-and-skip); `/post-merge-findings` reporting; `defineSchema` + `AR_NO_AUTO_SCHEMA` test-helper conventions.
+
+### Per-test loop
+
+For each `it.skip(...)` (or `xit(...)`, `test.skip(...)`, `describe.skip(...)`):
+
+1. Attempt to un-skip and run.
+2. **Pass** → un-skip, commit.
+3. **Failing with surgical fix (≤20 LOC, in-scope)** → fix, un-skip, commit.
+4. **Failing with deep gap** → leave skipped; upgrade the annotation to the format below.
+
+## Skip annotation format
+
+```ts
+it.skip("rails-test-name-verbatim", () => {
+  // BLOCKED: <category>
+  // ROOT-CAUSE: <file>#<symbol>: <one-sentence cause>
+  // SCOPE: ~<N> LOC <fix description>; affects ~<M> tests
+});
+```
+
+Three required lines, in this order:
+
+- `BLOCKED: <category>` — controlled vocabulary, see below. The grep contract.
+- `ROOT-CAUSE:` — one-sentence specific cause naming the file/symbol involved.
+- `SCOPE:` — rough fix size + how many other tests likely share this cause.
+
+### Unported alternative
+
+For permanently-not-portable tests (Ruby-only — Marshal/YAML/GVL/fork/Rake/dbconsole), use the `PERMANENT-SKIP` form and add the file/test to `scripts/api-compare/unported-files.ts`:
+
+```ts
+// PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — <category>
+```
+
+Categories: `marshal`, `yaml`, `psych`, `gvl`, `fork`, `rake`, `pty`, `dbconsole`, `message-pack`, `future_result`, `ruby-encoding`, `env-tz`, `protected-params`, `ruby-module-semantics`. Add new kebab-case slugs as needed.
+
+## BLOCKED vocabulary
+
+| Category                   | Meaning                                                                                                                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BLOCKED: STI`             | Single-table inheritance routing                                                                                                                                                                                |
+| `BLOCKED: associations`    | Specific association feature (specify which: habtm / inverse / through / ...)                                                                                                                                   |
+| `BLOCKED: encryption`      | Encryption subsystem gap                                                                                                                                                                                        |
+| `BLOCKED: schema`          | Schema introspection / dumper / definition gap                                                                                                                                                                  |
+| `BLOCKED: transactions`    | Transaction / savepoint / isolation gap                                                                                                                                                                         |
+| `BLOCKED: query-cache`     | Query cache behavior                                                                                                                                                                                            |
+| `BLOCKED: load-async`      | Async query / future result — likely permanent → `unported-files.ts`                                                                                                                                            |
+| `BLOCKED: GVL`             | Ruby thread / GVL — likely permanent → `unported-files.ts`                                                                                                                                                      |
+| `BLOCKED: serialization`   | Ruby Marshal / YAML round-trip — likely permanent → `unported-files.ts`                                                                                                                                         |
+| `BLOCKED: rake`            | Rake / dbconsole shell-out — likely permanent → `unported-files.ts`                                                                                                                                             |
+| `BLOCKED: fixture`         | Test needs a fixture set ported to TS. **Stays BLOCKED (not PERMANENT-SKIP).** TS-native fixture infrastructure shipped via `defineFixtures` / `useFixtures`; per-cluster fixture data folds into cluster work. |
+| `BLOCKED: migration`       | Migration runner feature                                                                                                                                                                                        |
+| `BLOCKED: connection-pool` | Connection pool / handler / pool config gap                                                                                                                                                                     |
+| `BLOCKED: relation`        | Relation API gap (specify which: where / scope / batches / ...)                                                                                                                                                 |
+| `BLOCKED: i18n`            | I18n message / translation gap                                                                                                                                                                                  |
+| `BLOCKED: validation`      | Validator behavior gap (specify which: uniqueness / length / numericality / ...)                                                                                                                                |
+| `BLOCKED: type`            | Type cast / serialize / deserialize gap (specify which Type)                                                                                                                                                    |
+| `BLOCKED: adapter-pg`      | PostgreSQL-specific adapter gap                                                                                                                                                                                 |
+| `BLOCKED: adapter-mysql`   | MySQL-specific adapter gap                                                                                                                                                                                      |
+| `BLOCKED: adapter-sqlite`  | SQLite-specific adapter gap                                                                                                                                                                                     |
+| `BLOCKED: range`           | pg/range type behavior                                                                                                                                                                                          |
+| `BLOCKED: store`           | `Base.store` / `store_accessor` DSL — per-key getters/setters over a hash-typed column (hstore/json/yaml)                                                                                                       |
+| `BLOCKED: unknown`         | Could not categorize from context; needs human triage                                                                                                                                                           |
+
+Cross-file consolidation pass:
+
+```bash
+grep -rn "BLOCKED:" packages/activerecord/src --include='*.test.ts' \
+  | sed 's/.*BLOCKED: //' | cut -d' ' -f1 | sort | uniq -c | sort -rn
+```
+
+## Tracking & cadence
+
+- Run `pnpm test:compare --package activerecord` after each merge.
+- Open all PRs as draft; run `/link <PR#>` after opening.
+- Per CLAUDE.md: do NOT rename Rails-derived test names.
+- After each work PR merges, run `/post-merge-findings` with anything out-of-scope.
+
+## Tests that don't translate to TypeScript / Node
+
+Permanently not-portable tests are excluded via `UNPORTED_FILES` in `scripts/api-compare/unported-files.ts` (whole-file entries with `testFile`, or per-test exclusions via `tests: [...]` for mixed files; optional `className?` for shared-name test classes). This drops them from both the Ruby denominator and the skipped backlog. Foundational exclusion PRs: #1304, #1305, #1391, #1392, #1396, #1397, #1400. Canonical list: YAML / Marshal / Ruby serialization, Ruby concurrency / GVL, process / fork, Rake / dbconsole, fixtures-internal tests, Ruby exception classes / encoding.
 
 ---
 
@@ -650,7 +785,7 @@ After B6.4 lands, measure `pnpm vitest run packages/activerecord` wall-clock bef
 - **Decision** — Root `Gemfile` / `Gemfile.lock`: globalid workstream or not? Currently untracked-and-ambiguous.
 - **Follow-up PR** — Run `sync-stats` refresh and clear "pending" disclaimer on README Data Layer Parity test-percentage.
 - **~5 LOC** — Triage `vendor/rails/activerecord/test/cases/mixin_test.rb` (4 tests: `test_update`, `test_create`, `test_many_updates`, `test_create_turned_off`). #1772 added 2 entries to `unported-files.ts` under the Ruby-module-semantics theme, but these tests actually exercise the `Mixin` AR model's timestamps + `lft_will_change!` — fixture-blocked (no `mixins` fixture / `lft` column in trails). Re-classify with the correct reason, or open a port slot if the timestamp tests are in-scope.
-- **Sweep** — Audit `grep "PERMANENT:" scripts/` for tooling missing the `PERMANENT-SKIP:` form (the canonical marker per `docs/test-compare-100-plan.md`).
+- **Sweep** — Audit `grep "PERMANENT:" scripts/` for tooling missing the `PERMANENT-SKIP:` form (canonical marker; see "Skip annotation format" above).
 
 ### Batch Audit-V1 — Validations root file (~285 LOC, risk: low)
 
@@ -672,6 +807,7 @@ Surfaced by 2026-05-19 audit. Port 12 missing tests from `adapters/postgresql/se
 
 ## Architectural (deferred; too big for single ~250-LOC slot)
 
+- **`test:compare` `covered_on:` annotation** (from retired shared-adapter-test-suite-plan; ~80 LOC). Per-test annotation noting which adapter(s) a Rails test runs on, so the test:compare denominator reflects adapter-conditional Rails tests correctly. Independent of pool epic; slot in any time.
 - **Connection-pool / per-thread query-cache architecture, Phases 2–4** (~120 LOC remaining). ~10 actionable test unskips (6 pool-attachment); other 4 are permanent (GVL/fork/thread skips). db_config resolver gap promoted to Batch Audit-DB1 (18 missing tests across 4 db-config files; resolver alone: 16).
 - `_aliasTracker` real semantics on `JoinDependency#joinConstraints`.
 - Multirange OID direct lookup via `LEFT JOIN pg_range` — blocked on PG12/13 compat decision.
@@ -706,7 +842,7 @@ Before proposing implementation slots, every audit MUST consult `scripts/api-com
 
 ### Test:compare workflow
 
-Test:compare un-skip work uses [`test-compare-100-plan.md`](test-compare-100-plan.md) + `$HOME/github/blazetrailsdev/test-compare-prompt-template.md`. Audits live as task files in `$HOME/.btwhooks/data/github/blazetrailsdev/trails/todo/` and submit via `/audit-report <slug>` — no PR.
+Test:compare un-skip work uses the Strategy + workflow section above + `$HOME/github/blazetrailsdev/test-compare-prompt-template.md`. Audits live as task files in `$HOME/.btwhooks/data/github/blazetrailsdev/trails/todo/` and submit via `/audit-report <slug>` — no PR.
 
 ### Spawned-agent constraints
 
@@ -758,6 +894,5 @@ Distilled from `~/.btwhooks/data/github/blazetrailsdev/trails/<PR#>/post-pr/*.md
 
 ## See also
 
-- [`test-compare-100-plan.md`](test-compare-100-plan.md) — strategy + workflow + BLOCKED vocab reference.
 - [`scripts/api-compare/unported-files.ts`](../scripts/api-compare/unported-files.ts) — canonical not-portable list.
 - [`activerecord-type-audit.md`](activerecord-type-audit.md) — supersedes the `as any` legacy-cast cleanup sweep.

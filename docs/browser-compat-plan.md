@@ -49,11 +49,12 @@ compat obligations.
 
 ### SQLite driver registry
 
-`docs/sqlite-driver-abstraction-plan.md` describes the registry pattern:
-a `DriverFactory` interface, a `registerDriver()` call in the adapter subpath
-export, and capability flags so the adapter layer can branch on
-async vs sync. The database-adapter registry in BC-3 copies this shape
-verbatim — read that doc for implementation detail.
+The SQLite driver track (shipped) established the registry pattern:
+`DriverFactory` interface, `registerDriver()` call in the adapter
+subpath export, capability flags so the adapter layer can branch on
+async vs sync. Live in `@blazetrails/activesupport/sqlite-adapter`; see
+`activesupport.md` for the interface reference. The database-adapter
+registry in BC-3 copies this shape verbatim.
 
 ## 3. Migration plan
 
@@ -98,36 +99,31 @@ every use case through BC-4. If a future consumer needs to inject a different en
 source (e.g. `import.meta.env` in a browser shim), lift `environment.ts` to the
 full adapter pattern at that point.
 
-### BC-3 — database-adapter registry (~250 LOC) 🟡 partial
+### BC-3 — database-adapter registry — partial
 
-**Subpath exports shipped** (verify in `packages/activerecord/package.json`):
+Subpath exports shipped for `postgresql-adapter`, `mysql2-adapter`,
+`sqlite3-adapter`. The eager `pg`/`mysql2` leaks from non-subpath-entry
+files were closed in #1296 + #1549 (`temporal-type-parsers.ts`).
+`peerDependenciesMeta` is in place.
 
-- `@blazetrails/activerecord/connection-adapters/postgresql-adapter.js`
-- `@blazetrails/activerecord/connection-adapters/mysql2-adapter.js`
-- `@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js`
+**Still open:**
 
-The sqlite driver track shipped its own `DriverFactory` / `registerDriver`
-registry independently of activerecord's adapter registry — see PRs #1238 (PR 1),
-#1240 (PR 2), #1247 (PR M), #1264 (PR 3), #1271 (PR 5 node:sqlite). That registry
-serves the sqlite-adapter side and is in `@blazetrails/activesupport/sqlite-adapter`.
+- **Self-registering adapter registry** (~100 LOC) — the
+  `registerAdapter`/`adapterRegistry` "register at import time" pattern
+  the original spec called for has not shipped. Today, importing
+  `@blazetrails/activerecord/connection-adapters/postgresql-adapter.js`
+  exposes the class but no global registry tracks "postgresql is wired."
+  The "no adapter registered for X" error message from the spec doesn't
+  exist.
 
-**Still open under BC-3:**
+### BC-3b — encryption namespace bundle-cleanliness — shipped #1302
 
-1. **Eager native imports leak from non-subpath-entry files.** Live grep against `packages/activerecord/src/connection-adapters/` (verified 2026-05-11):
-   - `postgresql/temporal-type-parsers.ts` — `import pg from "pg"` (eager, the one remaining leak)
-   - `postgresql/database-statements.ts` — `import type pg from "pg"` (type-only — OK; was eager, now stripped)
-   - `mysql/temporal-type-cast.ts` — `import type mysql from "mysql2/promise"` (type-only — OK)
-   - `mysql2/database-statements.ts` — `import type mysql from "mysql2/promise"` (type-only — OK)
+Shipped in #1302 — encryption namespace moved behind subpath; `zlib` no
+longer reachable from the activerecord barrel. Historical detail follows.
 
-   `temporal-type-parsers.ts` gets pulled in transitively when the main adapter file imports from it. The path forward: either gate behind a registry (lazy) or move the dep-using bits into the subpath entry only.
-
-2. **`pg` and `mysql2` peer-dep promotion** has not happened — `packages/activerecord/package.json` `dependencies` still lists only workspace deps (no native deps declared). They're picked up via the consumer app's installation. Worth formalizing as `optionalDependencies` so type-check works without a hard `pg` install.
-
-3. **Self-registering adapter registry** (the `register at import time` pattern that the original BC-3 spec required) has NOT shipped. Today, `import @blazetrails/activerecord/connection-adapters/postgresql-adapter.js` exposes the class but no global registry tracks "postgresql is wired." The "no adapter registered for postgresql" error message described in the spec doesn't exist.
-
-### BC-3b — encryption namespace bundle-cleanliness (~100-150 LOC)
-
-Surfaced during the bundle-smoke pass on #1296. `packages/activerecord/src/encryption/config.ts:84` does `import { deflateSync, inflateSync } from "zlib"` at module top-level. Reachable from the activerecord barrel via:
+Original motivation: `packages/activerecord/src/encryption/config.ts:84`
+did `import { deflateSync, inflateSync } from "zlib"` at module
+top-level, reachable from the activerecord barrel via:
 
 ```
 index.ts → encryption/install.js (installExtendedQueriesIfConfigured)
