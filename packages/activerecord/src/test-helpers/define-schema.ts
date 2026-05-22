@@ -222,23 +222,134 @@ const COLUMN_TYPE_MAP_SQLITE: Record<PrimitiveColumnSpec, string> = {
 };
 
 /**
- * Per-adapter cache of the last-applied normalized table signatures. Lets
+ * Per-database cache of the last-applied normalized table signatures. Lets
  * `defineSchema` skip DDL when an identical schema is requested again —
  * the Phase 6 hoist (`defineSchema` in `beforeAll` instead of `beforeEach`)
  * relies on this being a no-op when nothing changed.
  *
+ * Keyed by {@link databaseIdentity} so distinct adapter instances that
+ * target the same underlying DB (e.g. multiple pool-leased adapters over
+ * one SQLite shared-cache URI or one PG connection URL) share one cache
+ * entry. Without this, file A's `defineSchema({foo})` would populate
+ * adapter X's cache; file B's adapter Y would see an empty cache and
+ * attempt `CREATE TABLE foo` against the live DB.
+ *
  * @internal
  */
-// WeakMap so short-lived adapter wrappers (createTestAdapter() returns a
-// fresh wrapper per call, and withTransactionalFixtures skips the global
-// reset between tests) don't accumulate. The no-arg clear below rebinds
-// the WeakMap rather than enumerating — outstanding snapshots from
-// `_snapshotAppliedSchemaSignaturesForAdapter` are independent Map copies
-// so callers holding a snapshot can still restore.
-let _appliedSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>();
+let _appliedSchemaSignatures = new Map<string, Map<string, string>>();
 
 /**
- * Snapshot the per-adapter signature cache. Paired with
+ * Fallback cache for adapters whose underlying DB cannot be identified
+ * by a stringable connection target — notably SQLite `:memory:` (each
+ * adapter IS a separate DB) and any adapter that doesn't expose a
+ * recognizable config field. WeakMap-keyed so entries vanish when the
+ * adapter is GC'd, avoiding unbounded growth across many short-lived
+ * adapters.
+ *
+ * @internal
+ */
+let _fallbackSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>();
+
+/**
+ * Strip any `user:password@` userinfo from a URL-style connection string
+ * so the cache key doesn't retain credentials in heap. Non-URLs (e.g.
+ * `host=... dbname=...` key/value form) pass through unchanged — we don't
+ * try to parse those.
+ *
+ * @internal
+ */
+function _stripUrlCredentials(s: string): string {
+  try {
+    const u = new URL(s);
+    if (u.username || u.password) {
+      u.username = "";
+      u.password = "";
+      return u.toString();
+    }
+    return s;
+  } catch {
+    return s;
+  }
+}
+
+/**
+ * Derive a string identity for the underlying database an adapter is
+ * connected to, or `null` when no stringable identity is available
+ * (callers fall back to the {@link _fallbackSchemaSignatures} WeakMap).
+ *
+ * Does NOT unwrap `innerAdapter` chains: wrappers like
+ * `TestAdapterFixtures` carry their own per-wrapper `tables: Set<string>`
+ * that `defineSchema` reads via `adapterKnownTables`, so sharing one
+ * cache entry across wrappers would desync the cache from the per-wrapper
+ * "tables I know about" view and cause cross-file table leakage. Only
+ * raw adapters (pool-leased `SidecarAdapter`, etc.) share by DB identity.
+ *
+ * Reads private fields by name on purpose — defineSchema is test-only
+ * infrastructure and there is no public surface for "which DB are you
+ * connected to" on AbstractAdapter today. Strips URL credentials so the
+ * cache key doesn't retain `user:password@...` from `PG_TEST_URL` /
+ * `MYSQL_TEST_URL`.
+ *
+ * @internal
+ */
+function databaseIdentity(adapter: DatabaseAdapter): string | null {
+  const real = adapter;
+  const a = real as unknown as Record<string, unknown>;
+  // Wrapper shapes (e.g. TestAdapterFixtures with an `innerAdapter` field)
+  // intentionally don't share — see fn docstring.
+  if ((a as { innerAdapter?: unknown }).innerAdapter !== undefined) return null;
+  if (real.adapterName === "sqlite") {
+    const fn = a["_filename"];
+    if (typeof fn === "string" && fn !== ":memory:" && fn !== "") return `sqlite:${fn}`;
+    return null;
+  }
+  if (real.adapterName === "postgres") {
+    const opts = a["_pgPoolOptions"] as { connectionString?: unknown } | undefined;
+    const cs = opts?.connectionString;
+    if (typeof cs === "string" && cs !== "") return `postgres:${_stripUrlCredentials(cs)}`;
+    return null;
+  }
+  if (real.adapterName === "mysql") {
+    const pc = a["_poolConfig"] as { uri?: unknown } | undefined;
+    if (typeof pc?.uri === "string" && pc.uri !== "")
+      return `mysql:${_stripUrlCredentials(pc.uri)}`;
+    const db = a["_database"];
+    if (typeof db === "string" && db !== "") return `mysql:db=${db}`;
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Resolve the signature cache for `adapter`, creating it if missing.
+ * Adapters with a stringable DB identity share one Map across all
+ * sibling adapters pointing at the same DB; the rest get a per-instance
+ * WeakMap entry (auto-GC'd with the adapter).
+ *
+ * @internal
+ */
+function _cacheFor(adapter: DatabaseAdapter, create: boolean): Map<string, string> | undefined {
+  const key = databaseIdentity(adapter);
+  if (key !== null) {
+    let cache = _appliedSchemaSignatures.get(key);
+    if (!cache && create) {
+      cache = new Map();
+      _appliedSchemaSignatures.set(key, cache);
+    }
+    return cache;
+  }
+  const real = adapter;
+  let cache = _fallbackSchemaSignatures.get(real);
+  if (!cache && create) {
+    cache = new Map();
+    _fallbackSchemaSignatures.set(real, cache);
+  }
+  return cache;
+}
+
+/**
+ * Snapshot the signature cache for the database the adapter targets
+ * (resolved via {@link databaseIdentity}). Paired with
  * {@link _restoreAppliedSchemaSignaturesForAdapter} so
  * `withTransactionalFixtures` can preserve entries created in a `beforeAll`
  * (outside any rolled-back test transaction) while discarding entries
@@ -254,7 +365,7 @@ let _appliedSchemaSignatures = new WeakMap<DatabaseAdapter, Map<string, string>>
 export function _snapshotAppliedSchemaSignaturesForAdapter(
   adapter: DatabaseAdapter,
 ): Map<string, string> {
-  const cache = _appliedSchemaSignatures.get(adapter);
+  const cache = _cacheFor(adapter, false);
   return cache ? new Map(cache) : new Map();
 }
 
@@ -263,12 +374,19 @@ export function _restoreAppliedSchemaSignaturesForAdapter(
   adapter: DatabaseAdapter,
   snapshot: Map<string, string>,
 ): void {
-  _appliedSchemaSignatures.set(adapter, new Map(snapshot));
+  const key = databaseIdentity(adapter);
+  if (key !== null) {
+    _appliedSchemaSignatures.set(key, new Map(snapshot));
+  } else {
+    _fallbackSchemaSignatures.set(adapter, new Map(snapshot));
+  }
 }
 
 /**
- * Drop the cached signature(s) for one adapter (or all adapters when no
- * argument is given). Paired with `resetTestAdapterState` so the signature
+ * Drop the cached signatures for the database the given adapter targets
+ * (resolved via {@link databaseIdentity}, so this also clears entries for
+ * any sibling adapter pointing at the same DB), or for every database
+ * when no argument is given. Paired with `resetTestAdapterState` so the signature
  * cache stays synchronized with `dropAllTables`: a shared adapter — which
  * survives across tests under the sidecar shape — would otherwise hold
  * signatures for tables that no longer exist, making a subsequent
@@ -278,20 +396,21 @@ export function _restoreAppliedSchemaSignaturesForAdapter(
  */
 export function clearAppliedSchemaSignatures(adapter?: DatabaseAdapter): void {
   if (adapter) {
-    _appliedSchemaSignatures.delete(adapter);
+    const key = databaseIdentity(adapter);
+    if (key !== null) {
+      _appliedSchemaSignatures.delete(key);
+    } else {
+      _fallbackSchemaSignatures.delete(adapter);
+    }
   } else {
-    _appliedSchemaSignatures = new WeakMap();
+    _appliedSchemaSignatures = new Map();
+    _fallbackSchemaSignatures = new WeakMap();
   }
 }
 
 /** @internal */
 function getCache(adapter: DatabaseAdapter): Map<string, string> {
-  let cache = _appliedSchemaSignatures.get(adapter);
-  if (!cache) {
-    cache = new Map();
-    _appliedSchemaSignatures.set(adapter, cache);
-  }
-  return cache;
+  return _cacheFor(adapter, true)!;
 }
 
 /** @internal */
