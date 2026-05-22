@@ -919,6 +919,10 @@ export class Mapper {
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
     if (typeof endpoint === "string" && endpoint.startsWith("__redirect__:")) {
       redirectEndpoint = this.redirectInstances.get(endpoint);
+      if (!redirectEndpoint) {
+        throw new Error(`Mapper#redirect token ${endpoint} has no registered Redirect endpoint`);
+      }
+      this.redirectInstances.delete(endpoint);
     }
     if (options.redirect) {
       redirectTarget = options.redirect;

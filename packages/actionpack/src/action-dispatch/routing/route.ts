@@ -45,8 +45,10 @@ export interface RouteOptions {
    * Preconstructed redirect endpoint, supplied by {@link Mapper.redirect}
    * when the DSL builds a `Redirect`/`PathRedirect`/`OptionRedirect` via
    * the {@link redirect} factory. When present this primes
-   * {@link Route.redirectEndpoint} so dispatch and `resolveRedirect`
-   * delegate to the same instance the mapper constructed.
+   * {@link Route.redirectEndpoint} so `RouteSet#call` dispatches through
+   * the same instance the mapper constructed, and a representative
+   * {@link Route.redirectTarget} is derived from it so the legacy
+   * {@link Route.resolveRedirect} helper stays consistent.
    */
   redirectEndpoint?: Redirect;
   pathNames?: { new?: string; edit?: string };
