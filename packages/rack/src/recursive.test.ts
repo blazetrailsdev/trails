@@ -42,17 +42,13 @@ it("allow for subrequests", async () => {
 });
 
 it("raise error on requests not below the app", async () => {
-  // This test checks that subrequests to paths outside the map raise errors
-  // In our implementation, URLMap returns 404 for unknown paths rather than raising
-  // So we verify the 404 behavior instead
   const outerMap = new URLMap({
     "/app1": app1,
     "/app": (env: any) => recursive({ "/1": app1, "/2": app2 }).call(env),
   });
-  const res = await new MockRequest((env) => outerMap.call(env)).get("/app/2");
-  // The subrequest to /app1 from /app/2 will go to the inner recursive's URLMap
-  // which doesn't have /app1, so it returns 404 body
-  expect(res.status).toBe(200);
+  await expect(new MockRequest((env) => outerMap.call(env)).get("/app/2")).rejects.toThrow(
+    /can only include below/,
+  );
 });
 
 it("support forwarding", async () => {

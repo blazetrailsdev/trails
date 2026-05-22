@@ -102,7 +102,7 @@ export class Sendfile {
         .split(",")
         .map((s: string) => s.trim())) {
         const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
-        const newPath = path.replace(new RegExp("^" + internal, "i"), external);
+        const newPath = path.replace(new RegExp("^" + escape(internal), "i"), external);
         if (newPath !== path) return newPath;
       }
     }

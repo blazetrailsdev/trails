@@ -32,7 +32,11 @@ export class Recursive {
       return await this.app({ ...env, [RACK_RECURSIVE_INCLUDE]: include });
     } catch (e) {
       if (e instanceof ForwardRequest) {
-        return this.call({ ...env, ...(e.env || {}) });
+        const fwd = new URL(e.url, "http://localhost");
+        const merged: Record<string, any> = { ...env, ...(e.env || {}) };
+        merged[PATH_INFO] = fwd.pathname;
+        if (fwd.search) merged[QUERY_STRING] = fwd.search.substring(1);
+        return this.call(merged);
       }
       throw e;
     }
