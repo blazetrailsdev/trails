@@ -1,35 +1,47 @@
 import { HTTP_COOKIE, SET_COOKIE, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import * as RackMime from "./mime.js";
+import {
+  QueryParser,
+  ParameterTypeError,
+  InvalidParameterError,
+  QueryLimitError,
+  ParamsTooDeepError,
+} from "./query-parser.js";
 
 export { STATUS_WITH_NO_ENTITY_BODY };
+export { ParameterTypeError, InvalidParameterError, QueryLimitError, ParamsTooDeepError };
+export { QueryParser };
 
-// Re-export errors
-export class ParameterTypeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ParameterTypeError";
-  }
-}
-export class InvalidParameterError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidParameterError";
-  }
-}
-export class ParamsTooDeepError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ParamsTooDeepError";
-  }
-}
+let _defaultQueryParser = QueryParser.makeDefault(32);
+let _multipartFileLimit = 128;
+let _multipartTotalPartLimit = 4096;
 
-let _paramDepthLimit = 32;
+export function getDefaultQueryParser(): QueryParser {
+  return _defaultQueryParser;
+}
+export function setDefaultQueryParser(parser: QueryParser): void {
+  _defaultQueryParser = parser;
+}
 
 export function getParamDepthLimit(): number {
-  return _paramDepthLimit;
+  return _defaultQueryParser.paramDepthLimit;
 }
 export function setParamDepthLimit(v: number): void {
-  _paramDepthLimit = v;
+  _defaultQueryParser = _defaultQueryParser.newDepthLimit(v);
+}
+
+export function getMultipartFileLimit(): number {
+  return _multipartFileLimit;
+}
+export function setMultipartFileLimit(v: number): void {
+  _multipartFileLimit = v;
+}
+
+export function getMultipartTotalPartLimit(): number {
+  return _multipartTotalPartLimit;
+}
+export function setMultipartTotalPartLimit(v: number): void {
+  _multipartTotalPartLimit = v;
 }
 
 export function clockTime(): number {
@@ -56,218 +68,14 @@ export function parseQuery(
   qs: string,
   separator?: string,
 ): Record<string, string | string[] | null> {
-  if (!qs) return {};
-  const sep = separator
-    ? new RegExp(`[${separator.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}]`)
-    : /[&]/;
-  const result: Record<string, string | string[] | null> = {};
-
-  for (const part of qs.split(sep)) {
-    if (!part) continue;
-    const eqIdx = part.indexOf("=");
-    let key: string, value: string | null;
-    if (eqIdx === -1) {
-      key = unescape(part);
-      value = null;
-    } else {
-      key = unescape(part.substring(0, eqIdx));
-      value = unescape(part.substring(eqIdx + 1));
-    }
-    if (key in result) {
-      const existing = result[key];
-      if (Array.isArray(existing)) {
-        existing.push(value as string);
-      } else {
-        result[key] = [existing as string, value as string];
-      }
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
+  return _defaultQueryParser.parseQuery(qs, separator);
 }
 
 export function parseNestedQuery(
   qs: string | null | undefined,
-  _separator?: string,
+  separator?: string,
 ): Record<string, any> {
-  if (!qs) return {};
-  const result: Record<string, any> = Object.create(null);
-
-  for (const part of qs.split(/&/)) {
-    if (!part) continue;
-    const eqIdx = part.indexOf("=");
-    let key: string, value: string | null;
-    if (eqIdx === -1) {
-      key = unescape(part);
-      value = null;
-    } else {
-      key = unescape(part.substring(0, eqIdx));
-      value = unescape(part.substring(eqIdx + 1));
-    }
-    normalizeParams(result, key, value, 0);
-  }
-  return result;
-}
-
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
-function normalizeParams(params: any, name: string, v: string | null, depth: number): void {
-  if (depth >= _paramDepthLimit) {
-    throw new ParamsTooDeepError("param depth limit exceeded");
-  }
-
-  // Simple key: "foo"
-  if (!name.includes("[")) {
-    if (DANGEROUS_KEYS.has(name)) return;
-    // Drop empty keys (e.g. "&=Save" → no `name`). Matches Rack-Ruby's
-    // `return if k.empty?` in lib/rack/query_parser.rb.
-    if (name === "") return;
-    params[name] = v;
-    return;
-  }
-
-  // Parse bracket notation
-  const match = name.match(/^([^[]*)((?:\[[^\]]*\])*)$/);
-  if (!match || !match[1]) {
-    // Keys like "[]", "[a]" etc with no prefix
-    params[name] = v;
-    return;
-  }
-
-  const prefix = match[1];
-  if (DANGEROUS_KEYS.has(prefix)) return;
-  const rest = match[2];
-
-  if (!rest || rest === "") {
-    params[prefix] = v;
-    return;
-  }
-
-  // Extract bracket segments
-  const brackets = rest.match(/\[[^\]]*\]/g) || [];
-
-  // Check if there's trailing content after the last bracket
-  const fullBrackets = brackets.join("");
-  const afterBrackets = rest.substring(fullBrackets.length);
-
-  if (afterBrackets) {
-    // e.g. "g[h]i=8" => brackets = ["[h]"], afterBrackets = "i"
-    // Treat as nested with the last key including the remainder
-    const keys = [prefix, ...brackets.map((b) => b.slice(1, -1))];
-    const lastKey = keys.pop()!;
-    const realLastKey = lastKey + afterBrackets;
-    let current = params;
-    for (const k of keys) {
-      if (!(k in current) || typeof current[k] !== "object" || Array.isArray(current[k])) {
-        current[k] = Object.create(null);
-      }
-      current = current[k];
-    }
-    if (!DANGEROUS_KEYS.has(realLastKey)) current[realLastKey] = v;
-    return;
-  }
-
-  const keys = brackets.map((b) => b.slice(1, -1));
-  setNestedValue(params, prefix, keys, v, depth);
-}
-
-function setNestedValue(
-  params: any,
-  prefix: string,
-  keys: string[],
-  v: string | null,
-  depth: number,
-): void {
-  if (depth >= _paramDepthLimit) {
-    throw new ParamsTooDeepError("param depth limit exceeded");
-  }
-
-  if (DANGEROUS_KEYS.has(prefix)) return;
-
-  if (keys.length === 0) {
-    // Direct assignment
-    if (prefix in params) {
-      const existing = params[prefix];
-      if (typeof existing === "string" || existing === null) {
-        params[prefix] = v;
-      } else if (Array.isArray(existing)) {
-        // Overwrite array with scalar
-        params[prefix] = v;
-      } else {
-        // It's a hash - type error
-        throw new ParameterTypeError(`expected Hash (got String) for param \`${prefix}'`);
-      }
-    } else {
-      params[prefix] = v;
-    }
-    return;
-  }
-
-  const firstKey = keys[0];
-  const restKeys = keys.slice(1);
-
-  if (firstKey === "") {
-    // Array push: foo[]=bar
-    if (!(prefix in params)) {
-      params[prefix] = [];
-    }
-    const arr = params[prefix];
-    if (!Array.isArray(arr)) {
-      if (typeof arr === "string" || arr === null) {
-        throw new ParameterTypeError(
-          `expected Array (got ${typeof arr === "string" ? "String" : "NilClass"}) for param \`${prefix}'`,
-        );
-      }
-      throw new ParameterTypeError(
-        `expected Array (got ${arr?.constructor?.name || typeof arr}) for param \`${prefix}'`,
-      );
-    }
-
-    if (restKeys.length === 0) {
-      arr.push(v);
-    } else {
-      // Nested within array: foo[][bar]=1
-      if (arr.length === 0 || shouldStartNewHash(arr[arr.length - 1], restKeys)) {
-        arr.push(Object.create(null));
-      }
-      const lastItem = arr[arr.length - 1];
-      setNestedValue(lastItem, restKeys[0], restKeys.slice(1), v, depth + 1);
-    }
-    return;
-  }
-
-  // Hash key: foo[bar]
-  if (!(prefix in params)) {
-    params[prefix] = Object.create(null);
-  }
-  const container = params[prefix];
-  if (typeof container === "string" || container === null) {
-    throw new ParameterTypeError(`expected Hash (got String) for param \`${prefix}'`);
-  }
-  if (Array.isArray(container)) {
-    throw new ParameterTypeError(
-      `expected Array (got ${container.constructor.name}) for param \`${prefix}'`,
-    );
-  }
-  setNestedValue(container, firstKey, restKeys, v, depth + 1);
-}
-
-function shouldStartNewHash(lastItem: any, keys: string[]): boolean {
-  if (typeof lastItem !== "object" || lastItem === null || Array.isArray(lastItem)) return true;
-  // Start a new hash if the first non-array key already exists
-  let current = lastItem;
-  for (let i = 0; i < keys.length; i++) {
-    if (keys[i] === "") return false; // Array access, don't decide here
-    if (keys[i] in current) {
-      if (i === keys.length - 1) return true; // leaf key already exists
-      current = current[keys[i]];
-      if (typeof current !== "object" || current === null || Array.isArray(current)) return true;
-    } else {
-      return false;
-    }
-  }
-  return false;
+  return _defaultQueryParser.parseNestedQuery(qs, separator);
 }
 
 export function buildQuery(params: Record<string, string | string[] | null>): string {

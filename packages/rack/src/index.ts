@@ -51,6 +51,15 @@ export {
   InvalidParameterError,
   ParameterTypeError,
   ParamsTooDeepError,
+  QueryParser,
+  getDefaultQueryParser,
+  setDefaultQueryParser,
+  getParamDepthLimit,
+  setParamDepthLimit,
+  getMultipartFileLimit,
+  setMultipartFileLimit,
+  getMultipartTotalPartLimit,
+  setMultipartTotalPartLimit,
 } from "./utils.js";
 export { BodyProxy } from "./body-proxy.js";
 export { Request } from "./request.js";
