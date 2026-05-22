@@ -61,6 +61,15 @@ export class CookieJar implements Iterable<[string, string]> {
   private _deletedCookies: Map<string, { path?: string; domain?: string }> = new Map();
   private _options: CookieJarOptions;
   private _committed = false;
+  /**
+   * Backing request reference for the serialized signed/encrypted jars'
+   * `cookies_serializer` lookup and the {@link CookieJar.signedOrEncrypted}
+   * dispatch. Populated by {@link CookieJar.build}; `undefined` when the
+   * jar is constructed standalone (e.g. unit tests of the plain API).
+   *
+   * @internal
+   */
+  _request?: RequestCookieMethodsHost;
 
   constructor(options: CookieJarOptions = {}) {
     this._options = options;
@@ -94,7 +103,7 @@ export class CookieJar implements Iterable<[string, string]> {
    * @internal
    */
   static build(
-    request: { cookiesAppOptions?: CookieJarOptions } | null | undefined,
+    request: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
     cookies: Record<string, string>,
   ): CookieJar {
     // Rails: `jar = new(req); jar.update(cookies); jar` — the request stores
@@ -102,6 +111,7 @@ export class CookieJar implements Iterable<[string, string]> {
     // `request.cookiesAppOptions` if the host exposes it so signed/encrypted
     // accessors can find their secrets in test setups.
     const jar = new CookieJar(request?.cookiesAppOptions ?? {});
+    if (request && "env" in request) jar._request = request as RequestCookieMethodsHost;
     for (const [k, v] of Object.entries(cookies ?? {})) {
       jar._cookies.set(k, v);
     }
@@ -206,7 +216,7 @@ export class CookieJar implements Iterable<[string, string]> {
   get signed(): SignedCookieJar {
     const secret = this._options.signedSecret ?? this._options.secret;
     if (!secret) throw new Error("No secret configured for signed cookies");
-    return new SignedCookieJar(this, secret);
+    return new SignedCookieJar(this, secret, this._request);
   }
 
   // --- Encrypted ---
@@ -214,7 +224,19 @@ export class CookieJar implements Iterable<[string, string]> {
   get encrypted(): EncryptedCookieJar {
     const secret = this._options.encryptedSecret ?? this._options.secret;
     if (!secret) throw new Error("No secret configured for encrypted cookies");
-    return new EncryptedCookieJar(this, secret);
+    return new EncryptedCookieJar(this, secret, this._request);
+  }
+
+  /**
+   * Returns the `encrypted` jar when `secret_key_base` is configured on the
+   * request, otherwise falls back to `signed`. Mirrors Rails'
+   * `ChainedCookieJars#signed_or_encrypted`, used by
+   * `ActionDispatch::Session::CookieStore` to avoid the need to introduce
+   * new cookie stores.
+   */
+  get signedOrEncrypted(): SignedCookieJar | EncryptedCookieJar {
+    const skb = this._request ? secretKeyBase.call(this._request) : undefined;
+    return skb ? this.encrypted : this.signed;
   }
 
   // --- Response headers ---
@@ -268,31 +290,69 @@ export class PermanentCookieJar {
   }
 }
 
+/**
+ * Options accepted by the signed/encrypted jars' `set` — mirror of
+ * `AbstractCookieJar#[]=` accepting either a bare value or a `Hash` carrying
+ * `:value` alongside cookie metadata.
+ */
+export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
+
+/** @internal */
+function makeSerializedHost(
+  request: RequestCookieMethodsHost | undefined,
+): SerializedCookieJarsHost {
+  return { request: request ?? { env: {}, cookies: {} } };
+}
+
+/** @internal */
+function normalizeSerializedInput(input: unknown): SerializedSetOptions {
+  if (input !== null && typeof input === "object" && Object.hasOwn(input as object, "value")) {
+    return { ...(input as SerializedSetOptions) };
+  }
+  return { value: input };
+}
+
 export class SignedCookieJar {
   private jar: CookieJar;
   private secret: string;
   private digest: string;
+  private host: SerializedCookieJarsHost;
 
-  constructor(jar: CookieJar, secret: string, digest = "sha256") {
+  constructor(
+    jar: CookieJar,
+    secret: string,
+    request?: RequestCookieMethodsHost,
+    digest = "sha256",
+  ) {
     this.jar = jar;
     this.secret = secret;
     this.digest = digest;
+    this.host = makeSerializedHost(request);
   }
 
-  set(key: string, valueOrOptions: string | SetCookieOptions): void {
-    const value = typeof valueOrOptions === "string" ? valueOrOptions : valueOrOptions.value;
-    const signed = this.sign(value);
-    if (typeof valueOrOptions === "string") {
-      this.jar.set(key, signed);
-    } else {
-      this.jar.set(key, { ...valueOrOptions, value: signed });
-    }
+  /**
+   * Mirror of Rails `AbstractCookieJar#[]=` for the signed jar: accept a
+   * bare value or a hash with `:value`, JSON-serialize via the
+   * SerializedCookieJars layer, then sign and write to the parent jar.
+   */
+  set(key: string, valueOrOptions: unknown): void {
+    const options = normalizeSerializedInput(valueOrOptions);
+    commit.call(this.host, key, options);
+    const signed = this.sign(options.value as string);
+    checkForOverflowBang(key, { value: signed });
+    this.jar.set(key, { ...(options as SetCookieOptions), value: signed });
   }
 
-  get(key: string): string | undefined {
+  get(key: string): unknown {
     const raw = this.jar.get(key);
-    if (!raw) return undefined;
-    return this.verify(raw);
+    if (raw === undefined) return undefined;
+    const verified = this.verify(raw);
+    if (verified === undefined) return undefined;
+    try {
+      return serializer.call(this.host).load(verified);
+    } catch {
+      return undefined;
+    }
   }
 
   private sign(value: string): string {
@@ -319,26 +379,37 @@ export class SignedCookieJar {
 export class EncryptedCookieJar {
   private jar: CookieJar;
   private secret: string;
+  private host: SerializedCookieJarsHost;
 
-  constructor(jar: CookieJar, secret: string) {
+  constructor(jar: CookieJar, secret: string, request?: RequestCookieMethodsHost) {
     this.jar = jar;
     this.secret = secret;
+    this.host = makeSerializedHost(request);
   }
 
-  set(key: string, valueOrOptions: string | SetCookieOptions): void {
-    const value = typeof valueOrOptions === "string" ? valueOrOptions : valueOrOptions.value;
-    const encrypted = this.encrypt(value);
-    if (typeof valueOrOptions === "string") {
-      this.jar.set(key, encrypted);
-    } else {
-      this.jar.set(key, { ...valueOrOptions, value: encrypted });
-    }
+  /**
+   * Mirror of Rails `AbstractCookieJar#[]=` for the encrypted jar: accept a
+   * bare value or a hash with `:value`, JSON-serialize via the
+   * SerializedCookieJars layer, then encrypt and write to the parent jar.
+   */
+  set(key: string, valueOrOptions: unknown): void {
+    const options = normalizeSerializedInput(valueOrOptions);
+    commit.call(this.host, key, options);
+    const encrypted = this.encrypt(options.value as string);
+    checkForOverflowBang(key, { value: encrypted });
+    this.jar.set(key, { ...(options as SetCookieOptions), value: encrypted });
   }
 
-  get(key: string): string | undefined {
+  get(key: string): unknown {
     const raw = this.jar.get(key);
-    if (!raw) return undefined;
-    return this.decrypt(raw);
+    if (raw === undefined) return undefined;
+    const decrypted = this.decrypt(raw);
+    if (decrypted === undefined) return undefined;
+    try {
+      return serializer.call(this.host).load(decrypted);
+    } catch {
+      return undefined;
+    }
   }
 
   private encrypt(value: string): string {
