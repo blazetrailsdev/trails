@@ -417,36 +417,36 @@ export async function defineSchema(
       }
     });
     cache.set(table, newSig);
-    await warmSchemaCacheFor(adapter, table);
+    invalidateSchemaCacheFor(adapter, table);
   }
 }
 
 /**
- * Warm the adapter's schema cache for `table` so that
- * `columnForAttribute()` resolves columns for `defineSchema`-created
- * tables under the bare sidecar adapter. The legacy `TestAdapterFixtures`
- * wrapper masked this gap by lazy-loading on first access through paths
- * that already had a connection in hand; the bare adapter exposes it
- * because `columnForAttribute` → `schemaCache.columnsHash(pool, name)`
- * misses on a never-introspected table and PG's
- * `caseInsensitiveComparison` then silently drops the `LOWER()` wrap.
+ * Drop any cached schema entries for `table` so the next
+ * `columnForAttribute()` / `columnsHash()` lazy-loads against the freshly
+ * created table. Without this, a prior `defineSchema` (or any earlier
+ * introspection of a same-named table) can leave `_columns` /
+ * `_columnsHash` populated; the cache then returns stale data when callers
+ * read it — and on PG, `caseInsensitiveComparison` silently drops the
+ * `LOWER()` wrap when `columnsHash` returns a column it can't recognize.
+ *
+ * Mirrors Rails' `clear_data_source_cache!(connection, name)` shape
+ * (SchemaCache#clear_data_source_cache! in `schema_cache.rb`), used here
+ * for the same reason: when DDL changes a table out from under the cache.
  *
  * Skips quietly when the adapter doesn't expose a schema cache (raw
- * connections in low-level adapter tests) or when the warmup fails
- * (in-memory SQLite tables that don't survive a pool's `withConnection`
- * boundary, etc.) — caching is a performance/correctness aid here, not
- * a hard requirement.
+ * connections in low-level adapter tests).
  *
  * @internal
  */
-async function warmSchemaCacheFor(adapter: DatabaseAdapter, table: string): Promise<void> {
-  const sc = (adapter as { schemaCache?: { add(pool: unknown, name: string): Promise<void> } })
-    .schemaCache;
-  if (!sc || typeof sc.add !== "function") return;
+function invalidateSchemaCacheFor(adapter: DatabaseAdapter, table: string): void {
+  const sc = (
+    adapter as {
+      schemaCache?: {
+        clearDataSourceCacheBang?(connection: unknown, name: string): void;
+      };
+    }
+  ).schemaCache;
   const pool = (adapter as { pool?: unknown }).pool ?? adapter;
-  try {
-    await sc.add(pool, table);
-  } catch {
-    // Best-effort — see JSDoc.
-  }
+  sc?.clearDataSourceCacheBang?.(pool, table);
 }
