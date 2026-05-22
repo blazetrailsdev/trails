@@ -210,7 +210,7 @@ ceiling) and PR 7 (granted ceiling waiver — see entry).
 2. **PR 0.5a–h closed** (#2124 A, #2128 C, #2130 D-G, #2131 N-R, #2133 H-M, #2134 S-W, #2140 wire-up; final h-tier sibling).
 3. **PR 0.75 closed (#2125)** — id backfill + ref() resolver + adapterName helper.
 4. **PR 1a closed (#2143)** — Cluster 1 first half (categories/categorizations/categories_posts/categories_ordered/taggings/tags/essays/readers).
-5. **PR 1b in flight (#2205)** — Cluster 1 second half (author_favorites, bad_posts, other_posts, other_comments, other_topics, other_books, subscribers, subscriptions, references).
+5. **PR 1b closed (#2205)** — Cluster 1 second half (author_favorites, bad_posts, other_posts, other_comments, other_topics, other_books, subscribers, subscriptions, references).
 6. **PR 2** — Cluster 2 (pirates/ships) + Cluster 9 (encryption) +
    Cluster 10 (misc fk\_\*). Three small clusters bundled. (~190 LOC)
 7. **PR 3** — Cluster 3 (people/clubs) + the C4 tail (`pets`, `toys`,

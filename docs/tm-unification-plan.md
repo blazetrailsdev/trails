@@ -16,9 +16,11 @@ once-per-file schema setup with transactional fixtures.
 > Path 2 (sidecar) work tracks there too: 2a #2202, 2b #2206, 2c-2
 > batch 1 #2219, batch 2 #2230. (#2236 reverted by #2239.)
 >
-> Phase 6 ceiling reached — remaining work is per-file surgery
-> (memory `project_phase6_mechanical_ceiling`). The savepoint-tolerance
-> fix (~50–100 LOC) unblocks the `dependent:` cluster.
+> Phase 6 mechanical ceiling reached — bulk-migration phase done; the
+> ~37 remaining files all hit hazard buckets (inline DDL / MariaDB
+> savepoints / PG sequence drift / `test:compare` carve-out conflicts)
+> and need per-file surgery, not another mechanical sweep. The
+> savepoint-tolerance fix (~50–100 LOC) unblocks the `dependent:` cluster.
 
 For closed-phase narrative and the original Path 1/Path 2 fallback
 diagnosis, see the merged PRs cited in each phase header and the
