@@ -275,7 +275,7 @@ export class HostAuthorization {
     return out;
   }
 
-  /** @internal Rails passes the Request to `exclude`; we hand back the original env (pre-Request clone) so mutations are visible to downstream middleware. */
+  /** @internal Invokes the `exclude` predicate with the original Rack env so mutations are visible to downstream middleware (the `Request` constructed in `call` clones its env). */
   private isExcluded(env: RackEnv): boolean {
     return Boolean(this.exclude?.(env));
   }
