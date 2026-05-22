@@ -10,7 +10,6 @@ import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
 import type { AssociationSpec } from "./relation/query-methods.js";
-import { sanitizeSql } from "./sanitization.js";
 
 /**
  * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
@@ -56,7 +55,7 @@ export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number> {
-  const sanitized = typeof sql === "string" ? sql : sanitizeSql(sql);
+  const sanitized = typeof sql === "string" ? sql : this.sanitizeSql(sql);
   // Rails: connection.select_value(sanitize_sql(sql)).to_i
   // Our adapters return rows; extract the first scalar value.
   const rows = await this.adapter.execute(sanitized);
@@ -88,7 +87,7 @@ export async function _queryBySql(
 ): Promise<Record<string, unknown>[]> {
   if (Array.isArray(sql)) {
     // Array form [sql, ...values] — interpolate into the string
-    return this.adapter.execute(sanitizeSql(sql));
+    return this.adapter.execute(this.sanitizeSql(sql));
   }
   // String SQL with separate binds — pass directly to adapter
   // (matching Rails where binds go to connection.select_all)

@@ -227,30 +227,61 @@ function sanitizeSqlClassMethod(
 /** @internal */
 interface QuoterHost {
   connection?(): unknown;
+  adapter?: unknown;
 }
 
 /**
- * Resolves quoting through `connection()`. Only `ConnectionNotDefined`
- * (no pool configured) falls back; other failures propagate to avoid a
- * silent dialect downgrade. @internal
+ * Resolves quoting through `connection()`, falling back to `adapter` when
+ * the adapter is set directly (bypassing the pool). Only `ConnectionNotDefined`
+ * (no pool configured) falls back further to `ABSTRACT_QUOTER`; other failures
+ * propagate to avoid a silent dialect downgrade. @internal
  */
 function quoterFor(host: QuoterHost): Quoter {
-  if (typeof host.connection !== "function") return ABSTRACT_QUOTER;
   let conn: Partial<Quoter> | null | undefined;
-  try {
-    conn = host.connection() as Partial<Quoter> | null | undefined;
-  } catch (err) {
-    if (err instanceof ConnectionNotDefined) return ABSTRACT_QUOTER;
-    throw err;
+  if (typeof host.connection === "function") {
+    try {
+      conn = host.connection() as Partial<Quoter> | null | undefined;
+    } catch (err) {
+      if (!(err instanceof ConnectionNotDefined)) throw err;
+    }
   }
-  return conn &&
-    typeof conn.quote === "function" &&
+  if (!conn) {
+    try {
+      conn = host.adapter as Partial<Quoter> | null | undefined;
+    } catch (err) {
+      if (!(err instanceof ConnectionNotDefined)) throw err;
+    }
+  }
+  if (!conn || typeof conn.quote !== "function") return ABSTRACT_QUOTER;
+  if (
     typeof conn.quoteIdentifier === "function" &&
     typeof conn.quoteTableNameForAssignment === "function" &&
     typeof conn.quoteString === "function" &&
     typeof conn.castBoundValue === "function"
-    ? (conn as Quoter)
-    : ABSTRACT_QUOTER;
+  ) {
+    return conn as Quoter;
+  }
+  // Partial quoter (e.g. adapter set directly): delegate quote(); use ABSTRACT_QUOTER defaults.
+  const partialQuote = conn.quote.bind(conn);
+  return {
+    quote: partialQuote,
+    quoteIdentifier:
+      typeof conn.quoteIdentifier === "function"
+        ? conn.quoteIdentifier.bind(conn)
+        : ABSTRACT_QUOTER.quoteIdentifier,
+    quoteTableNameForAssignment:
+      typeof conn.quoteTableNameForAssignment === "function"
+        ? conn.quoteTableNameForAssignment.bind(conn)
+        : ABSTRACT_QUOTER.quoteTableNameForAssignment,
+    quoteString:
+      typeof conn.quoteString === "function"
+        ? conn.quoteString.bind(conn)
+        : ABSTRACT_QUOTER.quoteString,
+    castBoundValue:
+      typeof conn.castBoundValue === "function"
+        ? conn.castBoundValue.bind(conn)
+        : ABSTRACT_QUOTER.castBoundValue,
+  };
 }
 
 /**

@@ -530,5 +530,14 @@ describe("sanitizeSql", () => {
       const result = Post.sanitizeSqlArray("id IN (?)", new Set());
       expect(result).toContain("NULL");
     });
+
+    it("boolean quoting routes through the active adapter", () => {
+      class Post extends Base {
+        static _tableName = "posts";
+      }
+      Post.adapter = freshAdapter();
+      const sql = Post.sanitizeSqlArray("active = ?", true);
+      expect(sql).toBe(`active = ${Post.adapter.quotedTrue()}`);
+    });
   });
 });
