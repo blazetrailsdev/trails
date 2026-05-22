@@ -122,6 +122,15 @@ describe("AppGenerator", () => {
     expect(pkg.devDependencies.vite).toBeDefined();
   });
 
+  it("emits postinstall hook that builds .tse views", async () => {
+    await makeGen().run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    expect(pkg.scripts.postinstall).toBe("trails-tsc-views build --views src/app/views");
+    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
+    const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
+    expect(gitignore).toContain("/.trails/");
+  });
+
   it("configures postgres database", async () => {
     await makeGen("postgres").run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));

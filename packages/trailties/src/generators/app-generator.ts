@@ -68,6 +68,7 @@ export class AppGenerator extends AppBase {
             "db:seed": "trails db seed",
             "db:setup": "trails db create && trails db migrate && trails db seed",
             "db:reset": "trails db drop && trails db setup",
+            postinstall: "trails-tsc-views build --views src/app/views",
           },
           dependencies: {
             "@blazetrails/activerecord": "*",
@@ -79,6 +80,7 @@ export class AppGenerator extends AppBase {
             [dep.name]: dep.version,
           },
           devDependencies: {
+            "@blazetrails/trails-tsc": "*",
             typescript: "^5.7.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
@@ -115,6 +117,7 @@ export class AppGenerator extends AppBase {
       ".gitignore",
       `/node_modules/
 /dist/
+/.trails/
 /.env*
 !/.env.example
 
