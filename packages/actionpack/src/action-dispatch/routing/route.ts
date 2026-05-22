@@ -10,7 +10,7 @@ import { normalizePath as journeyNormalizePath } from "../journey/router/utils.j
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
-import type { Request } from "../http/request.js";
+import { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const PATHFOR_SEPARATORS = "/.?";
@@ -435,7 +435,17 @@ export class Route {
     if (!target) throw new Error("Route is not a redirect");
 
     if (typeof target === "function") {
-      return { url: target(params, request as unknown as Request), status: 301 };
+      // Synthesize a real Request from the legacy {method, path, host?} shape
+      // so user blocks reading `req.host`, `req.queryParameters`, `req.protocol`,
+      // etc. don't crash on a bare object.
+      const syntheticReq = new Request({
+        REQUEST_METHOD: request.method,
+        PATH_INFO: request.path,
+        SERVER_NAME: request.host ?? "www.example.com",
+        SERVER_PORT: "80",
+        "rack.url_scheme": "http",
+      });
+      return { url: target(params, syntheticReq), status: 301 };
     }
 
     if (typeof target === "string") {
