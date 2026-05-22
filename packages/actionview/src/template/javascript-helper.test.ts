@@ -1,11 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
+
+import { OutputBuffer } from "../buffers.js";
+import { OutputFlow } from "../flows.js";
+import { concat } from "../helpers/text-helper.js";
 import {
   escapeJavascript,
   j,
-  javascriptTag,
   javascriptCdataSection,
+  javascriptTag,
 } from "../helpers/javascript-helper.js";
-import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
+
+function host() {
+  return { outputBuffer: null as OutputBuffer | null, viewFlow: new OutputFlow() };
+}
 
 describe("JavaScriptHelperTest", () => {
   it("escape javascript", () => {
@@ -18,8 +26,8 @@ describe("JavaScriptHelperTest", () => {
     );
     expect(escapeJavascript("backslash\\test").toString()).toBe("backslash\\\\test");
     expect(escapeJavascript("don't </close> tags").toString()).toBe("don\\'t <\\/close> tags");
-    expect(escapeJavascript("unicode \u2028 newline").toString()).toBe("unicode &#x2028; newline");
-    expect(escapeJavascript("unicode \u2029 newline").toString()).toBe("unicode &#x2029; newline");
+    expect(escapeJavascript("unicode   newline").toString()).toBe("unicode &#x2028; newline");
+    expect(escapeJavascript("unicode   newline").toString()).toBe("unicode &#x2029; newline");
 
     expect(j("don't </close> tags").toString()).toBe("don\\'t <\\/close> tags");
   });
@@ -37,26 +45,37 @@ describe("JavaScriptHelperTest", () => {
     const expectedStr = "\\'quoted\\' \\\"double-quoted\\\" new-line:\\n <\\/closed>";
     expect(escapeJavascript(given).toString()).toBe(expectedStr);
     expect(escapeJavascript(htmlSafe(given)).toString()).toBe(expectedStr);
-    // Unsafe string returns plain string
     const unsafeResult = escapeJavascript(given);
     expect(unsafeResult instanceof SafeBuffer).toBe(false);
-    // Safe string returns SafeBuffer
     const safeResult = escapeJavascript(htmlSafe(given));
     expect(safeResult instanceof SafeBuffer).toBe(true);
     expect((safeResult as SafeBuffer).htmlSafe).toBe(true);
   });
 
   it("javascript tag", () => {
-    const result = javascriptTag("alert('hello')").toString();
+    const ctx = host();
+    ctx.outputBuffer = new OutputBuffer("foo");
+    const result = javascriptTag.call(ctx, "alert('hello')").toString();
     expect(result).toBe("<script>\n//<![CDATA[\nalert('hello')\n//]]>\n</script>");
+    expect(ctx.outputBuffer.toString().toString()).toBe("foo");
   });
 
   it("javascript tag with options", () => {
-    const result = javascriptTag("alert('hello')", {
-      id: "the_js_tag",
-    }).toString();
+    const result = javascriptTag.call(undefined, "alert('hello')", { id: "the_js_tag" }).toString();
     expect(result).toBe(
       "<script id=\"the_js_tag\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
+    );
+  });
+
+  it("javascript tag with block", () => {
+    const ctx = { outputBuffer: new OutputBuffer(), viewFlow: new OutputFlow() };
+    const result = javascriptTag
+      .call(ctx, { type: "application/javascript" }, () => {
+        concat.call(ctx, htmlSafe("alert('hello')"));
+      })
+      .toString();
+    expect(result).toBe(
+      "<script type=\"application/javascript\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
     );
   });
 
