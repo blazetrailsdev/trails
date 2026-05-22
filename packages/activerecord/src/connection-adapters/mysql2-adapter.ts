@@ -496,18 +496,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           payload.exception_object = e;
           throw e;
         }
-        const { error: translated, connReleased } = await this._translateAndEnrich(
-          e,
-          driverSql,
-          driverBinds,
-          conn,
-        );
-        if (connReleased) conn = undefined;
+        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
-      } finally {
-        if (conn) this.releaseConn(conn);
       }
     });
   }
@@ -584,13 +576,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * No-op release — single connection is never returned to a pool.
-   */
-  private releaseConn(_conn: mysql.Connection): void {
-    // single persistent connection — nothing to release
-  }
-
-  /**
    * Convert double-quoted identifiers to backtick-quoted for MySQL/MariaDB.
    *
    * CONVENTION: Arel-generated DML and SQL builders (Relation, InsertAll, etc.)
@@ -620,32 +605,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /**
    * Translate a driver exception and, if it's a MismatchedForeignKey,
    * enrich it with the referenced column's type via an async columns() call.
-   *
-   * Returns the translated (and possibly enriched) error plus a `connReleased`
-   * flag. When true, the caller should skip its `finally { releaseConn(conn) }`
-   * path. With a single persistent connection `releaseConn` is a no-op, so the
-   * flag only prevents the caller from making a redundant no-op call — it is
-   * still set to true for MismatchedForeignKey to match the pool-era contract.
    */
-  private async _translateAndEnrich(
-    e: unknown,
-    sql: string,
-    binds: unknown[],
-    conn: mysql.Connection | undefined,
-  ): Promise<{ error: Error; connReleased: boolean }> {
+  private async _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error> {
     let translated = this._translateException(e, sql, binds);
-    let connReleased = false;
     if (translated instanceof MismatchedForeignKey) {
-      // With a single connection there is nothing to release, but we still
-      // null out conn in the caller's finally to prevent a second no-op
-      // releaseConn call after enrichment.
-      if (conn) {
-        this.releaseConn(conn);
-        connReleased = true;
-      }
       translated = await this._enrichMismatchedForeignKey(translated);
     }
-    return { error: translated, connReleased };
+    return translated;
   }
 
   /**
@@ -709,18 +675,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // `payload.exception` too. Query-level driver errors
         // (ER_DUP_ENTRY etc.) are translated to Rails' typed exception
         // classes via _translateAndEnrich.
-        const { error: translated, connReleased } = await this._translateAndEnrich(
-          e,
-          driverSql,
-          driverBinds,
-          conn,
-        );
-        if (connReleased) conn = undefined;
+        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
-      } finally {
-        if (conn) this.releaseConn(conn);
       }
     });
   }
@@ -776,18 +734,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // subscribers still see `payload.exception`. Driver errors
         // (ER_DUP_ENTRY etc.) are translated to Rails' typed exception
         // classes via _translateAndEnrich.
-        const { error: translated, connReleased } = await this._translateAndEnrich(
-          e,
-          driverSql,
-          driverBinds,
-          conn,
-        );
-        if (connReleased) conn = undefined;
+        const translated = await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;
-      } finally {
-        if (conn) this.releaseConn(conn);
       }
     });
   }
@@ -853,11 +803,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async createSavepoint(name: string): Promise<void> {
     const conn = await this.getConn();
-    try {
-      await conn.query(`SAVEPOINT \`${name}\``);
-    } finally {
-      this.releaseConn(conn);
-    }
+    await conn.query(`SAVEPOINT \`${name}\``);
   }
 
   /**
@@ -865,11 +811,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async releaseSavepoint(name: string): Promise<void> {
     const conn = await this.getConn();
-    try {
-      await conn.query(`RELEASE SAVEPOINT \`${name}\``);
-    } finally {
-      this.releaseConn(conn);
-    }
+    await conn.query(`RELEASE SAVEPOINT \`${name}\``);
   }
 
   /**
@@ -877,11 +819,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async rollbackToSavepoint(name: string): Promise<void> {
     const conn = await this.getConn();
-    try {
-      await conn.query(`ROLLBACK TO SAVEPOINT \`${name}\``);
-    } finally {
-      this.releaseConn(conn);
-    }
+    await conn.query(`ROLLBACK TO SAVEPOINT \`${name}\``);
   }
 
   /**
@@ -901,23 +839,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // and therefore through perform_query, which re-syncs the database timezone.
     this._syncDatabaseTimezone();
     const conn = await this.getConn();
-    try {
-      const clause = this._explainStatementClause(options);
-      const start = Date.now();
-      // Forward binds in the same driver form execute() uses
-      // (booleans → 1/0). Without this, an EXPLAIN over a bind-
-      // carrying prepared-statement query would fail with a mysql
-      // parameter-count error.
-      const [rows] = await conn.query(`${clause} ${this.mysqlQuote(sql)}`, this.mysqlBinds(binds));
-      const elapsed = (Date.now() - start) / 1000;
-      const printer = new ExplainPrettyPrinter();
-      const typedRows = rows as Array<Record<string, unknown>>;
-      const columns = typedRows.length > 0 ? Object.keys(typedRows[0]) : [];
-      const result = { columns, rows: typedRows.map((r) => columns.map((c) => r[c])) };
-      return printer.pp(result, elapsed);
-    } finally {
-      this.releaseConn(conn);
-    }
+    const clause = this._explainStatementClause(options);
+    const start = Date.now();
+    // Forward binds in the same driver form execute() uses
+    // (booleans → 1/0). Without this, an EXPLAIN over a bind-
+    // carrying prepared-statement query would fail with a mysql
+    // parameter-count error.
+    const [rows] = await conn.query(`${clause} ${this.mysqlQuote(sql)}`, this.mysqlBinds(binds));
+    const elapsed = (Date.now() - start) / 1000;
+    const printer = new ExplainPrettyPrinter();
+    const typedRows = rows as Array<Record<string, unknown>>;
+    const columns = typedRows.length > 0 ? Object.keys(typedRows[0]) : [];
+    const result = { columns, rows: typedRows.map((r) => columns.map((c) => r[c])) };
+    return printer.pp(result, elapsed);
   }
 
   // `quote()` and `typeCast()` are inherited from AbstractMysqlAdapter,
@@ -934,11 +868,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async exec(sql: string): Promise<void> {
     this._syncDatabaseTimezone();
     const conn = await this.getConn();
-    try {
-      await conn.query(this.mysqlQuote(sql));
-    } finally {
-      this.releaseConn(conn);
-    }
+    await conn.query(this.mysqlQuote(sql));
   }
 
   createSchemaDumper(source: SchemaSource, _options: unknown = {}): MysqlSchemaDumper {
@@ -1577,12 +1507,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  private connect(): void {
-    // Rails' connect sets @raw_connection. Our single connection is
-    // established lazily in _ensureClient on the first query.
-  }
-
-  /** @internal */
   override configureConnection(): void {
     // In Rails this sets @raw_connection.query_options[:as] = :array and
     // database_timezone on the single raw connection. We have a single
@@ -1603,19 +1527,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async getFullVersion(): Promise<string> {
     if (this._fullVersionString) return this._fullVersionString;
     const conn = await this.getConn();
-    try {
-      const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [
-        Array<{ v: string }>,
-        unknown,
-      ];
-      const ver = row?.v ?? "0.0.0";
-      this._fullVersionString = ver;
-      this._mariadb = /mariadb/i.test(ver);
-      this._databaseVersion = new Version(this.versionString(ver));
-      return ver;
-    } finally {
-      this.releaseConn(conn);
-    }
+    const [[row]] = (await conn.query("SELECT VERSION() AS v")) as [Array<{ v: string }>, unknown];
+    const ver = row?.v ?? "0.0.0";
+    this._fullVersionString = ver;
+    this._mariadb = /mariadb/i.test(ver);
+    this._databaseVersion = new Version(this.versionString(ver));
+    return ver;
   }
 
   /**
@@ -1882,7 +1799,7 @@ function translateConnectError(
   database: string | undefined,
   config: mysql.PoolOptions & MysqlAdapterOptions,
 ): Error {
-  if (!(err instanceof Error)) return new Error(String(err));
+  if (!(err instanceof Error)) return new ConnectionNotEstablished(String(err));
   const errno = (err as { errno?: number }).errno;
   switch (errno) {
     case 1049: {
