@@ -10,6 +10,8 @@ import type { Request } from "./request.js";
 import {
   type CacheControlHash,
   cacheControl as _cacheControl,
+  cacheControlHeaders as _cacheControlHeaders,
+  cacheControlSegments as _cacheControlSegments,
   generateStrongEtag as _generateStrongEtag,
   generateWeakEtag as _generateWeakEtag,
   getDate as _getDate,
@@ -27,7 +29,12 @@ import {
   strongEtag as _strongEtag,
   weakEtag as _weakEtag,
 } from "./cache.js";
-import { filteredLocation as _filteredLocation } from "./filter-redirect.js";
+import {
+  filteredLocation as _filteredLocation,
+  locationFilterMatch as _locationFilterMatch,
+  locationFilters as _locationFilters,
+  parameterFilteredLocation as _parameterFilteredLocation,
+} from "./filter-redirect.js";
 
 // Lowercase to match the rest of this file's header conventions; setHeader
 // is case-insensitive but call sites read `headers["content-type"]` directly.
@@ -371,6 +378,16 @@ export class Response {
    * {@link _cacheControl}.
    */
   declare readonly cacheControl: CacheControlHash;
+  /** @internal Rails: `cache_control_segments` private. */
+  declare cacheControlSegments: () => string[] | undefined;
+  /** @internal Rails: `cache_control_headers` private. */
+  declare cacheControlHeaders: () => CacheControlHash;
+  /** @internal Rails: `FilterRedirect#location_filters` private. */
+  declare locationFilters: () => Array<string | RegExp>;
+  /** @internal Rails: `FilterRedirect#location_filter_match?` private. */
+  declare isLocationFilterMatch: () => boolean;
+  /** @internal Rails: `FilterRedirect#parameter_filtered_location` private. */
+  declare parameterFilteredLocation: () => string;
 
   // --- Rack response ---
 
@@ -701,6 +718,21 @@ Response.prototype.mergeAndNormalizeCacheControlBang = function (
   cacheControl: CacheControlHash,
 ) {
   _mergeAndNormalizeCacheControlBang.call(this, cacheControl);
+};
+Response.prototype.cacheControlSegments = function (this: Response) {
+  return _cacheControlSegments.call(this);
+};
+Response.prototype.cacheControlHeaders = function (this: Response) {
+  return _cacheControlHeaders.call(this);
+};
+Response.prototype.locationFilters = function (this: Response) {
+  return _locationFilters.call(this);
+};
+Response.prototype.isLocationFilterMatch = function (this: Response) {
+  return _locationFilterMatch.call(this);
+};
+Response.prototype.parameterFilteredLocation = function (this: Response) {
+  return _parameterFilteredLocation.call(this);
 };
 export interface CookieOptions {
   value: string;
