@@ -5,41 +5,45 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range, RecordNotFound } from "../index.js";
 
-import { createTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
+import { createPooledTestAdapter, type SidecarAdapter } from "../test-adapter.js";
 import { defineSchema } from "../test-helpers/define-schema.js";
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import type { DatabaseAdapter } from "../adapter.js";
 
-let _adapter: TestDatabaseAdapter;
+let _adapter: SidecarAdapter;
 beforeAll(async () => {
-  _adapter = createTestAdapter();
+  ({ adapter: _adapter } = await createPooledTestAdapter());
   const postCols = {
     title: "string" as const,
     published: "boolean" as const,
     salary: "integer" as const,
     author: "string" as const,
   };
-  await defineSchema(_adapter, {
-    developers: { name: "string", salary: "integer" },
-    posts: { title: "string", author: "string", published: "boolean" },
-    ro_posts: postCols,
-    dro_posts: postCols,
-    sf_posts: postCols,
-    sff_posts: postCols,
-    sfl_posts: postCols,
-    sc_posts: postCols,
-    sds_posts: postCols,
-    sfa_posts: postCols,
-    scnt_posts: postCols,
-    sj_posts: postCols,
-    nrs_posts: postCols,
-    ann_posts: postCols,
-    ann_unscoped_posts: postCols,
-    animals: { type: "string", name: "string" },
-    cats: { type: "string", name: "string" },
-    dogs: { type: "string", name: "string" },
-    categories: { name: "string" },
-  });
+  await defineSchema(
+    _adapter,
+    {
+      developers: { name: "string", salary: "integer" },
+      posts: { title: "string", author: "string", published: "boolean" },
+      ro_posts: postCols,
+      dro_posts: postCols,
+      sf_posts: postCols,
+      sff_posts: postCols,
+      sfl_posts: postCols,
+      sc_posts: postCols,
+      sds_posts: postCols,
+      sfa_posts: postCols,
+      scnt_posts: postCols,
+      sj_posts: postCols,
+      nrs_posts: postCols,
+      ann_posts: postCols,
+      ann_unscoped_posts: postCols,
+      animals: { type: "string", name: "string" },
+      cats: { type: "string", name: "string" },
+      dogs: { type: "string", name: "string" },
+      categories: { name: "string" },
+    },
+    { dropExisting: true },
+  );
 });
 withTransactionalFixtures(() => _adapter);
 function freshAdapter(): DatabaseAdapter {

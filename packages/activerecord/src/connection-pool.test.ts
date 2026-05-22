@@ -822,6 +822,29 @@ it("pin connection isolation across execution contexts", async () => {
   expect(ctx1Conn).not.toBe(ctx2Conn);
 });
 
+it("concurrent checkouts within a pinned context all return the pinned connection", async () => {
+  const pool = makeTransactionAwarePool(5);
+  await pool.pinConnectionBang();
+  const pinned = pool.checkout();
+
+  // Mirrors Promise.all sub-branches inside a `withTransactionalFixtures`
+  // test body: AsyncContext propagates the pin's ctx id to every branch,
+  // so every concurrent lease must resolve to the pinned connection rather
+  // than pulling a free-list connection (which would race the pinned TX).
+  const results = await Promise.all(
+    Array.from({ length: 11 }, async () => {
+      const sync = pool.checkout();
+      const async_ = await pool.checkoutAsync();
+      return { sync, async_ };
+    }),
+  );
+  for (const { sync, async_ } of results) {
+    expect(sync).toBe(pinned);
+    expect(async_).toBe(pinned);
+  }
+  await pool.unpinConnectionBang();
+});
+
 it.skip("pin connection nesting lock", () => {
   // BLOCKED: connection-pool — connection pool / handler gap in connection-pool
   // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or abstract/connection-handler.ts missing Rails parity for pool lifecycle
