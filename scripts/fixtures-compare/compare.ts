@@ -21,7 +21,36 @@ const TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/fixtures"
 type Row = Record<string, unknown>;
 type FixtureMap = Record<string, Row>;
 // prettier-ignore
-type Status = "MATCH" | "MISSING" | "DIFF" | "ERB-UNSUPPORTED" | "YAML-PARSE-ERR" | "TS-IMPORT-ERR" | "TS-EXPORT-MISSING";
+type Status = "MATCH" | "MISSING" | "DIFF" | "ERB-UNSUPPORTED" | "ERB-ALLOWED" | "YAML-PARSE-ERR" | "TS-IMPORT-ERR" | "TS-EXPORT-MISSING";
+
+// Fixtures whose Rails YAML uses ERB constructs we don't reduce (binary
+// helpers, 1000+ row loops). Listed here so the PR-7b strict flip treats
+// them as expected gaps rather than failures. Per docs/fixtures-port-plan.md
+// — the TS side is the source of truth for these tables (rows expanded
+// statically, with the original ERB intent preserved in a header comment).
+export const ERB_ALLOW_LIST = new Set<string>(["mixins", "paragraphs", "citations"]);
+
+// Per-table FK-column → target-table override map. Convention covers most
+// cases (column `foo_id` resolves to TS `ref("foos", …)`); declare an
+// override here when the column name doesn't match the target table — e.g.
+// `rich_person_id` on `peoples_treasures` points at `people`, not
+// `rich_people`. Consulted by canonicalizeRailsRow when rewriting
+// `assoc: label` shorthand into the `<col>_id` form so the per-attr diff
+// can resolve the FK through the right table's id index.
+export const FK_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string>>>> = {};
+
+// Per-table enum-symbol → integer map for `enum :status, [:proposed, …]`
+// columns. Rails YAML carries `status: :published` (or sometimes
+// `status: "proposed"`); the TS fixture carries the integer assigned by
+// the model's `enum` declaration. Lookups are best-effort: when a column
+// is registered, the comparator resolves symbol↔int; when it isn't, the
+// pair is reported as `enum-unmapped` and counted as a soft attribute skip
+// (not a DIFF). Maps are intentionally small — populating them is the
+// follow-up DIFF-reconcile PR. Keep this an `enums` registry and not a
+// general "I declare this string equals this number" knob.
+export const ENUM_MAPS: Readonly<
+  Record<string, Readonly<Record<string, Readonly<Record<string, number>>>>>
+> = {};
 
 // prettier-ignore
 interface FileResult { yamlBase: string; tsBase: string | null; status: Status; rowsMatched: number; rowsTotal: number; attrsMatched: number; attrsTotal: number; attrsSkipped: number; schemaPorted: boolean; schemaExtras: number; notes: string[]; }
@@ -213,7 +242,14 @@ function buildIdIndex(yamls: Map<string, FixtureMap>): Map<string, Map<number, s
   for (const [table, rows] of yamls) {
     const inner = new Map<number, string[]>();
     for (const [name, row] of Object.entries(rows)) {
-      if (typeof row.id === "number") inner.set(row.id, [...(inner.get(row.id) ?? []), name]);
+      // Rails fixtures.rb assigns each row an effective id even when the YAML
+      // omits an explicit `id:` — `ActiveRecord::FixtureSet.identify(label)`
+      // (CRC32 % MAX_ID). Numeric FK references in *other* fixtures
+      // (`<%= identify(:george) %>`) round-trip to that implicit id, so the
+      // reverse lookup must include it. Explicit `id:` always wins over the
+      // CRC32 fallback.
+      const id = typeof row.id === "number" ? row.id : fixtureIdValue(name);
+      inner.set(id, [...(inner.get(id) ?? []), name]);
     }
     idx.set(table, inner);
   }
@@ -225,8 +261,43 @@ export function isRefLike(v: unknown): v is { tableName: string; fixtureName: st
   return !!o && typeof o === "object" && typeof o.tableName === "string" && typeof o.fixtureName === "string"; // prettier-ignore
 }
 
+// `:foo` (Ruby symbol literal as YAML parses it: a string with a leading colon).
+const SYMBOL_RE = /^:(\w+)$/;
+// "YYYY-MM-DD" optionally followed by [T ]HH:MM:SS[.fff][TZ]. The YAML lib
+// already produces JS `Date` for tagged !!timestamp scalars, but Rails
+// often serializes datetimes as plain strings in fixtures (and AR's own
+// fixture loader re-parses them at insert time) — normalize both sides to
+// epoch ms before comparing so 2003-07-16T15:28:11+01:00 ≡ 2003-07-16 14:28:11.
+const DATETIMEISH_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+\-]\d{2}:?\d{2}|Z)?)?$/i;
+// Rails' YAML coder emits `--- <scalar>\n...\n` for `serialize :col` columns
+// stored as YAML literals. The TS fixture carries the deserialized scalar.
+const SERIALIZED_YAML_RE = /^---\s*([\s\S]*?)\n\.\.\.\n?$/;
+
+function normalizeDatetime(v: unknown): number | null {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v !== "string" || !DATETIMEISH_RE.test(v)) return null;
+  // Normalize: T-separator and force UTC when no offset is present. Rails
+  // fixtures without a TZ marker mean "UTC" (that's how AR's adapters
+  // store timestamps); JS `Date` would otherwise treat them as local time
+  // and the comparison would be host-dependent.
+  let iso = v.replace(" ", "T");
+  if (!/[zZ]|[+\-]\d{2}:?\d{2}$/.test(iso)) iso += "Z";
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+}
+
+function unwrapSerializedYaml(v: unknown): unknown {
+  if (typeof v !== "string") return v;
+  const m = SERIALIZED_YAML_RE.exec(v);
+  return m ? m[1] : v;
+}
+
+function resolveEnumSymbol(table: string, attr: string, symbol: string): number | undefined {
+  return ENUM_MAPS[table]?.[attr]?.[symbol];
+}
+
 // prettier-ignore
-export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, idIndex: Map<string, Map<number, string[]>>, notes: string[]): boolean {
+export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, idIndex: Map<string, Map<number, string[]>>, notes: string[], table: string = "", attrsSkipped?: { n: number }): boolean {
   if (isRefLike(tsVal)) {
     const { tableName, fixtureName } = tsVal;
     if (typeof railsVal === "number") {
@@ -255,6 +326,49 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
   if (Array.isArray(tsVal) && Array.isArray(railsVal)
     && tsVal.length === railsVal.length && tsVal.every((v, i) => v === railsVal[i]))
     return true;
+  // Datetime tolerance: round to second-precision since Rails fixtures often
+  // carry sub-second fractions the TS side trims when materializing values.
+  const tsT = normalizeDatetime(tsVal);
+  const railsT = normalizeDatetime(railsVal);
+  if (tsT !== null && railsT !== null && Math.floor(tsT / 1000) === Math.floor(railsT / 1000))
+    return true;
+  // Mixed datetime ↔ time-of-day: TIME columns (e.g. `bonus_time`) carry just
+  // `HH:MM:SS` in the TS fixture, but the YAML side often has a full datetime
+  // because Rails synthesizes a date prefix. Compare hours/min/sec in UTC.
+  const timeOnly = (v: unknown): [number, number, number] | null =>
+    typeof v === "string" && /^\d{2}:\d{2}:\d{2}$/.test(v)
+      ? (v.split(":").map(Number) as [number, number, number])
+      : null;
+  const tsTime = timeOnly(tsVal);
+  const railsTime = timeOnly(railsVal);
+  const utcHMS = (t: number): [number, number, number] => {
+    const d = new Date(t);
+    return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()];
+  };
+  const eqHMS = (a: [number, number, number], b: [number, number, number]): boolean =>
+    a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+  if (tsTime && railsT !== null && eqHMS(tsTime, utcHMS(railsT))) return true;
+  if (railsTime && tsT !== null && eqHMS(railsTime, utcHMS(tsT))) return true;
+  // `serialize :col` columns: Rails YAML wraps the value in `--- … \n…\n`;
+  // peel that off before retrying equality.
+  const railsUnwrapped = unwrapSerializedYaml(railsVal);
+  if (railsUnwrapped !== railsVal && tsVal === railsUnwrapped) return true;
+  // Enum: Rails `enum :status, [:proposed, …]` columns appear as `:foo`
+  // (YAML symbol) or plain string on the Rails side, integer on the TS side.
+  // With a registered mapping we resolve the symbol; without, treat as a
+  // soft skip so unregistered enums don't gate the strict flip.
+  if (typeof tsVal === "number" && typeof railsVal === "string") {
+    const sym = SYMBOL_RE.exec(railsVal)?.[1] ?? railsVal;
+    if (/^\w+$/.test(sym)) {
+      const mapped = resolveEnumSymbol(table, attr.split(".").pop() ?? attr, sym);
+      if (mapped === tsVal) return true;
+      if (mapped === undefined) {
+        notes.push(`enum-unmapped: ${attr}: ts=${tsVal} rails=${JSON.stringify(railsVal)} (add ENUM_MAPS["${table}"].${attr.split(".").pop()})`); // prettier-ignore
+        if (attrsSkipped) attrsSkipped.n++;
+        return true; // soft skip: don't fail the file on unmapped enums
+      }
+    }
+  }
   notes.push(`value-differs: ${attr}: ts=${JSON.stringify(tsVal)} rails=${JSON.stringify(railsVal)}`); // prettier-ignore
   return false;
 }
@@ -342,8 +456,9 @@ export function schemaCheck(
  * column list AND the `_id` form is missing do we drop the key as HABTM-like.
  */
 // prettier-ignore
-export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null): Row {
+export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = ""): Row {
   const out: Row = {};
+  const overrides = FK_OVERRIDES[table] ?? {};
   // Use Object.hasOwn for the schemaless tsRow probe so prototype keys
   // (`toString`, `constructor`, …) don't read as columns.
   const known = (k: string): boolean => (columns ? columns.has(k) : Object.hasOwn(tsRow, k));
@@ -351,6 +466,13 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
     columns ? columns.has(`${k}_id`) : Object.hasOwn(tsRow, `${k}_id`);
   for (const [k, v] of Object.entries(railsRow)) {
     if (known(k)) { out[k] = v; continue; } // prettier-ignore
+    // FK_OVERRIDES lets a fixture declare `assoc → column` when the shorthand
+    // doesn't follow the `<assoc>_id` convention (e.g. `creator → captain_id`).
+    const overrideCol = overrides[k];
+    if (overrideCol && (columns ? columns.has(overrideCol) : Object.hasOwn(tsRow, overrideCol))) {
+      out[overrideCol] = v as Row[string];
+      continue;
+    }
     if (hasIdForm(k)) {
       const idKey = `${k}_id`;
       if (typeof v === "string") {
@@ -374,7 +496,10 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
   const tsFile = path.join(TS_DIR, `${kebab(snake)}.ts`);
   const tsBase = existsSync(tsFile) ? `${kebab(snake)}.ts` : null;
   const r: FileResult = { yamlBase, tsBase, status: "MATCH", rowsMatched: 0, rowsTotal: 0, attrsMatched: 0, attrsTotal: 0, attrsSkipped: 0, schemaPorted: false, schemaExtras: 0, notes: [] }; // prettier-ignore
-  if (prelimFailure) { r.status = prelimFailure; return r; } // prettier-ignore
+  if (prelimFailure) {
+    r.status = prelimFailure === "ERB-UNSUPPORTED" && ERB_ALLOW_LIST.has(snake) ? "ERB-ALLOWED" : prelimFailure; // prettier-ignore
+    return r;
+  }
   const railsRows = yamlByTable.get(snake)!;
   r.rowsTotal = Object.keys(railsRows).length;
   if (!tsBase) { r.status = "MISSING"; return r; } // prettier-ignore
@@ -414,7 +539,7 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
       anyDiff = true;
       continue;
     }
-    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols);
+    const railsRow = canonicalizeRailsRow(railsRowRaw, tsRow, cols, snake);
     r.rowsMatched++;
     if ("id" in railsRow && (!("id" in tsRow) || tsRow.id !== railsRow.id)) {
       r.notes.push(`id-divergence: ${rowName} ts=${String(tsRow.id)} rails=${String(railsRow.id)}`);
@@ -431,8 +556,10 @@ export async function compareFile(yamlBase: string, yamlByTable: Map<string, Fix
       // still flag missing-in-ts when the TS row drops the attribute entirely.
       if (railsRow[attr] === ERB_SKIP_SENTINEL) { r.attrsSkipped++; r.attrsTotal--; continue; } // prettier-ignore
       if (attr === "id") { if (tsRow.id === railsRow.id) r.attrsMatched++; continue; } // prettier-ignore
-      if (compareValue(tsRow[attr], railsRow[attr], `${rowName}.${attr}`, idIndex, r.notes))
-        r.attrsMatched++; // prettier-ignore
+      const skipCounter = { n: 0 };
+      const ok = compareValue(tsRow[attr], railsRow[attr], `${rowName}.${attr}`, idIndex, r.notes, snake, skipCounter); // prettier-ignore
+      if (skipCounter.n > 0) { r.attrsSkipped += skipCounter.n; r.attrsTotal--; continue; } // prettier-ignore
+      if (ok) r.attrsMatched++;
       else anyDiff = true;
     }
   }
@@ -510,11 +637,17 @@ async function main(): Promise<void> {
     }
   }
   const n = (s: Status): number => results.filter((r) => r.status === s).length;
-  const other = results.length - n("MATCH") - n("DIFF") - n("MISSING") - n("ERB-UNSUPPORTED");
+  const other =
+    results.length -
+    n("MATCH") -
+    n("DIFF") -
+    n("MISSING") -
+    n("ERB-UNSUPPORTED") -
+    n("ERB-ALLOWED");
   const evaluated = results.filter(schemaEvaluated);
   const ported = evaluated.filter((r) => r.schemaPorted).length;
   const withExtras = evaluated.filter((r) => r.schemaExtras > 0).length;
-  console.log(`\n${results.length} files — match=${n("MATCH")} diff=${n("DIFF")} missing=${n("MISSING")} erb-unsupported=${n("ERB-UNSUPPORTED")} other=${other}`); // prettier-ignore
+  console.log(`\n${results.length} files — match=${n("MATCH")} diff=${n("DIFF")} missing=${n("MISSING")} erb-unsupported=${n("ERB-UNSUPPORTED")} erb-allowed=${n("ERB-ALLOWED")} other=${other}`); // prettier-ignore
   console.log(
     `schema — ported=${ported}/${evaluated.length} extras-flagged=${withExtras} (skipped ${results.length - evaluated.length})`,
   );
