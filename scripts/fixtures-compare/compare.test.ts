@@ -384,11 +384,12 @@ describe("datetime / serialized-YAML tolerance", () => {
     // typically still carries the string form.
     expect(cmp("2003-07-16 14:28:11", new Date("2003-07-16T14:28:11Z"))[0]).toBe(true);
   });
-  it("normalizes yaml-lib's lowercase `t` separator to uppercase (spec ISO 8601)", () => {
-    // V8 tolerates `2003-07-16t14:28:11Z` today, but Date.parse for
+  it("normalizes yaml-lib's lowercase `t`/`z` separators to uppercase (spec ISO 8601)", () => {
+    // V8 tolerates `2003-07-16t14:28:11z` today, but Date.parse for
     // non-standard variants is engine-defined and stricter runtimes
     // (deno/spec'd) can return NaN. Pin the normalization.
     expect(cmp("2003-07-16 14:28:11", "2003-07-16t14:28:11Z")[0]).toBe(true);
+    expect(cmp("2003-07-16 14:28:11", "2003-07-16T14:28:11z")[0]).toBe(true);
   });
   it("handles bare date-only scalars (YYYY-MM-DD) as midnight UTC, not as NaN", () => {
     // Regression: appending `Z` to a date-only string produces invalid ISO

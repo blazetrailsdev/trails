@@ -28,7 +28,11 @@ type Status = "MATCH" | "MISSING" | "DIFF" | "ERB-UNSUPPORTED" | "ERB-ALLOWED" |
 // them as expected gaps rather than failures. Per docs/fixtures-port-plan.md
 // — the TS side is the source of truth for these tables (rows expanded
 // statically, with the original ERB intent preserved in a header comment).
-export const ERB_ALLOW_LIST = new Set<string>(["mixins", "paragraphs", "citations"]);
+export const ERB_ALLOW_LIST: ReadonlySet<string> = new Set<string>([
+  "mixins",
+  "paragraphs",
+  "citations",
+]);
 
 // Per-table assoc-shorthand → FK-column override map. Mirrors Rails
 // `fixtures.rb#replace_belongs_to_keys`, which rewrites `pirate: blackbeard`
@@ -288,10 +292,13 @@ function normalizeDatetime(v: unknown): number | null {
   // and the comparison would be host-dependent. Date-only scalars
   // (`YYYY-MM-DD`) get midnight-UTC so `Date.parse` doesn't choke on the
   // bare `YYYY-MM-DDZ` shape it considers invalid.
-  // ISO 8601 mandates an uppercase `T`, but yaml-lib's !!timestamp output
-  // uses lowercase `t`. V8 accepts both today; spec'd JS engines and
-  // stricter runtimes can return NaN. Normalize both space and `t` here.
-  let iso = v.replace(" ", "T").replace(/(\d)t(\d)/, "$1T$2");
+  // ISO 8601 mandates uppercase `T` and `Z`, but yaml-lib's !!timestamp
+  // output uses lowercase. V8 accepts both today; spec'd JS engines and
+  // stricter runtimes can return NaN. Normalize both separators here.
+  let iso = v
+    .replace(" ", "T")
+    .replace(/(\d)t(\d)/, "$1T$2")
+    .replace(/z$/, "Z");
   // Date-only check is strict (must be exactly `YYYY-MM-DD`) so lowercase
   // `t` separators from `yaml` lib's !!timestamp output aren't mistaken
   // for date-only and double-appended.
@@ -479,7 +486,7 @@ export function schemaCheck(
 // prettier-ignore
 export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<string> | null, table: string = ""): Row {
   const out: Row = {};
-  const overrides = FK_OVERRIDES[table] ?? {};
+  const overrides: Readonly<Record<string, string>> = FK_OVERRIDES[table] ?? {};
   // Use Object.hasOwn for the schemaless tsRow probe so prototype keys
   // (`toString`, `constructor`, …) don't read as columns.
   const known = (k: string): boolean => (columns ? columns.has(k) : Object.hasOwn(tsRow, k));
