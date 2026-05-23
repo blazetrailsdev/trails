@@ -934,7 +934,9 @@ export class Mapper {
     const isRedirect = redirectEndpoint !== undefined || redirectTarget !== undefined;
     const [parsedController, action] = isRedirect ? ["", ""] : parseEndpoint(endpoint);
     let controller = parsedController;
-    if (scopeModulePrefix && controller && !controller.includes("/")) {
+    if (!isRedirect && scopeModulePrefix && !controller) {
+      controller = scopeModulePrefix;
+    } else if (scopeModulePrefix && controller && !controller.includes("/")) {
       controller = scopeModulePrefix + "/" + controller;
     }
     const name = options.as ?? options.name;
