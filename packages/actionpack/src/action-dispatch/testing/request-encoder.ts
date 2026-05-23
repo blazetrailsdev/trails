@@ -41,14 +41,13 @@ export class RequestEncoder {
     paramEncoder: ParamEncoder | null,
     responseParser: ResponseParser | null,
   ) {
-    const mime = MimeType.lookup(mimeName);
-    if (!mime) {
+    if (!MimeType.isRegistered(mimeName)) {
       throw new Error(
         `Can't register a request encoder for unregistered MIME Type: ${mimeName}. ` +
           `See \`MimeType.register\`.`,
       );
     }
-    this._mime = mime;
+    this._mime = MimeType.lookup(mimeName);
     this.responseParser = responseParser ?? ((body) => body);
     this._paramEncoder = paramEncoder ?? ((params) => params);
   }
@@ -67,7 +66,10 @@ export class RequestEncoder {
   }
 
   static parser(contentType: string | undefined): ResponseParser {
-    const type = contentType ? MimeType.lookup(contentType)?.symbol : undefined;
+    const type =
+      contentType && MimeType.isRegistered(contentType)
+        ? MimeType.lookup(contentType).symbol
+        : undefined;
     return RequestEncoder.encoder(type).responseParser;
   }
 

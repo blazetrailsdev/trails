@@ -61,7 +61,7 @@ export class PublicExceptions {
 
   private firstFormat(env: RackEnv): MimeType | undefined {
     const accept = String(env["HTTP_ACCEPT"] ?? "").trim();
-    if (accept === "") return MimeType.lookup("html");
+    if (accept === "") return MimeType.lookupByExtension("html");
     const parsed = MimeType.parse(accept);
     return parsed[0];
   }
@@ -111,7 +111,7 @@ export class PublicExceptions {
 
     if (found && file != null) {
       const html = getFs().readFileSync(file, "utf8");
-      const htmlType = MimeType.lookup("html") ?? new MimeType("text/html", "html");
+      const htmlType = MimeType.lookupByExtension("html") ?? MimeType.lookup("text/html");
       return this.renderFormat(status, htmlType, html);
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];

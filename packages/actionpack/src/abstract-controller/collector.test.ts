@@ -48,7 +48,7 @@ describe("TestCollector", () => {
       c.js();
       expect("js" in c).toBe(true);
     } finally {
-      if (!MimeType.lookup("js")) {
+      if (!MimeType.isRegistered("js")) {
         MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
       }
     }
@@ -109,7 +109,7 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     const c = new TestCollector() as TestCollector & {
       latefmt?: (...args: unknown[]) => unknown;
     };
-    expect(MimeType.lookup("latefmt")).toBeUndefined();
+    expect(MimeType.isRegistered("latefmt")).toBe(false);
     MimeType.register("application/latefmt", "latefmt");
     try {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");

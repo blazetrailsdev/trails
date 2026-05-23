@@ -75,11 +75,10 @@ export function sendFileHeadersBang(
   if (typeProvided && !contentType.includes("/")) {
     // String matches the Mime symbol shape (e.g. "json"). Mirror
     // Rails' `Mime[content_type]` lookup and reject unknown keys.
-    const resolved = MimeType.lookup(contentType);
-    if (!resolved) {
+    if (!MimeType.isRegistered(contentType)) {
       throw new TypeError(`Unknown MIME type ${String(options.type)}`);
     }
-    contentType = resolved.toString();
+    contentType = MimeType.lookup(contentType).toString();
   } else if (!typeProvided && options.filename) {
     // Guess from extension when caller didn't pin a type.
     const ext = getPath().extname(options.filename).toLowerCase().replace(/^\./, "");

@@ -59,25 +59,25 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
     if (RESERVED_KEYS.has(prop)) return undefined;
     if (typeof prop !== "string") return undefined;
-    const mime = MimeType.lookup(prop);
-    if (mime) {
-      // Bind `this` inside custom() to the Proxy receiver, not the raw
-      // target — otherwise property access inside custom() would bypass
-      // this proxy and miss the MIME dispatch / shadowing rules. Mirrors
-      // how `format.html(...)` and `format.custom(...)` should resolve
-      // the same `this` for subclasses.
-      return (...args: unknown[]): unknown => {
-        const fn = Reflect.get(target, "custom", receiver) as Collector["custom"];
-        return fn.call(receiver, mime, ...args);
+    if (!MimeType.isRegistered(prop)) {
+      // Unknown format — mirror Rails' NoMethodError message so callers
+      // who try `format.fakemime { … }` get a useful hint.
+      return (): never => {
+        throw new TypeError(
+          `To respond to a custom format, register it as a MIME type first. ` +
+            `Unknown format: ${prop}`,
+        );
       };
     }
-    // Unknown format — mirror Rails' NoMethodError message so callers
-    // who try `format.fakemime { … }` get a useful hint.
-    return (): never => {
-      throw new TypeError(
-        `To respond to a custom format, register it as a MIME type first. ` +
-          `Unknown format: ${prop}`,
-      );
+    const mime = MimeType.lookup(prop);
+    // Bind `this` inside custom() to the Proxy receiver, not the raw
+    // target — otherwise property access inside custom() would bypass
+    // this proxy and miss the MIME dispatch / shadowing rules. Mirrors
+    // how `format.html(...)` and `format.custom(...)` should resolve
+    // the same `this` for subclasses.
+    return (...args: unknown[]): unknown => {
+      const fn = Reflect.get(target, "custom", receiver) as Collector["custom"];
+      return fn.call(receiver, mime, ...args);
     };
   },
 
@@ -87,7 +87,7 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     // these keys, has must report false even when a MIME type is
     // registered under a colliding symbol.
     if (RESERVED_KEYS.has(prop)) return false;
-    return typeof prop === "string" && MimeType.lookup(prop) !== undefined;
+    return typeof prop === "string" && MimeType.isRegistered(prop);
   },
 };
 
@@ -98,12 +98,12 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
  * a no-op for us — the Proxy already picks up any MIME registered later.
  * Kept as a Rails-named entry point so `api:compare` matches and so
  * `MimeType.register_callback`-style wiring has a target to call. The
- * mime arg is validated (lookup must succeed) to surface typos early.
+ * mime arg is validated via `MimeType.isRegistered` to surface typos early.
  *
  * @internal
  */
 export function generateMethodForMime(mime: MimeType | string): void {
-  if (typeof mime === "string" && !MimeType.lookup(mime)) {
+  if (typeof mime === "string" && !MimeType.isRegistered(mime)) {
     throw new TypeError(`generateMethodForMime: unknown MIME ${JSON.stringify(mime)}`);
   }
 }
