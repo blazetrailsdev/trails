@@ -11,7 +11,7 @@
  * via `field.string()` and dispatches to the matching parser.
  *
  * Precondition: the connection's `@@session.time_zone` must be `'+00:00'`
- * (enforced via pool.on('connection') in Mysql2Adapter.newClient). Without
+ * (enforced via the init SQL run in Mysql2Adapter._createClient). Without
  * this, TIMESTAMP strings arrive in the server's session timezone and
  * parseMysqlInstant would produce wrong instants.
  *

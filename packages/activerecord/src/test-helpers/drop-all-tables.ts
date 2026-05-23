@@ -46,49 +46,35 @@ async function dropAllPgTables(adapter: DatabaseAdapter): Promise<void> {
 }
 
 async function dropAllMysqlTables(adapter: DatabaseAdapter): Promise<void> {
-  const driverPool = (adapter as any)._driverPool;
-  if (!driverPool) return;
-  const conn = await driverPool.getConnection();
-  let restored = false;
+  // Works with both the legacy pool model (_driverPool) and the current
+  // single-connection model (_client). Falls back to adapter.execute /
+  // adapter.executeMutation so both paths share one implementation.
   try {
-    await conn.query(`SET FOREIGN_KEY_CHECKS=0`);
-    const [tableRows] = (await conn.query(
+    await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
+    const tableRows = await adapter.execute(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-    )) as [Array<{ table_name?: string; TABLE_NAME?: string }>, unknown];
-    const [viewRows] = (await conn.query(
+    );
+    const viewRows = await adapter.execute(
       `SELECT table_name FROM information_schema.views WHERE table_schema = DATABASE()`,
-    )) as [Array<{ table_name?: string; TABLE_NAME?: string }>, unknown];
-    for (const r of viewRows) {
+    );
+    for (const r of viewRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
       if (name)
         try {
-          await conn.query(`DROP VIEW IF EXISTS \`${name}\``);
+          await adapter.executeMutation(`DROP VIEW IF EXISTS \`${name}\``);
         } catch {}
     }
-    for (const r of tableRows) {
+    for (const r of tableRows as Array<{ table_name?: string; TABLE_NAME?: string }>) {
       const name = r.table_name ?? r.TABLE_NAME;
       if (name)
         try {
-          await conn.query(`DROP TABLE IF EXISTS \`${name}\``);
+          await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
         } catch {}
     }
-    await conn.query(`SET FOREIGN_KEY_CHECKS=1`);
-    restored = true;
   } finally {
-    if (restored) {
-      conn.release();
-    } else {
-      // Connection state may be stale (FK_CHECKS=0). Destroy rather than release
-      // so the pool opens a fresh session.
-      try {
-        await conn.query(`SET FOREIGN_KEY_CHECKS=1`);
-        conn.release();
-      } catch {
-        try {
-          conn.destroy();
-        } catch {}
-      }
-    }
+    try {
+      await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
+    } catch {}
   }
 }
 
