@@ -127,6 +127,62 @@ describe("d1-migrate codemod", () => {
     expect(out).toEqual({ skip: expect.stringMatching(/Sidecar|Pooled/i) });
   });
 
+  it("transforms a describe-level adapter pattern", () => {
+    const before = `
+      import { createTestAdapter } from "./test-adapter.js";
+      import { defineSchema } from "./test-helpers/define-schema.js";
+      import type { TestDatabaseAdapter } from "./test-adapter.js";
+      describe("Foo", () => {
+        let adapter: TestDatabaseAdapter;
+        beforeAll(async () => {
+          adapter = createTestAdapter();
+          await defineSchema(adapter, { foos: { name: "string" } });
+        });
+        it("works", () => {});
+      });
+    `;
+    const abs = resolve(ROOT, "packages/activerecord/src/x.test.ts");
+    const out = migrateText(before, abs);
+    if (typeof out !== "string") throw new Error(`codemod skipped: ${out.skip}`);
+    expect(out).toContain("setupHandlerSuite()");
+    expect(out).toContain("useHandlerTransactionalFixtures()");
+    expect(out).toContain("defineSchema({ foos:");
+    expect(out).not.toContain("createTestAdapter");
+    expect(out).not.toContain("let adapter");
+    // helpers must be inserted inside the describe block, not at module scope
+    const describeIdx = out.indexOf('describe("Foo"');
+    const setupIdx = out.indexOf("setupHandlerSuite()");
+    const beforeAllIdx = out.indexOf("beforeAll(");
+    expect(describeIdx).toBeLessThan(setupIdx);
+    expect(setupIdx).toBeLessThan(beforeAllIdx);
+  });
+
+  it("removes afterAll(dropAllTables) in describe-level migration", () => {
+    const before = `
+      import { createTestAdapter } from "./test-adapter.js";
+      import { defineSchema } from "./test-helpers/define-schema.js";
+      import { dropAllTables } from "./test-helpers/drop-all-tables.js";
+      import type { TestDatabaseAdapter } from "./test-adapter.js";
+      describe("Bar", () => {
+        let adapter: TestDatabaseAdapter;
+        beforeAll(async () => {
+          adapter = createTestAdapter();
+          await defineSchema(adapter, { bars: { name: "string" } });
+        });
+        afterAll(async () => {
+          await dropAllTables(adapter);
+        });
+        it("works", () => {});
+      });
+    `;
+    const abs = resolve(ROOT, "packages/activerecord/src/x.test.ts");
+    const out = migrateText(before, abs);
+    if (typeof out !== "string") throw new Error(`codemod skipped: ${out.skip}`);
+    expect(out).toContain("useHandlerTransactionalFixtures()");
+    expect(out).not.toContain("dropAllTables");
+    expect(out).not.toContain("afterAll");
+  });
+
   it("skips files that call defineSchema inside it()", () => {
     const text = `
       import { createTestAdapter } from "./test-adapter.js";
