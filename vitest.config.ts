@@ -197,6 +197,7 @@ export default defineConfig({
             "scripts/fixtures-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
             "scripts/d1-migrate.test.ts",
+            "scripts/d1-migrate-sidecar.test.ts",
             "scripts/test-deps/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",

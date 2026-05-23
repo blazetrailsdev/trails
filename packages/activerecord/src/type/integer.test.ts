@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { createSidecarTestAdapter } from "../test-adapter.js";
+import { setupHandlerSuite } from "../test-helpers/setup-handler-suite.js";
+
+setupHandlerSuite();
 
 describe("IntegerTest", () => {
   it("casting ActiveRecord models", () => {
@@ -12,12 +14,10 @@ describe("IntegerTest", () => {
   });
 
   it("values which are out of range can be re-assigned", () => {
-    const { adapter } = createSidecarTestAdapter();
     class Post extends Base {
       static {
         this.tableName = "posts";
         this.attribute("foo", "integer");
-        this.adapter = adapter;
       }
     }
     const model = new Post();
