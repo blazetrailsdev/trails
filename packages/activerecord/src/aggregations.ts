@@ -66,7 +66,7 @@ export function composedOf(
     ),
   );
 
-  readerMethod(modelClass, name, options.mapping, options.className);
+  readerMethod(modelClass, name, options.mapping, options.className, options.constructorFn);
   writerMethod(modelClass, name, options.mapping, options.className, options.converter);
 }
 
@@ -79,6 +79,7 @@ function readerMethod(
   name: string,
   mapping: [string, string][],
   klass: new (...args: any[]) => any,
+  constructorFn?: (...args: any[]) => any,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
   Object.defineProperty(modelClass.prototype, name, {
@@ -88,7 +89,7 @@ function readerMethod(
       if (cache.has(name)) return cache.get(name);
       const args = mapping.map(([modelAttr]) => this.readAttribute(modelAttr));
       if (args.every((a) => a === null || a === undefined)) return null;
-      const obj = Object.freeze(new klass(...args));
+      const obj = Object.freeze(constructorFn ? constructorFn(...args) : new klass(...args));
       cache.set(name, obj);
       return obj;
     },

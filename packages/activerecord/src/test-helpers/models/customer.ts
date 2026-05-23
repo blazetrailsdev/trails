@@ -83,8 +83,12 @@ export class Fullname {
     this.last = last;
   }
 
-  toString(): string {
+  get toS(): string {
     return `${this.first} ${(this.last ?? "").toUpperCase()}`;
+  }
+
+  toString(): string {
+    return this.toS;
   }
 }
 
@@ -127,13 +131,13 @@ export class Customer extends Base {
     });
     composedOf(this, "fullname", {
       className: Fullname,
-      mapping: [["name", "toString"]],
+      mapping: [["name", "toS"]],
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
     composedOf(this, "fullnameNoConverter", {
       className: Fullname,
-      mapping: [["name", "toString"]],
+      mapping: [["name", "toS"]],
     });
   }
 }
