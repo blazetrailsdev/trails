@@ -286,40 +286,8 @@ function analyze(sf: SourceFile): PatternInfo | { skip: string } {
 function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): string[] {
   const details: string[] = [];
 
-  // 1) Rewrite imports.
-  // Remove ./test-adapter.js imports of createTestAdapter & TestDatabaseAdapter
-  for (const imp of sf.getImportDeclarations()) {
-    if (imp.getModuleSpecifierValue().endsWith("/test-adapter.js")) {
-      const named = imp.getNamedImports();
-      for (const n of [...named]) {
-        if (n.getName() === "createTestAdapter" || n.getName() === "TestDatabaseAdapter") {
-          n.remove();
-        }
-      }
-      if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) {
-        imp.remove();
-        details.push("removed empty test-adapter.js import");
-      }
-    }
-  }
-  // Remove ./adapter.js DatabaseAdapter import if unused elsewhere
-  for (const imp of [...sf.getImportDeclarations()]) {
-    if (imp.getModuleSpecifierValue().endsWith("/adapter.js")) {
-      const named = imp.getNamedImports();
-      for (const n of [...named]) {
-        if (n.getName() === "DatabaseAdapter") {
-          // Conservatively remove only if no remaining reference outside this import
-          const refs = sf
-            .getDescendantsOfKind(SyntaxKind.Identifier)
-            .filter((id) => id.getText() === "DatabaseAdapter" && id !== n.getNameNode());
-          if (refs.length === 0) n.remove();
-        }
-      }
-      if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) {
-        imp.remove();
-      }
-    }
-  }
+  // 1) Add new imports now; clean up stale imports AFTER beforeAll body is rewritten
+  // (so reference-counting reflects the post-transform state).
 
   // Add new imports if missing. The codemod no longer emits beforeAll/afterAll
   // teardown inline (that lives inside useHandlerTransactionalFixtures), nor
@@ -462,6 +430,38 @@ function transform(sf: SourceFile, info: PatternInfo, helpersRel: string): strin
       }
     }
   });
+
+  // Clean up stale imports now that beforeAll body has been rewritten.
+  // Removes createTestAdapter / TestDatabaseAdapter only when no references remain.
+  for (const imp of [...sf.getImportDeclarations()]) {
+    if (imp.getModuleSpecifierValue().endsWith("/test-adapter.js")) {
+      for (const n of [...imp.getNamedImports()]) {
+        const name = n.getName();
+        if (name !== "createTestAdapter" && name !== "TestDatabaseAdapter") continue;
+        const refs = sf
+          .getDescendantsOfKind(SyntaxKind.Identifier)
+          .filter((id) => id.getText() === name && id !== n.getNameNode());
+        if (refs.length === 0) n.remove();
+      }
+      if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) {
+        imp.remove();
+        details.push("removed empty test-adapter.js import");
+      }
+    }
+  }
+  // Remove ./adapter.js DatabaseAdapter import if unused elsewhere
+  for (const imp of [...sf.getImportDeclarations()]) {
+    if (imp.getModuleSpecifierValue().endsWith("/adapter.js")) {
+      for (const n of [...imp.getNamedImports()]) {
+        if (n.getName() !== "DatabaseAdapter") continue;
+        const refs = sf
+          .getDescendantsOfKind(SyntaxKind.Identifier)
+          .filter((id) => id.getText() === "DatabaseAdapter" && id !== n.getNameNode());
+        if (refs.length === 0) n.remove();
+      }
+      if (imp.getNamedImports().length === 0 && !imp.getDefaultImport()) imp.remove();
+    }
+  }
 
   return details;
 }
