@@ -150,11 +150,15 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 
   /**
-   * Derive the type column name from the association name, matching
-   * loadBelongsTo which reads `${underscore(assocName)}_type`.
+   * Derive the type column name. Returns `options.foreignType` when provided,
+   * otherwise falls back to `${underscore(assocName)}_type`. Mirrors the same
+   * logic in `loadBelongsTo` so reads and writes use the same column.
    */
   private foreignTypeName(): string {
-    return `${underscore(this.reflection.name)}_type`;
+    return (
+      (this.reflection.options.foreignType as string | undefined) ??
+      `${underscore(this.reflection.name)}_type`
+    );
   }
 
   /**
