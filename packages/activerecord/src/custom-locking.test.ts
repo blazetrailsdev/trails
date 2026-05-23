@@ -1,19 +1,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, {
+  await defineSchema({
     posts: { title: "string", lock_version: "integer" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("CustomLockingTest", () => {
   it("custom lock", async () => {
     class Post extends Base {
@@ -21,7 +18,6 @@ describe("CustomLockingTest", () => {
         this._tableName = "posts";
         this.attribute("title", "string");
         this.attribute("lock_version", "integer", { default: 0 });
-        this.adapter = adapter;
       }
     }
     const p = await Post.create({ title: "test" });

@@ -5,21 +5,17 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./index.js";
-
-import { createTestAdapter, type TestDatabaseAdapter } from "./test-adapter.js";
 import { defineSchema } from "./test-helpers/define-schema.js";
-import { withTransactionalFixtures } from "./test-helpers/with-transactional-fixtures.js";
+import { setupHandlerSuite } from "./test-helpers/setup-handler-suite.js";
+import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
-let adapter: TestDatabaseAdapter;
-
+setupHandlerSuite();
+useHandlerTransactionalFixtures();
 beforeAll(async () => {
-  adapter = createTestAdapter();
-  await defineSchema(adapter, {
+  await defineSchema({
     invoices: { amount: "integer", updated_at: "datetime", created_at: "datetime" },
   });
 });
-withTransactionalFixtures(() => adapter);
-
 describe("TouchLaterTest", () => {
   function makeTouchModel() {
     class Invoice extends Base {
@@ -28,7 +24,6 @@ describe("TouchLaterTest", () => {
         this.attribute("amount", "integer");
         this.attribute("updated_at", "datetime");
         this.attribute("created_at", "datetime");
-        this.adapter = adapter;
       }
     }
     return Invoice;
@@ -146,7 +141,6 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
         this._tableName = "invoices";
         this.attribute("amount", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const inv = await Invoice.create({ amount: 5 });
@@ -177,7 +171,6 @@ describe("touchDeferredAttributes delegates to timestampTouch with deferred time
         this._tableName = "invoices";
         this.attribute("amount", "integer");
         this.attribute("updated_at", "datetime");
-        this.adapter = adapter;
       }
     }
     const inv = await Invoice.create({ amount: 10 });
